@@ -1,16 +1,15 @@
 /*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
+Copyright © 2022
 */
 package cmd
 
 import (
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 )
-
-
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -48,4 +47,11 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-
+// Borrowed from go-tuf
+func parseExpires(e string) (time.Time, error) {
+	days, err := strconv.Atoi(e)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().AddDate(0, 0, days).UTC(), nil
+}
