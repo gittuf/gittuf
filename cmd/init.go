@@ -50,20 +50,7 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	var privKey tufdata.PrivateKey
-	privKeyData, err := os.ReadFile(privKeyPath)
-	if err != nil {
-		return err
-	}
-	/*
-		FIXME: Here, the assumption is that the key pair is in the
-		securesystemslib format. However, the default python-sslib format
-		does not contain the private and the public halves of the key in the
-		"private" field as go-tuf expects. So, while a keypair can be generated
-		using python-sslib, the public portion must be appended to the private
-		portion in the JSON representation.
-	*/
-	err = json.Unmarshal(privKeyData, &privKey)
+	privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(privKeyPath)
 	if err != nil {
 		return err
 	}
