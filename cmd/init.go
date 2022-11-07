@@ -55,6 +55,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	/*
+		FIXME: Here, the assumption is that the key pair is in the
+		securesystemslib format. However, the default python-sslib format
+		does not contain the private and the public halves of the key in the
+		"private" field as go-tuf expects. So, while a keypair can be generated
+		using python-sslib, the public portion must be appended to the private
+		portion in the JSON representation.
+	*/
 	err = json.Unmarshal(privKeyData, &privKey)
 	if err != nil {
 		return err
