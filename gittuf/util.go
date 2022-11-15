@@ -51,6 +51,31 @@ func LoadEd25519PrivateKeyFromSslib(path string) (tufdata.PrivateKey, error) {
 	return privKey, nil
 }
 
+func GetEd25519PublicKeyFromPrivateKey(privKey *tufdata.PrivateKey) (tufdata.PublicKey, error) {
+	var keyValue KeyValue
+
+	err := json.Unmarshal(privKey.Value, &keyValue)
+	if err != nil {
+		return tufdata.PublicKey{}, err
+	}
+
+	newValue, err := json.Marshal(KeyValue{
+		Private: []byte{},
+		Public:  keyValue.Public,
+	})
+	if err != nil {
+		return tufdata.PublicKey{}, err
+	}
+
+	return tufdata.PublicKey{
+		Type:       privKey.Type,
+		Scheme:     privKey.Scheme,
+		Algorithms: privKey.Algorithms,
+		Value:      newValue,
+	}, nil
+
+}
+
 type KeyValue struct {
 	Private []byte `json:"private,omitempty"`
 	Public  []byte `json:"public,omitempty"`
