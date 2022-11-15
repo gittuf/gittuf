@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/adityasaky/gittuf/gittuf"
@@ -16,28 +17,46 @@ var initCmd = &cobra.Command{
 }
 
 var (
-	privKeyPath    string
-	expires        string
-	publicKeyPaths []string
+	rootPrivKeyPath    string
+	targetsPrivKeyPath string
+	rootExpires        string
+	targetsExpires     string
+	publicKeyPaths     []string
 )
 
 func init() {
 	rootCmd.AddCommand(initCmd)
 
 	initCmd.Flags().StringVarP(
-		&privKeyPath,
-		"private-key",
-		"k",
+		&rootPrivKeyPath,
+		"root-key",
+		"",
 		"",
 		"Path to private key that must be loaded for signing root metadata",
 	)
 
 	initCmd.Flags().StringVarP(
-		&expires,
-		"expires",
-		"e",
+		&targetsPrivKeyPath,
+		"targets-key",
 		"",
-		"Expiry for metadata in days",
+		"",
+		"Path to private key that must be loaded for signing targets metadata",
+	)
+
+	initCmd.Flags().StringVarP(
+		&rootExpires,
+		"root-expires",
+		"",
+		"",
+		"Expiry for root metadata in days",
+	)
+
+	initCmd.Flags().StringVarP(
+		&targetsExpires,
+		"targets-expires",
+		"",
+		"",
+		"Expiry for targets metadata in days",
 	)
 
 	initCmd.Flags().StringArrayVarP(
@@ -50,12 +69,23 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(privKeyPath)
+	rootPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(rootPrivKeyPath)
 	if err != nil {
 		return err
 	}
 
-	expiresTime, err := parseExpires(expires)
+	targetsPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(
+		targetsPrivKeyPath)
+	if err != nil {
+		return err
+	}
+
+	rootExpiresTime, err := parseExpires(rootExpires)
+	if err != nil {
+		return err
+	}
+
+	targetsExpiresTime, err := parseExpires(targetsExpires)
 	if err != nil {
 		return err
 	}
@@ -73,21 +103,37 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		publicKeys = append(publicKeys, pubKey)
 	}
+	rootPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(&rootPrivKey)
+	if err != nil {
+		return err
+	}
+	targetsPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(
+		&targetsPrivKey)
+	if err != nil {
+		return err
+	}
+	publicKeys = append(publicKeys, rootPubKey, targetsPubKey)
 
-	rootRoleMb, err := gittuf.Init(privKey, expiresTime, publicKeys)
+	roles, err := gittuf.Init(
+		rootPrivKey,
+		rootExpiresTime,
+		publicKeys,
+		targetsPrivKey,
+		targetsExpiresTime)
 	if err != nil {
 		return err
 	}
 
-	rootRoleJson, err := json.Marshal(rootRoleMb)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Embed in Git
-	err = os.WriteFile("root.json", rootRoleJson, 0644)
-	if err != nil {
-		return err
+	for k, v := range roles {
+		roleJson, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		// TODO: Embed in Git
+		err = os.WriteFile(fmt.Sprintf("%s.json", k), roleJson, 0644)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -10,18 +10,44 @@ import (
 	tufsign "github.com/theupdateframework/go-tuf/sign"
 )
 
-func Init(rootKey tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKey) (tufdata.Signed, error) {
-	cmd := exec.Command("git", "init")
+func Init(
+	rootKey tufdata.PrivateKey,
+	rootExpires time.Time,
+	keys []tufdata.PublicKey,
+	targetsKey tufdata.PrivateKey,
+	targetsExpires time.Time) (map[string]tufdata.Signed, error) {
+	roles := map[string]tufdata.Signed{}
 
+	cmd := exec.Command("git", "init")
 	err := cmd.Run()
 	if err != nil {
-		return tufdata.Signed{}, err
+		return roles, err
 	}
 
+	rootRole, err := initRoot(rootKey, rootExpires, keys)
+	if err != nil {
+		return roles, err
+	}
+	roles["root"] = rootRole
+
+	targetsRole, err := initTargets(targetsKey, targetsExpires)
+	if err != nil {
+		return roles, err
+	}
+	roles["targets"] = targetsRole
+
+	return roles, nil
+}
+
+func initRoot(key tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKey) (tufdata.Signed, error) {
 	rootRole := tufdata.NewRoot()
+
 	if !expires.IsZero() {
 		rootRole.Expires = expires
 	}
+
+	rootRole.Version = 1
+
 	for _, k := range keys {
 		rootRole.AddKey(&k)
 	}
@@ -36,11 +62,39 @@ func Init(rootKey tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKe
 		Signatures: []tufdata.Signature{},
 	}
 
-	signer, err := tufkeys.GetSigner(&rootKey)
+	signer, err := tufkeys.GetSigner(&key)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
 	tufsign.Sign(&rootRoleMb, signer)
 
 	return rootRoleMb, nil
+}
+
+func initTargets(key tufdata.PrivateKey, expires time.Time) (tufdata.Signed, error) {
+	targetsRole := tufdata.NewTargets()
+
+	if !expires.IsZero() {
+		targetsRole.Expires = expires
+	}
+
+	targetsRole.Version = 1
+
+	targetsRoleJson, err := json.Marshal(targetsRole)
+	if err != nil {
+		return tufdata.Signed{}, err
+	}
+
+	targetsRoleMb := tufdata.Signed{
+		Signed:     targetsRoleJson,
+		Signatures: []tufdata.Signature{},
+	}
+
+	signer, err := tufkeys.GetSigner(&key)
+	if err != nil {
+		return tufdata.Signed{}, err
+	}
+	tufsign.Sign(&targetsRoleMb, signer)
+
+	return targetsRoleMb, nil
 }
