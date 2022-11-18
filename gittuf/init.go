@@ -49,7 +49,19 @@ func initRoot(key tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKe
 	rootRole.Version = 1
 
 	for _, k := range keys {
-		rootRole.AddKey(&k)
+		/*
+			 FIXME:
+				tufdata.Root.Keys is of type map[string]*tufdata.PublicKey
+				and passing &k in directly will result in the last public key in
+				the slice being associated with each entry.
+		*/
+		tmpKey := tufdata.PublicKey{
+			Type:       k.Type,
+			Algorithms: k.Algorithms,
+			Value:      k.Value,
+			Scheme:     k.Scheme,
+		}
+		rootRole.AddKey(&tmpKey)
 	}
 
 	rootRoleJson, err := json.Marshal(rootRole)
