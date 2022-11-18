@@ -14,7 +14,8 @@ func Init(
 	rootKey tufdata.PrivateKey,
 	rootExpires time.Time,
 	keys []tufdata.PublicKey,
-	targetsKey tufdata.PrivateKey,
+	targetsPubKey tufdata.PublicKey,
+	targetsPrivKey tufdata.PrivateKey,
 	targetsExpires time.Time) (map[string]tufdata.Signed, error) {
 	roles := map[string]tufdata.Signed{}
 
@@ -24,13 +25,13 @@ func Init(
 		return roles, err
 	}
 
-	rootRole, err := initRoot(rootKey, rootExpires, keys)
+	rootRole, err := initRoot(rootKey, rootExpires, keys, targetsPubKey)
 	if err != nil {
 		return roles, err
 	}
 	roles["root"] = rootRole
 
-	targetsRole, err := initTargets(targetsKey, targetsExpires)
+	targetsRole, err := initTargets(targetsPrivKey, targetsExpires)
 	if err != nil {
 		return roles, err
 	}
@@ -39,7 +40,11 @@ func Init(
 	return roles, nil
 }
 
-func initRoot(key tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKey) (tufdata.Signed, error) {
+func initRoot(
+	key tufdata.PrivateKey,
+	expires time.Time,
+	keys []tufdata.PublicKey,
+	targetsPubKey tufdata.PublicKey) (tufdata.Signed, error) {
 	rootRole := tufdata.NewRoot()
 
 	if !expires.IsZero() {
@@ -63,6 +68,12 @@ func initRoot(key tufdata.PrivateKey, expires time.Time, keys []tufdata.PublicKe
 		}
 		rootRole.AddKey(&tmpKey)
 	}
+
+	targetsRole := tufdata.Role{
+		KeyIDs:    targetsPubKey.IDs(),
+		Threshold: 1,
+	}
+	rootRole.Roles["targets"] = &targetsRole
 
 	rootRoleJson, err := json.Marshal(rootRole)
 	if err != nil {

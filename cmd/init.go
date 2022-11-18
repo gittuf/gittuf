@@ -24,6 +24,8 @@ var (
 	publicKeyPaths     []string
 )
 
+var METADATADIR = "../metadata" // TODO: Embed in Git
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 
@@ -118,6 +120,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		rootPrivKey,
 		rootExpiresTime,
 		publicKeys,
+		targetsPubKey,
 		targetsPrivKey,
 		targetsExpiresTime)
 	if err != nil {
@@ -130,7 +133,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		// TODO: Embed in Git
-		err = os.WriteFile(fmt.Sprintf("%s.json", k), roleJson, 0644)
+		err = os.WriteFile(fmt.Sprintf("%s/%s.json", METADATADIR, k), roleJson, 0644)
 		if err != nil {
 			return err
 		}
