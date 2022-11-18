@@ -27,8 +27,6 @@ var (
 	targetsThreshold    int
 )
 
-var METADATADIR = "../metadata" // TODO: Embed in Git
-
 func init() {
 	rootCmd.AddCommand(initCmd)
 
@@ -148,7 +146,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		// TODO: Embed in Git
 		err = os.WriteFile(
-			fmt.Sprintf("%s%s%s.json", METADATADIR, string(filepath.Separator), k),
+			fmt.Sprintf("%s%s%s.json", gittuf.METADATADIR, string(filepath.Separator), k),
 			roleJson,
 			0644)
 		if err != nil {

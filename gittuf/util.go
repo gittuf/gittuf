@@ -8,6 +8,22 @@ import (
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
+var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
+
+func LoadEd25519PublicKeyFromSslib(path string) (tufdata.PublicKey, error) {
+	var pubKey tufdata.PublicKey
+	pubKeyData, err := os.ReadFile(path)
+	if err != nil {
+		return tufdata.PublicKey{}, err
+	}
+	err = json.Unmarshal(pubKeyData, &pubKey)
+	if err != nil {
+		return tufdata.PublicKey{}, err
+	}
+
+	return pubKey, nil
+}
+
 func LoadEd25519PrivateKeyFromSslib(path string) (tufdata.PrivateKey, error) {
 	var privKey tufdata.PrivateKey
 	privKeyData, err := os.ReadFile(path)
