@@ -19,8 +19,6 @@ var newRuleCmd = &cobra.Command{
 }
 
 var (
-	role            string
-	roleKeyPaths    []string
 	ruleName        string
 	ruleThreshold   int
 	ruleTerminating bool
