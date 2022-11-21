@@ -112,7 +112,10 @@ func initRoot(
 		if err != nil {
 			return tufdata.Signed{}, err
 		}
-		tufsign.Sign(&rootRoleMb, signer)
+		err = tufsign.Sign(&rootRoleMb, signer)
+		if err != nil {
+			return tufdata.Signed{}, err
+		}
 	}
 
 	return rootRoleMb, nil
@@ -145,7 +148,10 @@ func initTargets(
 		if err != nil {
 			return tufdata.Signed{}, err
 		}
-		tufsign.Sign(&targetsRoleMb, signer)
+		err = tufsign.Sign(&targetsRoleMb, signer)
+		if err != nil {
+			return tufdata.Signed{}, err
+		}
 	}
 
 	return targetsRoleMb, nil
