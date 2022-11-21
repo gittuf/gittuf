@@ -14,6 +14,7 @@ var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a Git repository with TUF support",
 	RunE:  runInit,
+	// FIXME: Add validations using PreRunE
 }
 
 var (
