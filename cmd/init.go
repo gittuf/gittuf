@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/adityasaky/gittuf/gittuf"
 	"github.com/spf13/cobra"
@@ -147,7 +148,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		// TODO: Embed in Git
 		err = os.WriteFile(
-			fmt.Sprintf("%s/%s.json", METADATADIR, k),
+			fmt.Sprintf("%s%s%s.json", METADATADIR, string(filepath.Separator), k),
 			roleJson,
 			0644)
 		if err != nil {
