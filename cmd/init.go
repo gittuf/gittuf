@@ -17,11 +17,12 @@ var initCmd = &cobra.Command{
 }
 
 var (
-	rootPrivKeyPath    string
-	targetsPrivKeyPath string
-	rootExpires        string
-	targetsExpires     string
-	publicKeyPaths     []string
+	rootPrivKeyPaths    []string
+	targetsPrivKeyPaths []string
+	rootExpires         string
+	targetsExpires      string
+	rootThreshold       int
+	targetsThreshold    int
 )
 
 var METADATADIR = "../metadata" // TODO: Embed in Git
@@ -29,19 +30,19 @@ var METADATADIR = "../metadata" // TODO: Embed in Git
 func init() {
 	rootCmd.AddCommand(initCmd)
 
-	initCmd.Flags().StringVarP(
-		&rootPrivKeyPath,
+	initCmd.Flags().StringArrayVarP(
+		&rootPrivKeyPaths,
 		"root-key",
 		"",
-		"",
+		[]string{},
 		"Path to private key that must be loaded for signing root metadata",
 	)
 
-	initCmd.Flags().StringVarP(
-		&targetsPrivKeyPath,
+	initCmd.Flags().StringArrayVarP(
+		&targetsPrivKeyPaths,
 		"targets-key",
 		"",
-		"",
+		[]string{},
 		"Path to private key that must be loaded for signing targets metadata",
 	)
 
@@ -61,25 +62,40 @@ func init() {
 		"Expiry for targets metadata in days",
 	)
 
-	initCmd.Flags().StringArrayVarP(
-		&publicKeyPaths,
-		"public-keys",
+	initCmd.Flags().IntVarP(
+		&rootThreshold,
+		"root-threshold",
 		"",
-		[]string{},
-		"Public keys to be added to metadata",
+		1,
+		"Threshold of signatures needed for root role",
+	)
+
+	initCmd.Flags().IntVarP(
+		&targetsThreshold,
+		"targets-threshold",
+		"",
+		1,
+		"Threshold of signatures needed for targets role",
 	)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	rootPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(rootPrivKeyPath)
-	if err != nil {
-		return err
+	var rootPrivKeys []tufdata.PrivateKey
+	for _, p := range rootPrivKeyPaths {
+		rootPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(p)
+		if err != nil {
+			return err
+		}
+		rootPrivKeys = append(rootPrivKeys, rootPrivKey)
 	}
 
-	targetsPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(
-		targetsPrivKeyPath)
-	if err != nil {
-		return err
+	var targetsPrivKeys []tufdata.PrivateKey
+	for _, p := range targetsPrivKeyPaths {
+		targetsPrivKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(p)
+		if err != nil {
+			return err
+		}
+		targetsPrivKeys = append(targetsPrivKeys, targetsPrivKey)
 	}
 
 	rootExpiresTime, err := parseExpires(rootExpires)
@@ -92,37 +108,33 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var publicKeys []tufdata.PublicKey
-	for _, publicKeyPath := range publicKeyPaths {
-		var pubKey tufdata.PublicKey
-		pubKeyData, err := os.ReadFile(publicKeyPath)
+	var rootPublicKeys []tufdata.PublicKey
+	for _, privKey := range rootPrivKeys {
+		rootPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(&privKey)
 		if err != nil {
 			return err
 		}
-		err = json.Unmarshal(pubKeyData, &pubKey)
+		rootPublicKeys = append(rootPublicKeys, rootPubKey)
+	}
+
+	var targetsPublicKeys []tufdata.PublicKey
+	for _, privKey := range targetsPrivKeys {
+		targetsPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(&privKey)
 		if err != nil {
 			return err
 		}
-		publicKeys = append(publicKeys, pubKey)
+		targetsPublicKeys = append(targetsPublicKeys, targetsPubKey)
 	}
-	rootPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(&rootPrivKey)
-	if err != nil {
-		return err
-	}
-	targetsPubKey, err := gittuf.GetEd25519PublicKeyFromPrivateKey(
-		&targetsPrivKey)
-	if err != nil {
-		return err
-	}
-	publicKeys = append(publicKeys, rootPubKey, targetsPubKey)
 
 	roles, err := gittuf.Init(
-		rootPrivKey,
+		rootPrivKeys,
 		rootExpiresTime,
-		publicKeys,
-		targetsPubKey,
-		targetsPrivKey,
-		targetsExpiresTime)
+		rootThreshold,
+		rootPublicKeys,
+		targetsPublicKeys,
+		targetsPrivKeys,
+		targetsExpiresTime,
+		targetsThreshold)
 	if err != nil {
 		return err
 	}
@@ -133,7 +145,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		// TODO: Embed in Git
-		err = os.WriteFile(fmt.Sprintf("%s/%s.json", METADATADIR, k), roleJson, 0644)
+		err = os.WriteFile(
+			fmt.Sprintf("%s/%s.json", METADATADIR, k),
+			roleJson,
+			0644)
 		if err != nil {
 			return err
 		}
