@@ -8,17 +8,21 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "gittuf",
-	Short: "Making Git repositories more TUF",
+	PreRunE: preRoot,
+	Use:     "gittuf",
+	Short:   "Making Git repositories more TUF",
 	Long: `gittuf embeds TUF's access control semantics in a Git repository.
 The tool serves as a wrapper around Git, and a gittuf repository is compatible
 with existing Git tooling.`,
 }
+
+var verbosity string
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -39,6 +43,24 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	rootCmd.PersistentFlags().StringVarP(
+		&verbosity,
+		"verbose",
+		"v",
+		logrus.DebugLevel.String(),
+		"Verbosity level (debug, info, warn, error, fatal, panic)",
+	)
+}
+
+func preRoot(cmd *cobra.Command, args []string) error {
+	logrus.SetOutput(os.Stdout)
+	level, err := logrus.ParseLevel(verbosity)
+	if err != nil {
+		return err
+	}
+	logrus.SetLevel(level)
+	return nil
 }
 
 // Borrowed from go-tuf
