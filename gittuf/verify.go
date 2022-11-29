@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	tuftargets "github.com/theupdateframework/go-tuf/pkg/targets"
 	tufverify "github.com/theupdateframework/go-tuf/verify"
 )
@@ -14,18 +15,18 @@ import (
 /*
 Verify checks that a target has the hash specified in the TUF delegations tree.
 */
-func Verify(target string) error {
+func Verify(repo *gitstore.Repository, target string) error {
 	sha1Hash, err := getCurrentHash(target)
 	if err != nil {
 		return err
 	}
 
-	db, err := InitializeTopLevelDB()
+	db, err := InitializeTopLevelDB(repo)
 	if err != nil {
 		return err
 	}
 
-	topLevelTargets, err := loadTargetsRole("targets", db)
+	topLevelTargets, err := loadTargets(repo, "targets", db)
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func Verify(target string) error {
 		}
 
 		// TODO: Pass DB here
-		delegatedRole, err := loadTargetsRole(d.Delegatee.Name, d.DB)
+		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
 		if err != nil {
 			return err
 		}
@@ -81,10 +82,10 @@ func Verify(target string) error {
 	return nil
 }
 
-func InitializeTopLevelDB() (*tufverify.DB, error) {
+func InitializeTopLevelDB(repo *gitstore.Repository) (*tufverify.DB, error) {
 	db := tufverify.NewDB()
 
-	rootRole, err := loadRootRole("root")
+	rootRole, err := loadRoot(repo)
 	if err != nil {
 		return db, err
 	}
@@ -126,7 +127,7 @@ func getCurrentHash(target string) (string, error) {
 		}
 		currentHash = strings.Trim(stdout.String(), "\n")
 	} else {
-		// TODO: Implement hashing file in the repo
+		return "", fmt.Errorf("%s is not a Git object", target)
 	}
 	return currentHash, nil
 }

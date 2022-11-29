@@ -3,9 +3,10 @@ package gittuf
 import (
 	"crypto/ed25519"
 	"encoding/json"
-	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
+
+	"github.com/adityasaky/gittuf/internal/gitstore"
 
 	tufdata "github.com/theupdateframework/go-tuf/data"
 	tufkeys "github.com/theupdateframework/go-tuf/pkg/keys"
@@ -17,39 +18,34 @@ var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
 
 // FIXME: update load... methods to be generic of type
 
-func loadRootRole(roleName string) (tufdata.Root, error) {
+func loadRoot(repo *gitstore.Repository) (tufdata.Root, error) {
 	var role tufdata.Root
-	// TODO: Pass in pubkey and verify signature
-	// TODO: Update to handle metadata embedded in repo
-	roleJson, err := os.ReadFile(filepath.Join(METADATADIR, fmt.Sprintf("%s.json", roleName)))
+
+	roleBytes := repo.GetCurrentFileBytes("root.json")
+
+	var roleMb tufdata.Signed
+	err := json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
 		return role, err
 	}
 
-	var roleMb tufdata.Signed
-	err = json.Unmarshal(roleJson, &roleMb)
-	if err != nil {
-		return role, err
-	}
+	// FIXME: Activate sig verification
 
 	err = json.Unmarshal(roleMb.Signed, &role)
-	if err != nil {
-		return role, err
-	}
-
-	return role, nil
+	return role, err
 }
 
-func loadTargetsRole(roleName string, db *tufverify.DB) (tufdata.Targets, error) {
+func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (tufdata.Targets, error) {
 	var role tufdata.Targets
-	// TODO: Update to handle metadata embedded in repo
-	roleJson, err := os.ReadFile(filepath.Join(METADATADIR, fmt.Sprintf("%s.json", roleName)))
-	if err != nil {
-		return role, err
+
+	if !strings.HasPrefix(roleName, ".json") {
+		roleName = roleName + ".json"
 	}
 
+	roleBytes := repo.GetCurrentFileBytes(roleName)
+
 	var roleMb tufdata.Signed
-	err = json.Unmarshal(roleJson, &roleMb)
+	err := json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
 		return role, err
 	}
@@ -61,11 +57,7 @@ func loadTargetsRole(roleName string, db *tufverify.DB) (tufdata.Targets, error)
 	// }
 
 	err = json.Unmarshal(roleMb.Signed, &role)
-	if err != nil {
-		return role, err
-	}
-
-	return role, nil
+	return role, err
 }
 
 func LoadEd25519PublicKeyFromSslib(path string) (tufdata.PublicKey, error) {

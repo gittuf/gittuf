@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/adityasaky/gittuf/gittuf"
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	tufdata "github.com/theupdateframework/go-tuf/data"
@@ -41,6 +39,10 @@ func init() {
 }
 
 func runCommit(cmd *cobra.Command, args []string) error {
+	repo, err := gitstore.LoadRepository(".")
+	if err != nil {
+		return err
+	}
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {
 		logrus.Debug("Loading key from", k)
@@ -51,21 +53,17 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		roleKeys = append(roleKeys, privKey)
 	}
 
-	newRoleMb, err := gittuf.Commit(role, roleKeys, args...)
+	newRoleMb, err := gittuf.Commit(repo, role, roleKeys, args...)
 	if err != nil {
 		return err
 	}
 
-	newRoleJson, err := json.Marshal(newRoleMb)
+	// TODO: All commits after this should undo the commit
+
+	newRoleBytes, err := json.Marshal(newRoleMb)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(
-		fmt.Sprintf("%s%s%s.json", gittuf.METADATADIR, string(filepath.Separator), role),
-		newRoleJson,
-		0644,
-	)
-
-	return err
+	return repo.StageAndCommit(role+".json", newRoleBytes)
 }

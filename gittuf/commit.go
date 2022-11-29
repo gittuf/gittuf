@@ -8,12 +8,13 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/sirupsen/logrus"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 	//tuftargets "github.com/theupdateframework/go-tuf/pkg/targets"
 )
 
-func Commit(role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.Signed, error) {
+func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.Signed, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
 	cmd := exec.Command("git", "symbolic-ref", "HEAD")
@@ -29,7 +30,7 @@ func Commit(role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.
 	targetName := fmt.Sprintf("git:branch=%s", branchName)
 
 	// TODO: Verify staged files can be modified by specified role
-	verifyStagedFilesCanBeModified()
+	verifyStagedFilesCanBeModified(repo)
 
 	// Create a commit and get its identifier
 	commitID, err := createCommit(gitArgs)
@@ -44,11 +45,11 @@ func Commit(role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.
 	}
 
 	// Add entry to role
-	db, err := InitializeTopLevelDB()
+	db, err := InitializeTopLevelDB(repo)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
-	targetsRole, err := loadTargetsRole(role, db)
+	targetsRole, err := loadTargets(repo, role, db)
 	if err != nil {
 		if os.IsNotExist(err) {
 			targetsRole = *tufdata.NewTargets()
@@ -74,7 +75,7 @@ func Commit(role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.
 	return signedRoleMb, nil
 }
 
-func verifyStagedFilesCanBeModified() error {
+func verifyStagedFilesCanBeModified(repo *gitstore.Repository) error {
 	cmd := exec.Command("git", "diff", "--staged", "--name-only")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -84,7 +85,7 @@ func verifyStagedFilesCanBeModified() error {
 	}
 	stagedFilePaths := strings.Split(strings.Trim(stdout.String(), "\n"), "\n")
 
-	db, err := InitializeTopLevelDB()
+	db, err := InitializeTopLevelDB(repo)
 	if err != nil {
 		return err
 	}

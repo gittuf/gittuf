@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/adityasaky/gittuf/gittuf"
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -139,20 +137,20 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	metadata := map[string][]byte{}
+
 	for k, v := range roles {
-		roleJson, err := json.Marshal(v)
+		roleBytes, err := json.Marshal(v)
 		if err != nil {
 			return err
 		}
-		// TODO: Embed in Git
-		err = os.WriteFile(
-			fmt.Sprintf("%s%s%s.json", gittuf.METADATADIR, string(filepath.Separator), k),
-			roleJson,
-			0644)
-		if err != nil {
-			return err
-		}
+		metadata[k+".json"] = roleBytes
 	}
 
-	return nil
+	// TODO: Should we undo git init if this call fails?
+	repo, err := gitstore.InitRepository(".", metadata)
+	if err != nil {
+		return err
+	}
+	return repo.CommitHeldMetadata()
 }

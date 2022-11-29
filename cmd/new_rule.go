@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/adityasaky/gittuf/gittuf"
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -87,6 +85,11 @@ func init() {
 }
 
 func runNewRule(cmd *cobra.Command, args []string) error {
+	repo, err := gitstore.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {
 		privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(k)
@@ -105,22 +108,16 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		allowedKeys = append(allowedKeys, pubKey)
 	}
 
-	newRoleMb, err := gittuf.NewRule(role, roleKeys, ruleName, ruleThreshold,
+	newRoleMb, err := gittuf.NewRule(repo, role, roleKeys, ruleName, ruleThreshold,
 		ruleTerminating, protectPaths, allowedKeys)
 	if err != nil {
 		return err
 	}
 
-	newRoleJson, err := json.Marshal(newRoleMb)
+	newRoleBytes, err := json.Marshal(newRoleMb)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(
-		fmt.Sprintf("%s%s%s.json", gittuf.METADATADIR, string(filepath.Separator), role),
-		newRoleJson,
-		0644,
-	)
-
-	return err
+	return repo.StageAndCommit(role+".json", newRoleBytes)
 }

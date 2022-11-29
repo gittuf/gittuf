@@ -3,8 +3,8 @@ package gittuf
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+
+	"github.com/adityasaky/gittuf/internal/gitstore"
 
 	tufdata "github.com/theupdateframework/go-tuf/data"
 	tufkeys "github.com/theupdateframework/go-tuf/pkg/keys"
@@ -12,6 +12,7 @@ import (
 )
 
 func NewRule(
+	repo *gitstore.Repository,
 	role string,
 	roleKeys []tufdata.PrivateKey,
 	ruleName string,
@@ -20,27 +21,13 @@ func NewRule(
 	protectPaths []string,
 	allowedKeys []tufdata.PublicKey) (tufdata.Signed, error) {
 
-	_, err := os.Stat(
-		filepath.Join(METADATADIR, fmt.Sprintf("%s.json", ruleName)),
-	)
-	if !os.IsNotExist(err) {
-		// If the file doesn't exist, great!
-		// If we have a different error or nil, we return.
-		if err == nil {
-			return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
-		}
-		return tufdata.Signed{}, err
-	}
-
-	roleData, err := os.ReadFile(
-		filepath.Join(METADATADIR, fmt.Sprintf("%s.json", role)),
-	)
-	if err != nil {
-		return tufdata.Signed{}, err
+	if contents := repo.GetCurrentFileBytes(ruleName + ".json"); len(contents) > 0 {
+		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
 	}
 
 	var roleMb tufdata.Signed
-	err = json.Unmarshal(roleData, &roleMb)
+	roleData := repo.GetCurrentFileBytes(role + ".json")
+	err := json.Unmarshal(roleData, &roleMb)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
