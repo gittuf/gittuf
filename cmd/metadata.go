@@ -111,9 +111,7 @@ func runMetadataCat(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, n := range args {
-		if !strings.HasSuffix(n, ".json") {
-			n = n + ".json"
-		}
+		n = strings.TrimSuffix(n, ".json")
 		fmt.Println(repo.GetCurrentFileString(n))
 	}
 

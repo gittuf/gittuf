@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -73,14 +74,15 @@ func LoadRepository(repoRoot string) (*Repository, error) {
 	metadata := map[string][]byte{}
 	metadataIdentifiers := map[string]object.TreeEntry{}
 	for _, entry := range tree.Entries {
-		// FIXME: Assuming everything is a blob
+		// FIXME: Assuming everything is a blob and that all blobs are TUF metadata
 		_, contents, err := readBlob(repo, entry.Hash)
 		if err != nil {
 			return &Repository{}, err
 		}
 
-		metadataIdentifiers[entry.Name] = entry
-		metadata[entry.Name] = contents
+		roleName := getRoleName(entry.Name)
+		metadataIdentifiers[roleName] = entry
+		metadata[roleName] = contents
 	}
 
 	return &Repository{
@@ -95,7 +97,7 @@ func LoadRepository(repoRoot string) (*Repository, error) {
 
 type Repository struct {
 	// FIXME: We likely don't need the public Metadata field, it's added in-memory complexity
-	Metadata            map[string][]byte // filename: contents
+	Metadata            map[string][]byte // rolename: contents, rolename should NOT include extension
 	repository          *git.Repository
 	tip                 plumbing.Hash
 	tree                plumbing.Hash
@@ -115,27 +117,27 @@ func (r *Repository) Written() bool {
 	return r.written
 }
 
-func (r *Repository) GetCurrentFileBytes(name string) []byte {
-	return r.Metadata[name]
+func (r *Repository) GetCurrentFileBytes(roleName string) []byte {
+	return r.Metadata[roleName]
 }
 
-func (r *Repository) GetCurrentFileString(name string) string {
-	return string(r.Metadata[name])
+func (r *Repository) GetCurrentFileString(roleName string) string {
+	return string(r.Metadata[roleName])
 }
 
-func (r *Repository) Stage(name string, contents []byte) {
-	r.Metadata[name] = contents
+func (r *Repository) Stage(roleName string, contents []byte) {
+	r.Metadata[roleName] = contents
 	r.written = false
 }
 
-func (r *Repository) StageAndCommit(name string, contents []byte) error {
-	r.Stage(name, contents)
+func (r *Repository) StageAndCommit(roleName string, contents []byte) error {
+	r.Stage(roleName, contents)
 	return r.CommitHeldMetadata()
 }
 
 func (r *Repository) StageMultiple(metadata map[string][]byte) {
-	for name, contents := range metadata {
-		r.Stage(name, contents)
+	for roleName, contents := range metadata {
+		r.Stage(roleName, contents)
 	}
 }
 
@@ -148,17 +150,17 @@ func (r *Repository) CommitHeldMetadata() error {
 	currentEntries := make([]object.TreeEntry, 0, len(r.Metadata))
 
 	// Write held blobs
-	for metadata, contents := range r.Metadata {
+	for roleName, contents := range r.Metadata {
 		identifier, err := writeBlob(r.repository, contents)
 		if err != nil {
 			return err
 		}
 		entry := object.TreeEntry{
-			Name: metadata,
+			Name: fmt.Sprintf("%s.json", roleName),
 			Mode: 0644,
 			Hash: identifier,
 		}
-		r.metadataIdentifiers[metadata] = entry
+		r.metadataIdentifiers[roleName] = entry
 		currentEntries = append(currentEntries, entry)
 	}
 
@@ -181,6 +183,7 @@ func (r *Repository) CommitHeldMetadata() error {
 	return nil
 }
 
+// TODO: make this use gitDir instead
 func InitNamespace(repoRoot string) error {
 	_, err := os.Stat(filepath.Join(repoRoot, ".git", Ref))
 	if os.IsNotExist(err) {
@@ -279,4 +282,14 @@ func readBlob(repo *git.Repository, blobHash plumbing.Hash) (int, []byte, error)
 		return -1, []byte{}, err
 	}
 	return length, contents, nil
+}
+
+func getRoleName(fileName string) string {
+	knownFileTypes := []string{".json"}
+	for _, t := range knownFileTypes {
+		if strings.HasSuffix(fileName, t) {
+			return strings.TrimSuffix(fileName, t)
+		}
+	}
+	return fileName
 }

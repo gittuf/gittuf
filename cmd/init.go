@@ -144,7 +144,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		metadata[k+".json"] = roleBytes
+		metadata[k] = roleBytes
 	}
 
 	// TODO: Should we undo git init if this call fails?

@@ -64,7 +64,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoCommit(err)
 	}
 
-	err = repo.StageAndCommit(role+".json", newRoleBytes)
+	err = repo.StageAndCommit(role, newRoleBytes)
 	if err != nil {
 		return gittuf.UndoCommit(err)
 	}

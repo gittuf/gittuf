@@ -4,7 +4,6 @@ import (
 	"crypto/ed25519"
 	"encoding/json"
 	"os"
-	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
 
@@ -21,7 +20,7 @@ var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
 func loadRoot(repo *gitstore.Repository) (tufdata.Root, error) {
 	var role tufdata.Root
 
-	roleBytes := repo.GetCurrentFileBytes("root.json")
+	roleBytes := repo.GetCurrentFileBytes("root")
 
 	var roleMb tufdata.Signed
 	err := json.Unmarshal(roleBytes, &roleMb)
@@ -37,10 +36,6 @@ func loadRoot(repo *gitstore.Repository) (tufdata.Root, error) {
 
 func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (tufdata.Targets, error) {
 	var role tufdata.Targets
-
-	if !strings.HasPrefix(roleName, ".json") {
-		roleName = roleName + ".json"
-	}
 
 	roleBytes := repo.GetCurrentFileBytes(roleName)
 

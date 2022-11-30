@@ -21,12 +21,12 @@ func NewRule(
 	protectPaths []string,
 	allowedKeys []tufdata.PublicKey) (tufdata.Signed, error) {
 
-	if contents := repo.GetCurrentFileBytes(ruleName + ".json"); len(contents) > 0 {
+	if contents := repo.GetCurrentFileBytes(ruleName); len(contents) > 0 {
 		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
 	}
 
 	var roleMb tufdata.Signed
-	roleData := repo.GetCurrentFileBytes(role + ".json")
+	roleData := repo.GetCurrentFileBytes(role)
 	err := json.Unmarshal(roleData, &roleMb)
 	if err != nil {
 		return tufdata.Signed{}, err
