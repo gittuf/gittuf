@@ -5,8 +5,6 @@ package cmd
 
 import (
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -61,13 +59,4 @@ func preRoot(cmd *cobra.Command, args []string) error {
 	}
 	logrus.SetLevel(level)
 	return nil
-}
-
-// Borrowed from go-tuf
-func parseExpires(e string) (time.Time, error) {
-	days, err := strconv.Atoi(e)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return time.Now().AddDate(0, 0, days).UTC(), nil
 }
