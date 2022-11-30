@@ -57,12 +57,17 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// TODO: All commits after this should undo the commit
+	// All errors after this point should undo the commit
 
 	newRoleBytes, err := json.Marshal(newRoleMb)
 	if err != nil {
-		return err
+		return gittuf.UndoCommit(err)
 	}
 
-	return repo.StageAndCommit(role+".json", newRoleBytes)
+	err = repo.StageAndCommit(role+".json", newRoleBytes)
+	if err != nil {
+		return gittuf.UndoCommit(err)
+	}
+
+	return nil
 }

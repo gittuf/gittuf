@@ -41,7 +41,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, g
 	// go-tuf expects hashes to be represented as HexBytes
 	commitHB, err := getHashHexBytes(commitID)
 	if err != nil {
-		return tufdata.Signed{}, undoCommit(err)
+		return tufdata.Signed{}, UndoCommit(err)
 	}
 
 	// Add entry to role
@@ -54,7 +54,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, g
 		if os.IsNotExist(err) {
 			targetsRole = *tufdata.NewTargets()
 		} else {
-			return tufdata.Signed{}, undoCommit(err)
+			return tufdata.Signed{}, UndoCommit(err)
 		}
 	}
 
@@ -69,7 +69,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, g
 
 	signedRoleMb, err := generateAndSignMbFromStruct(targetsRole, keys)
 	if err != nil {
-		return tufdata.Signed{}, undoCommit(err)
+		return tufdata.Signed{}, UndoCommit(err)
 	}
 
 	return signedRoleMb, nil
@@ -119,7 +119,7 @@ func createCommit(gitArgs []string) ([]byte, error) {
 	cmd.Stdout = &stdout
 	err = cmd.Run()
 	if err != nil {
-		return commitID, undoCommit(err)
+		return commitID, UndoCommit(err)
 	}
 	commitID = stdout.Bytes()
 	commitID = commitID[0 : len(commitID)-1]
@@ -129,7 +129,7 @@ func createCommit(gitArgs []string) ([]byte, error) {
 	return commitID, nil
 }
 
-func undoCommit(cause error) error {
+func UndoCommit(cause error) error {
 	logrus.Debug("Undoing last commit due to error")
 	cmd := exec.Command("git", "reset", "--soft", "HEAD~1")
 	err := cmd.Run()
