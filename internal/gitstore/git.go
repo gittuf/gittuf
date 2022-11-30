@@ -193,6 +193,17 @@ func (r *Repository) CommitHeldMetadata() error {
 	return nil
 }
 
+func (r *Repository) RemoveFiles(roleNames []string) error {
+	r.written = false
+
+	for _, role := range roleNames {
+		delete(r.Metadata, role)
+		delete(r.metadataIdentifiers, role)
+	}
+
+	return r.CommitHeldMetadata()
+}
+
 // TODO: make this use gitDir instead
 func InitNamespace(repoRoot string) error {
 	_, err := os.Stat(filepath.Join(repoRoot, ".git", Ref))

@@ -40,6 +40,13 @@ var metadataCatCmd = &cobra.Command{
 	RunE:  runMetadataCat,
 }
 
+var metadataRmCmd = &cobra.Command{
+	Use:   "rm",
+	Short: "Remove specified files",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runMetadataRm,
+}
+
 var (
 	long bool
 )
@@ -57,6 +64,7 @@ func init() {
 	metadataCmd.AddCommand(metadataLsCmd)
 	metadataCmd.AddCommand(metadataAddCmd)
 	metadataCmd.AddCommand(metadataCatCmd)
+	metadataCmd.AddCommand(metadataRmCmd)
 
 	rootCmd.AddCommand(metadataCmd)
 }
@@ -116,4 +124,19 @@ func runMetadataCat(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runMetadataRm(cmd *cobra.Command, args []string) error {
+	repo, err := getGittufRepo()
+	if err != nil {
+		return err
+	}
+
+	roles := []string{}
+
+	for _, n := range args {
+		roles = append(roles, strings.TrimSuffix(n, ".json"))
+	}
+
+	return repo.RemoveFiles(roles)
 }
