@@ -117,6 +117,11 @@ func (r *Repository) Written() bool {
 	return r.written
 }
 
+func (r *Repository) HasFile(roleName string) bool {
+	_, exists := r.Metadata[roleName]
+	return exists
+}
+
 func (r *Repository) GetCurrentFileBytes(roleName string) []byte {
 	return r.Metadata[roleName]
 }

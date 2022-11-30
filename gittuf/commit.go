@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/sirupsen/logrus"
 	tufdata "github.com/theupdateframework/go-tuf/data"
-	//tuftargets "github.com/theupdateframework/go-tuf/pkg/targets"
 )
 
 func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.Signed, error) {
@@ -44,20 +42,21 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, g
 		return tufdata.Signed{}, UndoCommit(err)
 	}
 
-	// Add entry to role
-	db, err := InitializeTopLevelDB(repo)
-	if err != nil {
-		return tufdata.Signed{}, err
-	}
-	targetsRole, err := loadTargets(repo, role, db)
-	if err != nil {
-		if os.IsNotExist(err) {
-			targetsRole = *tufdata.NewTargets()
-		} else {
+	var targetsRole *tufdata.Targets
+	if repo.HasFile(role) {
+		db, err := InitializeDBUntilRole(repo, role)
+		if err != nil {
+			return tufdata.Signed{}, err
+		}
+		targetsRole, err = loadTargets(repo, role, db)
+		if err != nil {
 			return tufdata.Signed{}, UndoCommit(err)
 		}
+	} else {
+		targetsRole = tufdata.NewTargets()
 	}
 
+	// Add entry to role
 	targetsRole.Targets[targetName] = tufdata.TargetFileMeta{
 		FileMeta: tufdata.FileMeta{
 			Length: 1,

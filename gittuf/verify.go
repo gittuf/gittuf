@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
+	tufdata "github.com/theupdateframework/go-tuf/data"
 	tuftargets "github.com/theupdateframework/go-tuf/pkg/targets"
 	tufverify "github.com/theupdateframework/go-tuf/verify"
 )
@@ -102,6 +103,50 @@ func InitializeTopLevelDB(repo *gitstore.Repository) (*tufverify.DB, error) {
 	}
 
 	return db, nil
+}
+
+func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufverify.DB, error) {
+	db, err := InitializeTopLevelDB(repo)
+	if err != nil {
+		return db, err
+	}
+
+	if roleName == "targets" {
+		// The top level DB has that covered
+		return db, nil
+	}
+
+	toBeChecked := []string{"targets"}
+
+	for {
+		if len(toBeChecked) == 0 {
+			return db, fmt.Errorf("role %s not found", roleName)
+		}
+
+		current := toBeChecked[0]
+		toBeChecked = toBeChecked[1:]
+
+		targets, err := loadTargets(repo, current, db)
+		if err != nil {
+			return db, err
+		}
+
+		for id, key := range targets.Delegations.Keys {
+			db.AddKey(id, key)
+		}
+
+		for _, d := range targets.Delegations.Roles {
+			db.AddRole(d.Name, &tufdata.Role{
+				KeyIDs:    d.KeyIDs,
+				Threshold: d.Threshold,
+			})
+			if d.Name == roleName {
+				// Found in top level targets
+				return db, nil
+			}
+			toBeChecked = append(toBeChecked, d.Name)
+		}
+	}
 }
 
 func getCurrentHash(target string) (string, error) {

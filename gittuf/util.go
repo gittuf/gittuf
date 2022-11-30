@@ -17,7 +17,7 @@ var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
 
 // FIXME: update load... methods to be generic of type
 
-func loadRoot(repo *gitstore.Repository) (tufdata.Root, error) {
+func loadRoot(repo *gitstore.Repository) (*tufdata.Root, error) {
 	var role tufdata.Root
 
 	roleBytes := repo.GetCurrentFileBytes("root")
@@ -25,16 +25,16 @@ func loadRoot(repo *gitstore.Repository) (tufdata.Root, error) {
 	var roleMb tufdata.Signed
 	err := json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
-		return role, err
+		return &role, err
 	}
 
 	// FIXME: Activate sig verification
 
 	err = json.Unmarshal(roleMb.Signed, &role)
-	return role, err
+	return &role, err
 }
 
-func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (tufdata.Targets, error) {
+func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (*tufdata.Targets, error) {
 	var role tufdata.Targets
 
 	roleBytes := repo.GetCurrentFileBytes(roleName)
@@ -42,16 +42,16 @@ func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (
 	var roleMb tufdata.Signed
 	err := json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
-		return role, err
+		return &role, err
 	}
 
 	err = db.VerifySignatures(&roleMb, roleName)
 	if err != nil {
-		return role, err
+		return &role, err
 	}
 
 	err = json.Unmarshal(roleMb.Signed, &role)
-	return role, err
+	return &role, err
 }
 
 func LoadEd25519PublicKeyFromSslib(path string) (tufdata.PublicKey, error) {
