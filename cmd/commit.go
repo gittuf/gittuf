@@ -16,6 +16,10 @@ var commitCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 }
 
+var (
+	roleExpires string
+)
+
 func init() {
 	rootCmd.AddCommand(commitCmd)
 
@@ -35,6 +39,14 @@ func init() {
 		"Path to signing key for role",
 	)
 
+	commitCmd.Flags().StringVarP(
+		&roleExpires,
+		"role-expires",
+		"",
+		"",
+		"Expiry for role metadata in days",
+	)
+
 }
 
 func runCommit(cmd *cobra.Command, args []string) error {
@@ -52,7 +64,12 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		roleKeys = append(roleKeys, privKey)
 	}
 
-	newRoleMb, err := gittuf.Commit(repo, role, roleKeys, args...)
+	expires, err := parseExpires(roleExpires, "targets")
+	if err != nil {
+		return err
+	}
+
+	newRoleMb, err := gittuf.Commit(repo, role, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}

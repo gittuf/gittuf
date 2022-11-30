@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/sirupsen/logrus"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
-func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, gitArgs ...string) (tufdata.Signed, error) {
+func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
 	cmd := exec.Command("git", "symbolic-ref", "HEAD")
@@ -65,6 +66,12 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, g
 			},
 		},
 	}
+
+	// Update version number
+	targetsRole.Version++
+
+	// Update expiry
+	targetsRole.Expires = expires
 
 	signedRoleMb, err := generateAndSignMbFromStruct(targetsRole, keys)
 	if err != nil {
