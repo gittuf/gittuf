@@ -152,6 +152,11 @@ func (r *Repository) StageAndCommitMultiple(metadata map[string][]byte) error {
 }
 
 func (r *Repository) CommitHeldMetadata() error {
+	if r.Written() {
+		// Nothing to do
+		return nil
+	}
+
 	currentEntries := make([]object.TreeEntry, 0, len(r.Metadata))
 
 	// Write held blobs
