@@ -204,7 +204,6 @@ func (r *Repository) RemoveFiles(roleNames []string) error {
 	return r.CommitHeldMetadata()
 }
 
-// TODO: make this use gitDir instead
 func InitNamespace(repoRoot string) error {
 	_, err := os.Stat(filepath.Join(repoRoot, ".git", Ref))
 	if os.IsNotExist(err) {

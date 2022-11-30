@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/adityasaky/gittuf/gittuf"
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -26,6 +27,9 @@ func parseExpires(e string, role string) (time.Time, error) {
 }
 
 func getGittufRepo() (*gitstore.Repository, error) {
-	// FIXME: handle detached GITDIRs
-	return gitstore.LoadRepository(".")
+	dir, err := gittuf.GetRepoRootDir()
+	if err != nil {
+		return &gitstore.Repository{}, err
+	}
+	return gitstore.LoadRepository(dir)
 }

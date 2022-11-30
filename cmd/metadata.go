@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/adityasaky/gittuf/gittuf"
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 )
@@ -70,7 +71,11 @@ func init() {
 }
 
 func runMetadataInit(cmd *cobra.Command, args []string) error {
-	return gitstore.InitNamespace(".")
+	dir, err := gittuf.GetRepoRootDir()
+	if err != nil {
+		return err
+	}
+	return gitstore.InitNamespace(dir)
 }
 
 func runMetadataLs(cmd *cobra.Command, args []string) error {
