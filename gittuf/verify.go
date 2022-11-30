@@ -131,6 +131,10 @@ func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufveri
 			return db, err
 		}
 
+		if targets.Delegations == nil {
+			continue
+		}
+
 		for id, key := range targets.Delegations.Keys {
 			db.AddKey(id, key)
 		}
