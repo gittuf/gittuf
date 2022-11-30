@@ -51,7 +51,6 @@ func Verify(repo *gitstore.Repository, target string) error {
 			return fmt.Errorf("delegation not found for target %s", target)
 		}
 
-		// TODO: Pass DB here
 		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
 		if err != nil {
 			return err

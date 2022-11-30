@@ -50,11 +50,10 @@ func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (
 		return role, err
 	}
 
-	// FIXME: Activate sig verification
-	// err = db.VerifySignatures(&roleMb, roleName)
-	// if err != nil {
-	// 	return role, err
-	// }
+	err = db.VerifySignatures(&roleMb, roleName)
+	if err != nil {
+		return role, err
+	}
 
 	err = json.Unmarshal(roleMb.Signed, &role)
 	return role, err
