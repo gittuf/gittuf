@@ -96,12 +96,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		targetsPrivKeys = append(targetsPrivKeys, targetsPrivKey)
 	}
 
-	rootExpiresTime, err := parseExpires(rootExpires)
+	rootExpiresTime, err := parseExpires(rootExpires, "root")
 	if err != nil {
 		return err
 	}
 
-	targetsExpiresTime, err := parseExpires(targetsExpires)
+	targetsExpiresTime, err := parseExpires(targetsExpires, "targets")
 	if err != nil {
 		return err
 	}

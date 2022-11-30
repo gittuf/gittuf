@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
+	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
 var (
@@ -13,7 +14,10 @@ var (
 )
 
 // Borrowed from go-tuf
-func parseExpires(e string) (time.Time, error) {
+func parseExpires(e string, role string) (time.Time, error) {
+	if len(e) == 0 {
+		return tufdata.DefaultExpires(role), nil
+	}
 	days, err := strconv.Atoi(e)
 	if err != nil {
 		return time.Time{}, err
