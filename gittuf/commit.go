@@ -113,13 +113,15 @@ func createCommit(gitArgs []string) ([]byte, error) {
 	logrus.Debug("Creating commit")
 
 	commitID := []byte{}
-	command := []string{"commit"}
-	command = append(command, gitArgs...)
-	cmd := exec.Command("git", command...)
+
+	args := []string{"commit"}
+	args = append(args, gitArgs...)
+	cmd := exec.Command("git", args...)
 	err := cmd.Run()
 	if err != nil {
 		return commitID, err
 	}
+
 	cmd = exec.Command("git", "rev-parse", "HEAD")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout

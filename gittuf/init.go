@@ -18,10 +18,13 @@ func Init(
 	targetsPubKeys []tufdata.PublicKey,
 	targetsPrivKeys []tufdata.PrivateKey,
 	targetsExpires time.Time,
-	targetsThreshold int) (map[string]tufdata.Signed, error) {
+	targetsThreshold int,
+	initArgs ...string) (map[string]tufdata.Signed, error) {
 	roles := map[string]tufdata.Signed{}
 
-	cmd := exec.Command("git", "init")
+	args := []string{"init"}
+	args = append(args, initArgs...)
+	cmd := exec.Command("git", args...)
 	err := cmd.Run()
 	if err != nil {
 		return roles, err

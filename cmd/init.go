@@ -132,7 +132,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		targetsPublicKeys,
 		targetsPrivKeys,
 		targetsExpiresTime,
-		targetsThreshold)
+		targetsThreshold,
+		args...)
 	if err != nil {
 		return err
 	}
