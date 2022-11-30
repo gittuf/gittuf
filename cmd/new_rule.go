@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/adityasaky/gittuf/gittuf"
-	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -85,7 +84,7 @@ func init() {
 }
 
 func runNewRule(cmd *cobra.Command, args []string) error {
-	repo, err := gitstore.LoadRepository(".")
+	repo, err := getGittufRepo()
 	if err != nil {
 		return err
 	}

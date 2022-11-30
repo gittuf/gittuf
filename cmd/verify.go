@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/adityasaky/gittuf/gittuf"
-	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +19,7 @@ func init() {
 }
 
 func runVerify(cmd *cobra.Command, args []string) {
-	repo, err := gitstore.LoadRepository(".")
+	repo, err := getGittufRepo()
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
