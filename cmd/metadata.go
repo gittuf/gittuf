@@ -14,11 +14,16 @@ var metadataCmd = &cobra.Command{
 	Short: "Inspect gittuf metadata",
 }
 
-var metadataCatCmd = &cobra.Command{
-	Use:   "cat",
-	Short: "Print specified file on standard output",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  runMetadataCat,
+var metadataInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Initialize gittuf namespace",
+	RunE:  runMetadataInit,
+}
+
+var metadataLsCmd = &cobra.Command{
+	Use:   "ls",
+	Short: "List current set of gittuf metadata",
+	RunE:  runMetadataLs,
 }
 
 var metadataAddCmd = &cobra.Command{
@@ -28,37 +33,61 @@ var metadataAddCmd = &cobra.Command{
 	RunE:  runMetadataAdd,
 }
 
-var metadataInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize gittuf namespace",
-	RunE:  runMetadataInit,
+var metadataCatCmd = &cobra.Command{
+	Use:   "cat",
+	Short: "Print specified file on standard output",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  runMetadataCat,
 }
 
+var (
+	long bool
+)
+
 func init() {
-	metadataCmd.AddCommand(metadataCatCmd)
-	metadataCmd.AddCommand(metadataAddCmd)
+	metadataLsCmd.Flags().BoolVarP(
+		&long,
+		"long",
+		"l",
+		false,
+		"Use a long listing format",
+	)
+
 	metadataCmd.AddCommand(metadataInitCmd)
+	metadataCmd.AddCommand(metadataLsCmd)
+	metadataCmd.AddCommand(metadataAddCmd)
+	metadataCmd.AddCommand(metadataCatCmd)
+
 	rootCmd.AddCommand(metadataCmd)
 }
 
-func runMetadataCat(cmd *cobra.Command, args []string) error {
-	repo, err := gitstore.LoadRepository(".")
+func runMetadataInit(cmd *cobra.Command, args []string) error {
+	return gitstore.InitNamespace(".")
+}
+
+func runMetadataLs(cmd *cobra.Command, args []string) error {
+	repo, err := getGittufRepo()
 	if err != nil {
 		return err
 	}
 
-	for _, n := range args {
-		if !strings.HasSuffix(n, ".json") {
-			n = n + ".json"
-		}
-		fmt.Println(repo.GetCurrentFileString(n))
+	currentTree, err := repo.Tree()
+	if err != nil {
+		return err
 	}
 
+	for _, e := range currentTree.Entries {
+		if long {
+			fmt.Println(e.Mode.String(), e.Hash.String(), e.Name)
+		} else {
+			fmt.Println(e.Name)
+		}
+	}
 	return nil
 }
 
 func runMetadataAdd(cmd *cobra.Command, args []string) error {
-	repo, err := gitstore.LoadRepository(".")
+	repo, err := getGittufRepo()
 	if err != nil {
 		return err
 	}
@@ -75,6 +104,18 @@ func runMetadataAdd(cmd *cobra.Command, args []string) error {
 	return repo.StageAndCommitMultiple(metadata)
 }
 
-func runMetadataInit(cmd *cobra.Command, args []string) error {
-	return gitstore.InitNamespace(".")
+func runMetadataCat(cmd *cobra.Command, args []string) error {
+	repo, err := getGittufRepo()
+	if err != nil {
+		return err
+	}
+
+	for _, n := range args {
+		if !strings.HasSuffix(n, ".json") {
+			n = n + ".json"
+		}
+		fmt.Println(repo.GetCurrentFileString(n))
+	}
+
+	return nil
 }

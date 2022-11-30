@@ -107,8 +107,8 @@ func (r *Repository) Tip() string {
 	return r.tip.String()
 }
 
-func (r *Repository) Tree() string {
-	return r.tree.String()
+func (r *Repository) Tree() (*object.Tree, error) {
+	return r.repository.TreeObject(r.tree)
 }
 
 func (r *Repository) Written() bool {
