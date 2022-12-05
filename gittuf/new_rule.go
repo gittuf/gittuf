@@ -56,7 +56,7 @@ func NewRule(
 	if roleTargets.Delegations == nil {
 		roleTargets.Delegations = &tufdata.Delegations{
 			Keys:  map[string]*tufdata.PublicKey{},
-			Roles: []tufdata.DelegatedRole{},
+			Roles: []tufdata.DelegatedRole{createAllowRule()}, // TODO: Is this okay?
 		}
 	}
 	roleDelegations := *roleTargets.Delegations
@@ -90,7 +90,7 @@ func NewRule(
 		Paths:            protectPaths,
 	}
 
-	roleDelegations.Roles = append(roleDelegations.Roles, newRuleDelegation)
+	roleDelegations.Roles = append(roleDelegations.Roles[:len(roleDelegations.Roles)-1], newRuleDelegation, createAllowRule())
 	roleTargets.Delegations = &roleDelegations
 
 	roleTargets.Version += 1
@@ -117,4 +117,14 @@ func NewRule(
 	}
 
 	return newRoleMb, nil
+}
+
+func createAllowRule() tufdata.DelegatedRole {
+	return tufdata.DelegatedRole{
+		Name:        AllowRule,
+		KeyIDs:      []string{"*"},
+		Threshold:   1,
+		Terminating: true,
+		Paths:       []string{"*"},
+	}
 }

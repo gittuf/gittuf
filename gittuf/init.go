@@ -136,6 +136,11 @@ func initTargets(
 
 	targetsRole.Version = 1
 
+	targetsRole.Delegations = &tufdata.Delegations{
+		Keys:  map[string]*tufdata.PublicKey{},
+		Roles: []tufdata.DelegatedRole{createAllowRule()},
+	}
+
 	targetsRoleJson, err := json.Marshal(targetsRole)
 	if err != nil {
 		return tufdata.Signed{}, err

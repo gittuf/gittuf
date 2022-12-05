@@ -61,38 +61,53 @@ func LoadRepository(repoRoot string) (*Repository, error) {
 		}, nil
 	}
 
-	commitObj, err := repo.CommitObject(ref.Hash())
+	return loadRepository(repo, ref.Hash())
+}
+
+func LoadRepositoryAtState(repoRoot string, stateID string) (*Repository, error) {
+	repo, err := git.PlainOpen(repoRoot)
+	if err != nil {
+		return &Repository{}, nil
+	}
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		return &Repository{}, err
 	}
 
-	tree, err := repo.TreeObject(commitObj.TreeHash)
-	if err != nil {
-		return &Repository{}, err
+	currentHash := ref.Hash()
+	stateHash := plumbing.NewHash(stateID)
+
+	if stateHash == plumbing.ZeroHash || currentHash == plumbing.ZeroHash {
+		return &Repository{}, fmt.Errorf("can't load gittuf repository at state zero")
+	}
+	if currentHash == stateHash {
+		return LoadRepository(repoRoot)
 	}
 
-	metadata := map[string][]byte{}
-	metadataIdentifiers := map[string]object.TreeEntry{}
-	for _, entry := range tree.Entries {
-		// FIXME: Assuming everything is a blob and that all blobs are TUF metadata
-		_, contents, err := readBlob(repo, entry.Hash)
+	// Check if stateHash is present when tracing back from currentHash
+	iteratorHash := currentHash
+	for {
+		if iteratorHash == stateHash {
+			break
+		}
+
+		commitObj, err := repo.CommitObject(iteratorHash)
 		if err != nil {
 			return &Repository{}, err
 		}
 
-		roleName := getRoleName(entry.Name)
-		metadataIdentifiers[roleName] = entry
-		metadata[roleName] = contents
+		if len(commitObj.ParentHashes) == 0 {
+			return &Repository{}, fmt.Errorf("state %s not found in gittuf namespace", stateID)
+		}
+		if len(commitObj.ParentHashes) > 1 {
+			return &Repository{}, fmt.Errorf("state %s has multiple parents", iteratorHash.String())
+		}
+
+		iteratorHash = commitObj.ParentHashes[0]
 	}
 
-	return &Repository{
-		Metadata:            metadata,
-		repository:          repo,
-		tip:                 commitObj.Hash,
-		tree:                commitObj.TreeHash,
-		metadataIdentifiers: metadataIdentifiers,
-		written:             true,
-	}, nil
+	// Now that we've validated it's a valid commit, we can load at that state.
+	return loadRepository(repo, stateHash)
 }
 
 type Repository struct {
@@ -109,12 +124,57 @@ func (r *Repository) Tip() string {
 	return r.tip.String()
 }
 
+func (r *Repository) TipHash() plumbing.Hash {
+	return r.tip
+}
+
 func (r *Repository) Tree() (*object.Tree, error) {
 	return r.repository.TreeObject(r.tree)
 }
 
 func (r *Repository) Written() bool {
 	return r.written
+}
+
+func (r *Repository) GetCommitObject(id string) (*object.Commit, error) {
+	hash := plumbing.NewHash(id)
+	return r.repository.CommitObject(hash)
+}
+
+func (r *Repository) GetCommitObjectFromHash(hash plumbing.Hash) (*object.Commit, error) {
+	return r.repository.CommitObject(hash)
+}
+
+func (r *Repository) GetTreeObject(id string) (*object.Tree, error) {
+	hash := plumbing.NewHash(id)
+	return r.repository.TreeObject(hash)
+}
+
+func (r *Repository) GetTreeObjectFromHash(hash plumbing.Hash) (*object.Tree, error) {
+	return r.repository.TreeObject(hash)
+}
+
+func (r *Repository) GetMetadataForState(stateID string) (map[string][]byte, error) {
+	metadata := map[string][]byte{}
+
+	commit, err := r.GetCommitObject(stateID)
+	if err != nil {
+		return metadata, err
+	}
+	tree, err := r.GetTreeObjectFromHash(commit.TreeHash)
+	if err != nil {
+		return metadata, err
+	}
+
+	for _, e := range tree.Entries {
+		_, contents, err := readBlob(r.repository, e.Hash)
+		if err != nil {
+			return map[string][]byte{}, err
+		}
+		metadata[e.Name] = contents
+	}
+
+	return metadata, nil
 }
 
 func (r *Repository) HasFile(roleName string) bool {
@@ -312,4 +372,39 @@ func getRoleName(fileName string) string {
 		}
 	}
 	return fileName
+}
+
+func loadRepository(repo *git.Repository, commitID plumbing.Hash) (*Repository, error) {
+	commitObj, err := repo.CommitObject(commitID)
+	if err != nil {
+		return &Repository{}, err
+	}
+
+	tree, err := repo.TreeObject(commitObj.TreeHash)
+	if err != nil {
+		return &Repository{}, err
+	}
+
+	metadata := map[string][]byte{}
+	metadataIdentifiers := map[string]object.TreeEntry{}
+	for _, entry := range tree.Entries {
+		// FIXME: Assuming everything is a blob and that all blobs are TUF metadata
+		_, contents, err := readBlob(repo, entry.Hash)
+		if err != nil {
+			return &Repository{}, err
+		}
+
+		roleName := getRoleName(entry.Name)
+		metadataIdentifiers[roleName] = entry
+		metadata[roleName] = contents
+	}
+
+	return &Repository{
+		Metadata:            metadata,
+		repository:          repo,
+		tip:                 commitObj.Hash,
+		tree:                commitObj.TreeHash,
+		metadataIdentifiers: metadataIdentifiers,
+		written:             true,
+	}, nil
 }
