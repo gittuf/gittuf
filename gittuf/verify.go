@@ -14,9 +14,9 @@ import (
 )
 
 /*
-Verify checks that a target has the hash specified in the TUF delegations tree.
+VerifyState checks that a target has the hash specified in the TUF delegations tree.
 */
-func Verify(repo *gitstore.Repository, target string) error {
+func VerifyState(repo *gitstore.Repository, target string) error {
 	sha1Hash, err := getCurrentHash(target)
 	if err != nil {
 		return err
@@ -145,7 +145,6 @@ func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufveri
 				Threshold: d.Threshold,
 			})
 			if d.Name == roleName {
-				// Found in top level targets
 				return db, nil
 			}
 			toBeChecked = append(toBeChecked, d.Name)

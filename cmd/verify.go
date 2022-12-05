@@ -8,22 +8,28 @@ import (
 )
 
 var verifyCmd = &cobra.Command{
-	Use:   "verify <target>",
+	Use:   "verify",
+	Short: "Verify the repository",
+}
+
+var verifyStateCmd = &cobra.Command{
+	Use:   "state",
 	Short: "Verifies a target's hash matches signed TUF metadata",
-	Run:   runVerify,
+	Run:   runVerifyState,
 	Args:  cobra.ExactArgs(1),
 }
 
 func init() {
+	verifyCmd.AddCommand(verifyStateCmd)
 	rootCmd.AddCommand(verifyCmd)
 }
 
-func runVerify(cmd *cobra.Command, args []string) {
+func runVerifyState(cmd *cobra.Command, args []string) {
 	repo, err := getGittufRepo()
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
-	err = gittuf.Verify(repo, args[0])
+	err = gittuf.VerifyState(repo, args[0])
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
