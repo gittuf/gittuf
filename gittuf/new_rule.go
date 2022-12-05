@@ -49,7 +49,12 @@ func NewRule(
 		keyIds := k.IDs()
 		allowedKeyIds = append(allowedKeyIds, keyIds...)
 		for _, keyId := range keyIds {
-			allowedKeysMap[keyId] = &k
+			allowedKeysMap[keyId] = &tufdata.PublicKey{
+				Type:       k.Type,
+				Scheme:     k.Scheme,
+				Algorithms: k.Algorithms,
+				Value:      k.Value,
+			}
 		}
 	}
 

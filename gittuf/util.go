@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -50,7 +51,7 @@ func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (
 
 	err = db.VerifySignatures(&roleMb, roleName)
 	if err != nil {
-		return &role, err
+		return &role, fmt.Errorf("%w of role %s", err, roleName)
 	}
 
 	err = json.Unmarshal(roleMb.Signed, &role)
