@@ -17,68 +17,21 @@ import (
 VerifyState checks that a target has the hash specified in the TUF delegations tree.
 */
 func VerifyState(repo *gitstore.Repository, target string) error {
-	sha1Hash, err := getCurrentHash(target)
+	currentHash, err := getCurrentHash(target)
 	if err != nil {
 		return err
 	}
 
-	db, err := InitializeTopLevelDB(repo)
+	targetEntry, role, err := getTargetEntryForTarget(repo, target)
 	if err != nil {
 		return err
 	}
 
-	topLevelTargets, err := loadTargets(repo, "targets", db)
-	if err != nil {
-		return err
+	entryHash := targetEntry.Hashes["sha1"].String()
+	if currentHash != targetEntry.Hashes["sha1"].String() {
+		return fmt.Errorf("role %s has different hash value %s from current hash %s", role, entryHash, currentHash)
 	}
 
-	if t, ok := topLevelTargets.Targets[target]; ok {
-		expectedCommitID := t.Hashes["sha1"].String()
-		if expectedCommitID == sha1Hash {
-			return nil
-		}
-		// We return without checking delegations of top level in this instance
-		return fmt.Errorf("top level targets role has different hash value %s", expectedCommitID)
-	}
-
-	iterator, err := tuftargets.NewDelegationsIterator(target, db)
-	if err != nil {
-		return err
-	}
-
-	for {
-		d, ok := iterator.Next()
-		if !ok {
-			return fmt.Errorf("delegation not found for target %s", target)
-		}
-
-		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
-		if err != nil {
-			return err
-		}
-
-		if t, ok := delegatedRole.Targets[target]; ok {
-			expectedCommitID := t.Hashes["sha1"].String()
-			if expectedCommitID != sha1Hash {
-				return fmt.Errorf("role %s has different hash value %s from current hash %s", d.Delegatee.Name, expectedCommitID, sha1Hash)
-			}
-
-			// Should we continue searching for other delegations?
-			// Recent Writer means that a false match should fail
-			break
-		}
-
-		if delegatedRole.Delegations != nil {
-			newDB, err := tufverify.NewDBFromDelegations(delegatedRole.Delegations)
-			if err != nil {
-				return err
-			}
-			err = iterator.Add(delegatedRole.Delegations.Roles, d.Delegatee.Name, newDB)
-			if err != nil {
-				return err
-			}
-		}
-	}
 	return nil
 }
 
@@ -177,4 +130,53 @@ func getCurrentHash(target string) (string, error) {
 		return "", fmt.Errorf("%s is not a Git object", target)
 	}
 	return currentHash, nil
+}
+
+func getTargetEntryForTarget(repo *gitstore.Repository, target string) (tufdata.TargetFileMeta, string, error) {
+	db, err := InitializeTopLevelDB(repo)
+	if err != nil {
+		return tufdata.TargetFileMeta{}, "", err
+	}
+
+	topLevelTargets, err := loadTargets(repo, "targets", db)
+	if err != nil {
+		return tufdata.TargetFileMeta{}, "", err
+	}
+
+	if t, ok := topLevelTargets.Targets[target]; ok {
+		return t, "targets", nil
+	}
+
+	iterator, err := tuftargets.NewDelegationsIterator(target, db)
+	if err != nil {
+		return tufdata.TargetFileMeta{}, "", err
+	}
+
+	for {
+		d, ok := iterator.Next()
+		if !ok {
+			return tufdata.TargetFileMeta{}, "",
+				fmt.Errorf("delegation not found for target %s", target)
+		}
+
+		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
+		if err != nil {
+			return tufdata.TargetFileMeta{}, "", err
+		}
+
+		if t, ok := delegatedRole.Targets[target]; ok {
+			return t, d.Delegatee.Name, nil
+		}
+
+		if delegatedRole.Delegations != nil {
+			newDB, err := tufverify.NewDBFromDelegations(delegatedRole.Delegations)
+			if err != nil {
+				return tufdata.TargetFileMeta{}, "", err
+			}
+			err = iterator.Add(delegatedRole.Delegations.Roles, d.Delegatee.Name, newDB)
+			if err != nil {
+				return tufdata.TargetFileMeta{}, "", err
+			}
+		}
+	}
 }
