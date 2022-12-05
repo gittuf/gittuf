@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -227,7 +229,7 @@ func (r *Repository) CommitHeldMetadata() error {
 		}
 		entry := object.TreeEntry{
 			Name: fmt.Sprintf("%s.json", roleName),
-			Mode: 0644,
+			Mode: filemode.Regular,
 			Hash: identifier,
 		}
 		r.metadataIdentifiers[roleName] = entry
@@ -294,6 +296,9 @@ func writeBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 }
 
 func writeTree(repo *git.Repository, entries []object.TreeEntry) (plumbing.Hash, error) {
+	sort.Slice(entries, func(i int, j int) bool {
+		return entries[i].Name < entries[j].Name
+	})
 	obj := repo.Storer.NewEncodedObject()
 	tree := object.Tree{
 		Entries: entries,
