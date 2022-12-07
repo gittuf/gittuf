@@ -1,6 +1,3 @@
-/*
-Copyright © 2022 Aditya Sirish A Yelgundhalli
-*/
 package cmd
 
 import (
