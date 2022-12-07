@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/sirupsen/logrus"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -28,8 +30,18 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	branchName := branchSplit[len(branchSplit)-1]
 	targetName := fmt.Sprintf("git:branch=%s", branchName)
 
-	// TODO: Verify staged files can be modified by specified role
-	verifyStagedFilesCanBeModified(repo)
+	keyIDsToUse := []string{}
+	for _, k := range keys {
+		pubKey, err := GetEd25519PublicKeyFromPrivateKey(&k)
+		if err != nil {
+			return tufdata.Signed{}, err
+		}
+		keyIDsToUse = append(keyIDsToUse, pubKey.IDs()...)
+	}
+	err = verifyStagedFilesCanBeModified(repo, keyIDsToUse)
+	if err != nil {
+		return tufdata.Signed{}, err
+	}
 
 	// Create a commit and get its identifier
 	commitID, err := createCommit(gitArgs)
@@ -81,32 +93,48 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	return signedRoleMb, nil
 }
 
-func verifyStagedFilesCanBeModified(repo *gitstore.Repository) error {
-	cmd := exec.Command("git", "diff", "--staged", "--name-only")
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	err := cmd.Run()
+func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) error {
+	repoRoot, err := GetRepoRootDir()
 	if err != nil {
 		return err
 	}
-	stagedFilePaths := strings.Split(strings.Trim(stdout.String(), "\n"), "\n")
-
-	db, err := InitializeTopLevelDB(repo)
+	mainRepo, err := git.PlainOpen(repoRoot)
 	if err != nil {
 		return err
 	}
 
-	logrus.Debug("Created TUF verification database", db)
-
-	for _, target := range stagedFilePaths {
-		logrus.Debugf("Checking if %s can be modified", target)
-		// 	_, err = tuftargets.NewDelegationsIterator(target, db)
-		// 	if err != nil {
-		// 		return err
-		// 	}
+	worktree, err := mainRepo.Worktree()
+	if err != nil {
+		return err
+	}
+	worktreeStatus, err := worktree.Status()
+	if err != nil {
+		return err
 	}
 
-	return nil
+	changes := []*object.Change{}
+
+	for path, status := range worktreeStatus {
+		logrus.Debugf("Checking if %s can be modified", path)
+		if status.Staging == git.Modified {
+			to := path
+			if len(status.Extra) > 0 {
+				to = status.Extra
+			}
+			changes = append(changes, &object.Change{
+				// The other fields in ChangeEntry are never used.
+				// We should reconsider the signature of validateChanges.
+				From: object.ChangeEntry{
+					Name: path,
+				},
+				To: object.ChangeEntry{
+					Name: to,
+				},
+			})
+		}
+	}
+
+	return validateChanges(repo, changes, keyIDs)
 }
 
 func createCommit(gitArgs []string) ([]byte, error) {
