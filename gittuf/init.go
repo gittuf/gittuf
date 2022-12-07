@@ -22,9 +22,7 @@ func Init(
 	initArgs ...string) (map[string]tufdata.Signed, error) {
 	roles := map[string]tufdata.Signed{}
 
-	args := []string{"init"}
-	args = append(args, initArgs...)
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command("git", append([]string{"init"}, initArgs...)...)
 	err := cmd.Run()
 	if err != nil {
 		return roles, err

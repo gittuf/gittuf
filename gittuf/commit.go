@@ -18,6 +18,7 @@ import (
 func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
+	// FIXME: Use API here
 	cmd := exec.Command("git", "symbolic-ref", "HEAD")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -142,14 +143,13 @@ func createCommit(gitArgs []string) ([]byte, error) {
 
 	commitID := []byte{}
 
-	args := []string{"commit"}
-	args = append(args, gitArgs...)
-	cmd := exec.Command("git", args...)
+	cmd := exec.Command("git", append([]string{"commit"}, gitArgs...)...)
 	err := cmd.Run()
 	if err != nil {
 		return commitID, err
 	}
 
+	// FIXME: Use API here
 	cmd = exec.Command("git", "rev-parse", "HEAD")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -167,6 +167,7 @@ func createCommit(gitArgs []string) ([]byte, error) {
 
 func UndoCommit(cause error) error {
 	logrus.Debug("Undoing last commit due to error")
+	// FIXME: Use API here
 	cmd := exec.Command("git", "reset", "--soft", "HEAD~1")
 	err := cmd.Run()
 	if err != nil {

@@ -194,6 +194,7 @@ func getCurrentHash(target string) (string, error) {
 		// TODO: Fix this up, we need a better parser
 		objectName := strings.Split(u.Opaque, "=")[1]
 
+		// FIXME: Use API here
 		cmd := exec.Command("git", "rev-parse", objectName)
 		var stdout bytes.Buffer
 		cmd.Stdout = &stdout
