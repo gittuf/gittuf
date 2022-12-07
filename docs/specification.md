@@ -1,4 +1,4 @@
-# Notes
+# Specification
 
 This document covers several workflows users employ in their use of Git. This
 analysis is important to understand how gittuf will change user workflows.
