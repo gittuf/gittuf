@@ -80,36 +80,8 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 	if err != nil {
 		return err
 	}
-	for _, c := range changes {
-		// For each change, we want to verify that stateA's rules allow
-		// the role signing for the artifact in stateB is valid.
 
-		// First, we get the delegations entry for the target. If we end up at
-		// the catch all rule, we move on to the next change.
-
-		// Once we have a delegations entry, we get a list of keys authorized
-		// to sign for the target in stateB. Finally, we check if the signing
-		// role in stateB used an authorized key.
-
-		// If the change includes a rename, we follow the above rules for the
-		// original name AND the new name.
-
-		if len(c.From.Name) > 0 {
-			err = validateRule(stateARepo, c.From.Name, usedKeyIDs)
-			if err != nil {
-				return err
-			}
-		}
-
-		if c.From.Name != c.To.Name && len(c.To.Name) > 0 {
-			err = validateRule(stateARepo, c.To.Name, usedKeyIDs)
-			if err != nil {
-				return err
-			}
-		}
-
-	}
-	return nil
+	return validateChanges(stateARepo, changes, usedKeyIDs)
 }
 
 /*
@@ -380,5 +352,37 @@ func validateRule(ruleRepo *gitstore.Repository, path string, usedKeyIDs []strin
 		return fmt.Errorf("unauthorized change to file %s", path)
 	}
 
+	return nil
+}
+
+func validateChanges(policyRepo *gitstore.Repository, changes object.Changes, usedKeyIDs []string) error {
+	for _, c := range changes {
+		// For each change to a file, we want to verify that the policy allows
+		// the keys that were used to sign changes for the file.
+
+		// First, we get the delegations entry for the target. If we end up at
+		// the catch all rule, we move on to the next change.
+
+		// Once we have a delegations entry, we get a list of keys authorized
+		// to sign for the target. We then check if the keys used were part of
+		// this authorized set.
+
+		// If the change includes a rename, we follow the above rules for the
+		// original name AND the new name. This ensures that a rename does not
+		// result in a file being written to a protected namespace.
+
+		if len(c.From.Name) > 0 {
+			if err := validateRule(policyRepo, c.From.Name, usedKeyIDs); err != nil {
+				return err
+			}
+		}
+
+		if c.From.Name != c.To.Name && len(c.To.Name) > 0 {
+			if err := validateRule(policyRepo, c.To.Name, usedKeyIDs); err != nil {
+				return err
+			}
+		}
+
+	}
 	return nil
 }
