@@ -78,12 +78,12 @@ func runCommit(cmd *cobra.Command, args []string) error {
 
 	newRoleBytes, err := json.Marshal(newRoleMb)
 	if err != nil {
-		return gittuf.UndoCommit(err)
+		return gittuf.UndoLastCommit(err)
 	}
 
 	err = repo.StageAndCommit(role, newRoleBytes)
 	if err != nil {
-		return gittuf.UndoCommit(err)
+		return gittuf.UndoLastCommit(err)
 	}
 
 	return nil

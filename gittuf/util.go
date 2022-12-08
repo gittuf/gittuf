@@ -1,13 +1,10 @@
 package gittuf
 
 import (
-	"bytes"
 	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
 
@@ -166,15 +163,4 @@ func generateAndSignMbFromStruct(content interface{}, keys []tufdata.PrivateKey)
 		}
 	}
 	return newMb, nil
-}
-
-func GetRepoRootDir() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-	return strings.Trim(stdout.String(), "\n"), nil
 }
