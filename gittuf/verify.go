@@ -3,6 +3,7 @@ package gittuf
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
@@ -84,7 +85,7 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 VerifyState checks that a target has the hash specified in the TUF delegations tree.
 */
 func VerifyState(repo *gitstore.Repository, target string) error {
-	currentHash, err := getCurrentHash(target)
+	currentHash, err := getCurrentCommitID(target)
 	if err != nil {
 		return err
 	}
@@ -94,9 +95,9 @@ func VerifyState(repo *gitstore.Repository, target string) error {
 		return err
 	}
 
-	entryHash := targets.Targets[target].Hashes["sha1"].String()
-	if currentHash != entryHash {
-		return fmt.Errorf("role %s has different hash value %s from current hash %s", role, entryHash, currentHash)
+	entryHash := targets.Targets[target].Hashes["sha1"]
+	if !reflect.DeepEqual(currentHash, entryHash) {
+		return fmt.Errorf("role %s has different hash value %s from current hash %s", role, entryHash.String(), currentHash.String())
 	}
 
 	return nil
@@ -177,26 +178,21 @@ func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufveri
 	}
 }
 
-func getCurrentHash(target string) (string, error) {
+func getCurrentCommitID(target string) (tufdata.HexBytes, error) {
 	// We check if target has the form git:...
 	// In future, if multiple schemes are supported, this function can dispatch
 	// to different parsers.
 
 	if !strings.HasPrefix(target, "git:") {
-		return "", fmt.Errorf("%s is not a Git object", target)
+		return tufdata.HexBytes{}, fmt.Errorf("%s is not a Git object", target)
 	}
 
 	refName, refType, err := ParseGitTarget(target)
 	if err != nil {
-		return "", err
+		return tufdata.HexBytes{}, err
 	}
 
-	commitID, err := GetTipCommitIDForRef(refName, refType)
-	if err != nil {
-		return "", err
-	}
-
-	return string(commitID), nil
+	return GetTipCommitIDForRef(refName, refType)
 }
 
 func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata.Targets, string, error) {

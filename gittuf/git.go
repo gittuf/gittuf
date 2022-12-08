@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
 const (
@@ -75,10 +76,10 @@ func GetRefNameForHEAD() (string, error) {
 	return branchSplit[len(branchSplit)-1], nil
 }
 
-func GetTipCommitIDForRef(refName string, refType uint) ([]byte, error) {
+func GetTipCommitIDForRef(refName string, refType uint) (tufdata.HexBytes, error) {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
-		return []byte{}, err
+		return tufdata.HexBytes{}, err
 	}
 
 	var r plumbing.ReferenceName
@@ -88,27 +89,27 @@ func GetTipCommitIDForRef(refName string, refType uint) ([]byte, error) {
 	case TagRef:
 		r = plumbing.NewTagReferenceName(refName)
 	default:
-		return []byte{}, fmt.Errorf("unknown reference type for %s", refName)
+		return tufdata.HexBytes{}, fmt.Errorf("unknown reference type for %s", refName)
 	}
 
 	ref, err := mainRepo.Reference(r, false)
 	if err != nil {
-		return []byte{}, err
+		return tufdata.HexBytes{}, err
 	}
 
-	return convertGitHashToByteSlice(ref.Hash()), nil
+	return convertPlumbingHashToTUFHashHexBytes(ref.Hash()), nil
 }
 
-func GetHEADCommitID() ([]byte, error) {
+func GetHEADCommitID() (tufdata.HexBytes, error) {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
-		return []byte{}, err
+		return tufdata.HexBytes{}, err
 	}
 	headRef, err := mainRepo.Head()
 	if err != nil {
-		return []byte{}, err
+		return tufdata.HexBytes{}, err
 	}
-	return convertGitHashToByteSlice(headRef.Hash()), nil
+	return convertPlumbingHashToTUFHashHexBytes(headRef.Hash()), nil
 }
 
 func UndoLastCommit(cause error) error {
@@ -159,6 +160,10 @@ func UndoLastCommit(cause error) error {
 	return cause
 }
 
-func convertGitHashToByteSlice(hash plumbing.Hash) []byte {
-	return []byte(hash.String())
+func convertPlumbingHashToTUFHashHexBytes(hash plumbing.Hash) tufdata.HexBytes {
+	hb := make(tufdata.HexBytes, len(hash))
+	for i := range hash {
+		hb[i] = hash[i]
+	}
+	return hb
 }

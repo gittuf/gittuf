@@ -2,7 +2,6 @@ package gittuf
 
 import (
 	"crypto/ed25519"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -164,10 +163,4 @@ func generateAndSignMbFromStruct(content interface{}, keys []tufdata.PrivateKey)
 		}
 	}
 	return newMb, nil
-}
-
-func getHashHexBytes(hash []byte) (tufdata.HexBytes, error) {
-	hb := make(tufdata.HexBytes, hex.DecodedLen(len(hash)))
-	_, err := hex.Decode(hb, hash)
-	return hb, err
 }

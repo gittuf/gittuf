@@ -42,11 +42,6 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 		// commit will have been undone in createCommit already
 		return tufdata.Signed{}, err
 	}
-	// go-tuf expects hashes to be represented as HexBytes
-	commitHB, err := getHashHexBytes(commitID)
-	if err != nil {
-		return tufdata.Signed{}, UndoLastCommit(err)
-	}
 
 	var targetsRole *tufdata.Targets
 	if repo.HasFile(role) {
@@ -67,7 +62,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 		FileMeta: tufdata.FileMeta{
 			Length: 1,
 			Hashes: map[string]tufdata.HexBytes{
-				"sha1": commitHB,
+				"sha1": commitID,
 			},
 		},
 	}
@@ -126,21 +121,21 @@ func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) 
 	return validateChanges(repo, changes, keyIDs)
 }
 
-func createCommit(gitArgs []string) ([]byte, error) {
+func createCommit(gitArgs []string) (tufdata.HexBytes, error) {
 	logrus.Debug("Creating commit")
 
 	cmd := exec.Command("git", append([]string{"commit"}, gitArgs...)...)
 	err := cmd.Run()
 	if err != nil {
-		return []byte{}, err
+		return tufdata.HexBytes{}, err
 	}
 
-	// Get commit ID
+	// Get ID of commit we just created
 	commitID, err := GetHEADCommitID()
 	if err != nil {
-		return []byte{}, UndoLastCommit(err)
+		return tufdata.HexBytes{}, UndoLastCommit(err)
 	}
 
-	logrus.Debug("Created commit", string(commitID))
+	logrus.Debug("Created commit", commitID.String())
 	return commitID, nil
 }
