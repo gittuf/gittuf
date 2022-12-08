@@ -1,15 +1,11 @@
 package gittuf
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
-	"os/exec"
 	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	tufdata "github.com/theupdateframework/go-tuf/data"
@@ -182,31 +178,25 @@ func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufveri
 }
 
 func getCurrentHash(target string) (string, error) {
-	currentHash := ""
-	// First, we check if target has the form git:
-	if strings.HasPrefix(target, "git:") {
-		// Which git namespace?
-		// Actually, does it matter?
-		u, err := url.Parse(target)
-		if err != nil {
-			return "", err
-		}
-		// TODO: Fix this up, we need a better parser
-		objectName := strings.Split(u.Opaque, "=")[1]
+	// We check if target has the form git:...
+	// In future, if multiple schemes are supported, this function can dispatch
+	// to different parsers.
 
-		// FIXME: Use API here
-		cmd := exec.Command("git", "rev-parse", objectName)
-		var stdout bytes.Buffer
-		cmd.Stdout = &stdout
-		err = cmd.Run()
-		if err != nil {
-			return "", err
-		}
-		currentHash = strings.Trim(stdout.String(), "\n")
-	} else {
+	if !strings.HasPrefix(target, "git:") {
 		return "", fmt.Errorf("%s is not a Git object", target)
 	}
-	return currentHash, nil
+
+	refName, refType, err := ParseGitTarget(target)
+	if err != nil {
+		return "", err
+	}
+
+	commitID, err := GetTipCommitIDForRef(refName, refType)
+	if err != nil {
+		return "", err
+	}
+
+	return string(commitID), nil
 }
 
 func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata.Targets, string, error) {
@@ -259,11 +249,7 @@ func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata
 }
 
 func getStateTree(metadataRepo *gitstore.Repository, target string) (*object.Tree, error) {
-	repoRoot, err := GetRepoRootDir()
-	if err != nil {
-		return &object.Tree{}, err
-	}
-	mainRepo, err := git.PlainOpen(repoRoot)
+	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return &object.Tree{}, err
 	}

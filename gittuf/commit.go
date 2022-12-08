@@ -1,11 +1,8 @@
 package gittuf
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
@@ -18,17 +15,12 @@ import (
 func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
-	// FIXME: Use API here
-	cmd := exec.Command("git", "symbolic-ref", "HEAD")
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	err := cmd.Run()
+	// We can infer the branch the commit is being created in because that's
+	// how Git works already.
+	branchName, err := GetRefNameForHEAD()
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
-
-	branchSplit := strings.Split(strings.Trim(stdout.String(), "\n"), "/")
-	branchName := branchSplit[len(branchSplit)-1]
 	targetName := fmt.Sprintf("git:branch=%s", branchName)
 
 	keyIDsToUse := []string{}
@@ -53,7 +45,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	// go-tuf expects hashes to be represented as HexBytes
 	commitHB, err := getHashHexBytes(commitID)
 	if err != nil {
-		return tufdata.Signed{}, UndoCommit(err)
+		return tufdata.Signed{}, UndoLastCommit(err)
 	}
 
 	var targetsRole *tufdata.Targets
@@ -64,7 +56,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 		}
 		targetsRole, err = loadTargets(repo, role, db)
 		if err != nil {
-			return tufdata.Signed{}, UndoCommit(err)
+			return tufdata.Signed{}, UndoLastCommit(err)
 		}
 	} else {
 		targetsRole = tufdata.NewTargets()
@@ -88,18 +80,14 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 
 	signedRoleMb, err := generateAndSignMbFromStruct(targetsRole, keys)
 	if err != nil {
-		return tufdata.Signed{}, UndoCommit(err)
+		return tufdata.Signed{}, UndoLastCommit(err)
 	}
 
 	return signedRoleMb, nil
 }
 
 func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) error {
-	repoRoot, err := GetRepoRootDir()
-	if err != nil {
-		return err
-	}
-	mainRepo, err := git.PlainOpen(repoRoot)
+	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return err
 	}
@@ -141,43 +129,18 @@ func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) 
 func createCommit(gitArgs []string) ([]byte, error) {
 	logrus.Debug("Creating commit")
 
-	commitID := []byte{}
-
 	cmd := exec.Command("git", append([]string{"commit"}, gitArgs...)...)
 	err := cmd.Run()
 	if err != nil {
-		return commitID, err
+		return []byte{}, err
 	}
 
-	// FIXME: Use API here
-	cmd = exec.Command("git", "rev-parse", "HEAD")
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
-	err = cmd.Run()
+	// Get commit ID
+	commitID, err := GetHEADCommitID()
 	if err != nil {
-		return commitID, UndoCommit(err)
+		return []byte{}, UndoLastCommit(err)
 	}
-	commitID = stdout.Bytes()
-	commitID = commitID[0 : len(commitID)-1]
 
 	logrus.Debug("Created commit", string(commitID))
-
 	return commitID, nil
-}
-
-func UndoCommit(cause error) error {
-	logrus.Debug("Undoing last commit due to error")
-	// FIXME: Use API here
-	cmd := exec.Command("git", "reset", "--soft", "HEAD~1")
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("error undoing commit: %w, in turn triggered due to %w", err, cause)
-	}
-	return cause
-}
-
-func getHashHexBytes(hash []byte) (tufdata.HexBytes, error) {
-	hb := make(tufdata.HexBytes, hex.DecodedLen(len(hash)))
-	_, err := hex.Decode(hb, hash)
-	return hb, err
 }
