@@ -50,7 +50,7 @@ func init() {
 }
 
 func runCommit(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	state, err := getGitTUFState()
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	newRoleMb, err := gittuf.Commit(repo, role, roleKeys, expires, args...)
+	newRoleMb, err := gittuf.Commit(state, role, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoLastCommit(err)
 	}
 
-	err = repo.StageMetadataAndCommit(role, newRoleBytes)
+	err = state.StageMetadataAndCommit(role, newRoleBytes)
 	if err != nil {
 		return gittuf.UndoLastCommit(err)
 	}

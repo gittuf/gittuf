@@ -22,15 +22,15 @@ func getNameWithoutExtension(fileName string) string {
 	return fileName
 }
 
-func loadRepository(repo *git.Repository, commitID plumbing.Hash) (*Repository, error) {
+func loadState(repo *git.Repository, commitID plumbing.Hash) (*State, error) {
 	commitObj, err := repo.CommitObject(commitID)
 	if err != nil {
-		return &Repository{}, err
+		return &State{}, err
 	}
 
 	tree, err := repo.TreeObject(commitObj.TreeHash)
 	if err != nil {
-		return &Repository{}, err
+		return &State{}, err
 	}
 
 	var metadataTree *object.Tree
@@ -40,12 +40,12 @@ func loadRepository(repo *git.Repository, commitID plumbing.Hash) (*Repository, 
 		if entry.Name == MetadataDir {
 			metadataTree, err = repo.TreeObject(entry.Hash)
 			if err != nil {
-				return &Repository{}, err
+				return &State{}, err
 			}
 		} else if entry.Name == KeysDir {
 			keysTree, err = repo.TreeObject(entry.Hash)
 			if err != nil {
-				return &Repository{}, err
+				return &State{}, err
 			}
 		}
 	}
@@ -60,7 +60,7 @@ func loadRepository(repo *git.Repository, commitID plumbing.Hash) (*Repository, 
 		rootKeys[getNameWithoutExtension(entry.Name)] = entry
 	}
 
-	return &Repository{
+	return &State{
 		metadataStaging:     map[string][]byte{},
 		keysStaging:         map[string][]byte{},
 		repository:          repo,
@@ -139,7 +139,7 @@ func commit(repo *git.Repository, parent plumbing.Hash, treeHash plumbing.Hash, 
 		Author:    author,
 		Committer: author,
 		TreeHash:  treeHash,
-		Message:   fmt.Sprintf("gittuf: Writing metadata tree %s", treeHash.String()),
+		Message:   fmt.Sprintf("gittuf: Writing state tree %s", treeHash.String()),
 	}
 	if parent != plumbing.ZeroHash {
 		commit.ParentHashes = []plumbing.Hash{parent}

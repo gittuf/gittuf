@@ -11,7 +11,7 @@ import (
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
-func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
+func Commit(state *gitstore.State, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
 	// We can infer the branch the commit is being created in because that's
@@ -30,7 +30,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 		}
 		keyIDsToUse = append(keyIDsToUse, pubKey.IDs()...)
 	}
-	err = verifyStagedFilesCanBeModified(repo, keyIDsToUse)
+	err = verifyStagedFilesCanBeModified(state, keyIDsToUse)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
@@ -43,12 +43,12 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	}
 
 	var targetsRole *tufdata.Targets
-	if repo.HasFile(role) {
-		db, err := InitializeDBUntilRole(repo, role)
+	if state.HasFile(role) {
+		db, err := InitializeDBUntilRole(state, role)
 		if err != nil {
 			return tufdata.Signed{}, err
 		}
-		targetsRole, err = loadTargets(repo, role, db)
+		targetsRole, err = loadTargets(state, role, db)
 		if err != nil {
 			return tufdata.Signed{}, UndoLastCommit(err)
 		}
@@ -80,7 +80,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	return signedRoleMb, nil
 }
 
-func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) error {
+func verifyStagedFilesCanBeModified(state *gitstore.State, keyIDs []string) error {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) 
 		}
 	}
 
-	return validateChanges(repo, changes, keyIDs)
+	return validateChanges(state, changes, keyIDs)
 }
 
 func createCommit(gitArgs []string) (tufdata.HexBytes, error) {

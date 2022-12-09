@@ -36,7 +36,7 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 		return err
 	}
 
-	stateARepo, err := gitstore.LoadRepositoryAtState(repoRoot, stateA)
+	stateARepo, err := gitstore.LoadAtState(repoRoot, stateA)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 		return err
 	}
 
-	stateBRepo, err := gitstore.LoadRepositoryAtState(repoRoot, stateB)
+	stateBRepo, err := gitstore.LoadAtState(repoRoot, stateB)
 	if err != nil {
 		return err
 	}
@@ -86,13 +86,13 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 /*
 VerifyState checks that a target has the hash specified in the TUF delegations tree.
 */
-func VerifyState(repo *gitstore.Repository, target string) error {
+func VerifyState(state *gitstore.State, target string) error {
 	currentHash, err := getCurrentCommitID(target)
 	if err != nil {
 		return err
 	}
 
-	targets, role, err := getTargetsRoleForTarget(repo, target)
+	targets, role, err := getTargetsRoleForTarget(state, target)
 	if err != nil {
 		return err
 	}
@@ -105,10 +105,10 @@ func VerifyState(repo *gitstore.Repository, target string) error {
 	return nil
 }
 
-func InitializeTopLevelDB(repo *gitstore.Repository) (*tufverify.DB, error) {
+func InitializeTopLevelDB(state *gitstore.State) (*tufverify.DB, error) {
 	db := tufverify.NewDB()
 
-	rootRole, err := loadRoot(repo)
+	rootRole, err := loadRoot(state)
 	if err != nil {
 		return db, err
 	}
@@ -128,8 +128,8 @@ func InitializeTopLevelDB(repo *gitstore.Repository) (*tufverify.DB, error) {
 	return db, nil
 }
 
-func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufverify.DB, error) {
-	db, err := InitializeTopLevelDB(repo)
+func InitializeDBUntilRole(state *gitstore.State, roleName string) (*tufverify.DB, error) {
+	db, err := InitializeTopLevelDB(state)
 	if err != nil {
 		return db, err
 	}
@@ -154,7 +154,7 @@ func InitializeDBUntilRole(repo *gitstore.Repository, roleName string) (*tufveri
 		current := toBeChecked[0]
 		toBeChecked = toBeChecked[1:]
 
-		targets, err := loadTargets(repo, current, db)
+		targets, err := loadTargets(state, current, db)
 		if err != nil {
 			return db, err
 		}
@@ -197,13 +197,13 @@ func getCurrentCommitID(target string) (tufdata.HexBytes, error) {
 	return GetTipCommitIDForRef(refName, refType)
 }
 
-func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata.Targets, string, error) {
-	db, err := InitializeTopLevelDB(repo)
+func getTargetsRoleForTarget(state *gitstore.State, target string) (*tufdata.Targets, string, error) {
+	db, err := InitializeTopLevelDB(state)
 	if err != nil {
 		return &tufdata.Targets{}, "", err
 	}
 
-	topLevelTargets, err := loadTargets(repo, "targets", db)
+	topLevelTargets, err := loadTargets(state, "targets", db)
 	if err != nil {
 		return &tufdata.Targets{}, "", err
 	}
@@ -224,7 +224,7 @@ func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata
 				fmt.Errorf("delegation not found for target %s", target)
 		}
 
-		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
+		delegatedRole, err := loadTargets(state, d.Delegatee.Name, d.DB)
 		if err != nil {
 			return &tufdata.Targets{}, "", err
 		}
@@ -246,7 +246,7 @@ func getTargetsRoleForTarget(repo *gitstore.Repository, target string) (*tufdata
 	}
 }
 
-func getStateTree(metadataRepo *gitstore.Repository, target string) (*object.Tree, error) {
+func getStateTree(metadataRepo *gitstore.State, target string) (*object.Tree, error) {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return &object.Tree{}, err
@@ -266,8 +266,8 @@ func getStateTree(metadataRepo *gitstore.Repository, target string) (*object.Tre
 	return mainRepo.TreeObject(stateRefCommit.TreeHash)
 }
 
-func getDelegationForTarget(repo *gitstore.Repository, target string) (tufdata.DelegatedRole, error) {
-	db, err := InitializeTopLevelDB(repo)
+func getDelegationForTarget(state *gitstore.State, target string) (tufdata.DelegatedRole, error) {
+	db, err := InitializeTopLevelDB(state)
 	if err != nil {
 		return tufdata.DelegatedRole{}, err
 	}
@@ -292,7 +292,7 @@ func getDelegationForTarget(repo *gitstore.Repository, target string) (tufdata.D
 			return d.Delegatee, nil
 		}
 
-		delegatedRole, err := loadTargets(repo, d.Delegatee.Name, d.DB)
+		delegatedRole, err := loadTargets(state, d.Delegatee.Name, d.DB)
 		if err != nil {
 			return tufdata.DelegatedRole{}, err
 		}
@@ -323,8 +323,8 @@ func validateUsedKeyIDs(authorizedKeyIDs []string, usedKeyIDs []string) bool {
 	return true
 }
 
-func validateRule(ruleRepo *gitstore.Repository, path string, usedKeyIDs []string) error {
-	ruleInA, err := getDelegationForTarget(ruleRepo, path)
+func validateRule(ruleState *gitstore.State, path string, usedKeyIDs []string) error {
+	ruleInA, err := getDelegationForTarget(ruleState, path)
 	if err != nil {
 		return err
 	}
@@ -340,7 +340,7 @@ func validateRule(ruleRepo *gitstore.Repository, path string, usedKeyIDs []strin
 	return nil
 }
 
-func validateChanges(policyRepo *gitstore.Repository, changes object.Changes, usedKeyIDs []string) error {
+func validateChanges(ruleState *gitstore.State, changes object.Changes, usedKeyIDs []string) error {
 	for _, c := range changes {
 		// For each change to a file, we want to verify that the policy allows
 		// the keys that were used to sign changes for the file.
@@ -357,13 +357,13 @@ func validateChanges(policyRepo *gitstore.Repository, changes object.Changes, us
 		// result in a file being written to a protected namespace.
 
 		if len(c.From.Name) > 0 {
-			if err := validateRule(policyRepo, c.From.Name, usedKeyIDs); err != nil {
+			if err := validateRule(ruleState, c.From.Name, usedKeyIDs); err != nil {
 				return err
 			}
 		}
 
 		if c.From.Name != c.To.Name && len(c.To.Name) > 0 {
-			if err := validateRule(policyRepo, c.To.Name, usedKeyIDs); err != nil {
+			if err := validateRule(ruleState, c.To.Name, usedKeyIDs); err != nil {
 				return err
 			}
 		}

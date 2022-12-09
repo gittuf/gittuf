@@ -33,11 +33,11 @@ func init() {
 }
 
 func runVerifyState(cmd *cobra.Command, args []string) {
-	repo, err := getGittufRepo()
+	state, err := getGitTUFState()
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
-	err = gittuf.VerifyState(repo, args[0])
+	err = gittuf.VerifyState(state, args[0])
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
