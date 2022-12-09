@@ -15,9 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
-const (
-	Ref = "refs/gittuf/metadata"
-)
+const Ref = "refs/gittuf/metadata"
 
 /*
 InitRepository is invoked during the init workflow. A set of TUF metadata is
@@ -34,7 +32,7 @@ func InitRepository(repoRoot string, metadata map[string][]byte) (*Repository, e
 		return &Repository{}, err
 	}
 	return &Repository{
-		Metadata:            metadata,
+		staging:             metadata,
 		repository:          repo,
 		tip:                 plumbing.ZeroHash,
 		metadataIdentifiers: make(map[string]object.TreeEntry, len(metadata)),
@@ -54,7 +52,7 @@ func LoadRepository(repoRoot string) (*Repository, error) {
 
 	if ref.Hash() == plumbing.ZeroHash {
 		return &Repository{
-			Metadata:            map[string][]byte{},
+			staging:             map[string][]byte{},
 			repository:          repo,
 			tip:                 plumbing.ZeroHash,
 			tree:                plumbing.ZeroHash,
@@ -113,9 +111,8 @@ func LoadRepositoryAtState(repoRoot string, stateID string) (*Repository, error)
 }
 
 type Repository struct {
-	// FIXME: We likely don't need the public Metadata field, it's added in-memory complexity
-	Metadata            map[string][]byte // rolename: contents, rolename should NOT include extension
 	repository          *git.Repository
+	staging             map[string][]byte // rolename: contents, rolename should NOT include extension
 	tip                 plumbing.Hash
 	tree                plumbing.Hash
 	metadataIdentifiers map[string]object.TreeEntry // filename: TreeEntry object
@@ -139,8 +136,7 @@ func (r *Repository) Written() bool {
 }
 
 func (r *Repository) GetCommitObject(id string) (*object.Commit, error) {
-	hash := plumbing.NewHash(id)
-	return r.repository.CommitObject(hash)
+	return r.GetCommitObjectFromHash(plumbing.NewHash(id))
 }
 
 func (r *Repository) GetCommitObjectFromHash(hash plumbing.Hash) (*object.Commit, error) {
@@ -148,8 +144,7 @@ func (r *Repository) GetCommitObjectFromHash(hash plumbing.Hash) (*object.Commit
 }
 
 func (r *Repository) GetTreeObject(id string) (*object.Tree, error) {
-	hash := plumbing.NewHash(id)
-	return r.repository.TreeObject(hash)
+	return r.GetTreeObjectFromHash(plumbing.NewHash(id))
 }
 
 func (r *Repository) GetTreeObjectFromHash(hash plumbing.Hash) (*object.Tree, error) {
@@ -180,20 +175,37 @@ func (r *Repository) GetMetadataForState(stateID string) (map[string][]byte, err
 }
 
 func (r *Repository) HasFile(roleName string) bool {
-	_, exists := r.Metadata[roleName]
+	_, exists := r.metadataIdentifiers[roleName]
 	return exists
 }
 
-func (r *Repository) GetCurrentFileBytes(roleName string) []byte {
-	return r.Metadata[roleName]
+func (r *Repository) GetCurrentFileBytes(roleName string) ([]byte, error) {
+	_, contents, err := readBlob(r.repository, r.metadataIdentifiers[roleName].Hash)
+	if err != nil {
+		return []byte{}, err
+	}
+	return contents, nil
 }
 
-func (r *Repository) GetCurrentFileString(roleName string) string {
-	return string(r.Metadata[roleName])
+func (r *Repository) GetCurrentFileString(roleName string) (string, error) {
+	contents, err := r.GetCurrentFileBytes(roleName)
+	return string(contents), err
+}
+
+func (r *Repository) GetAllCurrentMetadata() (map[string][]byte, error) {
+	metadata := map[string][]byte{}
+	for roleName, treeEntry := range r.metadataIdentifiers {
+		_, contents, err := readBlob(r.repository, treeEntry.Hash)
+		if err != nil {
+			return map[string][]byte{}, err
+		}
+		metadata[roleName] = contents
+	}
+	return metadata, nil
 }
 
 func (r *Repository) Stage(roleName string, contents []byte) {
-	r.Metadata[roleName] = contents
+	r.staging[roleName] = contents
 	r.written = false
 }
 
@@ -219,21 +231,30 @@ func (r *Repository) CommitHeldMetadata() error {
 		return nil
 	}
 
-	currentEntries := make([]object.TreeEntry, 0, len(r.Metadata))
+	// We need to create a new tree that includes unchanged entries and the
+	// newly staged metadata.
+	currentEntries := []object.TreeEntry{}
+	for roleName, treeEntry := range r.metadataIdentifiers {
+		if _, exists := r.staging[roleName]; exists {
+			// We'll not reuse the entries for staged metadata
+			continue
+		}
+		currentEntries = append(currentEntries, treeEntry)
+	}
 
-	// Write held blobs
-	for roleName, contents := range r.Metadata {
+	// Write staged blobs and add them to currentEntries
+	for roleName, contents := range r.staging {
 		identifier, err := writeBlob(r.repository, contents)
 		if err != nil {
 			return err
 		}
-		entry := object.TreeEntry{
+		treeEntry := object.TreeEntry{
 			Name: fmt.Sprintf("%s.json", roleName),
 			Mode: filemode.Regular,
 			Hash: identifier,
 		}
-		r.metadataIdentifiers[roleName] = entry
-		currentEntries = append(currentEntries, entry)
+		r.metadataIdentifiers[roleName] = treeEntry
+		currentEntries = append(currentEntries, treeEntry)
 	}
 
 	// Create a new tree object
@@ -259,7 +280,7 @@ func (r *Repository) RemoveFiles(roleNames []string) error {
 	r.written = false
 
 	for _, role := range roleNames {
-		delete(r.Metadata, role)
+		delete(r.staging, role)
 		delete(r.metadataIdentifiers, role)
 	}
 
@@ -390,22 +411,13 @@ func loadRepository(repo *git.Repository, commitID plumbing.Hash) (*Repository, 
 		return &Repository{}, err
 	}
 
-	metadata := map[string][]byte{}
 	metadataIdentifiers := map[string]object.TreeEntry{}
 	for _, entry := range tree.Entries {
-		// FIXME: Assuming everything is a blob and that all blobs are TUF metadata
-		_, contents, err := readBlob(repo, entry.Hash)
-		if err != nil {
-			return &Repository{}, err
-		}
-
-		roleName := getRoleName(entry.Name)
-		metadataIdentifiers[roleName] = entry
-		metadata[roleName] = contents
+		metadataIdentifiers[getRoleName(entry.Name)] = entry
 	}
 
 	return &Repository{
-		Metadata:            metadata,
+		staging:             map[string][]byte{},
 		repository:          repo,
 		tip:                 commitObj.Hash,
 		tree:                commitObj.TreeHash,

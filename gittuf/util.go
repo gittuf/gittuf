@@ -21,10 +21,13 @@ var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
 func loadRoot(repo *gitstore.Repository) (*tufdata.Root, error) {
 	var role tufdata.Root
 
-	roleBytes := repo.GetCurrentFileBytes("root")
+	roleBytes, err := repo.GetCurrentFileBytes("root")
+	if err != nil {
+		return &role, err
+	}
 
 	var roleMb tufdata.Signed
-	err := json.Unmarshal(roleBytes, &roleMb)
+	err = json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
 		return &role, err
 	}
@@ -38,10 +41,13 @@ func loadRoot(repo *gitstore.Repository) (*tufdata.Root, error) {
 func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (*tufdata.Targets, error) {
 	var role tufdata.Targets
 
-	roleBytes := repo.GetCurrentFileBytes(roleName)
+	roleBytes, err := repo.GetCurrentFileBytes(roleName)
+	if err != nil {
+		return &role, err
+	}
 
 	var roleMb tufdata.Signed
-	err := json.Unmarshal(roleBytes, &roleMb)
+	err = json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
 		return &role, err
 	}

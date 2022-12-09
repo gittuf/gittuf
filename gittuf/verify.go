@@ -62,7 +62,10 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 	if err != nil {
 		return err
 	}
-	roleBytes := stateBRepo.GetCurrentFileBytes(roleName)
+	roleBytes, err := stateBRepo.GetCurrentFileBytes(roleName)
+	if err != nil {
+		return err
+	}
 	var roleSigned tufdata.Signed
 	err = json.Unmarshal(roleBytes, &roleSigned)
 	if err != nil {
