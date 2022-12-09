@@ -118,5 +118,5 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.StageAndCommit(role, newRoleBytes)
+	return repo.StageMetadataAndCommit(role, newRoleBytes)
 }

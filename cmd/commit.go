@@ -81,7 +81,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoLastCommit(err)
 	}
 
-	err = repo.StageAndCommit(role, newRoleBytes)
+	err = repo.StageMetadataAndCommit(role, newRoleBytes)
 	if err != nil {
 		return gittuf.UndoLastCommit(err)
 	}

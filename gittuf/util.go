@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 
 	tufdata "github.com/theupdateframework/go-tuf/data"
 	tufkeys "github.com/theupdateframework/go-tuf/pkg/keys"
@@ -16,32 +17,68 @@ import (
 
 var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
 
-// FIXME: update load... methods to be generic of type
-
 func loadRoot(repo *gitstore.Repository) (*tufdata.Root, error) {
 	var role tufdata.Root
 
-	roleBytes := repo.GetCurrentFileBytes("root")
-
-	var roleMb tufdata.Signed
-	err := json.Unmarshal(roleBytes, &roleMb)
+	roleBytes, err := repo.GetCurrentMetadataBytes("root")
 	if err != nil {
-		return &role, err
+		return &tufdata.Root{}, err
 	}
 
-	// FIXME: Activate sig verification
+	var roleMb tufdata.Signed
+	err = json.Unmarshal(roleBytes, &roleMb)
+	if err != nil {
+		return &tufdata.Root{}, err
+	}
 
 	err = json.Unmarshal(roleMb.Signed, &role)
+	if err != nil {
+		return &tufdata.Root{}, err
+	}
+
+	rootKeys, err := repo.GetAllRootKeys()
+	if err != nil {
+		return &tufdata.Root{}, err
+	}
+
+	msg, err := cjson.EncodeCanonical(role)
+	if err != nil {
+		return &tufdata.Root{}, err
+	}
+
+	verifiedKeyIDs := []string{}
+	for _, sig := range roleMb.Signatures {
+		key := rootKeys[sig.KeyID]
+		verifier, err := tufkeys.GetVerifier(&key)
+		if err != nil {
+			return &tufdata.Root{}, err
+		}
+		err = verifier.Verify(msg, sig.Signature)
+		if err != nil {
+			// TODO: do we fail for any sig that fails? What's the threshold
+			// strategy?
+			return &tufdata.Root{}, err
+		}
+		verifiedKeyIDs = append(verifiedKeyIDs, sig.KeyID)
+	}
+
+	if len(verifiedKeyIDs) == 0 {
+		return &tufdata.Root{}, fmt.Errorf("root role verified with zero keys")
+	}
+
 	return &role, err
 }
 
 func loadTargets(repo *gitstore.Repository, roleName string, db *tufverify.DB) (*tufdata.Targets, error) {
 	var role tufdata.Targets
 
-	roleBytes := repo.GetCurrentFileBytes(roleName)
+	roleBytes, err := repo.GetCurrentMetadataBytes(roleName)
+	if err != nil {
+		return &role, err
+	}
 
 	var roleMb tufdata.Signed
-	err := json.Unmarshal(roleBytes, &roleMb)
+	err = json.Unmarshal(roleBytes, &roleMb)
 	if err != nil {
 		return &role, err
 	}

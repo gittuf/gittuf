@@ -48,10 +48,6 @@ var metadataRmCmd = &cobra.Command{
 	RunE:  runMetadataRm,
 }
 
-var (
-	long bool
-)
-
 func init() {
 	metadataLsCmd.Flags().BoolVarP(
 		&long,
@@ -84,7 +80,7 @@ func runMetadataLs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	currentTree, err := repo.Tree()
+	currentTree, err := repo.GetTreeForNamespace(gitstore.MetadataDir)
 	if err != nil {
 		return err
 	}
@@ -114,7 +110,7 @@ func runMetadataAdd(cmd *cobra.Command, args []string) error {
 		}
 		metadata[n] = c
 	}
-	return repo.StageAndCommitMultiple(metadata)
+	return repo.StageAndCommitMultipleMetadata(metadata)
 }
 
 func runMetadataCat(cmd *cobra.Command, args []string) error {
@@ -125,7 +121,11 @@ func runMetadataCat(cmd *cobra.Command, args []string) error {
 
 	for _, n := range args {
 		n = strings.TrimSuffix(n, ".json")
-		fmt.Println(repo.GetCurrentFileString(n))
+		contents, err := repo.GetCurrentMetadataString(n)
+		if err != nil {
+			return err
+		}
+		fmt.Println(contents)
 	}
 
 	return nil
@@ -143,5 +143,5 @@ func runMetadataRm(cmd *cobra.Command, args []string) error {
 		roles = append(roles, strings.TrimSuffix(n, ".json"))
 	}
 
-	return repo.RemoveFiles(roles)
+	return repo.RemoveMetadata(roles)
 }

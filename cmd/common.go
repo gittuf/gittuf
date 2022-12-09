@@ -12,6 +12,7 @@ import (
 var (
 	role         string
 	roleKeyPaths []string
+	long         bool
 )
 
 // Borrowed from go-tuf
