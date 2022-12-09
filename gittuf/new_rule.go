@@ -21,14 +21,14 @@ func NewRule(
 	protectPaths []string,
 	allowedKeys []tufdata.PublicKey) (tufdata.Signed, error) {
 
-	if contents, err := repo.GetCurrentFileBytes(ruleName); len(contents) > 0 {
+	if contents, err := repo.GetCurrentMetadataBytes(ruleName); len(contents) > 0 {
 		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
 	} else if err != nil {
 		return tufdata.Signed{}, err
 	}
 
 	var roleMb tufdata.Signed
-	roleData, err := repo.GetCurrentFileBytes(role)
+	roleData, err := repo.GetCurrentMetadataBytes(role)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}

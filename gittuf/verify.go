@@ -62,7 +62,7 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 	if err != nil {
 		return err
 	}
-	roleBytes, err := stateBRepo.GetCurrentFileBytes(roleName)
+	roleBytes, err := stateBRepo.GetCurrentMetadataBytes(roleName)
 	if err != nil {
 		return err
 	}
