@@ -108,6 +108,10 @@ func LoadGitStore(repoRoot string) (*GitStore, error) {
 }
 
 func (g *GitStore) GetLastTrusted() (map[string]string, error) {
+	if g.lastTrusted.IsZero() {
+		return map[string]string{}, nil
+	}
+
 	_, contents, err := readBlob(g.repository, g.lastTrusted)
 	if err != nil {
 		return map[string]string{}, err
@@ -139,4 +143,14 @@ func (g *GitStore) WriteLastTrusted(lastTrusted map[string]string) error {
 
 func (g *GitStore) State() *State {
 	return g.state
+}
+
+func (g *GitStore) UpdateTrustedState(target, stateID string) error {
+	lastTrusted, err := g.GetLastTrusted()
+	if err != nil {
+		return err
+	}
+	lastTrusted[target] = stateID
+
+	return g.WriteLastTrusted(lastTrusted)
 }

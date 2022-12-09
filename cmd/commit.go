@@ -71,7 +71,8 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	newRoleMb, err := gittuf.Commit(state, role, roleKeys, expires, args...)
+	// TODO: should gittuf.Commit infer target name or should we do it here?
+	newRoleMb, target, err := gittuf.Commit(state, role, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}
@@ -88,5 +89,11 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoLastCommit(err)
 	}
 
+	err = store.UpdateTrustedState(target, state.Tip())
+	if err != nil {
+		return gittuf.UndoLastCommit(err)
+	}
+
+	// We always want to explicitly return nil and pass errors to UndoLastCommit
 	return nil
 }
