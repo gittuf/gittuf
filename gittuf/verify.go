@@ -88,19 +88,36 @@ VerifyState checks that a target has the hash specified in the TUF delegations t
 */
 func VerifyState(store *gitstore.GitStore, target string) error {
 	state := store.State()
-	currentHash, err := getCurrentCommitID(target)
+	activeID, err := getCurrentCommitID(target)
 	if err != nil {
 		return err
 	}
 
-	targets, role, err := getTargetsRoleForTarget(state, target)
+	currentTargets, role, err := getTargetsRoleForTarget(state, target)
 	if err != nil {
 		return err
 	}
 
-	entryHash := targets.Targets[target].Hashes["sha1"]
-	if !reflect.DeepEqual(currentHash, entryHash) {
-		return fmt.Errorf("role %s has different hash value %s from current hash %s", role, entryHash.String(), currentHash.String())
+	currentTargetsID := currentTargets.Targets[target].Hashes["sha1"]
+	if !reflect.DeepEqual(currentTargetsID, activeID) {
+		return fmt.Errorf("role %s has recorded different hash value %s from current hash %s", role, currentTargetsID.String(), activeID.String())
+	}
+
+	lastTrustedStateID, err := store.LastTrusted(target)
+	if err != nil {
+		return err
+	}
+	lastTrustedState, err := store.SpecificState(lastTrustedStateID)
+	if err != nil {
+		return err
+	}
+	lastTrustedTargets, role, err := getTargetsRoleForTarget(lastTrustedState, target)
+	if err != nil {
+		return err
+	}
+	lastTrustedTargetsID := lastTrustedTargets.Targets[target].Hashes["sha1"]
+	if !reflect.DeepEqual(lastTrustedTargetsID, activeID) {
+		return fmt.Errorf("role %s has recorded different hash value %s from current hash %s", role, lastTrustedTargetsID.String(), activeID.String())
 	}
 
 	return nil

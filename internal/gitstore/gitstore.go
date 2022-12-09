@@ -2,6 +2,7 @@ package gitstore
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -141,8 +142,27 @@ func (g *GitStore) WriteLastTrusted(lastTrusted map[string]string) error {
 	return g.repository.Storer.CheckAndSetReference(newRef, oldRef)
 }
 
+// State returns the current state.
 func (g *GitStore) State() *State {
 	return g.state
+}
+
+// SpecificState returns the specified state.
+func (g *GitStore) SpecificState(stateID string) (*State, error) {
+	stateHash := plumbing.NewHash(stateID)
+	return loadState(g.repository, stateHash)
+}
+
+func (g *GitStore) LastTrusted(target string) (string, error) {
+	lastTrusted, err := g.GetLastTrusted()
+	if err != nil {
+		return "", err
+	}
+	stateID, exists := lastTrusted[target]
+	if !exists {
+		return "", fmt.Errorf("no trusted state found for %s", target)
+	}
+	return stateID, nil
 }
 
 func (g *GitStore) UpdateTrustedState(target, stateID string) error {
