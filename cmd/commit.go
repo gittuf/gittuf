@@ -50,10 +50,12 @@ func init() {
 }
 
 func runCommit(cmd *cobra.Command, args []string) error {
-	state, err := getGitTUFState()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
+	state := store.State()
+
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {
 		logrus.Debug("Loading key from", k)

@@ -61,12 +61,12 @@ func init() {
 }
 
 func runKeysLs(cmd *cobra.Command, args []string) error {
-	state, err := getGitTUFState()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
 
-	currentTree, err := state.GetTreeForNamespace(gitstore.KeysDir)
+	currentTree, err := store.State().GetTreeForNamespace(gitstore.KeysDir)
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func runKeysLs(cmd *cobra.Command, args []string) error {
 }
 
 func runKeysAdd(cmd *cobra.Command, args []string) error {
-	state, err := getGitTUFState()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
@@ -102,18 +102,18 @@ func runKeysAdd(cmd *cobra.Command, args []string) error {
 		keys = append(keys, k)
 	}
 
-	return state.StageKeysAndCommit(keys)
+	return store.State().StageKeysAndCommit(keys)
 }
 
 func runKeysCat(cmd *cobra.Command, args []string) error {
-	state, err := getGitTUFState()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
 
 	for _, n := range args {
 		n = strings.TrimSuffix(n, ".pub")
-		key, err := state.GetRootKeyString(n)
+		key, err := store.State().GetRootKeyString(n)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func runKeysCat(cmd *cobra.Command, args []string) error {
 }
 
 func runKeysRm(cmd *cobra.Command, args []string) error {
-	state, err := getGitTUFState()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
@@ -135,5 +135,5 @@ func runKeysRm(cmd *cobra.Command, args []string) error {
 		keyIDs = append(keyIDs, strings.TrimSuffix(n, ".pub"))
 	}
 
-	return state.RemoveKeys(keyIDs)
+	return store.State().RemoveKeys(keyIDs)
 }

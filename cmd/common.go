@@ -27,10 +27,10 @@ func parseExpires(e string, role string) (time.Time, error) {
 	return time.Now().AddDate(0, 0, days).UTC(), nil
 }
 
-func getGitTUFState() (*gitstore.State, error) {
+func getGitStore() (*gitstore.GitStore, error) {
 	dir, err := gittuf.GetRepoRootDir()
 	if err != nil {
-		return &gitstore.State{}, err
+		return &gitstore.GitStore{}, err
 	}
-	return gitstore.LoadState(dir)
+	return gitstore.LoadGitStore(dir)
 }

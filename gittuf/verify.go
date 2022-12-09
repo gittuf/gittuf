@@ -86,7 +86,8 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 /*
 VerifyState checks that a target has the hash specified in the TUF delegations tree.
 */
-func VerifyState(state *gitstore.State, target string) error {
+func VerifyState(store *gitstore.GitStore, target string) error {
+	state := store.State()
 	currentHash, err := getCurrentCommitID(target)
 	if err != nil {
 		return err
