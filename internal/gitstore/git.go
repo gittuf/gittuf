@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	Ref         = "refs/gittuf/metadata"
+	Ref         = "refs/gittuf/state"
 	MetadataDir = "metadata"
 	KeysDir     = "keys"
 )
