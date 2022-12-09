@@ -18,20 +18,10 @@ const (
 )
 
 /*
-InitState is invoked during the init workflow. A set of TUF metadata is
+initState is invoked during the init workflow. A set of TUF metadata is
 created and passed in. This is then written to the store.
 */
-func InitState(repoRoot string, rootPublicKeys []tufdata.PublicKey, metadata map[string][]byte) (*State, error) {
-	err := InitNamespace(repoRoot)
-	if err != nil {
-		return &State{}, err
-	}
-
-	repo, err := git.PlainOpen(repoRoot)
-	if err != nil {
-		return &State{}, err
-	}
-
+func initState(repo *git.Repository, rootPublicKeys []tufdata.PublicKey, metadata map[string][]byte) (*State, error) {
 	r := &State{
 		metadataStaging:     map[string][]byte{},
 		keysStaging:         map[string][]byte{},
@@ -43,7 +33,7 @@ func InitState(repoRoot string, rootPublicKeys []tufdata.PublicKey, metadata map
 		written:             false,
 	}
 
-	err = r.StageKeys(rootPublicKeys)
+	err := r.StageKeys(rootPublicKeys)
 	if err != nil {
 		return &State{}, err
 	}
