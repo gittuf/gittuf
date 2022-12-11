@@ -1,7 +1,9 @@
 # gittuf
 
-The security layer for Git, built using
-[The Update Framework (TUF)](https://theupdateframework.io/).
+This project provides a new security layer for Git, built using
+[The Update Framework (TUF)](https://theupdateframework.io/).  It includes 
+the ability to distribute and revoke keys, protect commits / branches / tags,
+and more!
 
 ## Current Status
 
