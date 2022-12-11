@@ -17,32 +17,6 @@ const (
 	KeysDir     = "keys"
 )
 
-/*
-initState is invoked during the init workflow. A set of TUF metadata is
-created and passed in. This is then written to the store.
-*/
-func initState(repo *git.Repository, rootPublicKeys []tufdata.PublicKey, metadata map[string][]byte) (*State, error) {
-	r := &State{
-		metadataStaging:     map[string][]byte{},
-		keysStaging:         map[string][]byte{},
-		tip:                 plumbing.ZeroHash,
-		tree:                plumbing.ZeroHash,
-		repository:          repo,
-		metadataIdentifiers: map[string]object.TreeEntry{},
-		rootKeys:            map[string]object.TreeEntry{},
-		written:             false,
-	}
-
-	err := r.StageKeys(rootPublicKeys)
-	if err != nil {
-		return &State{}, err
-	}
-
-	r.StageMultipleMetadata(metadata)
-
-	return r, nil
-}
-
 func LoadState(repoRoot string) (*State, error) {
 	repo, err := git.PlainOpen(repoRoot)
 	if err != nil {
