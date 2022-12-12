@@ -75,12 +75,12 @@ func runMetadataInit(cmd *cobra.Command, args []string) error {
 }
 
 func runMetadataLs(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
 
-	currentTree, err := repo.GetTreeForNamespace(gitstore.MetadataDir)
+	currentTree, err := store.State().GetTreeForNamespace(gitstore.MetadataDir)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func runMetadataLs(cmd *cobra.Command, args []string) error {
 }
 
 func runMetadataAdd(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
@@ -110,18 +110,18 @@ func runMetadataAdd(cmd *cobra.Command, args []string) error {
 		}
 		metadata[n] = c
 	}
-	return repo.StageAndCommitMultipleMetadata(metadata)
+	return store.State().StageAndCommitMultipleMetadata(metadata)
 }
 
 func runMetadataCat(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
 
 	for _, n := range args {
 		n = strings.TrimSuffix(n, ".json")
-		contents, err := repo.GetCurrentMetadataString(n)
+		contents, err := store.State().GetCurrentMetadataString(n)
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func runMetadataCat(cmd *cobra.Command, args []string) error {
 }
 
 func runMetadataRm(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
@@ -143,5 +143,5 @@ func runMetadataRm(cmd *cobra.Command, args []string) error {
 		roles = append(roles, strings.TrimSuffix(n, ".json"))
 	}
 
-	return repo.RemoveMetadata(roles)
+	return store.State().RemoveMetadata(roles)
 }

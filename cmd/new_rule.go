@@ -84,10 +84,11 @@ func init() {
 }
 
 func runNewRule(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
+	state := store.State()
 
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {
@@ -107,7 +108,7 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		allowedKeys = append(allowedKeys, pubKey)
 	}
 
-	newRoleMb, err := gittuf.NewRule(repo, role, roleKeys, ruleName, ruleThreshold,
+	newRoleMb, err := gittuf.NewRule(state, role, roleKeys, ruleName, ruleThreshold,
 		ruleTerminating, protectPaths, allowedKeys)
 	if err != nil {
 		return err
@@ -118,5 +119,5 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.StageMetadataAndCommit(role, newRoleBytes)
+	return state.StageMetadataAndCommit(role, newRoleBytes)
 }

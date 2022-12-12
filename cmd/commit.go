@@ -50,10 +50,12 @@ func init() {
 }
 
 func runCommit(cmd *cobra.Command, args []string) error {
-	repo, err := getGittufRepo()
+	store, err := getGitStore()
 	if err != nil {
 		return err
 	}
+	state := store.State()
+
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {
 		logrus.Debug("Loading key from", k)
@@ -69,7 +71,8 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	newRoleMb, err := gittuf.Commit(repo, role, roleKeys, expires, args...)
+	// TODO: should gittuf.Commit infer target name or should we do it here?
+	newRoleMb, target, err := gittuf.Commit(state, role, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}
@@ -81,10 +84,16 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoLastCommit(err)
 	}
 
-	err = repo.StageMetadataAndCommit(role, newRoleBytes)
+	err = state.StageMetadataAndCommit(role, newRoleBytes)
 	if err != nil {
 		return gittuf.UndoLastCommit(err)
 	}
 
+	err = store.UpdateTrustedState(target, state.Tip())
+	if err != nil {
+		return gittuf.UndoLastCommit(err)
+	}
+
+	// We always want to explicitly return nil and pass errors to UndoLastCommit
 	return nil
 }

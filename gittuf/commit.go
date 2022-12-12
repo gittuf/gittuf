@@ -11,14 +11,14 @@ import (
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
-func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, error) {
+func Commit(state *gitstore.State, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, string, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
 	// We can infer the branch the commit is being created in because that's
 	// how Git works already.
 	branchName, err := GetRefNameForHEAD()
 	if err != nil {
-		return tufdata.Signed{}, err
+		return tufdata.Signed{}, "", err
 	}
 	targetName, _ := CreateGitTarget(branchName, GitBranchRef) // we're passing in BranchRef explicitly, we can skip the error check
 
@@ -26,31 +26,31 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	for _, k := range keys {
 		pubKey, err := GetEd25519PublicKeyFromPrivateKey(&k)
 		if err != nil {
-			return tufdata.Signed{}, err
+			return tufdata.Signed{}, "", err
 		}
 		keyIDsToUse = append(keyIDsToUse, pubKey.IDs()...)
 	}
-	err = verifyStagedFilesCanBeModified(repo, keyIDsToUse)
+	err = verifyStagedFilesCanBeModified(state, keyIDsToUse)
 	if err != nil {
-		return tufdata.Signed{}, err
+		return tufdata.Signed{}, "", err
 	}
 
 	// Create a commit and get its identifier
 	commitID, err := createCommit(gitArgs)
 	if err != nil {
 		// commit will have been undone in createCommit already
-		return tufdata.Signed{}, err
+		return tufdata.Signed{}, "", err
 	}
 
 	var targetsRole *tufdata.Targets
-	if repo.HasFile(role) {
-		db, err := InitializeDBUntilRole(repo, role)
+	if state.HasFile(role) {
+		db, err := InitializeDBUntilRole(state, role)
 		if err != nil {
-			return tufdata.Signed{}, err
+			return tufdata.Signed{}, "", err
 		}
-		targetsRole, err = loadTargets(repo, role, db)
+		targetsRole, err = loadTargets(state, role, db)
 		if err != nil {
-			return tufdata.Signed{}, UndoLastCommit(err)
+			return tufdata.Signed{}, "", UndoLastCommit(err)
 		}
 	} else {
 		targetsRole = tufdata.NewTargets()
@@ -74,13 +74,13 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 
 	signedRoleMb, err := generateAndSignMbFromStruct(targetsRole, keys)
 	if err != nil {
-		return tufdata.Signed{}, UndoLastCommit(err)
+		return tufdata.Signed{}, "", UndoLastCommit(err)
 	}
 
-	return signedRoleMb, nil
+	return signedRoleMb, targetName, nil
 }
 
-func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) error {
+func verifyStagedFilesCanBeModified(state *gitstore.State, keyIDs []string) error {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func verifyStagedFilesCanBeModified(repo *gitstore.Repository, keyIDs []string) 
 		}
 	}
 
-	return validateChanges(repo, changes, keyIDs)
+	return validateChanges(state, changes, keyIDs)
 }
 
 func createCommit(gitArgs []string) (tufdata.HexBytes, error) {

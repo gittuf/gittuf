@@ -149,9 +149,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// TODO: Should we undo git init if this call fails?
-	repo, err := gitstore.InitRepository(".", rootPublicKeys, metadata)
+	store, err := gitstore.InitGitStore(".", rootPublicKeys, metadata)
 	if err != nil {
 		return err
 	}
-	return repo.Commit()
+	return store.State().Commit()
 }

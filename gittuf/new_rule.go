@@ -12,7 +12,7 @@ import (
 )
 
 func NewRule(
-	repo *gitstore.Repository,
+	state *gitstore.State,
 	role string,
 	roleKeys []tufdata.PrivateKey,
 	ruleName string,
@@ -21,14 +21,14 @@ func NewRule(
 	protectPaths []string,
 	allowedKeys []tufdata.PublicKey) (tufdata.Signed, error) {
 
-	if contents, err := repo.GetCurrentMetadataBytes(ruleName); len(contents) > 0 {
+	if contents, err := state.GetCurrentMetadataBytes(ruleName); len(contents) > 0 {
 		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
 	} else if err != nil {
 		return tufdata.Signed{}, err
 	}
 
 	var roleMb tufdata.Signed
-	roleData, err := repo.GetCurrentMetadataBytes(role)
+	roleData, err := state.GetCurrentMetadataBytes(role)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
