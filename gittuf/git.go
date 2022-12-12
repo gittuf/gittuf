@@ -85,38 +85,38 @@ func GetHEADCommitID() (tufdata.HexBytes, error) {
 func UndoLastCommit(cause error) error {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
-		return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+		return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 	}
 
 	headRef, err := mainRepo.Head()
 	if err != nil {
-		return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+		return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 	}
 
 	lastCommit, err := mainRepo.CommitObject(headRef.Hash())
 	if err != nil {
-		return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+		return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 	}
 
 	if len(lastCommit.ParentHashes) == 0 {
 		// This is the first commit
 		refName, err := GetRefNameForHEAD()
 		if err != nil {
-			return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+			return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 		}
 		err = mainRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName(refName))
 		if err != nil {
-			return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+			return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 		}
 		return cause
 	} else if len(lastCommit.ParentHashes) > 1 {
 		// This is a merge commit
-		return fmt.Errorf("unable to undo last commit %s as it has multiple parent commits, in turn triggered due to error %w", lastCommit.Hash.String(), cause)
+		return fmt.Errorf("could not undo commit as it is a merge commit, triggered due to error %w", cause)
 	}
 
 	currentWorktree, err := mainRepo.Worktree()
 	if err != nil {
-		return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+		return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 	}
 
 	err = currentWorktree.Reset(&git.ResetOptions{
@@ -124,7 +124,7 @@ func UndoLastCommit(cause error) error {
 		Mode:   git.SoftReset,
 	})
 	if err != nil {
-		return fmt.Errorf("%w, in turn triggered due to error %w", err, cause)
+		return fmt.Errorf("could not undo commit triggered due to error %w", cause)
 	}
 
 	return cause
