@@ -1,7 +1,6 @@
 package gittuf
 
 import (
-	"fmt"
 	"os/exec"
 	"time"
 
@@ -21,7 +20,7 @@ func Commit(repo *gitstore.Repository, role string, keys []tufdata.PrivateKey, e
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
-	targetName := fmt.Sprintf("git:branch=%s", branchName)
+	targetName, _ := CreateGitTarget(branchName, GitBranchRef) // we're passing in BranchRef explicitly, we can skip the error check
 
 	keyIDsToUse := []string{}
 	for _, k := range keys {

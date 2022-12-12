@@ -5,7 +5,6 @@ package gittuf
 import (
 	"bytes"
 	"fmt"
-	"net/url"
 	"os/exec"
 	"strings"
 
@@ -13,35 +12,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
-
-const (
-	BranchRef = iota
-	TagRef
-)
-
-func ParseGitTarget(uri string) (string, uint, error) {
-	u, err := url.Parse(uri)
-	if err != nil {
-		return "", 0, err
-	}
-	if u.Scheme != "git" {
-		return "", 0, fmt.Errorf("%s is not a Git object", uri)
-	}
-
-	if len(u.Opaque) == 0 {
-		return "", 0, fmt.Errorf("invalid format for %s", uri)
-	}
-
-	split := strings.Split(u.Opaque, "=") // assuming there aren't multiple key value pairs
-	if len(split) > 2 {
-		return "", 0, fmt.Errorf("invalid format for %s", uri)
-	}
-
-	if split[0] == "tag" {
-		return split[1], TagRef, nil
-	}
-	return split[1], BranchRef, nil
-}
 
 func GetRepoRootDir() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
@@ -76,7 +46,7 @@ func GetRefNameForHEAD() (string, error) {
 	return branchSplit[len(branchSplit)-1], nil
 }
 
-func GetTipCommitIDForRef(refName string, refType uint) (tufdata.HexBytes, error) {
+func GetTipCommitIDForRef(refName string, refType int) (tufdata.HexBytes, error) {
 	mainRepo, err := GetRepoHandler()
 	if err != nil {
 		return tufdata.HexBytes{}, err
@@ -84,9 +54,9 @@ func GetTipCommitIDForRef(refName string, refType uint) (tufdata.HexBytes, error
 
 	var r plumbing.ReferenceName
 	switch refType {
-	case BranchRef:
+	case GitBranchRef:
 		r = plumbing.NewBranchReferenceName(refName)
-	case TagRef:
+	case GitTagRef:
 		r = plumbing.NewTagReferenceName(refName)
 	default:
 		return tufdata.HexBytes{}, fmt.Errorf("unknown reference type for %s", refName)

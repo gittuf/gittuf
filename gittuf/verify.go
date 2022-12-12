@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -28,7 +27,7 @@ func VerifyTrustedStates(target string, stateA string, stateB string) error {
 	}
 
 	// Verify the ref is in valid git format
-	if !strings.HasPrefix(target, "git:") {
+	if !IsValidGitTarget(target) {
 		return fmt.Errorf("specified ref '%s' is not in valid git format", target)
 	}
 
@@ -186,7 +185,7 @@ func getCurrentCommitID(target string) (tufdata.HexBytes, error) {
 	// In future, if multiple schemes are supported, this function can dispatch
 	// to different parsers.
 
-	if !strings.HasPrefix(target, "git:") {
+	if !IsValidGitTarget(target) {
 		return tufdata.HexBytes{}, fmt.Errorf("%s is not a Git object", target)
 	}
 
