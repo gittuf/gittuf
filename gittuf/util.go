@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/adityasaky/gittuf/internal/gitstore"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 
 	tufdata "github.com/theupdateframework/go-tuf/data"
@@ -90,6 +91,18 @@ func loadTargets(state *gitstore.State, roleName string, db *tufverify.DB) (*tuf
 
 	err = json.Unmarshal(roleMb.Signed, &role)
 	return &role, err
+}
+
+func getTreeObjectForTargetState(state *gitstore.State, targets *tufdata.Targets, targetName string) (*object.Tree, error) {
+	lastTrustedCommit, err := state.GetCommitObjectFromHash(
+		convertTUFHashHexBytesToPlumbingHash(
+			targets.Targets[targetName].Hashes["sha1"],
+		),
+	)
+	if err != nil {
+		return &object.Tree{}, err
+	}
+	return state.GetTreeObjectFromHash(lastTrustedCommit.TreeHash)
 }
 
 func LoadEd25519PublicKeyFromSslib(path string) (tufdata.PublicKey, error) {

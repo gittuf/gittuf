@@ -2,6 +2,7 @@ package gitstore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
@@ -109,6 +110,9 @@ func (s *State) FetchFromRemote(remoteName string) error {
 	}
 	err := s.repository.Fetch(options)
 	if err != nil {
+		if errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return nil
+		}
 		return err
 	}
 
@@ -226,6 +230,26 @@ func (s *State) GetCurrentMetadataBytes(roleName string) ([]byte, error) {
 		return []byte{}, err
 	}
 	return contents, nil
+}
+
+func (s *State) GetUnverifiedSignersForRole(roleName string) ([]string, error) {
+	contents, err := s.GetCurrentMetadataBytes(roleName)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var mb tufdata.Signed
+	err = json.Unmarshal(contents, &mb)
+	if err != nil {
+		return []string{}, err
+	}
+
+	keyIDs := []string{}
+	for _, s := range mb.Signatures {
+		keyIDs = append(keyIDs, s.KeyID)
+	}
+
+	return keyIDs, nil
 }
 
 func (s *State) GetCurrentMetadataString(roleName string) (string, error) {

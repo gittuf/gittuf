@@ -147,6 +147,10 @@ func (g *GitStore) State() *State {
 	return g.state
 }
 
+func (g *GitStore) Repository() *git.Repository {
+	return g.repository
+}
+
 // SpecificState returns the specified state.
 func (g *GitStore) SpecificState(stateID string) (*State, error) {
 	stateHash := plumbing.NewHash(stateID)
