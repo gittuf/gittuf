@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -98,6 +99,52 @@ type State struct {
 	rootKeys            map[string]object.TreeEntry // keyID: TreeEntry object
 	metadataIdentifiers map[string]object.TreeEntry // filename: TreeEntry object
 	written             bool
+}
+
+func (s *State) FetchFromRemote(remoteName string) error {
+	refSpec := config.RefSpec(fmt.Sprintf("%s:%s", StateRef, StateRef))
+	options := &git.FetchOptions{
+		RemoteName: remoteName,
+		RefSpecs:   []config.RefSpec{refSpec},
+	}
+	err := s.repository.Fetch(options)
+	if err != nil {
+		return err
+	}
+
+	ref, err := s.repository.Reference(plumbing.ReferenceName(StateRef), true)
+	if err != nil {
+		return err
+	}
+	tipCommit, err := s.repository.CommitObject(ref.Hash())
+	if err != nil {
+		return err
+	}
+
+	s.tip = tipCommit.Hash
+	s.tree = tipCommit.TreeHash
+
+	rootKeys := map[string]object.TreeEntry{}
+	keysTree, err := s.GetTreeForNamespace(KeysDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range keysTree.Entries {
+		rootKeys[getNameWithoutExtension(e.Name)] = e
+	}
+	s.rootKeys = rootKeys
+
+	metadataIdentifiers := map[string]object.TreeEntry{}
+	metadataTree, err := s.GetTreeForNamespace(MetadataDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range metadataTree.Entries {
+		metadataIdentifiers[getNameWithoutExtension(e.Name)] = e
+	}
+	s.metadataIdentifiers = metadataIdentifiers
+
+	return nil
 }
 
 func (s *State) Tip() string {
