@@ -21,29 +21,15 @@ func NewRule(
 	protectPaths []string,
 	allowedKeys []tufdata.PublicKey) (tufdata.Signed, error) {
 
-	if contents, err := state.GetCurrentMetadataBytes(ruleName); len(contents) > 0 {
+	if state.HasFile(ruleName) {
 		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
-	} else if err != nil {
-		return tufdata.Signed{}, err
 	}
 
-	var roleMb tufdata.Signed
-	roleData, err := state.GetCurrentMetadataBytes(role)
+	db, err := InitializeDBUntilRole(state, role)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
-	err = json.Unmarshal(roleData, &roleMb)
-	if err != nil {
-		return tufdata.Signed{}, err
-	}
-
-	/*
-		TODO: should we verify signatures on the current version of `role`
-		before proceeding?
-	*/
-
-	var roleTargets tufdata.Targets
-	err = json.Unmarshal(roleMb.Signed, &roleTargets)
+	roleTargets, err := loadTargets(state, role, db)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}
