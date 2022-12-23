@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/adityasaky/gittuf/gittuf"
+	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/spf13/cobra"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -89,6 +90,11 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	state := store.State()
+
+	err = state.FetchFromRemote(gitstore.DefaultRemote)
+	if err != nil {
+		return err
+	}
 
 	var roleKeys []tufdata.PrivateKey
 	for _, k := range roleKeyPaths {

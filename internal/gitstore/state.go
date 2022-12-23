@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	StateRef    = "refs/gittuf/state"
-	MetadataDir = "metadata"
-	KeysDir     = "keys"
+	StateRef      = "refs/gittuf/state"
+	DefaultRemote = "origin"
+	MetadataDir   = "metadata"
+	KeysDir       = "keys"
 )
 
 func LoadState(repoRoot string) (*State, error) {
