@@ -2,9 +2,11 @@ package gitstore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -12,9 +14,10 @@ import (
 )
 
 const (
-	StateRef    = "refs/gittuf/state"
-	MetadataDir = "metadata"
-	KeysDir     = "keys"
+	StateRef      = "refs/gittuf/state"
+	DefaultRemote = "origin"
+	MetadataDir   = "metadata"
+	KeysDir       = "keys"
 )
 
 func LoadState(repoRoot string) (*State, error) {
@@ -100,6 +103,55 @@ type State struct {
 	written             bool
 }
 
+func (s *State) FetchFromRemote(remoteName string) error {
+	refSpec := config.RefSpec(fmt.Sprintf("%s:%s", StateRef, StateRef))
+	options := &git.FetchOptions{
+		RemoteName: remoteName,
+		RefSpecs:   []config.RefSpec{refSpec},
+	}
+	err := s.repository.Fetch(options)
+	if err != nil {
+		if errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return nil
+		}
+		return err
+	}
+
+	ref, err := s.repository.Reference(plumbing.ReferenceName(StateRef), true)
+	if err != nil {
+		return err
+	}
+	tipCommit, err := s.repository.CommitObject(ref.Hash())
+	if err != nil {
+		return err
+	}
+
+	s.tip = tipCommit.Hash
+	s.tree = tipCommit.TreeHash
+
+	rootKeys := map[string]object.TreeEntry{}
+	keysTree, err := s.GetTreeForNamespace(KeysDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range keysTree.Entries {
+		rootKeys[getNameWithoutExtension(e.Name)] = e
+	}
+	s.rootKeys = rootKeys
+
+	metadataIdentifiers := map[string]object.TreeEntry{}
+	metadataTree, err := s.GetTreeForNamespace(MetadataDir)
+	if err != nil {
+		return err
+	}
+	for _, e := range metadataTree.Entries {
+		metadataIdentifiers[getNameWithoutExtension(e.Name)] = e
+	}
+	s.metadataIdentifiers = metadataIdentifiers
+
+	return nil
+}
+
 func (s *State) Tip() string {
 	return s.tip.String()
 }
@@ -179,6 +231,26 @@ func (s *State) GetCurrentMetadataBytes(roleName string) ([]byte, error) {
 		return []byte{}, err
 	}
 	return contents, nil
+}
+
+func (s *State) GetUnverifiedSignersForRole(roleName string) ([]string, error) {
+	contents, err := s.GetCurrentMetadataBytes(roleName)
+	if err != nil {
+		return []string{}, err
+	}
+
+	var mb tufdata.Signed
+	err = json.Unmarshal(contents, &mb)
+	if err != nil {
+		return []string{}, err
+	}
+
+	keyIDs := []string{}
+	for _, s := range mb.Signatures {
+		keyIDs = append(keyIDs, s.KeyID)
+	}
+
+	return keyIDs, nil
 }
 
 func (s *State) GetCurrentMetadataString(roleName string) (string, error) {

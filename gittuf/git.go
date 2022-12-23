@@ -137,3 +137,11 @@ func convertPlumbingHashToTUFHashHexBytes(hash plumbing.Hash) tufdata.HexBytes {
 	}
 	return hb
 }
+
+func convertTUFHashHexBytesToPlumbingHash(hb tufdata.HexBytes) plumbing.Hash {
+	hash := plumbing.Hash{}
+	for i := range hash {
+		hash[i] = hb[i]
+	}
+	return hash
+}
