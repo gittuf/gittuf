@@ -19,15 +19,15 @@ Now, suppose Alice makes some changes to her namespace.
 $ mkdir secret
 $ echo "this is for alice only" > secret/alice-only.txt
 $ git add secret/
-$ gittuf commit --role protect-main --role-key ../keys/alice --  -m "Initial commit"
+$ gittuf commit --  -m "Initial commit"
 $ gittuf verify state git:branch=main
 $ echo "some day bob may also write here" >> secret/alice-only.txt
 $ git add secret/
-$ gittuf commit --role protect-main --role-key ../keys/alice --  -m "Make Bob hopeful"
+$ gittuf commit --  -m "Make Bob hopeful"
 $ gittuf verify state git:branch=main
 Target git:branch=main verified successfully!
-$ gittuf verify trusted-state git:branch=main 74c46567326b64d495466d16dc07742332cc8f8f a35f9f4cfcdf2b0752446ce0f9bf08d2e900a964
-Changes in state a35f9f4cfcdf2b0752446ce0f9bf08d2e900a964 follow rules specified in state 74c46567326b64d495466d16dc07742332cc8f8f for git:branch=main!
+$ gittuf verify trusted-state git:branch=main <prevState> <curState>
+Changes in state <curState> follow rules specified in state <prevState> for git:branch=main!
 ```
 
 So far so good! What happens if Bob writes to Alice's namespace?
@@ -37,10 +37,10 @@ $ cd ..
 $ cp -r demo-clean demo-invalid && cd demo-invalid
 $ echo "hi i'm bob" >> secret/alice-only.txt
 $ git add secret/
-$ gittuf commit --role protect-main --role-key ../keys/bob --  -m "Bob gives it a go"
+$ gittuf commit --role-key ../keys/bob --  -m "Bob gives it a go"
 $ gittuf verify state git:branch=main
 Target git:branch=main verified successfully!
-$ gittuf verify trusted-state git:branch=main a35f9f4cfcdf2b0752446ce0f9bf08d2e900a964 61d1262122a57a4420c923f44a213f4620956ae6
+$ gittuf verify trusted-state git:branch=main <prevState> <curState>
 Error: unauthorized change to file secret/alice-only.txt
 ```
 
