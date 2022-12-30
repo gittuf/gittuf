@@ -8,9 +8,9 @@ import (
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	tufdata "github.com/theupdateframework/go-tuf/data"
-	tuftargets "github.com/theupdateframework/go-tuf/pkg/targets"
-	tufverify "github.com/theupdateframework/go-tuf/verify"
+	tufkeys "github.com/theupdateframework/go-tuf/pkg/keys"
 )
 
 const AllowRule = "allow-*"
@@ -123,81 +123,6 @@ func VerifyState(store *gitstore.GitStore, target string) error {
 	return nil
 }
 
-func InitializeTopLevelDB(state *gitstore.State) (*tufverify.DB, error) {
-	db := tufverify.NewDB()
-
-	rootRole, err := loadRoot(state)
-	if err != nil {
-		return db, err
-	}
-
-	for id, key := range rootRole.Keys {
-		if err := db.AddKey(id, key); err != nil {
-			return db, err
-		}
-	}
-
-	for name, role := range rootRole.Roles {
-		if err := db.AddRole(name, role); err != nil {
-			return db, err
-		}
-	}
-
-	return db, nil
-}
-
-func InitializeDBUntilRole(state *gitstore.State, roleName string) (*tufverify.DB, error) {
-	db, err := InitializeTopLevelDB(state)
-	if err != nil {
-		return db, err
-	}
-
-	if roleName == "targets" {
-		// The top level DB has that covered
-		return db, nil
-	}
-
-	toBeChecked := []string{"targets"}
-
-	for {
-		if len(toBeChecked) == 0 {
-			if len(roleName) != 0 {
-				return db, fmt.Errorf("role %s not found", roleName)
-			} else {
-				// We found every reachable role
-				return db, nil
-			}
-		}
-
-		current := toBeChecked[0]
-		toBeChecked = toBeChecked[1:]
-
-		targets, err := loadTargets(state, current, db)
-		if err != nil {
-			return db, err
-		}
-
-		if targets.Delegations == nil {
-			continue
-		}
-
-		for id, key := range targets.Delegations.Keys {
-			db.AddKey(id, key)
-		}
-
-		for _, d := range targets.Delegations.Roles {
-			db.AddRole(d.Name, &tufdata.Role{
-				KeyIDs:    d.KeyIDs,
-				Threshold: d.Threshold,
-			})
-			if d.Name == roleName {
-				return db, nil
-			}
-			toBeChecked = append(toBeChecked, d.Name)
-		}
-	}
-}
-
 func getCurrentCommitID(target string) (tufdata.HexBytes, error) {
 	// We check if target has the form git:...
 	// In future, if multiple schemes are supported, this function can dispatch
@@ -216,52 +141,69 @@ func getCurrentCommitID(target string) (tufdata.HexBytes, error) {
 }
 
 func getTargetsRoleForTarget(state *gitstore.State, target string) (*tufdata.Targets, string, error) {
-	db, err := InitializeTopLevelDB(state)
+	topLevelTargets, err := loadTopLevelTargets(state)
 	if err != nil {
 		return &tufdata.Targets{}, "", err
 	}
 
-	topLevelTargets, err := loadTargets(state, "targets", db)
+	refName, _, err := ParseGitTarget(target)
 	if err != nil {
 		return &tufdata.Targets{}, "", err
 	}
 
-	if _, ok := topLevelTargets.Targets[target]; ok {
-		return topLevelTargets, "targets", nil
-	}
-
-	iterator, err := tuftargets.NewDelegationsIterator(target, db)
-	if err != nil {
-		return &tufdata.Targets{}, "", err
-	}
-
-	for {
-		d, ok := iterator.Next()
-		if !ok {
-			return &tufdata.Targets{}, "",
-				fmt.Errorf("delegation not found for target %s", target)
+	allowRuleHit := false
+	acceptedKeys := map[string]*tufdata.PublicKey{}
+	for _, delegation := range topLevelTargets.Delegations.Roles {
+		if delegation.Name == AllowRule {
+			// there are no restrictions on who can sign
+			allowRuleHit = true
+			break
 		}
+		matches, err := delegation.MatchesPath(target)
+		if err != nil {
+			return &tufdata.Targets{}, "", err
+		}
+		if matches {
+			acceptedKeys = topLevelTargets.Delegations.Keys
+		}
+	}
 
-		delegatedRole, err := loadTargets(state, d.Delegatee.Name, d.DB)
+	contents, err := state.GetCurrentMetadataBytes(refName)
+	if err != nil {
+		return &tufdata.Targets{}, "", err
+	}
+
+	var s *tufdata.Signed
+	err = json.Unmarshal(contents, &s)
+	if err != nil {
+		return &tufdata.Targets{}, "", err
+	}
+
+	var role *tufdata.Targets
+	err = json.Unmarshal(s.Signed, &role)
+	if err != nil {
+		return &tufdata.Targets{}, "", err
+	}
+
+	if !allowRuleHit {
+		msg, err := cjson.EncodeCanonical(role)
 		if err != nil {
 			return &tufdata.Targets{}, "", err
 		}
 
-		if _, ok := delegatedRole.Targets[target]; ok {
-			return delegatedRole, d.Delegatee.Name, nil
-		}
-
-		if delegatedRole.Delegations != nil {
-			newDB, err := tufverify.NewDBFromDelegations(delegatedRole.Delegations)
+		for _, signature := range s.Signatures {
+			verifier, err := tufkeys.GetVerifier(acceptedKeys[signature.KeyID])
 			if err != nil {
 				return &tufdata.Targets{}, "", err
 			}
-			err = iterator.Add(delegatedRole.Delegations.Roles, d.Delegatee.Name, newDB)
+			err = verifier.Verify(msg, signature.Signature)
 			if err != nil {
 				return &tufdata.Targets{}, "", err
 			}
 		}
 	}
+
+	return role, refName, nil
 }
 
 func getStateTree(metadataRepo *gitstore.State, target string) (*object.Tree, error) {
@@ -284,53 +226,9 @@ func getStateTree(metadataRepo *gitstore.State, target string) (*object.Tree, er
 	return mainRepo.TreeObject(stateRefCommit.TreeHash)
 }
 
-func getDelegationForTarget(state *gitstore.State, target string) (tufdata.DelegatedRole, error) {
-	db, err := InitializeTopLevelDB(state)
-	if err != nil {
-		return tufdata.DelegatedRole{}, err
-	}
-
-	iterator, err := tuftargets.NewDelegationsIterator(target, db)
-	if err != nil {
-		return tufdata.DelegatedRole{}, err
-	}
-
-	for {
-		d, ok := iterator.Next()
-		if !ok {
-			return tufdata.DelegatedRole{},
-				fmt.Errorf("delegation not found for target %s", target)
-		}
-
-		match, err := d.Delegatee.MatchesPath(target)
-		if err != nil {
-			return tufdata.DelegatedRole{}, err
-		}
-		if match {
-			return d.Delegatee, nil
-		}
-
-		delegatedRole, err := loadTargets(state, d.Delegatee.Name, d.DB)
-		if err != nil {
-			return tufdata.DelegatedRole{}, err
-		}
-
-		if delegatedRole.Delegations != nil {
-			newDB, err := tufverify.NewDBFromDelegations(delegatedRole.Delegations)
-			if err != nil {
-				return tufdata.DelegatedRole{}, err
-			}
-			err = iterator.Add(delegatedRole.Delegations.Roles, d.Delegatee.Name, newDB)
-			if err != nil {
-				return tufdata.DelegatedRole{}, err
-			}
-		}
-	}
-}
-
-func validateUsedKeyIDs(authorizedKeyIDs []string, usedKeyIDs []string) bool {
+func validateUsedKeyIDs(authorizedKeyIDs map[string]tufdata.PublicKey, usedKeyIDs []string) bool {
 	set := map[string]bool{}
-	for _, k := range authorizedKeyIDs {
+	for k := range authorizedKeyIDs {
 		set[k] = true
 	}
 	for _, k := range usedKeyIDs {
@@ -342,16 +240,16 @@ func validateUsedKeyIDs(authorizedKeyIDs []string, usedKeyIDs []string) bool {
 }
 
 func validateRule(ruleState *gitstore.State, path string, usedKeyIDs []string) error {
-	ruleInA, err := getDelegationForTarget(ruleState, path)
+	keys, threshold, err := ExpectedSignersForTarget(ruleState, path)
 	if err != nil {
 		return err
 	}
-	if ruleInA.Name == AllowRule {
+	if threshold == 0 {
 		return nil
 	}
 
 	// TODO: threshold
-	if !validateUsedKeyIDs(ruleInA.KeyIDs, usedKeyIDs) {
+	if !validateUsedKeyIDs(keys, usedKeyIDs) {
 		return fmt.Errorf("unauthorized change to file %s", path)
 	}
 

@@ -10,7 +10,6 @@ import (
 )
 
 var (
-	role         string
 	roleKeyPaths []string
 	long         bool
 )

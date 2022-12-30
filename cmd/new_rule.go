@@ -27,14 +27,6 @@ var (
 func init() {
 	rootCmd.AddCommand(newRuleCmd)
 
-	newRuleCmd.Flags().StringVarP(
-		&role,
-		"role",
-		"",
-		"targets",
-		"Role to add rule to (default: top level targets)",
-	)
-
 	newRuleCmd.Flags().StringArrayVarP(
 		&roleKeyPaths,
 		"role-key",
@@ -114,7 +106,7 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		allowedKeys = append(allowedKeys, pubKey)
 	}
 
-	newRoleMb, err := gittuf.NewRule(state, role, roleKeys, ruleName, ruleThreshold,
+	newRoleMb, err := gittuf.NewRule(state, roleKeys, ruleName, ruleThreshold,
 		ruleTerminating, protectPaths, allowedKeys)
 	if err != nil {
 		return err
@@ -125,5 +117,5 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return state.StageMetadataAndCommit(role, newRoleBytes)
+	return state.StageMetadataAndCommit("targets", newRoleBytes)
 }

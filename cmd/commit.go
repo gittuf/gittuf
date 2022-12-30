@@ -24,14 +24,6 @@ var (
 func init() {
 	rootCmd.AddCommand(commitCmd)
 
-	commitCmd.Flags().StringVarP(
-		&role,
-		"role",
-		"",
-		"",
-		"Targets role to record commit in",
-	)
-
 	commitCmd.Flags().StringArrayVarP(
 		&roleKeyPaths,
 		"role-key",
@@ -84,13 +76,18 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		roleKeys = append(roleKeys, userConfig.PrivateKey)
 	}
 
+	branchName, err := gittuf.GetRefNameForHEAD()
+	if err != nil {
+		return err
+	}
+
 	expires, err := parseExpires(roleExpires, "targets")
 	if err != nil {
 		return err
 	}
 
 	// TODO: should gittuf.Commit infer target name or should we do it here?
-	newRoleMb, target, err := gittuf.Commit(state, role, roleKeys, expires, args...)
+	newRoleMb, target, err := gittuf.Commit(state, branchName, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}

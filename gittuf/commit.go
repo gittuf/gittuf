@@ -11,15 +11,10 @@ import (
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
 
-func Commit(state *gitstore.State, role string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, string, error) {
+func Commit(state *gitstore.State, branchName string, keys []tufdata.PrivateKey, expires time.Time, gitArgs ...string) (tufdata.Signed, string, error) {
 	// TODO: Should `commit` check for updated metadata on a remote?
 
-	// We can infer the branch the commit is being created in because that's
-	// how Git works already.
-	branchName, err := GetRefNameForHEAD()
-	if err != nil {
-		return tufdata.Signed{}, "", err
-	}
+	// TODO: do we need URI IDs for targetName?
 	targetName, _ := CreateGitTarget(branchName, GitBranchRef) // we're passing in BranchRef explicitly, we can skip the error check
 
 	keyIDsToUse := []string{}
@@ -30,7 +25,7 @@ func Commit(state *gitstore.State, role string, keys []tufdata.PrivateKey, expir
 		}
 		keyIDsToUse = append(keyIDsToUse, pubKey.IDs()...)
 	}
-	err = verifyStagedFilesCanBeModified(state, keyIDsToUse)
+	err := verifyStagedFilesCanBeModified(state, keyIDsToUse)
 	if err != nil {
 		return tufdata.Signed{}, "", err
 	}
@@ -43,12 +38,16 @@ func Commit(state *gitstore.State, role string, keys []tufdata.PrivateKey, expir
 	}
 
 	var targetsRole *tufdata.Targets
-	if state.HasFile(role) {
-		db, err := InitializeDBUntilRole(state, role)
+	if state.HasFile(branchName) {
+		keys, threshold, err := ExpectedSignersForTarget(state, targetName)
 		if err != nil {
 			return tufdata.Signed{}, "", err
 		}
-		targetsRole, err = loadTargets(state, role, db)
+		if threshold == 0 {
+			targetsRole, err = loadSpecificTargetsWithoutVerification(state, branchName)
+		} else {
+			targetsRole, err = loadSpecificTargets(state, branchName, keys, threshold)
+		}
 		if err != nil {
 			return tufdata.Signed{}, "", UndoLastCommit(err)
 		}

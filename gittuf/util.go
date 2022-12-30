@@ -13,7 +13,6 @@ import (
 	tufdata "github.com/theupdateframework/go-tuf/data"
 	tufkeys "github.com/theupdateframework/go-tuf/pkg/keys"
 	tufsign "github.com/theupdateframework/go-tuf/sign"
-	tufverify "github.com/theupdateframework/go-tuf/verify"
 )
 
 var METADATADIR = "../metadata" // FIXME: embed metadata in Git repo
@@ -37,6 +36,7 @@ func loadRoot(state *gitstore.State) (*tufdata.Root, error) {
 		return &tufdata.Root{}, err
 	}
 
+	// TODO: use verifySignatures
 	rootKeys, err := state.GetAllRootKeys()
 	if err != nil {
 		return &tufdata.Root{}, err
@@ -70,27 +70,108 @@ func loadRoot(state *gitstore.State) (*tufdata.Root, error) {
 	return &role, err
 }
 
-func loadTargets(state *gitstore.State, roleName string, db *tufverify.DB) (*tufdata.Targets, error) {
+func loadTopLevelTargets(state *gitstore.State) (*tufdata.Targets, error) {
+	rootRole, err := loadRoot(state)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	topLevelTargetsKeys := map[string]tufdata.PublicKey{}
+	for _, k := range rootRole.Roles["targets"].KeyIDs {
+		topLevelTargetsKeys[k] = *rootRole.Keys[k]
+	}
+
+	topLevelTargetsBytes, err := state.GetCurrentMetadataBytes("targets")
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	var s tufdata.Signed
+	err = json.Unmarshal(topLevelTargetsBytes, &s)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	err = verifySignatures(&s, topLevelTargetsKeys, rootRole.Roles["targets"].Threshold)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	var topLevelTargets tufdata.Targets
+	err = json.Unmarshal(s.Signed, &topLevelTargets)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	return &topLevelTargets, nil
+}
+
+func loadSpecificTargets(state *gitstore.State, roleName string, keys map[string]tufdata.PublicKey, threshold int) (*tufdata.Targets, error) {
+	targetsBytes, err := state.GetCurrentMetadataBytes(roleName)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	var mb tufdata.Signed
+	err = json.Unmarshal(targetsBytes, &mb)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	err = verifySignatures(&mb, keys, threshold)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
 	var role tufdata.Targets
-
-	roleBytes, err := state.GetCurrentMetadataBytes(roleName)
-	if err != nil {
-		return &role, err
-	}
-
-	var roleMb tufdata.Signed
-	err = json.Unmarshal(roleBytes, &roleMb)
-	if err != nil {
-		return &role, err
-	}
-
-	err = db.VerifySignatures(&roleMb, roleName)
-	if err != nil {
-		return &role, fmt.Errorf("%w of role %s", err, roleName)
-	}
-
-	err = json.Unmarshal(roleMb.Signed, &role)
+	err = json.Unmarshal(mb.Signed, &role)
 	return &role, err
+}
+
+func loadSpecificTargetsWithoutVerification(state *gitstore.State, roleName string) (*tufdata.Targets, error) {
+	targetsBytes, err := state.GetCurrentMetadataBytes(roleName)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	var mb tufdata.Signed
+	err = json.Unmarshal(targetsBytes, &mb)
+	if err != nil {
+		return &tufdata.Targets{}, err
+	}
+
+	var role tufdata.Targets
+	err = json.Unmarshal(mb.Signed, &role)
+	return &role, err
+}
+
+func verifySignatures(envelope *tufdata.Signed, keys map[string]tufdata.PublicKey, threshold int) error {
+	var role interface{}
+	if err := json.Unmarshal(envelope.Signed, &role); err != nil {
+		return err
+	}
+	msg, err := cjson.EncodeCanonical(role)
+	if err != nil {
+		return err
+	}
+	verifiedKeyIDs := []string{}
+	for _, sig := range envelope.Signatures {
+		key := keys[sig.KeyID]
+		verifier, err := tufkeys.GetVerifier(&key)
+		if err != nil {
+			return err
+		}
+		err = verifier.Verify(msg, sig.Signature)
+		if err != nil {
+			return err
+		}
+		verifiedKeyIDs = append(verifiedKeyIDs, sig.KeyID)
+	}
+	if len(verifiedKeyIDs) < threshold {
+		// TODO: this threshold check can be circumvented with multiple signatures from the same key
+		return fmt.Errorf("threshold not met")
+	}
+	return nil
 }
 
 func getTreeObjectForTargetState(state *gitstore.State, targets *tufdata.Targets, targetName string) (*object.Tree, error) {
@@ -213,4 +294,33 @@ func generateAndSignMbFromStruct(content interface{}, keys []tufdata.PrivateKey)
 		}
 	}
 	return newMb, nil
+}
+
+func ExpectedSignersForTarget(state *gitstore.State, target string) (map[string]tufdata.PublicKey, int, error) {
+	topLevelTargets, err := loadTopLevelTargets(state)
+	if err != nil {
+		return map[string]tufdata.PublicKey{}, -1, err
+	}
+
+	if topLevelTargets.Delegations == nil {
+		return map[string]tufdata.PublicKey{}, -1, fmt.Errorf("no rules found in targets")
+	}
+
+	for _, d := range topLevelTargets.Delegations.Roles {
+		if d.Name == AllowRule {
+			return map[string]tufdata.PublicKey{}, 0, nil
+		}
+		match, err := d.MatchesPath(target)
+		if err != nil {
+			return map[string]tufdata.PublicKey{}, -1, err
+		}
+		if match {
+			keys := map[string]tufdata.PublicKey{}
+			for _, k := range d.KeyIDs {
+				keys[k] = *topLevelTargets.Delegations.Keys[k]
+			}
+			return keys, d.Threshold, nil
+		}
+	}
+	return map[string]tufdata.PublicKey{}, -1, fmt.Errorf("no rule found for tagret %s", target)
 }
