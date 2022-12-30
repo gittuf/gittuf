@@ -83,9 +83,15 @@ func runNewRule(cmd *cobra.Command, args []string) error {
 	}
 	state := store.State()
 
-	err = state.FetchFromRemote(gitstore.DefaultRemote)
+	remotes, err := store.Repository().Remotes()
 	if err != nil {
 		return err
+	}
+	if len(remotes) > 0 {
+		err = state.FetchFromRemote(gitstore.DefaultRemote)
+		if err != nil {
+			return err
+		}
 	}
 
 	var roleKeys []tufdata.PrivateKey
