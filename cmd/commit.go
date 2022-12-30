@@ -63,13 +63,25 @@ func runCommit(cmd *cobra.Command, args []string) error {
 	}
 
 	var roleKeys []tufdata.PrivateKey
-	for _, k := range roleKeyPaths {
-		logrus.Debug("Loading key from", k)
-		privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(k)
+	if len(roleKeyPaths) > 0 {
+		for _, k := range roleKeyPaths {
+			logrus.Debug("Loading key from", k)
+			privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(k)
+			if err != nil {
+				return err
+			}
+			roleKeys = append(roleKeys, privKey)
+		}
+	} else {
+		userConfigPath, err := gittuf.FindConfigPath()
 		if err != nil {
 			return err
 		}
-		roleKeys = append(roleKeys, privKey)
+		userConfig, err := gittuf.ReadConfig(userConfigPath)
+		if err != nil {
+			return err
+		}
+		roleKeys = append(roleKeys, userConfig.PrivateKey)
 	}
 
 	expires, err := parseExpires(roleExpires, "targets")
