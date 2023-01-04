@@ -13,7 +13,6 @@ import (
 
 func NewRule(
 	state *gitstore.State,
-	role string,
 	roleKeys []tufdata.PrivateKey,
 	ruleName string,
 	ruleThreshold int,
@@ -25,11 +24,7 @@ func NewRule(
 		return tufdata.Signed{}, fmt.Errorf("metadata for rule %s already exists", ruleName)
 	}
 
-	db, err := InitializeDBUntilRole(state, role)
-	if err != nil {
-		return tufdata.Signed{}, err
-	}
-	roleTargets, err := loadTargets(state, role, db)
+	roleTargets, err := loadTopLevelTargets(state)
 	if err != nil {
 		return tufdata.Signed{}, err
 	}

@@ -24,14 +24,6 @@ var (
 func init() {
 	rootCmd.AddCommand(commitCmd)
 
-	commitCmd.Flags().StringVarP(
-		&role,
-		"role",
-		"",
-		"",
-		"Targets role to record commit in",
-	)
-
 	commitCmd.Flags().StringArrayVarP(
 		&roleKeyPaths,
 		"role-key",
@@ -57,19 +49,42 @@ func runCommit(cmd *cobra.Command, args []string) error {
 	}
 	state := store.State()
 
-	err = state.FetchFromRemote(gitstore.DefaultRemote)
+	remotes, err := store.Repository().Remotes()
 	if err != nil {
 		return err
 	}
-
-	var roleKeys []tufdata.PrivateKey
-	for _, k := range roleKeyPaths {
-		logrus.Debug("Loading key from", k)
-		privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(k)
+	if len(remotes) > 0 {
+		err = state.FetchFromRemote(gitstore.DefaultRemote)
 		if err != nil {
 			return err
 		}
-		roleKeys = append(roleKeys, privKey)
+	}
+
+	var roleKeys []tufdata.PrivateKey
+	if len(roleKeyPaths) > 0 {
+		for _, k := range roleKeyPaths {
+			logrus.Debug("Loading key from", k)
+			privKey, err := gittuf.LoadEd25519PrivateKeyFromSslib(k)
+			if err != nil {
+				return err
+			}
+			roleKeys = append(roleKeys, privKey)
+		}
+	} else {
+		userConfigPath, err := gittuf.FindConfigPath()
+		if err != nil {
+			return err
+		}
+		userConfig, err := gittuf.ReadConfig(userConfigPath)
+		if err != nil {
+			return err
+		}
+		roleKeys = append(roleKeys, userConfig.PrivateKey)
+	}
+
+	branchName, err := gittuf.GetRefNameForHEAD()
+	if err != nil {
+		return err
 	}
 
 	expires, err := parseExpires(roleExpires, "targets")
@@ -78,7 +93,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 	}
 
 	// TODO: should gittuf.Commit infer target name or should we do it here?
-	newRoleMb, target, err := gittuf.Commit(state, role, roleKeys, expires, args...)
+	newRoleMb, target, err := gittuf.Commit(state, branchName, roleKeys, expires, args...)
 	if err != nil {
 		return err
 	}
@@ -90,7 +105,7 @@ func runCommit(cmd *cobra.Command, args []string) error {
 		return gittuf.UndoLastCommit(err)
 	}
 
-	err = state.StageMetadataAndCommit(role, newRoleBytes)
+	err = state.StageMetadataAndCommit(branchName, newRoleBytes)
 	if err != nil {
 		return gittuf.UndoLastCommit(err)
 	}
