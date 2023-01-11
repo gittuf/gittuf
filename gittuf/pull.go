@@ -8,6 +8,7 @@ import (
 	"github.com/adityasaky/gittuf/internal/gitstore"
 	"github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/sirupsen/logrus"
 	tufdata "github.com/theupdateframework/go-tuf/data"
 )
@@ -34,14 +35,23 @@ func Pull(store *gitstore.GitStore, remoteName string, refName string) error {
 		return err
 	}
 
-	if newStateID == lastTrustedStateID {
-		logrus.Debug("Latest available state is already last trusted state")
-		return nil
-	}
-
 	lastTrustedState, err := store.SpecificState(lastTrustedStateID)
 	if err != nil {
 		return err
+	}
+
+	currentTargets, _, err := getTargetsRoleForTarget(currentState, targetName)
+	if err != nil {
+		return err
+	}
+
+	remoteHash, err := fetchRef(repository, remoteName, refName)
+	if err != nil {
+		return err
+	}
+
+	if newStateID == lastTrustedStateID {
+		logrus.Debug("Latest available state is already last trusted state")
 	}
 
 	pathStates, err := getPathToState(store, lastTrustedStateID, newStateID)
@@ -49,14 +59,14 @@ func Pull(store *gitstore.GitStore, remoteName string, refName string) error {
 		return err
 	}
 
-	if err = fetchRef(repository, remoteName, refName); err != nil {
-		return err
-	}
-
 	// We need to fetch the requisite trees to ensure validation works
 	latestRecordedCommit, err := validateSuccessiveStates(lastTrustedState, pathStates, targetName)
 	if err != nil {
 		return err
+	}
+
+	if remoteHash != convertTUFHashHexBytesToPlumbingHash(currentTargets.Targets[targetName].Hashes["sha1"]) {
+		return fmt.Errorf("remote updated without change in state")
 	}
 
 	if err = store.UpdateTrustedState(targetName, newStateID); err != nil {
@@ -132,12 +142,12 @@ func fetch(repository *git.Repository, remoteName string) error {
 	return err
 }
 
-func fetchRef(repository *git.Repository, remoteName string, refName string) error {
+func fetchRef(repository *git.Repository, remoteName string, refName string) (plumbing.Hash, error) {
 	// We do a regular fetch and then also explicitly fetch the ref we care about
 	// in case .git/config has been modified.
 	err := fetch(repository, remoteName)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 	fetchOptions := &git.FetchOptions{
 		RemoteName: remoteName,
@@ -146,10 +156,20 @@ func fetchRef(repository *git.Repository, remoteName string, refName string) err
 		},
 	}
 	err = repository.Fetch(fetchOptions)
-	if err != nil && errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return plumbing.ZeroHash, err
 	}
-	return err
+
+	remoteRef, err := repository.Reference(
+		plumbing.ReferenceName(
+			fmt.Sprintf("refs/remotes/%s/%s", remoteName, refName),
+		),
+		true,
+	)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	return remoteRef.Hash(), nil
 }
 
 func validateSuccessiveStates(sourceState *gitstore.State, pathStates []*gitstore.State, targetName string) (tufdata.HexBytes, error) {
