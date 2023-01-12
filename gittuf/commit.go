@@ -55,11 +55,18 @@ func Commit(state *gitstore.State, branchName string, keys []tufdata.PrivateKey,
 
 	var targetsRole *tufdata.Targets
 	if state.HasFile(branchName) {
-		if threshold == 0 {
-			targetsRole, err = loadSpecificTargetsWithoutVerification(state, branchName)
-		} else {
-			targetsRole, err = loadSpecificTargets(state, branchName, keys, threshold)
-		}
+		// FIXME: this breaks when policy has changed and expected keys
+		// are different.
+		// This would actually be better handled with decoupled RSLs. When we
+		// maintain the full state at all times, the policy may be updated
+		// invalidating other metadata held in that state which were valid
+		// when they were created.
+
+		// if threshold == 0 {
+		targetsRole, err = loadSpecificTargetsWithoutVerification(state, branchName)
+		// } else {
+		// targetsRole, err = loadSpecificTargets(state, branchName, expectedKeys, expectedThreshold)
+		// }
 		if err != nil {
 			return tufdata.Signed{}, "", UndoLastCommit(err)
 		}
