@@ -103,6 +103,19 @@ type State struct {
 	written             bool
 }
 
+func (s *State) PushToRemote(remoteName string) error {
+	refSpec := config.RefSpec(fmt.Sprintf("%s:%s", StateRef, StateRef))
+	options := &git.PushOptions{
+		RemoteName: remoteName,
+		RefSpecs:   []config.RefSpec{refSpec},
+	}
+	err := s.repository.Push(options)
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return err
+	}
+	return nil
+}
+
 func (s *State) FetchFromRemote(remoteName string) error {
 	refSpec := config.RefSpec(fmt.Sprintf("%s:%s", StateRef, StateRef))
 	options := &git.FetchOptions{
