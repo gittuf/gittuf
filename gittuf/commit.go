@@ -1,6 +1,7 @@
 package gittuf
 
 import (
+	"fmt"
 	"os/exec"
 	"time"
 
@@ -30,6 +31,21 @@ func Commit(state *gitstore.State, branchName string, keys []tufdata.PrivateKey,
 		return tufdata.Signed{}, "", err
 	}
 
+	expectedKeys, expectedThreshold, err := ExpectedSignersForTarget(state, targetName)
+	if err != nil {
+		return tufdata.Signed{}, "", err
+	}
+
+	if len(keys) < expectedThreshold {
+		return tufdata.Signed{}, "", fmt.Errorf("not enough keys to meet threshold for ref %s", branchName)
+	}
+
+	for _, k := range keyIDsToUse {
+		if _, ok := expectedKeys[k]; !ok {
+			return tufdata.Signed{}, "", fmt.Errorf("key %s not authorized to sign for ref %s", k, branchName)
+		}
+	}
+
 	// Create a commit and get its identifier
 	commitID, err := createCommit(gitArgs)
 	if err != nil {
@@ -39,10 +55,6 @@ func Commit(state *gitstore.State, branchName string, keys []tufdata.PrivateKey,
 
 	var targetsRole *tufdata.Targets
 	if state.HasFile(branchName) {
-		keys, threshold, err := ExpectedSignersForTarget(state, targetName)
-		if err != nil {
-			return tufdata.Signed{}, "", err
-		}
 		if threshold == 0 {
 			targetsRole, err = loadSpecificTargetsWithoutVerification(state, branchName)
 		} else {
