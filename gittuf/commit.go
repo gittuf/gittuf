@@ -117,7 +117,12 @@ func verifyStagedFilesCanBeModified(state *gitstore.State, keyIDs []string) erro
 
 	for path, status := range worktreeStatus {
 		logrus.Debugf("Checking if %s can be modified", path)
-		if status.Staging == git.Modified {
+		if status.Staging == git.Modified ||
+			status.Staging == git.Added ||
+			status.Staging == git.Deleted ||
+			status.Staging == git.Renamed ||
+			status.Staging == git.Copied ||
+			status.Staging == git.UpdatedButUnmerged {
 			to := path
 			if len(status.Extra) > 0 {
 				to = status.Extra
