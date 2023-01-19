@@ -68,7 +68,9 @@ distinct commit tree. Each commit in this tree corresponds to one entry in the
 RSL. The commit message has a fixed format `<ref name>: <commit ID>`, and the
 commit is signed using the actor's key.
 
-### Actor Access
+### Actor Access Control Policies
+
+Note: This section assumes some prior knowledge of the TUF specification.
 
 There are several aspects to how defining the access privileges an actor has.
 First, actors must be established in the repository unambiguously, and gittuf
@@ -84,6 +86,49 @@ changes to some namespace. As such, the owner of the repository can use gittuf
 to define actors representing other contributors to the repository, and delegate
 to them only the necessary authority to make changes to different namespaces of
 the repository.
+
+Policies for gittuf access are defined using a subset of TUF roles. The owners
+of the repository hold the keys used to sign the Root role that delegates trust
+to the other roles. The top level Targets role and any Targets roles it
+delegates to contain restrictions on protected namespaces. The specifics of the
+delegation structure vary from repository to repository as each will have its
+own constraints.
+
+A typical TUF delegation connects two TUF Targets role. In the delegations
+graph where each node is a Targets role, delegations are the edges connecting
+them. The delegations graph is traversed when verifying some target until the
+leaf node is encountered, after which the target's entry is compared against the
+target itself. gittuf modifies this workflow in part to incorporate RSLs, and in
+part to make use of Git's implicit change tracking mechanisms.
+
+In gittuf, the delegations graph is much like that of a standard TUF deployment,
+except that the leaf nodes are NOT Targets metadata. There are two types of
+namespace policies. The first are policies that apply to reference state. In
+this case, the delegations graph is traversed until the last available Targets
+metadata for the namespace. The delegation entry in that role's metadata for the
+namespace lists the set of keys that can sign an RSL entry for the ref. When
+no further metadata is found, gittuf consults the latest RSL entry applicable to
+the ref and verifies it was signed by an authorized key. In essence, this
+connects standard TUF policies to RSL entries and ensures ref updates were
+performed by authorized actors.
+
+The second type of policies apply to files and directories tracked by the
+repository. Once again, the leaf node for some protected namespace in the
+delegations graph is not Targets metadata. Instead, the parent node defines the
+set of keys authorized to make changes to the namespace. Once this set of keys
+is established, gittuf verifies that any commit modifying the protected
+namespace was signed by one of the authorized keys. Note that gittuf does not by
+default use Git commit metadata to identify the actor who created it as that may
+be trivially spoofed.
+
+In summary, a repository secured by gittuf stores the Root role and one or more
+Targets roles. Further, it embeds the public keys used to verify the Root role's
+signatures, the veracity of which are established out of band. The metadata and
+the public keys are stored as Git blobs and updates to them are tracked through
+a standalone commit tree. This commit tree is tracked at `refs/gittuf/policy`.
+The RSL compulsorily tracks the state of this reference and its protections
+apply to the policies. Further, RSL entries are used to identify historical
+policy states that may apply to older changes.
 
 ## Example
 
