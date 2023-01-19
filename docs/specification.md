@@ -1,12 +1,120 @@
-# Specification
+# gittuf Specification
 
-This document covers several workflows users employ in their use of Git. This
-analysis is important to understand how gittuf will change user workflows.
+Last Modified: January 19, 2023
 
-**AN:** A significant amount of this is a braindump still and needs revising and
-clarifications. I needed to get these ideas somewhere concrete first.
+Version: 0.1.0
 
-## Initializing a new repository -- `git init`
+## Introduction
+
+This document describes gittuf, a security layer for Git repositories. gittuf
+applies several key properties part of the
+[The Update Framework (TUF)](https://theupdateframework.io/) such as delegations
+and namespaces to Git repositories. This enables owners of the repositories to
+distribute (and revoke) contributor signing keys and define policies about which
+contributors can make changes to some namespaces within the repository. gittuf
+also implements the Reference State Log which was originally described in an
+[academic paper](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/torres-arias).
+Finally, gittuf can be used as a foundation to build other desirable features
+such as cryptographic algorithm agility, the ability to store secrets, storing
+in-toto attestations pertaining to the repository, and more.
+
+## Definitions
+
+### Git Reference (Ref)
+
+A Git reference is a "simple name" that typically points to a particular Git
+commit. Generally, development in Git repositories are centered in one or more
+refs, and they're updated as commits are added to the ref under development. By
+default, Git defines two of refs: branches (heads) and tags. Git allows for the
+creation of other arbitrary refs that users can store other information as long
+as they are formatted using Git's object types.
+
+### Actors
+
+In the context of a Git repository, an actor is any user who contributes changes
+to the repository. This may be to any file tracked by the repository in any Git
+ref. In gittuf, actors are identified by the signing keys they use when
+contributing to the repository. A policy that grants an actor the ability to
+make a certain change in fact grants it to the holder of their signing key.
+Verification of any action performed in the repository depends, among other
+factors, on the successful verification of the action's signature using the
+expected actor's public or verification key.
+
+## gittuf
+
+To begin with, gittuf carves out a namespace for itself within the repository.
+All gittuf-specific metadata and information are tracked in a separate Git ref,
+`refs/gittuf`.
+
+### Reference State Log (RSL)
+
+Note: This document presents only a summary of the academic paper and a
+description of gittuf's implementation of RSL. A full read of the paper is
+recommended.
+
+The Reference State Log contains a series of entries that each describe some
+change to a Git ref. Each entry contains the ref being updated, the new location
+it points to, and a hash of the parent RSL entry. The entry is signed by the
+actor making the change to the ref.
+
+Given that each entry in effect points to its parent entry using its hash, an
+RSL is a Merkle tree. gittuf's implementation of the RSL uses Git's underlying
+Merkle graph. Generally, gittuf is designed to ensure the RSL is linear but a
+privileged attacker may be able to cause the RSL to branch, resulting in a
+forking attack.
+
+The RSL is tracked at `refs/gittuf/reference-state-log`, and is implemented as a
+distinct commit tree. Each commit in this tree corresponds to one entry in the
+RSL. The commit message has a fixed format `<ref name>: <commit ID>`, and the
+commit is signed using the actor's key.
+
+### Actor Access
+
+There are several aspects to how defining the access privileges an actor has.
+First, actors must be established in the repository unambiguously, and gittuf
+uses TUF's mechanisms to associate actors with their signing keys. TUF metadata
+distributes the public keys of all the actors in the repository and if a key is
+compromised, new metadata is issued to revoke its trust.
+
+Second, TUF allows for defining _namespaces_ for the repository. TUF's notion of
+namespaces aligns with Git's, and TUF namespaces can be used to reason about
+both Git refs and files tracked within the repository. Namespaces are combined
+with TUF's _delegations_ to define sets of actors who are authorized to make
+changes to some namespace. As such, the owner of the repository can use gittuf
+to define actors representing other contributors to the repository, and delegate
+to them only the necessary authority to make changes to different namespaces of
+the repository.
+
+## Example
+
+Consider project `foo`'s Git repository maintained by Alice and Bob. Alice and
+Bob are the only actors authorized to update the state of the main branch. This
+is accomplished by defining a TUF delegation to Alice and Bob's keys for the
+namespace corresponding to the main branch. All changes to the main branch's
+state MUST have a corresponding entry in the repository's RSL signed by either
+Alice or Bob.
+
+Further, `foo` has another contributor, Clara, who does not have maintainer
+privileges. This means that Clara is free to make changes to other Git branches
+but only Alice or Bob may merge Clara's changes from other unprotected branches
+into the main branch.
+
+Over time, `foo` grows to incorporate several subprojects with other
+contributors Dave and Ella. Alice and Bob take the decision to reorganize the
+repository into a monorepo containing two projects, `bar` and `baz`. Clara and
+Dave work exclusively on bar and Ella works on baz with Bob. In this situation,
+Alice and Bob retain their privileges to merge changes to the main branch.
+Further, they set up delegations for each subproject's path within the
+repository. Clara and Dave are only authorized to work on files within `bar/*`
+and Ella is restricted to `baz/*`. As Bob is a maintainer of foo, he is not
+restricted to working only on `baz/*`.
+
+## Actor Workflows
+
+WIP. These workflows were originally written during the prototyping phase and
+need to be updated.
+
+### Initializing a new repository -- `git init`
 
 This command is used to create a new Git repository. This entails creating the
 `.git` directory (by default--the user can specify an alternate name) and the
@@ -25,14 +133,14 @@ directory or its equivalent.
 **Q:** What is the blessed copy of the repository? Do we hand that off to
 `remote`?
 
-### Edge Case 1 -- Running `init` on an existing repository
+#### Edge Case 1 -- Running `init` on an existing repository
 
 `git init` has no impact in an existing repository. However, there may be uses
 to running `gittuf init` to (re-)initialize the TUF root for the repository. If
 a TUF root already exists, the tool must exit with a warning and allow users to
 forcefully overwrite the existing TUF root with a new one.
 
-### Additional Thoughts
+#### Additional Thoughts
 
 Git includes support for templates that are copied into the `.git` directory or
 its equivalent. gittuf can probably utilize this functionality to initialize its
@@ -43,7 +151,7 @@ keys based on what refs or files each set is authorized to modify. This
 information must be used to automatically create the initial delegations tree.
 "Recent Writer Trust" is relevant here.
 
-## Making a change -- `git add` and `git commit`
+### Making a change -- `git add` and `git commit`
 
 The most common workflow used when recording changes within a repository is as
 follows:
@@ -93,7 +201,7 @@ private key. A delegation structure like that used in "Recent Writer Trust"
 likely makes the most sense and the reordering described there must be performed
 by gittuf.
 
-### Edge Case 1 -- Amending an existing commit
+#### Edge Case 1 -- Amending an existing commit
 
 In some cases, users can choose to amend an existing commit with new commits.
 The user stages the changes they want to add to the commit and use the
@@ -102,7 +210,7 @@ the same workflow as when a new commit is being created--validate that the
 user is authorized to modify the files and update the targets metadata with the
 new commit's hashes for the corresponding ref.
 
-### Edge Case 2 -- Rebasing a series of commits
+#### Edge Case 2 -- Rebasing a series of commits
 
 When a commit is rebased, its history is edited. This can have significant
 consequences if gittuf is unable to correctly validate the new sequence of
@@ -117,7 +225,7 @@ the changes in a rebase based on the prior state of the series of commits. At
 the formation of each commit, gittuf must apply the same series of checks as
 with creating a new commit and abort appropriately.
 
-### Edge Case 3 -- Cherry-picking a series of commits
+#### Edge Case 3 -- Cherry-picking a series of commits
 
 A cherry-pick applies the changes from the selected commits into a target
 branch. New commit objects are created that correspond to each commit
@@ -125,7 +233,7 @@ cherry-picked. As before, when cherry-picking each commit, the full workflow
 must be applied to ensure the committer is authorized to the target branch and
 to make changes to the selected files.
 
-## Merging changes from feature branches to protected branches
+### Merging changes from feature branches to protected branches
 
 This workflow shares several characteristics with that of
 [adding commits](#making-a-change----git-add-and-git-commit). However, a key
@@ -144,7 +252,7 @@ The SHA-1 identifiers are mapped to their corresponding SHA-256 identifiers.
 Finally, the right targets role is updated with the identifiers of the merge
 commit.
 
-## Pushing changes to blessed repository
+### Pushing changes to blessed repository
 
 This workflow needs to be designed carefully. Not only must metadata from
 multiple clients be handled correctly (with delegations in the right order),
@@ -170,7 +278,7 @@ branches locally (and the metadata reflects that), but is only pushing changes
 upstream to one branch. The delegations tree should perhaps mirror the branches.
 Do we still have the recent writer trust issue if we split up the metadata?
 
-### Resolving Git conflicts
+#### Resolving Git conflicts
 
 A push operation will fail if the client contains some changes that conflict
 with those on the remote. In these cases, the user is prompted to fetch the
@@ -179,7 +287,7 @@ should be able to handle these situations using semantics already described for
 [merging](#merging-changes-from-feature-branches-to-protected-branches) and
 [rebasing](#edge-case-2----rebasing-a-series-of-commits) commits.
 
-### Recovering from accidental changes and pushes
+#### Recovering from accidental changes and pushes
 
 A gittuf repository is simply a Git repository with an extra set of metadata. As
 such, it is quite possible for users to make changes to their copies of the
@@ -207,7 +315,7 @@ corresponding branches and files.
 **N:** How do we handle situations where history has been rewritten and gittuf's
 recorded state doesn't have a clear path to the current state?
 
-### Recovering from a developer compromise
+#### Recovering from a developer compromise
 
 In this scenario, one or more developer keys have been compromised and used to
 sign valid metadata for malicious changes. These metadata and changes are pushed
@@ -219,7 +327,7 @@ removes the compromised keys. The Git repository must be reverted to the last
 known good state, and the owners must issue new targets metadata that records
 this state.
 
-### Recovering from an unsynchronized state on the blessed repository
+#### Recovering from an unsynchronized state on the blessed repository
 
 This state occurs when the repository branches have different states than what
 is recorded in its TUF metadata. The repository owners must first assess if the
@@ -236,7 +344,7 @@ metadata reflecting that the changes were authorized. Appropriate measures must
 again be taken, eg. the aforementioned server side hook, to avoid this situation
 from recurring.
 
-## Providing SHA-256 identifiers alongside existing SHA-1 identifiers
+### Providing SHA-256 identifiers alongside existing SHA-1 identifiers
 
 By default, Git uses the SHA-1 hash algorithm to calculate unique identifiers.
 There is experimental support for SHA-256 identifiers, but:
@@ -249,7 +357,7 @@ repository, it can also provide a mapping to SHA-256 identifiers. This requires
 gittuf to maintain a SHA-256 reference to every SHA-1 identifier that exists in
 a repository.
 
-### Background: SHA-1
+#### Background: SHA-1
 
 Git stores all its objects in a content addressed store located under
 `.git/objects`. This directory contains subdirectories that act as an index to
@@ -264,7 +372,7 @@ $ cat .git/objects/4d/cd174e182cedf597b8a84f24ea5a53dae7e1e7 | zlib-flate -uncom
 4dcd174e182cedf597b8a84f24ea5a53dae7e1e7  -
 ```
 
-### Supporting SHA-256
+#### Supporting SHA-256
 
 There are several types of Git objects: commits, blobs, and trees. Commits
 record changes made in the repository. Blobs are files in the repository while
@@ -282,7 +390,7 @@ parent 4dcd174e182cedf597b8a84f24ea5a53dae7e1e7
 ...
 ```
 
-#### Approach 1
+##### Approach 1
 
 Now, there are several ways to calculate SHA-256 identifiers. The simplest way
 is to calculate the SHA-256 hash of the commit object itself.
@@ -300,7 +408,7 @@ more dangerous. In this situation, the commit object can remain the same but
 point to a malicious version of the tree. The SHA-256 identifier will not
 detect this change.
 
-#### Approach 2
+##### Approach 2
 
 A more involved way of calculating SHA-256 identifiers requires every object in
 the repository with a SHA-1 object to have a SHA-256 identifier. In this
@@ -334,7 +442,7 @@ that SHA-256 identifiers calculated by gittuf are the same as Git's SHA-256
 identifiers. This will play well with any transition techniques provided by Git
 for SHA-1 repositories to SHA-256 in future.
 
-### Commit / Tag signing
+#### Commit / Tag signing
 
 By default, Git signs commits using a SHA-256 representation of the commit
 objects. However, these commit objects contain SHA-1 references. A collision of
