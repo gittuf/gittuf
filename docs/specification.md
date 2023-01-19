@@ -42,6 +42,14 @@ Verification of any action performed in the repository depends, among other
 factors, on the successful verification of the action's signature using the
 expected actor's public or verification key.
 
+### State
+
+State describes the expected values for tracked refs of the repository. It is
+identified by the tip or last entry of the
+[reference state log](#reference-state-log-rsl). Note that when inspecting
+changes to the state of the repository, a workflow may only consider state
+updates relevant to a particular ref.
+
 ## gittuf
 
 To begin with, gittuf carves out a namespace for itself within the repository.
@@ -156,191 +164,120 @@ repository. Clara and Dave are only authorized to work on files within `bar/*`
 and Ella is restricted to `baz/*`. As Bob is a maintainer of foo, he is not
 restricted to working only on `baz/*`.
 
+## Verification Workflow
+
+As noted before, there are two types of verifications that apply. Each may also
+be subdivided into distinct operations.
+
+### Verifying Changes Made
+
+In gittuf, verifying the validity of changes is _relative_. Verification of a
+new state depends on comparing it against some prior, verified state. For some
+ref `X` that is currently at verified entry `S` in the RSL and its latest
+available state entry is `D`:
+
+1. Fetch all changes made to `X` between the commit recorded in `S` and that
+   recorded in `D`, including the latest commit into a temporary branch.
+1. Walk back from `S` until a state entry `P` is found that updated the gittuf
+   policy namespace. This identifies the policy that was active for changes made
+   immediately after `S`.
+1. Validate `P`'s metadata using the TUF workflow, ignore expiration date
+   checks.
+1. Walk back from `D` until `S` and create an ordered list of all state updates
+   that targeted either `X` or the gittuf policy namespace. At this point, the
+   verification workflow has an ordered list of states `[I1, I2, ..., In, D]` it
+   needs to validate, including changes to policies. Other intermediate states
+   that updated other refs MAY be ignored.
+1. For each set of consecutive states starting with `(S, I1)` to `(In, D)`:
+   1. If second state changes gittuf policy:
+      1. Validate new policy metadata using the TUF workflow and `P`'s contents
+         to established authorized signers for new policy. Ignore expiration
+         date checks. If verification passes, update `P` to new policy state.
+   1. Verify the second state entry was signed by an authorized key as defined
+      in P.
+   1. Enumerate all commits between that recorded in the first state and the
+      second state with the signing key used for each commit. Verify each
+      commit's signature using public key recorded in `P`.
+   1. Identify the net or combined set of files modified between the commits in
+      the first and second states as `F`.
+   1. If all commits are signed by the same key, individual commits need not be
+      validated. Instead, `F` can be used directly. For each path:
+         1. Find the set of keys authorized to make changes to the path in `P`.
+         1. Verify key used is in authorized set. If not, terminate verification
+            workflow with an error.
+   1. If not, iterate over each commit. For each commit:
+      1. Identify the file paths modified by the commit. For each path:
+         1. Find the set of keys authorized to make changes to the path in `P`.
+         1. Verify key used is in authorized set. If not, check if path is
+            present in `F`, as an unauthorized change may have been corrected
+            subsequently. This merely acts as a hint as path may have been also
+            changed subsequently by an authorized user, meaning it is in `F`. If
+            path is not in `F`, continue with verification. Else, request user
+            input, indicating potential policy violation.
+   1. Set trusted state for `X` to second state of current iteration.
+
 ## Actor Workflows
 
-WIP. These workflows were originally written during the prototyping phase and
-need to be updated.
+These workflows were originally written during the prototyping phase and need to
+be updated. Note: This document expects readers to be familiar with some of
+Git's default user workflows.
 
 ### Initializing a new repository -- `git init`
 
-This command is used to create a new Git repository. This entails creating the
-`.git` directory (by default--the user can specify an alternate name) and the
-directory structure within it.
+Alongside the standard creation of a new Git repository, gittuf also signs and
+issues version 1 of the Root metadata and the top level Targets metadata. An out
+of band process may be used (such as a root signing ceremony) to generate these
+files, and therefore, pre-signed metadata may be passed in. The public keys used
+to verify the Root role must also be included.
 
-gittuf will require some additional operations. Not only must it initialize a
-new repository, it must initialize a TUF root. In this situation, it is assumed
-that the user executing the command is one of the owners of the repository. The
-owner specifies an expiry date and can add one or more public keys that map to
-other functionaries of the repository. Finally, they sign it using their root
-key. gittuf then writes this file to the `refs/tuf/root.ext` within the `.git`
-directory or its equivalent.
+All of these files are stored in the `refs/gittuf/policy` namespace. The tree
+object must contain two subtrees: `keys` and `metadata`. The root public keys
+are stored as Git blobs and recorded in the `keys` tree object and the metadata
+blobs are recorded in the `metadata` tree object.
 
-**Q:** Should `init` also add the top level Targets role?
-
-**Q:** What is the blessed copy of the repository? Do we hand that off to
-`remote`?
-
-#### Edge Case 1 -- Running `init` on an existing repository
+#### Edge Case -- Running `init` on an existing repository
 
 `git init` has no impact in an existing repository. However, there may be uses
-to running `gittuf init` to (re-)initialize the TUF root for the repository. If
-a TUF root already exists, the tool must exit with a warning and allow users to
-forcefully overwrite the existing TUF root with a new one.
+to running `gittuf init` to (re-)initialize the TUF Root for the repository. If
+a TUF Root already exists, gittuf MUST exit with a warning and allow users to
+forcefully overwrite the existing TUF Root with a new one. Once again, out of
+band processes may be necessary to bootstrap the Root metadata.
 
-#### Additional Thoughts
+### Making changes -- `git add`, `git commit`, and `git merge`
 
-Git includes support for templates that are copied into the `.git` directory or
-its equivalent. gittuf can probably utilize this functionality to initialize its
-namespace. This will avoid issues with detached or renamed `.git` directories.
+gittuf applies access control policies to files tracked in the repository based
+on the author of the commits modifying them. As such, no changes are necessary
+to the standard commit workflows employed by developers. However, to benefit
+from the gittuf's guarantees, all commits SHOULD be signed by their authors.
 
-The initialization process must also prompt owners to create sets of users /
-keys based on what refs or files each set is authorized to modify. This
-information must be used to automatically create the initial delegations tree.
-"Recent Writer Trust" is relevant here.
+### Making changes available to other users -- `git push`
 
-### Making a change -- `git add` and `git commit`
+The RSL is updated when users are ready to push changes for some ref to a remote
+version of the repository. There are some modifications to this workflow from
+what is described in the RSL academic paper. First, the remote's RSL is fetched
+and its entries are evaluated against the current state of the target ref. If
+changes were made to the ref remotely, they need to be incorporated and the
+local changes must be reapplied. Further, any updates to the policy namespace
+must also be applied locally. Once this process is complete (it may take
+multiple passes if the target ref receives a lot of activity on the remote),
+gittuf creates a provisional entry in the local RSL.
 
-The most common workflow used when recording changes within a repository is as
-follows:
+This entry is provisional because before the remote can be updated with the new
+status of the target ref and the RSL, gittuf executes the
+[verification workflow](#verifying-changes-made) with the provisional entry.
+This means that prior to changes being pushed, the verification workflow ensures
+the commits and the entry are all valid as per the latest available policy on
+the remote.
 
-```
-git add ...
-git commit ...
-```
+If verification passes, the target ref and the RSL entry are pushed to the
+remote, _after_ checking that more entries have not been created on the remote
+when verification was in progress locally. If this is the case, the provisional
+entry is deleted, upstream changes are fetched, and the entire process is
+repeated.
 
-The `add` command adds one or more files specified to Git's "staging" area. The
-changes in the staging area are then recorded into a commit using the `commit`
-command. gittuf does not need to keep track of the changes being added to the
-staging area. This is because gittuf's policies are applied with respect to
-commits--files the current user does not have access to can be modified and
-added to the staging area and this does not matter until the user tries to
-actually commit these changes.
+## Recovery Workflows
 
-On the other hand, a number of additions to the Git's `commit` workflow are
-necessary. First, gittuf must check if updated TUF targets metadata is
-available. This is important because new policies may have been issued that
-provide or revoke access to the committing user for a set of files. If the user
-has modified a file they aren't authorized to, gittuf must terminate without
-committing the changes. Similarly, gittuf must also validate that the changes
-are in a branch the user is authorized to write to. If not, the process must
-be terminated without committing the changes.
-
-**Q:** Should gittuf download the latest set of TUF metadata from some
-designated remote? How is the blessed remote managed?
-
-**Q:** What if the user is making changes to files they're not authorized to
-write to but in a separate feature branch? A repo owner with write access to a
-protected branch and the files in question may choose to merge it, and that
-should be considered valid? I think there isn't one right answer here, and we
-should show variations of this using delegation semantics with corresponding
-policies.
-
-Second, once past verifying if the user is making an authorized change, a new
-commit object must be created using default Git semantics. Git provides the
-default SHA-1 identifier for this commit object. The same process used to
-generate this identifier must be performed with SHA-256 to obtain that
-identifier.
-[Read more](#providing-sha-256-identifiers-alongside-existing-sha-1-identifiers).
-
-Third, the corresponding targets role must be updated with both the SHA-1 and
-SHA-256 hashes for the target branch. The metadata must be signed by the user's
-private key. A delegation structure like that used in "Recent Writer Trust"
-likely makes the most sense and the reordering described there must be performed
-by gittuf.
-
-#### Edge Case 1 -- Amending an existing commit
-
-In some cases, users can choose to amend an existing commit with new commits.
-The user stages the changes they want to add to the commit and use the
-`--amend` flag to edit the existing commit. In this scenario, gittuf can apply
-the same workflow as when a new commit is being created--validate that the
-user is authorized to modify the files and update the targets metadata with the
-new commit's hashes for the corresponding ref.
-
-#### Edge Case 2 -- Rebasing a series of commits
-
-When a commit is rebased, its history is edited. This can have significant
-consequences if gittuf is unable to correctly validate the new sequence of
-changes. Rebasing a series of commits essentially creates a new series of
-commits that may or may not have the same changes. In fact, the commits may not
-even be in the same location in the commit Merkle DAG.
-
-During a rebase, Git's commit workflow is applied to the series of changes the
-user selects. The user may choose to pause a rebase and amend commits in the
-middle of a range of commits. Therefore, gittuf must make no assumptions about
-the changes in a rebase based on the prior state of the series of commits. At
-the formation of each commit, gittuf must apply the same series of checks as
-with creating a new commit and abort appropriately.
-
-#### Edge Case 3 -- Cherry-picking a series of commits
-
-A cherry-pick applies the changes from the selected commits into a target
-branch. New commit objects are created that correspond to each commit
-cherry-picked. As before, when cherry-picking each commit, the full workflow
-must be applied to ensure the committer is authorized to the target branch and
-to make changes to the selected files.
-
-### Merging changes from feature branches to protected branches
-
-This workflow shares several characteristics with that of
-[adding commits](#making-a-change----git-add-and-git-commit). However, a key
-difference is that a merge can place commits from an unauthorized user in a
-protected branch **if** the merge was initiated by an authorized user.
-
-First, as before, gittuf checks for new TUF targets metadata. This ensures the
-merge is performed with the latest set of policies. These policies are checked
-to see if the merging user is authorized to make changes to the files modified
-in the commits. Similarly, the policies are checked to ensure the merging user
-is indeed authorized to write to the base branch. FIXME: branch should probably
-be checked first.
-
-Second, as before, a new _merge_ commit object is created by the merging user.
-The SHA-1 identifiers are mapped to their corresponding SHA-256 identifiers.
-Finally, the right targets role is updated with the identifiers of the merge
-commit.
-
-### Pushing changes to blessed repository
-
-This workflow needs to be designed carefully. Not only must metadata from
-multiple clients be handled correctly (with delegations in the right order),
-the server on receiving a set of changes must also handle conflict resolution
-and recovery in potential attacks.
-
-When a user invokes the push workflow to submit a set of changes from their
-local copy to the remote blessed repository, they may hold changes that are
-now considered unauthorized by the remote. As such, all pushes should begin with
-a refresh of the client's TUF metadata to verify that the user is authorized to
-push to the target branch and that the changes being pushed are in files the
-user can write to. If this verification fails, the push operation should be
-terminated.
-
-If the verification passes, the local targets metadata with a record of the new
-changes and the changes themselves must be submitted to the repository.
-
-**N:** We should ensure this is atomic to avoid the metadata being out of sync
-from the actual states of the repositories.
-
-**N:** We should address situations where the user has made changes to multiple
-branches locally (and the metadata reflects that), but is only pushing changes
-upstream to one branch. The delegations tree should perhaps mirror the branches.
-Do we still have the recent writer trust issue if we split up the metadata?
-
-#### Resolving Git conflicts
-
-A push operation will fail if the client contains some changes that conflict
-with those on the remote. In these cases, the user is prompted to fetch the
-changes from the remote, resolve the conflicts, and then push again. gittuf
-should be able to handle these situations using semantics already described for
-[merging](#merging-changes-from-feature-branches-to-protected-branches) and
-[rebasing](#edge-case-2----rebasing-a-series-of-commits) commits.
-
-#### Recovering from accidental changes and pushes
-
-A gittuf repository is simply a Git repository with an extra set of metadata. As
-such, it is quite possible for users to make changes to their copies of the
-repository without using gittuf, but rather the Git command directly. This means
-that the metadata they hold may be out of sync from the actual state of the
-repository.
+### Recovering from accidental changes and pushes
 
 There are several scenarios here. If a user makes changes locally and tries to
 push them to the blessed copy, it should be quite easy to detect and reject the
@@ -348,48 +285,23 @@ changes. A pre-receive hook on the server can be employed to ensure the client
 is also sending valid metadata for the set of changes. If not, the operation
 must be terminated.
 
-**N:** We should map out the scenarios where the blessed repo has been
-compromised and the hooks have been disabled. We can likely make use of
-something like Rekor to point to last known policies for the repo? This is
-likely a separate aspect of validation of the repo state.
+In situations where server-side hooks cannot be used (or trusted), maintainers
+of the repositories can correct the record for the affected refs and sign new
+RSL entries indicating the correct locations. Clients that employ gittuf are
+always secure as they will reject changes that fail validation.
 
-When the user is prompted to sign new metadata, they should be able to use
-gittuf to "catch up" to the current state of their copy of the repository. Prior
-to signing new targets metadata, gittuf must validate that the changes made
-compared to its previous entry are allowed by the repository's policies for the
-corresponding branches and files.
+TODO: evaluate if consecutive state verification fails on clients behind the
+times. Should recovery rewrite non-valid RSL entries? Defeats the purpose?
 
-**N:** How do we handle situations where history has been rewritten and gittuf's
-recorded state doesn't have a clear path to the current state?
+### Recovering from a developer compromise
 
-#### Recovering from a developer compromise
+If a developer's keys are compromised and used to make changes to the
+repository, maintainers must immediately sign updated policies revoking their
+keys. Further, maintainers may reset the states of the affected refs and sign
+new RSL entries with corrected states.
 
-In this scenario, one or more developer keys have been compromised and used to
-sign valid metadata for malicious changes. These metadata and changes are pushed
-to the blessed repository. Note that this assumes the TUF root keys are not
-among those compromised.
-
-In this scenario, the repository owners must immediately sign new metadata that
-removes the compromised keys. The Git repository must be reverted to the last
-known good state, and the owners must issue new targets metadata that records
-this state.
-
-#### Recovering from an unsynchronized state on the blessed repository
-
-This state occurs when the repository branches have different states than what
-is recorded in its TUF metadata. The repository owners must first assess if the
-repository state is malicious--an attacker was able to push malicious changes
-but lacked the ability to sign metadata. If this is the case, the owners must
-revert the changes to the last known good state matched in the metadata. The
-specific set of circumstances that allowed attackers to push to the repository
-is out of scope of gittuf but they must be appropriately handled.
-
-If the synchronization was not the result of an attack, the commits that were
-not recorded must be checked against the active delegations policy to ensure
-they were valid. If yes, the owners or the appropriate developer must sign new
-metadata reflecting that the changes were authorized. Appropriate measures must
-again be taken, eg. the aforementioned server side hook, to avoid this situation
-from recurring.
+TODO: evaluate if consecutive state verification fails on clients behind the
+times. Should recovery rewrite non-valid RSL entries? Defeats the purpose?
 
 ### Providing SHA-256 identifiers alongside existing SHA-1 identifiers
 
