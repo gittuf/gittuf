@@ -8,11 +8,13 @@ Version: 0.1.0
 
 This document describes gittuf, a security layer for Git repositories. gittuf
 applies several key properties part of the
-[The Update Framework (TUF)](https://theupdateframework.io/) such as delegations
-and namespaces to Git repositories. This enables owners of the repositories to
-distribute (and revoke) contributor signing keys and define policies about which
-contributors can make changes to some namespaces within the repository. gittuf
-also implements the Reference State Log which was originally described in an
+[The Update Framework (TUF)](https://theupdateframework.io/) such as
+delegations, secure key distribution, key revocation, trust rotation, read /
+write access control, and namespaces to Git repositories. This enables owners of
+the repositories to distribute (and revoke) contributor signing keys and define
+policies about which contributors can make changes to some namespaces within the
+repository. gittuf also protects against reference state attacks by extending
+the Reference State Log design which was originally described in an
 [academic paper](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/torres-arias).
 Finally, gittuf can be used as a foundation to build other desirable features
 such as cryptographic algorithm agility, the ability to store secrets, storing
@@ -94,7 +96,7 @@ delegates to contain restrictions on protected namespaces. The specifics of the
 delegation structure vary from repository to repository as each will have its
 own constraints.
 
-A typical TUF delegation connects two TUF Targets role. In the delegations
+A typical TUF delegation connects two TUF Targets roles. In the delegations
 graph where each node is a Targets role, delegations are the edges connecting
 them. The delegations graph is traversed when verifying some target until the
 leaf node is encountered, after which the target's entry is compared against the
