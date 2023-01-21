@@ -20,6 +20,13 @@ Finally, gittuf can be used as a foundation to build other desirable features
 such as cryptographic algorithm agility, the ability to store secrets, storing
 in-toto attestations pertaining to the repository, and more.
 
+This document is scoped to describing how TUF's access control policies are
+applied to Git repositories. It contains the corresponding workflows for
+developers and their gittuf clients. Note that gittuf is designed in a manner
+that enables other security features. These descriptions will be in standalone
+specifications alongside this one, and will describe modifications or extensions
+to the "default" workflows in this document.
+
 ## Definitions
 
 ### Git Reference (Ref)
