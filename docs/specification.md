@@ -173,11 +173,6 @@ restricted to working only on `baz/*`.
 
 ## Verification Workflow
 
-As noted before, there are two types of verifications that apply. Each may also
-be subdivided into distinct operations.
-
-### Verifying Changes Made
-
 In gittuf, verifying the validity of changes is _relative_. Verification of a
 new state depends on comparing it against some prior, verified state. For some
 ref `X` that is currently at verified entry `S` in the RSL and its latest
