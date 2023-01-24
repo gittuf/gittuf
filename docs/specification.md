@@ -111,32 +111,41 @@ delegates to contain restrictions on protected namespaces. The specifics of the
 delegation structure vary from repository to repository as each will have its
 own constraints.
 
-A typical TUF delegation connects two TUF Targets roles. In the delegations
-graph where each node is a Targets role, delegations are the edges connecting
-them. The delegations graph is traversed when verifying some target until the
-leaf node is encountered, after which the target's entry is compared against the
-target itself. gittuf modifies this workflow in part to incorporate RSLs, and in
-part to make use of Git's implicit change tracking mechanisms.
+A typical TUF delegation connects two TUF Targets roles. Therefore, delegations
+can be represented as a directed graph where each node is a Targets role, and
+each edge connects the delegating role to a delegatee role for some specified
+namespace. When verifying or fetching a target, the graph is traversed using the
+namespaces that match the target until a Targets entry is found for it. The
+Targets entry contains, among other information, the hashes and length of the
+target. gittuf applies this namespaced delegations graph traversal to Git and
+also incorporate RSLs and Git's implicit change tracking mechanisms.
 
-In gittuf, the delegations graph is much like that of a standard TUF deployment,
-except that the leaf nodes are NOT Targets metadata. There are two types of
-namespace policies. The first are policies that apply to reference state. In
-this case, the delegations graph is traversed until the last available Targets
-metadata for the namespace. The delegation entry in that role's metadata for the
-namespace lists the set of keys that can sign an RSL entry for the ref. When
-no further metadata is found, gittuf consults the latest RSL entry applicable to
-the ref and verifies it was signed by an authorized key. In essence, this
-connects standard TUF policies to RSL entries and ensures ref updates were
-performed by authorized actors.
+In gittuf, the delegations graph is similarly traversed, except that it
+explicitly does not expect any Targets metadata to contain an entry. Instead,
+the delegation mechanism is used to identify the set of keys authorized to sign
+the target such as an RSL entry or commit being verified. Therefore, the
+delegation graph is searched until a delegation is encountered such that no
+metadata exists in the repository for the delegatee role. At this point, the
+search is terminated and the keys listed in that delegation entry are used as
+the set of authorized keys.
 
-The second type of policies apply to files and directories tracked by the
-repository. Once again, the leaf node for some protected namespace in the
-delegations graph is not Targets metadata. Instead, the parent node defines the
-set of keys authorized to make changes to the namespace. Once this set of keys
-is established, gittuf verifies that any commit modifying the protected
-namespace was signed by one of the authorized keys. Note that gittuf does not by
-default use Git commit metadata to identify the actor who created it as that may
-be trivially spoofed.
+This mechanism is employed when verifying both RSL entries for Git ref updates
+_and_ when verifying the commits introduced between two ref updates. The latter
+option allows for defining policies to files and directories tracked by the
+repository. It also enables repository owners to define closed sets of
+developers authorized to make changes to the repository. Note that gittuf does
+not by default use Git commit metadata to identify the actor who created it as
+that may be trivially spoofed.
+
+Another difference between standard TUF policies and those used by gittuf is a
+more fundamental difference in expectations of the policies. Typical TUF
+deployments are explicit about the artifacts they are distributing. Any artifact
+not listed in TUF metadata is rejected. In gittuf, policies are written only to
+express _restrictions_. As such, when verifying changes to unprotected
+namespaces, gittuf must allow any key to sign for these changes. This means that
+after all explicit policies (expressed as delegations) are processed, and none
+apply to the namespace being verified, an implicit `allow-rule` is applied,
+allowing verification to succeed.
 
 In summary, a repository secured by gittuf stores the Root role and one or more
 Targets roles. Further, it embeds the public keys used to verify the Root role's
