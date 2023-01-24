@@ -173,6 +173,42 @@ restricted to working only on `baz/*`.
 
 ## Verification Workflow
 
+There are several aspects to verification. First, the right policy state must be
+identified by walking back RSL entries to find the last change to that
+namespace. Next, authorized keys must be identified to verify that commit or RSL
+entry signatures are valid.
+
+### Identifying Authorized Signers for Protected Namespaces
+
+When verifying a commit or RSL entry, the first step is identifying the set of
+keys authorized to sign a commit or RSL entry in their respective namespaces.
+With commits, the relevant namespaces pertain to the files they modify, tracked
+by the repository. On the other hand, RSL entries pertain to Git refs. Assume
+the relevant policy state entry is `P` and the namespace being checked is `N`.
+Then:
+
+1. Validate `P`'s Root metadata using the TUF workflow, ignore expiration date
+   checks.
+1. Begin traversing the delegations graph rooted at the top level Targets
+   metadata. Set `current` to top level Targets and `parent` to Root metadata.
+1. Create empty set `K` to record keys authorized to sign for `N`.
+1. While `K` is empty:
+   1. Load and verify signatures of `current` using keys provided in `parent`.
+      Abort if signature verification fails.
+   1. Identify delegation entry that matches `N`, `D`.
+   1. If `D` is the `allow-rule`:
+      1. Explicitly indicate any key is authorized to sign changes as `N` is not
+         protected. Returning empty `K` alone is not sufficient.
+   1. Else:
+      1. If repository contains metadata with the role name in `D`:
+         1. Set `parent` to `current`, `current` to delegatee role.
+         1. Continue to next iteration.
+      1. Else:
+         1. Set `K` to keys authorized in the delegations entry.
+1. Return `K`.
+
+### Verifying Changes Made
+
 In gittuf, verifying the validity of changes is _relative_. Verification of a
 new state depends on comparing it against some prior, verified state. For some
 ref `X` that is currently at verified entry `S` in the RSL and its latest
