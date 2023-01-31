@@ -11,13 +11,8 @@ gittuf is currently a pre-pre-alpha. It is NOT intended for use in anything
 remotely resembling a production system or repository. Contributions are
 welcome!
 
-## Use
-
-Build and install gittuf using the [Makefile](./Makefile). Note that gittuf has
-an implicit dependency on the Git binary installed on the system. Install Git
-from your preferred package manager.
-
-Currently, gittuf supports
-[ED25519 keys only](https://github.com/adityasaky/gittuf/issues/5) and expects
-them to be in the
-[securesystemslib format](https://github.com/secure-systems-lab/securesystemslib/blob/master/securesystemslib/formats.py#L316-L323).
+The original prototype of gittuf has been archived. You can find it
+[here](https://github.com/adityasaky/gittuf/tree/archived-prototype). The
+takeaways from the prototype have been incorporated into our
+[design document](docs/specification.md), and development going forward will
+use this document as a foundation.
