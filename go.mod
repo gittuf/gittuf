@@ -6,7 +6,7 @@ require (
 	github.com/go-git/go-git/v5 v5.5.2
 	github.com/jonboulle/clockwork v0.3.0
 	github.com/spf13/cobra v1.6.1
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.8.1
 )
 
 require (
