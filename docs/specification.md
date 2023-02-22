@@ -75,7 +75,7 @@ it points to, and a hash of the parent RSL entry. The entry is signed by the
 actor making the change to the ref.
 
 Given that each entry in effect points to its parent entry using its hash, an
-RSL is a Merkle tree. gittuf's implementation of the RSL uses Git's underlying
+RSL is a hash chain. gittuf's implementation of the RSL uses Git's underlying
 Merkle graph. Generally, gittuf is designed to ensure the RSL is linear but a
 privileged attacker may be able to cause the RSL to branch, resulting in a
 forking attack.
@@ -151,10 +151,10 @@ In summary, a repository secured by gittuf stores the Root role and one or more
 Targets roles. Further, it embeds the public keys used to verify the Root role's
 signatures, the veracity of which are established out of band. The metadata and
 the public keys are stored as Git blobs and updates to them are tracked through
-a standalone commit tree. This commit tree is tracked at `refs/gittuf/policy`.
-The RSL compulsorily tracks the state of this reference and its protections
-apply to the policies. Further, RSL entries are used to identify historical
-policy states that may apply to older changes.
+a standalone Git commit graph. This is tracked at `refs/gittuf/policy`. The RSL
+MUST track the state of this reference so that the policy namespace is protected
+from reference state attacks. Further, RSL entries are used to identify
+historical policy states that may apply to older changes.
 
 ## Example
 
