@@ -5,8 +5,10 @@ go 1.19
 require (
 	github.com/go-git/go-git/v5 v5.6.0
 	github.com/jonboulle/clockwork v0.3.0
+	github.com/secure-systems-lab/go-securesystemslib v0.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.2
+	golang.org/x/exp v0.0.0-20230303215020-44a13b063f3e
 )
 
 require (

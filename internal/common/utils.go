@@ -4,10 +4,35 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 )
+
+const GittufNamespace = "refs/gittuf"
+
+// InitializeGittufNamespace creates the refs/gittuf directory if it does not
+// already exist. It does not initialize the refs for policy and RSL namespaces.
+func InitializeGittufNamespace() error {
+	repoRootDir, err := GetRepositoryRootDirectory()
+	if err != nil {
+		return err
+	}
+
+	refPath := filepath.Join(repoRootDir, GetGitDir(), GittufNamespace)
+	if _, err := os.Stat(refPath); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.Mkdir(refPath, 0755); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func GetRepositoryRootDirectory() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
@@ -35,4 +60,9 @@ func CreateTestRepository() (string, error) {
 	}
 	cmd := exec.Command("git", "init", testDir)
 	return testDir, cmd.Run()
+}
+
+func GetGitDir() string {
+	// TODO: handle detached gitdir
+	return ".git"
 }
