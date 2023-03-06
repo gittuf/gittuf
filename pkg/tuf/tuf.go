@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
@@ -62,7 +61,7 @@ type RootMetadata struct {
 	SpecVersion        string          `json:"spec_version"`
 	ConsistentSnapshot bool            `json:"consistent_snapshot"` // TODO: how do we handle this?
 	Version            int             `json:"version"`
-	Expires            time.Time       `json:"expires"`
+	Expires            string          `json:"expires"`
 	Keys               map[string]Key  `json:"keys"`
 	Roles              map[string]Role `json:"roles"`
 }
