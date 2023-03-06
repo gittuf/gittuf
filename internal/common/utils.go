@@ -58,8 +58,17 @@ func CreateTestRepository() (string, error) {
 	if err != nil {
 		return testDir, err
 	}
-	cmd := exec.Command("git", "init", testDir)
-	return testDir, cmd.Run()
+
+	if err := os.Chdir(testDir); err != nil {
+		return testDir, err
+	}
+
+	cmd := exec.Command("git", "init")
+	if err := cmd.Run(); err != nil {
+		return testDir, err
+	}
+
+	return testDir, InitializeGittufNamespace()
 }
 
 func GetGitDir() string {
