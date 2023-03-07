@@ -84,42 +84,11 @@ func GenerateOrAppendToUnsignedRootMetadata(rootPublicKey tuf.Key, rootThreshold
 	rootMetadata.Keys[rootPublicKey.ID()] = rootPublicKey
 	rootRole := rootMetadata.Roles["root"]
 	rootRole.KeyIDs = append(rootRole.KeyIDs, rootPublicKey.ID())
-	rootRole.KeyIDs = set(rootRole.KeyIDs)
-	sort.Slice(rootRole.KeyIDs, func(i int, j int) bool {
-		return rootRole.KeyIDs[i] < rootRole.KeyIDs[j]
-	})
+	rootRole.KeyIDs = sortedSet(rootRole.KeyIDs)
 	rootRole.Threshold = rootThreshold
 	rootMetadata.Roles["root"] = rootRole
 
 	return rootMetadata, nil
-}
-
-func StageUnsignedRootMetadata(rootPublicKey tuf.Key, rootMetadata *tuf.RootMetadata) error {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return err
-	}
-
-	rootPublicKeys := map[string]tuf.Key{}
-	metadata := map[string]*dsse.Envelope{}
-	rootPublicKeys, metadata, err = loadCurrentPolicyObjects(repo, PolicyStagingRef)
-	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
-		return err
-	}
-
-	rootPublicKeys[rootPublicKey.ID()] = rootPublicKey
-
-	contents, err := json.Marshal(rootMetadata)
-	if err != nil {
-		return err
-	}
-	metadata[RootMetadataBlobName] = &dsse.Envelope{
-		PayloadType: RootMetadataPayloadType,
-		Payload:     base64.StdEncoding.EncodeToString(contents),
-		Signatures:  []dsse.Signature{},
-	}
-
-	return writePolicyObjects(repo, PolicyStagingRef, rootPublicKeys, metadata)
 }
 
 func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int, expires string, targetsPublicKeys map[string]tuf.Key, targetsThreshold int) (*tuf.RootMetadata, error) {
@@ -154,81 +123,6 @@ func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int,
 			return &tuf.RootMetadata{}, err
 		}
 	}
-	// ref, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// if ref.Hash().IsZero() {
-	// 	rootMetadata := &tuf.RootMetadata{
-	// 		Type:               "root",
-	// 		SpecVersion:        "1.0",
-	// 		ConsistentSnapshot: true,
-	// 		Version:            1,
-	// 		Expires:            expires,
-	// 		Keys:               map[string]tuf.Key{},
-	// 		Roles: map[string]tuf.Role{
-	// 			"root": {
-	// 				KeyIDs: []string{},
-	// 			},
-	// 			"targets": {
-	// 				Threshold: targetsThreshold,
-	// 			},
-	// 		},
-	// 	}
-
-	// 	for keyID, key := range targetsPublicKeys {
-	// 		rootMetadata.Keys[keyID] = key
-	// 		targetsRole := rootMetadata.Roles["targets"]
-	// 		targetsRole.KeyIDs = append(targetsRole.KeyIDs, keyID)
-	// 		rootMetadata.Roles["targets"] = targetsRole
-	// 	}
-	// 	return rootMetadata, nil
-	// }
-
-	// tipCommit, err := repo.CommitObject(ref.Hash())
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// tipTree, err := repo.TreeObject(tipCommit.TreeHash)
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// var metadataTreeID plumbing.Hash
-	// var rootPublicKeysTreeID plumbing.Hash
-	// for _, e := range tipTree.Entries {
-	// 	switch e.Name {
-	// 	case "metadata":
-	// 		metadataTreeID = e.Hash
-	// 	case "keys":
-	// 		rootPublicKeysTreeID = e.Hash
-	// 	}
-	// }
-
-	// metadataTree, err := repo.TreeObject(metadataTreeID)
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// var rootMetadataBlobID plumbing.Hash
-	// for _, e := range metadataTree.Entries {
-	// 	if e.Name == RootMetadataBlobName {
-	// 		rootMetadataBlobID = e.Hash
-	// 		break
-	// 	}
-	// }
-
-	// _, contents, err := gitinterface.ReadBlob(repo, rootMetadataBlobID)
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// env := &dsse.Envelope{}
-	// if err := json.Unmarshal(contents, env); err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
 
 	env := metadata[RootMetadataBlobName]
 
@@ -248,29 +142,6 @@ func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int,
 	if err := json.Unmarshal(payload, &rootMetadata); err != nil {
 		return &tuf.RootMetadata{}, err
 	}
-
-	// // We finally have the staged root metadata file but we're not done yet.
-	// rootPublicKeysTree, err := repo.TreeObject(rootPublicKeysTreeID)
-	// if err != nil {
-	// 	return &tuf.RootMetadata{}, err
-	// }
-
-	// if len(rootPublicKeysTree.Entries) != len(rootMetadata.Roles["root"].KeyIDs) {
-	// 	return &tuf.RootMetadata{}, ErrMisalignedRootPublicKeyEntries
-	// }
-
-	// storedRootPublicKeys := map[string]tuf.Key{}
-	// for _, e := range rootPublicKeysTree.Entries {
-	// 	if _, keyContents, err := gitinterface.ReadBlob(repo, e.Hash); err != nil {
-	// 		return &tuf.RootMetadata{}, err
-	// 	} else {
-	// 		if key, err := tuf.LoadKeyFromBytes(keyContents); err != nil {
-	// 			return &tuf.RootMetadata{}, err
-	// 		} else {
-	// 			storedRootPublicKeys[key.ID()] = key
-	// 		}
-	// 	}
-	// }
 
 	for _, keyID := range rootMetadata.Roles["root"].KeyIDs {
 		keyInMetadata := rootMetadata.Keys[keyID]
@@ -311,10 +182,46 @@ func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int,
 	return &rootMetadata, nil
 }
 
-func set(list []string) []string {
+func sortedSet(list []string) []string {
 	m := map[string]bool{}
 	for _, l := range list {
 		m[l] = true
 	}
-	return maps.Keys(m)
+	keys := maps.Keys(m)
+	sort.Slice(keys, func(i int, j int) bool {
+		return keys[i] < keys[j]
+	})
+	return keys
 }
+
+func StageUnsignedRootMetadata(rootPublicKey tuf.Key, rootMetadata *tuf.RootMetadata) error {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return err
+	}
+
+	rootPublicKeys := map[string]tuf.Key{}
+	metadata := map[string]*dsse.Envelope{}
+	rootPublicKeys, metadata, err = loadCurrentPolicyObjects(repo, PolicyStagingRef)
+	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
+		return err
+	}
+
+	rootPublicKeys[rootPublicKey.ID()] = rootPublicKey
+
+	contents, err := json.Marshal(rootMetadata)
+	if err != nil {
+		return err
+	}
+	metadata[RootMetadataBlobName] = &dsse.Envelope{
+		PayloadType: RootMetadataPayloadType,
+		Payload:     base64.StdEncoding.EncodeToString(contents),
+		Signatures:  []dsse.Signature{},
+	}
+
+	return writePolicyObjects(repo, PolicyStagingRef, rootPublicKeys, metadata)
+}
+
+// func SignStagedRootMetadata(rootMetadata *tuf.RootMetadata, signingKey *tuf.Key) (*dsse.Envelope, error) {
+// 	dsse.NewEnvelopeSigner(sv)
+// }
