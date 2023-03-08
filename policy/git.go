@@ -117,6 +117,38 @@ func writePolicyObjects(repo *git.Repository, refName string, rootPublicKeys map
 	return gitinterface.Commit(repo, newTree, refName, "Writing new policy objects\n", true)
 }
 
+func writeSingleKey(repo *git.Repository, refName string, newKey tuf.Key) error {
+	rootPublicKeys := map[string]tuf.Key{}
+	metadata := map[string]*dsse.Envelope{}
+
+	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, refName)
+	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
+		return err
+	}
+
+	rootPublicKeys[newKey.ID()] = newKey
+	return writePolicyObjects(repo, refName, rootPublicKeys, metadata)
+}
+
+func writeSingleMetadata(repo *git.Repository, refName string, newMetadata *dsse.Envelope) error {
+	rootPublicKeys := map[string]tuf.Key{}
+	metadata := map[string]*dsse.Envelope{}
+
+	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, refName)
+	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
+		return err
+	}
+
+	switch newMetadata.PayloadType {
+	case RootMetadataPayloadType:
+		metadata[RootMetadataBlobName] = newMetadata
+	case TargetsMetadataPayloadType:
+		metadata[TargetsMetadataBlobName] = newMetadata
+	}
+
+	return writePolicyObjects(repo, refName, rootPublicKeys, metadata)
+}
+
 func writeParentTree(repo *git.Repository, rootPublicKeys map[string]tuf.Key, metadata map[string]*dsse.Envelope) (plumbing.Hash, error) {
 	entries := []object.TreeEntry{}
 

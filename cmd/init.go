@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/adityasaky/gittuf/internal/signers.go"
 	"github.com/adityasaky/gittuf/pkg/tuf"
 	"github.com/adityasaky/gittuf/policy"
 	"github.com/adityasaky/gittuf/rsl"
@@ -24,14 +27,22 @@ var initPreSignCmd = &cobra.Command{
 	Run:   runInitPreSign,
 }
 
+var initSignRootCmd = &cobra.Command{
+	Use:   "sign-root",
+	Short: "Sign generated Root metadata",
+	Run:   runInitSignRoot,
+}
+
 var (
 	rootPublicKeyPath     string
 	rootThreshold         int
 	rootExpiryTimestamp   string
 	targetsPublicKeyPaths []string
 	targetsThreshold      int
+	rootSigningKeyPath    string
 )
 
+// init for pre-sign
 func init() {
 	initPreSignCmd.Flags().StringVar(
 		&rootPublicKeyPath,
@@ -72,8 +83,24 @@ func init() {
 	initPreSignCmd.MarkFlagRequired("root-threshold")
 	initPreSignCmd.MarkFlagRequired("root-expiry")
 	initPreSignCmd.MarkFlagRequired("targets-public-key")
+}
 
+// init for sifn-root
+func init() {
+	initSignRootCmd.Flags().StringVar(
+		&rootSigningKeyPath,
+		"root-signing-key",
+		"",
+		"Signing key to be used",
+	)
+
+	initSignRootCmd.MarkFlagRequired("root-signing-key")
+}
+
+// final init
+func init() {
 	initCmd.AddCommand(initPreSignCmd)
+	initCmd.AddCommand(initSignRootCmd)
 
 	rootCmd.AddCommand(initCmd)
 }
@@ -96,13 +123,13 @@ func runInitPreSign(cmd *cobra.Command, args []string) {
 
 	keyContents, err := os.ReadFile(rootPublicKeyPath)
 	if err != nil {
-		fmt.Println("Error reading root public key:", err)
+		fmt.Println("Error reading Root public key:", err)
 		os.Exit(1)
 	}
 
 	rootPublicKey, err := tuf.LoadKeyFromBytes(keyContents)
 	if err != nil {
-		fmt.Println("Error reading root public key:", err)
+		fmt.Println("Error reading Root public key:", err)
 		os.Exit(1)
 	}
 
@@ -110,31 +137,38 @@ func runInitPreSign(cmd *cobra.Command, args []string) {
 	for _, p := range targetsPublicKeyPaths {
 		keyContents, err := os.ReadFile(p)
 		if err != nil {
-			fmt.Println("Error reading targets key:", err)
+			fmt.Println("Error reading Targets public key:", err)
 			os.Exit(1)
 		}
 
 		k, err := tuf.LoadKeyFromBytes(keyContents)
 		if err != nil {
-			fmt.Println("Error reading targets key:", err)
+			fmt.Println("Error reading Targets public key:", err)
 			os.Exit(1)
 		}
 		targetsPublicKeys[k.ID()] = k
 	}
 
-	rootMetadata, err := policy.GenerateOrAppendToUnsignedRootMetadata(rootPublicKey, rootThreshold, rootExpiryTimestamp, targetsPublicKeys, targetsThreshold)
+	rootMetadataEnv, err := policy.GenerateOrAppendToUnsignedRootMetadata(rootPublicKey, rootThreshold, rootExpiryTimestamp, targetsPublicKeys, targetsThreshold)
 	if err != nil {
 		fmt.Println("Error creating unsigned Root metadata:", err)
 		os.Exit(1)
 	}
 
-	rootMetadataJson, err := json.MarshalIndent(rootMetadata, "", "\t")
+	decodedPayload, err := base64.StdEncoding.DecodeString(rootMetadataEnv.Payload)
 	if err != nil {
 		fmt.Println("Error creating unsigned Root metadata:", err)
 		os.Exit(1)
 	}
+
+	var prettyPrint bytes.Buffer
+	if err := json.Indent(&prettyPrint, decodedPayload, "", "\t"); err != nil {
+		fmt.Println("Error creating unsigned Root metadata:", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Here's the root of trust generated for your gittuf repository:")
-	fmt.Println(string(rootMetadataJson))
+	fmt.Println(prettyPrint.String())
 
 	prompt := promptui.Select{
 		Label: "Proceed?",
@@ -152,8 +186,33 @@ func runInitPreSign(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}
 
-	if err := policy.StageUnsignedRootMetadata(rootPublicKey, rootMetadata); err != nil {
+	if err := policy.StageUnsignedRootMetadata(rootPublicKey, rootMetadataEnv); err != nil {
 		fmt.Println("Error staging unsigned Root:", err)
+		os.Exit(1)
+	}
+}
+
+func runInitSignRoot(cmd *cobra.Command, args []string) {
+	signingKeyContents, err := os.ReadFile(rootSigningKeyPath)
+	if err != nil {
+		fmt.Println("Error reading signing key:", err)
+		os.Exit(1)
+	}
+
+	rootMetadataEnv, err := policy.LoadStagedUnsignedRootMetadata()
+	if err != nil {
+		fmt.Println("Error loading unsigned Root metadata:", err)
+		os.Exit(1)
+	}
+
+	signedRootMetadata, err := signers.SignEnvelope(rootMetadataEnv, signingKeyContents)
+	if err != nil {
+		fmt.Println("Error signing Root metadata:", err)
+		os.Exit(1)
+	}
+
+	if err := policy.StageSignedRootMetadata(signedRootMetadata); err != nil {
+		fmt.Println("Error staging signed Root metadata:", err)
 		os.Exit(1)
 	}
 }

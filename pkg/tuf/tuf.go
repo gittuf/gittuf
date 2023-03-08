@@ -15,6 +15,7 @@ var (
 	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 )
 
+// Key defines the structure for how public keys are stored in TUF metadata.
 type Key struct {
 	KeyType string `json:"keytype"`
 	Scheme  string `json:"scheme"`
@@ -24,8 +25,7 @@ type Key struct {
 }
 
 type KeyVal struct {
-	Public  string `json:"public"`
-	private string
+	Public string `json:"public"`
 }
 
 func LoadKeyFromBytes(contents []byte) (Key, error) {

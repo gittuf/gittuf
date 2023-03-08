@@ -63,22 +63,40 @@ func InitializeNamespace() error {
 	return nil
 }
 
-func GenerateOrAppendToUnsignedRootMetadata(rootPublicKey tuf.Key, rootThreshold int, expires string, targetsPublicKeys map[string]tuf.Key, targetsThreshold int) (*tuf.RootMetadata, error) {
+func ApplyStagedPolicy() error {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return err
+	}
+
+	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	// TODO: verify reachable metadata's validity
+
+	// TODO: create RSL entry, this entire operation must be atomic
+
+	return writePolicyObjects(repo, PolicyRef, rootPublicKeys, metadata)
+}
+
+func GenerateOrAppendToUnsignedRootMetadata(rootPublicKey tuf.Key, rootThreshold int, expires string, targetsPublicKeys map[string]tuf.Key, targetsThreshold int) (*dsse.Envelope, error) {
 	// In this phase, each root key holder adds their keys to the root metadata.
 	// They DO NOT sign the root role, and an RSL entry is not created for the
 	// policy namespace.
 	if err := InitializeNamespace(); err != nil {
-		return &tuf.RootMetadata{}, err
+		return &dsse.Envelope{}, err
 	}
 
 	repo, err := common.GetRepositoryHandler()
 	if err != nil {
-		return &tuf.RootMetadata{}, err
+		return &dsse.Envelope{}, err
 	}
 
 	rootMetadata, err := generateOrLoadUnsignedRootMetadata(repo, rootThreshold, expires, targetsPublicKeys, targetsThreshold)
 	if err != nil {
-		return &tuf.RootMetadata{}, err
+		return &dsse.Envelope{}, err
 	}
 
 	rootMetadata.Keys[rootPublicKey.ID()] = rootPublicKey
@@ -88,7 +106,16 @@ func GenerateOrAppendToUnsignedRootMetadata(rootPublicKey tuf.Key, rootThreshold
 	rootRole.Threshold = rootThreshold
 	rootMetadata.Roles["root"] = rootRole
 
-	return rootMetadata, nil
+	rootMetadataBytes, err := json.Marshal(rootMetadata)
+	if err != nil {
+		return &dsse.Envelope{}, err
+	}
+
+	return &dsse.Envelope{
+		PayloadType: RootMetadataPayloadType,
+		Payload:     base64.StdEncoding.EncodeToString(rootMetadataBytes),
+		Signatures:  []dsse.Signature{},
+	}, nil
 }
 
 func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int, expires string, targetsPublicKeys map[string]tuf.Key, targetsThreshold int) (*tuf.RootMetadata, error) {
@@ -112,12 +139,14 @@ func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int,
 				},
 			}
 
+			targetsRole := rootMetadata.Roles["targets"]
 			for keyID, key := range targetsPublicKeys {
 				rootMetadata.Keys[keyID] = key
-				targetsRole := rootMetadata.Roles["targets"]
 				targetsRole.KeyIDs = append(targetsRole.KeyIDs, keyID)
-				rootMetadata.Roles["targets"] = targetsRole
 			}
+			targetsRole.KeyIDs = sortedSet(targetsRole.KeyIDs)
+			rootMetadata.Roles["targets"] = targetsRole
+
 			return rootMetadata, nil
 		} else {
 			return &tuf.RootMetadata{}, err
@@ -182,6 +211,42 @@ func generateOrLoadUnsignedRootMetadata(repo *git.Repository, rootThreshold int,
 	return &rootMetadata, nil
 }
 
+func StageUnsignedRootMetadata(rootPublicKey tuf.Key, rootMetadataEnv *dsse.Envelope) error {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return err
+	}
+
+	if err := writeSingleKey(repo, PolicyStagingRef, rootPublicKey); err != nil {
+		return err
+	}
+
+	return writeSingleMetadata(repo, PolicyStagingRef, rootMetadataEnv)
+}
+
+func LoadStagedUnsignedRootMetadata() (*dsse.Envelope, error) {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return &dsse.Envelope{}, err
+	}
+
+	_, metadata, err := loadCurrentPolicyObjects(repo, PolicyStagingRef)
+	if err != nil {
+		return &dsse.Envelope{}, err
+	}
+
+	return metadata[RootMetadataBlobName], nil
+}
+
+func StageSignedRootMetadata(rootMetadataEnvelope *dsse.Envelope) error {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return err
+	}
+
+	return writeSingleMetadata(repo, PolicyStagingRef, rootMetadataEnvelope)
+}
+
 func sortedSet(list []string) []string {
 	m := map[string]bool{}
 	for _, l := range list {
@@ -193,35 +258,3 @@ func sortedSet(list []string) []string {
 	})
 	return keys
 }
-
-func StageUnsignedRootMetadata(rootPublicKey tuf.Key, rootMetadata *tuf.RootMetadata) error {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return err
-	}
-
-	rootPublicKeys := map[string]tuf.Key{}
-	metadata := map[string]*dsse.Envelope{}
-	rootPublicKeys, metadata, err = loadCurrentPolicyObjects(repo, PolicyStagingRef)
-	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
-		return err
-	}
-
-	rootPublicKeys[rootPublicKey.ID()] = rootPublicKey
-
-	contents, err := json.Marshal(rootMetadata)
-	if err != nil {
-		return err
-	}
-	metadata[RootMetadataBlobName] = &dsse.Envelope{
-		PayloadType: RootMetadataPayloadType,
-		Payload:     base64.StdEncoding.EncodeToString(contents),
-		Signatures:  []dsse.Signature{},
-	}
-
-	return writePolicyObjects(repo, PolicyStagingRef, rootPublicKeys, metadata)
-}
-
-// func SignStagedRootMetadata(rootMetadata *tuf.RootMetadata, signingKey *tuf.Key) (*dsse.Envelope, error) {
-// 	dsse.NewEnvelopeSigner(sv)
-// }
