@@ -118,8 +118,8 @@ func writePolicyObjects(repo *git.Repository, refName string, rootPublicKeys map
 }
 
 func writeSingleKey(repo *git.Repository, refName string, newKey tuf.Key) error {
-	rootPublicKeys := map[string]tuf.Key{}
-	metadata := map[string]*dsse.Envelope{}
+	rootPublicKeys := map[string]tuf.Key{}  //nolint:ineffassign
+	metadata := map[string]*dsse.Envelope{} //nolint:ineffassign
 
 	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, refName)
 	if err != nil && !errors.Is(err, ErrNoPolicyExists) {
@@ -131,8 +131,8 @@ func writeSingleKey(repo *git.Repository, refName string, newKey tuf.Key) error 
 }
 
 func writeSingleMetadata(repo *git.Repository, refName string, newMetadata *dsse.Envelope) error {
-	rootPublicKeys := map[string]tuf.Key{}
-	metadata := map[string]*dsse.Envelope{}
+	rootPublicKeys := map[string]tuf.Key{}  //nolint:ineffassign
+	metadata := map[string]*dsse.Envelope{} //nolint:ineffassign
 
 	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, refName)
 	if err != nil && !errors.Is(err, ErrNoPolicyExists) {

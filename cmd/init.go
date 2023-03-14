@@ -79,10 +79,11 @@ func init() {
 		"Threshold of keys that must sign the Targets role",
 	)
 
-	initPreSignCmd.MarkFlagRequired("root-public-key")
-	initPreSignCmd.MarkFlagRequired("root-threshold")
-	initPreSignCmd.MarkFlagRequired("root-expiry")
-	initPreSignCmd.MarkFlagRequired("targets-public-key")
+	initPreSignCmd.MarkFlagRequired("root-public-key")    //nolint:errcheck
+	initPreSignCmd.MarkFlagRequired("root-threshold")     //nolint:errcheck
+	initPreSignCmd.MarkFlagRequired("root-expiry")        //nolint:errcheck
+	initPreSignCmd.MarkFlagRequired("targets-public-key") //nolint:errcheck
+	initPreSignCmd.MarkFlagRequired("targets-threshold")  //nolint:errcheck
 }
 
 // init for sifn-root
