@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/adityasaky/gittuf/policy"
+	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/spf13/cobra"
 )
 

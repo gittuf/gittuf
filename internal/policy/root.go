@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/adityasaky/gittuf/internal/common"
-	"github.com/adityasaky/gittuf/pkg/tuf"
+	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"golang.org/x/exp/maps"

@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/adityasaky/gittuf/internal/signers.go"
-	"github.com/adityasaky/gittuf/pkg/tuf"
-	"github.com/adityasaky/gittuf/policy"
+	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/adityasaky/gittuf/rsl"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"

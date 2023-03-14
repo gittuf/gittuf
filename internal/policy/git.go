@@ -7,7 +7,7 @@ import (
 	"errors"
 
 	"github.com/adityasaky/gittuf/internal/gitinterface"
-	"github.com/adityasaky/gittuf/pkg/tuf"
+	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
