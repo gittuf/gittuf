@@ -7,6 +7,8 @@ import (
 	"sort"
 
 	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/adityasaky/gittuf/internal/gitinterface"
+	"github.com/adityasaky/gittuf/rsl"
 	"github.com/go-git/go-git/v5/plumbing"
 	"golang.org/x/exp/maps"
 )
@@ -63,6 +65,11 @@ func ApplyStagedPolicy() error {
 		return err
 	}
 
+	currentPolicyTip, err := gitinterface.GetTip(repo, PolicyRef)
+	if err != nil {
+		return err
+	}
+
 	rootPublicKeys, metadata, err := loadCurrentPolicyObjects(repo, PolicyStagingRef)
 	if err != nil {
 		return err
@@ -70,9 +77,22 @@ func ApplyStagedPolicy() error {
 
 	// TODO: verify reachable metadata's validity
 
-	// TODO: create RSL entry, this entire operation must be atomic
+	if err := writePolicyObjects(repo, PolicyRef, rootPublicKeys, metadata); err != nil {
+		return err
+	}
 
-	return writePolicyObjects(repo, PolicyRef, rootPublicKeys, metadata)
+	// All errors from here must reset PolicyRef to currentPolicyTip
+
+	newPolicyTip, err := gitinterface.GetTip(repo, PolicyRef)
+	if err != nil {
+		return gitinterface.ResetDueToError(err, repo, PolicyRef, currentPolicyTip)
+	}
+
+	if err := rsl.AddEntry(PolicyRef, newPolicyTip, true); err != nil {
+		return gitinterface.ResetDueToError(err, repo, PolicyRef, currentPolicyTip)
+	}
+
+	return nil
 }
 
 func sortedSet(list []string) []string {
