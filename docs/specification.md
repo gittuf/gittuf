@@ -121,13 +121,12 @@ target. gittuf applies this namespaced delegations graph traversal to Git and
 also incorporate RSLs and Git's implicit change tracking mechanisms.
 
 In gittuf, the delegations graph is similarly traversed, except that it
-explicitly does not expect any Targets metadata to contain an entry. Instead,
-the delegation mechanism is used to identify the set of keys authorized to sign
-the target such as an RSL entry or commit being verified. Therefore, the
-delegation graph is searched until a delegation is encountered such that no
-metadata exists in the repository for the delegatee role. At this point, the
-search is terminated and the keys listed in that delegation entry are used as
-the set of authorized keys.
+explicitly does not expect any Targets metadata to contain a target entry.
+Instead, the delegation mechanism is used to identify the set of keys authorized
+to sign the target such as an RSL entry or commit being verified. Therefore, the
+delegation graph is used to decide which keys git actions should trust, but no
+targets entries are used.  Any key which delegated trust up to this part of the 
+namespace (including the last delegation), is trusted to sign the git actions.
 
 This mechanism is employed when verifying both RSL entries for Git ref updates
 _and_ when verifying the commits introduced between two ref updates. The latter
