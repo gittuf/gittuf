@@ -9,7 +9,7 @@ import (
 
 	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/policy"
-	"github.com/adityasaky/gittuf/internal/signers.go"
+	"github.com/adityasaky/gittuf/internal/signers"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/adityasaky/gittuf/rsl"
 	"github.com/manifoldco/promptui"
