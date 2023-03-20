@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/rsl"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
@@ -32,6 +33,9 @@ func init() {
 }
 
 func runRslInit(cmd *cobra.Command, args []string) error {
+	if err := common.InitializeGittufNamespace("."); err != nil {
+		return err
+	}
 	return rsl.InitializeNamespace()
 }
 

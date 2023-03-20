@@ -14,10 +14,10 @@ import (
 func TestInitializeNamespace(t *testing.T) {
 	testDir, err := common.CreateTestRepository()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if err := os.Chdir(testDir); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if err := InitializeNamespace(); err != nil {
@@ -34,10 +34,10 @@ func TestInitializeNamespace(t *testing.T) {
 func TestAddEntry(t *testing.T) {
 	testDir, err := common.CreateTestRepository()
 	if err != nil {
-		t.Error(t)
+		t.Fatal(err)
 	}
 	if err := os.Chdir(testDir); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if err := InitializeNamespace(); err != nil {
@@ -93,10 +93,10 @@ func TestAddEntry(t *testing.T) {
 func TestGetLatestEntry(t *testing.T) {
 	testDir, err := common.CreateTestRepository()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if err := os.Chdir(testDir); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if err := InitializeNamespace(); err != nil {
