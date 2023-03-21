@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	e "crypto/ed25519"
@@ -16,7 +16,7 @@ import (
 
 func TestNewSignerVerifierFromSecureSystemsLibFormat(t *testing.T) {
 	t.Run("test private key", func(t *testing.T) {
-		privateKeyPath := path.Join("test-data", "test-key")
+		privateKeyPath := filepath.Join("test-data", "test-key")
 		privateKeyBytes, err := os.ReadFile(privateKeyPath)
 		if err != nil {
 			t.Fatal(err)
@@ -39,7 +39,7 @@ func TestNewSignerVerifierFromSecureSystemsLibFormat(t *testing.T) {
 	})
 
 	t.Run("test public key", func(t *testing.T) {
-		publicKeyPath := path.Join("test-data", "test-key.pub")
+		publicKeyPath := filepath.Join("test-data", "test-key.pub")
 		publicKeyBytes, err := os.ReadFile(publicKeyPath)
 		if err != nil {
 			t.Fatal(err)
@@ -61,7 +61,7 @@ func TestNewSignerVerifierFromSecureSystemsLibFormat(t *testing.T) {
 }
 
 func TestNewSignerVerifierFromTUFKey(t *testing.T) {
-	publicKeyPath := path.Join("test-data", "test-key.pub")
+	publicKeyPath := filepath.Join("test-data", "test-key.pub")
 	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestNewSignerVerifierFromTUFKey(t *testing.T) {
 }
 
 func TestEd25519SignerVeriferSign(t *testing.T) {
-	privateKeyPath := path.Join("test-data", "test-key")
+	privateKeyPath := filepath.Join("test-data", "test-key")
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestEd25519SignerVeriferSign(t *testing.T) {
 	expectedSignature := []byte{0x80, 0x72, 0xb4, 0x31, 0xc5, 0xa3, 0x7e, 0xc, 0xf3, 0x91, 0x22, 0x3, 0x60, 0xbf, 0x92, 0xa4, 0x46, 0x31, 0x84, 0x83, 0xf1, 0x31, 0x3, 0xdc, 0xbc, 0x5, 0x6f, 0xab, 0x84, 0xe4, 0xdc, 0xe9, 0xf5, 0x1c, 0xa9, 0xb3, 0x95, 0xa5, 0xa0, 0x16, 0xd3, 0xaa, 0x4d, 0xe7, 0xde, 0xaf, 0xc2, 0x5e, 0x1e, 0x9a, 0x9d, 0xc8, 0xb2, 0x5c, 0x1c, 0x68, 0xf7, 0x28, 0xb4, 0x1, 0x4d, 0x9f, 0xc8, 0x4}
 	assert.Equal(t, expectedSignature, signature)
 
-	publicKeyPath := path.Join("test-data", "test-key.pub")
+	publicKeyPath := filepath.Join("test-data", "test-key.pub")
 	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestEd25519SignerVeriferSign(t *testing.T) {
 }
 
 func TestEd25519SignerVerifierVerify(t *testing.T) {
-	publicKeyPath := path.Join("test-data", "test-key.pub")
+	publicKeyPath := filepath.Join("test-data", "test-key.pub")
 	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)

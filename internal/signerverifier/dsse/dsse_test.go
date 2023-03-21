@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -27,7 +27,7 @@ func TestVerifyEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	publicKeyPath := path.Join("test-data", "test-key.pub")
+	publicKeyPath := filepath.Join("test-data", "test-key.pub")
 	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func createSignedEnvelope() (*d.Envelope, error) {
-	privateKeyPath := path.Join("test-data", "test-key")
+	privateKeyPath := filepath.Join("test-data", "test-key")
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
 		return &d.Envelope{}, err
