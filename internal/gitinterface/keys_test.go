@@ -12,10 +12,10 @@ import (
 func TestGetSigningInfo(t *testing.T) {
 	testDir, err := common.CreateTestRepository()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if err := os.Chdir(testDir); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	repo, err := common.GetRepositoryHandler()

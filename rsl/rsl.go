@@ -1,7 +1,6 @@
 package rsl
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,24 +15,23 @@ const RSLRef = "refs/gittuf/reference-state-log"
 
 // InitializeNamespace creates a git ref for the reference state log. Initially,
 // the entry has a zero hash.
+// Note: rsl.InitializeNamespace assumes the gittuf namespace has been created
+// already.
 func InitializeNamespace() error {
 	repoRootDir, err := common.GetRepositoryRootDirectory()
 	if err != nil {
 		return err
 	}
 
-	refPath := filepath.Join(repoRootDir, ".git", RSLRef)
-	_, err = os.Stat(refPath)
-	if os.IsNotExist(err) {
-		if err := os.Mkdir(filepath.Join(repoRootDir, ".git", "refs", "gittuf"), 0755); err != nil && !errors.Is(err, os.ErrExist) {
+	refPath := filepath.Join(repoRootDir, common.GetGitDir(), RSLRef)
+	if _, err := os.Stat(refPath); err != nil {
+		if os.IsNotExist(err) {
+			if err := os.WriteFile(refPath, plumbing.ZeroHash[:], 0644); err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
-
-		if err := os.WriteFile(refPath, plumbing.ZeroHash[:], 0644); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
 	}
 
 	return nil

@@ -2,14 +2,14 @@ package tuf
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadKeyFromBytes(t *testing.T) {
-	publicKeyPath := path.Join("test-data", "test-key.pub")
+	publicKeyPath := filepath.Join("test-data", "test-key.pub")
 	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)
