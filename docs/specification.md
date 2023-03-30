@@ -1,8 +1,8 @@
 # gittuf Specification
 
-Last Modified: January 19, 2023
+Last Modified: March 21, 2023
 
-Version: 0.1.0
+Version: 0.1.0-draft
 
 ## Introduction
 
@@ -81,9 +81,50 @@ privileged attacker may be able to cause the RSL to branch, resulting in a
 forking attack.
 
 The RSL is tracked at `refs/gittuf/reference-state-log`, and is implemented as a
-distinct commit tree. Each commit in this tree corresponds to one entry in the
-RSL. The commit message has a fixed format `<ref name>: <commit ID>`, and the
-commit is signed using the actor's key.
+distinct commit graph. Each commit corresponds to one entry in the RSL, and
+standard Git signing mechanisms are employed for the actor's signature on the
+RSL entry.
+
+#### Normal RSL Entries
+
+These entries are the standard variety described above. They contain the name of
+the reference they apply to and a commit ID. As such, they have the following
+structure.
+
+```
+RSL Entry
+
+ref: <ref name>
+commit: <commit ID>
+```
+
+#### RSL Annotation Entries
+
+Apart from regular entries, the RSL can include annotations that apply to prior
+RSL entries. Annotations can be used to add more information as a message about
+a prior entry, or to _explicitly_ mark one or more entries as ones to be
+skipped. This semantic is necessary when accidental or possibly malicious RSL
+entries are recorded. Since the RSL history cannot be overwritten, an annotation
+entry must be used to communicate to gittuf clients to skip the corresponding
+entries. Annotations have the following schema.
+
+```
+RSL Annotation
+
+entryID: <RSL entry ID 1>
+entryID: <RSL entry ID 2>
+...
+skip: <true/false>
+-----BEGIN MESSAGE-----
+<message>
+------END MESSAGE------
+```
+
+#### Example Entries
+
+TODO: Add example entries with all commit information. Create a couple of
+regular entries and annotations, paste the outputs of `git cat-file -p <ID>`
+here.
 
 ### Actor Access Control Policies
 
@@ -230,11 +271,19 @@ available state entry is `D`:
 1. Validate `P`'s metadata using the TUF workflow, ignore expiration date
    checks.
 1. Walk back from `D` until `S` and create an ordered list of all state updates
-   that targeted either `X` or the gittuf policy namespace. At this point, the
-   verification workflow has an ordered list of states `[I1, I2, ..., In, D]` it
-   needs to validate, including changes to policies. Other intermediate states
-   that updated other refs MAY be ignored.
+   that targeted either `X` or the gittuf policy namespace. During this process,
+   all state updates that affect `X` and the policy namespace must be recorded.
+   Entries pertaining to other refs MAY be ignored. Additionally, all annotation
+   entries must be recorded using a dictionary where the key is the ID of the
+   entry referred to and the value the annotation itself. Each entry referred to
+   in an annotation, therefore, must have a corresponding entry in the
+   dictionary.
+1. The verification workflow has an ordered list of states
+   `[I1, I2, ..., In, D]` that are to be verified.
 1. For each set of consecutive states starting with `(S, I1)` to `(In, D)`:
+   1. Check if an annotation exists for the second state. If it does, verify if
+      the annotation indicates the state is to be skipped. It true, proceed to
+      the next set of consecutive states.
    1. If second state changes gittuf policy:
       1. Validate new policy metadata using the TUF workflow and `P`'s contents
          to established authorized signers for new policy. Ignore expiration
