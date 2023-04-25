@@ -3,112 +3,92 @@ package rsl
 import (
 	"encoding/base64"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitializeNamespace(t *testing.T) {
-	testDir, err := common.CreateTestRepository()
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
 
-	if err := InitializeNamespace(); err != nil {
+	if err := InitializeNamespace(repo); err != nil {
 		t.Error(err)
 	}
 
-	refContents, err := os.ReadFile(filepath.Join(".git", RSLRef))
-	if err != nil {
-		t.Error(err)
-	}
-	assert.Equal(t, plumbing.ZeroHash, plumbing.NewHash(string(refContents)))
+	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	assert.Nil(t, err)
+	assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 }
 
 func TestNewEntry(t *testing.T) {
-	testDir, err := common.CreateTestRepository()
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(testDir); err != nil {
+
+	if err := InitializeNamespace(repo); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := InitializeNamespace(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(false); err != nil {
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
-	refContents, err := os.ReadFile(filepath.Join(".git", RSLRef))
+	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	assert.Nil(t, err)
+	assert.NotEqual(t, plumbing.ZeroHash, ref.Hash())
+
+	commitObj, err := repo.CommitObject(ref.Hash())
 	if err != nil {
 		t.Error(err)
 	}
-	refHash := plumbing.NewHash(string(refContents))
-	assert.NotEqual(t, plumbing.ZeroHash, refHash)
-
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		t.Error(err)
-	}
-
-	commitObj, err := repo.CommitObject(refHash)
-	if err != nil {
-		t.Error(err)
-	}
-
 	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.ZeroHash.String())
 	assert.Equal(t, expectedMessage, commitObj.Message)
-
 	assert.Empty(t, commitObj.ParentHashes)
 
-	if err := NewEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(false); err != nil {
+	if err := NewEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
-	refContents, err = os.ReadFile(filepath.Join(".git", RSLRef))
+
+	originalRefHash := ref.Hash()
+
+	ref, err = repo.Reference(plumbing.ReferenceName(RSLRef), true)
 	if err != nil {
 		t.Error(err)
 	}
-	newRefHash := plumbing.NewHash(string(refContents))
 
-	commitObj, err = repo.CommitObject(newRefHash)
+	commitObj, err = repo.CommitObject(ref.Hash())
 	if err != nil {
 		t.Error(err)
 	}
 
 	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.NewHash("abcdef1234567890"))
 	assert.Equal(t, expectedMessage, commitObj.Message)
-
-	assert.Contains(t, commitObj.ParentHashes, refHash)
+	assert.Contains(t, commitObj.ParentHashes, originalRefHash)
 }
 
 func TestGetLatestEntry(t *testing.T) {
-	testDir, err := common.CreateTestRepository()
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
 
-	if err := InitializeNamespace(); err != nil {
+	if err := InitializeNamespace(repo); err != nil {
 		t.Error(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(false); err != nil {
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
-	if entry, err := GetLatestEntry(); err != nil {
+	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
 		e := entry.(*Entry)
@@ -116,20 +96,15 @@ func TestGetLatestEntry(t *testing.T) {
 		assert.Equal(t, plumbing.ZeroHash, e.CommitID)
 	}
 
-	if err := NewEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(false); err != nil {
+	if err := NewEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
-	if entry, err := GetLatestEntry(); err != nil {
+	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
 		e := entry.(*Entry)
 		assert.NotEqual(t, "main", e.RefName)
 		assert.NotEqual(t, plumbing.ZeroHash, e.CommitID)
-	}
-
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
@@ -138,11 +113,11 @@ func TestGetLatestEntry(t *testing.T) {
 	}
 	entryID := ref.Hash()
 
-	if err := NewAnnotation([]plumbing.Hash{entryID}, true, "This was a mistaken push!").Commit(false); err != nil {
+	if err := NewAnnotation([]plumbing.Hash{entryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
-	if entry, err := GetLatestEntry(); err != nil {
+	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
 		a := entry.(*Annotation)
@@ -153,24 +128,16 @@ func TestGetLatestEntry(t *testing.T) {
 }
 
 func TestGetEntry(t *testing.T) {
-	testDir, err := common.CreateTestRepository()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := InitializeNamespace(); err != nil {
-		t.Fatal(err)
-	}
-
-	repo, err := common.GetRepositoryHandler()
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(false); err != nil {
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -181,7 +148,7 @@ func TestGetEntry(t *testing.T) {
 
 	initialEntryID := ref.Hash()
 
-	if err := NewAnnotation([]plumbing.Hash{initialEntryID}, true, "This was a mistaken push!").Commit(false); err != nil {
+	if err := NewAnnotation([]plumbing.Hash{initialEntryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -192,11 +159,11 @@ func TestGetEntry(t *testing.T) {
 
 	annotationID := ref.Hash()
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(false); err != nil {
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
-	if entry, err := GetEntry(initialEntryID); err != nil {
+	if entry, err := GetEntry(repo, initialEntryID); err != nil {
 		t.Error(err)
 	} else {
 		e := entry.(*Entry)
@@ -204,7 +171,7 @@ func TestGetEntry(t *testing.T) {
 		assert.Equal(t, plumbing.ZeroHash, e.CommitID)
 	}
 
-	if entry, err := GetEntry(annotationID); err != nil {
+	if entry, err := GetEntry(repo, annotationID); err != nil {
 		t.Error(err)
 	} else {
 		a := entry.(*Annotation)
