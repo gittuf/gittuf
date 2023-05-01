@@ -28,6 +28,7 @@ const (
 )
 
 var (
+	ErrRSLExists         = errors.New("cannot initialize RSL namespace as it exists already")
 	ErrRSLEntryNotFound  = errors.New("unable to find RSL entry")
 	ErrRSLBranchDetected = errors.New("potential RSL branch detected, entry has more than one parent")
 	ErrInvalidRSLEntry   = errors.New("RSL entry has invalid format")
@@ -36,6 +37,14 @@ var (
 // InitializeNamespace creates a git ref for the reference state log. Initially,
 // the entry has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
+	if _, err := repo.Reference(plumbing.ReferenceName(RSLRef), true); err != nil {
+		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+			return err
+		}
+	} else {
+		return ErrRSLExists
+	}
+
 	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(RSLRef), plumbing.ZeroHash))
 }
 

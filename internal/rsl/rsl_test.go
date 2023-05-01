@@ -13,18 +13,34 @@ import (
 )
 
 func TestInitializeNamespace(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("clean repository", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if err := InitializeNamespace(repo); err != nil {
-		t.Error(err)
-	}
+		if err := InitializeNamespace(repo); err != nil {
+			t.Error(err)
+		}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
-	assert.Nil(t, err)
-	assert.Equal(t, plumbing.ZeroHash, ref.Hash())
+		ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+		assert.Nil(t, err)
+		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
+	})
+
+	t.Run("existing RSL namespace", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		err = InitializeNamespace(repo)
+		assert.ErrorIs(t, err, ErrRSLExists)
+	})
 }
 
 func TestNewEntry(t *testing.T) {
