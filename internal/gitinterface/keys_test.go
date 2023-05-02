@@ -20,7 +20,7 @@ func TestGetSigningInfo(t *testing.T) {
 
 	repo, err := common.GetRepositoryHandler()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	tests := map[string]struct {

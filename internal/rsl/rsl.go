@@ -4,12 +4,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/gitinterface"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -30,6 +28,7 @@ const (
 )
 
 var (
+	ErrRSLExists         = errors.New("cannot initialize RSL namespace as it exists already")
 	ErrRSLEntryNotFound  = errors.New("unable to find RSL entry")
 	ErrRSLBranchDetected = errors.New("potential RSL branch detected, entry has more than one parent")
 	ErrInvalidRSLEntry   = errors.New("RSL entry has invalid format")
@@ -37,30 +36,20 @@ var (
 
 // InitializeNamespace creates a git ref for the reference state log. Initially,
 // the entry has a zero hash.
-// Note: rsl.InitializeNamespace assumes the gittuf namespace has been created
-// already.
-func InitializeNamespace() error {
-	repoRootDir, err := common.GetRepositoryRootDirectory()
-	if err != nil {
-		return err
-	}
-
-	refPath := filepath.Join(repoRootDir, common.GetGitDir(), RSLRef)
-	if _, err := os.Stat(refPath); err != nil {
-		if os.IsNotExist(err) {
-			if err := os.WriteFile(refPath, plumbing.ZeroHash[:], 0644); err != nil {
-				return err
-			}
-		} else {
+func InitializeNamespace(repo *git.Repository) error {
+	if _, err := repo.Reference(plumbing.ReferenceName(RSLRef), true); err != nil {
+		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return err
 		}
+	} else {
+		return ErrRSLExists
 	}
 
-	return nil
+	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(RSLRef), plumbing.ZeroHash))
 }
 
 type EntryType interface {
-	Commit(bool) error
+	Commit(*git.Repository, bool) error
 	createCommitMessage() (string, error)
 }
 
@@ -75,12 +64,7 @@ func NewEntry(refName string, commitID plumbing.Hash) *Entry {
 }
 
 // Commit creates a commit object in the RSL for the Entry.
-func (e Entry) Commit(sign bool) error {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return err
-	}
-
+func (e Entry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
 	return gitinterface.Commit(repo, plumbing.ZeroHash, RSLRef, message, sign)
@@ -109,15 +93,10 @@ func NewAnnotation(rslEntryIDs []plumbing.Hash, skip bool, message string) *Anno
 }
 
 // Commit creates a commit object in the RSL for the Annotation.
-func (a Annotation) Commit(sign bool) error {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return err
-	}
-
+func (a Annotation) Commit(repo *git.Repository, sign bool) error {
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
-		if _, err := GetEntry(id); err != nil {
+		if _, err := GetEntry(repo, id); err != nil {
 			return err
 		}
 	}
@@ -163,12 +142,7 @@ func (a Annotation) createCommitMessage() (string, error) {
 
 // GetLatestEntry returns the latest entry available locally in the RSL.
 // TODO: There is no information yet about the signature for the entry.
-func GetLatestEntry() (EntryType, error) {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return nil, err
-	}
-
+func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
 	if err != nil {
 		return nil, err
@@ -184,12 +158,7 @@ func GetLatestEntry() (EntryType, error) {
 
 // GetEntry returns the entry corresponding to entryID.
 // TODO: There is no information yet about the signature for the entry.
-func GetEntry(entryID plumbing.Hash) (EntryType, error) {
-	repo, err := common.GetRepositoryHandler()
-	if err != nil {
-		return nil, err
-	}
-
+func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
 	if err != nil {
 		return nil, err

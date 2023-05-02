@@ -61,20 +61,27 @@ func init() {
 }
 
 func runRslInit(cmd *cobra.Command, args []string) error {
-	if err := common.InitializeGittufNamespace("."); err != nil {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
 		return err
 	}
-	return rsl.InitializeNamespace()
+
+	return rsl.InitializeNamespace(repo)
 }
 
 func runRslAdd(cmd *cobra.Command, args []string) error {
+	repo, err := common.GetRepositoryHandler()
+	if err != nil {
+		return err
+	}
+
 	if !annotation {
-		return rsl.NewEntry(args[0], plumbing.ZeroHash).Commit(true)
+		return rsl.NewEntry(args[0], plumbing.ZeroHash).Commit(repo, true)
 	}
 
 	entryIDs := []plumbing.Hash{}
 	for _, r := range args {
 		entryIDs = append(entryIDs, plumbing.NewHash(r))
 	}
-	return rsl.NewAnnotation(entryIDs, skip, message).Commit(true)
+	return rsl.NewAnnotation(entryIDs, skip, message).Commit(repo, true)
 }

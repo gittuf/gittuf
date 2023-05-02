@@ -1,10 +1,9 @@
 package policy
 
 import (
-	"os"
-	"path/filepath"
+	"errors"
 
-	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -13,31 +12,24 @@ const (
 	PolicyStagingRef = "refs/gittuf/policy-staging"
 )
 
+var ErrPolicyExists = errors.New("cannot initialize Policy namespace as it exists already")
+
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
 // has a zero hash.
-// Note: policy.InitializeNamespace assumes the gittuf namespace has been
-// created already.
-func InitializeNamespace() error {
-	repoRootDir, err := common.GetRepositoryRootDirectory()
-	if err != nil {
-		return err
-	}
-
-	refPaths := []string{
-		filepath.Join(repoRootDir, common.GetGitDir(), PolicyRef),
-		filepath.Join(repoRootDir, common.GetGitDir(), PolicyStagingRef),
-	}
-	for _, refPath := range refPaths {
-		if _, err := os.Stat(refPath); err != nil {
-			if os.IsNotExist(err) {
-				if err := os.WriteFile(refPath, plumbing.ZeroHash[:], 0644); err != nil {
-					return err
-				}
-			} else {
+func InitializeNamespace(repo *git.Repository) error {
+	for _, name := range []string{PolicyRef, PolicyStagingRef} {
+		if _, err := repo.Reference(plumbing.ReferenceName(name), true); err != nil {
+			if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 				return err
 			}
+		} else {
+			return ErrPolicyExists
 		}
 	}
 
-	return nil
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(PolicyRef), plumbing.ZeroHash)); err != nil {
+		return err
+	}
+
+	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(PolicyStagingRef), plumbing.ZeroHash))
 }
