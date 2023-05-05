@@ -10,6 +10,11 @@ import (
 )
 
 func TestGetSigningInfo(t *testing.T) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	testDir, err := common.CreateTestRepository()
 	if err != nil {
 		t.Fatal(err)
@@ -17,6 +22,7 @@ func TestGetSigningInfo(t *testing.T) {
 	if err := os.Chdir(testDir); err != nil {
 		t.Fatal(err)
 	}
+	defer os.Chdir(currentDir) //nolint:errcheck
 
 	repo, err := common.GetRepositoryHandler()
 	if err != nil {
