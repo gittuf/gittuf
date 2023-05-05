@@ -9,7 +9,7 @@ import (
 
 	e "crypto/ed25519"
 
-	"github.com/adityasaky/gittuf/internal/signerverifier"
+	"github.com/adityasaky/gittuf/internal/signerverifier/common"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
@@ -119,7 +119,7 @@ func TestEd25519SignerVeriferSign(t *testing.T) {
 	}
 
 	_, err = sv.Sign(context.Background(), message)
-	assert.ErrorIs(t, err, signerverifier.ErrNotPrivateKey)
+	assert.ErrorIs(t, err, common.ErrNotPrivateKey)
 }
 
 func TestEd25519SignerVerifierVerify(t *testing.T) {
@@ -140,7 +140,7 @@ func TestEd25519SignerVerifierVerify(t *testing.T) {
 
 	message = []byte("corrupted message")
 	err = sv.Verify(context.Background(), message, signature)
-	assert.ErrorIs(t, err, signerverifier.ErrSignatureVerificationFailed)
+	assert.ErrorIs(t, err, common.ErrSignatureVerificationFailed)
 }
 
 func hexDecode(t *testing.T, data string) []byte {
