@@ -114,7 +114,7 @@ func TestGetSigningInfo(t *testing.T) {
 			t.Error(err)
 		}
 
-		signingMethod, keyInfo, program, err := getSigningInfo(repo)
+		signingMethod, keyInfo, program, err := getSigningInfo()
 		if err != nil {
 			t.Error(err)
 		}

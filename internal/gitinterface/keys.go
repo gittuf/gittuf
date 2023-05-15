@@ -2,8 +2,6 @@ package gitinterface
 
 import (
 	"errors"
-
-	"github.com/go-git/go-git/v5"
 )
 
 var (
@@ -25,10 +23,10 @@ const (
 	DefaultSigningProgramX509 string = "gpgsm"
 )
 
-func GetSigningCommand(repo *git.Repository) (string, []string, error) {
+func GetSigningCommand() (string, []string, error) {
 	var args []string
 
-	signingMethod, keyInfo, program, err := getSigningInfo(repo)
+	signingMethod, keyInfo, program, err := getSigningInfo()
 	if err != nil {
 		return "", []string{}, err
 	}
@@ -55,7 +53,7 @@ func GetSigningCommand(repo *git.Repository) (string, []string, error) {
 	return program, args, nil
 }
 
-func getSigningInfo(repo *git.Repository) (SigningMethod, string, string, error) {
+func getSigningInfo() (SigningMethod, string, string, error) {
 	gitConfig, err := GetConfig()
 	if err != nil {
 		return -1, "", "", err

@@ -30,7 +30,7 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 	commit := createCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
 
 	if sign {
-		command, args, err := GetSigningCommand(repo)
+		command, args, err := GetSigningCommand()
 		if err != nil {
 			return err
 		}
