@@ -1,18 +1,9 @@
-.PHONY : build
+.PHONY : install
 
-default : build
+default : install
 
-build :
-	go build -o bin/gittuf main.go
+install : test
+	go install
 
-completion: build
-	bin/gittuf completion bash > /usr/share/bash-completion/completions/gittuf
-
-install : completion
-	install -Dm 755 -t "/usr/local/bin" bin/gittuf
-
-uninstall :
-	rm /usr/local/bin/gittuf
-
-clean :
-	rm bin/gittuf
+test :
+	go test ./...
