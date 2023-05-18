@@ -32,7 +32,6 @@ var trustRemovePolicyKeyCmd = &cobra.Command{
 }
 
 var (
-	signingKeyString string
 	targetsKeyString string
 	targetsKeyID     string
 )
