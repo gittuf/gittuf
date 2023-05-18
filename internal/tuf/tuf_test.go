@@ -29,8 +29,11 @@ func TestNewKey(t *testing.T) {
 
 	key, err := NewKey(k.KeyType, k.Scheme, KeyVal{Public: k.KeyVal["public"]}, k.KeyIDHashAlgorithms)
 	assert.Nil(t, err)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", key.ID())
 	assert.Equal(t, "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f", key.KeyVal.Public)
+
+	keyID, err := key.ID()
+	assert.Nil(t, err)
+	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", keyID)
 }
 
 func TestLoadKeyFromBytes(t *testing.T) {
@@ -44,9 +47,11 @@ func TestLoadKeyFromBytes(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", key.ID())
 	assert.Equal(t, "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f", key.KeyVal.Public)
+
+	keyID, err := key.ID()
+	assert.Nil(t, err)
+	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", keyID)
 }
 
 func TestRootMetadata(t *testing.T) {
