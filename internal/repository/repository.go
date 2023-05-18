@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/signerverifier"
@@ -23,7 +22,7 @@ type Repository struct {
 }
 
 func LoadRepository() (*Repository, error) {
-	repo, err := common.GetRepositoryHandler()
+	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return nil, err
 	}
