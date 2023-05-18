@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/adityasaky/gittuf/internal/signerverifier"
+	"github.com/adityasaky/gittuf/internal/signerverifier/common"
 	"github.com/adityasaky/gittuf/internal/tuf"
 )
 
@@ -42,13 +42,9 @@ func NewSignerVerifierFromSecureSystemsLibFormat(keyContents []byte) (*Ed25519Si
 	}
 
 	if len(k.KeyID) == 0 {
-		key := tuf.Key{
-			KeyType: Ed25519KeyType,
-			Scheme:  Ed25519KeyScheme,
-			KeyVal: tuf.KeyVal{
-				Public: k.KeyVal.Public,
-			},
-			KeyIDHashAlgorithms: k.KeyIDHashAlgorithms,
+		key, err := tuf.NewKey(Ed25519KeyType, Ed25519KeyScheme, tuf.KeyVal{Public: k.KeyVal.Public}, k.KeyIDHashAlgorithms)
+		if err != nil {
+			return nil, err
 		}
 		k.KeyID = key.ID()
 	}
@@ -107,7 +103,7 @@ func NewSignerVerifierFromTUFKey(key *tuf.Key) (*Ed25519SignerVerifier, error) {
 // Sign creates a signature for `data`.
 func (sv *Ed25519SignerVerifier) Sign(ctx context.Context, data []byte) ([]byte, error) {
 	if len(sv.private) == 0 {
-		return nil, signerverifier.ErrNotPrivateKey
+		return nil, common.ErrNotPrivateKey
 	}
 
 	signature := ed25519.Sign(sv.private, data) // Should we use a digest?
@@ -119,7 +115,7 @@ func (sv Ed25519SignerVerifier) Verify(ctx context.Context, data []byte, sig []b
 	if ok := ed25519.Verify(sv.public, data, sig); ok { // Should we use a digest?
 		return nil
 	}
-	return signerverifier.ErrSignatureVerificationFailed
+	return common.ErrSignatureVerificationFailed
 }
 
 // KeyID returns the identifier of the key used to create the

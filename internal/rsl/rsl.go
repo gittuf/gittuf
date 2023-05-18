@@ -11,14 +11,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-const RSLRef = "refs/gittuf/reference-state-log"
-
 const (
-	EntryHeader = "RSL Entry"
-	RefKey      = "ref"
-	CommitIDKey = "commitID"
-)
-const (
+	RSLRef                     = "refs/gittuf/reference-state-log"
+	EntryHeader                = "RSL Entry"
+	RefKey                     = "ref"
+	CommitIDKey                = "commitID"
 	AnnotationHeader           = "RSL Annotation"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
@@ -28,10 +25,11 @@ const (
 )
 
 var (
-	ErrRSLExists         = errors.New("cannot initialize RSL namespace as it exists already")
-	ErrRSLEntryNotFound  = errors.New("unable to find RSL entry")
-	ErrRSLBranchDetected = errors.New("potential RSL branch detected, entry has more than one parent")
-	ErrInvalidRSLEntry   = errors.New("RSL entry has invalid format")
+	ErrRSLExists               = errors.New("cannot initialize RSL namespace as it exists already")
+	ErrRSLEntryNotFound        = errors.New("unable to find RSL entry")
+	ErrRSLBranchDetected       = errors.New("potential RSL branch detected, entry has more than one parent")
+	ErrInvalidRSLEntry         = errors.New("RSL entry has invalid format")
+	ErrRSLEntryDoesNotMatchRef = errors.New("RSL entry does not match requested ref")
 )
 
 // InitializeNamespace creates a git ref for the reference state log. Initially,
@@ -54,7 +52,13 @@ type EntryType interface {
 }
 
 type Entry struct {
-	RefName  string
+	// ID contains the Git hash for the commit corresponding to the entry.
+	ID plumbing.Hash
+
+	// RefName contains the Git reference the entry is for.
+	RefName string
+
+	// CommitID contains the Git hash for the object expected at RefName.
 	CommitID plumbing.Hash
 }
 
@@ -81,9 +85,17 @@ func (e Entry) createCommitMessage() (string, error) {
 }
 
 type Annotation struct {
+	// ID contains the Git hash for the commit corresponding to the annotation.
+	ID plumbing.Hash
+
+	// RSLEntryIDs contains one or more Git hashes for the RSL entries the annotation applies to.
 	RSLEntryIDs []plumbing.Hash
-	Skip        bool
-	Message     string
+
+	// Skip indicates if the RSLEntryIDs must be skipped during gittuf workflows.
+	Skip bool
+
+	// Message contains any messages or notes added by a user for the annotation.
+	Message string
 }
 
 // NewAnnotation returns an Annotation object that applies to one or more prior
@@ -150,15 +162,16 @@ func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 
 	commitObj, err := repo.CommitObject(ref.Hash())
 	if err != nil {
-		return nil, err
+		return nil, ErrRSLEntryNotFound
 	}
 
-	return parseRSLEntryText(commitObj.Message)
+	return parseRSLEntryText(commitObj.Hash, commitObj.Message)
 }
 
-// GetEntry returns the entry corresponding to entryID.
+// GetLatestEntryForRef returns the latest entry available locally in the RSL
+// for the specified refName.
 // TODO: There is no information yet about the signature for the entry.
-func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
+func GetLatestEntryForRef(repo *git.Repository, refName string) (EntryType, error) {
 	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
 	if err != nil {
 		return nil, err
@@ -168,11 +181,17 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 	for {
 		commitObj, err := repo.CommitObject(iteratorHash)
 		if err != nil {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		tmpEntry, err := parseRSLEntryText(commitObj.Hash, commitObj.Message)
+		if err != nil {
 			return nil, err
 		}
 
-		if iteratorHash == entryID {
-			return parseRSLEntryText(commitObj.Message)
+		entry := tmpEntry.(*Entry) // TODO: skip annotations?
+		if entry.RefName == refName {
+			return entry, nil
 		}
 
 		if len(commitObj.ParentHashes) == 0 {
@@ -187,22 +206,53 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 	}
 }
 
-func parseRSLEntryText(text string) (EntryType, error) {
-	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, AnnotationHeader) {
-		return parseAnnotationText(text)
+// GetEntry returns the entry corresponding to entryID.
+// TODO: There is no information yet about the signature for the entry.
+func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
+	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	if err != nil {
+		return nil, err
 	}
-	return parseEntryText(text)
+
+	iteratorHash := ref.Hash()
+	for {
+		commitObj, err := repo.CommitObject(iteratorHash)
+		if err != nil {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		if iteratorHash == entryID {
+			return parseRSLEntryText(commitObj.Hash, commitObj.Message)
+		}
+
+		if len(commitObj.ParentHashes) == 0 {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		if len(commitObj.ParentHashes) > 1 {
+			return nil, ErrRSLBranchDetected
+		}
+
+		iteratorHash = commitObj.ParentHashes[0]
+	}
 }
 
-func parseEntryText(text string) (*Entry, error) {
+func parseRSLEntryText(id plumbing.Hash, text string) (EntryType, error) {
+	text = strings.TrimSpace(text)
+	if strings.HasPrefix(text, AnnotationHeader) {
+		return parseAnnotationText(id, text)
+	}
+	return parseEntryText(id, text)
+}
+
+func parseEntryText(id plumbing.Hash, text string) (*Entry, error) {
 	lines := strings.Split(text, "\n")
 	if len(lines) < 4 {
 		return nil, ErrInvalidRSLEntry
 	}
 	lines = lines[2:]
 
-	entry := &Entry{}
+	entry := &Entry{ID: id}
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 
@@ -222,8 +272,9 @@ func parseEntryText(text string) (*Entry, error) {
 	return entry, nil
 }
 
-func parseAnnotationText(text string) (*Annotation, error) {
+func parseAnnotationText(id plumbing.Hash, text string) (*Annotation, error) {
 	annotation := &Annotation{
+		ID:          id,
 		RSLEntryIDs: []plumbing.Hash{},
 	}
 

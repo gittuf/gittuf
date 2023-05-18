@@ -7,9 +7,20 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/adityasaky/gittuf/internal/signerverifier"
+	"github.com/adityasaky/gittuf/internal/signerverifier/ed25519"
+	"github.com/adityasaky/gittuf/internal/tuf"
 	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestCreateEnvelope(t *testing.T) {
+	rootMetadata := tuf.NewRootMetadata()
+	env, err := CreateEnvelope(rootMetadata)
+	assert.Nil(t, err)
+	assert.Equal(t, PayloadType, env.PayloadType)
+	assert.Equal(t, "eyJ0eXBlIjoicm9vdCIsInNwZWNfdmVyc2lvbiI6IjEuMCIsImNvbnNpc3RlbnRfc25hcHNob3QiOnRydWUsInZlcnNpb24iOjAsImV4cGlyZXMiOiIiLCJrZXlzIjpudWxsLCJyb2xlcyI6bnVsbH0=", env.Payload)
+}
 
 func TestSignEnvelope(t *testing.T) {
 	env, err := createSignedEnvelope()
@@ -33,14 +44,28 @@ func TestVerifyEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Nil(t, VerifyEnvelope(context.Background(), env, [][]byte{publicKeyBytes}, 1))
+	key, err := tuf.LoadKeyFromBytes(publicKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Nil(t, VerifyEnvelope(context.Background(), env, []d.Verifier{verifier}, 1))
 }
 
 func createSignedEnvelope() (*d.Envelope, error) {
 	privateKeyPath := filepath.Join("test-data", "test-key")
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
-		return &d.Envelope{}, err
+		return nil, err
+	}
+
+	signer, err := ed25519.NewSignerVerifierFromSecureSystemsLibFormat(privateKeyBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	message := []byte("test payload")
@@ -52,9 +77,9 @@ func createSignedEnvelope() (*d.Envelope, error) {
 		Signatures:  []d.Signature{},
 	}
 
-	env, err = SignEnvelope(context.Background(), env, privateKeyBytes)
+	env, err = SignEnvelope(context.Background(), env, signer)
 	if err != nil {
-		return &d.Envelope{}, err
+		return nil, err
 	}
 
 	return env, nil

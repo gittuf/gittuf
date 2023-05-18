@@ -143,6 +143,44 @@ func TestGetLatestEntry(t *testing.T) {
 	}
 }
 
+func TestGetLatestEntryForRef(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	rslRef, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
+		t.Error(err)
+	} else {
+		e := entry.(*Entry)
+		assert.Equal(t, rslRef.Hash(), e.ID)
+	}
+
+	if err := NewEntry("feature", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
+		t.Error(err)
+	} else {
+		e := entry.(*Entry)
+		assert.Equal(t, rslRef.Hash(), e.ID)
+	}
+}
+
 func TestGetEntry(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -296,6 +334,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 	}{
 		"entry, fully resolved ref": {
 			expectedEntry: &Entry{
+				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
 				CommitID: plumbing.ZeroHash,
 			},
@@ -303,6 +342,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"entry, non-zero commit": {
 			expectedEntry: &Entry{
+				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
 				CommitID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
 			},
@@ -318,6 +358,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, no message": {
 			expectedEntry: &Annotation{
+				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "",
@@ -326,6 +367,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, with message": {
 			expectedEntry: &Annotation{
+				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message",
@@ -334,6 +376,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, with multi-line message": {
 			expectedEntry: &Annotation{
+				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
@@ -342,6 +385,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, no message, skip false": {
 			expectedEntry: &Annotation{
+				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
@@ -350,6 +394,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
 			expectedEntry: &Annotation{
+				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash, plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
@@ -368,7 +413,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			entry, err := parseRSLEntryText(test.message)
+			entry, err := parseRSLEntryText(plumbing.ZeroHash, test.message)
 			if err != nil {
 				assert.ErrorIs(t, err, test.expectedError)
 			} else {
