@@ -1,39 +1,32 @@
 package gitinterface
 
 import (
+	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/adityasaky/gittuf/internal/common"
+	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	format "github.com/go-git/go-git/v5/plumbing/format/config"
+	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetSigningInfo(t *testing.T) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testDir, err := common.CreateTestRepository()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
-
-	repo, err := common.GetRepositoryHandler()
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	tests := map[string]struct {
 		c                   *config.Config
+		configFile          string
 		wantedSigningMethod SigningMethod
 		wantedKeyInfo       string
 		wantedProgram       string
+		expectedError       error
 	}{
 		"gpg signing method, key abcdef": {
 			c: &config.Config{
@@ -51,6 +44,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
+			configFile:          filepath.Join("test-data", "config-1"),
 			wantedSigningMethod: SigningMethodGPG,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "gpg",
@@ -80,6 +74,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
+			configFile:          filepath.Join("test-data", "config-2"),
 			wantedSigningMethod: SigningMethodSSH,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "ssh-keygen",
@@ -109,9 +104,57 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
+			configFile:          filepath.Join("test-data", "config-3"),
 			wantedSigningMethod: SigningMethodX509,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "gpgsm",
+		},
+		"unknown signing key": {
+			c: &config.Config{
+				Raw: &format.Config{
+					Sections: format.Sections{
+						&format.Section{
+							Name: "user",
+							Options: format.Options{
+								&format.Option{
+									Key:   "foo",
+									Value: "bar",
+								},
+							},
+						},
+					},
+				},
+			},
+			configFile:    filepath.Join("test-data", "config-4"),
+			expectedError: ErrSigningKeyNotSpecified,
+		},
+		"unknown signing method": {
+			c: &config.Config{
+				Raw: &format.Config{
+					Sections: format.Sections{
+						&format.Section{
+							Name: "user",
+							Options: format.Options{
+								&format.Option{
+									Key:   "signingkey",
+									Value: "abcdef",
+								},
+							},
+						},
+						&format.Section{
+							Name: "gpg",
+							Options: format.Options{
+								&format.Option{
+									Key:   "format",
+									Value: "abcdef",
+								},
+							},
+						},
+					},
+				},
+			},
+			configFile:    filepath.Join("test-data", "config-5"),
+			expectedError: ErrUnknownSigningMethod,
 		},
 	}
 
@@ -120,75 +163,26 @@ func TestGetSigningInfo(t *testing.T) {
 			t.Error(err)
 		}
 
-		signingMethod, keyInfo, program, err := getSigningInfo()
-		if err != nil {
-			t.Error(err)
+		getGitConfig = func() (io.Reader, error) {
+			return os.Open(test.configFile)
 		}
 
-		if signingMethod != test.wantedSigningMethod {
+		signingMethod, keyInfo, program, err := getSigningInfo()
+		if err != nil {
+			if assert.ErrorIs(t, err, test.expectedError) {
+				continue
+			}
+			t.Fatal(err)
+		}
+
+		if !assert.Equal(t, test.wantedSigningMethod, signingMethod) {
 			t.Errorf("expected %d, got %d in test %s", test.wantedSigningMethod, signingMethod, name)
 		}
-		if keyInfo != test.wantedKeyInfo {
+		if !assert.Equal(t, test.wantedKeyInfo, keyInfo) {
 			t.Errorf("expected %s, got %s in test %s", test.wantedKeyInfo, keyInfo, name)
 		}
-		if program != test.wantedProgram {
+		if !assert.Equal(t, test.wantedProgram, program) {
 			t.Errorf("expected %s, got %s in test %s", test.wantedProgram, program, name)
 		}
 	}
-
-	// FIXME: We have to mock the system / global configs, this test will fail
-	// because it'll detect the user's configuration.
-	// This config defaults to gpg, but no signing key is specified.
-	// if err := repo.SetConfig(&config.Config{
-	// 	Raw: &format.Config{
-	// 		Sections: format.Sections{
-	// 			&format.Section{
-	// 				Name: "user",
-	// 				Options: format.Options{
-	// 					&format.Option{
-	// 						Key:   "foo",
-	// 						Value: "bar",
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }); err != nil {
-	// 	t.Error(err)
-	// }
-	// _, _, _, err = GetSigningInfo(repo)
-	// assert.ErrorIs(t, err, ErrSigningKeyNotSpecified)
-
-	// FIXME: We have to mock the system / global configs, this test will fail
-	// because it'll detect the user's configuration.
-	// // This config is set to use some unknown signing method.
-	// if err := repo.SetConfig(&config.Config{
-	// 	Raw: &format.Config{
-	// 		Sections: format.Sections{
-	// 			&format.Section{
-	// 				Name: "user",
-	// 				Options: format.Options{
-	// 					&format.Option{
-	// 						Key:   "signingkey",
-	// 						Value: "abcdef",
-	// 					},
-	// 				},
-	// 			},
-	// 			&format.Section{
-	// 				Name: "gpg",
-	// 				Options: format.Options{
-	// 					&format.Option{
-	// 						Key:   "format",
-	// 						Value: "abcdef",
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 	},
-	// }); err != nil {
-	// 	t.Error(err)
-	// }
-
-	// _, _, _, err = GetSigningInfo(repo)
-	// assert.ErrorIs(t, err, ErrUnknownSigningMethod)
 }
