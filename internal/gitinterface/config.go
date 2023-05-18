@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 )
+
+var getGitConfig = execGitConfig // variable used to override in tests
 
 // GetConfig parses the user's Git config. It shells out to the Git binary
 // because go-git has difficulty combining local, global, and system configs
@@ -16,18 +19,14 @@ import (
 // Deprecated: This is a public function only as long as the `gittuf dev config`
 // interface is around.
 func GetConfig() (map[string]string, error) {
-	config := map[string]string{}
-
-	cmd := exec.Command("git", "config", "--get-regexp", `.*`)
-	stdout := bytes.Buffer{}
-	stderr := bytes.Buffer{}
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return map[string]string{}, fmt.Errorf("%w: %s", err, stderr.String())
+	configReader, err := getGitConfig()
+	if err != nil {
+		return nil, err
 	}
 
-	s := bufio.NewScanner(&stdout)
+	config := map[string]string{}
+
+	s := bufio.NewScanner(configReader)
 	for s.Scan() {
 		raw := s.Text()
 		data := strings.Split(raw, " ")
@@ -38,4 +37,17 @@ func GetConfig() (map[string]string, error) {
 	}
 
 	return config, nil
+}
+
+func execGitConfig() (io.Reader, error) {
+	cmd := exec.Command("git", "config", "--get-regexp", `.*`)
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("%w: %s", err, stderr.String())
+	}
+
+	return stdout, nil
 }
