@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/adityasaky/gittuf/internal/signerverifier/dsse"
@@ -19,20 +18,6 @@ import (
 )
 
 func TestLoadRepository(t *testing.T) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testDir, err := common.CreateTestRepository()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
-
 	repository, err := LoadRepository()
 	assert.Nil(t, err)
 	assert.NotNil(t, repository.r)

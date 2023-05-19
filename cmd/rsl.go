@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/rsl"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/spf13/cobra"
 )
@@ -61,7 +61,7 @@ func init() {
 }
 
 func runRslInit(cmd *cobra.Command, args []string) error {
-	repo, err := common.GetRepositoryHandler()
+	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func runRslInit(cmd *cobra.Command, args []string) error {
 }
 
 func runRslAdd(cmd *cobra.Command, args []string) error {
-	repo, err := common.GetRepositoryHandler()
+	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return err
 	}
