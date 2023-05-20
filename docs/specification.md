@@ -1,6 +1,6 @@
 # gittuf Specification
 
-Last Modified: March 21, 2023
+Last Modified: June 27, 2023
 
 Version: 0.1.0-draft
 
@@ -28,6 +28,9 @@ specifications alongside this one, and will describe modifications or extensions
 to the "default" workflows in this document.
 
 ## Definitions
+
+The gittuf specification uses several terms or phrases in specific ways
+throughout the document. These are defined here.
 
 ### Git Reference (Ref)
 
@@ -83,7 +86,19 @@ forking attack.
 The RSL is tracked at `refs/gittuf/reference-state-log`, and is implemented as a
 distinct commit graph. Each commit corresponds to one entry in the RSL, and
 standard Git signing mechanisms are employed for the actor's signature on the
-RSL entry.
+RSL entry. The latest entry is identified using the tip of the RSL Git ref.
+
+Note that the RSL and liveness of the repository in Git remove the need for some
+traditional TUF roles. As the RSL records changes to other Git refs in the
+repository, it incorporates TUF's
+[snapshot role](https://theupdateframework.github.io/specification/latest/#snapshot)
+properties. At present, gittuf does not include an equivalent to TUF's
+[timestamp role](https://theupdateframework.github.io/specification/latest/#timestamp)
+to guarantee the freshness of the RSL. This is because the timestamp role in the
+context of gittuf at most provides a non-repudiation guarantee for each claim of
+the RSL's tip. The use of an online timestamp does not guarantee that actors
+will receive the correct RSL tip. This may evolve in future versions of the
+gittuf specification.
 
 #### Normal RSL Entries
 
@@ -311,89 +326,168 @@ available state entry is `D`:
             input, indicating potential policy violation.
    1. Set trusted state for `X` to second state of current iteration.
 
-## Actor Workflows
+## Recovery
 
-These workflows were originally written during the prototyping phase and need to
-be updated. Note: This document expects readers to be familiar with some of
-Git's default user workflows.
+If every user were using gittuf and were performing each operation by
+generating all of the correct metadata, following the specification, etc., then
+the procedure for handling each situation is fairly straightforward. However,
+an important property of gittuf is to ensure that a malicious or erroneous
+party cannot make changes that impact the state of the repository in a negative
+manner. To address this, this section discusses how to handle situations where
+something has not gone according to protocol. The goal is to recover to a
+"known good" situation which does match the metadata which a set of valid
+gittuf clients would generate.
 
-### Initializing a new repository -- `git init`
+### Recovery Mechanisms
 
-Alongside the standard creation of a new Git repository, gittuf also signs and
-issues version 1 of the Root metadata and the top level Targets metadata. An out
-of band process may be used (such as a root signing ceremony) to generate these
-files, and therefore, pre-signed metadata may be passed in. The public keys used
-to verify the Root role must also be included.
+gittuf uses two basic mechanisms for recovery. We describe these core building
+blocks for recovery before we discuss the exact scenarios when they are applied
+and why they provide the desired security properties.
 
-All of these files are stored in the `refs/gittuf/policy` namespace. The tree
-object must contain two subtrees: `keys` and `metadata`. The root public keys
-are stored as Git blobs and recorded in the `keys` tree object and the metadata
-blobs are recorded in the `metadata` tree object.
+#### M1: Removing information to reset to known good state
 
-#### Edge Case -- Running `init` on an existing repository
+This mechanism is utilized in scenarios where some change is rejected. For
+example, one or more commits may have been pushed to a branch that do not meet
+gittuf policy. The repository is updated such that these commits are neutralized
+and all Git refs match their latest RSL entries. This can take two forms:
 
-`git init` has no impact in an existing repository. However, there may be uses
-to running `gittuf init` to (re-)initialize the TUF Root for the repository. If
-a TUF Root already exists, gittuf MUST exit with a warning and allow users to
-forcefully overwrite the existing TUF Root with a new one. Once again, out of
-band processes may be necessary to bootstrap the Root metadata.
+1. The rejected commit is removed and the state of the repo is set to the prior
+commit which is known to be good. This is used when all rejected commits are
+together at the end of the commit graph, making it easy to remove all of them.
 
-### Making changes -- `git add`, `git commit`, and `git merge`
+2. The rejected commit is _reverted_ where a new commit is introduced that
+reverses all the changes made in the reverted commit. This is needed when "good"
+commits that must be retained are interspersed with "bad" commits that must be
+rejected.
 
-gittuf applies access control policies to files tracked in the repository based
-on the author of the commits modifying them. As such, no changes are necessary
-to the standard commit workflows employed by developers. However, to benefit
-from the gittuf's guarantees, all commits SHOULD be signed by their authors.
+In both cases, new RSL entries and annotations may be used to record the
+incident or to skip the invalid RSL entries corresponding to the rejected
+changes. TODO: should these new RSL entries come from authorized users for the
+affected namespace?
 
-### Making changes available to other users -- `git push`
+#### M2: Create RSL entry on behalf of another user
 
-The RSL is updated when users are ready to push changes for some ref to a remote
-version of the repository. There are some modifications to this workflow from
-what is described in the RSL academic paper. First, the remote's RSL is fetched
-and its entries are evaluated against the current state of the target ref. If
-changes were made to the ref remotely, they need to be incorporated and the
-local changes must be reapplied. Further, any updates to the policy namespace
-must also be applied locally. Once this process is complete (it may take
-multiple passes if the target ref receives a lot of activity on the remote),
-gittuf creates a provisional entry in the local RSL.
+This mechanism is necessary for adoptions where a subset of developers do not
+use gittuf. When they submit changes to the main copy of the repository, they do
+not include RSL entries. Therefore, when a change is pushed to a branch by a
+non-gittuf user A, a gittuf user B can submit an RSL entry on their behalf.
+Additionally, the entry must identify the original user (TODO: cross-reference
+with signed pushes?) and include some evidence about why B thinks the change
+came from A (TODO: signed push can be evidence option?).
 
-This entry is provisional because before the remote can be updated with the new
-status of the target ref and the RSL, gittuf executes the
-[verification workflow](#verifying-changes-made) with the provisional entry.
-This means that prior to changes being pushed, the verification workflow ensures
-the commits and the entry are all valid as per the latest available policy on
-the remote.
+TODO: decide if B needs to be authorized for the affected branch to sign for A.
 
-If verification passes, the target ref and the RSL entry are pushed to the
-remote, _after_ checking that more entries have not been created on the remote
-when verification was in progress locally. If this is the case, the provisional
-entry is deleted, upstream changes are fetched, and the entire process is
-repeated.
+### Recovery Scenarios
 
-## Recovery Workflows
+These scenarios are some examples where recovery is necessary.
 
-### Recovering from accidental changes and pushes
+#### A change is made without an RSL entry
 
-There are several scenarios here. If a user makes changes locally and tries to
-push them to the blessed copy, it should be quite easy to detect and reject the
-changes. A pre-receive hook on the server can be employed to ensure the client
-is also sending valid metadata for the set of changes. If not, the operation
-must be terminated.
+Bob does not use gittuf and pushes to a branch. Alice notices this as her gittuf
+client detects a push to the branch without an accompanying RSL entry. She
+validates that the change came from Bob and creates an RSL entry on his behalf,
+identifying him and including information about how she verified it was him.
+Alice applies M2.
 
-In situations where server-side hooks cannot be used (or trusted), maintainers
-of the repositories can correct the record for the affected refs and sign new
-RSL entries indicating the correct locations. Clients that employ gittuf are
-always secure as they will reject changes that fail validation.
+#### An incorrect RSL entry is added
 
-TODO: evaluate if consecutive state verification fails on clients behind the
-times. Should recovery rewrite non-valid RSL entries? Defeats the purpose?
+There are several ways in which an RSL entry can be considered "incorrect". If
+an entry is malformed (structurally), Git may catch it if it's not a valid
+commit. In such instances, the push from a buggy client is rejected altogether,
+meaning other users are not exposed to the malformed commit.
 
-### Recovering from a developer compromise
+Invalid entries that are not rejected by Git must be caught by gittuf. Some
+examples of such invalid entries are:
 
-If a developer's keys are compromised and used to make changes to the
-repository, maintainers must immediately sign updated policies revoking their
-keys. Further, maintainers may reset the states of the affected refs and sign
-new RSL entries with corrected states.
+* RSL entry is for a non-existing Git reference
+* Commit recorded in RSL entry does not exist
+* Commit recorded in RSL entry does not match the tip of the corresponding Git
+  reference
+* RSL annotation contains references to RSL entries that do not exist or are not
+  RSL entries (i.e. the annotation points to other commits in the repository)
 
-TODO: evaluate if consecutive state verification fails on clients behind the
-times. Should recovery rewrite non-valid RSL entries? Defeats the purpose?
+Note that as invalid RSL entries are only created by buggy or malicious gittuf
+clients, these entries cannot be detected prior to them being pushed to the main
+repository.
+
+As correctly implemented gittuf clients verify the validity of RSL entries when
+they pull from the main repository, the user is warned if invalid entries are
+encountered. Then, the user can then use M1 to invalidate the incorrect entry.
+Other clients with the invalid entry only need to fetch the latest RSL entries
+to recover. Additionally, the client that created the invalid entries must
+switch to a correct implementation of gittuf before further interactions with
+the main repository.
+
+If the main repository is also gittuf enabled, such incidents can be caught
+before other users receive the incorrect RSL entries. The repository, though,
+must not behave like a typical gittuf client. Instead, gittuf's repository
+behavior is slightly different as RSL entries are submitted before the changes
+they represent. The repository must wait to receive the full changes rather than
+immediately rejecting the RSL entry. TODO: the repository-specific behavior
+needs further discussion.
+
+Consider this example as a representative of this scenario. Bob has a buggy
+gittuf client and pushes an invalid entry to the main repository. Alice pulls
+and receives a warning from her gittuf client. Alice reverses Bob's changes,
+creating an RSL entry for the affected branch if needed, and includes an RSL
+annotation skipping Bob's RSL entry.
+
+#### A gittuf access control policy is violated
+
+Bob creates an RSL entry for a branch he's not authorized for by gittuf policy.
+He pushes a change to that branch. Alice notices this (TODO: decide if alice
+needs to be authorized). Alice reverses Bob's change, creating a new RSL entry
+reflecting that. Alice also creates an RSL annotation marking Bob's entry as
+one to be skipped. Alice, therefore, uses M1.
+
+#### Attacker modifies or deletes historical RSL entry
+
+Overwriting or deleting an historical RSL entry is a complicated proposition.
+Git's content addressable properties mean that a SHA-1 collision is necessary to
+overwrite an existing RSL entry in the Git object store. Further, the attacker
+also needs more than push access to the repository as Git will not accept an
+object it already has in its store. Similarly, deleting an entry from the object
+store preserves the RSL structure cosmetically but verification workflows that
+require the entry will fail. This ensures that such an attack is detected, at
+which point the owners of the repository can restore the RSL state from their
+local copies.
+
+Also note that while Git uses SHA-1 for its object store, cryptographic 
+signatures are generated and verified using stronger hash algorithms. Therefore,
+a successful SHA-1 collision for an RSL entry will not go undetected as all
+entries are signed.
+
+#### Dealing with fork* attacks
+
+An attacker may attempt a forking attack where different developers receive
+different RSL states. This is the case where the attacker wants to rewrite the
+RSL's history by modifying an historical entry (which also requires a key
+compromise so the attacker can re-sign the modified entry) or deleting it
+altogether. To carry out this attack, the attacker must maintain and serve at
+least two versions of the RSL. This is because at least one developer must have
+the affected RSL entries--the author of the modified or deleted entries.
+Maintaining and sending the expected RSL entry for each user is not trivial,
+especially if multiple users have a version of the RSL without the attack. Also,
+the attacker may be able to serve multiple versions of the RSL from a central
+repository they control but any direct interactions between users that have the
+original RSL and the attacked RSL will expose the attack.  These characteristics
+indicate that while a fork* attack is not impossible, it is highly unlikely to
+be carried out given its overhead and high chances of detection.
+
+Finally, while gittuf primarily uses TUF's root of trust and delegations, it is
+possible that TUF's timestamp role can be leveraged to further mitigate fork*
+attacks. A future version of the gittuf specification may explore the use of the
+timestamp role in this context.
+
+#### An authorized key is compromised
+
+When a key authorized by gittuf policies is compromised, it must be revoked and
+rotated so that an attacker cannot use it to sign repository objects. gittuf
+policies that grant permissions to the key must be updated to revoke the key,
+possibly adding the actor's new key in the process. Further, if a security
+analysis shows that the key was used to make malicious changes, those changes
+must be reverted and the corresponding RSL entries signed with the compromised
+key must be skipped. This ensures that gittuf clients do not consider attacker
+created RSL entries as valid states for the corresponding Git references.
+Clients that have an older RSL from before the attack can skip past the
+malicious entries altogether.
