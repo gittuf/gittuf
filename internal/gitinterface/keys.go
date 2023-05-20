@@ -54,7 +54,7 @@ func GetSigningCommand() (string, []string, error) {
 }
 
 func getSigningInfo() (SigningMethod, string, string, error) {
-	gitConfig, err := GetConfig()
+	gitConfig, err := getConfig()
 	if err != nil {
 		return -1, "", "", err
 	}

@@ -15,10 +15,7 @@ var getGitConfig = execGitConfig // variable used to override in tests
 // because go-git has difficulty combining local, global, and system configs
 // while maintaining all of their fields.
 // See: https://github.com/go-git/go-git/issues/508
-//
-// Deprecated: This is a public function only as long as the `gittuf dev config`
-// interface is around.
-func GetConfig() (map[string]string, error) {
+func getConfig() (map[string]string, error) {
 	configReader, err := getGitConfig()
 	if err != nil {
 		return nil, err
