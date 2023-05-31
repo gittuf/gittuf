@@ -33,14 +33,19 @@ const (
 	// TargetsRoleName defines the expected name for the top level gittuf policy file.
 	TargetsRoleName = "targets"
 
+	// DefaultCommitMessage defines the fallback message to use when updating the policy ref if an action specific message is unavailable.
+	DefaultCommitMessage = "Update policy state"
+
 	rootPublicKeysTreeEntryName = "keys"
 	metadataTreeEntryName       = "metadata"
 )
 
 var (
+	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
 	ErrInvalidPolicyTree          = errors.New("invalid policy tree structure")
 	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
 	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
+	ErrDelegationNotFound         = errors.New("required delegation entry not found")
 )
 
 var ErrPolicyExists = errors.New("cannot initialize Policy namespace as it exists already")
@@ -193,6 +198,38 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 	return state, nil
 }
 
+// FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
+// keys trusted to sign for the specified role.
+func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {
+	if err := s.Verify(ctx); err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	if roleName == RootRoleName {
+		return rootMetadata.Roles[RootRoleName].KeyIDs, nil
+	}
+
+	if roleName == TargetsRoleName {
+		if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
+			return nil, ErrDelegationNotFound
+		}
+
+		return rootMetadata.Roles[TargetsRoleName].KeyIDs, nil
+	}
+
+	entry, err := s.findDelegationEntry(roleName)
+	if err != nil {
+		return nil, err
+	}
+
+	return entry.KeyIDs, nil
+}
+
 // Verify performs a self-contained verification of all the metadata in the
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
@@ -299,7 +336,7 @@ func (s *State) Verify(ctx context.Context) error {
 			return err
 		}
 
-		var delegationMetadata *tuf.TargetsMetadata
+		delegationMetadata := &tuf.TargetsMetadata{}
 		if delegationContents, err := delegationEnvelope.DecodeB64Payload(); err != nil {
 			return err
 		} else {
@@ -332,9 +369,13 @@ func (s *State) Verify(ctx context.Context) error {
 
 // Commit verifies and writes the State to the policy namespace. It also creates
 // an RSL entry recording the new tip of the policy namespace.
-func (s *State) Commit(ctx context.Context, repo *git.Repository, signCommit bool) error {
+func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool) error {
 	if err := s.Verify(ctx); err != nil {
 		return err
+	}
+
+	if len(commitMessage) == 0 {
+		commitMessage = DefaultCommitMessage
 	}
 
 	metadata := map[string]*d.Envelope{}
@@ -384,8 +425,13 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, signCommit boo
 			return err
 		}
 
+		keyID, err := key.ID()
+		if err != nil {
+			return err
+		}
+
 		keysEntries = append(keysEntries, object.TreeEntry{
-			Name: key.ID(),
+			Name: keyID,
 			Mode: filemode.Regular,
 			Hash: blobID,
 		})
@@ -417,7 +463,7 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, signCommit boo
 	}
 	originalCommitID := ref.Hash()
 
-	if err := gitinterface.Commit(repo, policyRootTreeID, PolicyRef, "Update policy state", signCommit); err != nil {
+	if err := gitinterface.Commit(repo, policyRootTreeID, PolicyRef, commitMessage, signCommit); err != nil {
 		return err
 	}
 
@@ -448,4 +494,76 @@ func (s *State) GetRootMetadata() (*tuf.RootMetadata, error) {
 	}
 
 	return rootMetadata, nil
+}
+
+func (s *State) GetTargetsMetadata(roleName string) (*tuf.TargetsMetadata, error) {
+	e := s.TargetsEnvelope
+	if roleName != TargetsRoleName {
+		env, ok := s.DelegationEnvelopes[roleName]
+		if !ok {
+			return nil, ErrMetadataNotFound
+		}
+		e = env
+	}
+	payloadBytes, err := e.DecodeB64Payload()
+	if err != nil {
+		return nil, err
+	}
+
+	targetsMetadata := &tuf.TargetsMetadata{}
+	if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+		return nil, err
+	}
+
+	return targetsMetadata, nil
+}
+
+func (s *State) HasTargetsRole(roleName string) bool {
+	if roleName == TargetsRoleName {
+		return s.TargetsEnvelope != nil
+	}
+
+	_, ok := s.DelegationEnvelopes[roleName]
+	return ok
+}
+
+func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
+	topLevelTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return tuf.Delegation{}, err
+	}
+
+	delegationTargetsMetadata := map[string]*tuf.TargetsMetadata{}
+	for name, env := range s.DelegationEnvelopes {
+		targetsMetadata := &tuf.TargetsMetadata{}
+
+		envBytes, err := env.DecodeB64Payload()
+		if err != nil {
+			return tuf.Delegation{}, err
+		}
+
+		if err := json.Unmarshal(envBytes, targetsMetadata); err != nil {
+			return tuf.Delegation{}, err
+		}
+		delegationTargetsMetadata[name] = targetsMetadata
+	}
+
+	delegationsQueue := topLevelTargetsMetadata.Delegations.Roles
+
+	for {
+		if len(delegationsQueue) == 0 {
+			return tuf.Delegation{}, ErrDelegationNotFound
+		}
+
+		delegation := delegationsQueue[0]
+		delegationsQueue = delegationsQueue[1:]
+
+		if delegation.Name == roleName {
+			return delegation, nil
+		}
+
+		if s.HasTargetsRole(delegation.Name) {
+			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
+		}
+	}
 }

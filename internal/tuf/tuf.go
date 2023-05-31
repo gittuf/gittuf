@@ -66,8 +66,12 @@ func LoadKeyFromBytes(contents []byte) (*Key, error) {
 }
 
 // ID returns the key ID.
-func (k *Key) ID() string {
-	return k.keyID
+func (k *Key) ID() (string, error) {
+	if len(k.keyID) > 0 {
+		return k.keyID, nil
+	}
+
+	return calculateKeyID(k)
 }
 
 func calculateKeyID(k *Key) (string, error) {
@@ -151,6 +155,7 @@ func NewTargetsMetadata() *TargetsMetadata {
 	return &TargetsMetadata{
 		Type:        "targets",
 		SpecVersion: specVersion,
+		Delegations: &Delegations{},
 	}
 }
 

@@ -46,7 +46,11 @@ func NewSignerVerifierFromSecureSystemsLibFormat(keyContents []byte) (*Ed25519Si
 		if err != nil {
 			return nil, err
 		}
-		k.KeyID = key.ID()
+		keyID, err := key.ID()
+		if err != nil {
+			return nil, err
+		}
+		k.KeyID = keyID
 	}
 
 	public, err := hex.DecodeString(k.KeyVal.Public)
@@ -93,8 +97,13 @@ func NewSignerVerifierFromTUFKey(key *tuf.Key) (*Ed25519SignerVerifier, error) {
 		return nil, err
 	}
 
+	keyID, err := key.ID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Ed25519SignerVerifier{
-		keyID:   key.ID(),
+		keyID:   keyID,
 		public:  ed25519.PublicKey(kb),
 		private: nil,
 	}, nil

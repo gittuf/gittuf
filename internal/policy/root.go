@@ -11,42 +11,52 @@ var ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys 
 
 // InitializeRootMetadata creates a new instance of tuf.RootMetadata with
 // default values.
-func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
+func InitializeRootMetadata(key *tuf.Key) (*tuf.RootMetadata, error) {
 	rootMetadata := tuf.NewRootMetadata()
 	rootMetadata.SetVersion(1)
 	rootMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
 	rootMetadata.AddKey(*key)
+
+	keyID, err := key.ID()
+	if err != nil {
+		return nil, err
+	}
+
 	rootMetadata.AddRole(RootRoleName, tuf.Role{
-		KeyIDs:    []string{key.ID()},
+		KeyIDs:    []string{keyID},
 		Threshold: 1,
 	})
 
-	return rootMetadata
+	return rootMetadata, nil
 }
 
 // AddTargetsKey adds targetsKey as a trusted public key in rootMetadata for the
 // top level Targets role.
-func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) *tuf.RootMetadata {
-	rootMetadata.Keys[targetsKey.ID()] = *targetsKey
+func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.RootMetadata, error) {
+	targetsKeyID, err := targetsKey.ID()
+	if err != nil {
+		return nil, err
+	}
+	rootMetadata.Keys[targetsKeyID] = *targetsKey
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		rootMetadata.AddRole(TargetsRoleName, tuf.Role{
-			KeyIDs:    []string{targetsKey.ID()},
+			KeyIDs:    []string{targetsKeyID},
 			Threshold: 1,
 		})
-		return rootMetadata
+		return rootMetadata, nil
 	}
 
 	targetsRole := rootMetadata.Roles[TargetsRoleName]
 	for _, keyID := range targetsRole.KeyIDs {
-		if keyID == targetsKey.ID() {
-			return rootMetadata
+		if keyID == targetsKeyID {
+			return rootMetadata, nil
 		}
 	}
 
-	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKey.ID())
+	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKeyID)
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
-	return rootMetadata
+	return rootMetadata, nil
 }
 
 // DeleteTargetsKey removes keyID from the list of trusted top level Targets

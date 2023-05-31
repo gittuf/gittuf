@@ -170,7 +170,7 @@ func createTestRepository(t *testing.T) (*git.Repository, *State) {
 		t.Fatal(err)
 	}
 
-	if err := state.Commit(context.Background(), repo, false); err != nil {
+	if err := state.Commit(context.Background(), repo, "Create test state", false); err != nil {
 		t.Fatal(err)
 	}
 
