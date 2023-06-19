@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -14,7 +15,10 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
-var ErrUnableToSign = errors.New("unable to sign Git object")
+var (
+	ErrUnableToSign             = errors.New("unable to sign Git object")
+	ErrIncorrectVerificationKey = errors.New("incorrect key provided to verify signature")
+)
 
 func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, message string, sign bool) error {
 	gitConfig, err := repo.ConfigScoped(config.GlobalScope)
@@ -41,8 +45,12 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		commit.PGPSignature = signature
 	}
 
+	return ApplyCommit(repo, commit, curRef)
+}
+
+func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) error {
 	obj := repo.Storer.NewEncodedObject()
-	err = commit.Encode(obj)
+	err := commit.Encode(obj)
 	if err != nil {
 		return err
 	}
@@ -51,9 +59,23 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		return err
 	}
 
-	newRef := plumbing.NewHashReference(plumbing.ReferenceName(targetRef),
-		commitHash)
+	newRef := plumbing.NewHashReference(curRef.Name(), commitHash)
 	return repo.Storer.CheckAndSetReference(newRef, curRef)
+}
+
+func VerifyCommitSignature(commit *object.Commit, key *tuf.Key) error {
+	switch key.KeyType {
+	case "gpg":
+		if _, err := commit.Verify(key.KeyVal.Public); err != nil {
+			return ErrIncorrectVerificationKey
+		} else {
+			return nil
+		}
+	case "sigstore-oidc":
+		return ErrUnknownSigningMethod // TODO: implement
+	}
+
+	return ErrUnknownSigningMethod
 }
 
 func createCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
