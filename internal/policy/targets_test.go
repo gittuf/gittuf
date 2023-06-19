@@ -47,9 +47,9 @@ func TestAddOrUpdateDelegation(t *testing.T) {
 	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"})
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1ID)
-	assert.Equal(t, targetsMetadata.Delegations.Keys[key1ID], *key1)
+	assert.Equal(t, targetsMetadata.Delegations.Keys[key1ID], key1)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key2ID)
-	assert.Equal(t, targetsMetadata.Delegations.Keys[key2ID], *key2)
+	assert.Equal(t, targetsMetadata.Delegations.Keys[key2ID], key2)
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Equal(t, targetsMetadata.Delegations.Roles[0], tuf.Delegation{
 		Name:        "test-rule",

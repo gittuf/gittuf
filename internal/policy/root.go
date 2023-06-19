@@ -15,7 +15,7 @@ func InitializeRootMetadata(key *tuf.Key) (*tuf.RootMetadata, error) {
 	rootMetadata := tuf.NewRootMetadata()
 	rootMetadata.SetVersion(1)
 	rootMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
-	rootMetadata.AddKey(*key)
+	rootMetadata.AddKey(key)
 
 	keyID, err := key.ID()
 	if err != nil {
@@ -37,7 +37,7 @@ func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.Ro
 	if err != nil {
 		return nil, err
 	}
-	rootMetadata.Keys[targetsKeyID] = *targetsKey
+	rootMetadata.Keys[targetsKeyID] = targetsKey
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		rootMetadata.AddRole(TargetsRoleName, tuf.Role{
 			KeyIDs:    []string{targetsKeyID},

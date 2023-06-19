@@ -77,6 +77,7 @@ type State struct {
 	TargetsEnvelope     *d.Envelope
 	DelegationEnvelopes map[string]*d.Envelope
 	RootPublicKeys      []*tuf.Key
+	AllPublicKeys       []*tuf.Key
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
@@ -145,6 +146,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 	state := &State{
 		DelegationEnvelopes: map[string]*d.Envelope{},
 		RootPublicKeys:      []*tuf.Key{},
+		AllPublicKeys:       []*tuf.Key{},
 	}
 
 	metadataTree, err := repo.TreeObject(metadataTreeID)
@@ -170,10 +172,38 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 
 		if entry.Name == fmt.Sprintf("%s.json", RootRoleName) {
 			state.RootEnvelope = env
+			rootMetadata, err := state.GetRootMetadata()
+			if err != nil {
+				return nil, err
+			}
+			for _, key := range rootMetadata.Keys {
+				key := key // avoid iterator pointer issues
+				key.ID()   //nolint:errcheck
+				state.AllPublicKeys = append(state.AllPublicKeys, key)
+			}
 		} else if entry.Name == fmt.Sprintf("%s.json", TargetsRoleName) {
 			state.TargetsEnvelope = env
+			targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+			if err != nil {
+				return nil, err
+			}
+			for _, key := range targetsMetadata.Delegations.Keys {
+				key := key // avoid iterator pointer issues
+				key.ID()   //nolint:errcheck
+				state.AllPublicKeys = append(state.AllPublicKeys, key)
+			}
 		} else {
-			state.DelegationEnvelopes[strings.TrimSuffix(entry.Name, ".json")] = env
+			roleName := strings.TrimSuffix(entry.Name, ".json")
+			state.DelegationEnvelopes[roleName] = env
+			targetsMetadata, err := state.GetTargetsMetadata(roleName)
+			if err != nil {
+				return nil, err
+			}
+			for _, key := range targetsMetadata.Delegations.Keys {
+				key := key // avoid iterator pointer issues
+				key.ID()   //nolint:errcheck
+				state.AllPublicKeys = append(state.AllPublicKeys, key)
+			}
 		}
 	}
 
@@ -230,6 +260,50 @@ func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string
 	return entry.KeyIDs, nil
 }
 
+func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.Key, error) {
+	if err := s.Verify(ctx); err != nil {
+		return nil, err
+	}
+
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+
+	allPublicKeys := targetsMetadata.Delegations.Keys
+	delegationsQueue := targetsMetadata.Delegations.Roles
+
+	trustedKeys := []*tuf.Key{}
+	for {
+		if len(delegationsQueue) <= 1 {
+			return trustedKeys, nil
+		}
+
+		delegation := delegationsQueue[0]
+		delegationsQueue = delegationsQueue[1:]
+
+		if delegation.Matches(path) {
+			for _, keyID := range delegation.KeyIDs {
+				key := allPublicKeys[keyID]
+				trustedKeys = append(trustedKeys, key)
+			}
+
+			// TODO: clarify logic for delegation.Terminating
+
+			if s.HasTargetsRole(delegation.Name) {
+				delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+				if err != nil {
+					return nil, err
+				}
+				for keyID, key := range delegatedMetadata.Delegations.Keys {
+					allPublicKeys[keyID] = key
+				}
+				delegationsQueue = append(delegationsQueue[:len(delegationsQueue)-1], delegatedMetadata.Delegations.Roles...)
+			}
+		}
+	}
+}
+
 // Verify performs a self-contained verification of all the metadata in the
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
@@ -263,7 +337,7 @@ func (s *State) Verify(ctx context.Context) error {
 	targetsVerifiers := []d.Verifier{}
 	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
 		key := rootMetadata.Keys[keyID]
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(&key)
+		sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
 		if err != nil {
 			return err
 		}
@@ -324,7 +398,7 @@ func (s *State) Verify(ctx context.Context) error {
 		delegationVerifiers := make([]d.Verifier, 0, len(delegation.KeyIDs))
 		for _, keyID := range delegation.KeyIDs {
 			key := delegationKeys[keyID]
-			sv, err := signerverifier.NewSignerVerifierFromTUFKey(&key)
+			sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
 			if err != nil {
 				return err
 			}

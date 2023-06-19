@@ -28,7 +28,7 @@ func TestInitializeRootMetadata(t *testing.T) {
 	rootMetadata, err := InitializeRootMetadata(key)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, rootMetadata.Version)
-	assert.Equal(t, *key, rootMetadata.Keys[keyID])
+	assert.Equal(t, key, rootMetadata.Keys[keyID])
 	assert.Equal(t, 1, rootMetadata.Roles[RootRoleName].Threshold)
 	assert.Equal(t, []string{keyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
 }
@@ -65,7 +65,7 @@ func TestAddTargetsKey(t *testing.T) {
 
 	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey)
 	assert.Nil(t, err)
-	assert.Equal(t, *targetsKey, rootMetadata.Keys[targetsKeyID])
+	assert.Equal(t, targetsKey, rootMetadata.Keys[targetsKeyID])
 	assert.Equal(t, []string{targetsKeyID}, rootMetadata.Roles[TargetsRoleName].KeyIDs)
 }
 
@@ -124,8 +124,8 @@ func TestDeleteTargetsKey(t *testing.T) {
 
 	rootMetadata, err = DeleteTargetsKey(rootMetadata, targetsKey1ID)
 	assert.Nil(t, err)
-	assert.Equal(t, *targetsKey1, rootMetadata.Keys[targetsKey1ID])
-	assert.Equal(t, *targetsKey2, rootMetadata.Keys[targetsKey2ID])
+	assert.Equal(t, targetsKey1, rootMetadata.Keys[targetsKey1ID])
+	assert.Equal(t, targetsKey2, rootMetadata.Keys[targetsKey2ID])
 	targetsRole := rootMetadata.Roles[TargetsRoleName]
 	assert.Contains(t, targetsRole.KeyIDs, targetsKey2ID)
 

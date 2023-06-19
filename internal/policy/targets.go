@@ -29,7 +29,7 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 
 	authorizedKeyIDs := []string{}
 	for _, key := range authorizedKeys {
-		targetsMetadata.Delegations.AddKey(*key)
+		targetsMetadata.Delegations.AddKey(key)
 
 		keyID, err := key.ID()
 		if err != nil {

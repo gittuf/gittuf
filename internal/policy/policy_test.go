@@ -54,7 +54,7 @@ func TestInitializeNamespace(t *testing.T) {
 }
 
 func TestLoadState(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestState)
 
 	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestLoadState(t *testing.T) {
 }
 
 func TestLoadCurrentState(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestState)
 
 	loadedState, err := LoadCurrentState(context.Background(), repo)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestLoadCurrentState(t *testing.T) {
 }
 
 func TestLoadStateForEntry(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestState)
 
 	e, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
 	if err != nil {
@@ -122,7 +122,7 @@ func TestStateVerify(t *testing.T) {
 }
 
 func TestStateCommit(t *testing.T) {
-	repo, _ := createTestRepository(t)
+	repo, _ := createTestRepository(t, createTestState)
 
 	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
 	if err != nil {
@@ -153,10 +153,10 @@ func TestStateGetRootMetadata(t *testing.T) {
 	assert.Equal(t, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7", rootMetadata.Roles[RootRoleName].KeyIDs[0])
 }
 
-func createTestRepository(t *testing.T) (*git.Repository, *State) {
+func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*git.Repository, *State) {
 	t.Helper()
 
-	state := createTestState(t)
+	state := stateCreator(t)
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -178,6 +178,9 @@ func createTestRepository(t *testing.T) (*git.Repository, *State) {
 }
 
 func createTestState(t *testing.T) *State {
+	// TODO: consider removing altogether in favour of dynamically created
+	// states
+
 	t.Helper()
 
 	rootEnvBytes, err := os.ReadFile(filepath.Join("test-data", metadataTreeEntryName, "root.json"))
@@ -202,6 +205,7 @@ func createTestState(t *testing.T) *State {
 
 	return &State{
 		RootPublicKeys:      []*tuf.Key{key},
+		AllPublicKeys:       []*tuf.Key{key},
 		RootEnvelope:        rootEnv,
 		DelegationEnvelopes: map[string]*dsse.Envelope{},
 	}
