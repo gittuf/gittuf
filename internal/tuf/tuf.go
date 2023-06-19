@@ -9,11 +9,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"path"
+	"strings"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
-const specVersion = "1.0"
+const (
+	specVersion = "1.0"
+	gpgKeyType  = "gpg"
+)
 
 var (
 	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
@@ -24,8 +30,8 @@ type Key struct {
 	KeyType             string   `json:"keytype"`
 	Scheme              string   `json:"scheme"`
 	KeyVal              KeyVal   `json:"keyval"`
-	KeyIDHashAlgorithms []string `json:"keyid_hash_algorithms"`
-	keyID               string
+	KeyIDHashAlgorithms []string `json:"keyid_hash_algorithms,omitempty"`
+	KeyID               string   `json:"-"`
 }
 
 // KeyVal contains a `Public` field that records the public key value.
@@ -41,9 +47,11 @@ func NewKey(keyType string, scheme string, keyVal KeyVal, keyIDHashAlgorithms []
 		KeyVal:              keyVal,
 		KeyIDHashAlgorithms: keyIDHashAlgorithms,
 	}
-	keyID, err := calculateKeyID(key)
-	key.keyID = keyID
-	return key, err
+	if err := key.calculateKeyID(); err != nil {
+		return nil, err
+	}
+
+	return key, nil
 }
 
 // LoadKeyFromBytes returns a pointer to a Key instance created from the
@@ -56,32 +64,44 @@ func LoadKeyFromBytes(contents []byte) (*Key, error) {
 		return nil, err
 	}
 
-	keyID, err := calculateKeyID(key)
-	if err != nil {
+	if err := key.calculateKeyID(); err != nil {
 		return nil, err
 	}
-	key.keyID = keyID
 
 	return key, nil
 }
 
 // ID returns the key ID.
 func (k *Key) ID() (string, error) {
-	if len(k.keyID) > 0 {
-		return k.keyID, nil
+	if len(k.KeyID) == 0 {
+		if err := k.calculateKeyID(); err != nil {
+			return "", err
+		}
 	}
-
-	return calculateKeyID(k)
+	return k.KeyID, nil
 }
 
-func calculateKeyID(k *Key) (string, error) {
+func (k *Key) calculateKeyID() error {
+	if k.KeyType == gpgKeyType {
+		keyringReader := strings.NewReader(k.KeyVal.Public)
+		keyring, err := openpgp.ReadArmoredKeyRing(keyringReader)
+		if err != nil {
+			return err
+		}
+		k.KeyID = hex.EncodeToString(keyring[0].PrimaryKey.Fingerprint)
+
+		return nil
+	}
+
 	// Modified version of go-tuf's implementation to use a single Key ID.
 	canonical, err := cjson.EncodeCanonical(k)
 	if err != nil {
-		return "", err
+		return err
 	}
 	digest := sha256.Sum256(canonical)
-	return hex.EncodeToString(digest[:]), nil
+	k.KeyID = hex.EncodeToString(digest[:])
+
+	return nil
 }
 
 // Role records common characteristics recorded in a role entry in Root metadata
@@ -98,7 +118,7 @@ type RootMetadata struct {
 	ConsistentSnapshot bool            `json:"consistent_snapshot"` // TODO: how do we handle this?
 	Version            int             `json:"version"`
 	Expires            string          `json:"expires"`
-	Keys               map[string]Key  `json:"keys"`
+	Keys               map[string]*Key `json:"keys"`
 	Roles              map[string]Role `json:"roles"`
 }
 
@@ -122,12 +142,12 @@ func (r *RootMetadata) SetExpires(expires string) {
 }
 
 // AddKey adds a key to the RootMetadata instance.
-func (r *RootMetadata) AddKey(key Key) {
+func (r *RootMetadata) AddKey(key *Key) {
 	if r.Keys == nil {
-		r.Keys = map[string]Key{}
+		r.Keys = map[string]*Key{}
 	}
 
-	r.Keys[key.keyID] = key
+	r.Keys[key.KeyID] = key
 }
 
 // AddRole adds a role object and associates it with roleName in the
@@ -181,17 +201,17 @@ func (t *TargetsMetadata) Validate() error {
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
-	Keys  map[string]Key `json:"keys"`
-	Roles []Delegation   `json:"roles"`
+	Keys  map[string]*Key `json:"keys"`
+	Roles []Delegation    `json:"roles"`
 }
 
 // AddKey adds a delegations key.
-func (d *Delegations) AddKey(key Key) {
+func (d *Delegations) AddKey(key *Key) {
 	if d.Keys == nil {
-		d.Keys = map[string]Key{}
+		d.Keys = map[string]*Key{}
 	}
 
-	d.Keys[key.keyID] = key
+	d.Keys[key.KeyID] = key
 }
 
 // AddDelegation adds a new delegation.
@@ -212,4 +232,13 @@ type Delegation struct {
 	Terminating bool             `json:"terminating"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`
 	Role
+}
+
+func (d *Delegation) Matches(target string) bool {
+	for _, pattern := range d.Paths {
+		if ok, _ := path.Match(pattern, target); ok {
+			return true
+		}
+	}
+	return false
 }
