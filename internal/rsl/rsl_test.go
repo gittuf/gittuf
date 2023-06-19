@@ -165,8 +165,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
 		t.Error(err)
 	} else {
-		e := entry.(*Entry)
-		assert.Equal(t, rslRef.Hash(), e.ID)
+		assert.Equal(t, rslRef.Hash(), entry.ID)
 	}
 
 	if err := NewEntry("feature", plumbing.ZeroHash).Commit(repo, false); err != nil {
@@ -176,11 +175,108 @@ func TestGetLatestEntryForRef(t *testing.T) {
 	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
 		t.Error(err)
 	} else {
-		e := entry.(*Entry)
-		assert.Equal(t, rslRef.Hash(), e.ID)
+		assert.Equal(t, rslRef.Hash(), entry.ID)
 	}
 }
 
+func TestGetLatestEntryForRefBefore(t *testing.T) {
+	t.Run("no annotations", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// RSL structure for the test
+		// main <- feature <- main <- feature <- main
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []plumbing.Hash{}
+		for _, ref := range testRefs {
+			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[3], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[1], entry.ID)
+
+		_, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with annotations", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// RSL structure for the test
+		// main <- A <- feature <- A <- main <- A <- feature <- A <- main <- A
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []plumbing.Hash{}
+		for _, ref := range testRefs {
+			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+
+			if err := NewAnnotation([]plumbing.Hash{latest.GetID()}, false, "test annotation").Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err = GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[6], entry.ID)
+
+		_, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+}
 func TestGetEntry(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -233,6 +329,102 @@ func TestGetEntry(t *testing.T) {
 		assert.Equal(t, []plumbing.Hash{initialEntryID}, a.RSLEntryIDs)
 		assert.Equal(t, "This was a mistaken push!", a.Message)
 	}
+}
+
+func TestGetParentForEntry(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert no parent for first entry
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryID := entry.GetID()
+
+	_, err = GetParentForEntry(repo, entry)
+	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+	// Find parent for an entry
+	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parentEntry, err := GetParentForEntry(repo, entry)
+	assert.Nil(t, err)
+	assert.Equal(t, entryID, parentEntry.GetID())
+
+	entryID = entry.GetID()
+
+	// Find parent for an annotation
+	if err := NewAnnotation([]plumbing.Hash{entryID}, false, "test annotation").Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parentEntry, err = GetParentForEntry(repo, entry)
+	assert.Nil(t, err)
+	assert.Equal(t, entryID, parentEntry.GetID())
+}
+
+func TestGetFirstEntry(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	firstEntryT, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstEntry := firstEntryT.(*Entry)
+
+	for i := 0; i < 5; i++ {
+		if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	testEntry, err := GetFirstEntry(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, firstEntry, testEntry)
+
+	for i := 0; i < 5; i++ {
+		if err := NewAnnotation([]plumbing.Hash{firstEntry.ID}, false, "test annotation").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	testEntry, err = GetFirstEntry(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, firstEntry, testEntry)
 }
 
 func TestEntryCreateCommitMessage(t *testing.T) {
