@@ -47,6 +47,7 @@ func InitializeNamespace(repo *git.Repository) error {
 }
 
 type EntryType interface {
+	GetID() plumbing.Hash
 	Commit(*git.Repository, bool) error
 	createCommitMessage() (string, error)
 }
@@ -65,6 +66,10 @@ type Entry struct {
 // NewEntry returns an Entry object for a normal RSL entry.
 func NewEntry(refName string, commitID plumbing.Hash) *Entry {
 	return &Entry{RefName: refName, CommitID: commitID}
+}
+
+func (e Entry) GetID() plumbing.Hash {
+	return e.ID
 }
 
 // Commit creates a commit object in the RSL for the Entry.
@@ -102,6 +107,10 @@ type Annotation struct {
 // RSL entries.
 func NewAnnotation(rslEntryIDs []plumbing.Hash, skip bool, message string) *Annotation {
 	return &Annotation{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
+}
+
+func (a Annotation) GetID() plumbing.Hash {
+	return a.ID
 }
 
 // Commit creates a commit object in the RSL for the Annotation.
@@ -152,6 +161,38 @@ func (a Annotation) createCommitMessage() (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
+func GetFirstEntry(repo *git.Repository) (EntryType, error) {
+	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	if err != nil {
+		return nil, err
+	}
+
+	iteratorHash := ref.Hash()
+	for {
+		commitObj, err := repo.CommitObject(iteratorHash)
+		if err != nil {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		if len(commitObj.ParentHashes) == 0 {
+			// Found first entry
+			tmpEntry, err := parseRSLEntryText(commitObj.Hash, commitObj.Message)
+			if err != nil {
+				return nil, err
+			}
+
+			entry := tmpEntry.(*Entry)
+			return entry, nil
+		}
+
+		if len(commitObj.ParentHashes) > 1 {
+			return nil, ErrRSLBranchDetected
+		}
+
+		iteratorHash = commitObj.ParentHashes[0]
+	}
+}
+
 // GetLatestEntry returns the latest entry available locally in the RSL.
 // TODO: There is no information yet about the signature for the entry.
 func GetLatestEntry(repo *git.Repository) (EntryType, error) {
@@ -178,6 +219,37 @@ func GetLatestEntryForRef(repo *git.Repository, refName string) (EntryType, erro
 	}
 
 	iteratorHash := ref.Hash()
+	for {
+		commitObj, err := repo.CommitObject(iteratorHash)
+		if err != nil {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		tmpEntry, err := parseRSLEntryText(commitObj.Hash, commitObj.Message)
+		if err != nil {
+			return nil, err
+		}
+
+		entry := tmpEntry.(*Entry) // TODO: skip annotations?
+		if entry.RefName == refName {
+			return entry, nil
+		}
+
+		if len(commitObj.ParentHashes) == 0 {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		if len(commitObj.ParentHashes) > 1 {
+			return nil, ErrRSLBranchDetected
+		}
+
+		iteratorHash = commitObj.ParentHashes[0]
+	}
+}
+
+func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (EntryType, error) {
+	// FIXME: DRY with GetLatestEntry
+	iteratorHash := anchor
 	for {
 		commitObj, err := repo.CommitObject(iteratorHash)
 		if err != nil {
@@ -235,6 +307,23 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 
 		iteratorHash = commitObj.ParentHashes[0]
 	}
+}
+
+func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error) {
+	commitObj, err := repo.CommitObject(entry.GetID())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(commitObj.ParentHashes) == 0 {
+		return nil, ErrRSLEntryNotFound
+	}
+
+	if len(commitObj.ParentHashes) > 1 {
+		return nil, ErrRSLBranchDetected
+	}
+
+	return GetEntry(repo, commitObj.ParentHashes[0])
 }
 
 func parseRSLEntryText(id plumbing.Hash, text string) (EntryType, error) {
