@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/adityasaky/gittuf/internal/cmd/common"
 	"github.com/adityasaky/gittuf/internal/cmd/policy/persistent"
 	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/adityasaky/gittuf/internal/repository"
@@ -63,8 +64,8 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	authorizedKeysBytes := [][]byte{}
-	for _, file := range o.authorizedKeys {
-		kb, err := os.ReadFile(file)
+	for _, key := range o.authorizedKeys {
+		kb, err := common.ReadKeyBytes(key)
 		if err != nil {
 			return err
 		}

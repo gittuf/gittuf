@@ -2,7 +2,9 @@ package root
 
 import (
 	"github.com/adityasaky/gittuf/internal/cmd/policy"
+	"github.com/adityasaky/gittuf/internal/cmd/rsl"
 	"github.com/adityasaky/gittuf/internal/cmd/trust"
+	"github.com/adityasaky/gittuf/internal/cmd/verify"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +16,8 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
+	cmd.AddCommand(rsl.New())
+	cmd.AddCommand(verify.New())
 
 	return cmd
 }

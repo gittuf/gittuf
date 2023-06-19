@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/adityasaky/gittuf/internal/cmd/common"
 	"github.com/adityasaky/gittuf/internal/cmd/trust/persistent"
 	"github.com/adityasaky/gittuf/internal/repository"
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	targetsKeyBytes, err := os.ReadFile(o.targetsKey)
+	targetsKeyBytes, err := common.ReadKeyBytes(o.targetsKey)
 	if err != nil {
 		return err
 	}
