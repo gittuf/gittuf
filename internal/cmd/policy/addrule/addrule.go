@@ -81,6 +81,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-rule",
 		Short: "Add a new rule to a policy file",
+		Long:  `This command allows users to add a new rule to the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk using the custom securesystemslib format or from the GPG keyring using the "gpg:<fingerprint>" format.`,
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
