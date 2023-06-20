@@ -15,3 +15,4 @@ jobs:
         uses: golangci/golangci-lint-action@639cd343e1d3b897ff35927a75193d57cfcba299
         with:
           version: v1.51.0
+          args: --timeout=5m
