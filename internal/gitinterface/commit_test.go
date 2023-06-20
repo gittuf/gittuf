@@ -1,14 +1,24 @@
 package gitinterface
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/adityasaky/gittuf/internal/signerverifier"
+	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	format "github.com/go-git/go-git/v5/plumbing/format/config"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/jonboulle/clockwork"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,4 +52,76 @@ func TestCreateCommitObject(t *testing.T) {
 	}
 
 	assert.Equal(t, plumbing.NewHash("dce09cc0f41eaa323f6949142d66ead789f40f6f"), enc.Hash())
+}
+
+func TestVerifyCommitSignature(t *testing.T) {
+	testCommit := createTestSignedCommit(t)
+
+	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := &sslibsv.SSLibKey{
+		KeyType: signerverifier.GPGKeyType,
+		Scheme:  signerverifier.GPGKeyType,
+		KeyVal: sslibsv.KeyVal{
+			Public: strings.TrimSpace(string(keyBytes)),
+		},
+	}
+
+	err = VerifyCommitSignature(testCommit, key)
+	assert.Nil(t, err)
+}
+
+func createTestSignedCommit(t *testing.T) *object.Commit {
+	t.Helper()
+
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+	testCommit := &object.Commit{
+		Author: object.Signature{
+			Name:  "Jane Doe",
+			Email: "jane.doe@example.com",
+			When:  clock.Now(),
+		},
+		Committer: object.Signature{
+			Name:  "Jane Doe",
+			Email: "jane.doe@example.com",
+			When:  clock.Now(),
+		},
+		Message:  "Test commit",
+		TreeHash: plumbing.ZeroHash,
+	}
+
+	commitEncoded := repo.Storer.NewEncodedObject()
+	if err := testCommit.EncodeWithoutSignature(commitEncoded); err != nil {
+		t.Fatal(err)
+	}
+	r, err := commitEncoded.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(signingKeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig := new(strings.Builder)
+	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
+		t.Fatal(err)
+	}
+	testCommit.PGPSignature = sig.String()
+
+	return testCommit
 }

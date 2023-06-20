@@ -7,13 +7,21 @@ import (
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
+const (
+	ED25519KeyType = sslibsv.ED25519KeyType
+	ECDSAKeyType   = sslibsv.ECDSAKeyType
+	RSAKeyType     = sslibsv.RSAKeyType
+	GPGKeyType     = "gpg"
+	FulcioKeyType  = "sigstore-oidc"
+)
+
 func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.SignerVerifier, error) {
 	switch key.KeyType {
-	case sslibsv.ED25519KeyType:
+	case ED25519KeyType:
 		return sslibsv.NewED25519SignerVerifierFromSSLibKey(key)
-	case sslibsv.ECDSAKeyType:
+	case ECDSAKeyType:
 		return sslibsv.NewECDSASignerVerifierFromSSLibKey(key)
-	case sslibsv.RSAKeyType:
+	case RSAKeyType:
 		return sslibsv.NewRSAPSSSignerVerifierFromSSLibKey(key)
 	}
 	return nil, common.ErrUnknownKeyType
