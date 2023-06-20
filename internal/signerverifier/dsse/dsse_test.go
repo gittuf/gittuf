@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/adityasaky/gittuf/internal/signerverifier"
-	"github.com/adityasaky/gittuf/internal/signerverifier/ed25519"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,7 @@ func createSignedEnvelope() (*d.Envelope, error) {
 		return nil, err
 	}
 
-	signer, err := ed25519.NewSignerVerifierFromSecureSystemsLibFormat(privateKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(privateKeyBytes)
 	if err != nil {
 		return nil, err
 	}

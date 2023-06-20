@@ -11,6 +11,7 @@ import (
 	"errors"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const specVersion = "1.0"
@@ -20,63 +21,40 @@ var (
 )
 
 // Key defines the structure for how public keys are stored in TUF metadata.
-type Key struct {
-	KeyType             string   `json:"keytype"`
-	Scheme              string   `json:"scheme"`
-	KeyVal              KeyVal   `json:"keyval"`
-	KeyIDHashAlgorithms []string `json:"keyid_hash_algorithms"`
-	keyID               string
-}
-
-// KeyVal contains a `Public` field that records the public key value.
-type KeyVal struct {
-	Public string `json:"public"`
-}
-
-// NewKey creates a new instance of Key for the values passed in.
-func NewKey(keyType string, scheme string, keyVal KeyVal, keyIDHashAlgorithms []string) (*Key, error) {
-	key := &Key{
-		KeyType:             keyType,
-		Scheme:              scheme,
-		KeyVal:              keyVal,
-		KeyIDHashAlgorithms: keyIDHashAlgorithms,
-	}
-	keyID, err := calculateKeyID(key)
-	key.keyID = keyID
-	return key, err
-}
+type Key = signerverifier.SSLibKey
 
 // LoadKeyFromBytes returns a pointer to a Key instance created from the
 // contents of the bytes. The key contents are expected to be in the custom
 // securesystemslib format.
 func LoadKeyFromBytes(contents []byte) (*Key, error) {
 	// FIXME: this assumes keys are stored in securesystemslib format.
+	// RSA keys are stored in PEM format.
 	var key *Key
 	if err := json.Unmarshal(contents, &key); err != nil {
 		return nil, err
 	}
 
-	keyID, err := calculateKeyID(key)
-	if err != nil {
-		return nil, err
+	if len(key.KeyID) == 0 {
+		keyID, err := calculateKeyID(key)
+		if err != nil {
+			return nil, err
+		}
+		key.KeyID = keyID
 	}
-	key.keyID = keyID
 
 	return key, nil
 }
 
-// ID returns the key ID.
-func (k *Key) ID() (string, error) {
-	if len(k.keyID) > 0 {
-		return k.keyID, nil
-	}
-
-	return calculateKeyID(k)
-}
-
 func calculateKeyID(k *Key) (string, error) {
-	// Modified version of go-tuf's implementation to use a single Key ID.
-	canonical, err := cjson.EncodeCanonical(k)
+	key := map[string]any{
+		"keytype":               k.KeyType,
+		"scheme":                k.Scheme,
+		"keyid_hash_algorithms": k.KeyIDHashAlgorithms,
+		"keyval": map[string]string{
+			"public": k.KeyVal.Public,
+		},
+	}
+	canonical, err := cjson.EncodeCanonical(key)
 	if err != nil {
 		return "", err
 	}
@@ -127,7 +105,11 @@ func (r *RootMetadata) AddKey(key Key) {
 		r.Keys = map[string]Key{}
 	}
 
-	r.Keys[key.keyID] = key
+	if key.KeyVal.Private != "" {
+		key.KeyVal.Private = ""
+	}
+
+	r.Keys[key.KeyID] = key
 }
 
 // AddRole adds a role object and associates it with roleName in the
@@ -191,7 +173,11 @@ func (d *Delegations) AddKey(key Key) {
 		d.Keys = map[string]Key{}
 	}
 
-	d.Keys[key.keyID] = key
+	if key.KeyVal.Private != "" {
+		key.KeyVal.Private = ""
+	}
+
+	d.Keys[key.KeyID] = key
 }
 
 // AddDelegation adds a new delegation.

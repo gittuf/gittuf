@@ -34,10 +34,6 @@ func TestAddDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsKeyID, err := targetsKey.ID()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	ruleName := "test-rule"
 	authorizedKeyBytes := [][]byte{targetsKeyBytes}
@@ -63,13 +59,13 @@ func TestAddDelegation(t *testing.T) {
 
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{targetsKeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
 	})
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }
@@ -78,10 +74,6 @@ func TestRemoveDelegation(t *testing.T) {
 	r, targetsKeyBytes := createTestRepositoryWithTargets(t)
 
 	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsKeyID, err := targetsKey.ID()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,13 +92,13 @@ func TestRemoveDelegation(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{targetsKeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
 	})
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 
@@ -120,7 +112,7 @@ func TestRemoveDelegation(t *testing.T) {
 
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }

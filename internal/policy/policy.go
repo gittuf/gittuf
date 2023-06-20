@@ -425,13 +425,8 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 			return err
 		}
 
-		keyID, err := key.ID()
-		if err != nil {
-			return err
-		}
-
 		keysEntries = append(keysEntries, object.TreeEntry{
-			Name: keyID,
+			Name: key.KeyID,
 			Mode: filemode.Regular,
 			Hash: blobID,
 		})
