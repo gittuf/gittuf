@@ -21,6 +21,8 @@ var (
 	ErrIncorrectVerificationKey = errors.New("incorrect key provided to verify signature")
 )
 
+// Commit creates a new commit in the repo and sets targetRef's HEAD to the
+// commit.
 func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, message string, sign bool) error {
 	gitConfig, err := repo.ConfigScoped(config.GlobalScope)
 	if err != nil {
@@ -61,6 +63,8 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 	return repo.Storer.CheckAndSetReference(newRef, curRef)
 }
 
+// VerifyCommitSignature is used to verify a cryptographic signature associated
+// with commit using TUF public keys.
 func VerifyCommitSignature(commit *object.Commit, key *tuf.Key) error {
 	switch key.KeyType {
 	case signerverifier.GPGKeyType:
