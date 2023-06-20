@@ -55,8 +55,8 @@ func TestRootMetadata(t *testing.T) {
 	}
 
 	t.Run("test AddKey", func(t *testing.T) {
-		rootMetadata.AddKey(*key)
-		assert.Equal(t, *key, rootMetadata.Keys[key.KeyID])
+		rootMetadata.AddKey(key)
+		assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	})
 
 	t.Run("test AddRole", func(t *testing.T) {
@@ -112,8 +112,8 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 	t.Run("test AddKey", func(t *testing.T) {
 		assert.Nil(t, delegations.Keys)
-		delegations.AddKey(*key)
-		assert.Equal(t, *key, delegations.Keys[key.KeyID])
+		delegations.AddKey(key)
+		assert.Equal(t, key, delegations.Keys[key.KeyID])
 	})
 
 	t.Run("test AddDelegation", func(t *testing.T) {

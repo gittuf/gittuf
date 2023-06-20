@@ -76,7 +76,7 @@ type RootMetadata struct {
 	ConsistentSnapshot bool            `json:"consistent_snapshot"` // TODO: how do we handle this?
 	Version            int             `json:"version"`
 	Expires            string          `json:"expires"`
-	Keys               map[string]Key  `json:"keys"`
+	Keys               map[string]*Key `json:"keys"`
 	Roles              map[string]Role `json:"roles"`
 }
 
@@ -100,9 +100,9 @@ func (r *RootMetadata) SetExpires(expires string) {
 }
 
 // AddKey adds a key to the RootMetadata instance.
-func (r *RootMetadata) AddKey(key Key) {
+func (r *RootMetadata) AddKey(key *Key) {
 	if r.Keys == nil {
-		r.Keys = map[string]Key{}
+		r.Keys = map[string]*Key{}
 	}
 
 	if key.KeyVal.Private != "" {
@@ -163,14 +163,14 @@ func (t *TargetsMetadata) Validate() error {
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
-	Keys  map[string]Key `json:"keys"`
-	Roles []Delegation   `json:"roles"`
+	Keys  map[string]*Key `json:"keys"`
+	Roles []Delegation    `json:"roles"`
 }
 
 // AddKey adds a delegations key.
-func (d *Delegations) AddKey(key Key) {
+func (d *Delegations) AddKey(key *Key) {
 	if d.Keys == nil {
-		d.Keys = map[string]Key{}
+		d.Keys = map[string]*Key{}
 	}
 
 	if key.KeyVal.Private != "" {
