@@ -11,52 +11,43 @@ var ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys 
 
 // InitializeRootMetadata creates a new instance of tuf.RootMetadata with
 // default values.
-func InitializeRootMetadata(key *tuf.Key) (*tuf.RootMetadata, error) {
+func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
 	rootMetadata := tuf.NewRootMetadata()
 	rootMetadata.SetVersion(1)
 	rootMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
-	rootMetadata.AddKey(*key)
-
-	keyID, err := key.ID()
-	if err != nil {
-		return nil, err
-	}
+	rootMetadata.AddKey(key)
 
 	rootMetadata.AddRole(RootRoleName, tuf.Role{
-		KeyIDs:    []string{keyID},
+		KeyIDs:    []string{key.KeyID},
 		Threshold: 1,
 	})
 
-	return rootMetadata, nil
+	return rootMetadata
 }
 
 // AddTargetsKey adds targetsKey as a trusted public key in rootMetadata for the
 // top level Targets role.
-func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.RootMetadata, error) {
-	targetsKeyID, err := targetsKey.ID()
-	if err != nil {
-		return nil, err
-	}
-	rootMetadata.Keys[targetsKeyID] = *targetsKey
+func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) *tuf.RootMetadata {
+	rootMetadata.Keys[targetsKey.KeyID] = targetsKey
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		rootMetadata.AddRole(TargetsRoleName, tuf.Role{
-			KeyIDs:    []string{targetsKeyID},
+			KeyIDs:    []string{targetsKey.KeyID},
 			Threshold: 1,
 		})
-		return rootMetadata, nil
+		return rootMetadata
 	}
 
 	targetsRole := rootMetadata.Roles[TargetsRoleName]
 	for _, keyID := range targetsRole.KeyIDs {
-		if keyID == targetsKeyID {
-			return rootMetadata, nil
+		if keyID == targetsKey.KeyID {
+			return rootMetadata
 		}
 	}
 
-	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKeyID)
+	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKey.KeyID)
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
-	return rootMetadata, nil
+	return rootMetadata
 }
 
 // DeleteTargetsKey removes keyID from the list of trusted top level Targets

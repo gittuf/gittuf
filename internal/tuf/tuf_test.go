@@ -1,7 +1,6 @@
 package tuf
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,32 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-func TestNewKey(t *testing.T) {
-	publicKeyPath := filepath.Join("test-data", "test-key.pub")
-	publicKeyBytes, err := os.ReadFile(publicKeyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	k := &struct {
-		KeyType             string            `json:"keytype"`
-		Scheme              string            `json:"scheme"`
-		KeyVal              map[string]string `json:"keyval"`
-		KeyIDHashAlgorithms []string          `json:"keyid_hash_algorithms"`
-	}{}
-	if err := json.Unmarshal(publicKeyBytes, k); err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := NewKey(k.KeyType, k.Scheme, KeyVal{Public: k.KeyVal["public"]}, k.KeyIDHashAlgorithms)
-	assert.Nil(t, err)
-	assert.Equal(t, "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f", key.KeyVal.Public)
-
-	keyID, err := key.ID()
-	assert.Nil(t, err)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", keyID)
-}
 
 func TestLoadKeyFromBytes(t *testing.T) {
 	publicKeyPath := filepath.Join("test-data", "test-key.pub")
@@ -48,10 +21,7 @@ func TestLoadKeyFromBytes(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f", key.KeyVal.Public)
-
-	keyID, err := key.ID()
-	assert.Nil(t, err)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", keyID)
+	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", key.KeyID)
 }
 
 func TestRootMetadata(t *testing.T) {
@@ -85,16 +55,16 @@ func TestRootMetadata(t *testing.T) {
 	}
 
 	t.Run("test AddKey", func(t *testing.T) {
-		rootMetadata.AddKey(*key)
-		assert.Equal(t, *key, rootMetadata.Keys[key.keyID])
+		rootMetadata.AddKey(key)
+		assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	})
 
 	t.Run("test AddRole", func(t *testing.T) {
 		rootMetadata.AddRole("targets", Role{
-			KeyIDs:    []string{key.keyID},
+			KeyIDs:    []string{key.KeyID},
 			Threshold: 1,
 		})
-		assert.Contains(t, rootMetadata.Roles["targets"].KeyIDs, key.keyID)
+		assert.Contains(t, rootMetadata.Roles["targets"].KeyIDs, key.KeyID)
 	})
 }
 
@@ -142,8 +112,8 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 	t.Run("test AddKey", func(t *testing.T) {
 		assert.Nil(t, delegations.Keys)
-		delegations.AddKey(*key)
-		assert.Equal(t, *key, delegations.Keys[key.keyID])
+		delegations.AddKey(key)
+		assert.Equal(t, key, delegations.Keys[key.KeyID])
 	})
 
 	t.Run("test AddDelegation", func(t *testing.T) {
@@ -151,7 +121,7 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		d := Delegation{
 			Name: "delegation",
 			Role: Role{
-				KeyIDs:    []string{key.keyID},
+				KeyIDs:    []string{key.KeyID},
 				Threshold: 1,
 			},
 		}

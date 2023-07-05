@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/adityasaky/gittuf/internal/cmd/common"
 	"github.com/adityasaky/gittuf/internal/cmd/policy/persistent"
 	"github.com/adityasaky/gittuf/internal/policy"
 	"github.com/adityasaky/gittuf/internal/repository"
@@ -63,8 +64,8 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	authorizedKeysBytes := [][]byte{}
-	for _, file := range o.authorizedKeys {
-		kb, err := os.ReadFile(file)
+	for _, key := range o.authorizedKeys {
+		kb, err := common.ReadKeyBytes(key)
 		if err != nil {
 			return err
 		}
@@ -80,6 +81,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-rule",
 		Short: "Add a new rule to a policy file",
+		Long:  `This command allows users to add a new rule to the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk using the custom securesystemslib format or from the GPG keyring using the "gpg:<fingerprint>" format.`,
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

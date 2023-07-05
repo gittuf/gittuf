@@ -29,10 +29,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, rootKeyBytes []byte, si
 		return err
 	}
 
-	rootMetadata, err := policy.InitializeRootMetadata(publicKey)
-	if err != nil {
-		return err
-	}
+	rootMetadata := policy.InitializeRootMetadata(publicKey)
 
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -84,15 +81,8 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 	if err != nil {
 		return err
 	}
-	targetsKeyID, err := targetsKey.ID()
-	if err != nil {
-		return err
-	}
 
-	rootMetadata, err = policy.AddTargetsKey(rootMetadata, targetsKey)
-	if err != nil {
-		return err
-	}
+	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
@@ -111,7 +101,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 
 	state.RootEnvelope = env
 
-	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKeyID)
+	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.KeyID)
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }

@@ -263,7 +263,7 @@ func (s *State) Verify(ctx context.Context) error {
 	targetsVerifiers := []d.Verifier{}
 	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
 		key := rootMetadata.Keys[keyID]
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(&key)
+		sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
 		if err != nil {
 			return err
 		}
@@ -324,7 +324,7 @@ func (s *State) Verify(ctx context.Context) error {
 		delegationVerifiers := make([]d.Verifier, 0, len(delegation.KeyIDs))
 		for _, keyID := range delegation.KeyIDs {
 			key := delegationKeys[keyID]
-			sv, err := signerverifier.NewSignerVerifierFromTUFKey(&key)
+			sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
 			if err != nil {
 				return err
 			}
@@ -425,13 +425,8 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 			return err
 		}
 
-		keyID, err := key.ID()
-		if err != nil {
-			return err
-		}
-
 		keysEntries = append(keysEntries, object.TreeEntry{
-			Name: keyID,
+			Name: key.KeyID,
 			Mode: filemode.Regular,
 			Hash: blobID,
 		})
