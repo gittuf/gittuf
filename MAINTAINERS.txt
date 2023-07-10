@@ -1,0 +1,22 @@
+gittuf is built and maintained by developers from New York University (NYU),
+Chainguard, and New Jersey Institute of Technology (NJIT).
+
+Aditya Sirish A Yelgundhalli
+  Email: aditya.sirish@nyu.edu
+  GitHub username: @adityasaky
+  Affiliation: NYU
+
+Justin Cappos
+  Email: jcappos@nyu.edu
+  GitHub username: @JustinCappos
+  Affiliation: NYU
+
+Billy Lynch
+  Email: billy@chainguard.dev
+  GitHub username: @wlynch
+  Affiliation: Chainguard
+
+Reza Curtmola
+  Email: reza.curtmola@njit.edu
+  GitHub username: @reza-curtmola
+  Affiliation: NJIT
