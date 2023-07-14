@@ -55,3 +55,11 @@ func TestWriteTree(t *testing.T) {
 	assert.Equal(t, "e8df153fd5749966e7ddf148fcbee17d747753ae", treeHash.String())
 	assert.Equal(t, entries, tree.Entries)
 }
+
+func TestEmptyTree(t *testing.T) {
+	hash := EmptyTree()
+
+	// SHA-1 ID used by Git to denote an empty tree
+	// $ git hash-object -t tree --stdin < /dev/null
+	assert.Equal(t, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", hash.String())
+}
