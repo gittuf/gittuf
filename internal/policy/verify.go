@@ -146,6 +146,11 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		return err
 	}
 
+	// No trusted keys => no protection
+	if len(trustedKeys) == 0 {
+		return nil
+	}
+
 	// 2. Find commit object for the RSL entry
 	commitObj, err := repo.CommitObject(entry.ID)
 	if err != nil {
