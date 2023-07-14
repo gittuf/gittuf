@@ -2,9 +2,10 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -12,9 +13,11 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 
 	"github.com/adityasaky/gittuf/internal/rsl"
+	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,7 +57,7 @@ func TestInitializeNamespace(t *testing.T) {
 }
 
 func TestLoadState(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
 	if err != nil {
@@ -70,7 +73,7 @@ func TestLoadState(t *testing.T) {
 }
 
 func TestLoadCurrentState(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	loadedState, err := LoadCurrentState(context.Background(), repo)
 	if err != nil {
@@ -81,7 +84,7 @@ func TestLoadCurrentState(t *testing.T) {
 }
 
 func TestLoadStateForEntry(t *testing.T) {
-	repo, state := createTestRepository(t)
+	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	entry, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
 	if err != nil {
@@ -97,7 +100,7 @@ func TestLoadStateForEntry(t *testing.T) {
 }
 
 func TestStateVerify(t *testing.T) {
-	state := createTestState(t)
+	state := createTestStateWithOnlyRoot(t)
 
 	if err := state.Verify(context.Background()); err != nil {
 		t.Error(err)
@@ -111,13 +114,13 @@ func TestStateVerify(t *testing.T) {
 	assert.NotNil(t, err)
 
 	state.RootPublicKeys = rootKeys
-	state.RootEnvelope.Signatures = []dsse.Signature{}
+	state.RootEnvelope.Signatures = []sslibdsse.Signature{}
 	err = state.Verify(context.Background())
 	assert.NotNil(t, err)
 }
 
 func TestStateCommit(t *testing.T) {
-	repo, _ := createTestRepository(t)
+	repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
 	if err != nil {
@@ -140,64 +143,47 @@ func TestStateCommit(t *testing.T) {
 }
 
 func TestStateGetRootMetadata(t *testing.T) {
-	state := createTestState(t)
+	state := createTestStateWithOnlyRoot(t)
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
 	assert.Equal(t, 1, rootMetadata.Version)
-	assert.Equal(t, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7", rootMetadata.Roles[RootRoleName].KeyIDs[0])
+	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", rootMetadata.Roles[RootRoleName].KeyIDs[0])
 }
 
-func createTestRepository(t *testing.T) (*git.Repository, *State) {
-	t.Helper()
+func TestStateFindPublicKeysForPath(t *testing.T) {
+	state := createTestStateWithPolicy(t)
 
-	state := createTestState(t)
-
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if err := InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
-	if err := rsl.InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := state.Commit(context.Background(), repo, "Create test state", false); err != nil {
-		t.Fatal(err)
+	gpgKey := &sslibsv.SSLibKey{
+		KeyType: signerverifier.GPGKeyType,
+		Scheme:  signerverifier.GPGKeyType,
+		KeyVal: sslibsv.KeyVal{
+			Public: strings.TrimSpace(string(gpgKeyBytes)),
+		},
 	}
 
-	return repo, state
-}
-
-func createTestState(t *testing.T) *State {
-	t.Helper()
-
-	rootEnvBytes, err := os.ReadFile(filepath.Join("test-data", metadataTreeEntryName, "root.json"))
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]struct {
+		path string
+		keys []*sslibsv.SSLibKey
+	}{
+		"public keys for refs/heads/main": {
+			path: "git:refs/heads/main",
+			keys: []*sslibsv.SSLibKey{gpgKey},
+		},
+		"public keys for unprotected branch": {
+			path: "git:refs/heads/unprotected",
+			keys: []*sslibsv.SSLibKey{},
+		},
 	}
 
-	rootEnv := &dsse.Envelope{}
-	if err := json.Unmarshal(rootEnvBytes, rootEnv); err != nil {
-		t.Fatal(err)
+	for name, test := range tests {
+		keys, err := state.FindPublicKeysForPath(context.Background(), test.path)
+		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+		assert.Equal(t, test.keys, keys, fmt.Sprintf("policy keys for path '%s' don't match expected keys in test '%s'", test.path, name))
 	}
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", rootPublicKeysTreeEntryName, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return &State{
-		RootPublicKeys:      []*tuf.Key{key},
-		RootEnvelope:        rootEnv,
-		DelegationEnvelopes: map[string]*dsse.Envelope{},
-	}
 }

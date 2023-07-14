@@ -2,13 +2,18 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/adityasaky/gittuf/internal/policy"
+	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,4 +85,50 @@ func createTestRepositoryWithRoot(t *testing.T) (*Repository, []byte) {
 	}
 
 	return r, keyBytes
+}
+
+func createTestRepositoryWithPolicy(t *testing.T) *Repository {
+	t.Helper()
+
+	r, keyBytes := createTestRepositoryWithRoot(t)
+
+	targetsPrivKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddTopLevelTargetsKey(context.Background(), keyBytes, targetsPubKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.InitializeTargets(context.Background(), targetsPrivKeyBytes, policy.TargetsRoleName, false); err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := &sslibsv.SSLibKey{
+		KeyType: signerverifier.GPGKeyType,
+		Scheme:  signerverifier.GPGKeyType,
+		KeyVal: sslibsv.KeyVal{
+			Public: strings.TrimSpace(string(gpgKeyBytes)),
+		},
+	}
+	kb, err := json.Marshal(gpgKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorizedKeys := [][]byte{kb}
+
+	if err := r.AddDelegation(context.Background(), targetsPrivKeyBytes, policy.TargetsRoleName, "protect-main", authorizedKeys, []string{"git:refs/heads/main"}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	return r
 }

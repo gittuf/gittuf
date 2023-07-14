@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"path"
 
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
@@ -187,6 +188,16 @@ func (d *Delegations) AddDelegation(delegation Delegation) {
 	}
 
 	d.Roles = append(d.Roles, delegation)
+}
+
+// Matches checks if any of the delegation's patterns match the target.
+func (d *Delegation) Matches(target string) bool {
+	for _, pattern := range d.Paths {
+		if ok, _ := path.Match(pattern, target); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Delegation defines the schema for a single delegation entry. It differs from

@@ -31,7 +31,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	}
 
 	if err := repo.RecordRSLEntryForReference("refs/heads/main", false); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	rslRef, err := repo.r.Reference(rsl.RSLRef, true)
@@ -59,7 +59,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	}
 
 	if err := repo.RecordRSLEntryForReference("main", false); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	rslRef, err = repo.r.Reference(rsl.RSLRef, true)

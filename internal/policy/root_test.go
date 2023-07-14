@@ -10,7 +10,7 @@ import (
 )
 
 func TestInitializeRootMetadata(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", rootPublicKeysTreeEntryName, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7"))
+	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestInitializeRootMetadata(t *testing.T) {
 }
 
 func TestAddTargetsKey(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", rootPublicKeysTreeEntryName, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7"))
+	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestAddTargetsKey(t *testing.T) {
 }
 
 func TestDeleteTargetsKey(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", rootPublicKeysTreeEntryName, "437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7"))
+	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}

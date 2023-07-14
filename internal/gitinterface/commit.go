@@ -48,18 +48,23 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		commit.PGPSignature = signature
 	}
 
+	return ApplyCommit(repo, commit, curRef)
+}
+
+// ApplyCommit writes a commit object in the repository and updates the
+// specified reference to point to the commit.
+func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) error {
 	obj := repo.Storer.NewEncodedObject()
-	err = commit.Encode(obj)
-	if err != nil {
+	if err := commit.Encode(obj); err != nil {
 		return err
 	}
+
 	commitHash, err := repo.Storer.SetEncodedObject(obj)
 	if err != nil {
 		return err
 	}
 
-	newRef := plumbing.NewHashReference(plumbing.ReferenceName(targetRef),
-		commitHash)
+	newRef := plumbing.NewHashReference(curRef.Name(), commitHash)
 	return repo.Storer.CheckAndSetReference(newRef, curRef)
 }
 

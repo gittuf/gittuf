@@ -230,6 +230,59 @@ func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string
 	return entry.KeyIDs, nil
 }
 
+// FindPublicKeysForPath identifies the trusted keys for the path. If the path
+// protected in gittuf policy, the trusted keys are returned.
+func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.Key, error) {
+	if err := s.Verify(ctx); err != nil {
+		return nil, err
+	}
+
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+
+	allPublicKeys := targetsMetadata.Delegations.Keys
+	delegationsQueue := targetsMetadata.Delegations.Roles
+
+	trustedKeys := []*tuf.Key{}
+	for {
+		if len(delegationsQueue) <= 1 {
+			return trustedKeys, nil
+		}
+
+		delegation := delegationsQueue[0]
+		delegationsQueue = delegationsQueue[1:]
+
+		if delegation.Matches(path) {
+			for _, keyID := range delegation.KeyIDs {
+				key := allPublicKeys[keyID]
+				trustedKeys = append(trustedKeys, key)
+			}
+
+			if s.HasTargetsRole(delegation.Name) {
+				delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+				if err != nil {
+					return nil, err
+				}
+				for keyID, key := range delegatedMetadata.Delegations.Keys {
+					allPublicKeys[keyID] = key
+				}
+
+				if delegation.Terminating {
+					// Remove other delegations from the queue
+					delegationsQueue = delegatedMetadata.Delegations.Roles
+				} else {
+					// Depth first, so newly discovered delegations go first
+					// Also, we skip the allow-rule, so we don't include the
+					// last element in the delegatedMetadata list.
+					delegationsQueue = append(delegatedMetadata.Delegations.Roles[:len(delegatedMetadata.Delegations.Roles)-1], delegationsQueue...)
+				}
+			}
+		}
+	}
+}
+
 // Verify performs a self-contained verification of all the metadata in the
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
@@ -558,6 +611,7 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 		}
 
 		if s.HasTargetsRole(delegation.Name) {
+			// TODO: clarifying terminating / reachability
 			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
 		}
 	}
