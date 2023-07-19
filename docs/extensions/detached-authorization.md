@@ -85,6 +85,33 @@ knowledge.
 
 TODO: nail down wireline format for authorization and how it is stored signed.
 
+### Design Updates
+
+Detached authorizations must identify:
+* the Git ref affected
+* the tip of the set of commits being applied (if commits A, B, C are to be
+  applied to the ref, C is explicitly recorded, implicitly approving A and B)
+* optionally, the last valid RSL entry for the Git ref affected
+
+In effect, Carol says "I approve setting the main branch to commit C, where the
+last valid RSL entry for main is X." Carol may omit the last valid entry for the
+branch. This supports scenarios such as the first approval for a branch as well
+as high traffic refs where other changes may be merged before Carol's in a
+single go. When Carol does include the last RSL entry ID information, she
+ensures her authorization cannot be replayed during a rollback attack.
+
+In addition, Carol records commit C but the RSL entry for the merge may not
+actually reflect C. This is the case when a merge commit is created. So, during
+the verification workflow, if the RSL entry records a merge commit (identified
+by having two parents in the affected branch), the second parent must match C.
+If the RSL entry does not record a merge commit, then the commit must be C.
+Significantly, this supports merge commits and fast forwards but NOT squash or
+rebase workflows that re-create and apply A, B, C or (A + B + C) to the target
+branch. Also, if Carol issues an authorization for C but A, B, and C must be
+rebased to fix conflicts, Carol will need to issue a new authorization. Note
+that if Carol includes the last valid RSL entry in her authorization, she must
+issue new authorizations even if A, B, and C can be merged as-is.
+
 ## In Practice
 
 Detached authorizations must be stored separately in
