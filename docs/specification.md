@@ -1,6 +1,6 @@
 # gittuf Specification
 
-Last Modified: June 27, 2023
+Last Modified: July 11, 2023
 
 Version: 0.1.0-draft
 
@@ -234,6 +234,139 @@ Further, they set up delegations for each subproject's path within the
 repository. Clara and Dave are only authorized to work on files within `bar/*`
 and Ella is restricted to `baz/*`. As Bob is a maintainer of foo, he is not
 restricted to working only on `baz/*`.
+
+## Actor Workflows
+
+gittuf does not modify the underlying Git implementation itself. For the most
+part, developers can continue using their usual Git workflows and add some
+gittuf specific invocations to update the RSL and sync gittuf namespaces.
+
+### Managing gittuf root of trust
+
+The gittuf root of trust is a TUF Root stored in the gittuf policy namespace.
+The keys used to sign the root role are expected to be securely managed by the
+owners of the repository. TODO: Discuss detached roots, and root specific
+protections for the policy namespace.
+
+The root of trust is responsible for managing the root of gittuf policies. Each
+gittuf policy file is a TUF Targets role. The top level Targets role's keys are
+managed in the root of trust. All other policy files are delegated to directly
+or indirectly by the top level Targets role.
+
+```bash
+$ gittuf trust init
+$ gittuf trust add-policy-key
+$ gittuf trust remove-policy-key
+```
+
+Note: the commands listed here are examples and not exhaustive. Please refer to
+gittuf's help documentation for more specific information about gittuf's usage.
+
+### Managing gittuf policies
+
+Developers can initialize a policy file if it does not already exist by
+specifying its name. Further, they must present its signing keys. The policy
+file will only be initialized if the presented keys are authorized for the
+policy. That is, gittuf verifies that there exists a path in the delegations
+graph from the top level Targets role to the newly named policy, and that the
+delegation path contains the keys presented for the new policy. If this check
+succeeds, the new policy is created with the default `allow-rule`.
+
+After a policy is initialized and stored in the gittuf policy namespace, new
+protection rules can be added to the file. In each instance, the policy file is
+re-signed, and therefore, authorized keys for that policy must be presented.
+
+```bash
+$ gittuf policy init
+$ gittuf policy add-rule
+$ gittuf policy remove-rule
+```
+
+Note: the commands listed here are examples and not exhaustive. Please refer to
+gittuf's help documentation for more specific information about gittuf's usage.
+
+### Recording updates in the RSL
+
+The RSL records changes to the policy namespace automatically. To record changes
+to other Git references, the developer must invoke the gittuf client and specify
+the reference. gittuf then examines the reference and creates a new RSL entry.
+
+Similarly, gittuf can also be invoked to create new RSL annotations. In this
+case, the developer must specify the RSL entries the annotation applies to using
+the target entries' Git identifiers.
+
+```bash
+$ gittuf rsl record
+$ gittuf rsl annotate
+```
+
+Note: the commands listed here are examples and not exhaustive. Please refer to
+gittuf's help documentation for more specific information about gittuf's usage.
+
+### Syncing gittuf namespaces with the main repository
+
+gittuf clients uses the `origin` Git remote to identify the main repository. As
+the RSL must be linear with no branches, gittuf employs a variation of the
+`Secure_Fetch` and `Secure_Push` workflows described in the RSL academic paper.
+
+#### RSLFetch: Receiving remote RSL changes
+
+Before local RSL changes can be made or pushed, it is necessary to verify that
+they are compatible with the remote RSL state. If the remote RSL has entries
+that are unavailable locally, entries made locally will be rejected by the
+remote. For example, let the local RSL tip be entry A and the new entry be entry
+C. If the remote has entry B after A with B being the tip, attempting to push C
+which also comes right after A will fail. Instead, the local RSL must first
+fetch entry B and then create entry C. This is because entries in the RSL must
+be made serially. As each entry includes the ID of the previous entry, a local
+entry that does not incorporate the latest RSL entries on the remote is invalid.
+The workflow is as follows:
+
+1. Fetch remote RSL to the local remote tracker
+   `refs/remotes/origin/gittuf/reference-state-log`.
+1. If the last entry in the remote RSL is the same as the local RSL, terminate
+   successfully.
+1. Perform the verification workflow for the new entries in the remote RSL,
+   incorporating remote changes to the local policy namespace. The verification
+   workflow is performed for each Git reference in the new entries, relative to
+   the local state of each reference. If verification fails, abort and warn
+   user. Note that the verification workflow must fetch each Git reference to
+   its corresponding remote tracker, `refs/remotes/origin/<ref>`. TODO: discuss
+   if verification is skipped for entries that work with namespaces not present
+   locally.
+1. For each modified Git reference, update the local state. As all the refs have
+   been successfully verified, each ref's remote state can be applied to the
+   local repository, so `refs/heads/<ref>` matches `refs/remotes/origin/<ref>`.
+1. Set local RSL to the remote RSL's tip.
+
+#### RSLPush: Submitting local RSL changes
+
+1. Execute `RSLFetch` repeatedly until there are no new RSL entries in the
+   remote RSL. Every time there is a remote update, the user must be prompted to
+   fetch and re-apply their changes to the RSL. This process could be automated
+   but user intervention may be needed to resolve conflicts in the refs they
+   modified. Changes to the gittuf policy must be fetched and applied locally.
+1. Verify the validity of the RSL entries being submitted using locally
+   available gittuf policies to ensure the user is authorized for the changes.
+   If verification fails, abort and warn user.
+1. For each new local RSL entry:
+   1. Push the RSL entry to the remote. At this point, the remote is in an
+      invalid state as changes to modified Git references have not been pushed.
+      However, by submitting the RSL entry first, other gittuf clients that may
+      be pushing to the repository must wait until this push is complete.
+   1. If the entry is a normal entry, push the changes to the remote.
+   1. TODO: discuss if RSL entries must be submitted one by one. If yes,
+      `RSLFetch` probably needs to happen after each push. On the other hand, if
+      all RSL entries are submitted first, other clients can recognize a push is
+      in progress while other Git references are updated.
+
+#### Invoking RSLFetch and RSLPush
+
+While `RSLFetch` and `RSLPush` are invoked directly by the user to sync changes
+with the remote, gittuf executes `RSLFetch` implicitly when a new RSL entry is
+recorded. As RSL entries are typically recorded right before changes are
+submitted to the remote, this ensures that new entries are created using the
+latest remote RSL.
 
 ## Verification Workflow
 
