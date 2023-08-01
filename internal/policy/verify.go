@@ -159,7 +159,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 	// 3. Use each trusted key to verify signature
 	for _, key := range trustedKeys {
-		err := gitinterface.VerifyCommitSignature(commitObj, key)
+		err := gitinterface.VerifyCommitSignature(ctx, commitObj, key)
 		if err == nil {
 			// Signature verification succeeded
 			return nil

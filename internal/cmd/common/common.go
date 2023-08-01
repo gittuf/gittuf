@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -24,7 +25,7 @@ func ReadKeyBytes(key string) ([]byte, error) {
 	)
 
 	if strings.HasPrefix(key, GPGKeyPrefix) {
-		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, "gpg:")))
+		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, GPGKeyPrefix)))
 
 		command := exec.Command("gpg", "--export", "--armor", fingerprint)
 		stdOut, err := command.Output()
@@ -43,6 +44,27 @@ func ReadKeyBytes(key string) ([]byte, error) {
 		}
 
 		kb, err = json.Marshal(pgpKey)
+		if err != nil {
+			return nil, err
+		}
+	} else if strings.HasPrefix(key, FulcioPrefix) {
+		keyID := strings.TrimPrefix(key, FulcioPrefix)
+		ks := strings.Split(keyID, "::")
+		if len(ks) != 2 {
+			return nil, fmt.Errorf("incorrect format for fulcio identity")
+		}
+
+		fulcioKey := &sslibsv.SSLibKey{
+			KeyID:   keyID,
+			KeyType: sslibsv.SigstoreKeyType,
+			Scheme:  sslibsv.SigstoreKeyScheme,
+			KeyVal: sslibsv.KeyVal{
+				Identity: ks[0],
+				Issuer:   ks[1],
+			},
+		}
+
+		kb, err = json.Marshal(fulcioKey)
 		if err != nil {
 			return nil, err
 		}
