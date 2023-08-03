@@ -171,17 +171,17 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 		keys []*sslibsv.SSLibKey
 	}{
 		"public keys for refs/heads/main": {
-			path: "git:refs/heads/main",
+			path: "refs/heads/main",
 			keys: []*sslibsv.SSLibKey{gpgKey},
 		},
 		"public keys for unprotected branch": {
-			path: "git:refs/heads/unprotected",
+			path: "refs/heads/unprotected",
 			keys: []*sslibsv.SSLibKey{},
 		},
 	}
 
 	for name, test := range tests {
-		keys, err := state.FindPublicKeysForPath(context.Background(), test.path)
+		keys, err := state.FindPublicKeysForPath(context.Background(), test.path, "")
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		assert.Equal(t, test.keys, keys, fmt.Sprintf("policy keys for path '%s' don't match expected keys in test '%s'", test.path, name))
 	}

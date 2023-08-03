@@ -37,7 +37,8 @@ func TestAddDelegation(t *testing.T) {
 
 	ruleName := "test-rule"
 	authorizedKeyBytes := [][]byte{targetsKeyBytes}
-	rulePatterns := []string{"git:branch=main"}
+	rulePatterns := []string{"git:refs/heads/main"}
+	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main"}}
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
 	if err != nil {
@@ -63,7 +64,7 @@ func TestAddDelegation(t *testing.T) {
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
-		Paths:       rulePatterns,
+		Paths:       expectedRulePaths,
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
 	})
@@ -80,7 +81,8 @@ func TestRemoveDelegation(t *testing.T) {
 
 	ruleName := "test-rule"
 	authorizedKeyBytes := [][]byte{targetsKeyBytes}
-	rulePatterns := []string{"git:branch=main"}
+	rulePatterns := []string{"git:refs/heads/main"}
+	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main"}}
 
 	err = r.AddDelegation(context.Background(), targetsKeyBytes, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
 	assert.Nil(t, err)
@@ -96,7 +98,7 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
-		Paths:       rulePatterns,
+		Paths:       expectedRulePaths,
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
 	})

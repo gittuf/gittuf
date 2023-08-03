@@ -232,7 +232,7 @@ func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string
 
 // FindPublicKeysForPath identifies the trusted keys for the path. If the path
 // protected in gittuf policy, the trusted keys are returned.
-func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.Key, error) {
+func (s *State) FindPublicKeysForPath(ctx context.Context, gitRef, file string) ([]*tuf.Key, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
 	}
@@ -254,7 +254,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 		delegation := delegationsQueue[0]
 		delegationsQueue = delegationsQueue[1:]
 
-		if delegation.Matches(path) {
+		if delegation.Matches(gitRef, file) {
 			for _, keyID := range delegation.KeyIDs {
 				key := allPublicKeys[keyID]
 				trustedKeys = append(trustedKeys, key)

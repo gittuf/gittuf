@@ -27,6 +27,16 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 		return nil, ErrCannotManipulateAllowRule
 	}
 
+	delegationPaths := make([]*tuf.DelegationPath, 0, len(rulePatterns))
+	for _, pattern := range rulePatterns {
+		delegationPath, err := tuf.NewDelegationPath(pattern)
+		if err != nil {
+			return nil, err
+		}
+
+		delegationPaths = append(delegationPaths, delegationPath)
+	}
+
 	authorizedKeyIDs := []string{}
 	for _, key := range authorizedKeys {
 		targetsMetadata.Delegations.AddKey(key)
@@ -45,7 +55,7 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 		if delegation.Name == ruleName {
 			// update existing delegation
 			existingDelegation = true
-			delegation.Paths = rulePatterns
+			delegation.Paths = delegationPaths
 			delegation.Role = tuf.Role{KeyIDs: authorizedKeyIDs, Threshold: 1}
 		}
 
@@ -55,7 +65,7 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 	if !existingDelegation {
 		allDelegations = append(allDelegations, tuf.Delegation{
 			Name:        ruleName,
-			Paths:       rulePatterns,
+			Paths:       delegationPaths,
 			Terminating: false,
 			Role: tuf.Role{
 				KeyIDs:    authorizedKeyIDs,
@@ -94,7 +104,7 @@ func RemoveDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string) (*t
 func AllowRule() tuf.Delegation {
 	return tuf.Delegation{
 		Name:        AllowRuleName,
-		Paths:       []string{"*"},
+		Paths:       []*tuf.DelegationPath{{GitRefPattern: "*", FilePattern: "*"}},
 		Terminating: true,
 		Role: tuf.Role{
 			KeyIDs:    []string{},

@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"github.com/adityasaky/gittuf/internal/cmd/policy/addgitbranchrule"
 	"github.com/adityasaky/gittuf/internal/cmd/policy/addrule"
 	i "github.com/adityasaky/gittuf/internal/cmd/policy/init"
 	"github.com/adityasaky/gittuf/internal/cmd/policy/persistent"
@@ -18,6 +19,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addrule.New(o))
+	cmd.AddCommand(addgitbranchrule.New(o))
 	cmd.AddCommand(removerule.New(o))
 
 	return cmd

@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	GPGKeyPrefix = "gpg:"
-	FulcioPrefix = "fulcio:"
+	GPGKeyPrefix    = "gpg:"
+	FulcioPrefix    = "fulcio:"
+	GitBranchPrefix = "refs/heads/"
 )
 
 // ReadKeyBytes returns public key bytes using the custom securesystemslib
@@ -76,4 +77,11 @@ func ReadKeyBytes(key string) ([]byte, error) {
 	}
 
 	return kb, nil
+}
+
+func AbsoluteBranch(p string) string {
+	if strings.HasPrefix(p, GitBranchPrefix) {
+		return p
+	}
+	return fmt.Sprintf("%s%s", GitBranchPrefix, p)
 }

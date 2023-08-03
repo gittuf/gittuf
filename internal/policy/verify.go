@@ -3,7 +3,6 @@ package policy
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/adityasaky/gittuf/internal/gitinterface"
 	"github.com/adityasaky/gittuf/internal/rsl"
@@ -141,7 +140,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	)
 
 	// 1. Find authorized public keys for entry's ref
-	trustedKeys, err = policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName)) // FIXME: "git:" shouldn't be here
+	trustedKeys, err = policy.FindPublicKeysForPath(ctx, entry.RefName, "")
 	if err != nil {
 		return err
 	}
