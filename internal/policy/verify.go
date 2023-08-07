@@ -3,11 +3,15 @@ package policy
 import (
 	"context"
 	"errors"
+	"reflect"
+	"sort"
 
 	"github.com/adityasaky/gittuf/internal/gitinterface"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
@@ -126,6 +130,70 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	return nil
 }
 
+type ruleSet struct {
+	rules []keyThresholdVerifier
+	keys  map[string]*tuf.Key
+}
+
+func newRuleSet() *ruleSet {
+	return &ruleSet{rules: []keyThresholdVerifier{}, keys: map[string]*tuf.Key{}}
+}
+
+func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
+	if len(keys) == 0 {
+		return
+	}
+
+	keyIDs := make([]string, 0, len(keys))
+	for _, k := range keys {
+		keyIDs = append(keyIDs, k.KeyID)
+		r.keys[k.KeyID] = k
+	}
+	sort.Slice(keyIDs, func(i, j int) bool {
+		return keyIDs[i] < keyIDs[j]
+	})
+
+	exists := false
+
+	for _, rule := range r.rules {
+		if rule.equals(keyIDs) {
+			exists = true
+			if threshold > rule.threshold {
+				rule.threshold = threshold
+			}
+			break
+		}
+	}
+
+	if !exists {
+		r.rules = append(r.rules, keyThresholdVerifier{
+			keys:      keyIDs,
+			threshold: threshold,
+			verified:  false,
+		})
+	}
+}
+
+func (r *ruleSet) verified() bool {
+	for _, rule := range r.rules {
+		if !rule.verified {
+			return false
+		}
+	}
+
+	return true
+}
+
+type keyThresholdVerifier struct {
+	keys      []string
+	threshold int
+	verified  bool
+}
+
+func (v *keyThresholdVerifier) equals(keys []string) bool {
+	return reflect.DeepEqual(v.keys, keys)
+}
+
 // verifyEntry is a helper to verify an entry's signature using the specified
 // policy.
 func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
@@ -134,41 +202,155 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		return nil
 	}
 
-	var (
-		trustedKeys []*tuf.Key
-		err         error
-	)
+	rules := newRuleSet()
 
-	// 1. Find authorized public keys for entry's ref
-	trustedKeys, err = policy.FindPublicKeysForPath(ctx, entry.RefName, "")
+	// Find commit object for the RSL entry
+	entryCommitObj, err := repo.CommitObject(entry.ID)
 	if err != nil {
 		return err
+	}
+
+	changedPaths, err := getChangedPaths(repo, entry)
+	if err != nil {
+		return err
+	}
+
+	// Find authorized public keys for entry's ref and every modified path
+	for _, path := range changedPaths {
+		trustedKeys, err := policy.FindPublicKeysForPath(ctx, entry.RefName, path)
+		if err != nil {
+			return err
+		}
+		rules.addRuleSet(trustedKeys, 1) // TODO: threshold
 	}
 
 	// No trusted keys => no protection
-	if len(trustedKeys) == 0 {
+	if len(rules.rules) == 0 {
 		return nil
 	}
 
-	// 2. Find commit object for the RSL entry
-	commitObj, err := repo.CommitObject(entry.ID)
-	if err != nil {
-		return err
+	// Verify each rule is fulfilled
+	for _, rule := range rules.rules {
+		for _, keyID := range rule.keys {
+			err := gitinterface.VerifyCommitSignature(ctx, entryCommitObj, rules.keys[keyID])
+			if err == nil {
+				// TODO: threshold
+				// For now, rule is satisfied
+				rule.verified = true
+				break
+			}
+
+			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+				// Unexpected error
+				return err
+			}
+
+			// Haven't found a valid key, continue with next key
+		}
 	}
 
-	// 3. Use each trusted key to verify signature
-	for _, key := range trustedKeys {
-		err := gitinterface.VerifyCommitSignature(ctx, commitObj, key)
-		if err == nil {
-			// Signature verification succeeded
-			return nil
-		}
-		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-			// Unexpected error
-			return err
-		}
-		// Haven't found a valid key, continue with next key
+	if rules.verified() {
+		return nil
 	}
+
+	// for _, key := range trustedKeys {
+	// 	err := gitinterface.VerifyCommitSignature(commitObj, key)
+	// 	if err == nil {
+	// 		// Signature verification succeeded
+	// 		return nil
+	// 	}
+	// 	if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+	// 		// Unexpected error
+	// 		return err
+	// 	}
+	// 	// Haven't found a valid key, continue with next key
+	// }
 
 	return ErrUnauthorizedSignature
+}
+
+func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
+	firstEntry := false
+	filePaths := []string{}
+
+	currentCommit, err := repo.CommitObject(entry.CommitID)
+	if err != nil {
+		return nil, err
+	}
+
+	priorRefEntry, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil, err
+		}
+
+		firstEntry = true
+	}
+
+	if firstEntry {
+		filesIter, err := currentCommit.Files()
+		if err != nil {
+			if errors.Is(err, plumbing.ErrObjectNotFound) {
+				// empty commit
+				return nil, nil
+			}
+
+			return nil, err
+		}
+
+		filesIter.ForEach(func(f *object.File) error {
+			filePaths = append(filePaths, f.Name)
+			return nil
+		})
+
+		return filePaths, nil
+	}
+
+	priorCommit, err := repo.CommitObject(priorRefEntry.CommitID)
+	if err != nil {
+		return nil, err
+	}
+	priorTreeEmpty := false
+	priorTree, err := repo.TreeObject(priorCommit.TreeHash)
+	if err != nil {
+		if errors.Is(err, plumbing.ErrObjectNotFound) {
+			priorTreeEmpty = true
+		} else {
+			return nil, err
+		}
+	}
+
+	currentTreeEmpty := false
+	currentTree, err := repo.TreeObject(currentCommit.TreeHash)
+	if err != nil {
+		if errors.Is(err, plumbing.ErrObjectNotFound) {
+			currentTreeEmpty = true
+		} else {
+			return nil, err
+		}
+	}
+
+	if currentTreeEmpty && priorTreeEmpty {
+		return nil, nil
+	} else if priorTreeEmpty {
+		// return files from current tree
+	} else if currentTreeEmpty {
+		// return files from prior tree, everything got deleted
+	}
+
+	diffSet := map[string]bool{}
+	changes, err := currentTree.Diff(priorTree)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range changes {
+		diffSet[c.From.Name] = true
+		diffSet[c.To.Name] = true
+	}
+
+	for path := range diffSet {
+		filePaths = append(filePaths, path)
+	}
+
+	return filePaths, nil
 }

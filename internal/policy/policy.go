@@ -243,7 +243,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, gitRef, file string) 
 	}
 
 	allPublicKeys := targetsMetadata.Delegations.Keys
-	delegationsQueue := targetsMetadata.Delegations.Roles
+	delegationsQueue := targetsMetadata.Delegations.SortedDelegations()
 
 	trustedKeys := []*tuf.Key{}
 	for {
@@ -269,14 +269,15 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, gitRef, file string) 
 					allPublicKeys[keyID] = key
 				}
 
+				newDelegations := delegatedMetadata.Delegations.SortedDelegations()
 				if delegation.Terminating {
 					// Remove other delegations from the queue
-					delegationsQueue = delegatedMetadata.Delegations.Roles
+					delegationsQueue = newDelegations
 				} else {
 					// Depth first, so newly discovered delegations go first
 					// Also, we skip the allow-rule, so we don't include the
 					// last element in the delegatedMetadata list.
-					delegationsQueue = append(delegatedMetadata.Delegations.Roles[:len(delegatedMetadata.Delegations.Roles)-1], delegationsQueue...)
+					delegationsQueue = append(newDelegations[:len(newDelegations)-1], delegationsQueue...)
 				}
 			}
 		}

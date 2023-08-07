@@ -196,11 +196,14 @@ func (d *Delegations) AddDelegation(delegation Delegation) {
 	d.Roles = append(d.Roles, delegation)
 }
 
+// SortedDelegations sorts and returns all delegations in the Targets metadata.
+// The sorting ensures that delegations that apply policies against both
+// namespaces are prioritized.
 func (d *Delegations) SortedDelegations() []Delegation {
 	sortedDelegations := make([]Delegation, 0, len(d.Roles))
 
-	delegationsOverBoth := []Delegation{}
-	delegationsOverOne := []Delegation{}
+	delegationsOverBoth := make([]Delegation, 0, len(d.Roles))
+	delegationsOverOne := make([]Delegation, 0, len(d.Roles))
 
 	for _, delegation := range d.Roles {
 		if delegation.IsBothNamespaces() {

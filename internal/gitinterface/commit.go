@@ -41,7 +41,7 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		return err
 	}
 
-	commit := createCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
+	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
 
 	if sign {
 		command, args, err := GetSigningCommand()
@@ -145,7 +145,7 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 	return ErrUnknownSigningMethod
 }
 
-func createCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
+func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
 	author := object.Signature{
 		Name:  gitConfig.User.Name,
 		Email: gitConfig.User.Email,

@@ -45,7 +45,7 @@ func TestCreateCommitObject(t *testing.T) {
 	}
 
 	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
-	commit := createCommitObject(gitConfig, plumbing.ZeroHash, plumbing.ZeroHash, "Test commit", clock)
+	commit := CreateCommitObject(gitConfig, plumbing.ZeroHash, plumbing.ZeroHash, "Test commit", clock)
 
 	enc := memory.NewStorage().NewEncodedObject()
 	if err := commit.Encode(enc); err != nil {

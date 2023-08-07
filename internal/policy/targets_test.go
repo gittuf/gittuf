@@ -45,7 +45,7 @@ func TestAddOrUpdateDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
-		Paths:       []*tuf.DelegationPath{{FilePattern: "test/*"}},
+		Paths:       []*tuf.DelegationPath{{FilePattern: "test/*", GitRefPattern: "*"}},
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
