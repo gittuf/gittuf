@@ -3,31 +3,32 @@ package policy
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/adityasaky/gittuf/internal/common"
-	"github.com/adityasaky/gittuf/internal/gitinterface"
 	"github.com/adityasaky/gittuf/internal/rsl"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	format "github.com/go-git/go-git/v5/plumbing/format/config"
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestVerifyRef(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), plumbing.ZeroHash)); err != nil {
+	refName := "refs/heads/main"
+
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
 		t.Fatal(err)
 	}
 
-	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
-	common.CreateTestRSLEntryCommit(t, repo, entry)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
-	err := VerifyRef(context.Background(), repo, "refs/heads/main")
-	assert.Nil(t, err)
+	for _, commitID := range commitIDs {
+		entry := rsl.NewEntry(refName, commitID)
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		err := VerifyRef(context.Background(), repo, refName)
+		assert.Nil(t, err)
+	}
 }
 
 func TestVerifyRefFull(t *testing.T) {
@@ -37,15 +38,22 @@ func TestVerifyRefFull(t *testing.T) {
 	// to.
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), plumbing.ZeroHash)); err != nil {
+	refName := "refs/heads/main"
+
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
 		t.Fatal(err)
 	}
 
-	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
-	common.CreateTestRSLEntryCommit(t, repo, entry)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
-	err := VerifyRefFull(context.Background(), repo, "refs/heads/main")
-	assert.Nil(t, err)
+	for _, commitID := range commitIDs {
+		entry := rsl.NewEntry(refName, commitID)
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		err := VerifyRefFull(context.Background(), repo, refName)
+		assert.Nil(t, err)
+	}
 }
 
 func TestVerifyRelativeForRef(t *testing.T) {
@@ -55,7 +63,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	// to.
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), plumbing.ZeroHash)); err != nil {
+	refName := "refs/heads/main"
+
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,15 +74,25 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
-	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
-	entry.ID = entryID
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
+	entries := []*rsl.Entry{}
 
-	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, "refs/heads/main")
+	for _, commitID := range commitIDs {
+		entry := rsl.NewEntry(refName, commitID)
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		entries = append(entries, entry)
+	}
+
+	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entries[0], refName)
 	assert.Nil(t, err)
 
-	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entry, policyEntry, "refs/heads/main")
-	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entries[0], entries[1], refName)
+	assert.Nil(t, err)
+
+	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entries[1], entries[0], refName)
+	assert.ErrorIs(t, err, ErrNotAncestor)
 }
 
 func TestVerifyEntry(t *testing.T) {
@@ -83,69 +103,14 @@ func TestVerifyEntry(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 	refName := "refs/heads/main"
-	commitIDs := addTestCommits(t, repo, refName)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry("refs/heads/main", commitID)
+		entry := rsl.NewEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		err := verifyEntry(context.Background(), repo, state, entry)
 		assert.Nil(t, err)
 	}
-}
-
-func addTestCommits(t *testing.T, repo *git.Repository, refName string) []plumbing.Hash {
-	t.Helper()
-	commitIDs := []plumbing.Hash{}
-
-	refNameTyped := plumbing.ReferenceName(refName)
-	repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash))
-	ref, err := repo.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gitConfig := &config.Config{
-		Raw: &format.Config{
-			Sections: format.Sections{
-				&format.Section{
-					Name: "user",
-					Options: format.Options{
-						&format.Option{
-							Key:   "name",
-							Value: "Jane Doe",
-						},
-						&format.Option{
-							Key:   "email",
-							Value: "jane.doe@example.com",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
-	commit := gitinterface.CreateCommitObject(gitConfig, gitinterface.EmptyTree(), plumbing.ZeroHash, "Test commit", clock)
-	gitinterface.ApplyCommit(repo, commit, ref)
-
-	ref, err = repo.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	commitIDs = append(commitIDs, ref.Hash())
-
-	commit = gitinterface.CreateCommitObject(gitConfig, gitinterface.EmptyTree(), ref.Hash(), "Test commit", clock)
-	gitinterface.ApplyCommit(repo, commit, ref)
-
-	ref, err = repo.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	commitIDs = append(commitIDs, ref.Hash())
-
-	return commitIDs
 }

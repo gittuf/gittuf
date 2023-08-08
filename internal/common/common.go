@@ -13,7 +13,9 @@ import (
 	"github.com/adityasaky/gittuf/internal/gitinterface"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	format "github.com/go-git/go-git/v5/plumbing/format/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/jonboulle/clockwork"
 )
@@ -104,4 +106,63 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 	commit.PGPSignature = sig.String()
 
 	return commit
+}
+
+// AddNTestCommitsToSpecifiedRef is a test helper that adds test commits to the
+// specified Git ref in the provided repository. Parameter `n` determines how
+// many commits are added.
+//
+// Currently, the test commits have an empty tree.
+func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int) []plumbing.Hash {
+	t.Helper()
+
+	commitIDs := []plumbing.Hash{}
+
+	refNameTyped := plumbing.ReferenceName(refName)
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	ref, err := repo.Reference(refNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gitConfig := &config.Config{
+		Raw: &format.Config{
+			Sections: format.Sections{
+				&format.Section{
+					Name: "user",
+					Options: format.Options{
+						&format.Option{
+							Key:   "name",
+							Value: "Jane Doe",
+						},
+						&format.Option{
+							Key:   "email",
+							Value: "jane.doe@example.com",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+
+	for i := 0; i < n; i++ {
+		commit := gitinterface.CreateCommitObject(gitConfig, gitinterface.EmptyTree(), ref.Hash(), "Test commit", clock)
+		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
+			t.Fatal(err)
+		}
+
+		ref, err = repo.Reference(refNameTyped, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs = append(commitIDs, ref.Hash())
+	}
+
+	return commitIDs
 }

@@ -10,12 +10,11 @@ import (
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
 	ErrUnauthorizedSignature = errors.New("unauthorized signature")
+	ErrNotAncestor           = errors.New("first entry is not ancestor of second entry")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -83,6 +82,10 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 		parentEntryTmp, err := rsl.GetParentForEntry(repo, iteratorEntry)
 		if err != nil {
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				return ErrNotAncestor
+			}
+
 			return err
 		}
 		parentEntry := parentEntryTmp.(*rsl.Entry) // TODO: handle annotations
@@ -235,7 +238,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 			err := gitinterface.VerifyCommitSignature(ctx, entryCommitObj, rules.keys[keyID])
 			if err == nil {
 				// TODO: threshold
-				// For now, rule is satisfied
+				// For now, rule is satisfied with a single valid sig
 				rule.verified = true
 				break
 			}
@@ -253,25 +256,11 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		return nil
 	}
 
-	// for _, key := range trustedKeys {
-	// 	err := gitinterface.VerifyCommitSignature(commitObj, key)
-	// 	if err == nil {
-	// 		// Signature verification succeeded
-	// 		return nil
-	// 	}
-	// 	if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-	// 		// Unexpected error
-	// 		return err
-	// 	}
-	// 	// Haven't found a valid key, continue with next key
-	// }
-
 	return ErrUnauthorizedSignature
 }
 
 func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 	firstEntry := false
-	filePaths := []string{}
 
 	currentCommit, err := repo.CommitObject(entry.CommitID)
 	if err != nil {
@@ -288,69 +277,13 @@ func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 	}
 
 	if firstEntry {
-		filesIter, err := currentCommit.Files()
-		if err != nil {
-			if errors.Is(err, plumbing.ErrObjectNotFound) {
-				// empty commit
-				return nil, nil
-			}
-
-			return nil, err
-		}
-
-		filesIter.ForEach(func(f *object.File) error {
-			filePaths = append(filePaths, f.Name)
-			return nil
-		})
-
-		return filePaths, nil
+		return gitinterface.GetCommitFilePaths(repo, currentCommit)
 	}
 
 	priorCommit, err := repo.CommitObject(priorRefEntry.CommitID)
 	if err != nil {
 		return nil, err
 	}
-	priorTreeEmpty := false
-	priorTree, err := repo.TreeObject(priorCommit.TreeHash)
-	if err != nil {
-		if errors.Is(err, plumbing.ErrObjectNotFound) {
-			priorTreeEmpty = true
-		} else {
-			return nil, err
-		}
-	}
 
-	currentTreeEmpty := false
-	currentTree, err := repo.TreeObject(currentCommit.TreeHash)
-	if err != nil {
-		if errors.Is(err, plumbing.ErrObjectNotFound) {
-			currentTreeEmpty = true
-		} else {
-			return nil, err
-		}
-	}
-
-	if currentTreeEmpty && priorTreeEmpty {
-		return nil, nil
-	} else if priorTreeEmpty {
-		// return files from current tree
-	} else if currentTreeEmpty {
-		// return files from prior tree, everything got deleted
-	}
-
-	diffSet := map[string]bool{}
-	changes, err := currentTree.Diff(priorTree)
-	if err != nil {
-		return nil, err
-	}
-	for _, c := range changes {
-		diffSet[c.From.Name] = true
-		diffSet[c.To.Name] = true
-	}
-
-	for path := range diffSet {
-		filePaths = append(filePaths, path)
-	}
-
-	return filePaths, nil
+	return gitinterface.GetDiffFilePaths(repo, currentCommit, priorCommit)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage/memory"
 )
 
 var ErrWrittenBlobLengthMismatch = errors.New("length of blob written does not match length of contents")
@@ -46,4 +47,11 @@ func WriteBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 	}
 
 	return repo.Storer.SetEncodedObject(obj)
+}
+
+func EmptyBlob() plumbing.Hash {
+	obj := memory.NewStorage().NewEncodedObject()
+	obj.SetType(plumbing.BlobObject)
+
+	return obj.Hash()
 }

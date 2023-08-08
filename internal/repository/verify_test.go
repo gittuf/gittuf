@@ -18,9 +18,15 @@ func TestVerifyRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
-	entryID := common.CreateTestRSLEntryCommit(t, repo.r, entry)
-	entry.ID = entryID
+	refName := "refs/heads/main"
+
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 2)
+
+	for _, commitID := range commitIDs {
+		entry := rsl.NewEntry(refName, commitID)
+		entryID := common.CreateTestRSLEntryCommit(t, repo.r, entry)
+		entry.ID = entryID
+	}
 
 	tests := map[string]struct {
 		target string

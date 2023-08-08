@@ -108,3 +108,11 @@ func TestWriteBlob(t *testing.T) {
 	}
 	assert.Equal(t, writeContents, writtenContents)
 }
+
+func TestEmptyBlob(t *testing.T) {
+	hash := EmptyBlob()
+
+	// SHA-1 ID used by Git to denote an empty tree
+	// $ git hash-object -t tree --stdin < /dev/null
+	assert.Equal(t, "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", hash.String())
+}

@@ -61,18 +61,22 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 // ApplyCommit writes a commit object in the repository and updates the
 // specified reference to point to the commit.
 func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) error {
-	obj := repo.Storer.NewEncodedObject()
-	if err := commit.Encode(obj); err != nil {
-		return err
-	}
-
-	commitHash, err := repo.Storer.SetEncodedObject(obj)
+	commitHash, err := WriteCommit(repo, commit)
 	if err != nil {
 		return err
 	}
 
 	newRef := plumbing.NewHashReference(curRef.Name(), commitHash)
 	return repo.Storer.CheckAndSetReference(newRef, curRef)
+}
+
+func WriteCommit(repo *git.Repository, commit *object.Commit) (plumbing.Hash, error) {
+	obj := repo.Storer.NewEncodedObject()
+	if err := commit.Encode(obj); err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	return repo.Storer.SetEncodedObject(obj)
 }
 
 // VerifyCommitSignature is used to verify a cryptographic signature associated

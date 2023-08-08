@@ -38,7 +38,7 @@ func TestAddDelegation(t *testing.T) {
 	ruleName := "test-rule"
 	authorizedKeyBytes := [][]byte{targetsKeyBytes}
 	rulePatterns := []string{"git:refs/heads/main"}
-	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main"}}
+	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main", FilePattern: "*"}}
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
 	if err != nil {
@@ -82,7 +82,7 @@ func TestRemoveDelegation(t *testing.T) {
 	ruleName := "test-rule"
 	authorizedKeyBytes := [][]byte{targetsKeyBytes}
 	rulePatterns := []string{"git:refs/heads/main"}
-	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main"}}
+	expectedRulePaths := []*tuf.DelegationPath{{GitRefPattern: "refs/heads/main", FilePattern: "*"}}
 
 	err = r.AddDelegation(context.Background(), targetsKeyBytes, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
 	assert.Nil(t, err)
