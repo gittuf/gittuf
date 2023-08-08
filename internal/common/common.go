@@ -116,6 +116,15 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int) []plumbing.Hash {
 	t.Helper()
 
+	if _, err := gitinterface.WriteBlob(repo, []byte{}); err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeHash, err := gitinterface.WriteTree(repo, []object.TreeEntry{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	commitIDs := []plumbing.Hash{}
 
 	refNameTyped := plumbing.ReferenceName(refName)
@@ -151,7 +160,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 
 	for i := 0; i < n; i++ {
-		commit := gitinterface.CreateCommitObject(gitConfig, gitinterface.EmptyTree(), ref.Hash(), "Test commit", clock)
+		commit := gitinterface.CreateCommitObject(gitConfig, emptyTreeHash, ref.Hash(), "Test commit", clock)
 		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}

@@ -17,28 +17,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetCommitFilePaths(t *testing.T) {
-	gitConfig := &config.Config{
-		Raw: &format.Config{
-			Sections: format.Sections{
-				&format.Section{
-					Name: "user",
-					Options: format.Options{
-						&format.Option{
-							Key:   "name",
-							Value: "Jane Doe",
-						},
-						&format.Option{
-							Key:   "email",
-							Value: "jane.doe@example.com",
-						},
+var gitConfig = &config.Config{
+	Raw: &format.Config{
+		Sections: format.Sections{
+			&format.Section{
+				Name: "user",
+				Options: format.Options{
+					&format.Option{
+						Key:   "name",
+						Value: "Jane Doe",
+					},
+					&format.Option{
+						Key:   "email",
+						Value: "jane.doe@example.com",
 					},
 				},
 			},
 		},
-	}
+	},
+}
 
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+var clock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+
+func TestGetCommitFilePaths(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
@@ -102,4 +103,263 @@ func TestGetCommitFilePaths(t *testing.T) {
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test %s", name))
 		assert.Equal(t, test.expectedPaths, paths, fmt.Sprintf("unexpected list of files received: expected %v, got %v in test %s", test.expectedPaths, paths, name))
 	}
+}
+
+func TestGetDiffFilePaths(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobIDs := []plumbing.Hash{}
+	for i := 0; i < 3; i++ {
+		blobID, err := WriteBlob(repo, []byte(fmt.Sprintf("%d", i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		blobIDs = append(blobIDs, blobID)
+	}
+
+	t.Run("modify single file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("rename single file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "b", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("swap two files around", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("create new file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("delete file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("modify file and create new file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[2]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(gitConfig, treeA, plumbing.ZeroHash, "Test commit", clock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(gitConfig, treeB, plumbing.ZeroHash, "Test commit", clock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitA, err := repo.CommitObject(cAID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitB, err := repo.CommitObject(cBID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
 }

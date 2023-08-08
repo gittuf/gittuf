@@ -14,13 +14,6 @@ import (
 func GetCommitFilePaths(repo *git.Repository, commit *object.Commit) ([]string, error) {
 	filesIter, err := commit.Files()
 	if err != nil {
-		if errors.Is(err, plumbing.ErrObjectNotFound) {
-			// Not returning nil here because this likely shouldn't be triggered
-			// except in tests. Even an empty tree must typically be written in
-			// the object store.
-			return []string{}, nil
-		}
-
 		return nil, err
 	}
 
@@ -91,8 +84,12 @@ func diff(treeA, treeB *object.Tree) ([]string, error) {
 	}
 
 	for _, c := range changes {
-		changesSet[c.From.Name] = true
-		changesSet[c.To.Name] = true
+		if len(c.From.Name) > 0 {
+			changesSet[c.From.Name] = true
+		}
+		if len(c.To.Name) > 0 {
+			changesSet[c.To.Name] = true
+		}
 	}
 
 	paths := []string{}
