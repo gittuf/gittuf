@@ -13,6 +13,7 @@ const (
 	RSAKeyType     = sslibsv.RSAKeyType
 	GPGKeyType     = "gpg"
 	FulcioKeyType  = "sigstore-oidc"
+	RekorServer    = "https://rekor.sigstore.dev"
 )
 
 func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.SignerVerifier, error) {
