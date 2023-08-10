@@ -22,7 +22,7 @@ func TestVerifyRef(t *testing.T) {
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
+		entry := rsl.NewCompleteEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
@@ -47,7 +47,7 @@ func TestVerifyRefFull(t *testing.T) {
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
+		entry := rsl.NewCompleteEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
@@ -78,7 +78,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	entries := []*rsl.Entry{}
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
+		entry := rsl.NewCompleteEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
@@ -106,7 +106,7 @@ func TestVerifyEntry(t *testing.T) {
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
+		entry := rsl.NewCompleteEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 

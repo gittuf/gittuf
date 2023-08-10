@@ -23,7 +23,7 @@ func TestVerifyRef(t *testing.T) {
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 2)
 
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
+		entry := rsl.NewCompleteEntry(refName, commitID)
 		entryID := common.CreateTestRSLEntryCommit(t, repo.r, entry)
 		entry.ID = entryID
 	}

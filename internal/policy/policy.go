@@ -523,7 +523,7 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
 	}
 
-	if err := rsl.NewEntry(PolicyRef, ref.Hash()).Commit(repo, signCommit); err != nil {
+	if err := rsl.NewCompleteEntry(PolicyRef, ref.Hash()).Commit(repo, signCommit); err != nil {
 		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
 	}
 

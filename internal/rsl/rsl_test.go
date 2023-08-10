@@ -53,7 +53,7 @@ func TestNewEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -65,11 +65,11 @@ func TestNewEntry(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.ZeroHash.String(), CompleteKey, "true")
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Empty(t, commitObj.ParentHashes)
 
-	if err := NewEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
+	if err := NewPartialEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -85,7 +85,7 @@ func TestNewEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.NewHash("abcdef1234567890"))
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.NewHash("abcdef1234567890"), CompleteKey, "false")
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Contains(t, commitObj.ParentHashes, originalRefHash)
 }
@@ -100,7 +100,7 @@ func TestGetLatestEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -112,7 +112,7 @@ func TestGetLatestEntry(t *testing.T) {
 		assert.Equal(t, plumbing.ZeroHash, e.CommitID)
 	}
 
-	if err := NewEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 	if entry, err := GetLatestEntry(repo); err != nil {
@@ -153,7 +153,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -168,7 +168,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		assert.Equal(t, rslRef.Hash(), entry.ID)
 	}
 
-	if err := NewEntry("feature", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("feature", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,7 +194,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []plumbing.Hash{}
 		for _, ref := range testRefs {
-			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewCompleteEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -238,7 +238,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []plumbing.Hash{}
 		for _, ref := range testRefs {
-			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewCompleteEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -287,7 +287,7 @@ func TestGetEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -309,7 +309,7 @@ func TestGetEntry(t *testing.T) {
 
 	annotationID := ref.Hash()
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -342,7 +342,7 @@ func TestGetParentForEntry(t *testing.T) {
 	}
 
 	// Assert no parent for first entry
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -356,7 +356,7 @@ func TestGetParentForEntry(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 	// Find parent for an entry
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -396,7 +396,7 @@ func TestGetFirstEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewCompleteEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -407,7 +407,7 @@ func TestGetFirstEntry(t *testing.T) {
 	firstEntry := firstEntryT.(*Entry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewCompleteEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -436,15 +436,17 @@ func TestEntryCreateCommitMessage(t *testing.T) {
 			entry: &Entry{
 				RefName:  "refs/heads/main",
 				CommitID: plumbing.ZeroHash,
+				Complete: true,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, plumbing.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, plumbing.ZeroHash.String(), CompleteKey, "true"),
 		},
 		"entry, non-zero commit": {
 			entry: &Entry{
 				RefName:  "refs/heads/main",
 				CommitID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
+				Complete: false,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, "abcdef12345678900987654321fedcbaabcdef12", CompleteKey, "false"),
 		},
 	}
 

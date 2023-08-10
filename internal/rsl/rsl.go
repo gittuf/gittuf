@@ -16,6 +16,7 @@ const (
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
 	CommitIDKey                = "commitID"
+	CompleteKey                = "complete"
 	AnnotationHeader           = "RSL Annotation"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
@@ -61,11 +62,19 @@ type Entry struct {
 
 	// CommitID contains the Git hash for the object expected at RefName.
 	CommitID plumbing.Hash
+
+	// Complete indicates where the entry is to be processed in combination with other entries.
+	Complete bool
 }
 
-// NewEntry returns an Entry object for a normal RSL entry.
-func NewEntry(refName string, commitID plumbing.Hash) *Entry {
-	return &Entry{RefName: refName, CommitID: commitID}
+// NewCompleteEntry returns an Entry object for a normal RSL entry marked complete.
+func NewCompleteEntry(refName string, commitID plumbing.Hash) *Entry {
+	return &Entry{RefName: refName, CommitID: commitID, Complete: true}
+}
+
+// NewPartialEntry returns an Entry object for a normal RSL entry marked incomplete or partial.
+func NewPartialEntry(refName string, commitID plumbing.Hash) *Entry {
+	return &Entry{RefName: refName, CommitID: commitID, Complete: false}
 }
 
 func (e Entry) GetID() plumbing.Hash {
@@ -85,6 +94,7 @@ func (e Entry) createCommitMessage() (string, error) {
 		"",
 		fmt.Sprintf("%s: %s", RefKey, e.RefName),
 		fmt.Sprintf("%s: %s", CommitIDKey, e.CommitID.String()),
+		fmt.Sprintf("%s: %t", CompleteKey, e.Complete),
 	}
 	return strings.Join(lines, "\n"), nil
 }

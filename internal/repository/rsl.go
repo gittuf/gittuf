@@ -21,7 +21,7 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
-	return rsl.NewEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
+	return rsl.NewCompleteEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
 }
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
