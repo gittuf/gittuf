@@ -1,6 +1,6 @@
 # Supporting Detached Authorizations for Actor Actions
 
-Last Modified: July 13, 2023
+Last Modified: August 10, 2023
 
 Version: early draft, not ready for 0.1.0
 
@@ -111,33 +111,6 @@ branch. Also, if Carol issues an authorization for C but A, B, and C must be
 rebased to fix conflicts, Carol will need to issue a new authorization. Note
 that if Carol includes the last valid RSL entry in her authorization, she must
 issue new authorizations even if A, B, and C can be merged as-is.
-
-## Alternative Option
-
-The structure described above is complicated because we have two
-rather-different mechanisms for communicating the same piece of information. An
-alternative is to overload RSL entries. Specifically, instead of issuing a
-separate authorization, each party that needs to authorize a merge signs a
-distinct RSL entry.
-
-For example, if only Alice is authorized to merge changes to main and all
-changes to file foo require sign off from Bob, after the change to foo is made,
-both Alice and Bob issue identical (in content) RSL entries for main.
-
-This design means there's a period of time where the RSL contains only one of
-the two necessary entries. In the standard verification workflow, this would
-trigger an error. To avoid this, the RSL entry schema is updated to include a
-new field that indicates whether an entry must be processed in isolation or with
-other entries. Suppose Alice's entry is submitted first. As it indicates it must
-be processed with more entries, gittuf clients recognize that a threshold of
-signatures are not present but do not error out. However, note that the client
-also does not apply the entry's commit to the branch. After Bob's entry is also
-added and the client fetches it, it re-runs verification and with a sufficient
-number of signatures, the change is applied to main.
-
-By not raising an error with only Alice's entry, clients can process other
-subsequent entries between Alice's and Bob's entries. This ensures that clients
-are not frozen by a delay in Bob's authorization.
 
 ## In Practice
 
