@@ -1,6 +1,7 @@
 package tuf
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -128,4 +129,86 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		delegations.AddDelegation(d)
 		assert.Contains(t, delegations.Roles, d)
 	})
+}
+
+func TestNewDelegationPath(t *testing.T) {
+	tests := map[string]struct {
+		pattern                string
+		expectedDelegationPath *DelegationPath
+		expectedError          error
+	}{
+		"only Git ref": {
+			pattern:                "git:refs/heads/main",
+			expectedDelegationPath: &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+		},
+		"only File ref": {
+			pattern:                "file:foo/*",
+			expectedDelegationPath: &DelegationPath{GitRefPattern: "*", FilePattern: "foo/*"},
+		},
+		"both Git and File ref": {
+			pattern:                "git:refs/heads/main&&file:foo/*",
+			expectedDelegationPath: &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+		},
+		"reversed Git and File ref": {
+			pattern:                "file:foo/*&&git:refs/heads/main",
+			expectedDelegationPath: &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+		},
+		"empty pattern": {
+			pattern:       "",
+			expectedError: ErrInvalidDelegationPattern,
+		},
+		"incorrect Git prefix": {
+			pattern:       "giit:refs/heads/main",
+			expectedError: ErrInvalidDelegationPattern,
+		},
+		"incorrect File prefix": {
+			pattern:       "fiile:foo/*",
+			expectedError: ErrInvalidDelegationPattern,
+		},
+		"incorrect Git prefix, correct File prefix": {
+			pattern:       "giit:refs/heads/main&&file:foo/*",
+			expectedError: ErrInvalidDelegationPattern,
+		},
+		"incorrect File prefix, correct Git prefix": {
+			pattern:       "git:refs/heads/main&&fiile:foo/*",
+			expectedError: ErrInvalidDelegationPattern,
+		},
+	}
+
+	for name, test := range tests {
+		delegationPath, err := NewDelegationPath(test.pattern)
+		if err != nil {
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test %s", name))
+		} else {
+			assert.Nil(t, err, fmt.Sprintf("unexpected error in test %s", name))
+			assert.Equal(t, test.expectedDelegationPath, delegationPath, fmt.Sprintf("unexpected delegation path in test %s", name))
+		}
+	}
+}
+
+func TestDelegationPathMatches(t *testing.T) {
+	tests := map[string]struct {
+		delegationPath  *DelegationPath
+		gitRef          string
+		file            string
+		expectedMatched bool
+	}{
+		"only Git pattern, matches": {
+			delegationPath:  &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+			gitRef:          "refs/heads/main",
+			file:            "foo",
+			expectedMatched: true,
+		},
+		"only File pattern, matches": {
+			delegationPath:  &DelegationPath{GitRefPattern: "*", FilePattern: "foo"},
+			gitRef:          "refs/heads/main",
+			file:            "foo",
+			expectedMatched: true,
+		},
+	}
+
+	for name, test := range tests {
+		matched := test.delegationPath.Matches(test.gitRef, test.file)
+		assert.Equal(t, test.expectedMatched, matched, fmt.Sprintf("unexpected matched result in test %s", name))
+	}
 }

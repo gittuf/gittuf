@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/adityasaky/gittuf/internal/signerverifier/dsse"
@@ -120,6 +121,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	gpgKey := &sslibsv.SSLibKey{
+		KeyID:   common.TestGPGKeyFingerprint, // FIXME: create helper for GPG keys that populates fingerprint
 		KeyType: signerverifier.GPGKeyType,
 		Scheme:  signerverifier.GPGKeyType,
 		KeyVal: sslibsv.KeyVal{
@@ -129,6 +131,11 @@ func createTestStateWithPolicy(t *testing.T) *State {
 
 	targetsMetadata := InitializeTargetsMetadata()
 	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-file-2", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main&&file:2"})
 	if err != nil {
 		t.Fatal(err)
 	}

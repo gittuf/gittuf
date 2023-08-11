@@ -134,12 +134,12 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 }
 
 type ruleSet struct {
-	rules []keyThresholdVerifier
+	rules []*keyThresholdVerifier
 	keys  map[string]*tuf.Key
 }
 
 func newRuleSet() *ruleSet {
-	return &ruleSet{rules: []keyThresholdVerifier{}, keys: map[string]*tuf.Key{}}
+	return &ruleSet{rules: []*keyThresholdVerifier{}, keys: map[string]*tuf.Key{}}
 }
 
 func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
@@ -169,7 +169,7 @@ func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
 	}
 
 	if !exists {
-		r.rules = append(r.rules, keyThresholdVerifier{
+		r.rules = append(r.rules, &keyThresholdVerifier{
 			keys:      keyIDs,
 			threshold: threshold,
 			verified:  false,
@@ -207,7 +207,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 	rules := newRuleSet()
 
-	// Find commit object for the RSL entry
+	// Find commit object for the RSL entrcommon.Testy
 	entryCommitObj, err := repo.CommitObject(entry.ID)
 	if err != nil {
 		return err

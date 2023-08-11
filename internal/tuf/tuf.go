@@ -282,7 +282,7 @@ func NewDelegationPath(pattern string) (*DelegationPath, error) {
 	return &DelegationPath{GitRefPattern: g, FilePattern: f}, nil
 }
 
-func (d *DelegationPath) Matches(gitRef string, file string) bool {
+func (d *DelegationPath) Matches(gitRef, file string) bool {
 	gitRule, fileRule := d.RuleType()
 
 	gitMatched, _ := path.Match(d.GitRefPattern, gitRef)
@@ -298,5 +298,5 @@ func (d *DelegationPath) Matches(gitRef string, file string) bool {
 }
 
 func (d *DelegationPath) RuleType() (bool, bool) {
-	return len(d.GitRefPattern) > 0, len(d.FilePattern) > 0
+	return d.GitRefPattern != "*", d.FilePattern != "*"
 }

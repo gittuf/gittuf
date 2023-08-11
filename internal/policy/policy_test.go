@@ -12,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	"github.com/adityasaky/gittuf/internal/common"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/adityasaky/gittuf/internal/tuf"
@@ -159,6 +160,7 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	gpgKey := &sslibsv.SSLibKey{
+		KeyID:   common.TestGPGKeyFingerprint, // FIXME: this should not be hard-coded
 		KeyType: signerverifier.GPGKeyType,
 		Scheme:  signerverifier.GPGKeyType,
 		KeyVal: sslibsv.KeyVal{

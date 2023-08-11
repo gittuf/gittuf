@@ -20,6 +20,8 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+const TestGPGKeyFingerprint = "6e841b4c529b179a83cf5dcf3219f1e4436a2288"
+
 // CreateTestRSLEntryCommit is a test helper used to create a **signed** RSL
 // entry using the GPG key stored in the repository. It is used to substitute
 // for the default RSL entry creation and signing mechanism which relies on the
@@ -116,16 +118,26 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int) []plumbing.Hash {
 	t.Helper()
 
-	if _, err := gitinterface.WriteBlob(repo, []byte{}); err != nil {
-		t.Fatal(err)
-	}
-
-	emptyTreeHash, err := gitinterface.WriteTree(repo, []object.TreeEntry{})
+	emptyBlobHash, err := gitinterface.WriteBlob(repo, []byte{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commitIDs := []plumbing.Hash{}
+	// Create N trees with 1...N artifacts
+	treeHashes := make([]plumbing.Hash, 0, n)
+	for i := 1; i <= n; i++ {
+		objects := make([]object.TreeEntry, 0, i)
+		for j := 0; j < i; j++ {
+			objects = append(objects, object.TreeEntry{Name: fmt.Sprintf("%d", j+1), Hash: emptyBlobHash})
+		}
+
+		treeHash, err := gitinterface.WriteTree(repo, objects)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeHashes = append(treeHashes, treeHash)
+	}
 
 	refNameTyped := plumbing.ReferenceName(refName)
 	if err := repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
@@ -159,8 +171,9 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 
 	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 
+	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
-		commit := gitinterface.CreateCommitObject(gitConfig, emptyTreeHash, ref.Hash(), "Test commit", clock)
+		commit := gitinterface.CreateCommitObject(gitConfig, treeHashes[i], ref.Hash(), "Test commit", clock)
 		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}
