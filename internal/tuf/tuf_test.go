@@ -131,6 +131,186 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 	})
 }
 
+func TestDelegationMatches(t *testing.T) {
+	// TODO
+}
+
+func TestDelegationsSorted(t *testing.T) {
+	tests := map[string]struct {
+		delegations               *Delegations
+		expectedSortedDelegations []Delegation
+	}{
+		"sorted delegations": {
+			delegations: &Delegations{Roles: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+			}},
+			expectedSortedDelegations: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+			},
+		},
+		"unsorted delegations": {
+			delegations: &Delegations{Roles: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+					},
+				},
+			}},
+			expectedSortedDelegations: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+			},
+		},
+		"unsorted delegations with multiple paths": {
+			delegations: &Delegations{Roles: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+						{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+					},
+				},
+			}},
+			expectedSortedDelegations: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+						{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+			},
+		},
+		"interspersed delegations with multiple paths": {
+			delegations: &Delegations{Roles: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "bar/*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+						{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+					},
+				},
+			}},
+			expectedSortedDelegations: []Delegation{
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "bar/*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+						{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+					},
+				},
+				{
+					Paths: []*DelegationPath{
+						{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		sortedDelegations := test.delegations.Sorted()
+		assert.Equal(t, test.expectedSortedDelegations, sortedDelegations, fmt.Sprintf("unexpected sorting in delegations in test %s", name))
+	}
+}
+
+func TestDelegationIsBothNamespaces(t *testing.T) {
+	tests := map[string]struct {
+		delegation     *Delegation
+		expectedResult bool
+	}{
+		"both namespaces": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+			}},
+			expectedResult: true,
+		},
+		"only Git namespace": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+			}},
+			expectedResult: false,
+		},
+		"only File namespace": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "*", FilePattern: "foo/*"},
+			}},
+			expectedResult: false,
+		},
+		"multiple paths, all both namespaces": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+				{GitRefPattern: "refs/heads/prod", FilePattern: "bar/*"},
+			}},
+			expectedResult: true,
+		},
+		"multiple paths, only some are both namespaces": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo/*"},
+				{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+			}},
+			expectedResult: true,
+		},
+	}
+
+	for name, test := range tests {
+		result := test.delegation.IsBothNamespaces()
+		assert.Equal(t, test.expectedResult, result, fmt.Sprintf("unexpected result in test %s", name))
+	}
+}
+
 func TestNewDelegationPath(t *testing.T) {
 	tests := map[string]struct {
 		pattern                string
@@ -205,10 +385,63 @@ func TestDelegationPathMatches(t *testing.T) {
 			file:            "foo",
 			expectedMatched: true,
 		},
+		"both patterns, only Git matches": {
+			delegationPath:  &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			gitRef:          "refs/heads/main",
+			file:            "bar",
+			expectedMatched: false,
+		},
+		"both patterns, only File matches": {
+			delegationPath:  &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			gitRef:          "refs/heads/prod",
+			file:            "foo",
+			expectedMatched: false,
+		},
+		"both patterns, neither match": {
+			delegationPath:  &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: false,
+		},
 	}
 
 	for name, test := range tests {
 		matched := test.delegationPath.Matches(test.gitRef, test.file)
 		assert.Equal(t, test.expectedMatched, matched, fmt.Sprintf("unexpected matched result in test %s", name))
+	}
+}
+
+func TestDelegationPathRuleType(t *testing.T) {
+	tests := map[string]struct {
+		delegationPath *DelegationPath
+		gitPattern     bool
+		filePattern    bool
+	}{
+		"only Git pattern": {
+			delegationPath: &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+			gitPattern:     true,
+			filePattern:    false,
+		},
+		"only File pattern": {
+			delegationPath: &DelegationPath{GitRefPattern: "*", FilePattern: "foo"},
+			gitPattern:     false,
+			filePattern:    true,
+		},
+		"both patterns": {
+			delegationPath: &DelegationPath{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			gitPattern:     true,
+			filePattern:    true,
+		},
+		"no patterns": {
+			delegationPath: &DelegationPath{GitRefPattern: "*", FilePattern: "*"},
+			gitPattern:     false,
+			filePattern:    false,
+		},
+	}
+
+	for name, test := range tests {
+		g, f := test.delegationPath.RuleType()
+		assert.Equal(t, test.gitPattern, g, fmt.Sprintf("unexpected rule type result in test %s", name))
+		assert.Equal(t, test.filePattern, f, fmt.Sprintf("unexpected rule type result in test %s", name))
 	}
 }

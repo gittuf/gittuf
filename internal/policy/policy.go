@@ -243,7 +243,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, gitRef, file string) 
 	}
 
 	allPublicKeys := targetsMetadata.Delegations.Keys
-	delegationsQueue := targetsMetadata.Delegations.SortedDelegations()
+	delegationsQueue := targetsMetadata.Delegations.Sorted()
 
 	trustedKeys := []*tuf.Key{}
 	for {
@@ -269,7 +269,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, gitRef, file string) 
 					allPublicKeys[keyID] = key
 				}
 
-				newDelegations := delegatedMetadata.Delegations.SortedDelegations()
+				newDelegations := delegatedMetadata.Delegations.Sorted()
 				if delegation.Terminating {
 					// Remove other delegations from the queue
 					delegationsQueue = newDelegations
