@@ -10,6 +10,7 @@ import (
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
@@ -36,7 +37,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 		return err
 	}
 
-	return verifyEntry(ctx, repo, policyState, latestEntry)
+	return verifyEntries(ctx, repo, policyState, []*rsl.Entry{latestEntry})
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -125,7 +126,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			continue
 		}
 
-		if err := verifyEntry(ctx, repo, currentPolicy, entry); err != nil {
+		if err := verifyEntries(ctx, repo, currentPolicy, []*rsl.Entry{entry}); err != nil {
 			return err
 		}
 	}
@@ -133,15 +134,19 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	return nil
 }
 
+// ruleSet defines the set of rules that must be satisfied during verification.
+// A rule is defined by a set of public keys and a threshold.
 type ruleSet struct {
 	rules []*keyThresholdVerifier
 	keys  map[string]*tuf.Key
 }
 
+// newRuleSet creates a new instance of ruleSet.
 func newRuleSet() *ruleSet {
 	return &ruleSet{rules: []*keyThresholdVerifier{}, keys: map[string]*tuf.Key{}}
 }
 
+// addRuleSet adds a new rule that must be satisfied to the rule set.
 func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
 	if len(keys) == 0 {
 		return
@@ -158,6 +163,8 @@ func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
 
 	exists := false
 
+	// If a rule set exists with the same public keys, the higher of the two
+	// thresholds is used to avoid repeated verification.
 	for _, rule := range r.rules {
 		if rule.equals(keyIDs) {
 			exists = true
@@ -177,6 +184,7 @@ func (r *ruleSet) addRuleSet(keys []*tuf.Key, threshold int) {
 	}
 }
 
+// verified indicates if all the rules in the ruleSet have been satisfied.
 func (r *ruleSet) verified() bool {
 	for _, rule := range r.rules {
 		if !rule.verified {
@@ -187,40 +195,49 @@ func (r *ruleSet) verified() bool {
 	return true
 }
 
+// keyThresholdVerifier defines a single rule. A rule is a combination of a set
+// of verification keys and a threshold.
 type keyThresholdVerifier struct {
 	keys      []string
 	threshold int
 	verified  bool
 }
 
+// equals indicates if a slice of verification key IDs match the rule.
 func (v *keyThresholdVerifier) equals(keys []string) bool {
 	return reflect.DeepEqual(v.keys, keys)
 }
 
-// verifyEntry is a helper to verify an entry's signature using the specified
-// policy.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
+// verifyEntries is a helper to verify an entry's signature using the specified
+// policy. Each content in the entries slice must be identical except for their
+// signature.
+func verifyEntries(ctx context.Context, repo *git.Repository, policy *State, entries []*rsl.Entry) error {
 	// TODO: discuss how / if we want to verify RSL entry signatures for the policy namespace
-	if entry.RefName == PolicyRef {
+	if entries[0].RefName == PolicyRef {
 		return nil
 	}
 
 	rules := newRuleSet()
 
-	// Find commit object for the RSL entrcommon.Testy
-	entryCommitObj, err := repo.CommitObject(entry.ID)
-	if err != nil {
-		return err
+	// Find commit object for the RSL entries
+	entryCommitObjs := make([]*object.Commit, 0, len(entries))
+	for _, e := range entries {
+		entryCommitObj, err := repo.CommitObject(e.ID)
+		if err != nil {
+			return err
+		}
+
+		entryCommitObjs = append(entryCommitObjs, entryCommitObj)
 	}
 
-	changedPaths, err := getChangedPaths(repo, entry)
+	changedPaths, err := getChangedPaths(repo, entries[0])
 	if err != nil {
 		return err
 	}
 
 	// Find authorized public keys for entry's ref and every modified path
 	for _, path := range changedPaths {
-		trustedKeys, err := policy.FindPublicKeysForPath(ctx, entry.RefName, path)
+		trustedKeys, err := policy.FindPublicKeysForPath(ctx, entries[0].RefName, path)
 		if err != nil {
 			return err
 		}
@@ -234,21 +251,32 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 	// Verify each rule is fulfilled
 	for _, rule := range rules.rules {
+		verifiedCount := 0
 		for _, keyID := range rule.keys {
-			err := gitinterface.VerifyCommitSignature(ctx, entryCommitObj, rules.keys[keyID])
-			if err == nil {
-				// TODO: threshold
-				// For now, rule is satisfied with a single valid sig
-				rule.verified = true
+			if rule.verified {
+				// Allows us to break early if prior keys satisfied the rule
 				break
 			}
 
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				// Unexpected error
-				return err
-			}
+			for _, entryCommitObj := range entryCommitObjs {
+				err := gitinterface.VerifyCommitSignature(ctx, entryCommitObj, rules.keys[keyID])
+				if err == nil {
+					verifiedCount++
 
-			// Haven't found a valid key, continue with next key
+					// If threshold is met, mark rule verified
+					if verifiedCount >= rule.threshold {
+						rule.verified = true
+						break
+					}
+				}
+
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					// Unexpected error
+					return err
+				}
+
+				// Haven't found a valid key, continue with next key
+			}
 		}
 	}
 

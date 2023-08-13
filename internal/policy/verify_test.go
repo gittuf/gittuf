@@ -110,7 +110,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
-		err := verifyEntry(context.Background(), repo, state, entry)
+		err := verifyEntries(context.Background(), repo, state, []*rsl.Entry{entry})
 		assert.Nil(t, err)
 	}
 }

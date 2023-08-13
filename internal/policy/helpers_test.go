@@ -135,11 +135,6 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-file-2", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main&&file:2"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
