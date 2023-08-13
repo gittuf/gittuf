@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrUnauthorizedSignature = errors.New("unauthorized signature")
+	ErrInvalidSetOfEntries   = errors.New("collection of entries being verified must make the same claims")
 	ErrNotAncestor           = errors.New("first entry is not ancestor of second entry")
 )
 
@@ -222,6 +223,15 @@ func verifyEntries(ctx context.Context, repo *git.Repository, policy *State, ent
 	// Find commit object for the RSL entries
 	entryCommitObjs := make([]*object.Commit, 0, len(entries))
 	for _, e := range entries {
+		// In the process, we verify that all entries make the same claims
+		if e.RefName != entries[0].RefName {
+			return ErrInvalidSetOfEntries
+		}
+
+		if e.CommitID != entries[0].CommitID {
+			return ErrInvalidSetOfEntries
+		}
+
 		entryCommitObj, err := repo.CommitObject(e.ID)
 		if err != nil {
 			return err
