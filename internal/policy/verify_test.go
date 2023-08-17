@@ -95,7 +95,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotAncestor)
 }
 
-func TestVerifyEntry(t *testing.T) {
+func TestVerifyEntries(t *testing.T) {
 	// FIXME: currently this test is nearly identical to the one for VerifyRef.
 	// This is because it's not trivial to create a bunch of test policy / RSL
 	// states cleanly. We need something that is easy to maintain and add cases

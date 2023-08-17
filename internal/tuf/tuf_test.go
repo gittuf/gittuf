@@ -131,10 +131,6 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 	})
 }
 
-func TestDelegationMatches(t *testing.T) {
-	// TODO
-}
-
 func TestDelegationsSorted(t *testing.T) {
 	tests := map[string]struct {
 		delegations               *Delegations
@@ -262,7 +258,108 @@ func TestDelegationsSorted(t *testing.T) {
 
 	for name, test := range tests {
 		sortedDelegations := test.delegations.Sorted()
-		assert.Equal(t, test.expectedSortedDelegations, sortedDelegations, fmt.Sprintf("unexpected sorting in delegations in test %s", name))
+		assert.Equal(t, test.expectedSortedDelegations, sortedDelegations, fmt.Sprintf("unexpected sorting in delegations in test '%s'", name))
+	}
+}
+
+func TestDelegationMatches(t *testing.T) {
+	tests := map[string]struct {
+		delegation      *Delegation
+		gitRef          string
+		file            string
+		expectedMatched bool
+	}{
+		"only Git pattern, matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "*"},
+			}},
+			gitRef:          "refs/heads/main",
+			file:            "foo",
+			expectedMatched: true,
+		},
+		"only File pattern, matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "*", FilePattern: "foo"},
+			}},
+			gitRef:          "refs/heads/main",
+			file:            "foo",
+			expectedMatched: true,
+		},
+		"both patterns, only Git matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			}},
+			gitRef:          "refs/heads/main",
+			file:            "bar",
+			expectedMatched: false,
+		},
+		"both patterns, only File matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "foo",
+			expectedMatched: false,
+		},
+		"both patterns, neither match": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: false,
+		},
+		"multiple patterns both namespaces, one matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+				{GitRefPattern: "refs/heads/prod", FilePattern: "bar"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: true,
+		},
+		"multiple patterns both namespaces, none match": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+				{GitRefPattern: "refs/heads/legacy", FilePattern: "foo"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: false,
+		},
+		"multiple patterns mixed namespaces, file-only rule matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+				{GitRefPattern: "*", FilePattern: "bar"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: true,
+		},
+		"multiple patterns mixed namespaces, git-only rule matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+				{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+			}},
+			gitRef:          "refs/heads/prod",
+			file:            "bar",
+			expectedMatched: true,
+		},
+		"multiple patterns mixed namespaces, none matches": {
+			delegation: &Delegation{Paths: []*DelegationPath{
+				{GitRefPattern: "refs/heads/main", FilePattern: "foo"},
+				{GitRefPattern: "refs/heads/prod", FilePattern: "*"},
+				{GitRefPattern: "*", FilePattern: "bar"},
+			}},
+			gitRef:          "refs/heads/legacy",
+			file:            "foobar",
+			expectedMatched: false,
+		},
+	}
+
+	for name, test := range tests {
+		matched := test.delegation.Matches(test.gitRef, test.file)
+		assert.Equal(t, test.expectedMatched, matched, fmt.Sprintf("unexpected result in test '%s'", name))
 	}
 }
 
@@ -307,7 +404,7 @@ func TestDelegationIsBothNamespaces(t *testing.T) {
 
 	for name, test := range tests {
 		result := test.delegation.IsBothNamespaces()
-		assert.Equal(t, test.expectedResult, result, fmt.Sprintf("unexpected result in test %s", name))
+		assert.Equal(t, test.expectedResult, result, fmt.Sprintf("unexpected result in test '%s'", name))
 	}
 }
 
@@ -358,10 +455,10 @@ func TestNewDelegationPath(t *testing.T) {
 	for name, test := range tests {
 		delegationPath, err := NewDelegationPath(test.pattern)
 		if err != nil {
-			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test %s", name))
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test %s", name))
-			assert.Equal(t, test.expectedDelegationPath, delegationPath, fmt.Sprintf("unexpected delegation path in test %s", name))
+			assert.Equal(t, test.expectedDelegationPath, delegationPath, fmt.Sprintf("unexpected delegation path in test '%s'", name))
 		}
 	}
 }
@@ -407,7 +504,7 @@ func TestDelegationPathMatches(t *testing.T) {
 
 	for name, test := range tests {
 		matched := test.delegationPath.Matches(test.gitRef, test.file)
-		assert.Equal(t, test.expectedMatched, matched, fmt.Sprintf("unexpected matched result in test %s", name))
+		assert.Equal(t, test.expectedMatched, matched, fmt.Sprintf("unexpected matched result in test '%s'", name))
 	}
 }
 
@@ -441,7 +538,7 @@ func TestDelegationPathRuleType(t *testing.T) {
 
 	for name, test := range tests {
 		g, f := test.delegationPath.RuleType()
-		assert.Equal(t, test.gitPattern, g, fmt.Sprintf("unexpected rule type result in test %s", name))
-		assert.Equal(t, test.filePattern, f, fmt.Sprintf("unexpected rule type result in test %s", name))
+		assert.Equal(t, test.gitPattern, g, fmt.Sprintf("unexpected rule type result in test '%s'", name))
+		assert.Equal(t, test.filePattern, f, fmt.Sprintf("unexpected rule type result in test '%s'", name))
 	}
 }

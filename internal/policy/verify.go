@@ -10,6 +10,7 @@ import (
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/adityasaky/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -32,13 +33,35 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 		return err
 	}
 
-	// 2. Find latest entry for target
+	// 2. Find latest entries for target
 	latestEntry, err := rsl.GetLatestEntryForRef(repo, target)
 	if err != nil {
 		return err
 	}
+	latestEntries := []*rsl.Entry{latestEntry}
+	iteratorID := latestEntry.ID
+	for {
+		priorEntry, err := rsl.GetLatestEntryForRefBefore(repo, target, iteratorID)
+		if err != nil {
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				// Suppress as the latest entry may be the very first for the
+				// ref
+				break
+			}
 
-	return verifyEntries(ctx, repo, policyState, []*rsl.Entry{latestEntry})
+			return err
+		}
+
+		if priorEntry.CommitID != latestEntry.CommitID {
+			break
+		}
+
+		latestEntries = append(latestEntries, priorEntry)
+		iteratorID = priorEntry.ID
+	}
+
+	entryQueue := newEntryQueue(latestEntries)
+	return entryQueue.verify(ctx, repo, policyState)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -99,40 +122,98 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 		iteratorEntry = parentEntry
 	}
 
+	entryQueue := newEntryQueueFromEntryStack(entryStack)
+	return entryQueue.verify(ctx, repo, currentPolicy)
+}
+
+type entryQueue struct {
+	entriesSet []*entryVerifier
+}
+
+func newEntryQueue(queue []*rsl.Entry) *entryQueue {
+	eq := &entryQueue{entriesSet: []*entryVerifier{}}
+	for _, entry := range queue {
+		eq.addEntry(entry)
+	}
+
+	return eq
+}
+
+func newEntryQueueFromEntryStack(entryStack []*rsl.Entry) *entryQueue {
 	// entryStack has a list of RSL entries in reverse order
-	entryQueue := make([]*rsl.Entry, 0, len(entryStack))
+	queue := make([]*rsl.Entry, 0, len(entryStack))
 	for j := len(entryStack) - 1; j >= 0; j-- {
 		// We reverse the entries so that they are chronologically sorted. If we
 		// process them in the reverse order, we have to go past each entry
 		// anyway to find the last policy entry to use. It also makes the entry
 		// processing easier to reason about.
-		entryQueue = append(entryQueue, entryStack[j])
+		queue = append(queue, entryStack[j])
 	}
 
-	for _, entry := range entryQueue {
-		// FIXME: we're not verifying policy RSL entry signatures because we
-		// need to establish how to fetch that info. An additional blocker is
-		// for managing special keys like root and targets keys. RSL entry
-		// signatures are commit signatures. What do we do when metadata is
-		// signed using other methods? Do we instead flip the script and require
-		// metadata signatures to match git signing methods?
-		if entry.RefName == PolicyRef {
-			// TODO: this is repetition if the firstEntry is for policy
-			state, err := LoadStateForEntry(ctx, repo, entry)
+	return newEntryQueue(queue)
+}
+
+func (e *entryQueue) addEntry(entry *rsl.Entry) {
+	exists := false
+	for _, s := range e.entriesSet {
+		if s.ref == entry.RefName && s.commitID == entry.CommitID {
+			// Add this entry to be verified along others making same claim
+			// TODO: do we check the complete field?
+			exists = true
+			s.entries = append(s.entries, entry)
+			break
+		}
+	}
+
+	if !exists {
+		e.entriesSet = append(e.entriesSet, &entryVerifier{
+			entries:  []*rsl.Entry{entry},
+			ref:      entry.RefName,
+			commitID: entry.CommitID,
+		})
+	}
+}
+
+func (e *entryQueue) verify(ctx context.Context, repo *git.Repository, policy *State) error {
+	for _, s := range e.entriesSet {
+		if s.ref == PolicyRef {
+			// FIXME: we're not verifying policy RSL entry signatures because we
+			// need to establish how to fetch that info. An additional blocker
+			// is for managing special keys like root and targets keys. RSL
+			// entry signatures are commit signatures. What do we do when
+			// metadata is signed using other methods? Do we instead flip the
+			// script and require metadata signatures to match git signing
+			// methods?
+			newPolicy, err := LoadState(ctx, repo, s.entries[0].ID)
 			if err != nil {
 				return err
 			}
-			currentPolicy = state
+			policy = newPolicy
 
 			continue
 		}
 
-		if err := verifyEntries(ctx, repo, currentPolicy, []*rsl.Entry{entry}); err != nil {
+		if err := s.verify(ctx, repo, policy); err != nil {
+			// TODO: should we return the error or just track it as unverified?
+			// Tracking unverified allows us to move forward with those that
+			// don't meet threshold yet.
 			return err
 		}
 	}
 
 	return nil
+}
+
+type entryVerifier struct {
+	entries  []*rsl.Entry
+	ref      string
+	commitID plumbing.Hash
+}
+
+func (e *entryVerifier) verify(ctx context.Context, repo *git.Repository, policy *State) error {
+	// TODO: we may eventually not need verifyEntries to be a separate helper,
+	// we may be able to roll all verification paths through this verifier.
+	return verifyEntries(ctx, repo, policy, e.entries)
 }
 
 // ruleSet defines the set of rules that must be satisfied during verification.

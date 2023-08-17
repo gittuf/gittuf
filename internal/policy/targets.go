@@ -34,6 +34,9 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 			return nil, err
 		}
 
+		// TODO: should we sort to prioritize dual namespace patterns?
+		// Or should all patterns be of the same class? i.e., only git, only
+		// file, or both?
 		delegationPaths = append(delegationPaths, delegationPath)
 	}
 

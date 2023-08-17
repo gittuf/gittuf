@@ -9,9 +9,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"path"
 	"strings"
 
+	"github.com/gobwas/glob"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
@@ -283,18 +283,10 @@ func NewDelegationPath(pattern string) (*DelegationPath, error) {
 }
 
 func (d *DelegationPath) Matches(gitRef, file string) bool {
-	gitRule, fileRule := d.RuleType()
+	g := glob.MustCompile(d.GitRefPattern)
+	f := glob.MustCompile(d.FilePattern)
 
-	gitMatched, _ := path.Match(d.GitRefPattern, gitRef)
-	fileMatched, _ := path.Match(d.FilePattern, file)
-
-	if gitRule && fileRule {
-		return gitMatched && fileMatched
-	} else if gitRule {
-		return gitMatched
-	}
-
-	return fileMatched
+	return g.Match(gitRef) && f.Match(file)
 }
 
 func (d *DelegationPath) RuleType() (bool, bool) {
