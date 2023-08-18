@@ -13,7 +13,9 @@ import (
 	"github.com/adityasaky/gittuf/internal/gitinterface"
 	"github.com/adityasaky/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	format "github.com/go-git/go-git/v5/plumbing/format/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/jonboulle/clockwork"
 )
@@ -104,4 +106,83 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 	commit.PGPSignature = sig.String()
 
 	return commit
+}
+
+// AddNTestCommitsToSpecifiedRef is a test helper that adds test commits to the
+// specified Git ref in the provided repository. Parameter `n` determines how
+// many commits are added. Each commit is associated with a distinct tree. The
+// first commit contains a tree with one object (an empty blob), the second with
+// two objects (both empty blobs), and so on.
+func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int) []plumbing.Hash {
+	t.Helper()
+
+	emptyBlobHash, err := gitinterface.WriteBlob(repo, []byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create N trees with 1...N artifacts
+	treeHashes := make([]plumbing.Hash, 0, n)
+	for i := 1; i <= n; i++ {
+		objects := make([]object.TreeEntry, 0, i)
+		for j := 0; j < i; j++ {
+			objects = append(objects, object.TreeEntry{Name: fmt.Sprintf("%d", j+1), Hash: emptyBlobHash})
+		}
+
+		treeHash, err := gitinterface.WriteTree(repo, objects)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeHashes = append(treeHashes, treeHash)
+	}
+
+	refNameTyped := plumbing.ReferenceName(refName)
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	ref, err := repo.Reference(refNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gitConfig := &config.Config{
+		Raw: &format.Config{
+			Sections: format.Sections{
+				&format.Section{
+					Name: "user",
+					Options: format.Options{
+						&format.Option{
+							Key:   "name",
+							Value: "Jane Doe",
+						},
+						&format.Option{
+							Key:   "email",
+							Value: "jane.doe@example.com",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+
+	commitIDs := []plumbing.Hash{}
+	for i := 0; i < n; i++ {
+		commit := gitinterface.CreateCommitObject(gitConfig, treeHashes[i], ref.Hash(), "Test commit", clock)
+		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
+			t.Fatal(err)
+		}
+
+		ref, err = repo.Reference(refNameTyped, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs = append(commitIDs, ref.Hash())
+	}
+
+	return commitIDs
 }
