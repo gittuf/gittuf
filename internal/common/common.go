@@ -20,6 +20,34 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
+const (
+	testName  = "Jane Doe"
+	testEmail = "jane.doe@example.com"
+)
+
+var (
+	testGitConfig = &config.Config{
+		Raw: &format.Config{
+			Sections: format.Sections{
+				&format.Section{
+					Name: "user",
+					Options: format.Options{
+						&format.Option{
+							Key:   "name",
+							Value: testName,
+						},
+						&format.Option{
+							Key:   "email",
+							Value: testEmail,
+						},
+					},
+				},
+			},
+		},
+	}
+	testClock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+)
+
 // CreateTestRSLEntryCommit is a test helper used to create a **signed** RSL
 // entry using the GPG key stored in the repository. It is used to substitute
 // for the default RSL entry creation and signing mechanism which relies on the
@@ -43,17 +71,16 @@ func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Ent
 		t.Fatal(err)
 	}
 
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 	testCommit := &object.Commit{
 		Author: object.Signature{
-			Name:  "Jane Doe",
-			Email: "jane.doe@example.com",
-			When:  clock.Now(),
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
 		},
 		Committer: object.Signature{
-			Name:  "Jane Doe",
-			Email: "jane.doe@example.com",
-			When:  clock.Now(),
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
 		},
 		Message:      commitMessage,
 		TreeHash:     plumbing.ZeroHash,
@@ -147,31 +174,9 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 		t.Fatal(err)
 	}
 
-	gitConfig := &config.Config{
-		Raw: &format.Config{
-			Sections: format.Sections{
-				&format.Section{
-					Name: "user",
-					Options: format.Options{
-						&format.Option{
-							Key:   "name",
-							Value: "Jane Doe",
-						},
-						&format.Option{
-							Key:   "email",
-							Value: "jane.doe@example.com",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
-
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
-		commit := gitinterface.CreateCommitObject(gitConfig, treeHashes[i], ref.Hash(), "Test commit", clock)
+		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
 		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}

@@ -13,39 +13,15 @@ import (
 	"github.com/adityasaky/gittuf/internal/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	format "github.com/go-git/go-git/v5/plumbing/format/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/jonboulle/clockwork"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateCommitObject(t *testing.T) {
-	gitConfig := &config.Config{
-		Raw: &format.Config{
-			Sections: format.Sections{
-				&format.Section{
-					Name: "user",
-					Options: format.Options{
-						&format.Option{
-							Key:   "name",
-							Value: "Jane Doe",
-						},
-						&format.Option{
-							Key:   "email",
-							Value: "jane.doe@example.com",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
-	commit := CreateCommitObject(gitConfig, plumbing.ZeroHash, plumbing.ZeroHash, "Test commit", clock)
+	commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, plumbing.ZeroHash, "Test commit", testClock)
 
 	enc := memory.NewStorage().NewEncodedObject()
 	if err := commit.Encode(enc); err != nil {
@@ -153,17 +129,16 @@ func createTestSignedCommit(t *testing.T) *object.Commit {
 		t.Fatal(err)
 	}
 
-	clock := clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 	testCommit := &object.Commit{
 		Author: object.Signature{
-			Name:  "Jane Doe",
-			Email: "jane.doe@example.com",
-			When:  clock.Now(),
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
 		},
 		Committer: object.Signature{
-			Name:  "Jane Doe",
-			Email: "jane.doe@example.com",
-			When:  clock.Now(),
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
 		},
 		Message:  "Test commit",
 		TreeHash: plumbing.ZeroHash,
