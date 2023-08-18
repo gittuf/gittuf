@@ -52,6 +52,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 			return err
 		}
 
+		// Scan until all entries for this ref making the same claim are found.
 		if priorEntry.CommitID != latestEntry.CommitID {
 			break
 		}
@@ -122,14 +123,20 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 		iteratorEntry = parentEntry
 	}
 
+	// 3. Create an entryQueue instance with related entries collated. Then, the
+	// queue is verified.
 	entryQueue := newEntryQueueFromEntryStack(entryStack)
 	return entryQueue.verify(ctx, repo, currentPolicy)
 }
 
+// entryQueue contains a list of RSL entries to be verified with related entries
+// collated so that they're verified together.
 type entryQueue struct {
 	entriesSet []*entryVerifier
 }
 
+// newEntryQueue creates a new entryQueue instance using the list of entries
+// provided. The entries are processed to collate related entries.
 func newEntryQueue(queue []*rsl.Entry) *entryQueue {
 	eq := &entryQueue{entriesSet: []*entryVerifier{}}
 	for _, entry := range queue {
@@ -139,6 +146,9 @@ func newEntryQueue(queue []*rsl.Entry) *entryQueue {
 	return eq
 }
 
+// newEntryQueueFromEntryStack creates a new entryQueue instance using a list of
+// RSL entries in reverse chronological order. The entries are first reversed
+// and then processed to collate related entries.
 func newEntryQueueFromEntryStack(entryStack []*rsl.Entry) *entryQueue {
 	// entryStack has a list of RSL entries in reverse order
 	queue := make([]*rsl.Entry, 0, len(entryStack))
@@ -153,6 +163,9 @@ func newEntryQueueFromEntryStack(entryStack []*rsl.Entry) *entryQueue {
 	return newEntryQueue(queue)
 }
 
+// addEntry adds an RSL entry to the existing entryQueue. If the entryQueue
+// instance contains one or more entries with the same claim (ref and commit
+// ID), the new entry is collated with those entries.
 func (e *entryQueue) addEntry(entry *rsl.Entry) {
 	exists := false
 	for _, s := range e.entriesSet {
@@ -174,6 +187,9 @@ func (e *entryQueue) addEntry(entry *rsl.Entry) {
 	}
 }
 
+// verify uses the provided initial policy to begin verification for all the
+// entries in the entryQueue. If the entryQueue contains a change in policy,
+// that policy is used for subsequent entries in the queue.
 func (e *entryQueue) verify(ctx context.Context, repo *git.Repository, policy *State) error {
 	for _, s := range e.entriesSet {
 		if s.ref == PolicyRef {
@@ -204,6 +220,8 @@ func (e *entryQueue) verify(ctx context.Context, repo *git.Repository, policy *S
 	return nil
 }
 
+// entryVerifier collates all RSL entries making the same claim so that they can
+// be verified together.
 type entryVerifier struct {
 	entries  []*rsl.Entry
 	ref      string
