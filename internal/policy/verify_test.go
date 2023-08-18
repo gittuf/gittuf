@@ -17,6 +17,9 @@ func TestVerifyRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// FIXME: In a future change, this will be updated to use
+	// common.AddNTestCommitsToSpecifiedRef. For that to happen, the
+	// verification must also check file policies.
 	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
 	common.CreateTestRSLEntryCommit(t, repo, entry)
 
@@ -35,6 +38,9 @@ func TestVerifyRefFull(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// FIXME: In a future change, this will be updated to use
+	// common.AddNTestCommitsToSpecifiedRef. For that to happen, the
+	// verification must also check file policies.
 	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
 	common.CreateTestRSLEntryCommit(t, repo, entry)
 
@@ -58,6 +64,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// FIXME: In a future change, this will be updated to use
+	// common.AddNTestCommitsToSpecifiedRef. For that to happen, the
+	// verification must also check file policies.
 	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
 	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 	entry.ID = entryID
@@ -76,10 +85,50 @@ func TestVerifyEntry(t *testing.T) {
 	// to.
 	repo, state := createTestRepository(t, createTestStateWithPolicy)
 
+	// FIXME: In a future change, this will be updated to use
+	// common.AddNTestCommitsToSpecifiedRef. For that to happen, the
+	// verification must also check file policies.
 	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
 	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	err := verifyEntry(context.Background(), repo, state, entry)
 	assert.Nil(t, err)
+}
+
+func TestGetChangedPaths(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+	refName := "refs/heads/main"
+
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	// FIXME: this setup with RSL entries can be formalized using another
+	// helper like createTestStateWithPolicy. The RSL could then also
+	// incorporate policy changes and so on.
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
+	entries := []*rsl.Entry{}
+	for _, commitID := range commitIDs {
+		entry := rsl.NewEntry(refName, commitID)
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		entries = append(entries, entry)
+	}
+
+	changedPaths, err := getChangedPaths(repo, entries[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// First commit's tree has a single file, 1.
+	assert.Equal(t, []string{"1"}, changedPaths)
+
+	changedPaths, err = getChangedPaths(repo, entries[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Second commit's tree has two files, 1 and 2. Only 2 is new.
+	assert.Equal(t, []string{"2"}, changedPaths)
 }
