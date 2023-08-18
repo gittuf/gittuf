@@ -41,7 +41,7 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		return err
 	}
 
-	commit := createCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
+	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
 
 	if sign {
 		command, args, err := GetSigningCommand()
@@ -61,18 +61,24 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 // ApplyCommit writes a commit object in the repository and updates the
 // specified reference to point to the commit.
 func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) error {
-	obj := repo.Storer.NewEncodedObject()
-	if err := commit.Encode(obj); err != nil {
-		return err
-	}
-
-	commitHash, err := repo.Storer.SetEncodedObject(obj)
+	commitHash, err := WriteCommit(repo, commit)
 	if err != nil {
 		return err
 	}
 
 	newRef := plumbing.NewHashReference(curRef.Name(), commitHash)
 	return repo.Storer.CheckAndSetReference(newRef, curRef)
+}
+
+// WriteCommit stores the commit object in the repository's object store,
+// returning the new commit's ID.
+func WriteCommit(repo *git.Repository, commit *object.Commit) (plumbing.Hash, error) {
+	obj := repo.Storer.NewEncodedObject()
+	if err := commit.Encode(obj); err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	return repo.Storer.SetEncodedObject(obj)
 }
 
 // VerifyCommitSignature is used to verify a cryptographic signature associated
@@ -145,7 +151,8 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 	return ErrUnknownSigningMethod
 }
 
-func createCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
+// CreateCommitObject returns a commit object using the specified parameters.
+func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
 	author := object.Signature{
 		Name:  gitConfig.User.Name,
 		Email: gitConfig.User.Email,
