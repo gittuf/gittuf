@@ -28,6 +28,20 @@ By integrating support for source control specific in-toto attestations, gittuf
 can also support verification against requirements specified by projects like
 [SLSA](https://slsa.dev/).
 
+## Integrate with Git Ecosystem
+
+Git forges like GitHub and GitLab allow repository owners to specify policies
+such as the developers authorized to push to a branch, the developers who must
+approve changes to certain files, and more. These repository policies can be
+specified in gittuf, making conformance with repository policies publicly
+verifiable. In addition, as gittuf tracks historic policies, auditing
+repositories hosted on such forges at some older state can be made possible.
+
+Another Git-specific tool that gittuf could integrate with is Gerrit, the code
+review system. This integration, in combination with support for
+[in-toto attestations](#integrate-in-toto-attestations) would allow for
+transparent and auditable code review policy enforcement.
+
 ## Read Permissions
 
 gittuf's specification implements _write_ permission policies such as who can
