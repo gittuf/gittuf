@@ -60,9 +60,3 @@ is working on SHA-256 support, it is currently not backwards compatible with
 existing repositories and unsupported by major Git hosts and forges. This
 feature needs to be fleshed out as the current document merely records some
 early ideas.
-
-## Submit to OpenSSF
-
-Finally, one major roadmap item is to submit gittuf to the
-[OpenSSF](https://openssf.org/). This would allow the project to grow faster and
-support a wider variety of Git use cases.
