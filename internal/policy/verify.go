@@ -171,5 +171,43 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		// Haven't found a valid key, continue with next key
 	}
 
+	// 4. Verify modified files
+	// TODO
+
+	// ensure the linter doesn't complain about unused helper
+	getChangedPaths(repo, entry) //nolint: errcheck
+
 	return ErrUnauthorizedSignature
+}
+
+// getChangedPaths identifies the paths of all the files changed using the
+// specified RSL entry. The entry's commit ID is compared with the commit ID
+// from the previous RSL entry for the same namespace.
+func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
+	firstEntry := false
+
+	currentCommit, err := repo.CommitObject(entry.CommitID)
+	if err != nil {
+		return nil, err
+	}
+
+	priorRefEntry, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil, err
+		}
+
+		firstEntry = true
+	}
+
+	if firstEntry {
+		return gitinterface.GetCommitFilePaths(repo, currentCommit)
+	}
+
+	priorCommit, err := repo.CommitObject(priorRefEntry.CommitID)
+	if err != nil {
+		return nil, err
+	}
+
+	return gitinterface.GetDiffFilePaths(repo, currentCommit, priorCommit)
 }
