@@ -9,6 +9,8 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
@@ -136,8 +138,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	}
 
 	var (
-		trustedKeys []*tuf.Key
-		err         error
+		trustedKeys           []*tuf.Key
+		err                   error
+		gitNamespaceVerified  bool = false
+		pathNamespaceVerified bool = true // Assume paths are verified until we find out otherwise
 	)
 
 	// 1. Find authorized public keys for entry's ref
@@ -146,9 +150,9 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		return err
 	}
 
-	// No trusted keys => no protection
+	// No trusted keys => allow any key's signature for the git namespace
 	if len(trustedKeys) == 0 {
-		return nil
+		gitNamespaceVerified = true
 	}
 
 	// 2. Find commit object for the RSL entry
@@ -162,7 +166,8 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		err := gitinterface.VerifyCommitSignature(ctx, commitObj, key)
 		if err == nil {
 			// Signature verification succeeded
-			return nil
+			gitNamespaceVerified = true
+			break
 		}
 		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
 			// Unexpected error
@@ -171,18 +176,151 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		// Haven't found a valid key, continue with next key
 	}
 
+	if !gitNamespaceVerified {
+		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
+	}
+
 	// 4. Verify modified files
-	// TODO
 
-	// ensure the linter doesn't complain about unused helper
-	getChangedPaths(repo, entry) //nolint: errcheck
+	// First, get all commits between the current and last entry for the ref.
+	commits, err := getCommits(repo, entry) // note: this is ordered by commit ID
+	if err != nil {
+		return err
+	}
 
-	return ErrUnauthorizedSignature
+	commitsVerified := make([]bool, len(commits))
+	for i, commit := range commits {
+		// Assume the commit's paths are verified, if a path is left unverified,
+		// we flip this later.
+		commitsVerified[i] = true
+
+		paths, err := gitinterface.GetFilePathsChangedByCommit(repo, commit)
+		if err != nil {
+			return err
+		}
+
+		// TODO: evaluate if this can be done once for the earliest commit in
+		// the set being verified if we had them ordered.
+		commitPolicy := policy
+		firstSeenEntry, err := rsl.GetFirstEntryForCommit(repo, commit)
+		if err != nil {
+			if !errors.Is(err, rsl.ErrNoRecordOfCommit) {
+				return err
+			}
+		} else {
+			commitPolicyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
+			if err != nil {
+				return err
+			}
+			commitPolicy, err = LoadStateForEntry(ctx, repo, commitPolicyEntry)
+			if err != nil {
+				return err
+			}
+		}
+
+		pathsVerified := make([]bool, len(paths))
+		verifiedKeyID := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
+		for j, path := range paths {
+			trustedKeys, err := commitPolicy.FindPublicKeysForPath(ctx, fmt.Sprintf("file:%s", path)) // FIXME: "file:" shouldn't be here
+			if err != nil {
+				return err
+			}
+
+			if len(trustedKeys) == 0 {
+				pathsVerified[j] = true
+				continue
+			}
+
+			if len(verifiedKeyID) > 0 {
+				// We've already verified and identified commit signature's key
+				// ID, we can just check if that key ID is trusted for the new
+				// path.
+				// If not found, we don't make any assumptions about it being a
+				// failure in case of key ID mismatches. So, the signature check
+				// proceeds as usual.
+				for _, key := range trustedKeys {
+					if key.KeyID == verifiedKeyID {
+						pathsVerified[j] = true
+						break
+					}
+				}
+			}
+
+			if pathsVerified[j] {
+				continue
+			}
+
+			for _, key := range trustedKeys {
+				err := gitinterface.VerifyCommitSignature(ctx, commit, key)
+				if err == nil {
+					// Signature verification succeeded
+					pathsVerified[j] = true
+					verifiedKeyID = key.KeyID
+					break
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					// Unexpected error
+					return err
+				}
+				// Haven't found a valid key, continue with next key
+			}
+		}
+
+		for _, p := range pathsVerified {
+			if !p {
+				// Flip earlier assumption that commit paths are verified as we
+				// find that at least one path wasn't verified successfully
+				commitsVerified[i] = false
+				break
+			}
+		}
+	}
+
+	for _, c := range commitsVerified {
+		if !c {
+			// Set path namespace verified to false as at least one commit's
+			// paths weren't verified successfully
+			pathNamespaceVerified = false
+			break
+		}
+	}
+
+	if !pathNamespaceVerified {
+		return fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
+	}
+
+	return nil
+}
+
+// getCommits identifies the commits introduced to the entry's ref since the
+// last RSL entry for the same ref. These commits are then verified for file
+// policies.
+func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error) {
+	firstEntry := false
+
+	priorRefEntry, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil, err
+		}
+
+		firstEntry = true
+	}
+
+	if firstEntry {
+		return gitinterface.GetCommitsBetweenRange(repo, entry.CommitID, plumbing.ZeroHash)
+	}
+
+	return gitinterface.GetCommitsBetweenRange(repo, entry.CommitID, priorRefEntry.CommitID)
 }
 
 // getChangedPaths identifies the paths of all the files changed using the
 // specified RSL entry. The entry's commit ID is compared with the commit ID
 // from the previous RSL entry for the same namespace.
+//
+// Deprecated: this was introduced in a previous design. As it turns out, it is
+// flawed as we want changed paths per commit rather than all changed paths
+// between two RSL entries that span multiple commits.
 func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 	firstEntry := false
 

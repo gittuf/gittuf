@@ -132,6 +132,11 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-files-1-and-2", []*tuf.Key{gpgKey}, []string{"file:1", "file:2"})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
