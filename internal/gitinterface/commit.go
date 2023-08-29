@@ -172,6 +172,22 @@ func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parent
 	return commit
 }
 
+// KnowsCommit indicates if the commit under test, identified by commitID, has a
+// path to commit. If commit is the same as the commit under test or if commit
+// is an ancestor of commit under test, KnowsCommit returns true.
+func KnowsCommit(repo *git.Repository, commitID plumbing.Hash, commit *object.Commit) (bool, error) {
+	if commitID == commit.Hash {
+		return true, nil
+	}
+
+	commitUnderTest, err := repo.CommitObject(commitID)
+	if err != nil {
+		return false, err
+	}
+
+	return commit.IsAncestor(commitUnderTest)
+}
+
 func signCommit(repo *git.Repository, commit *object.Commit, signingCommand string, signingArgs []string) (string, error) {
 	commitContents, err := getCommitBytesWithoutSignature(commit)
 	if err != nil {

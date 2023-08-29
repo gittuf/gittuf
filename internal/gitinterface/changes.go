@@ -32,6 +32,34 @@ func GetCommitFilePaths(repo *git.Repository, commit *object.Commit) ([]string, 
 	return paths, nil
 }
 
+// GetFilePathsChangedByCommit returns the paths changed by the commit relative
+// to its parent commit. If the commit is a merge commit, i.e., it has more than
+// one parent, no changes are returned.
+//
+// Currently, this function does not verify that the tree for a merge commit
+// matches one of its parents. In a future version, this behavior may change and
+// return an error if a multi-parent commit seems invalid.
+func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([]string, error) {
+	if len(commit.ParentHashes) > 1 {
+		// merge commits are expected not to introduce changes themselves
+		// TODO: should we check that the merge commit's tree matches one of its
+		// parents (usually the last)?
+		return nil, nil
+	}
+
+	if len(commit.ParentHashes) == 0 {
+		// No parent, return all file paths for commit
+		return GetCommitFilePaths(repo, commit)
+	}
+
+	parentCommit, err := repo.CommitObject(commit.ParentHashes[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return GetDiffFilePaths(repo, commit, parentCommit)
+}
+
 // GetDiffFilePaths enumerates all the changed file paths between the two
 // commits. If one of the commits is nil, the other commit's tree is enumerated.
 func GetDiffFilePaths(repo *git.Repository, commitA, commitB *object.Commit) ([]string, error) {
