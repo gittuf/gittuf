@@ -60,3 +60,9 @@ is working on SHA-256 support, it is currently not backwards compatible with
 existing repositories and unsupported by major Git hosts and forges. This
 feature needs to be fleshed out as the current document merely records some
 early ideas.
+
+## Dogfood gittuf
+
+Once gittuf achieves sufficient maturity, the gittuf source must be protected
+using gittuf. This will contribute significantly to the usability and further
+development of the tool, and will demonstrate its features and viability.
