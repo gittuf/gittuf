@@ -14,11 +14,13 @@ import (
 func TestVerifyRef(t *testing.T) {
 	repo := createTestRepositoryWithPolicy(t)
 
-	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), plumbing.ZeroHash)); err != nil {
+	refName := "refs/heads/main"
+	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
 		t.Fatal(err)
 	}
 
-	entry := rsl.NewEntry("refs/heads/main", plumbing.ZeroHash)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1)
+	entry := rsl.NewEntry(refName, commitIDs[0])
 	entryID := common.CreateTestRSLEntryCommit(t, repo.r, entry)
 	entry.ID = entryID
 
