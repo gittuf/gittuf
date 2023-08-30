@@ -2,9 +2,11 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -36,4 +38,21 @@ func absoluteReference(repo *git.Repository, target string) (string, error) {
 	}
 
 	return "", ErrReferenceNotFound
+}
+
+func refSpec(refName string, fastForwardOnly bool) config.RefSpec {
+	var refString string
+
+	found := strings.Contains(refName, ":")
+	if found {
+		refString = refName
+	} else {
+		refString = fmt.Sprintf("%s:%s", refName, refName)
+	}
+
+	if fastForwardOnly {
+		return config.RefSpec(refString)
+	}
+
+	return config.RefSpec(fmt.Sprintf("+%s", refString))
 }
