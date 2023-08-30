@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/adityasaky/gittuf/internal/signerverifier"
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"

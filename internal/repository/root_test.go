@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/adityasaky/gittuf/internal/policy"
-	"github.com/adityasaky/gittuf/internal/signerverifier"
-	"github.com/adityasaky/gittuf/internal/signerverifier/dsse"
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )

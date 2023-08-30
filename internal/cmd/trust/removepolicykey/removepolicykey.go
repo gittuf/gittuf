@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/adityasaky/gittuf/internal/cmd/trust/persistent"
-	"github.com/adityasaky/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 

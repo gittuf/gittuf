@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/adityasaky/gittuf/internal/cmd/root"
+	"github.com/gittuf/gittuf/internal/cmd/root"
 )
 
 func main() {

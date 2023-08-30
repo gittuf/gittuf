@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")

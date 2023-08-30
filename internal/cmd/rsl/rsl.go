@@ -1,8 +1,8 @@
 package rsl
 
 import (
-	"github.com/adityasaky/gittuf/internal/cmd/rsl/annotate"
-	"github.com/adityasaky/gittuf/internal/cmd/rsl/record"
+	"github.com/gittuf/gittuf/internal/cmd/rsl/annotate"
+	"github.com/gittuf/gittuf/internal/cmd/rsl/record"
 	"github.com/spf13/cobra"
 )
 

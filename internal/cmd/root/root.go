@@ -1,10 +1,10 @@
 package root
 
 import (
-	"github.com/adityasaky/gittuf/internal/cmd/policy"
-	"github.com/adityasaky/gittuf/internal/cmd/rsl"
-	"github.com/adityasaky/gittuf/internal/cmd/trust"
-	"github.com/adityasaky/gittuf/internal/cmd/verifyref"
+	"github.com/gittuf/gittuf/internal/cmd/policy"
+	"github.com/gittuf/gittuf/internal/cmd/rsl"
+	"github.com/gittuf/gittuf/internal/cmd/trust"
+	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/spf13/cobra"
 )
 

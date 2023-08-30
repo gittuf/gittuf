@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/adityasaky/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/policy"
 )
 
 func (r *Repository) VerifyRef(ctx context.Context, target string, full bool) error {

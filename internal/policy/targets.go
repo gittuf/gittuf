@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const AllowRuleName = "gittuf-allow-rule"

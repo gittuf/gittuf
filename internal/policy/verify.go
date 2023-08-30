@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/adityasaky/gittuf/internal/gitinterface"
-	"github.com/adityasaky/gittuf/internal/rsl"
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 )
 

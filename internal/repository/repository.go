@@ -3,8 +3,8 @@ package repository
 import (
 	"errors"
 
-	"github.com/adityasaky/gittuf/internal/policy"
-	"github.com/adityasaky/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5"
 )
 

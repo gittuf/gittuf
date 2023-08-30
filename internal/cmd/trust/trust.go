@@ -1,10 +1,10 @@
 package trust
 
 import (
-	"github.com/adityasaky/gittuf/internal/cmd/trust/addpolicykey"
-	i "github.com/adityasaky/gittuf/internal/cmd/trust/init"
-	"github.com/adityasaky/gittuf/internal/cmd/trust/persistent"
-	"github.com/adityasaky/gittuf/internal/cmd/trust/removepolicykey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
+	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
+	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
 	"github.com/spf13/cobra"
 )
 

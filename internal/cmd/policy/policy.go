@@ -1,10 +1,10 @@
 package policy
 
 import (
-	"github.com/adityasaky/gittuf/internal/cmd/policy/addrule"
-	i "github.com/adityasaky/gittuf/internal/cmd/policy/init"
-	"github.com/adityasaky/gittuf/internal/cmd/policy/persistent"
-	"github.com/adityasaky/gittuf/internal/cmd/policy/removerule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
+	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
+	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
 	"github.com/spf13/cobra"
 )
 

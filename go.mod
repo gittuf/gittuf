@@ -1,4 +1,4 @@
-module github.com/adityasaky/gittuf
+module github.com/gittuf/gittuf
 
 go 1.20
 
