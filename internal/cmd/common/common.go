@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/adityasaky/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 

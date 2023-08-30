@@ -1,7 +1,7 @@
 package annotate
 
 import (
-	"github.com/adityasaky/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 

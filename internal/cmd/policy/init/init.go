@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/adityasaky/gittuf/internal/cmd/policy/persistent"
-	"github.com/adityasaky/gittuf/internal/policy"
-	"github.com/adityasaky/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 

@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/adityasaky/gittuf/internal/signerverifier/common"
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 

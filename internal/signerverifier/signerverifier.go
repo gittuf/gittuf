@@ -1,8 +1,8 @@
 package signerverifier
 
 import (
-	"github.com/adityasaky/gittuf/internal/signerverifier/common"
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )

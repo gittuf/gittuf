@@ -12,9 +12,9 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 
-	"github.com/adityasaky/gittuf/internal/rsl"
-	"github.com/adityasaky/gittuf/internal/signerverifier"
-	"github.com/adityasaky/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
