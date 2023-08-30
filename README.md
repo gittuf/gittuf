@@ -14,6 +14,25 @@ a production system or repository. Contributions are welcome, please refer to
 the [contributing guide]. Some of the features listed above are being actively
 developed, please refer to the [roadmap] and the issue tracker for more details.
 
+## Installation
+
+gittuf requires Go 1.20 or higher.
+
+The tool can be installed using `go install` as follows:
+
+```bash
+$ go install github.com/adityasaky/gittuf@latest
+```
+
+Alternatively, you can clone the repository and run `make`. This will also run
+the test suite prior to installing gittuf.
+
+```bash
+$ git clone https://github.com/adityasaky/gittuf
+$ cd gittuf
+$ make
+```
+
 [The Update Framework (TUF)]: https://theupdateframework.io/
 [other attacks]: https://ssl.engineering.nyu.edu/papers/torres_toto_usenixsec-2016.pdf
 [contributing guide]: /CONTRIBUTING.md
