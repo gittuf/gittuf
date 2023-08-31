@@ -1,5 +1,7 @@
 # gittuf
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/7789/badge)](https://www.bestpractices.dev/projects/7789)
+
 gittuf provides a security layer for Git using some concepts introduced by [The
 Update Framework (TUF)]. Among other features, gittuf handles key management for
 all developers on the repository, allows you to set permissions for repository
