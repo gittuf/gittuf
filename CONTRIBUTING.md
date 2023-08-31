@@ -12,8 +12,9 @@ When submitting changes to the gittuf docs or implementation, contributors must
 open a GitHub pull request to the repository. gittuf uses the NYU Secure
 Systems Lab
 [development workflow](https://github.com/secure-systems-lab/lab-guidelines/blob/master/dev-workflow.md).
-Pull requests undergo review by one or more [maintainers](MAINTAINERS.txt) and
-undergo automated testing such as:
+Pull requests must include tests for the changes in behavior they introduce.
+They are reviewed by one or more [maintainers](MAINTAINERS.txt) and undergo
+automated testing such as (but not limited to):
 * Unit and build testing
 * Static analysis using linters
 
