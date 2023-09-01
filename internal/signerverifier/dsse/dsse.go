@@ -56,7 +56,7 @@ func SignEnvelope(ctx context.Context, envelope *dsse.Envelope, signer dsse.Sign
 }
 
 // VerifyEnvelope verifies a DSSE envelope against an expected threshold using
-// a slice of verifiers passed in to it. Threshold indicates the number of
+// a slice of verifiers passed into it. Threshold indicates the number of
 // providers that must validate the envelope.
 func VerifyEnvelope(ctx context.Context, envelope *dsse.Envelope, verifiers []dsse.Verifier, threshold int) error {
 	if threshold < 1 || threshold > len(verifiers) {
