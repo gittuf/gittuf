@@ -54,7 +54,7 @@ func TestReadBlob(t *testing.T) {
 		assert.Equal(t, readContents, contents)
 	})
 
-	t.Run("test non existent blob", func(t *testing.T) {
+	t.Run("test nonexistent blob", func(t *testing.T) {
 		_, err := ReadBlob(repo, plumbing.ZeroHash)
 		assert.ErrorIs(t, err, plumbing.ErrObjectNotFound)
 	})

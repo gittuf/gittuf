@@ -185,7 +185,7 @@ targets entries are used.  Any key which delegated trust up to this part of the
 namespace (including the last delegation), is trusted to sign the git actions.
 
 ![delegation_example_2](https://github.com/gittuf/gittuf/assets/14241779/963bba32-6c34-4211-80e9-87e0d6fe8836)
-In this example, the repository adminstrator grants write permissions to Carol 
+In this example, the repository administrator grants write permissions to Carol 
 for the main branch, to Alice for the alice-dev branch, and to Bob for the /tests folder
 (under any of the existing branches).
 
