@@ -184,10 +184,10 @@ delegation graph is used to decide which keys git actions should trust, but no
 targets entries are used.  Any key which delegated trust up to this part of the 
 namespace (including the last delegation), is trusted to sign the git actions.
 
-![delegation_example_2](https://github.com/gittuf/gittuf/assets/14241779/963bba32-6c34-4211-80e9-87e0d6fe8836)
-In this example, the repository administrator grants write permissions to Carol 
-for the main branch, to Alice for the alice-dev branch, and to Bob for the /tests folder
-(under any of the existing branches).
+![Policy delegations](/docs/media/policy-delegations.png)
+_In this example, the repository administrator grants write permissions to Carol 
+for the main branch, to Alice for the alice-dev branch, and to Bob for the
+/tests folder (under any of the existing branches)._
 
 This mechanism is employed when verifying both RSL entries for Git ref updates
 _and_ when verifying the commits introduced between two ref updates. The latter
@@ -314,9 +314,14 @@ gittuf clients uses the `origin` Git remote to identify the main repository. As
 the RSL must be linear with no branches, gittuf employs a variation of the
 `Secure_Fetch` and `Secure_Push` workflows described in the RSL academic paper.
 
-![gittuf-new-arch-alternate](https://github.com/gittuf/gittuf/assets/14241779/c01f438e-c4a0-4179-b570-4a39a215992b)
-
-Note that gittuf can be used even if the main repository is not gittuf-enabled. The repository can host the gittuf namespaces which other gittuf clients can pull from for verification. In this example, a gittuf client with a changeset to commit to the dev branch (step 1), creates in its local repository a new commit object and the associated RSL entry (step 2). These changes are pushed next to a remote Git repository (step 3), from where other gittuf or legacy Git clients pull the changes (step 4).
+![Using gittuf with legacy servers](/docs/media/gittuf-with-legacy-servers.png)
+_Note that gittuf can be used even if the main repository is not gittuf-enabled.
+The repository can host the gittuf namespaces which other gittuf clients can
+pull from for verification. In this example, a gittuf client with a changeset to
+commit to the dev branch (step 1), creates in its local repository a new commit
+object and the associated RSL entry (step 2). These changes are pushed next to a
+remote Git repository (step 3), from where other gittuf or legacy Git clients
+pull the changes (step 4)._
 
 #### RSLFetch: Receiving remote RSL changes
 
