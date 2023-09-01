@@ -10,7 +10,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.7.1-0.20230801180332-1e75bb347966
 	github.com/sigstore/cosign/v2 v2.2.0
 	github.com/sigstore/gitsign v0.7.1
-	github.com/sigstore/sigstore v1.7.2
+	github.com/sigstore/sigstore v1.7.3
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
 )
