@@ -12,10 +12,25 @@ func Push(repo *git.Repository, remoteName string, refs []config.RefSpec) error 
 	}
 
 	pushOpts := &git.PushOptions{
-		RefSpecs: refs,
-		Atomic:   true,
-		Force:    true,
+		RemoteName: remoteName,
+		RefSpecs:   refs,
+		Atomic:     true,
+		Force:      true,
 	}
 
 	return remote.Push(pushOpts)
+}
+
+func Fetch(repo *git.Repository, remoteName string, refs []config.RefSpec) error {
+	remote, err := repo.Remote(remoteName)
+	if err != nil {
+		return err
+	}
+
+	fetchOpts := &git.FetchOptions{
+		RemoteName: remoteName,
+		RefSpecs:   refs,
+	}
+
+	return remote.Fetch(fetchOpts)
 }

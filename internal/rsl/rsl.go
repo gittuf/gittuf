@@ -8,11 +8,13 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
 	RSLRef                     = "refs/gittuf/reference-state-log"
+	RSLRemoteTrackerRef        = "refs/remotes/%s/gittuf/reference-state-log"
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
 	CommitIDKey                = "commitID"
@@ -44,6 +46,69 @@ func InitializeNamespace(repo *git.Repository) error {
 	}
 
 	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(RSLRef), plumbing.ZeroHash))
+}
+
+func CheckRemoteRSLForUpdates(repo *git.Repository, remoteName string) (bool, error) {
+	trackerRef := fmt.Sprintf(RSLRemoteTrackerRef, remoteName)
+	rslRemoteRefSpec := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, trackerRef))}
+	if err := gitinterface.Fetch(repo, remoteName, rslRemoteRefSpec); err != nil {
+		if strings.Contains(err.Error(), "malformed zero-id ref") { // FIXME: what's the expectation around uninitialized namespaces?
+			return false, nil
+		}
+		return false, err
+	}
+
+	remoteRefState, err := repo.Reference(plumbing.ReferenceName(trackerRef), true)
+	if err != nil {
+		return false, err
+	}
+
+	localRefState, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	if err != nil {
+		return false, err
+	}
+
+	// Check if local is nil and exit appropriately
+	if localRefState.Hash().IsZero() {
+		// Local RSL has not been populated but remote is not zero
+		// So there are updates the local can pull
+		return true, nil
+	}
+
+	// Check if equal and exit early if true
+	if remoteRefState.Hash() == localRefState.Hash() {
+		return false, nil
+	}
+
+	// Next, check if remote is ahead of local
+	remoteCommit, err := repo.CommitObject(remoteRefState.Hash())
+	if err != nil {
+		return false, err
+	}
+	localCommit, err := repo.CommitObject(localRefState.Hash())
+	if err != nil {
+		return false, err
+	}
+
+	isAncestor, err := localCommit.IsAncestor(remoteCommit)
+	if err != nil {
+		return false, err
+	}
+	if isAncestor {
+		return true, nil
+	}
+
+	// If not ancestor, local may be ahead or they may have diverged
+	// If remote is ancestor, only local is ahead, no updates
+	// If remote is not ancestor, the two have diverged, local needs to pull updates
+	isAncestor, err = remoteCommit.IsAncestor(localCommit)
+	if err != nil {
+		return false, err
+	}
+	if isAncestor {
+		return false, nil
+	}
+	return true, nil
 }
 
 type EntryType interface {
