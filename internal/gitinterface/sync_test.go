@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -116,13 +117,8 @@ func TestFetch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// if err := repoDst.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
-	// 	t.Fatal(err)
-	// }
-
-	// err = Fetch(repoSrc, remoteName, []config.RefSpec{refSpec})
-	// assert.ErrorIs(t, err, git.NoErrAlreadyUpToDate)
-	// FIXME: what's the expected handling of uninitialized refs?
+	err = Fetch(repoSrc, remoteName, []config.RefSpec{refSpec})
+	assert.ErrorIs(t, err, transport.ErrEmptyRemoteRepository)
 
 	// Check that the empty tree object we'll later push to the dest repo is not
 	// present
