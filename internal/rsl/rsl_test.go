@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -938,7 +937,7 @@ func copyDir(t *testing.T, src string, dst string) {
 		t.Fatal(err)
 	}
 
-	entries, err := ioutil.ReadDir(src)
+	entries, err := os.ReadDir(src)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -951,7 +950,7 @@ func copyDir(t *testing.T, src string, dst string) {
 			copyDir(t, srcPath, dstPath)
 		} else {
 			// Skip symlinks.
-			if entry.Mode()&os.ModeSymlink != 0 {
+			if entry.Type()&os.ModeSymlink != 0 {
 				continue
 			}
 
