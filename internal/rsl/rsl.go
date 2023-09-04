@@ -1,6 +1,7 @@
 package rsl
 
 import (
+	"context"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -49,10 +50,10 @@ func InitializeNamespace(repo *git.Repository) error {
 	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(RSLRef), plumbing.ZeroHash))
 }
 
-func CheckRemoteRSLForUpdates(repo *git.Repository, remoteName string) (bool, error) {
+func CheckRemoteRSLForUpdates(ctx context.Context, repo *git.Repository, remoteName string) (bool, error) {
 	trackerRef := fmt.Sprintf(RSLRemoteTrackerRef, remoteName)
 	rslRemoteRefSpec := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, trackerRef))}
-	if err := gitinterface.Fetch(repo, remoteName, rslRemoteRefSpec); err != nil {
+	if err := gitinterface.FetchRefSpec(ctx, repo, remoteName, rslRemoteRefSpec); err != nil {
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			return false, nil
 		}

@@ -1,6 +1,7 @@
 package root
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/push"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
@@ -16,6 +17,7 @@ func New() *cobra.Command {
 	}
 
 	// Packages are sorted alphabetically here
+	cmd.AddCommand(clone.New())
 	cmd.AddCommand(policy.New())
 	cmd.AddCommand(push.New())
 	cmd.AddCommand(rsl.New())

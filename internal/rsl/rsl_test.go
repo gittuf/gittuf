@@ -1,6 +1,7 @@
 package rsl
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -9,7 +10,6 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
@@ -77,7 +77,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Clone remote repository
-		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		localRepo, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{RSLRef}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,7 +88,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Local should be notified that remote has updates
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
+		hasUpdates, err := CheckRemoteRSLForUpdates(context.Background(), localRepo, remoteName)
 		assert.Nil(t, err)
 		assert.True(t, hasUpdates)
 	})
@@ -119,13 +119,13 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Clone remote repository
-		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		localRepo, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{RSLRef}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Local should be notified that remote has no updates
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
+		hasUpdates, err := CheckRemoteRSLForUpdates(context.Background(), localRepo, remoteName)
 		assert.Nil(t, err)
 		assert.False(t, hasUpdates)
 	})
@@ -156,7 +156,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Clone remote repository
-		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		localRepo, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{RSLRef}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Local should be notified that remote has no updates
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
+		hasUpdates, err := CheckRemoteRSLForUpdates(context.Background(), localRepo, remoteName)
 		assert.Nil(t, err)
 		assert.False(t, hasUpdates)
 	})
@@ -202,7 +202,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 
 		// Clone remote repository
-		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		localRepo, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{RSLRef}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +227,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Local should be notified that remote has updates that needs to be
 		// reconciled
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
+		hasUpdates, err := CheckRemoteRSLForUpdates(context.Background(), localRepo, remoteName)
 		assert.Nil(t, err)
 		assert.True(t, hasUpdates)
 	})

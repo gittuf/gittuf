@@ -1,6 +1,8 @@
 package push
 
 import (
+	"context"
+
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +16,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return repo.Push(args[0], args[1:]...)
+	return repo.Push(context.Background(), args[0], args[1:]...)
 }
 
 func New() *cobra.Command {

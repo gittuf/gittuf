@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -60,7 +61,7 @@ func TestPush(t *testing.T) {
 	}
 
 	// RSL is not explicitly named here for Push
-	err = repoLocal.Push(remoteName, refName)
+	err = repoLocal.Push(context.Background(), remoteName, refName)
 	assert.Nil(t, err)
 
 	localRef, err := repoLocal.r.Reference(refNameTyped, true)
