@@ -137,7 +137,7 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Commit(repo, emptyTreeHash, refName, "First commit", false); err != nil {
+	if _, err := Commit(repo, emptyTreeHash, refName, "First commit", false); err != nil {
 		t.Fatal(err)
 	}
 	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
@@ -150,7 +150,7 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
+	if _, err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
 		t.Fatal(err)
 	}
 	ref, err = repo.Reference(plumbing.ReferenceName(refName), true)

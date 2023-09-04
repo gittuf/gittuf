@@ -79,7 +79,8 @@ func (e Entry) GetID() plumbing.Hash {
 func (e Entry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
-	return gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	_, err := gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	return err
 }
 
 func (e Entry) createCommitMessage() (string, error) {
@@ -130,7 +131,8 @@ func (a Annotation) Commit(repo *git.Repository, sign bool) error {
 		return err
 	}
 
-	return gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	_, err = gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	return err
 }
 
 func (a Annotation) createCommitMessage() (string, error) {

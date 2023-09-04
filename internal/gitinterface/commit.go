@@ -30,15 +30,28 @@ var (
 
 // Commit creates a new commit in the repo and sets targetRef's HEAD to the
 // commit.
-func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, message string, sign bool) error {
+func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, message string, sign bool) (plumbing.Hash, error) {
 	gitConfig, err := repo.ConfigScoped(config.GlobalScope)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
-	curRef, err := repo.Reference(plumbing.ReferenceName(targetRef), true)
+	targetRefTyped := plumbing.ReferenceName(targetRef)
+	curRef, err := repo.Reference(targetRefTyped, true)
 	if err != nil {
-		return err
+		// FIXME: this is a bit messy
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			// Set empty ref
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(targetRefTyped, plumbing.ZeroHash)); err != nil {
+				return plumbing.ZeroHash, err
+			}
+			curRef, err = repo.Reference(targetRefTyped, true)
+			if err != nil {
+				return plumbing.ZeroHash, err
+			}
+		} else {
+			return plumbing.ZeroHash, err
+		}
 	}
 
 	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
@@ -46,11 +59,11 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 	if sign {
 		command, args, err := GetSigningCommand()
 		if err != nil {
-			return err
+			return plumbing.ZeroHash, err
 		}
 		signature, err := signCommit(repo, commit, command, args)
 		if err != nil {
-			return err
+			return plumbing.ZeroHash, err
 		}
 		commit.PGPSignature = signature
 	}
@@ -60,14 +73,14 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 
 // ApplyCommit writes a commit object in the repository and updates the
 // specified reference to point to the commit.
-func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) error {
+func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) (plumbing.Hash, error) {
 	commitHash, err := WriteCommit(repo, commit)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
 	newRef := plumbing.NewHashReference(curRef.Name(), commitHash)
-	return repo.Storer.CheckAndSetReference(newRef, curRef)
+	return commitHash, repo.Storer.CheckAndSetReference(newRef, curRef)
 }
 
 // WriteCommit stores the commit object in the repository's object store,

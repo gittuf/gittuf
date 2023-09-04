@@ -90,16 +90,12 @@ func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Ent
 
 	testCommit = SignTestCommit(t, repo, testCommit)
 
-	if err := gitinterface.ApplyCommit(repo, testCommit, ref); err != nil {
-		t.Fatal(err)
-	}
-
-	ref, err = repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return ref.Hash()
+	return commitID
 }
 
 // SignTestCommit signs the test commit using the test key stored in the
@@ -186,10 +182,12 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	for i := 0; i < n; i++ {
 		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
 		commit = SignTestCommit(t, repo, commit)
-		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
+		if _, err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}
 
+		// we need to re-set ref because it needs to be updated for the next
+		// iteration
 		ref, err = repo.Reference(refNameTyped, true)
 		if err != nil {
 			t.Fatal(err)
