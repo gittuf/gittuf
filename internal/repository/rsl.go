@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing"
 )
@@ -8,7 +9,7 @@ import (
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
 func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool) error {
-	absRefName, err := absoluteReference(r.r, refName)
+	absRefName, err := gitinterface.AbsoluteReference(r.r, refName)
 	if err != nil {
 		return err
 	}
