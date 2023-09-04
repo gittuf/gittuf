@@ -511,18 +511,14 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 	}
 	originalCommitID := ref.Hash()
 
-	if err := gitinterface.Commit(repo, policyRootTreeID, PolicyRef, commitMessage, signCommit); err != nil {
+	commitID, err := gitinterface.Commit(repo, policyRootTreeID, PolicyRef, commitMessage, signCommit)
+	if err != nil {
 		return err
 	}
 
 	// We must reset to original policy commit if err != nil from here onwards.
 
-	ref, err = repo.Reference(plumbing.ReferenceName(PolicyRef), true)
-	if err != nil {
-		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
-	}
-
-	if err := rsl.NewEntry(PolicyRef, ref.Hash()).Commit(repo, signCommit); err != nil {
+	if err := rsl.NewEntry(PolicyRef, commitID).Commit(repo, signCommit); err != nil {
 		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
 	}
 

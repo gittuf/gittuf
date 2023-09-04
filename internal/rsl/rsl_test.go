@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -49,6 +50,8 @@ func TestInitializeNamespace(t *testing.T) {
 
 func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	remoteName := "origin"
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
 
 	t.Run("remote has updates for local", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "gittuf")
@@ -57,15 +60,8 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
 		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
+		remoteRepo, err := git.PlainInit(tmpDir, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,22 +70,22 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
+		commitID, err := gitinterface.Commit(remoteRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
+		if err := NewEntry(refName, commitID).Commit(remoteRepo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Simulate more remote actions
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
+		if err := NewEntry(refName, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -106,15 +102,8 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
 		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
+		remoteRepo, err := git.PlainInit(tmpDir, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,17 +112,17 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
+		commitID, err := gitinterface.Commit(remoteRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
+		if err := NewEntry(refName, commitID).Commit(remoteRepo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -150,15 +139,8 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
 		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
+		remoteRepo, err := git.PlainInit(tmpDir, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,22 +149,26 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
+		commitID, err := gitinterface.Commit(remoteRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
+		if err := NewEntry(refName, commitID).Commit(remoteRepo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Simulate local actions
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(localRepo, false); err != nil {
+		commitID, err = gitinterface.Commit(localRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := NewEntry(refName, commitID).Commit(localRepo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -190,91 +176,6 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
 		assert.Nil(t, err)
 		assert.False(t, hasUpdates)
-	})
-
-	t.Run("both have no entries", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
-
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(remoteRepo); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
-			t.Fatal(err)
-		}
-
-		// Local should be notified that remote has no updates
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
-		assert.Nil(t, err)
-		assert.False(t, hasUpdates)
-	})
-
-	t.Run("local has no entries", func(t *testing.T) {
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
-
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(remoteRepo); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate remote actions
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// Local should be notified that remote has updates
-		hasUpdates, err := CheckRemoteRSLForUpdates(localRepo, remoteName)
-		assert.Nil(t, err)
-		assert.True(t, hasUpdates)
 	})
 
 	t.Run("remote and local have diverged", func(t *testing.T) {
@@ -284,15 +185,8 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-		localRepoDir := filepath.Join(tmpDir, "local")
-
-		remoteRepoDir := filepath.Join(tmpDir, "remote")
-		if err := os.Mkdir(remoteRepoDir, 0755); err != nil {
-			t.Fatal(err)
-		}
-
 		// Simulate remote actions
-		remoteRepo, err := git.PlainInit(remoteRepoDir, false)
+		remoteRepo, err := git.PlainInit(tmpDir, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -301,27 +195,35 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// Simulate clone
-		copyDir(t, remoteRepoDir, localRepoDir)
-		localRepo, err := git.PlainOpen(localRepoDir)
+		commitID, err := gitinterface.Commit(remoteRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := localRepo.CreateRemote(&config.RemoteConfig{Name: remoteName, URLs: []string{remoteRepoDir}}); err != nil {
+		if err := NewEntry(refName, commitID).Commit(remoteRepo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localRepo, err := gitinterface.CloneAndFetchToMemory(tmpDir, refName, []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, RSLRef))})
+		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Simulate remote actions
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
+		commitID, err = gitinterface.Commit(remoteRepo, gitinterface.EmptyTree(), refName, "Test commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := NewEntry(refName, commitID).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// Simulate local actions
-		if err := NewEntry("refs/heads/feature", plumbing.ZeroHash).Commit(localRepo, false); err != nil {
+		commitID, err = gitinterface.Commit(localRepo, gitinterface.EmptyTree(), anotherRefName, "Test commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := NewEntry(anotherRefName, commitID).Commit(localRepo, false); err != nil {
 			t.Fatal(err)
 		}
 

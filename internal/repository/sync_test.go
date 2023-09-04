@@ -46,16 +46,12 @@ func TestPush(t *testing.T) {
 	_, err = repoRemote.Reference(rslRefNameTyped, true)
 	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
 
-	if err := repoLocal.r.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
-
 	// Create a test commit and its RSL entry
 	emptyTreeHash, err := gitinterface.WriteTree(repoLocal.r, []object.TreeEntry{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := gitinterface.Commit(repoLocal.r, emptyTreeHash, refName, "Test commit", false); err != nil {
+	if _, err := gitinterface.Commit(repoLocal.r, emptyTreeHash, refName, "Test commit", false); err != nil {
 		t.Fatal(err)
 	}
 

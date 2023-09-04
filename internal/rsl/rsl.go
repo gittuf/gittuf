@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
 const (
@@ -52,7 +53,7 @@ func CheckRemoteRSLForUpdates(repo *git.Repository, remoteName string) (bool, er
 	trackerRef := fmt.Sprintf(RSLRemoteTrackerRef, remoteName)
 	rslRemoteRefSpec := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", RSLRef, trackerRef))}
 	if err := gitinterface.Fetch(repo, remoteName, rslRemoteRefSpec); err != nil {
-		if strings.Contains(err.Error(), "malformed zero-id ref") { // FIXME: what's the expectation around uninitialized namespaces?
+		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			return false, nil
 		}
 		return false, err
@@ -141,7 +142,13 @@ func (e Entry) GetID() plumbing.Hash {
 func (e Entry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
-	return gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	emptyTreeHash, err := gitinterface.WriteTree(repo, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = gitinterface.Commit(repo, emptyTreeHash, RSLRef, message, sign)
+	return err
 }
 
 func (e Entry) createCommitMessage() (string, error) {
@@ -192,7 +199,13 @@ func (a Annotation) Commit(repo *git.Repository, sign bool) error {
 		return err
 	}
 
-	return gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	emptyTreeHash, err := gitinterface.WriteTree(repo, nil)
+	if err != nil {
+		return err
+	}
+
+	_, err = gitinterface.Commit(repo, emptyTreeHash, RSLRef, message, sign)
+	return err
 }
 
 func (a Annotation) createCommitMessage() (string, error) {
