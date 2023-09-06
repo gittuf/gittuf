@@ -9,9 +9,11 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 const (
+	GittufNamespacePrefix      = "refs/gittuf/"
 	RSLRef                     = "refs/gittuf/reference-state-log"
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
@@ -30,6 +32,7 @@ var (
 	ErrRSLBranchDetected       = errors.New("potential RSL branch detected, entry has more than one parent")
 	ErrInvalidRSLEntry         = errors.New("RSL entry has invalid format or is of unexpected type")
 	ErrRSLEntryDoesNotMatchRef = errors.New("RSL entry does not match requested ref")
+	ErrNoRecordOfCommit        = errors.New("commit has not been encountered before")
 )
 
 // InitializeNamespace creates a git ref for the reference state log. Initially,
@@ -191,6 +194,29 @@ func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error)
 	return GetEntry(repo, commitObj.ParentHashes[0])
 }
 
+// GetNonGittufParentForEntry returns the first RSL entry starting from the
+// specified entry's parent that is not for the gittuf namespace.
+// TODO: There is no information yet about the signature for the entry.
+func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, error) {
+	it, err := GetParentForEntry(repo, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if e, ok := it.(*Entry); ok {
+			if !strings.HasPrefix(e.RefName, GittufNamespacePrefix) {
+				return e, nil
+			}
+		} // TODO: handle annotations
+
+		it, err = GetParentForEntry(repo, it)
+		if err != nil {
+			return nil, err
+		}
+	}
+}
+
 // GetLatestEntry returns the latest entry available locally in the RSL.
 // TODO: There is no information yet about the signature for the entry.
 func GetLatestEntry(repo *git.Repository) (EntryType, error) {
@@ -205,6 +231,29 @@ func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 	}
 
 	return parseRSLEntryText(commitObj.Hash, commitObj.Message)
+}
+
+// GetLatestNonGittufEntry returns the first RSL entry that is not for the
+// gittuf namespace.
+// TODO: There is no information yet about the signature for the entry.
+func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, error) {
+	it, err := GetLatestEntry(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		if entry, ok := it.(*Entry); ok {
+			if !strings.HasPrefix(entry.RefName, GittufNamespacePrefix) {
+				return entry, nil
+			}
+		} // TODO: handle annotations
+
+		it, err = GetParentForEntry(repo, it)
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 // GetLatestEntryForRef returns the latest entry available locally in the RSL
@@ -285,6 +334,58 @@ func GetFirstEntry(repo *git.Repository) (*Entry, error) {
 			return nil, err
 		}
 		iteratorT = parentT
+	}
+}
+
+// GetFirstEntryForCommit returns the first entry in the RSL that either records
+// the commit itself or a descendent of the commit. This establishes the first
+// time a commit was seen in the repository, irrespective of the ref it was
+// associated with, and we can infer things like the active developers who could
+// have signed the commit.
+// TODO: There is no information yet about the signature for the entry.
+// TODO: What if the first seen RSL entry is invalid? Should it be verified
+// against policy here? Probably not as this is strictly the RSL library.
+func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry, error) {
+	// We check entries in pairs. In the initial case, we have the latest entry
+	// and its parent. At all times, the parent in the pair is being tested.
+	// If the latest entry is a descendant of the target commit, we start
+	// checking the parent. The first pair where the parent entry is not
+	// descended from the target commit, we return the other entry in the pair.
+
+	firstEntry, err := GetLatestNonGittufEntry(repo)
+	if err != nil {
+		if errors.Is(err, ErrRSLEntryNotFound) {
+			return nil, ErrNoRecordOfCommit
+		}
+		return nil, err
+	}
+	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.CommitID, commit)
+	if err != nil {
+		return nil, err
+	}
+	if !knowsCommit {
+		return nil, ErrNoRecordOfCommit
+	}
+
+	for {
+		iteratorEntry, err := GetNonGittufParentForEntry(repo, firstEntry)
+		if err != nil {
+			if errors.Is(err, ErrRSLEntryNotFound) {
+				return firstEntry, nil
+			}
+			return nil, err
+		}
+
+		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.CommitID, commit)
+		if err != nil {
+			return nil, err
+		}
+
+		if !knowsCommit {
+			return firstEntry, nil
+		}
+
+		firstEntry = iteratorEntry
 	}
 }
 
