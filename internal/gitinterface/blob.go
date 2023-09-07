@@ -49,6 +49,19 @@ func WriteBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 	return repo.Storer.SetEncodedObject(obj)
 }
 
+// RecordBlob writes the contents into a blob object using WriteBlob. In
+// addition, it also records the equivalent hash in a stronger hash algorithm
+// than SHA-1, currently SHA-256.
+// Experimental: This function is not intended for use in user workflows yet.
+func RecordBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
+	blobHash, err := WriteBlob(repo, contents)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	return blobHash, RecordHashEntry(repo, blobHash, SHA256HashAlg)
+}
+
 // EmptyBlob returns the hash of an empty blob in a Git repository.
 // Note: it is generated on the fly rather than stored as a constant to support
 // SHA-256 repositories in future.
