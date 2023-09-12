@@ -1,7 +1,6 @@
 package addpolicykey
 
 import (
-	"context"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -41,7 +40,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsKeyBytes, true)
+	return repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKeyBytes, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

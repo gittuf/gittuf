@@ -1,7 +1,6 @@
 package check
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/repository"
@@ -17,7 +16,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	hasUpdates, hasDiverged, err := repo.CheckRemoteRSLForUpdates(context.Background(), args[0])
+	hasUpdates, hasDiverged, err := repo.CheckRemoteRSLForUpdates(cmd.Context(), args[0])
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package removerule
 
 import (
-	"context"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
@@ -44,7 +43,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RemoveDelegation(context.Background(), keyBytes, o.policyName, o.ruleName, true)
+	return repo.RemoveDelegation(cmd.Context(), keyBytes, o.policyName, o.ruleName, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
