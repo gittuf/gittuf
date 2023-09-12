@@ -15,6 +15,7 @@ import (
 const (
 	GittufNamespacePrefix      = "refs/gittuf/"
 	RSLRef                     = "refs/gittuf/reference-state-log"
+	RSLRemoteTrackerRef        = "refs/remotes/%s/gittuf/reference-state-log"
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
 	CommitIDKey                = "commitID"
