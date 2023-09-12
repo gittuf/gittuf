@@ -37,7 +37,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rslRef, err := repo.r.Reference(rsl.RSLRef, true)
+	rslRef, err := repo.r.Reference(rsl.Ref, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rslRef, err = repo.r.Reference(rsl.RSLRef, true)
+	rslRef, err = repo.r.Reference(rsl.Ref, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.RSLRef}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +227,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.RSLRef}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -269,7 +269,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.RSLRef}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -319,7 +319,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.RSLRef}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
 		if err != nil {
 			t.Fatal(err)
 		}

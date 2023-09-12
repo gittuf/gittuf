@@ -53,8 +53,8 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 // there is an update and the second return value indicates if the two RSLs have
 // diverged and need to be reconciled.
 func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName string) (bool, bool, error) {
-	trackerRef := fmt.Sprintf(rsl.RSLRemoteTrackerRef, remoteName)
-	rslRemoteRefSpec := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", rsl.RSLRef, trackerRef))}
+	trackerRef := rsl.RemoteTrackerRef(remoteName)
+	rslRemoteRefSpec := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", rsl.Ref, trackerRef))}
 	if err := gitinterface.FetchRefSpec(ctx, r.r, remoteName, rslRemoteRefSpec); err != nil {
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			// Check if remote is empty and exit appropriately
@@ -68,7 +68,7 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 		return false, false, err
 	}
 
-	localRefState, err := r.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	localRefState, err := r.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		return false, false, err
 	}

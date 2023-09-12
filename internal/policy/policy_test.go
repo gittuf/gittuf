@@ -61,7 +61,7 @@ func TestInitializeNamespace(t *testing.T) {
 func TestLoadState(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestStateCommit(t *testing.T) {
 	}
 	assert.NotEqual(t, plumbing.ZeroHash, policyRef.Hash())
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		t.Error(err)
 	}

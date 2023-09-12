@@ -24,7 +24,7 @@ func TestInitializeNamespace(t *testing.T) {
 			t.Error(err)
 		}
 
-		ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 		assert.Nil(t, err)
 		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 	})
@@ -58,7 +58,7 @@ func TestNewEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	assert.Nil(t, err)
 	assert.NotEqual(t, plumbing.ZeroHash, ref.Hash())
 
@@ -76,7 +76,7 @@ func TestNewEntry(t *testing.T) {
 
 	originalRefHash := ref.Hash()
 
-	ref, err = repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err = repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -124,7 +124,7 @@ func TestGetLatestEntry(t *testing.T) {
 		assert.NotEqual(t, plumbing.ZeroHash, e.CommitID)
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	rslRef, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestGetEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func TestGetEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	ref, err = repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err = repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}

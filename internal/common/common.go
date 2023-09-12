@@ -67,7 +67,7 @@ func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Ent
 
 	commitMessage := strings.Join(lines, "\n")
 
-	ref, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
