@@ -36,9 +36,11 @@ func TestInitializeNamespace(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 
-		ref, err = repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
-		assert.Nil(t, err)
-		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
+		// Disable PolicyStagingRef until it is actually used
+		// https://github.com/gittuf/gittuf/issues/45
+		// ref, err = repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+		// assert.Nil(t, err)
+		// assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 	})
 
 	t.Run("existing Policy namespace", func(t *testing.T) {
