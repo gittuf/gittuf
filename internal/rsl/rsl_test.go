@@ -617,15 +617,12 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 
 	initialCommitIDs := []plumbing.Hash{}
 	for i := 0; i < 3; i++ {
-		if err := gitinterface.Commit(repo, emptyTreeHash, mainRef, "Test commit", false); err != nil {
-			t.Fatal(err)
-		}
-		ref, err := repo.Reference(plumbing.ReferenceName(mainRef), true)
+		commitID, err := gitinterface.Commit(repo, emptyTreeHash, mainRef, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		initialCommitIDs = append(initialCommitIDs, ref.Hash())
+		initialCommitIDs = append(initialCommitIDs, commitID)
 	}
 
 	// Right now, the RSL has no entries.
@@ -667,15 +664,12 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	// Next, add some new commits to this branch.
 	featureCommitIDs := []plumbing.Hash{}
 	for i := 0; i < 3; i++ {
-		if err := gitinterface.Commit(repo, emptyTreeHash, featureRef, "Feature commit", false); err != nil {
-			t.Fatal(err)
-		}
-		ref, err := repo.Reference(plumbing.ReferenceName(featureRef), true)
+		commitID, err := gitinterface.Commit(repo, emptyTreeHash, featureRef, "Feature commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		featureCommitIDs = append(featureCommitIDs, ref.Hash())
+		featureCommitIDs = append(featureCommitIDs, commitID)
 	}
 
 	// The RSL hasn't seen these new commits, however.

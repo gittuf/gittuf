@@ -52,7 +52,7 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < 5; i++ {
 		commit := CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
-		if err := ApplyCommit(repo, commit, ref); err != nil {
+		if _, err := ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}
 

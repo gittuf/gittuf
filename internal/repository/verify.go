@@ -3,11 +3,12 @@ package repository
 import (
 	"context"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 )
 
 func (r *Repository) VerifyRef(ctx context.Context, target string, full bool) error {
-	target, err := absoluteReference(r.r, target)
+	target, err := gitinterface.AbsoluteReference(r.r, target)
 	if err != nil {
 		return err
 	}
