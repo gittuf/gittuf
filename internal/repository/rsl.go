@@ -12,6 +12,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
+var ErrCommitNotInRef = errors.New("specified commit is not in ref")
+
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
 func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool) error {
@@ -29,6 +31,41 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	// signCommit must be verified for the refName in the delegation tree.
 
 	return rsl.NewEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
+}
+
+// RecordRSLEntryForReferenceAtCommit is a special version of
+// RecordRSLEntryForReference used for evaluation. It is only invoked when
+// gittuf is explicitly set in eval mode. This interface adds an RSL entry for
+// the specified Git reference at the specified commit. If the commit is not in
+// that ref, an entry is not created.
+func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signCommit bool) error {
+	absRefName, err := gitinterface.AbsoluteReference(r.r, refName)
+	if err != nil {
+		return err
+	}
+
+	ref, err := r.r.Reference(plumbing.ReferenceName(absRefName), true)
+	if err != nil {
+		return err
+	}
+
+	commit, err := r.r.CommitObject(plumbing.NewHash(commitID))
+	if err != nil {
+		return err
+	}
+
+	// Even in eval mode, we ought to only create RSL entries for commits
+	// actually in the specified ref.
+	if knows, err := gitinterface.KnowsCommit(r.r, ref.Hash(), commit); err != nil {
+		return err
+	} else if !knows {
+		return ErrCommitNotInRef
+	}
+
+	// TODO: once policy verification is in place, the signing key used by
+	// signCommit must be verified for the refName in the delegation tree.
+
+	return rsl.NewEntry(absRefName, plumbing.NewHash(commitID)).Commit(r.r, signCommit)
 }
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
