@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -165,18 +166,26 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	}
 
 	refNameTyped := plumbing.ReferenceName(refName)
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
 
 	ref, err := repo.Reference(refNameTyped, true)
 	if err != nil {
-		t.Fatal(err)
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(refNameTyped, plumbing.ZeroHash)); err != nil {
+				t.Fatal(err)
+			}
+			ref, err = repo.Reference(refNameTyped, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatal(err)
+		}
 	}
 
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
 		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
+		commit = SignTestCommit(t, repo, commit)
 		if err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}

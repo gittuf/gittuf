@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -141,6 +142,75 @@ func TestGetLatestEntry(t *testing.T) {
 		assert.Equal(t, []plumbing.Hash{entryID}, a.RSLEntryIDs)
 		assert.Equal(t, "This was a mistaken push!", a.Message)
 	}
+}
+
+func TestGetLatestNonGittufEntry(t *testing.T) {
+	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add the first gittuf entry
+		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add non gittuf entries
+		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// At this point, latest entry should be returned
+		expectedLatestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		latestEntry, err := GetLatestNonGittufEntry(repo)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+
+		// Add another gittuf entry
+		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// At this point, the expected entry is the same as before
+		latestEntry, err = GetLatestNonGittufEntry(repo)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+	})
+
+	t.Run("only gittuf entries", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add the first gittuf entry
+		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = GetLatestNonGittufEntry(repo)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Add another gittuf entry
+		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = GetLatestNonGittufEntry(repo)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
 }
 
 func TestGetLatestEntryForRef(t *testing.T) {
@@ -386,6 +456,104 @@ func TestGetParentForEntry(t *testing.T) {
 	assert.Equal(t, entryID, parentEntry.GetID())
 }
 
+func TestGetNonGittufParentForEntry(t *testing.T) {
+	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add the first gittuf entry
+		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add non gittuf entry
+		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add non gittuf entry
+		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		parentEntry, err := GetNonGittufParentForEntry(repo, latestEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedEntry, parentEntry)
+
+		// Add another gittuf entry and then a non gittuf entry
+		expectedEntry = latestEntry
+
+		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := NewEntry("refs/gittuf/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// The expected entry should be from before this latest gittuf addition
+		parentEntry, err = GetNonGittufParentForEntry(repo, latestEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedEntry, parentEntry)
+	})
+
+	t.Run("only gittuf entries", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add the first gittuf entry
+		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = GetNonGittufParentForEntry(repo, latestEntry)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Add another gittuf entry
+		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = GetNonGittufParentForEntry(repo, latestEntry)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+}
+
 func TestGetFirstEntry(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -425,6 +593,156 @@ func TestGetFirstEntry(t *testing.T) {
 	testEntry, err = GetFirstEntry(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
+}
+
+func TestGetFirstEntryForCommit(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeHash, err := gitinterface.WriteTree(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mainRef := "refs/heads/main"
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(mainRef), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	initialCommitIDs := []plumbing.Hash{}
+	for i := 0; i < 3; i++ {
+		if err := gitinterface.Commit(repo, emptyTreeHash, mainRef, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		ref, err := repo.Reference(plumbing.ReferenceName(mainRef), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		initialCommitIDs = append(initialCommitIDs, ref.Hash())
+	}
+
+	// Right now, the RSL has no entries.
+	for _, commitID := range initialCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = GetFirstEntryForCommit(repo, commit)
+		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
+	}
+
+	if err := NewEntry(mainRef, initialCommitIDs[len(initialCommitIDs)-1]).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// At this point, searching for any commit's entry should return the
+	// solitary RSL entry.
+	latestEntryT, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, commitID := range initialCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := GetFirstEntryForCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntryT, entry)
+	}
+
+	// Now, let's branch off from this ref and add more commits.
+	featureRef := "refs/heads/feature"
+	// First, "checkout" the feature branch.
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(featureRef), initialCommitIDs[len(initialCommitIDs)-1])); err != nil {
+		t.Fatal(err)
+	}
+	// Next, add some new commits to this branch.
+	featureCommitIDs := []plumbing.Hash{}
+	for i := 0; i < 3; i++ {
+		if err := gitinterface.Commit(repo, emptyTreeHash, featureRef, "Feature commit", false); err != nil {
+			t.Fatal(err)
+		}
+		ref, err := repo.Reference(plumbing.ReferenceName(featureRef), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs = append(featureCommitIDs, ref.Hash())
+	}
+
+	// The RSL hasn't seen these new commits, however.
+	for _, commitID := range featureCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = GetFirstEntryForCommit(repo, commit)
+		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
+	}
+
+	if err := NewEntry(featureRef, featureCommitIDs[len(featureCommitIDs)-1]).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// At this point, searching for any of the original commits' entry should
+	// return the first RSL entry.
+	for _, commitID := range initialCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := GetFirstEntryForCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntryT, entry)
+	}
+	// Searching for the feature commits should return the second entry.
+	latestEntryT, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, commitID := range featureCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := GetFirstEntryForCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntryT, entry)
+	}
+
+	// Now, fast forward main branch to the latest feature branch commit.
+	oldRef, err := repo.Reference(plumbing.ReferenceName(mainRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newRef := plumbing.NewHashReference(plumbing.ReferenceName(mainRef), featureCommitIDs[len(featureCommitIDs)-1])
+	if err := repo.Storer.CheckAndSetReference(newRef, oldRef); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewEntry(mainRef, featureCommitIDs[len(featureCommitIDs)-1]).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Testing for any of the feature commits should return the feature branch
+	// entry, not the main branch entry.
+	for _, commitID := range featureCommitIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, err := GetFirstEntryForCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntryT, entry)
+	}
 }
 
 func TestEntryCreateCommitMessage(t *testing.T) {

@@ -121,6 +121,77 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 	})
 }
 
+func TestKnowsCommit(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refName := "refs/heads/main"
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeHash, err := WriteTree(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Commit(repo, emptyTreeHash, refName, "First commit", false); err != nil {
+		t.Fatal(err)
+	}
+	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstCommitID := ref.Hash()
+	firstCommit, err := repo.CommitObject(firstCommitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
+		t.Fatal(err)
+	}
+	ref, err = repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondCommitID := ref.Hash()
+	secondCommit, err := repo.CommitObject(secondCommitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("check if second commit knows first", func(t *testing.T) {
+		knows, err := KnowsCommit(repo, secondCommitID, firstCommit)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that first commit does not know second", func(t *testing.T) {
+		knows, err := KnowsCommit(repo, firstCommitID, secondCommit)
+		assert.Nil(t, err)
+		assert.False(t, knows)
+	})
+
+	t.Run("check that both commits know themselves", func(t *testing.T) {
+		knows, err := KnowsCommit(repo, firstCommitID, firstCommit)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+
+		knows, err = KnowsCommit(repo, secondCommitID, secondCommit)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
+		knows, err := KnowsCommit(repo, plumbing.ZeroHash, firstCommit)
+		assert.ErrorIs(t, err, plumbing.ErrObjectNotFound)
+		assert.False(t, knows)
+	})
+}
+
 func createTestSignedCommit(t *testing.T) *object.Commit {
 	t.Helper()
 
