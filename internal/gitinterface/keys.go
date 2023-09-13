@@ -139,7 +139,8 @@ func getSigningProgram(gitConfig map[string]string, signingMethod SigningMethod)
 	return DefaultSigningProgramGPG
 }
 
-// signGitObject signs a Git commit using the user's configured Git config.
+// signGitObject signs a Git commit or tag using the user's configured Git
+// config.
 func signGitObject(contents []byte) (string, error) {
 	command, args, err := GetSigningCommand()
 	if err != nil {
@@ -202,7 +203,7 @@ func signGitObject(contents []byte) (string, error) {
 }
 
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
-// verifying commit signatures issued by gitsign.
+// verifying commit or tag signatures issued by gitsign.
 func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature []byte) error {
 	root, err := fulcioroots.Get()
 	if err != nil {
