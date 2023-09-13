@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -13,7 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -158,12 +157,9 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gpgKey := &sslibsv.SSLibKey{
-		KeyType: signerverifier.GPGKeyType,
-		Scheme:  signerverifier.GPGKeyType,
-		KeyVal: sslibsv.KeyVal{
-			Public: strings.TrimSpace(string(gpgKeyBytes)),
-		},
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	tests := map[string]struct {
