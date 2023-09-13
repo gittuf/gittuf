@@ -3,10 +3,7 @@ package gitinterface
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
-	"os"
-	"os/exec"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -16,16 +13,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/jonboulle/clockwork"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
-	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
-	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
-)
-
-var (
-	ErrUnableToSign               = errors.New("unable to sign Git object")
-	ErrIncorrectVerificationKey   = errors.New("incorrect key provided to verify signature")
-	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
 )
 
 // Commit creates a new commit in the repo and sets targetRef's HEAD to the
@@ -54,14 +41,10 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		}
 	}
 
-	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clockwork.NewRealClock())
+	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clock)
 
 	if sign {
-		command, args, err := GetSigningCommand()
-		if err != nil {
-			return plumbing.ZeroHash, err
-		}
-		signature, err := signCommit(repo, commit, command, args)
+		signature, err := signCommit(commit)
 		if err != nil {
 			return plumbing.ZeroHash, err
 		}
@@ -105,60 +88,13 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 
 		return nil
 	case signerverifier.FulcioKeyType:
-		root, err := fulcioroots.Get()
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-		intermediate, err := fulcioroots.GetIntermediates()
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		verifier, err := gitsignVerifier.NewCertVerifier(
-			gitsignVerifier.WithRootPool(root),
-			gitsignVerifier.WithIntermediatePool(intermediate),
-		)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
+		commitSignature := []byte(commit.PGPSignature)
 
-		verifiedCert, err := verifier.Verify(ctx, commitContents, []byte(commit.PGPSignature), true)
-		if err != nil {
-			return ErrIncorrectVerificationKey
-		}
-
-		rekor, err := gitsignRekor.New(signerverifier.RekorServer)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		ctPub, err := cosign.GetCTLogPubs(ctx)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		checkOpts := &cosign.CheckOpts{
-			RekorClient:       rekor.Rekor,
-			RootCerts:         root,
-			IntermediateCerts: intermediate,
-			CTLogPubKeys:      ctPub,
-			RekorPubKeys:      rekor.PublicKeys(),
-			Identities: []cosign.Identity{{
-				Issuer:  key.KeyVal.Issuer,
-				Subject: key.KeyVal.Identity,
-			}},
-		}
-
-		if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
-			return ErrIncorrectVerificationKey
-		}
-
-		return nil
+		return verifyGitsignSignature(ctx, key, commitContents, commitSignature)
 	}
 
 	return ErrUnknownSigningMethod
@@ -201,65 +137,13 @@ func KnowsCommit(repo *git.Repository, commitID plumbing.Hash, commit *object.Co
 	return commit.IsAncestor(commitUnderTest)
 }
 
-func signCommit(repo *git.Repository, commit *object.Commit, signingCommand string, signingArgs []string) (string, error) {
+func signCommit(commit *object.Commit) (string, error) {
 	commitContents, err := getCommitBytesWithoutSignature(commit)
 	if err != nil {
 		return "", err
 	}
 
-	cmd := exec.Command(signingCommand, signingArgs...)
-
-	stdInWriter, err := cmd.StdinPipe()
-	if err != nil {
-		return "", err
-	}
-
-	stdOutReader, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	defer stdOutReader.Close()
-
-	stdErrReader, err := cmd.StderrPipe()
-	if err != nil {
-		return "", err
-	}
-	defer stdErrReader.Close()
-
-	if err = cmd.Start(); err != nil {
-		return "", err
-	}
-
-	if _, err := stdInWriter.Write(commitContents); err != nil {
-		return "", err
-	}
-	if err := stdInWriter.Close(); err != nil {
-		return "", err
-	}
-
-	sig, err := io.ReadAll(stdOutReader)
-	if err != nil {
-		return "", err
-	}
-
-	e, err := io.ReadAll(stdErrReader)
-	if err != nil {
-		return "", err
-	}
-
-	if len(e) > 0 {
-		fmt.Fprint(os.Stderr, string(e))
-	}
-
-	if err = cmd.Wait(); err != nil {
-		return "", err
-	}
-
-	if len(sig) == 0 {
-		return "", ErrUnableToSign
-	}
-
-	return string(sig), nil
+	return signGitObject(commitContents)
 }
 
 func getCommitBytesWithoutSignature(commit *object.Commit) ([]byte, error) {
