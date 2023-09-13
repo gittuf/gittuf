@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -28,6 +29,9 @@ func TestTag(t *testing.T) {
 	refName := "refs/heads/main"
 	tagName := "v0.1.0"
 	clock = testClock
+	getGitConfig = func(repo *git.Repository) (*config.Config, error) {
+		return testGitConfig, nil
+	}
 
 	// Try to create tag with an unknown underlying object
 	_, err = Tag(repo, plumbing.ZeroHash, tagName, tagName, false)
@@ -45,7 +49,7 @@ func TestTag(t *testing.T) {
 
 	tagHash, err := Tag(repo, commitID, tagName, tagName, false)
 	assert.Nil(t, err)
-	assert.Equal(t, "9a8f0431497731853a05c1f80c16ab37e04f1bd6", tagHash.String())
+	assert.Equal(t, "8b195348588d8a48060ec8d5436459b825a1b352", tagHash.String())
 
 	tag, err := repo.TagObject(tagHash)
 	if err != nil {

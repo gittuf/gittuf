@@ -21,7 +21,7 @@ var (
 
 // Tag creates a new tag in the repository pointing to the specified target.
 func Tag(repo *git.Repository, target plumbing.Hash, name, message string, sign bool) (plumbing.Hash, error) {
-	gitConfig, err := repo.ConfigScoped(config.GlobalScope)
+	gitConfig, err := getGitConfig(repo)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}

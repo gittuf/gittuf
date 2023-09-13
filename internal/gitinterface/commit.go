@@ -18,7 +18,7 @@ import (
 // Commit creates a new commit in the repo and sets targetRef's HEAD to the
 // commit.
 func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, message string, sign bool) (plumbing.Hash, error) {
-	gitConfig, err := repo.ConfigScoped(config.GlobalScope)
+	gitConfig, err := getGitConfig(repo)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
