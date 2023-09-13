@@ -130,7 +130,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified
-// policy.
+// policy. The specified policy is used for the RSL entry itself. However, for
+// commit signatures, verifyEntry checks when the commit was first introduced
+// via the RSL across all refs. Then, it uses the policy applicable at the
+// commit's first entry into the repository. If the commit is brand new to the
+// repository, the specified policy is used.
 func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
 	// TODO: discuss how / if we want to verify RSL entry signatures for the policy namespace
 	if entry.RefName == PolicyRef {
@@ -201,21 +205,15 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 		// TODO: evaluate if this can be done once for the earliest commit in
 		// the set being verified if we had them ordered.
-		commitPolicy := policy
-		firstSeenEntry, err := rsl.GetFirstEntryForCommit(repo, commit)
+		var commitPolicy *State
+		commitPolicy, err = GetStateForCommit(ctx, repo, commit)
 		if err != nil {
-			if !errors.Is(err, rsl.ErrNoRecordOfCommit) {
-				return err
-			}
-		} else {
-			commitPolicyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
-			if err != nil {
-				return err
-			}
-			commitPolicy, err = LoadStateForEntry(ctx, repo, commitPolicyEntry)
-			if err != nil {
-				return err
-			}
+			return err
+		}
+		if commitPolicy == nil {
+			// the commit hasn't been seen in any refs in the repository, use
+			// specified policy
+			commitPolicy = policy
 		}
 
 		pathsVerified := make([]bool, len(paths))

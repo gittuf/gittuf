@@ -200,6 +200,29 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 	return state, nil
 }
 
+// GetStateForCommit scans the RSL to identify the first time a commit was seen
+// in the repository. The policy preceding that RSL entry is returned as the
+// State to be used for verifying the commit's signature. If the commit hasn't
+// been seen in the repository previously, no policy state is returned. Also, no
+// error is returned. Identifying the policy in this case is left to the calling
+// workflow.
+func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object.Commit) (*State, error) {
+	firstSeenEntry, err := rsl.GetFirstEntryForCommit(repo, commit)
+	if err != nil {
+		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	commitPolicyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return LoadStateForEntry(ctx, repo, commitPolicyEntry)
+}
+
 // FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
 // keys trusted to sign for the specified role.
 func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {

@@ -144,8 +144,9 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	}
 
 	return &State{
-		RootEnvelope:    rootEnv,
-		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []*tuf.Key{key},
+		RootEnvelope:        rootEnv,
+		TargetsEnvelope:     targetsEnv,
+		DelegationEnvelopes: map[string]*sslibdsse.Envelope{}, // FIXME: this isn't the best fix. Instead, LoadState* methods should set this to nil when no delegated roles exist.
+		RootPublicKeys:      []*tuf.Key{key},
 	}
 }
