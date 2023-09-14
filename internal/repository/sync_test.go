@@ -370,3 +370,124 @@ func TestPush(t *testing.T) {
 	}
 	assert.Equal(t, localPolicyRef.Hash(), remotePolicyRef.Hash())
 }
+
+func TestPull(t *testing.T) {
+	remoteTmpDir, err := os.MkdirTemp("", "gittuf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
+
+	remoteR, err := git.PlainInit(remoteTmpDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteRepo := &Repository{r: remoteR}
+	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsPubKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
+		t.Fatal(err)
+	}
+	emptyTreeHash, err := gitinterface.WriteTree(remoteRepo.r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+	remoteName := "origin"
+	commitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Initial commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.RecordRSLEntryForReference(anotherRefName, false); err != nil {
+		t.Fatal(err)
+	}
+
+	remoteRSLRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remotePolicyRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// repository.Clone is an option but that needs a dir
+	localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{rsl.RSLRef, policy.PolicyRef}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localRepo := &Repository{r: localR}
+
+	localRSLRef, err := localRepo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localPolicyRef, err := localRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
+	assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+
+	// Make remote changes
+	newCommitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Another commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = localRepo.Pull(context.Background(), remoteName, refName)
+	assert.Nil(t, err)
+
+	localRef, err := localRepo.r.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, newCommitID, localRef.Hash())
+
+	// Assert second ref isn't in local
+	_, err = localRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
+	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
+
+	err = localRepo.Pull(context.Background(), remoteName, anotherRefName)
+	assert.Nil(t, err)
+
+	remoteAnotherRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	localAnotherRef, err := localRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, remoteAnotherRef.Hash(), localAnotherRef.Hash())
+}
