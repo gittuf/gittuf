@@ -14,6 +14,7 @@ import (
 var (
 	ErrCloningRepository = errors.New("unable to clone repository")
 	ErrDirExists         = errors.New("directory exists")
+	ErrPushingRepository = errors.New("unable to push repository")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
@@ -55,4 +56,21 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 
 	repository := &Repository{r: r}
 	return repository, repository.VerifyRef(ctx, head.Name().String(), true)
+}
+
+// Push wraps a typical git push invocation by also pushing gittuf namespaces to
+// the remote.
+func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...string) error {
+	for _, ref := range refNames {
+		if err := r.VerifyRef(ctx, ref, true); err != nil {
+			return errors.Join(ErrPushingRepository, err)
+		}
+	}
+	refNames = append(refNames, rsl.RSLRef, policy.PolicyRef)
+	err := gitinterface.Push(ctx, r.r, remoteName, refNames)
+	if err != nil {
+		return errors.Join(ErrPushingRepository, err)
+	}
+
+	return nil
 }
