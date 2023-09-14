@@ -3,6 +3,7 @@ package root
 import (
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
+	"github.com/gittuf/gittuf/internal/cmd/pull"
 	"github.com/gittuf/gittuf/internal/cmd/push"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
@@ -19,6 +20,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(clone.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
+	cmd.AddCommand(pull.New())
 	cmd.AddCommand(push.New())
 	cmd.AddCommand(rsl.New())
 	cmd.AddCommand(verifyref.New())
