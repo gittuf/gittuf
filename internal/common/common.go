@@ -73,7 +73,7 @@ func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Ent
 			When:  testClock.Now(),
 		},
 		Message:      commitMessage,
-		TreeHash:     plumbing.ZeroHash,
+		TreeHash:     gitinterface.EmptyTree(),
 		ParentHashes: []plumbing.Hash{ref.Hash()},
 	}
 
