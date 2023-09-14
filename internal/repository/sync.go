@@ -49,13 +49,14 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		}
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
-	head, err := r.Reference(plumbing.HEAD, false)
+
+	headRef, err := gitinterface.AbsoluteReference(r, "HEAD")
 	if err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
 	repository := &Repository{r: r}
-	return repository, repository.VerifyRef(ctx, head.Name().String(), true)
+	return repository, repository.VerifyRef(ctx, headRef, true)
 }
 
 // Push wraps a typical git push invocation by also pushing gittuf namespaces to

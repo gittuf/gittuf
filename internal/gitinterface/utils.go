@@ -83,6 +83,15 @@ func AbsoluteReference(repo *git.Repository, target string) (string, error) {
 		return target, nil
 	}
 
+	if target == plumbing.HEAD.String() {
+		ref, err := repo.Reference(plumbing.ReferenceName(target), false)
+		if err != nil {
+			return "", err
+		}
+
+		return string(ref.Target()), nil
+	}
+
 	// Check if branch
 	refName := plumbing.NewBranchReferenceName(target)
 	_, err := repo.Reference(refName, false)

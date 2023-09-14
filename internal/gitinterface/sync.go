@@ -72,10 +72,25 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 	}
 
 	err = remote.FetchContext(ctx, fetchOpts)
-	if errors.Is(err, transport.ErrEmptyRemoteRepository) || errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return nil
+	if err != nil {
+		if errors.Is(err, transport.ErrEmptyRemoteRepository) || errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return nil
+		}
+		return err
 	}
-	return err
+
+	ref, err := repo.Reference(plumbing.HEAD, false)
+	if err != nil {
+		return err
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	return wt.Checkout(&git.CheckoutOptions{
+		Branch: ref.Target(),
+	})
 }
 
 // Fetch constructs refspecs for the refs and fetches to the repo from the
@@ -87,22 +102,22 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 func Fetch(ctx context.Context, repo *git.Repository, remoteName string, refs []string, trackRemote bool) error {
 	refSpecs := make([]config.RefSpec, 0, len(refs))
 	for _, r := range refs {
-		var (
-			refSpec config.RefSpec
-			err     error
-		)
-		if trackRemote {
-			refSpec, err = RefSpec(repo, r, remoteName, false)
-			if err != nil {
-				return err
-			}
-		} else {
-			refSpec, err = RefSpec(repo, r, "", false)
-			if err != nil {
-				return err
-			}
+		// We always update the remote tracker
+		refSpec, err := RefSpec(repo, r, remoteName, false)
+		if err != nil {
+			return err
 		}
 		refSpecs = append(refSpecs, refSpec)
+
+		// If we're not _exclusively_ tracking the remote, we also fetch to the
+		// local ref
+		if !trackRemote {
+			refSpec, err := RefSpec(repo, r, "", false)
+			if err != nil {
+				return err
+			}
+			refSpecs = append(refSpecs, refSpec)
+		}
 	}
 
 	return FetchRefSpec(ctx, repo, remoteName, refSpecs)
