@@ -1,6 +1,7 @@
 package root
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
@@ -14,6 +15,7 @@ func New() *cobra.Command {
 		Short: "A security layer for Git repositories, powered by TUF",
 	}
 
+	cmd.AddCommand(clone.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
 	cmd.AddCommand(rsl.New())
