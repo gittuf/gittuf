@@ -36,9 +36,11 @@ func TestInitializeNamespace(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 
-		ref, err = repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
-		assert.Nil(t, err)
-		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
+		// Disable PolicyStagingRef until it is actually used
+		// https://github.com/gittuf/gittuf/issues/45
+		// ref, err = repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+		// assert.Nil(t, err)
+		// assert.Equal(t, plumbing.ZeroHash, ref.Hash())
 	})
 
 	t.Run("existing Policy namespace", func(t *testing.T) {
@@ -59,7 +61,7 @@ func TestInitializeNamespace(t *testing.T) {
 func TestLoadState(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +130,7 @@ func TestStateCommit(t *testing.T) {
 	}
 	assert.NotEqual(t, plumbing.ZeroHash, policyRef.Hash())
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
+	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		t.Error(err)
 	}

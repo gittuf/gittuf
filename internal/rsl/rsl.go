@@ -14,7 +14,7 @@ import (
 
 const (
 	GittufNamespacePrefix      = "refs/gittuf/"
-	RSLRef                     = "refs/gittuf/reference-state-log"
+	Ref                        = "refs/gittuf/reference-state-log"
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
 	CommitIDKey                = "commitID"
@@ -24,6 +24,8 @@ const (
 	EndMessage                 = "-----END MESSAGE-----"
 	EntryIDKey                 = "entryID"
 	SkipKey                    = "skip"
+
+	remoteTrackerRef = "refs/remotes/%s/gittuf/reference-state-log"
 )
 
 var (
@@ -38,7 +40,7 @@ var (
 // InitializeNamespace creates a git ref for the reference state log. Initially,
 // the entry has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
-	if _, err := repo.Reference(plumbing.ReferenceName(RSLRef), true); err != nil {
+	if _, err := repo.Reference(plumbing.ReferenceName(Ref), true); err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return err
 		}
@@ -46,7 +48,14 @@ func InitializeNamespace(repo *git.Repository) error {
 		return ErrRSLExists
 	}
 
-	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(RSLRef), plumbing.ZeroHash))
+	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(Ref), plumbing.ZeroHash))
+}
+
+// RemoteTrackerRef returns the remote tracking ref for the specified remote
+// name. For example, for 'origin', the remote tracker ref is
+// 'refs/remotes/origin/gittuf/reference-state-log'.
+func RemoteTrackerRef(remote string) string {
+	return fmt.Sprintf(remoteTrackerRef, remote)
 }
 
 type EntryType interface {
@@ -79,7 +88,7 @@ func (e Entry) GetID() plumbing.Hash {
 func (e Entry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
-	_, err := gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	_, err := gitinterface.Commit(repo, gitinterface.EmptyTree(), Ref, message, sign)
 	return err
 }
 
@@ -131,7 +140,7 @@ func (a Annotation) Commit(repo *git.Repository, sign bool) error {
 		return err
 	}
 
-	_, err = gitinterface.Commit(repo, gitinterface.EmptyTree(), RSLRef, message, sign)
+	_, err = gitinterface.Commit(repo, gitinterface.EmptyTree(), Ref, message, sign)
 	return err
 }
 
@@ -222,7 +231,7 @@ func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, 
 // GetLatestEntry returns the latest entry available locally in the RSL.
 // TODO: There is no information yet about the signature for the entry.
 func GetLatestEntry(repo *git.Repository) (EntryType, error) {
-	ref, err := repo.Reference(plumbing.ReferenceName(RSLRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package init
 
 import (
-	"context"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
@@ -35,7 +34,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.InitializeTargets(context.Background(), keyBytes, o.policyName, true)
+	return repo.InitializeTargets(cmd.Context(), keyBytes, o.policyName, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

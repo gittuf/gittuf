@@ -1,8 +1,6 @@
 package verifyref
 
 import (
-	"context"
-
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +24,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return repo.VerifyRef(context.Background(), args[0], o.full)
+	return repo.VerifyRef(cmd.Context(), args[0], o.full)
 }
 
 func New() *cobra.Command {

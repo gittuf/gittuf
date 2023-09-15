@@ -1,7 +1,6 @@
 package addrule
 
 import (
-	"context"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -73,7 +72,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		authorizedKeysBytes = append(authorizedKeysBytes, kb)
 	}
 
-	return repo.AddDelegation(context.Background(), keyBytes, o.policyName, o.ruleName, authorizedKeysBytes, o.rulePatterns, true)
+	return repo.AddDelegation(cmd.Context(), keyBytes, o.policyName, o.ruleName, authorizedKeysBytes, o.rulePatterns, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

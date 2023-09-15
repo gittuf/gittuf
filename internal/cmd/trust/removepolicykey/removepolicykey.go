@@ -1,7 +1,6 @@
 package removepolicykey
 
 import (
-	"context"
 	"os"
 	"strings"
 
@@ -36,7 +35,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RemoveTopLevelTargetsKey(context.Background(), rootKeyBytes, strings.ToLower(o.targetsKeyID), true)
+	return repo.RemoveTopLevelTargetsKey(cmd.Context(), rootKeyBytes, strings.ToLower(o.targetsKeyID), true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
