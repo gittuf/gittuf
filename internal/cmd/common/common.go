@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -36,14 +36,9 @@ func ReadKeyBytes(key string) ([]byte, error) {
 			return nil, err
 		}
 
-		publicKey := strings.TrimSpace(string(stdOut))
-		pgpKey := &sslibsv.SSLibKey{
-			KeyID:   fingerprint,
-			KeyType: signerverifier.GPGKeyType,
-			Scheme:  signerverifier.GPGKeyType, // TODO: this should use the underlying key algorithm
-			KeyVal: sslibsv.KeyVal{
-				Public: publicKey,
-			},
+		pgpKey, err := gpg.LoadGPGKeyFromBytes(stdOut)
+		if err != nil {
+			return nil, err
 		}
 
 		kb, err = json.Marshal(pgpKey)
