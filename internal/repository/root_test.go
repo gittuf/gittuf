@@ -10,7 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +37,7 @@ func TestInitializeRoot(t *testing.T) {
 	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.RootRoleName].KeyIDs[0])
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
-	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []d.Verifier{sv}, 1)
+	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -68,7 +68,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
-	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []d.Verifier{sv}, 1)
+	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -118,7 +118,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Equal(t, rootKey.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, rootKey.KeyID)
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
-	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []d.Verifier{sv}, 1)
+	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveTopLevelTargetsKey(context.Background(), keyBytes, rootKey.KeyID, false)
@@ -136,6 +136,6 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 
 	assert.Equal(t, 4, rootMetadata.Version)
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
-	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []d.Verifier{sv}, 1)
+	err = dsse.VerifyEnvelope(context.Background(), state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }

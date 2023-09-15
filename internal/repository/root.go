@@ -10,7 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 // InitializeRoot is the interface for the user to create the repository's root
@@ -91,7 +91,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 	}
 
 	env := state.RootEnvelope
-	env.Signatures = []d.Signature{}
+	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
 	env, err = dsse.SignEnvelope(ctx, env, sv)
@@ -144,7 +144,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, rootKeyBytes 
 	}
 
 	env := state.RootEnvelope
-	env.Signatures = []d.Signature{}
+	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
 	env, err = dsse.SignEnvelope(ctx, env, sv)
