@@ -11,7 +11,10 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -184,4 +187,114 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 		assert.Equal(t, test.keys, keys, fmt.Sprintf("policy keys for path '%s' don't match expected keys in test '%s'", test.path, name))
 	}
 
+}
+
+func TestGetStateForCommit(t *testing.T) {
+	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
+
+	// Create some commits
+	refName := "refs/heads/main"
+	emptyTreeHash, err := gitinterface.WriteTree(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitID, err := gitinterface.Commit(repo, emptyTreeHash, refName, "Initial commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No RSL entry for commit => no state yet
+	commit, err := repo.CommitObject(commitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := GetStateForCommit(context.Background(), repo, commit)
+	assert.Nil(t, err)
+	assert.Nil(t, state)
+
+	// Record RSL entry for commit
+	if err := rsl.NewEntry(refName, commitID).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err = GetStateForCommit(context.Background(), repo, commit)
+	assert.Nil(t, err)
+	assert.Equal(t, firstState, state)
+
+	// Create new branch, record new commit there
+	anotherRefName := "refs/heads/feature"
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
+		t.Fatal(err)
+	}
+	newCommitID, err := gitinterface.Commit(repo, emptyTreeHash, anotherRefName, "Second commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rsl.NewEntry(anotherRefName, newCommitID).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	newCommit, err := repo.CommitObject(newCommitID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	assert.Nil(t, err)
+	assert.Equal(t, firstState, state)
+
+	// Update policy, record in RSL
+	secondState, err := LoadCurrentState(context.Background(), repo) // secondState := firstState will modify firstState as well
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}) // just a dummy rule
+	if err != nil {
+		t.Fatal(err)
+	}
+	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondState.TargetsEnvelope = targetsEnv
+	if err := secondState.Commit(context.Background(), repo, "Second state", false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Merge feature branch commit into main
+	curRef, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Storer.CheckAndSetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), newCommitID), curRef); err != nil {
+		t.Fatal(err)
+	}
+
+	// Record in RSL
+	if err := rsl.NewEntry(refName, newCommitID).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that for this commit ID, the first state is returned and not the
+	// second
+	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	assert.Nil(t, err)
+	assert.Equal(t, firstState, state)
 }
