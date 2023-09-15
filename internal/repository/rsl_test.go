@@ -52,7 +52,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
-	assert.Equal(t, plumbing.ZeroHash, entry.CommitID)
+	assert.Equal(t, plumbing.ZeroHash, entry.TargetID)
 
 	testHash := plumbing.NewHash("abcdef1234567890")
 
@@ -80,7 +80,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
-	assert.Equal(t, testHash, entry.CommitID)
+	assert.Equal(t, testHash, entry.TargetID)
 }
 
 func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
@@ -114,7 +114,7 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, refName, latestEntry.(*rsl.Entry).RefName)
-	assert.Equal(t, commitID, latestEntry.(*rsl.Entry).CommitID)
+	assert.Equal(t, commitID, latestEntry.(*rsl.Entry).TargetID)
 
 	// Now checkout another branch, add another commit
 	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {

@@ -1,7 +1,6 @@
 package policy
 
 import (
-	_ "embed"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,9 +10,6 @@ import (
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
-
-//go:embed test-data/gpg-pubkey.asc
-var gpgPubKeyBytes []byte
 
 func TestInitializeTargetsMetadata(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
