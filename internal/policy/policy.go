@@ -223,6 +223,55 @@ func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object
 	return LoadStateForEntry(ctx, repo, commitPolicyEntry)
 }
 
+// PublicKeys returns all the public keys associated with a state.
+func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
+	allKeys := map[string]*tuf.Key{}
+
+	// Add root keys
+	for _, key := range s.RootPublicKeys {
+		key := key
+		allKeys[key.KeyID] = key
+	}
+
+	// Add keys from the root metadata
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+	for keyID, key := range rootMetadata.Keys {
+		key := key
+		allKeys[keyID] = key
+	}
+
+	// Add keys from top level targets metadata
+	if s.TargetsEnvelope == nil {
+		// Early states where this hasn't been initialized yet
+		return nil, err
+	}
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+	for keyID, key := range targetsMetadata.Delegations.Keys {
+		key := key
+		allKeys[keyID] = key
+	}
+
+	// Add keys from delegated targets metadata
+	for roleName := range s.DelegationEnvelopes {
+		delegatedMetadata, err := s.GetTargetsMetadata(roleName)
+		if err != nil {
+			return nil, err
+		}
+		for keyID, key := range delegatedMetadata.Delegations.Keys {
+			key := key
+			allKeys[keyID] = key
+		}
+	}
+
+	return allKeys, nil
+}
+
 // FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
 // keys trusted to sign for the specified role.
 func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {

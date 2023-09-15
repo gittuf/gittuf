@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -18,6 +19,19 @@ import (
 var (
 	ErrTagAlreadyExists = errors.New("tag already exists")
 )
+
+// IsTag returns true if the specified target is a tag in the repository.
+func IsTag(repo *git.Repository, target string) bool {
+	absPath, err := AbsoluteReference(repo, target)
+	if err == nil {
+		if strings.HasPrefix(absPath, TagRefPrefix) {
+			return true
+		}
+	}
+
+	_, err = repo.TagObject(plumbing.NewHash(target))
+	return err == nil
+}
 
 // Tag creates a new tag in the repository pointing to the specified target.
 func Tag(repo *git.Repository, target plumbing.Hash, name, message string, sign bool) (plumbing.Hash, error) {

@@ -17,6 +17,17 @@ import (
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
+const (
+	nonCommitMessage                  = "cannot verify non-commit object"
+	unableToResolveRevisionMessage    = "unable to resolve revision (must be a reference or a commit identifier)"
+	noPublicKeyMessage                = "no public key found"
+	unableToLoadPolicyMessageFmt      = "unable to load applicable gittuf policy: %s"
+	unableToFindPolicyMessage         = "unable to find applicable gittuf policy"
+	goodSignatureMessageFmt           = "good signature from key '%s:%s'"
+	noSignatureMessage                = "no signature found"
+	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
+)
+
 var (
 	ErrUnauthorizedSignature = errors.New("unauthorized signature")
 )
@@ -141,6 +152,98 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	}
 
 	return nil
+}
+
+// VerifyCommit verifies the signature on the specified commits (identified by
+// their hash or via a reference that is resolved). For each commit, the policy
+// applicable when the commit was first recorded (directly or indirectly) in the
+// RSL is used. The function returns a map that identifies the verification
+// status for each of the submitted IDs. All commit IDs that are passed in will
+// have an entry in the returned status. The status is currently meant to be
+// consumed directly by the user, as this is used for a special, user-invoked
+// workflow. gittuf's other verification workflows are currently not expected to
+// use this function.
+func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[string]string {
+	status := make(map[string]string, len(ids))
+	commits := make(map[string]*object.Commit, len(ids))
+
+	for _, id := range ids {
+		if gitinterface.IsTag(repo, id) {
+			// we do this because ResolveRevision returns a tag's commit object.
+			// For tags, we want to verify the signature on the tag object
+			// rather than the underlying commit.
+			status[id] = nonCommitMessage
+			continue
+		}
+
+		rev, err := repo.ResolveRevision(plumbing.Revision(id))
+		if err != nil {
+			status[id] = unableToResolveRevisionMessage
+			continue
+		}
+		commit, err := repo.CommitObject(*rev)
+		if err != nil {
+			if errors.Is(err, plumbing.ErrObjectNotFound) {
+				status[id] = nonCommitMessage
+			} else {
+				status[id] = err.Error()
+			}
+			continue
+		}
+		commits[id] = commit
+	}
+
+	for id, commit := range commits {
+		verified := false
+		if len(commit.PGPSignature) == 0 {
+			status[id] = noSignatureMessage
+			continue
+		}
+
+		commitPolicy, err := GetStateForCommit(ctx, repo, commit)
+		if err != nil {
+			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
+			continue
+		}
+		if commitPolicy == nil {
+			status[id] = unableToFindPolicyMessage
+			continue
+		}
+
+		// TODO: Add `applyFilePolicies` flag that uses the commitPolicy to
+		// check that the commit signature is from a key trusted for all the
+		// paths modified by the commit.
+
+		keys, err := commitPolicy.PublicKeys()
+		if err != nil {
+			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
+			continue
+		}
+		for _, key := range keys {
+			err = gitinterface.VerifyCommitSignature(ctx, commit, key)
+			if err == nil {
+				verified = true
+				status[id] = fmt.Sprintf(goodSignatureMessageFmt, key.KeyType, key.KeyID)
+				break
+			}
+
+			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+				// We encounter this for key types that can be used for metadata
+				// but not Git objects
+				continue
+			}
+
+			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+				status[id] = fmt.Sprintf(errorVerifyingSignatureMessageFmt, key.KeyType, key.KeyID, err.Error())
+			}
+		}
+
+		if !verified {
+			status[id] = noPublicKeyMessage
+		}
+	}
+
+	return status
 }
 
 // VerifyNewState ensures that when a new policy is encountered, its root role
