@@ -83,6 +83,69 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.Equal(t, testHash, entry.CommitID)
 }
 
+func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
+	r, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo := &Repository{r: r}
+
+	if err := rsl.InitializeNamespace(repo.r); err != nil {
+		t.Fatal(err)
+	}
+
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+	emptyTreeHash, err := gitinterface.WriteTree(repo.r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitID, err := gitinterface.Commit(repo.r, emptyTreeHash, refName, "Test commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), false)
+	assert.Nil(t, err)
+
+	latestEntry, err := rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, refName, latestEntry.(*rsl.Entry).RefName)
+	assert.Equal(t, commitID, latestEntry.(*rsl.Entry).CommitID)
+
+	// Now checkout another branch, add another commit
+	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
+		t.Fatal(err)
+	}
+	newCommitID, err := gitinterface.Commit(repo.r, emptyTreeHash, anotherRefName, "Commit on feature branch", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.RecordRSLEntryForReferenceAtCommit(refName, newCommitID.String(), false)
+	assert.ErrorIs(t, err, ErrCommitNotInRef)
+
+	// We can, however, record an RSL entry for the commit in the new branch
+	err = repo.RecordRSLEntryForReferenceAtCommit(anotherRefName, newCommitID.String(), false)
+	assert.Nil(t, err)
+
+	// Finally, let's record a couple more commits and use the older of the two
+	commitID, err = gitinterface.Commit(repo.r, emptyTreeHash, refName, "Another commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = gitinterface.Commit(repo.r, emptyTreeHash, refName, "Latest commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), false)
+	assert.Nil(t, err)
+}
+
 func TestRecordRSLAnnotation(t *testing.T) {
 	r, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
