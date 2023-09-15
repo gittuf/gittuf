@@ -2,13 +2,19 @@ package policy
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -181,4 +187,56 @@ func TestGetChangedPaths(t *testing.T) {
 	}
 	// Second commit's tree has two files, 1 and 2. Only 2 is new.
 	assert.Equal(t, []string{"2"}, changedPaths)
+}
+
+func TestStateVerifyNewState(t *testing.T) {
+	t.Run("valid policy transition", func(t *testing.T) {
+		currentPolicy := createTestStateWithOnlyRoot(t)
+		newPolicy := createTestStateWithOnlyRoot(t)
+
+		err := currentPolicy.VerifyNewState(context.Background(), newPolicy)
+		assert.Nil(t, err)
+	})
+
+	t.Run("invalid policy transition", func(t *testing.T) {
+		currentPolicy := createTestStateWithOnlyRoot(t)
+
+		// Create invalid state
+		signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		keyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1.pub"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		key, err := tuf.LoadKeyFromBytes(keyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata := InitializeRootMetadata(key)
+
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newPolicy := &State{
+			RootPublicKeys:      []*tuf.Key{key},
+			RootEnvelope:        rootEnv,
+			DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+		}
+
+		err = currentPolicy.VerifyNewState(context.Background(), newPolicy)
+		assert.ErrorContains(t, err, "do not match threshold")
+	})
 }
