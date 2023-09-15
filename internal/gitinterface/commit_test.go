@@ -29,7 +29,7 @@ func TestCreateCommitObject(t *testing.T) {
 		t.Error(err)
 	}
 
-	assert.Equal(t, plumbing.NewHash("dce09cc0f41eaa323f6949142d66ead789f40f6f"), enc.Hash())
+	assert.Equal(t, "22ddfd55fb5fba7b37b50b068d1527a1b0f9f561", enc.Hash().String())
 }
 
 func TestVerifyCommitSignature(t *testing.T) {

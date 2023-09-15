@@ -163,7 +163,7 @@ func TestGetSigningInfo(t *testing.T) {
 			t.Error(err)
 		}
 
-		getGitConfig = func() (io.Reader, error) {
+		getGitConfigFromCommand = func() (io.Reader, error) {
 			return os.Open(test.configFile)
 		}
 

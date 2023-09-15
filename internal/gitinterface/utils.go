@@ -9,6 +9,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/jonboulle/clockwork"
 )
 
 const (
@@ -18,7 +19,11 @@ const (
 	RemoteRefPrefix = "refs/remotes/"
 )
 
-var ErrReferenceNotFound = plumbing.ErrReferenceNotFound
+var (
+	ErrReferenceNotFound = plumbing.ErrReferenceNotFound
+
+	clock = clockwork.NewRealClock()
+)
 
 // GetTip returns the hash of the tip of the specified ref.
 func GetTip(repo *git.Repository, refName string) (plumbing.Hash, error) {
