@@ -29,40 +29,15 @@ var targetsPubKeyBytes []byte
 func TestClone(t *testing.T) {
 	remoteTmpDir := t.TempDir()
 
-	remoteR, err := git.PlainInit(remoteTmpDir, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteRepo := &Repository{r: remoteR}
-	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsPubKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
-		t.Fatal(err)
-	}
-	emptyTreeHash, err := gitinterface.WriteTree(remoteRepo.r, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	remoteRepo := initializeTestRepositoryInDir(t, remoteTmpDir)
+
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
-	commitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Initial commit", false)
+
+	recordChangesInTestRepository(t, remoteRepo, refName, []string{anotherRefName})
+
+	remoteHead, err := remoteRepo.r.Head()
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.RecordRSLEntryForReference(anotherRefName, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +60,7 @@ func TestClone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, commitID, head.Hash())
+		assert.Equal(t, remoteHead.Hash(), head.Hash())
 
 		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
 		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
@@ -106,7 +81,7 @@ func TestClone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, commitID, head.Hash())
+		assert.Equal(t, remoteHead.Hash(), head.Hash())
 
 		dirInfo, err := os.Stat(dirName)
 		assert.Nil(t, err)
@@ -130,7 +105,7 @@ func TestClone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, commitID, head.Hash())
+		assert.Equal(t, remoteHead.Hash(), head.Hash())
 		assert.Equal(t, plumbing.ReferenceName(anotherRefName), head.Name())
 
 		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
@@ -181,11 +156,7 @@ func TestPush(t *testing.T) {
 	repoLocal := createTestRepositoryWithPolicy(t)
 
 	// Create tmp dir for destination repo so we have a URL for it
-	tmpDir, err := os.MkdirTemp("", "gittuf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir) //nolint:errcheck
+	tmpDir := t.TempDir()
 
 	repoRemoteR, err := git.PlainInit(tmpDir, true)
 	if err != nil {
@@ -255,51 +226,17 @@ func TestPush(t *testing.T) {
 }
 
 func TestPull(t *testing.T) {
-	remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
+	remoteTmpDir := t.TempDir()
 
-	remoteR, err := git.PlainInit(remoteTmpDir, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteRepo := &Repository{r: remoteR}
-	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsPubKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
-		t.Fatal(err)
-	}
-	emptyTreeHash, err := gitinterface.WriteTree(remoteRepo.r, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	remoteRepo := initializeTestRepositoryInDir(t, remoteTmpDir)
+
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 	rslRefNameTyped := plumbing.ReferenceName(rsl.RSLRef)
 	policyRefNameTyped := plumbing.ReferenceName(policy.PolicyRef)
 	remoteName := "origin"
-	commitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Initial commit", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
-		t.Fatal(err)
-	}
-	if err := remoteRepo.RecordRSLEntryForReference(anotherRefName, false); err != nil {
-		t.Fatal(err)
-	}
+
+	recordChangesInTestRepository(t, remoteRepo, refName, []string{anotherRefName})
 
 	// repository.Clone is an option but that needs a dir
 	localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{rsl.RSLRef, policy.PolicyRef}, false)
@@ -312,7 +249,7 @@ func TestPull(t *testing.T) {
 	assertRefsEqual(t, policyRefNameTyped, remoteRepo, localRepo)
 
 	// Make remote changes
-	_, err = gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Another commit", false)
+	_, err = gitinterface.Commit(remoteRepo.r, gitinterface.EmptyTree(), refName, "Another commit", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,4 +306,52 @@ func assertRefsEqual(t *testing.T, ref plumbing.ReferenceName, a, b *Repository)
 	}
 
 	assert.Equal(t, aRef.Hash(), bRef.Hash())
+}
+
+func initializeTestRepositoryInDir(t *testing.T, dir string) *Repository {
+	t.Helper()
+
+	remoteR, err := git.PlainInit(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remoteRepo := &Repository{r: remoteR}
+	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsPubKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
+		t.Fatal(err)
+	}
+	_, err = gitinterface.WriteTree(remoteRepo.r, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return remoteRepo
+}
+
+func recordChangesInTestRepository(t *testing.T, repo *Repository, mainRef string, otherRefs []string) {
+	t.Helper()
+
+	commitID, err := gitinterface.Commit(repo.r, gitinterface.EmptyTree(), mainRef, "Initial commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RecordRSLEntryForReference(mainRef, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(mainRef))); err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range otherRefs {
+		if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(ref), commitID)); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.RecordRSLEntryForReference(ref, false); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
