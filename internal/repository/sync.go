@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"net/url"
 	"os"
 	"strings"
 
@@ -24,9 +25,7 @@ var (
 // TODO: resolve how root keys are trusted / bootstrapped.
 func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
 	if dir == "" {
-		// FIXME: my understanding is backslashes are not used in URLs but I haven't dived into the RFCs to check yet
-		split := strings.Split(strings.TrimSpace(strings.ReplaceAll(remoteURL, "\\", "/")), "/")
-		dir = strings.TrimSuffix(split[len(split)-1], ".git")
+		dir = getLocalDirName(remoteURL)
 	}
 	_, err := os.Stat(dir)
 	if err == nil {
@@ -92,4 +91,25 @@ func (r *Repository) Pull(ctx context.Context, remoteName string, refNames ...st
 	}
 
 	return nil
+}
+
+func getLocalDirName(remoteURL string) string {
+	var path string
+	rURL, err := url.Parse(remoteURL)
+	if err != nil {
+		// We suppress errors and try to find the dir using the URL itself
+		// git@github.com:gittuf/gittuf triggers an error for example due to the
+		// colon
+		path = remoteURL
+	} else {
+		path = rURL.EscapedPath()
+		if len(path) == 0 {
+			// https://go.dev/play/p/eEoLuwxWE2F
+			// In Windows paths, the escapedPath is empty
+			path = remoteURL
+		}
+	}
+
+	split := strings.Split(strings.TrimSpace(strings.ReplaceAll(path, "\\", "/")), "/")
+	return strings.TrimSuffix(split[len(split)-1], ".git")
 }

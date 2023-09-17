@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -490,4 +491,25 @@ func TestPull(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, remoteAnotherRef.Hash(), localAnotherRef.Hash())
+}
+
+func TestGetLocalDirName(t *testing.T) {
+	tests := map[string]string{
+		"unix dir":                            "/tmp/dir/gittuf",
+		"unix dir with .git":                  "/tmp/dir/gittuf.git",
+		"windows dir":                         `D:\\Documents\gittuf`,
+		"windows dir with .git":               `D:\\Documents\gittuf.git`,
+		"URL":                                 "https://github.com/gittuf/gittuf",
+		"URL with .git":                       "https://github.com/gittuf/gittuf.git",
+		"SSH URL":                             "git@github.com:gittuf/gittuf",
+		"SSH URL with .git":                   "git@github.com:gittuf/gittuf.git",
+		"SSH URL with protocol":               "ssh:git@github.com:gittuf/gittuf",
+		"SSH URL with protocol and with .git": "ssh:git@github.com:gittuf/gittuf.git",
+	}
+	expectedDirName := "gittuf"
+
+	for name, url := range tests {
+		dirName := getLocalDirName(url)
+		assert.Equal(t, expectedDirName, dirName, fmt.Sprintf("unexpected result in test '%s", name))
+	}
 }
