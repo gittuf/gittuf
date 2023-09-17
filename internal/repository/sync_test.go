@@ -71,15 +71,6 @@ func TestClone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remoteRSLRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePolicyRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("successful clone without specifying dir", func(t *testing.T) {
 		localTmpDir := t.TempDir()
 
@@ -88,24 +79,16 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repo, err := Clone(context.Background(), remoteTmpDir, "", "")
+		localRepo, err := Clone(context.Background(), remoteTmpDir, "", "")
 		assert.Nil(t, err)
-		head, err := repo.r.Head()
+		head, err := localRepo.r.Head()
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Equal(t, commitID, head.Hash())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
 	t.Run("successful clone with dir", func(t *testing.T) {
@@ -117,9 +100,9 @@ func TestClone(t *testing.T) {
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		dirName := "myRepo"
-		repo, err := Clone(context.Background(), remoteTmpDir, dirName, "")
+		localRepo, err := Clone(context.Background(), remoteTmpDir, dirName, "")
 		assert.Nil(t, err)
-		head, err := repo.r.Head()
+		head, err := localRepo.r.Head()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,16 +112,8 @@ func TestClone(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, dirInfo.IsDir())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch", func(t *testing.T) {
@@ -149,25 +124,17 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repo, err := Clone(context.Background(), remoteTmpDir, "", anotherRefName)
+		localRepo, err := Clone(context.Background(), remoteTmpDir, "", anotherRefName)
 		assert.Nil(t, err)
-		head, err := repo.r.Head()
+		head, err := localRepo.r.Head()
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Equal(t, commitID, head.Hash())
 		assert.Equal(t, plumbing.ReferenceName(anotherRefName), head.Name())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
 	t.Run("unsuccessful clone when unspecified dir already exists", func(t *testing.T) {
@@ -220,10 +187,11 @@ func TestPush(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-	repoRemote, err := git.PlainInit(tmpDir, true)
+	repoRemoteR, err := git.PlainInit(tmpDir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
+	repoRemote := &Repository{r: repoRemoteR}
 	_, err = repoLocal.r.CreateRemote(&config.RemoteConfig{
 		Name: remoteName,
 		URLs: []string{tmpDir},
@@ -234,11 +202,11 @@ func TestPush(t *testing.T) {
 
 	// Assert that the remote repo does not contain the main branch or the
 	// gittuf refs
-	_, err = repoRemote.Reference(refNameTyped, true)
+	_, err = repoRemote.r.Reference(refNameTyped, true)
 	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
-	_, err = repoRemote.Reference(rslRefNameTyped, true)
+	_, err = repoRemote.r.Reference(rslRefNameTyped, true)
 	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
-	_, err = repoRemote.Reference(policyRefNameTyped, true)
+	_, err = repoRemote.r.Reference(policyRefNameTyped, true)
 	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
 
 	// Create a test commit and its RSL entry
@@ -252,42 +220,19 @@ func TestPush(t *testing.T) {
 	// gittuf namespaces are not explicitly named here for Push
 	err = repoLocal.Push(context.Background(), remoteName, refName)
 	assert.Nil(t, err)
+	assertRefsEqual(t, refNameTyped, repoRemote, repoLocal)
+	assertRefsEqual(t, rslRefNameTyped, repoRemote, repoLocal)
+	assertRefsEqual(t, policyRefNameTyped, repoRemote, repoLocal)
 
+	// Verify remote doesn't have the second ref
+	_, err = repoRemote.r.Reference(anotherRefNameTyped, true)
+	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
+
+	// Initialize second ref and add another commit to first ref
 	localRef, err := repoLocal.r.Reference(refNameTyped, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	remoteRef, err := repoRemote.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localRef.Hash(), remoteRef.Hash())
-
-	localRSLRef, err := repoLocal.r.Reference(rslRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteRSLRef, err := repoRemote.Reference(rslRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localRSLRef.Hash(), remoteRSLRef.Hash())
-
-	localPolicyRef, err := repoLocal.r.Reference(policyRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePolicyRef, err := repoRemote.Reference(policyRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localPolicyRef.Hash(), remotePolicyRef.Hash())
-
-	// Verify remote doesn't have the second ref
-	_, err = repoRemote.Reference(anotherRefNameTyped, true)
-	assert.ErrorIs(t, err, plumbing.ErrReferenceNotFound)
-
-	// Initialize second ref and add another commit to first ref
 	if err := repoLocal.r.Storer.SetReference(plumbing.NewHashReference(anotherRefNameTyped, localRef.Hash())); err != nil {
 		t.Fatal(err)
 	}
@@ -303,46 +248,10 @@ func TestPush(t *testing.T) {
 	// Push both
 	err = repoLocal.Push(context.Background(), remoteName, refName, anotherRefName)
 	assert.Nil(t, err)
-
-	localRef, err = repoLocal.r.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteRef, err = repoRemote.Reference(refNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localRef.Hash(), remoteRef.Hash())
-
-	localAnotherRef, err := repoLocal.r.Reference(anotherRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteAnotherRef, err := repoRemote.Reference(anotherRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localAnotherRef.Hash(), remoteAnotherRef.Hash())
-
-	localRSLRef, err = repoLocal.r.Reference(rslRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remoteRSLRef, err = repoRemote.Reference(rslRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localRSLRef.Hash(), remoteRSLRef.Hash())
-
-	localPolicyRef, err = repoLocal.r.Reference(policyRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePolicyRef, err = repoRemote.Reference(policyRefNameTyped, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, localPolicyRef.Hash(), remotePolicyRef.Hash())
+	assertRefsEqual(t, refNameTyped, repoRemote, repoLocal)
+	assertRefsEqual(t, anotherRefNameTyped, repoRemote, repoLocal)
+	assertRefsEqual(t, rslRefNameTyped, repoRemote, repoLocal)
+	assertRefsEqual(t, policyRefNameTyped, repoRemote, repoLocal)
 }
 
 func TestPull(t *testing.T) {
@@ -372,6 +281,8 @@ func TestPull(t *testing.T) {
 	}
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
+	rslRefNameTyped := plumbing.ReferenceName(rsl.RSLRef)
+	policyRefNameTyped := plumbing.ReferenceName(policy.PolicyRef)
 	remoteName := "origin"
 	commitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Initial commit", false)
 	if err != nil {
@@ -390,15 +301,6 @@ func TestPull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remoteRSLRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePolicyRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// repository.Clone is an option but that needs a dir
 	localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{rsl.RSLRef, policy.PolicyRef}, false)
 	if err != nil {
@@ -406,20 +308,11 @@ func TestPull(t *testing.T) {
 	}
 	localRepo := &Repository{r: localR}
 
-	localRSLRef, err := localRepo.r.Reference(plumbing.ReferenceName(rsl.RSLRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	localPolicyRef, err := localRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-	assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+	assertRefsEqual(t, rslRefNameTyped, remoteRepo, localRepo)
+	assertRefsEqual(t, policyRefNameTyped, remoteRepo, localRepo)
 
 	// Make remote changes
-	newCommitID, err := gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Another commit", false)
+	_, err = gitinterface.Commit(remoteRepo.r, emptyTreeHash, refName, "Another commit", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,11 +323,7 @@ func TestPull(t *testing.T) {
 	err = localRepo.Pull(context.Background(), remoteName, refName)
 	assert.Nil(t, err)
 
-	localRef, err := localRepo.r.Reference(plumbing.ReferenceName(refName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, newCommitID, localRef.Hash())
+	assertRefsEqual(t, plumbing.ReferenceName(refName), remoteRepo, localRepo)
 
 	// Assert second ref isn't in local
 	_, err = localRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
@@ -443,15 +332,7 @@ func TestPull(t *testing.T) {
 	err = localRepo.Pull(context.Background(), remoteName, anotherRefName)
 	assert.Nil(t, err)
 
-	remoteAnotherRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	localAnotherRef, err := localRepo.r.Reference(plumbing.ReferenceName(anotherRefName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, remoteAnotherRef.Hash(), localAnotherRef.Hash())
+	assertRefsEqual(t, plumbing.ReferenceName(anotherRefName), remoteRepo, localRepo)
 }
 
 func TestGetLocalDirName(t *testing.T) {
@@ -473,4 +354,19 @@ func TestGetLocalDirName(t *testing.T) {
 		dirName := getLocalDirName(url)
 		assert.Equal(t, expectedDirName, dirName, fmt.Sprintf("unexpected result in test '%s", name))
 	}
+}
+
+func assertRefsEqual(t *testing.T, ref plumbing.ReferenceName, a, b *Repository) {
+	t.Helper()
+
+	aRef, err := a.r.Reference(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bRef, err := b.r.Reference(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, aRef.Hash(), bRef.Hash())
 }
