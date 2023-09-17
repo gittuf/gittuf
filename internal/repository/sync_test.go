@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common"
@@ -17,30 +17,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//go:embed test-data/root
+var rootKeyBytes []byte
+
+//go:embed test-data/targets
+var targetsKeyBytes []byte
+
+//go:embed test-data/targets.pub
+var targetsPubKeyBytes []byte
+
 func TestClone(t *testing.T) {
-	remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
+	remoteTmpDir := t.TempDir()
 
 	remoteR, err := git.PlainInit(remoteTmpDir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	remoteRepo := &Repository{r: remoteR}
-	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
 		t.Fatal(err)
 	}
@@ -88,11 +81,7 @@ func TestClone(t *testing.T) {
 	}
 
 	t.Run("successful clone without specifying dir", func(t *testing.T) {
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localTmpDir := t.TempDir()
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -120,11 +109,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone with dir", func(t *testing.T) {
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localTmpDir := t.TempDir()
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -157,11 +142,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch", func(t *testing.T) {
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localTmpDir := t.TempDir()
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -190,11 +171,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("unsuccessful clone when unspecified dir already exists", func(t *testing.T) {
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localTmpDir := t.TempDir()
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -209,11 +186,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("unsuccessful clone when specified dir already exists", func(t *testing.T) {
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localTmpDir := t.TempDir()
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -384,18 +357,6 @@ func TestPull(t *testing.T) {
 		t.Fatal(err)
 	}
 	remoteRepo := &Repository{r: remoteR}
-	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
 		t.Fatal(err)
 	}
