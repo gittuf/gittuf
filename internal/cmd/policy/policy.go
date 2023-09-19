@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/policy/addkey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
 	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
@@ -17,6 +18,7 @@ func New() *cobra.Command {
 	o.AddPersistentFlags(cmd)
 
 	cmd.AddCommand(i.New(o))
+	cmd.AddCommand(addkey.New(o))
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(removerule.New(o))
 

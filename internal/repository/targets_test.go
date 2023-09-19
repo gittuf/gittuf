@@ -2,14 +2,20 @@ package repository
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
+
+//go:embed test-data/gpg-pubkey.asc
+var gpgPubKeyBytes []byte
 
 func TestInitializeTargets(t *testing.T) {
 	// The helper also runs InitializeTargets for this test
@@ -115,6 +121,43 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
+}
+
+func TestAddKeyToTargets(t *testing.T) {
+	r, targetsKeyBytes := createTestRepositoryWithTargets(t)
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kb, err := json.Marshal(gpgKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authorizedKeysBytes := [][]byte{targetsKeyBytes, kb}
+
+	state, err := policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	assert.Nil(t, err)
+	assert.Empty(t, targetsMetadata.Delegations.Keys)
+
+	err = r.AddKeyToTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, authorizedKeysBytes, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
 }
 
 func createTestRepositoryWithTargets(t *testing.T) (*Repository, []byte) {

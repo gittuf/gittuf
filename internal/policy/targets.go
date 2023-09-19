@@ -90,6 +90,15 @@ func RemoveDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string) (*t
 	return targetsMetadata, nil
 }
 
+// AddKeyToTargets adds public keys to the specified targets metadata.
+func AddKeyToTargets(targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf.Key) (*tuf.TargetsMetadata, error) {
+	for _, key := range authorizedKeys {
+		targetsMetadata.Delegations.AddKey(key)
+	}
+
+	return targetsMetadata, nil
+}
+
 // AllowRule returns the default, last rule for all policy files.
 func AllowRule() tuf.Delegation {
 	return tuf.Delegation{
