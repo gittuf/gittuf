@@ -57,6 +57,75 @@ func Push(ctx context.Context, repo *git.Repository, remoteName string, refs []s
 	return PushRefSpec(ctx, repo, remoteName, refSpecs)
 }
 
+func Pull(ctx context.Context, repo *git.Repository, remoteName string, refs []string) error {
+	absRefs := make([]string, 0, len(refs))
+	for _, refName := range refs {
+		absRef, err := AbsoluteReference(repo, refName)
+		if err != nil {
+			return err
+		}
+		absRefs = append(absRefs, absRef)
+	}
+
+	// 1. Fetch remote trackers
+	if err := Fetch(ctx, repo, remoteName, refs, true); err != nil {
+		return err
+	}
+
+	// 2. Check and set local references
+	// Also check if head is in the list of refs pulled to update worktree
+	headRef, err := repo.Reference(plumbing.HEAD, false)
+	if err != nil {
+		return err
+	}
+	var newHeadCommit plumbing.Hash
+	for _, refName := range absRefs {
+		ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+		if err != nil {
+			if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+				return err
+			}
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+				return err
+			}
+			ref, err = repo.Reference(plumbing.ReferenceName(refName), true)
+			if err != nil {
+				return err
+			}
+		}
+		remoteRef, err := repo.Reference(plumbing.ReferenceName(RemoteRefForLocalRef(refName, remoteName)), true)
+		if err != nil {
+			return err
+		}
+		if ref.Hash() == remoteRef.Hash() {
+			continue
+		}
+		newRef := plumbing.NewHashReference(plumbing.ReferenceName(refName), remoteRef.Hash())
+		if err := repo.Storer.CheckAndSetReference(newRef, ref); err != nil {
+			return err
+		}
+		if refName == headRef.Target().String() {
+			newHeadCommit = remoteRef.Hash()
+		}
+	}
+
+	// 3. MergeReset worktree if HEAD was pulled
+	if newHeadCommit.IsZero() {
+		return nil
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	// FIXME: this isn't the correct merge behaviour for divergent branches,
+	// go-git doesn't handle merges. Should we just shell out?
+	return wt.Reset(&git.ResetOptions{
+		Commit: newHeadCommit,
+		Mode:   git.MergeReset,
+	})
+}
+
 // FetchRefSpec fetches to the repo from the specified remote using
 // pre-constructed refspecs. For more information on the Git refspec, please
 // consult: https://git-scm.com/book/en/v2/Git-Internals-The-Refspec.
@@ -73,24 +142,11 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 
 	err = remote.FetchContext(ctx, fetchOpts)
 	if err != nil {
-		if errors.Is(err, transport.ErrEmptyRemoteRepository) || errors.Is(err, git.NoErrAlreadyUpToDate) {
-			return nil
+		if !errors.Is(err, transport.ErrEmptyRemoteRepository) && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return err
 		}
-		return err
 	}
-
-	ref, err := repo.Reference(plumbing.HEAD, false)
-	if err != nil {
-		return err
-	}
-
-	wt, err := repo.Worktree()
-	if err != nil {
-		return err
-	}
-	return wt.Checkout(&git.CheckoutOptions{
-		Branch: ref.Target(),
-	})
+	return nil
 }
 
 // Fetch constructs refspecs for the refs and fetches to the repo from the

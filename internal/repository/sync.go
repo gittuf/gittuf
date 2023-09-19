@@ -80,7 +80,7 @@ func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...st
 // from the remote.
 func (r *Repository) Pull(ctx context.Context, remoteName string, refNames ...string) error {
 	updatedRefNames := append(refNames, rsl.RSLRef, policy.PolicyRef)
-	if err := gitinterface.Fetch(ctx, r.r, remoteName, updatedRefNames, false); err != nil {
+	if err := gitinterface.Pull(ctx, r.r, remoteName, updatedRefNames); err != nil {
 		return errors.Join(ErrPullingRepository, err)
 	}
 

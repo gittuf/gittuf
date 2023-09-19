@@ -142,18 +142,7 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 	localPath := refPath
 	var remotePath string
 	if len(remoteName) > 0 {
-		if strings.HasPrefix(refPath, BranchRefPrefix) {
-			// refs/heads/<path> -> refs/remotes/<remote>/<path>
-			rest := strings.TrimPrefix(refPath, BranchRefPrefix)
-			remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
-		} else if strings.HasPrefix(refPath, TagRefPrefix) {
-			// refs/tags/<path> -> refs/tags/<path>
-			remotePath = refPath
-		} else {
-			// refs/<path> -> refs/remotes/<remote>/<path>
-			rest := strings.TrimPrefix(refPath, RefPrefix)
-			remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
-		}
+		remotePath = RemoteRefForLocalRef(refPath, remoteName)
 	} else {
 		remotePath = refPath
 	}
@@ -164,4 +153,22 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 	}
 
 	return config.RefSpec(refSpecString), nil
+}
+
+func RemoteRefForLocalRef(refPath, remoteName string) string {
+	var remotePath string
+	if strings.HasPrefix(refPath, BranchRefPrefix) {
+		// refs/heads/<path> -> refs/remotes/<remote>/<path>
+		rest := strings.TrimPrefix(refPath, BranchRefPrefix)
+		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
+	} else if strings.HasPrefix(refPath, TagRefPrefix) {
+		// refs/tags/<path> -> refs/tags/<path>
+		remotePath = refPath
+	} else {
+		// refs/<path> -> refs/remotes/<remote>/<path>
+		rest := strings.TrimPrefix(refPath, RefPrefix)
+		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
+	}
+
+	return remotePath
 }
