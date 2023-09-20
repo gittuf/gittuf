@@ -40,7 +40,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	refs := []string{rsl.RSLRef, policy.PolicyRef}
+	refs := []string{rsl.Ref, policy.PolicyRef}
 
 	r, err := gitinterface.CloneAndFetch(ctx, remoteURL, dir, initialBranch, refs, false)
 	if err != nil {
@@ -67,7 +67,7 @@ func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...st
 			return errors.Join(ErrPushingRepository, err)
 		}
 	}
-	refNames = append(refNames, rsl.RSLRef, policy.PolicyRef)
+	refNames = append(refNames, rsl.Ref, policy.PolicyRef)
 	err := gitinterface.Push(ctx, r.r, remoteName, refNames)
 	if err != nil {
 		return errors.Join(ErrPushingRepository, err)
@@ -79,7 +79,7 @@ func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...st
 // Pull wraps a typical git pull invocation by also fetching gittuf namespaces
 // from the remote.
 func (r *Repository) Pull(ctx context.Context, remoteName string, refNames ...string) error {
-	updatedRefNames := append(refNames, rsl.RSLRef, policy.PolicyRef)
+	updatedRefNames := append(refNames, rsl.Ref, policy.PolicyRef)
 	if err := gitinterface.Pull(ctx, r.r, remoteName, updatedRefNames); err != nil {
 		return errors.Join(ErrPullingRepository, err)
 	}

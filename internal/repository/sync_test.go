@@ -62,7 +62,7 @@ func TestClone(t *testing.T) {
 		}
 		assert.Equal(t, remoteHead.Hash(), head.Hash())
 
-		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, rsl.Ref, remoteRepo, localRepo)
 		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
@@ -87,7 +87,7 @@ func TestClone(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, dirInfo.IsDir())
 
-		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, rsl.Ref, remoteRepo, localRepo)
 		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
@@ -108,7 +108,7 @@ func TestClone(t *testing.T) {
 		assert.Equal(t, remoteHead.Hash(), head.Hash())
 		assert.Equal(t, plumbing.ReferenceName(anotherRefName), head.Name())
 
-		assertRefsEqual(t, rsl.RSLRef, remoteRepo, localRepo)
+		assertRefsEqual(t, rsl.Ref, remoteRepo, localRepo)
 		assertRefsEqual(t, policy.PolicyRef, remoteRepo, localRepo)
 	})
 
@@ -150,7 +150,7 @@ func TestPush(t *testing.T) {
 	anotherRefName := "refs/heads/feature"
 	refNameTyped := plumbing.ReferenceName(refName)
 	anotherRefNameTyped := plumbing.ReferenceName(anotherRefName)
-	rslRefNameTyped := plumbing.ReferenceName(rsl.RSLRef)
+	rslRefNameTyped := plumbing.ReferenceName(rsl.Ref)
 	policyRefNameTyped := plumbing.ReferenceName(policy.PolicyRef)
 
 	repoLocal := createTestRepositoryWithPolicy(t)
@@ -232,14 +232,14 @@ func TestPull(t *testing.T) {
 
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
-	rslRefNameTyped := plumbing.ReferenceName(rsl.RSLRef)
+	rslRefNameTyped := plumbing.ReferenceName(rsl.Ref)
 	policyRefNameTyped := plumbing.ReferenceName(policy.PolicyRef)
 	remoteName := "origin"
 
 	recordChangesInTestRepository(t, remoteRepo, refName, []string{anotherRefName})
 
 	// repository.Clone is an option but that needs a dir
-	localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{rsl.RSLRef, policy.PolicyRef}, false)
+	localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{rsl.Ref, policy.PolicyRef}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
