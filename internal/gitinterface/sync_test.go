@@ -11,6 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
@@ -393,7 +394,7 @@ func TestFetchRefSpec(t *testing.T) {
 		assert.Equal(t, refRemote.Hash(), refLocal.Hash())
 	})
 
-	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
+	t.Run("assert expected error when remote is empty", func(t *testing.T) {
 		// The local repo can be in-memory
 		repoLocal, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -424,7 +425,7 @@ func TestFetchRefSpec(t *testing.T) {
 		}
 
 		err = FetchRefSpec(context.Background(), repoLocal, remoteName, refSpecs)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, transport.ErrEmptyRemoteRepository)
 	})
 }
 
@@ -536,7 +537,7 @@ func TestFetch(t *testing.T) {
 		assert.Equal(t, refRemote.Hash(), refLocal.Hash())
 	})
 
-	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
+	t.Run("assert expected error when remote is empty", func(t *testing.T) {
 		// The local repo can be in-memory
 		repoLocal, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -567,8 +568,62 @@ func TestFetch(t *testing.T) {
 		}
 
 		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, transport.ErrEmptyRemoteRepository)
 	})
+}
+
+func TestPull(t *testing.T) {
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+	remoteName := "origin"
+	remoteTmpDir := t.TempDir()
+	remoteRepo, err := git.PlainInit(remoteTmpDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make remote changes
+	emptyTreeHash, err := WriteTree(remoteRepo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mainCommitID, err := Commit(remoteRepo, emptyTreeHash, refName, "Commit to main", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Set HEAD
+	if err := remoteRepo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
+		t.Fatal(err)
+	}
+
+	// New branch with an additional commit
+	if err := remoteRepo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), mainCommitID)); err != nil {
+		t.Fatal(err)
+	}
+	_, err = Commit(remoteRepo, emptyTreeHash, anotherRefName, "Commit to feature", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertRefsEqual(t, plumbing.ReferenceName(refName), remoteRepo, localRepo)
+
+	err = Pull(context.Background(), localRepo, remoteName, []string{anotherRefName})
+	assert.Nil(t, err)
+	assertRefsEqual(t, plumbing.ReferenceName(anotherRefName), remoteRepo, localRepo)
+
+	localHead, err := localRepo.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, mainCommitID, localHead.Hash())
+
+	// We've only fetched the other one, so worktree shouldn't have been updated
+	// How do we check this?
 }
 
 func TestCloneAndFetch(t *testing.T) {
@@ -864,4 +919,19 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, mainCommitID, *localMainCommitID)
 	})
+}
+
+func assertRefsEqual(t *testing.T, ref plumbing.ReferenceName, a, b *git.Repository) {
+	t.Helper()
+
+	aRef, err := a.Reference(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bRef, err := b.Reference(ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, aRef.Hash(), bRef.Hash())
 }

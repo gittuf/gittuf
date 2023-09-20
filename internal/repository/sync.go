@@ -17,6 +17,7 @@ var (
 	ErrDirExists         = errors.New("directory exists")
 	ErrPushingRepository = errors.New("unable to push repository")
 	ErrPullingRepository = errors.New("unable to pull from remote")
+	ErrRSLHasDiverged    = errors.New("remote and local RSLs have diverged, pull and re-apply local changes")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
@@ -62,14 +63,24 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 // Push wraps a typical git push invocation by also pushing gittuf namespaces to
 // the remote.
 func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...string) error {
+	_, hasDiverged, err := r.CheckRemoteRSLForUpdates(ctx, remoteName)
+	if err != nil {
+		return errors.Join(ErrPushingRepository, err)
+	}
+
+	if hasDiverged {
+		// TODO: what tooling should we provide for rebasing and recreating RSL
+		// entries?
+		return errors.Join(ErrPushingRepository, ErrRSLHasDiverged)
+	}
+
 	for _, ref := range refNames {
 		if err := r.VerifyRef(ctx, ref, true); err != nil {
 			return errors.Join(ErrPushingRepository, err)
 		}
 	}
 	refNames = append(refNames, rsl.Ref, policy.PolicyRef)
-	err := gitinterface.Push(ctx, r.r, remoteName, refNames)
-	if err != nil {
+	if err := gitinterface.Push(ctx, r.r, remoteName, refNames); err != nil {
 		return errors.Join(ErrPushingRepository, err)
 	}
 
@@ -79,6 +90,18 @@ func (r *Repository) Push(ctx context.Context, remoteName string, refNames ...st
 // Pull wraps a typical git pull invocation by also fetching gittuf namespaces
 // from the remote.
 func (r *Repository) Pull(ctx context.Context, remoteName string, refNames ...string) error {
+	_, hasDiverged, err := r.CheckRemoteRSLForUpdates(ctx, remoteName)
+	if err != nil {
+		return errors.Join(ErrPullingRepository, err)
+	}
+
+	if hasDiverged {
+		// TODO: what tooling should we provide for rebasing and recreating RSL
+		// entries?
+		return errors.Join(ErrPullingRepository, ErrRSLHasDiverged)
+	}
+
+	// TODO: this is wasteful, we have the RSL state already, we can just apply?
 	updatedRefNames := append(refNames, rsl.Ref, policy.PolicyRef)
 	if err := gitinterface.Pull(ctx, r.r, remoteName, updatedRefNames); err != nil {
 		return errors.Join(ErrPullingRepository, err)

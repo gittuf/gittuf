@@ -8,7 +8,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
@@ -57,6 +56,9 @@ func Push(ctx context.Context, repo *git.Repository, remoteName string, refs []s
 	return PushRefSpec(ctx, repo, remoteName, refSpecs)
 }
 
+// Pull fetches the specified Git refs and gittuf namespaces and applies their
+// changes to the local refs. If one of the specified refs is the current HEAD,
+// the worktree is updated to reflect changes to that ref.
 func Pull(ctx context.Context, repo *git.Repository, remoteName string, refs []string) error {
 	absRefs := make([]string, 0, len(refs))
 	for _, refName := range refs {
@@ -142,7 +144,7 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 
 	err = remote.FetchContext(ctx, fetchOpts)
 	if err != nil {
-		if !errors.Is(err, transport.ErrEmptyRemoteRepository) && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		if !errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return err
 		}
 	}
