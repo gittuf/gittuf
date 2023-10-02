@@ -10,6 +10,7 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -78,12 +79,9 @@ func TestVerifyTagSignature(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	gpgKey := &sslibsv.SSLibKey{
-		KeyType: signerverifier.GPGKeyType,
-		Scheme:  signerverifier.GPGKeyType,
-		KeyVal: sslibsv.KeyVal{
-			Public: strings.TrimSpace(string(keyBytes)),
-		},
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(keyBytes)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	fulcioKey := &sslibsv.SSLibKey{
