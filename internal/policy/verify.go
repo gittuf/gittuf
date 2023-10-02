@@ -7,10 +7,14 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 var (
@@ -110,14 +114,24 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 		// signatures are commit signatures. What do we do when metadata is
 		// signed using other methods? Do we instead flip the script and require
 		// metadata signatures to match git signing methods?
+		// UPDATE: This has likely been fixed. Policy RSL entries aren't
+		// verified. Instead, each policy state is internally verified AND each
+		// new policy state's root role signatures are verified with the prior
+		// policy's root role to ensure they have a threshold of valid
+		// signatures. This comment is being left in until this workflow is
+		// audited against the gittuf specification.
 		if entry.RefName == PolicyRef {
 			// TODO: this is repetition if the firstEntry is for policy
-			state, err := LoadStateForEntry(ctx, repo, entry)
+			newPolicy, err := LoadStateForEntry(ctx, repo, entry)
 			if err != nil {
 				return err
 			}
-			currentPolicy = state
 
+			if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
+				return err
+			}
+
+			currentPolicy = newPolicy
 			continue
 		}
 
@@ -127,6 +141,38 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	}
 
 	return nil
+}
+
+// VerifyNewState ensures that when a new policy is encountered, its root role
+// is signed by keys trusted in the current policy.
+func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
+	currentRoot, err := s.GetRootMetadata()
+	if err != nil {
+		return err
+	}
+
+	rootKeyIDs := currentRoot.Roles[RootRoleName].KeyIDs
+	rootThreshold := currentRoot.Roles[RootRoleName].Threshold
+
+	verifiers := make([]sslibdsse.Verifier, 0, len(rootKeyIDs))
+	for _, keyID := range rootKeyIDs {
+		k, ok := currentRoot.Keys[keyID]
+		if !ok {
+			// This is almost certainly an issue but we can be a little
+			// permissive and let failure happen in case the threshold isn't
+			// met
+			continue
+		}
+
+		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k)
+		if err != nil {
+			return err
+		}
+
+		verifiers = append(verifiers, sv)
+	}
+
+	return dsse.VerifyEnvelope(ctx, newPolicy.RootEnvelope, verifiers, rootThreshold)
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified
