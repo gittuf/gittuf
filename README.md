@@ -9,6 +9,9 @@ branches, tags, files, etc., lets you use new cryptographic algorithms (SHA256,
 etc.), protects against [other attacks] Git is vulnerable to, and more — all
 while being backwards compatible with GitHub, GitLab, etc.
 
+gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
+as part of the [Supply Chain Integrity Working Group].
+
 ## Current Status
 
 gittuf is currently approaching an alpha release. It is NOT intended for use in
@@ -39,3 +42,5 @@ $ make
 [other attacks]: https://ssl.engineering.nyu.edu/papers/torres_toto_usenixsec-2016.pdf
 [contributing guide]: /CONTRIBUTING.md
 [roadmap]: /docs/roadmap.md
+[Open Source Security Foundation (OpenSSF)]: https://openssf.org/
+[Supply Chain Integrity Working Group]: https://github.com/ossf/wg-supply-chain-integrity
