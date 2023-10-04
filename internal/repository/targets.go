@@ -194,3 +194,76 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
+
+// AddKeyToTargets is the interface for a user to add a trusted key to the
+// gittuf policy.
+func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, authorizedKeysBytes [][]byte, signCommit bool) error {
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	if err != nil {
+		return err
+	}
+	keyID, err := sv.KeyID()
+	if err != nil {
+		return err
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	authorizedKeyIDsForRole, err := state.FindAuthorizedSigningKeyIDs(ctx, targetsRoleName)
+	if err != nil {
+		return err
+	}
+	if !isKeyAuthorized(authorizedKeyIDsForRole, keyID) {
+		return ErrUnauthorizedKey
+	}
+
+	authorizedKeys := []*tuf.Key{}
+	keyIDs := ""
+	for _, kb := range authorizedKeysBytes {
+		key, err := tuf.LoadKeyFromBytes(kb)
+		if err != nil {
+			return err
+		}
+
+		authorizedKeys = append(authorizedKeys, key)
+		keyIDs += fmt.Sprintf("\n%s:%s", key.KeyType, key.KeyID)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	targetsMetadata, err = policy.AddKeyToTargets(targetsMetadata, authorizedKeys)
+	if err != nil {
+		return err
+	}
+
+	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return nil
+	}
+
+	env, err = dsse.SignEnvelope(ctx, env, sv)
+	if err != nil {
+		return nil
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Add keys to policy '%s'\n%s", targetsRoleName, keyIDs)
+
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}

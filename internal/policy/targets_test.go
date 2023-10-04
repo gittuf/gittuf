@@ -1,13 +1,19 @@
 package policy
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
+
+//go:embed test-data/gpg-pubkey.asc
+var gpgPubKeyBytes []byte
 
 func TestInitializeTargetsMetadata(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
@@ -74,6 +80,43 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+}
+
+func TestAddKeyToTargets(t *testing.T) {
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fulcioKey := &tuf.Key{
+		KeyType: sslibsv.SigstoreKeyType,
+		Scheme:  sslibsv.SigstoreKeyScheme,
+		KeyVal:  sslibsv.KeyVal{Identity: "jane.doe@example.com", Issuer: "https://github.com/login/oauth"},
+		KeyID:   "jane.doe@example.com::https://github.com/login/oauth",
+	}
+
+	t.Run("add single key", func(t *testing.T) {
+		targetsMetadata := InitializeTargetsMetadata()
+
+		assert.Nil(t, targetsMetadata.Delegations.Keys)
+
+		targetsMetadata, err = AddKeyToTargets(targetsMetadata, []*tuf.Key{gpgKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
+		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
+	})
+
+	t.Run("add multiple keys", func(t *testing.T) {
+		targetsMetadata := InitializeTargetsMetadata()
+
+		assert.Nil(t, targetsMetadata.Delegations.Keys)
+
+		targetsMetadata, err = AddKeyToTargets(targetsMetadata, []*tuf.Key{gpgKey, fulcioKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
+		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
+		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
+	})
 }
 
 func TestAllowRule(t *testing.T) {
