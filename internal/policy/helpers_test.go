@@ -17,6 +17,8 @@ import (
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
+var testCtx = context.Background()
+
 func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*git.Repository, *State) {
 	t.Helper()
 

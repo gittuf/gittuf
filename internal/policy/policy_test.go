@@ -103,6 +103,35 @@ func TestLoadStateForEntry(t *testing.T) {
 	assert.Equal(t, state, loadedState)
 }
 
+func TestStateKeys(t *testing.T) {
+	state := createTestStateWithPolicy(t)
+
+	expectedKeys := map[string]*tuf.Key{}
+	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedKeys[rootKey.KeyID] = rootKey
+
+	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedKeys[gpgKey.KeyID] = gpgKey
+
+	keys, err := state.PublicKeys()
+	assert.Nil(t, err, keys)
+	assert.Equal(t, expectedKeys, keys)
+}
+
 func TestStateVerify(t *testing.T) {
 	state := createTestStateWithOnlyRoot(t)
 

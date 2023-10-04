@@ -19,3 +19,7 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, full bool) er
 
 	return policy.VerifyRef(ctx, r.r, target)
 }
+
+func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
+	return policy.VerifyCommit(ctx, r.r, ids...)
+}

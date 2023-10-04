@@ -2,15 +2,18 @@ package policy
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -85,6 +88,64 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entry, policyEntry, refName)
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+}
+
+func TestVerifyCommit(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+	refName := "refs/heads/main"
+	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+	entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
+	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry.ID = entryID
+
+	expectedStatus := make(map[string]string, len(commitIDs))
+	commitIDStrings := make([]string, 0, len(commitIDs))
+	for _, c := range commitIDs {
+		commitIDStrings = append(commitIDStrings, c.String())
+		expectedStatus[c.String()] = fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID)
+	}
+
+	// Verify all commit signatures
+	status := VerifyCommit(testCtx, repo, commitIDStrings...)
+	assert.Equal(t, expectedStatus, status)
+
+	if err := repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify signature for HEAD and branch
+	expectedStatus = map[string]string{
+		"HEAD":  fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
+		refName: fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
+	}
+	status = VerifyCommit(testCtx, repo, "HEAD", refName)
+	assert.Equal(t, expectedStatus, status)
+
+	// Try a tag
+	tagHash, err := gitinterface.Tag(repo, commitIDs[len(commitIDs)-1], "v1", "Test tag", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedStatus = map[string]string{tagHash.String(): nonCommitMessage}
+	status = VerifyCommit(testCtx, repo, tagHash.String())
+	assert.Equal(t, expectedStatus, status)
+
+	// Add a commit but don't record it in the RSL
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+
+	expectedStatus = map[string]string{commitIDs[0].String(): unableToFindPolicyMessage}
+	status = VerifyCommit(testCtx, repo, commitIDs[0].String())
+	assert.Equal(t, expectedStatus, status)
 }
 
 func TestVerifyEntry(t *testing.T) {
