@@ -95,7 +95,7 @@ func LoadState(ctx context.Context, repo *git.Repository, rslEntryID plumbing.Ha
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy.
 func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error) {
-	e, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	e, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 // error is returned. Identifying the policy in this case is left to the calling
 // workflow.
 func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object.Commit) (*State, error) {
-	firstSeenEntry, err := rsl.GetFirstEntryForCommit(repo, commit)
+	firstSeenEntry, _, err := rsl.GetFirstEntryForCommit(repo, commit)
 	if err != nil {
 		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
 			return nil, nil
@@ -215,7 +215,7 @@ func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object
 		return nil, err
 	}
 
-	commitPolicyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
+	commitPolicyEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
 	if err != nil {
 		return nil, err
 	}

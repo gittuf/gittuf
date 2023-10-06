@@ -43,7 +43,7 @@ var (
 // using the latest policy.
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 	// 1. Get latest policy entry
-	policyEntry, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	policyEntry, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 	}
 
 	// 2. Find latest entry for target
-	latestEntry, err := rsl.GetLatestEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestEntryForRef(repo, target)
 	if err != nil {
 		return err
 	}
@@ -65,13 +65,13 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 // entry.
 func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) error {
 	// 1. Trace RSL back to the start
-	firstEntry, err := rsl.GetFirstEntry(repo)
+	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
 		return err
 	}
 
 	// 2. Find latest entry for target
-	latestEntry, err := rsl.GetLatestEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestEntryForRef(repo, target)
 	if err != nil {
 		return err
 	}
@@ -284,18 +284,18 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 			absPath = string(plumbing.NewTagReferenceName(tagObj.Name))
 		}
 
-		entry, err := rsl.GetLatestEntryForRef(repo, absPath)
+		entry, _, err := rsl.GetLatestEntryForRef(repo, absPath)
 		if err != nil {
 			status[id] = unableToFindRSLEntryMessage
 			continue
 		}
 
-		if _, err := rsl.GetLatestEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
+		if _, _, err := rsl.GetLatestEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
 			status[id] = multipleTagRSLEntriesFoundMessage
 			continue
 		}
 
-		policyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, entry.ID)
+		policyEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, entry.ID)
 		if err != nil {
 			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
 			continue
@@ -605,7 +605,7 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error) {
 	firstEntry := false
 
-	priorRefEntry, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err
@@ -636,7 +636,7 @@ func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 		return nil, err
 	}
 
-	priorRefEntry, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err

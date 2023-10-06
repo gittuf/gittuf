@@ -144,6 +144,18 @@ func (a *Annotation) Commit(repo *git.Repository, sign bool) error {
 	return err
 }
 
+// RefersTo returns true if the specified entryID is referred to by the
+// annotation.
+func (a *Annotation) RefersTo(entryID plumbing.Hash) bool {
+	for _, id := range a.RSLEntryIDs {
+		if id == entryID {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (a *Annotation) createCommitMessage() (string, error) {
 	lines := []string{
 		AnnotationHeader,
@@ -205,24 +217,39 @@ func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error)
 
 // GetNonGittufParentForEntry returns the first RSL entry starting from the
 // specified entry's parent that is not for the gittuf namespace.
-func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, error) {
+func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, []*Annotation, error) {
 	it, err := GetParentForEntry(repo, entry)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	allAnnotations := []*Annotation{}
+	var targetEntry *Entry
+
 	for {
-		if e, ok := it.(*Entry); ok {
-			if !strings.HasPrefix(e.RefName, GittufNamespacePrefix) {
-				return e, nil
+		switch iterator := it.(type) {
+		case *Entry:
+			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+				targetEntry = iterator
 			}
-		} // TODO: handle annotations
+		case *Annotation:
+			allAnnotations = append(allAnnotations, iterator)
+		}
+
+		if targetEntry != nil {
+			// we've found the target entry, stop walking the RSL
+			break
+		}
 
 		it, err = GetParentForEntry(repo, it)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
+
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
+
+	return targetEntry, annotations, nil
 }
 
 // GetLatestEntry returns the latest entry available locally in the RSL.
@@ -242,35 +269,50 @@ func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 
 // GetLatestNonGittufEntry returns the first RSL entry that is not for the
 // gittuf namespace.
-func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, error) {
+func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
 	it, err := GetLatestEntry(repo)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	allAnnotations := []*Annotation{}
+	var targetEntry *Entry
+
 	for {
-		if entry, ok := it.(*Entry); ok {
-			if !strings.HasPrefix(entry.RefName, GittufNamespacePrefix) {
-				return entry, nil
+		switch iterator := it.(type) {
+		case *Entry:
+			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+				targetEntry = iterator
 			}
-		} // TODO: handle annotations
+		case *Annotation:
+			allAnnotations = append(allAnnotations, iterator)
+		}
+
+		if targetEntry != nil {
+			// we've found the target entry, stop walking the RSL
+			break
+		}
 
 		it, err = GetParentForEntry(repo, it)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
+
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
+
+	return targetEntry, annotations, nil
 }
 
 // GetLatestEntryForRef returns the latest entry available locally in the RSL
 // for the specified refName.
-func GetLatestEntryForRef(repo *git.Repository, refName string) (*Entry, error) {
+func GetLatestEntryForRef(repo *git.Repository, refName string) (*Entry, []*Annotation, error) {
 	return GetLatestEntryForRefBefore(repo, refName, plumbing.ZeroHash)
 }
 
 // GetLatestEntryForRefBefore returns the latest entry available locally in the
 // RSL for the specified refName before the specified anchor.
-func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*Entry, error) {
+func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*Entry, []*Annotation, error) {
 	var (
 		iteratorT EntryType
 		err       error
@@ -279,12 +321,12 @@ func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plu
 	if anchor.IsZero() {
 		iteratorT, err = GetLatestEntry(repo)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	} else {
 		iteratorT, err = GetEntry(repo, anchor)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// We have to set the iterator to the parent. The other option is to
@@ -293,35 +335,53 @@ func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plu
 		// here, we avoid repetition.
 		iteratorT, err = GetParentForEntry(repo, iteratorT)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
+
+	allAnnotations := []*Annotation{}
+	var targetEntry *Entry
 
 	for {
 		switch iterator := iteratorT.(type) {
 		case *Entry:
 			if iterator.RefName == refName {
-				return iterator, nil
+				targetEntry = iterator
 			}
 		case *Annotation:
-			// TODO: discuss if annotations should be checked to see if they
-			// requested entry.
+			allAnnotations = append(allAnnotations, iterator)
+		}
+
+		if targetEntry != nil {
+			// we've found the target entry, stop walking the RSL
+			break
 		}
 
 		iteratorT, err = GetParentForEntry(repo, iteratorT)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 	}
+
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
+
+	return targetEntry, annotations, nil
 }
 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
 // *Entry as the first entry in the RSL cannot be an annotation.
-func GetFirstEntry(repo *git.Repository) (*Entry, error) {
+func GetFirstEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
 	iteratorT, err := GetLatestEntry(repo)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	allAnnotations := []*Annotation{}
+	var firstEntry *Entry
+
+	if iterator, ok := iteratorT.(*Annotation); ok {
+		allAnnotations = append(allAnnotations, iterator)
 	}
 
 	for {
@@ -330,14 +390,26 @@ func GetFirstEntry(repo *git.Repository) (*Entry, error) {
 			if errors.Is(err, ErrRSLEntryNotFound) {
 				entry, ok := iteratorT.(*Entry)
 				if !ok {
-					return nil, ErrInvalidRSLEntry
+					// The first entry cannot be an annotation
+					return nil, nil, ErrInvalidRSLEntry
 				}
-				return entry, nil
+				firstEntry = entry
+				break
 			}
-			return nil, err
+
+			return nil, nil, err
 		}
+
+		if annotation, ok := parentT.(*Annotation); ok {
+			allAnnotations = append(allAnnotations, annotation)
+		}
+
 		iteratorT = parentT
 	}
+
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
+
+	return firstEntry, annotations, nil
 }
 
 // GetFirstEntryForCommit returns the first entry in the RSL that either records
@@ -345,47 +417,48 @@ func GetFirstEntry(repo *git.Repository) (*Entry, error) {
 // time a commit was seen in the repository, irrespective of the ref it was
 // associated with, and we can infer things like the active developers who could
 // have signed the commit.
-func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry, error) {
+func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry, []*Annotation, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
 	// checking the parent. The first pair where the parent entry is not
 	// descended from the target commit, we return the other entry in the pair.
 
-	firstEntry, err := GetLatestNonGittufEntry(repo)
+	firstEntry, firstAnnotations, err := GetLatestNonGittufEntry(repo)
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
-			return nil, ErrNoRecordOfCommit
+			return nil, nil, ErrNoRecordOfCommit
 		}
-		return nil, err
+		return nil, nil, err
 	}
+
 	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.TargetID, commit)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !knowsCommit {
-		return nil, ErrNoRecordOfCommit
+		return nil, nil, ErrNoRecordOfCommit
 	}
 
 	for {
-		iteratorEntry, err := GetNonGittufParentForEntry(repo, firstEntry)
+		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentForEntry(repo, firstEntry)
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
-				return firstEntry, nil
+				return firstEntry, firstAnnotations, nil
 			}
-			return nil, err
+			return nil, nil, err
 		}
 
 		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.TargetID, commit)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-
 		if !knowsCommit {
-			return firstEntry, nil
+			return firstEntry, firstAnnotations, nil
 		}
 
 		firstEntry = iteratorEntry
+		firstAnnotations = iteratorAnnotations
 	}
 }
 
@@ -465,4 +538,20 @@ func parseAnnotationText(id plumbing.Hash, text string) (*Annotation, error) {
 	}
 
 	return annotation, nil
+}
+
+func filterAnnotationsForRelevantAnnotations(allAnnotations []*Annotation, entryID plumbing.Hash) []*Annotation {
+	annotations := []*Annotation{}
+	for _, annotation := range allAnnotations {
+		annotation := annotation
+		if annotation.RefersTo(entryID) {
+			annotations = append(annotations, annotation)
+		}
+	}
+
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	return annotations
 }

@@ -170,7 +170,7 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		latestEntry, err := GetLatestNonGittufEntry(repo)
+		latestEntry, _, err := GetLatestNonGittufEntry(repo)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
@@ -180,7 +180,7 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		}
 
 		// At this point, the expected entry is the same as before
-		latestEntry, err = GetLatestNonGittufEntry(repo)
+		latestEntry, _, err = GetLatestNonGittufEntry(repo)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 	})
@@ -200,7 +200,7 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = GetLatestNonGittufEntry(repo)
+		_, _, err = GetLatestNonGittufEntry(repo)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
@@ -208,7 +208,7 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = GetLatestNonGittufEntry(repo)
+		_, _, err = GetLatestNonGittufEntry(repo)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
@@ -232,7 +232,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
+	if entry, _, err := GetLatestEntryForRef(repo, "main"); err != nil {
 		t.Error(err)
 	} else {
 		assert.Equal(t, rslRef.Hash(), entry.ID)
@@ -242,7 +242,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if entry, err := GetLatestEntryForRef(repo, "main"); err != nil {
+	if entry, _, err := GetLatestEntryForRef(repo, "main"); err != nil {
 		t.Error(err)
 	} else {
 		assert.Equal(t, rslRef.Hash(), entry.ID)
@@ -274,23 +274,23 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, _, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[3], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[1], entry.ID)
 
-		_, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
@@ -327,23 +327,23 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, _, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
+		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[6], entry.ID)
 
-		_, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
@@ -492,7 +492,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentEntry, err := GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, _, err := GetNonGittufParentForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedEntry, parentEntry)
 
@@ -512,7 +512,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// The expected entry should be from before this latest gittuf addition
-		parentEntry, err = GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, _, err = GetNonGittufParentForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedEntry, parentEntry)
 	})
@@ -536,7 +536,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = GetNonGittufParentForEntry(repo, latestEntry)
+		_, _, err = GetNonGittufParentForEntry(repo, latestEntry)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
@@ -549,7 +549,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = GetNonGittufParentForEntry(repo, latestEntry)
+		_, _, err = GetNonGittufParentForEntry(repo, latestEntry)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
@@ -580,7 +580,7 @@ func TestGetFirstEntry(t *testing.T) {
 		}
 	}
 
-	testEntry, err := GetFirstEntry(repo)
+	testEntry, _, err := GetFirstEntry(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
 
@@ -590,7 +590,7 @@ func TestGetFirstEntry(t *testing.T) {
 		}
 	}
 
-	testEntry, err = GetFirstEntry(repo)
+	testEntry, _, err = GetFirstEntry(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
 }
@@ -631,7 +631,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = GetFirstEntryForCommit(repo, commit)
+		_, _, err = GetFirstEntryForCommit(repo, commit)
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
@@ -650,7 +650,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, err := GetFirstEntryForCommit(repo, commit)
+		entry, _, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
 	}
@@ -678,7 +678,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = GetFirstEntryForCommit(repo, commit)
+		_, _, err = GetFirstEntryForCommit(repo, commit)
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
@@ -693,7 +693,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, err := GetFirstEntryForCommit(repo, commit)
+		entry, _, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
 	}
@@ -707,7 +707,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, err := GetFirstEntryForCommit(repo, commit)
+		entry, _, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
 	}
@@ -733,7 +733,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, err := GetFirstEntryForCommit(repo, commit)
+		entry, _, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
 	}

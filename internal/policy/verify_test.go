@@ -73,7 +73,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	policyEntry, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	policyEntry, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
 	if err != nil {
 		t.Fatal(err)
 	}
