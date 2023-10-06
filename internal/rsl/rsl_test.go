@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const annotationMessage = "test annotation"
+
 func TestInitializeNamespace(t *testing.T) {
 	t.Run("clean repository", func(t *testing.T) {
 		repo, err := git.Init(memory.NewStorage(), memfs.New())
@@ -170,8 +172,9 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		latestEntry, _, err := GetLatestNonGittufEntry(repo)
+		latestEntry, annotations, err := GetLatestNonGittufEntry(repo)
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
 		// Add another gittuf entry
@@ -180,9 +183,20 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		}
 
 		// At this point, the expected entry is the same as before
-		latestEntry, _, err = GetLatestNonGittufEntry(repo)
+		latestEntry, annotations, err = GetLatestNonGittufEntry(repo)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+
+		// Add an annotation for latest entry, check that it's returned
+		if err := NewAnnotation([]plumbing.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, annotations, err = GetLatestNonGittufEntry(repo)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
+		assertAnnotationsReferToEntry(t, latestEntry, annotations)
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
@@ -223,7 +237,10 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	refName := "refs/heads/main"
+	otherRefName := "refs/heads/feature"
+
+	if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,21 +249,29 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if entry, _, err := GetLatestEntryForRef(repo, "main"); err != nil {
-		t.Error(err)
-	} else {
-		assert.Equal(t, rslRef.Hash(), entry.ID)
-	}
+	entry, annotations, err := GetLatestEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Nil(t, annotations)
+	assert.Equal(t, rslRef.Hash(), entry.ID)
 
-	if err := NewEntry("feature", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewEntry(otherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
-	if entry, _, err := GetLatestEntryForRef(repo, "main"); err != nil {
-		t.Error(err)
-	} else {
-		assert.Equal(t, rslRef.Hash(), entry.ID)
+	entry, annotations, err = GetLatestEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Nil(t, annotations)
+	assert.Equal(t, rslRef.Hash(), entry.ID)
+
+	// Add annotation for the target entry
+	if err := NewAnnotation([]plumbing.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
 	}
+
+	entry, annotations, err = GetLatestEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, rslRef.Hash(), entry.ID)
+	assertAnnotationsReferToEntry(t, entry, annotations)
 }
 
 func TestGetLatestEntryForRefBefore(t *testing.T) {
@@ -274,20 +299,24 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, _, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[3], entry.ID)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[1], entry.ID)
 
 		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
@@ -317,7 +346,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			}
 			entryIDs = append(entryIDs, latest.GetID())
 
-			if err := NewAnnotation([]plumbing.Hash{latest.GetID()}, false, "test annotation").Commit(repo, false); err != nil {
+			if err := NewAnnotation([]plumbing.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err = GetLatestEntry(repo)
@@ -327,21 +356,25 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, _, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		entry, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
+		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[6], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
 
 		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
@@ -442,7 +475,7 @@ func TestGetParentForEntry(t *testing.T) {
 	entryID = entry.GetID()
 
 	// Find parent for an annotation
-	if err := NewAnnotation([]plumbing.Hash{entryID}, false, "test annotation").Commit(repo, false); err != nil {
+	if err := NewAnnotation([]plumbing.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -492,8 +525,9 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentEntry, _, err := GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, annotations, err := GetNonGittufParentForEntry(repo, latestEntry)
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, expectedEntry, parentEntry)
 
 		// Add another gittuf entry and then a non gittuf entry
@@ -512,9 +546,20 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// The expected entry should be from before this latest gittuf addition
-		parentEntry, _, err = GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, annotations, err = GetNonGittufParentForEntry(repo, latestEntry)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, expectedEntry, parentEntry)
+
+		// Add annotation pertaining to the expected entry
+		if err := NewAnnotation([]plumbing.Hash{expectedEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		parentEntry, annotations, err = GetNonGittufParentForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedEntry, parentEntry)
+		assertAnnotationsReferToEntry(t, parentEntry, annotations)
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
@@ -580,19 +625,22 @@ func TestGetFirstEntry(t *testing.T) {
 		}
 	}
 
-	testEntry, _, err := GetFirstEntry(repo)
+	testEntry, annotations, err := GetFirstEntry(repo)
 	assert.Nil(t, err)
+	assert.Nil(t, annotations)
 	assert.Equal(t, firstEntry, testEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewAnnotation([]plumbing.Hash{firstEntry.ID}, false, "test annotation").Commit(repo, false); err != nil {
+		if err := NewAnnotation([]plumbing.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	testEntry, _, err = GetFirstEntry(repo)
+	testEntry, annotations, err = GetFirstEntry(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
+	assert.Equal(t, 5, len(annotations))
+	assertAnnotationsReferToEntry(t, firstEntry, annotations)
 }
 
 func TestGetFirstEntryForCommit(t *testing.T) {
@@ -650,8 +698,9 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, _, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
 	}
 
@@ -693,8 +742,9 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, _, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
 	}
 	// Searching for the feature commits should return the second entry.
@@ -707,8 +757,9 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, _, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
+		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
 	}
 
@@ -733,9 +784,65 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, _, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, latestEntryT, entry)
+	}
+
+	// Add annotation for feature entry
+	if err := NewAnnotation([]plumbing.Hash{latestEntryT.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	latestEntry := latestEntryT.(*Entry)
+	for _, commitID := range featureTargetIDs {
+		commit, err := repo.CommitObject(commitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
+		assertAnnotationsReferToEntry(t, latestEntry, annotations)
+	}
+}
+
+func TestAnnotationRefersTo(t *testing.T) {
+	// We use these as stand-ins for actual RSL IDs that have the same data type
+	emptyBlobID := gitinterface.EmptyBlob()
+	emptyTreeID := gitinterface.EmptyTree()
+
+	tests := map[string]struct {
+		annotation     *Annotation
+		entryID        plumbing.Hash
+		expectedResult bool
+	}{
+		"annotation refers to single entry, returns true": {
+			annotation:     NewAnnotation([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
+			entryID:        emptyBlobID,
+			expectedResult: true,
+		},
+		"annotation refers to multiple entries, returns true": {
+			annotation:     NewAnnotation([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			entryID:        emptyBlobID,
+			expectedResult: true,
+		},
+		"annotation refers to single entry, returns false": {
+			annotation:     NewAnnotation([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
+			entryID:        plumbing.ZeroHash,
+			expectedResult: false,
+		},
+		"annotation refers to multiple entries, returns false": {
+			annotation:     NewAnnotation([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			entryID:        plumbing.ZeroHash,
+			expectedResult: false,
+		},
+	}
+
+	for name, test := range tests {
+		result := test.annotation.RefersTo(test.entryID)
+		assert.Equal(t, test.expectedResult, result, fmt.Sprintf("unexpected result in test '%s'", name))
 	}
 }
 
@@ -926,5 +1033,14 @@ func TestParseRSLEntryMessage(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func assertAnnotationsReferToEntry(t *testing.T, entry *Entry, annotations []*Annotation) {
+	t.Helper()
+
+	for _, annotation := range annotations {
+		assert.True(t, annotation.RefersTo(entry.ID))
+		assert.Equal(t, annotationMessage, annotation.Message)
 	}
 }
