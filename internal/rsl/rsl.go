@@ -176,7 +176,6 @@ func (a Annotation) createCommitMessage() (string, error) {
 }
 
 // GetEntry returns the entry corresponding to entryID.
-// TODO: There is no information yet about the signature for the entry.
 func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 	commitObj, err := repo.CommitObject(entryID)
 	if err != nil {
@@ -187,7 +186,6 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 }
 
 // GetParentForEntry returns the entry's parent RSL entry.
-// TODO: There is no information yet about the signature for the parent entry.
 func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error) {
 	commitObj, err := repo.CommitObject(entry.GetID())
 	if err != nil {
@@ -207,7 +205,6 @@ func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error)
 
 // GetNonGittufParentForEntry returns the first RSL entry starting from the
 // specified entry's parent that is not for the gittuf namespace.
-// TODO: There is no information yet about the signature for the entry.
 func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, error) {
 	it, err := GetParentForEntry(repo, entry)
 	if err != nil {
@@ -229,7 +226,6 @@ func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, 
 }
 
 // GetLatestEntry returns the latest entry available locally in the RSL.
-// TODO: There is no information yet about the signature for the entry.
 func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
@@ -246,7 +242,6 @@ func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 
 // GetLatestNonGittufEntry returns the first RSL entry that is not for the
 // gittuf namespace.
-// TODO: There is no information yet about the signature for the entry.
 func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, error) {
 	it, err := GetLatestEntry(repo)
 	if err != nil {
@@ -269,14 +264,12 @@ func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, error) {
 
 // GetLatestEntryForRef returns the latest entry available locally in the RSL
 // for the specified refName.
-// TODO: There is no information yet about the signature for the entry.
 func GetLatestEntryForRef(repo *git.Repository, refName string) (*Entry, error) {
 	return GetLatestEntryForRefBefore(repo, refName, plumbing.ZeroHash)
 }
 
 // GetLatestEntryForRefBefore returns the latest entry available locally in the
 // RSL for the specified refName before the specified anchor.
-// TODO: There is no information yet about the signature for the entry.
 func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*Entry, error) {
 	var (
 		iteratorT EntryType
@@ -325,7 +318,6 @@ func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plu
 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
 // *Entry as the first entry in the RSL cannot be an annotation.
-// TODO: There is no information yet about the signature for the entry.
 func GetFirstEntry(repo *git.Repository) (*Entry, error) {
 	iteratorT, err := GetLatestEntry(repo)
 	if err != nil {
@@ -353,9 +345,6 @@ func GetFirstEntry(repo *git.Repository) (*Entry, error) {
 // time a commit was seen in the repository, irrespective of the ref it was
 // associated with, and we can infer things like the active developers who could
 // have signed the commit.
-// TODO: There is no information yet about the signature for the entry.
-// TODO: What if the first seen RSL entry is invalid? Should it be verified
-// against policy here? Probably not as this is strictly the RSL library.
 func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
