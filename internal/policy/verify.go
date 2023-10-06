@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -19,13 +20,19 @@ import (
 
 const (
 	nonCommitMessage                  = "cannot verify non-commit object"
+	nonTagMessage                     = "cannot verify non-tag object"
 	unableToResolveRevisionMessage    = "unable to resolve revision (must be a reference or a commit identifier)"
-	noPublicKeyMessage                = "no public key found"
+	noPublicKeyMessage                = "no public key found for Git object"
 	unableToLoadPolicyMessageFmt      = "unable to load applicable gittuf policy: %s"
 	unableToFindPolicyMessage         = "unable to find applicable gittuf policy"
 	goodSignatureMessageFmt           = "good signature from key '%s:%s'"
+	goodTagSignatureMessage           = "good signature for RSL entry and tag"
+	goodSignatureMessageForRSLEntry   = "good signature for RSL entry"
+	badSignatureMessageForRSLEntry    = "bad signature for RSL entry"
 	noSignatureMessage                = "no signature found"
 	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
+	unableToFindRSLEntryMessage       = "unable to find tag's RSL entry"
+	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
 var (
@@ -246,6 +253,70 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 	return status
 }
 
+// VerifyTag verifies the signature on the RSL entries for the specified tags.
+// In addition, each tag object's signature is also verified using the same set
+// of trusted keys. If the tag is not protected by policy, then all keys in the
+// applicable policy are used to verify the signatures.
+func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[string]string {
+	status := make(map[string]string, len(ids))
+
+	for _, id := range ids {
+		// Check if id is tag name or hash of tag obj
+		absPath, err := gitinterface.AbsoluteReference(repo, id)
+		if err == nil {
+			if !strings.HasPrefix(absPath, gitinterface.TagRefPrefix) {
+				status[id] = nonTagMessage
+				continue
+			}
+		} else {
+			if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+				status[id] = err.Error()
+				continue
+			}
+
+			// Must be a hash
+			// verifyTagEntry also finds the tag object, wasteful?
+			tagObj, err := repo.TagObject(plumbing.NewHash(id))
+			if err != nil {
+				status[id] = nonTagMessage
+				continue
+			}
+			absPath = string(plumbing.NewTagReferenceName(tagObj.Name))
+		}
+
+		entry, err := rsl.GetLatestEntryForRef(repo, absPath)
+		if err != nil {
+			status[id] = unableToFindRSLEntryMessage
+			continue
+		}
+
+		if _, err := rsl.GetLatestEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
+			status[id] = multipleTagRSLEntriesFoundMessage
+			continue
+		}
+
+		policyEntry, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, entry.ID)
+		if err != nil {
+			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
+			continue
+		}
+
+		policy, err := LoadStateForEntry(ctx, repo, policyEntry)
+		if err != nil {
+			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
+			continue
+		}
+
+		if err := verifyTagEntry(ctx, repo, policy, entry); err == nil {
+			status[id] = goodTagSignatureMessage
+		} else {
+			status[id] = err.Error()
+		}
+	}
+
+	return status
+}
+
 // VerifyNewState ensures that when a new policy is encountered, its root role
 // is signed by keys trusted in the current policy.
 func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
@@ -288,6 +359,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	// TODO: discuss how / if we want to verify RSL entry signatures for the policy namespace
 	if entry.RefName == PolicyRef {
 		return nil
+	}
+
+	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
+		return verifyTagEntry(ctx, repo, policy, entry)
 	}
 
 	var (
@@ -439,6 +514,91 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	return nil
 }
 
+func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
+	// 1. Find authorized public keys for tag's RSL entry
+	trustedKeys, err := policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName))
+	if err != nil {
+		return err
+	}
+
+	if len(trustedKeys) == 0 {
+		allKeys, err := policy.PublicKeys()
+		if err != nil {
+			return err
+		}
+
+		// FIXME: decide if we want to pass around map or slice for these APIs
+		for _, key := range allKeys {
+			trustedKeys = append(trustedKeys, key)
+		}
+	}
+
+	// 2. Find commit object for the RSL entry
+	commitObj, err := repo.CommitObject(entry.ID)
+	if err != nil {
+		return err
+	}
+
+	// 3. Use each trusted key to verify signature
+	rslEntryVerified := false
+	for _, key := range trustedKeys {
+		err := gitinterface.VerifyCommitSignature(ctx, commitObj, key)
+		if err == nil {
+			// Signature verification succeeded
+			rslEntryVerified = true
+			break
+		}
+		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			continue
+		}
+		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+			// Unexpected error
+			return err
+		}
+		// Haven't found a valid key, continue with next key
+	}
+
+	if !rslEntryVerified {
+		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
+	}
+
+	// 4. Verify tag object
+	tagObjVerified := false
+	tagObj, err := repo.TagObject(entry.TargetID)
+	if err != nil {
+		// Likely indicates the ref is not pointing to a tag object
+		// What about lightweight tags?
+		return err
+	}
+
+	if len(tagObj.PGPSignature) == 0 {
+		return fmt.Errorf(noSignatureMessage)
+	}
+
+	for _, key := range trustedKeys {
+		err := gitinterface.VerifyTagSignature(ctx, tagObj, key)
+		if err == nil {
+			// Signature verification succeeded
+			tagObjVerified = true
+			break
+		}
+		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			continue
+		}
+		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+			// Unexpected error
+			return err
+		}
+		// Haven't found a valid key, continue with next key
+	}
+
+	if !tagObjVerified {
+		return fmt.Errorf("verifying tag object's signature failed, %w", ErrUnauthorizedSignature)
+	}
+
+	return nil
+}
+
 // getCommits identifies the commits introduced to the entry's ref since the
 // last RSL entry for the same ref. These commits are then verified for file
 // policies.
@@ -455,10 +615,10 @@ func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error
 	}
 
 	if firstEntry {
-		return gitinterface.GetCommitsBetweenRange(repo, entry.CommitID, plumbing.ZeroHash)
+		return gitinterface.GetCommitsBetweenRange(repo, entry.TargetID, plumbing.ZeroHash)
 	}
 
-	return gitinterface.GetCommitsBetweenRange(repo, entry.CommitID, priorRefEntry.CommitID)
+	return gitinterface.GetCommitsBetweenRange(repo, entry.TargetID, priorRefEntry.TargetID)
 }
 
 // getChangedPaths identifies the paths of all the files changed using the
@@ -471,7 +631,7 @@ func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error
 func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 	firstEntry := false
 
-	currentCommit, err := repo.CommitObject(entry.CommitID)
+	currentCommit, err := repo.CommitObject(entry.TargetID)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +649,7 @@ func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 		return gitinterface.GetCommitFilePaths(repo, currentCommit)
 	}
 
-	priorCommit, err := repo.CommitObject(priorRefEntry.CommitID)
+	priorCommit, err := repo.CommitObject(priorRefEntry.TargetID)
 	if err != nil {
 		return nil, err
 	}

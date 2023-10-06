@@ -66,7 +66,7 @@ func TestNewEntry(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", TargetIDKey, plumbing.ZeroHash.String())
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Empty(t, commitObj.ParentHashes)
 
@@ -86,7 +86,7 @@ func TestNewEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", CommitIDKey, plumbing.NewHash("abcdef1234567890"))
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", TargetIDKey, plumbing.NewHash("abcdef1234567890"))
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Contains(t, commitObj.ParentHashes, originalRefHash)
 }
@@ -110,7 +110,7 @@ func TestGetLatestEntry(t *testing.T) {
 	} else {
 		e := entry.(*Entry)
 		assert.Equal(t, "main", e.RefName)
-		assert.Equal(t, plumbing.ZeroHash, e.CommitID)
+		assert.Equal(t, plumbing.ZeroHash, e.TargetID)
 	}
 
 	if err := NewEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
@@ -121,7 +121,7 @@ func TestGetLatestEntry(t *testing.T) {
 	} else {
 		e := entry.(*Entry)
 		assert.NotEqual(t, "main", e.RefName)
-		assert.NotEqual(t, plumbing.ZeroHash, e.CommitID)
+		assert.NotEqual(t, plumbing.ZeroHash, e.TargetID)
 	}
 
 	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
@@ -388,7 +388,7 @@ func TestGetEntry(t *testing.T) {
 	} else {
 		e := entry.(*Entry)
 		assert.Equal(t, "main", e.RefName)
-		assert.Equal(t, plumbing.ZeroHash, e.CommitID)
+		assert.Equal(t, plumbing.ZeroHash, e.TargetID)
 	}
 
 	if entry, err := GetEntry(repo, annotationID); err != nil {
@@ -615,18 +615,18 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	initialCommitIDs := []plumbing.Hash{}
+	initialTargetIDs := []plumbing.Hash{}
 	for i := 0; i < 3; i++ {
 		commitID, err := gitinterface.Commit(repo, emptyTreeHash, mainRef, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		initialCommitIDs = append(initialCommitIDs, commitID)
+		initialTargetIDs = append(initialTargetIDs, commitID)
 	}
 
 	// Right now, the RSL has no entries.
-	for _, commitID := range initialCommitIDs {
+	for _, commitID := range initialTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -635,7 +635,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
-	if err := NewEntry(mainRef, initialCommitIDs[len(initialCommitIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewEntry(mainRef, initialTargetIDs[len(initialTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -645,7 +645,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, commitID := range initialCommitIDs {
+	for _, commitID := range initialTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -658,22 +658,22 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	// Now, let's branch off from this ref and add more commits.
 	featureRef := "refs/heads/feature"
 	// First, "checkout" the feature branch.
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(featureRef), initialCommitIDs[len(initialCommitIDs)-1])); err != nil {
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(featureRef), initialTargetIDs[len(initialTargetIDs)-1])); err != nil {
 		t.Fatal(err)
 	}
 	// Next, add some new commits to this branch.
-	featureCommitIDs := []plumbing.Hash{}
+	featureTargetIDs := []plumbing.Hash{}
 	for i := 0; i < 3; i++ {
 		commitID, err := gitinterface.Commit(repo, emptyTreeHash, featureRef, "Feature commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		featureCommitIDs = append(featureCommitIDs, commitID)
+		featureTargetIDs = append(featureTargetIDs, commitID)
 	}
 
 	// The RSL hasn't seen these new commits, however.
-	for _, commitID := range featureCommitIDs {
+	for _, commitID := range featureTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -682,13 +682,13 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
-	if err := NewEntry(featureRef, featureCommitIDs[len(featureCommitIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewEntry(featureRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
 	// At this point, searching for any of the original commits' entry should
 	// return the first RSL entry.
-	for _, commitID := range initialCommitIDs {
+	for _, commitID := range initialTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -702,7 +702,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, commitID := range featureCommitIDs {
+	for _, commitID := range featureTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -717,18 +717,18 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newRef := plumbing.NewHashReference(plumbing.ReferenceName(mainRef), featureCommitIDs[len(featureCommitIDs)-1])
+	newRef := plumbing.NewHashReference(plumbing.ReferenceName(mainRef), featureTargetIDs[len(featureTargetIDs)-1])
 	if err := repo.Storer.CheckAndSetReference(newRef, oldRef); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry(mainRef, featureCommitIDs[len(featureCommitIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewEntry(mainRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
 	// Testing for any of the feature commits should return the feature branch
 	// entry, not the main branch entry.
-	for _, commitID := range featureCommitIDs {
+	for _, commitID := range featureTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
@@ -747,16 +747,16 @@ func TestEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref": {
 			entry: &Entry{
 				RefName:  "refs/heads/main",
-				CommitID: plumbing.ZeroHash,
+				TargetID: plumbing.ZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, plumbing.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
 		"entry, non-zero commit": {
 			entry: &Entry{
 				RefName:  "refs/heads/main",
-				CommitID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
+				TargetID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
 	}
 
@@ -840,21 +840,21 @@ func TestParseRSLEntryMessage(t *testing.T) {
 			expectedEntry: &Entry{
 				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
-				CommitID: plumbing.ZeroHash,
+				TargetID: plumbing.ZeroHash,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, plumbing.ZeroHash.String()),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
 		"entry, non-zero commit": {
 			expectedEntry: &Entry{
 				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
-				CommitID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
+				TargetID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", CommitIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
 		"entry, missing header": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s: %s\n%s: %s", RefKey, "refs/heads/main", CommitIDKey, plumbing.ZeroHash.String()),
+			message:       fmt.Sprintf("%s: %s\n%s: %s", RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
 		"entry, missing information": {
 			expectedError: ErrInvalidRSLEntry,

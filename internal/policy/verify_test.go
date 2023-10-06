@@ -148,6 +148,42 @@ func TestVerifyCommit(t *testing.T) {
 	assert.Equal(t, expectedStatus, status)
 }
 
+func TestVerifyTag(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+	refName := "refs/heads/main"
+
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+	entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
+	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry.ID = entryID
+
+	tagName := "v1"
+	tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+	expectedStatus := map[string]string{tagID.String(): unableToFindRSLEntryMessage}
+	status := VerifyTag(context.Background(), repo, []string{tagID.String()})
+	assert.Equal(t, expectedStatus, status)
+
+	entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+	entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry.ID = entryID
+
+	// Use tag ID
+	expectedStatus = map[string]string{tagID.String(): goodTagSignatureMessage}
+	status = VerifyTag(context.Background(), repo, []string{tagID.String()})
+	assert.Equal(t, expectedStatus, status)
+
+	// Use tagName
+	expectedStatus = map[string]string{tagName: goodTagSignatureMessage}
+	status = VerifyTag(context.Background(), repo, []string{tagName})
+	assert.Equal(t, expectedStatus, status)
+
+	// Use refs path for tagName
+	expectedStatus = map[string]string{string(plumbing.NewTagReferenceName(tagName)): goodTagSignatureMessage}
+	status = VerifyTag(context.Background(), repo, []string{string(plumbing.NewTagReferenceName(tagName))})
+	assert.Equal(t, expectedStatus, status)
+}
+
 func TestVerifyEntry(t *testing.T) {
 	// FIXME: currently this test is nearly identical to the one for VerifyRef.
 	// This is because it's not trivial to create a bunch of test policy / RSL
@@ -170,6 +206,68 @@ func TestVerifyEntry(t *testing.T) {
 	// change. This only applies to fast forwards, any other commits that make
 	// the same semantic change will result in a new commit with a new
 	// signature, unseen by the RSL.
+}
+
+func TestVerifyTagEntry(t *testing.T) {
+	t.Run("no tag specific policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, unauthorized", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicyForUnauthorizedTest)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry.ID = entryID
+
+		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
 }
 
 func TestGetCommits(t *testing.T) {

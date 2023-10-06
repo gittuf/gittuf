@@ -17,7 +17,7 @@ const (
 	Ref                        = "refs/gittuf/reference-state-log"
 	EntryHeader                = "RSL Entry"
 	RefKey                     = "ref"
-	CommitIDKey                = "commitID"
+	TargetIDKey                = "targetID"
 	AnnotationHeader           = "RSL Annotation"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
@@ -71,13 +71,13 @@ type Entry struct {
 	// RefName contains the Git reference the entry is for.
 	RefName string
 
-	// CommitID contains the Git hash for the object expected at RefName.
-	CommitID plumbing.Hash
+	// TargetID contains the Git hash for the object expected at RefName.
+	TargetID plumbing.Hash
 }
 
 // NewEntry returns an Entry object for a normal RSL entry.
-func NewEntry(refName string, commitID plumbing.Hash) *Entry {
-	return &Entry{RefName: refName, CommitID: commitID}
+func NewEntry(refName string, targetID plumbing.Hash) *Entry {
+	return &Entry{RefName: refName, TargetID: targetID}
 }
 
 func (e Entry) GetID() plumbing.Hash {
@@ -97,7 +97,7 @@ func (e Entry) createCommitMessage() (string, error) {
 		EntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", RefKey, e.RefName),
-		fmt.Sprintf("%s: %s", CommitIDKey, e.CommitID.String()),
+		fmt.Sprintf("%s: %s", TargetIDKey, e.TargetID.String()),
 	}
 	return strings.Join(lines, "\n"), nil
 }
@@ -370,7 +370,7 @@ func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry
 		}
 		return nil, err
 	}
-	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.CommitID, commit)
+	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.TargetID, commit)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +387,7 @@ func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry
 			return nil, err
 		}
 
-		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.CommitID, commit)
+		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.TargetID, commit)
 		if err != nil {
 			return nil, err
 		}
@@ -427,8 +427,8 @@ func parseEntryText(id plumbing.Hash, text string) (*Entry, error) {
 		switch strings.TrimSpace(ls[0]) {
 		case RefKey:
 			entry.RefName = strings.TrimSpace(ls[1])
-		case CommitIDKey:
-			entry.CommitID = plumbing.NewHash(strings.TrimSpace(ls[1]))
+		case TargetIDKey:
+			entry.TargetID = plumbing.NewHash(strings.TrimSpace(ls[1]))
 		}
 	}
 

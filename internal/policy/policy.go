@@ -115,7 +115,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	policyCommit, err := repo.CommitObject(entry.CommitID)
+	policyCommit, err := repo.CommitObject(entry.TargetID)
 	if err != nil {
 		return nil, err
 	}

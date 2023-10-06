@@ -51,7 +51,7 @@ func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Ent
 		rsl.EntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", rsl.RefKey, entry.RefName),
-		fmt.Sprintf("%s: %s", rsl.CommitIDKey, entry.CommitID.String()),
+		fmt.Sprintf("%s: %s", rsl.TargetIDKey, entry.TargetID.String()),
 	}
 
 	commitMessage := strings.Join(lines, "\n")
@@ -121,6 +121,39 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 	return commit
 }
 
+// SignTestTag signs the test tag using the test key stored in the repository.
+// Note that the GPG key is loaded relative to the package containing the test.
+func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag) *object.Tag {
+	t.Helper()
+
+	tagEncoded := repo.Storer.NewEncodedObject()
+	if err := tag.EncodeWithoutSignature(tagEncoded); err != nil {
+		t.Fatal(err)
+	}
+	r, err := tagEncoded.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(signingKeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig := new(strings.Builder)
+	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
+		t.Fatal(err)
+	}
+	tag.PGPSignature = sig.String()
+
+	return tag
+}
+
 // AddNTestCommitsToSpecifiedRef is a test helper that adds test commits to the
 // specified Git ref in the provided repository. Parameter `n` determines how
 // many commits are added. Each commit is associated with a distinct tree. The
@@ -186,4 +219,23 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	}
 
 	return commitIDs
+}
+
+func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, target plumbing.Hash) plumbing.Hash {
+	t.Helper()
+
+	targetObj, err := repo.Object(plumbing.AnyObject, target)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagMessage := fmt.Sprintf("%s\n", tagName)
+	tag := gitinterface.CreateTagObject(testGitConfig, targetObj, tagName, tagMessage, testClock)
+	tag = SignTestTag(t, repo, tag)
+	tagHash, err := gitinterface.ApplyTag(repo, tag)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return tagHash
 }

@@ -172,7 +172,7 @@ func TestStateCommit(t *testing.T) {
 		t.Error(err)
 	}
 	entry := tmpEntry.(*rsl.Entry)
-	assert.Equal(t, entry.CommitID, policyRef.Hash())
+	assert.Equal(t, entry.TargetID, policyRef.Hash())
 }
 
 func TestStateGetRootMetadata(t *testing.T) {

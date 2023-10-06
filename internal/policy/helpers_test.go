@@ -2,9 +2,9 @@ package policy
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
+
+	_ "embed"
 
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -18,6 +18,15 @@ import (
 )
 
 var testCtx = context.Background()
+
+//go:embed test-data/root
+var rootKeyBytes []byte
+
+//go:embed test-data/root.pub
+var rootPubKeyBytes []byte
+
+//go:embed test-data/gpg-pubkey.asc
+var gpgPubKeyBytes []byte
 
 func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*git.Repository, *State) {
 	t.Helper()
@@ -46,20 +55,12 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,20 +86,12 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,11 +109,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,4 +140,72 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		DelegationEnvelopes: map[string]*sslibdsse.Envelope{}, // FIXME: this isn't the best fix. Instead, LoadState* methods should set this to nil when no delegated roles exist.
 		RootPublicKeys:      []*tuf.Key{key},
 	}
+}
+
+func createTestStateWithTagPolicy(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-tags", []*tuf.Key{gpgKey}, []string{"git:refs/tags/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	return state
+}
+
+func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	rootKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-tags", []*tuf.Key{rootKey}, []string{"git:refs/tags/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	return state
 }
