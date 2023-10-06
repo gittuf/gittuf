@@ -80,19 +80,19 @@ func NewEntry(refName string, targetID plumbing.Hash) *Entry {
 	return &Entry{RefName: refName, TargetID: targetID}
 }
 
-func (e Entry) GetID() plumbing.Hash {
+func (e *Entry) GetID() plumbing.Hash {
 	return e.ID
 }
 
 // Commit creates a commit object in the RSL for the Entry.
-func (e Entry) Commit(repo *git.Repository, sign bool) error {
+func (e *Entry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
 	_, err := gitinterface.Commit(repo, gitinterface.EmptyTree(), Ref, message, sign)
 	return err
 }
 
-func (e Entry) createCommitMessage() (string, error) {
+func (e *Entry) createCommitMessage() (string, error) {
 	lines := []string{
 		EntryHeader,
 		"",
@@ -122,12 +122,12 @@ func NewAnnotation(rslEntryIDs []plumbing.Hash, skip bool, message string) *Anno
 	return &Annotation{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
 }
 
-func (a Annotation) GetID() plumbing.Hash {
+func (a *Annotation) GetID() plumbing.Hash {
 	return a.ID
 }
 
 // Commit creates a commit object in the RSL for the Annotation.
-func (a Annotation) Commit(repo *git.Repository, sign bool) error {
+func (a *Annotation) Commit(repo *git.Repository, sign bool) error {
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
 		if _, err := GetEntry(repo, id); err != nil {
@@ -144,7 +144,7 @@ func (a Annotation) Commit(repo *git.Repository, sign bool) error {
 	return err
 }
 
-func (a Annotation) createCommitMessage() (string, error) {
+func (a *Annotation) createCommitMessage() (string, error) {
 	lines := []string{
 		AnnotationHeader,
 		"",
