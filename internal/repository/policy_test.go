@@ -56,7 +56,7 @@ func TestPushPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
 		}
 

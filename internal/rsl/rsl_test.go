@@ -48,7 +48,7 @@ func TestInitializeNamespace(t *testing.T) {
 	})
 }
 
-func TestNewEntry(t *testing.T) {
+func TestNewReferenceEntry(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestNewEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -70,11 +70,11 @@ func TestNewEntry(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", TargetIDKey, plumbing.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "main", TargetIDKey, plumbing.ZeroHash.String())
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Empty(t, commitObj.ParentHashes)
 
-	if err := NewEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -90,7 +90,7 @@ func TestNewEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "main", TargetIDKey, plumbing.NewHash("abcdef1234567890"))
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "main", TargetIDKey, plumbing.NewHash("abcdef1234567890"))
 	assert.Equal(t, expectedMessage, commitObj.Message)
 	assert.Contains(t, commitObj.ParentHashes, originalRefHash)
 }
@@ -105,25 +105,25 @@ func TestGetLatestEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
 	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
-		e := entry.(*Entry)
+		e := entry.(*ReferenceEntry)
 		assert.Equal(t, "main", e.RefName)
 		assert.Equal(t, plumbing.ZeroHash, e.TargetID)
 	}
 
-	if err := NewEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("feature", plumbing.NewHash("abcdef1234567890")).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
-		e := entry.(*Entry)
+		e := entry.(*ReferenceEntry)
 		assert.NotEqual(t, "main", e.RefName)
 		assert.NotEqual(t, plumbing.ZeroHash, e.TargetID)
 	}
@@ -134,21 +134,21 @@ func TestGetLatestEntry(t *testing.T) {
 	}
 	entryID := ref.Hash()
 
-	if err := NewAnnotation([]plumbing.Hash{entryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{entryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
 	if entry, err := GetLatestEntry(repo); err != nil {
 		t.Error(err)
 	} else {
-		a := entry.(*Annotation)
+		a := entry.(*AnnotationEntry)
 		assert.True(t, a.Skip)
 		assert.Equal(t, []plumbing.Hash{entryID}, a.RSLEntryIDs)
 		assert.Equal(t, "This was a mistaken push!", a.Message)
 	}
 }
 
-func TestGetLatestNonGittufEntry(t *testing.T) {
+func TestGetLatestNonGittufReferenceEntry(t *testing.T) {
 	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
 		repo, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -160,12 +160,12 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		}
 
 		// Add the first gittuf entry
-		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// Add non gittuf entries
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -174,31 +174,31 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		latestEntry, annotations, err := GetLatestNonGittufEntry(repo)
+		latestEntry, annotations, err := GetLatestNonGittufReferenceEntry(repo)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
 		// Add another gittuf entry
-		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// At this point, the expected entry is the same as before
-		latestEntry, annotations, err = GetLatestNonGittufEntry(repo)
+		latestEntry, annotations, err = GetLatestNonGittufReferenceEntry(repo)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
 		// Add an annotation for latest entry, check that it's returned
-		if err := NewAnnotation([]plumbing.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]plumbing.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		latestEntry, annotations, err = GetLatestNonGittufEntry(repo)
+		latestEntry, annotations, err = GetLatestNonGittufReferenceEntry(repo)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedLatestEntry, latestEntry)
-		assertAnnotationsReferToEntry(t, latestEntry, annotations)
+		assertAnnotationEntrysReferToEntry(t, latestEntry, annotations)
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
@@ -212,24 +212,24 @@ func TestGetLatestNonGittufEntry(t *testing.T) {
 		}
 
 		// Add the first gittuf entry
-		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		_, _, err = GetLatestNonGittufEntry(repo)
+		_, _, err = GetLatestNonGittufReferenceEntry(repo)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
-		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		_, _, err = GetLatestNonGittufEntry(repo)
+		_, _, err = GetLatestNonGittufReferenceEntry(repo)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
 
-func TestGetLatestEntryForRef(t *testing.T) {
+func TestGetLatestReferenceEntryForRef(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestGetLatestEntryForRef(t *testing.T) {
 	refName := "refs/heads/main"
 	otherRefName := "refs/heads/feature"
 
-	if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -251,32 +251,32 @@ func TestGetLatestEntryForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry, annotations, err := GetLatestEntryForRef(repo, refName)
+	entry, annotations, err := GetLatestReferenceEntryForRef(repo, refName)
 	assert.Nil(t, err)
 	assert.Nil(t, annotations)
 	assert.Equal(t, rslRef.Hash(), entry.ID)
 
-	if err := NewEntry(otherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(otherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
-	entry, annotations, err = GetLatestEntryForRef(repo, refName)
+	entry, annotations, err = GetLatestReferenceEntryForRef(repo, refName)
 	assert.Nil(t, err)
 	assert.Nil(t, annotations)
 	assert.Equal(t, rslRef.Hash(), entry.ID)
 
 	// Add annotation for the target entry
-	if err := NewAnnotation([]plumbing.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
-	entry, annotations, err = GetLatestEntryForRef(repo, refName)
+	entry, annotations, err = GetLatestReferenceEntryForRef(repo, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, rslRef.Hash(), entry.ID)
-	assertAnnotationsReferToEntry(t, entry, annotations)
+	assertAnnotationEntrysReferToEntry(t, entry, annotations)
 }
 
-func TestGetLatestEntryForRefBefore(t *testing.T) {
+func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 	t.Run("no annotations", func(t *testing.T) {
 		repo, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -291,7 +291,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []plumbing.Hash{}
 		for _, ref := range testRefs {
-			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -301,27 +301,27 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, annotations, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[4])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[3], entry.ID)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[1], entry.ID)
 
-		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
@@ -339,7 +339,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []plumbing.Hash{}
 		for _, ref := range testRefs {
-			if err := NewEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, plumbing.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -348,7 +348,7 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			}
 			entryIDs = append(entryIDs, latest.GetID())
 
-			if err := NewAnnotation([]plumbing.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			if err := NewAnnotationEntry([]plumbing.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err = GetLatestEntry(repo)
@@ -358,27 +358,27 @@ func TestGetLatestEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, annotations, err := GetLatestEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[4])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
-		assertAnnotationsReferToEntry(t, entry, annotations)
+		assertAnnotationEntrysReferToEntry(t, entry, annotations)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[3])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
-		assertAnnotationsReferToEntry(t, entry, annotations)
+		assertAnnotationEntrysReferToEntry(t, entry, annotations)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[6])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[6])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
-		assertAnnotationsReferToEntry(t, entry, annotations)
+		assertAnnotationEntrysReferToEntry(t, entry, annotations)
 
-		entry, annotations, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[7])
+		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[7])
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[6], entry.ID)
-		assertAnnotationsReferToEntry(t, entry, annotations)
+		assertAnnotationEntrysReferToEntry(t, entry, annotations)
 
-		_, _, err = GetLatestEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
@@ -392,7 +392,7 @@ func TestGetEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -403,7 +403,7 @@ func TestGetEntry(t *testing.T) {
 
 	initialEntryID := ref.Hash()
 
-	if err := NewAnnotation([]plumbing.Hash{initialEntryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{initialEntryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -414,14 +414,14 @@ func TestGetEntry(t *testing.T) {
 
 	annotationID := ref.Hash()
 
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
 	if entry, err := GetEntry(repo, initialEntryID); err != nil {
 		t.Error(err)
 	} else {
-		e := entry.(*Entry)
+		e := entry.(*ReferenceEntry)
 		assert.Equal(t, "main", e.RefName)
 		assert.Equal(t, plumbing.ZeroHash, e.TargetID)
 	}
@@ -429,7 +429,7 @@ func TestGetEntry(t *testing.T) {
 	if entry, err := GetEntry(repo, annotationID); err != nil {
 		t.Error(err)
 	} else {
-		a := entry.(*Annotation)
+		a := entry.(*AnnotationEntry)
 		assert.True(t, a.Skip)
 		assert.Equal(t, []plumbing.Hash{initialEntryID}, a.RSLEntryIDs)
 		assert.Equal(t, "This was a mistaken push!", a.Message)
@@ -447,7 +447,7 @@ func TestGetParentForEntry(t *testing.T) {
 	}
 
 	// Assert no parent for first entry
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -461,7 +461,7 @@ func TestGetParentForEntry(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 	// Find parent for an entry
-	if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -477,7 +477,7 @@ func TestGetParentForEntry(t *testing.T) {
 	entryID = entry.GetID()
 
 	// Find parent for an annotation
-	if err := NewAnnotation([]plumbing.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -491,7 +491,7 @@ func TestGetParentForEntry(t *testing.T) {
 	assert.Equal(t, entryID, parentEntry.GetID())
 }
 
-func TestGetNonGittufParentForEntry(t *testing.T) {
+func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
 	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
 		repo, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -503,12 +503,12 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// Add the first gittuf entry
-		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// Add non gittuf entry
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -518,7 +518,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// Add non gittuf entry
-		if err := NewEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -527,7 +527,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		parentEntry, annotations, err := GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, annotations, err := GetNonGittufParentReferenceEntryForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, expectedEntry, parentEntry)
@@ -535,10 +535,10 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		// Add another gittuf entry and then a non gittuf entry
 		expectedEntry = latestEntry
 
-		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := NewEntry("refs/gittuf/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -548,20 +548,20 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// The expected entry should be from before this latest gittuf addition
-		parentEntry, annotations, err = GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, annotations, err = GetNonGittufParentReferenceEntryForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, expectedEntry, parentEntry)
 
 		// Add annotation pertaining to the expected entry
-		if err := NewAnnotation([]plumbing.Hash{expectedEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]plumbing.Hash{expectedEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		parentEntry, annotations, err = GetNonGittufParentForEntry(repo, latestEntry)
+		parentEntry, annotations, err = GetNonGittufParentReferenceEntryForEntry(repo, latestEntry)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedEntry, parentEntry)
-		assertAnnotationsReferToEntry(t, parentEntry, annotations)
+		assertAnnotationEntrysReferToEntry(t, parentEntry, annotations)
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
@@ -575,7 +575,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		}
 
 		// Add the first gittuf entry
-		if err := NewEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -583,11 +583,11 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, _, err = GetNonGittufParentForEntry(repo, latestEntry)
+		_, _, err = GetNonGittufParentReferenceEntryForEntry(repo, latestEntry)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
-		if err := NewEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -596,7 +596,7 @@ func TestGetNonGittufParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, _, err = GetNonGittufParentForEntry(repo, latestEntry)
+		_, _, err = GetNonGittufParentReferenceEntryForEntry(repo, latestEntry)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
@@ -611,7 +611,7 @@ func TestGetFirstEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -619,10 +619,10 @@ func TestGetFirstEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstEntry := firstEntryT.(*Entry)
+	firstEntry := firstEntryT.(*ReferenceEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -633,7 +633,7 @@ func TestGetFirstEntry(t *testing.T) {
 	assert.Equal(t, firstEntry, testEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewAnnotation([]plumbing.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]plumbing.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -642,10 +642,10 @@ func TestGetFirstEntry(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
 	assert.Equal(t, 5, len(annotations))
-	assertAnnotationsReferToEntry(t, firstEntry, annotations)
+	assertAnnotationEntrysReferToEntry(t, firstEntry, annotations)
 }
 
-func TestGetFirstEntryForCommit(t *testing.T) {
+func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
@@ -681,11 +681,11 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, _, err = GetFirstEntryForCommit(repo, commit)
+		_, _, err = GetFirstReferenceEntryForCommit(repo, commit)
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
-	if err := NewEntry(mainRef, initialTargetIDs[len(initialTargetIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(mainRef, initialTargetIDs[len(initialTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -700,7 +700,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstReferenceEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
@@ -729,11 +729,11 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, _, err = GetFirstEntryForCommit(repo, commit)
+		_, _, err = GetFirstReferenceEntryForCommit(repo, commit)
 		assert.ErrorIs(t, err, ErrNoRecordOfCommit)
 	}
 
-	if err := NewEntry(featureRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(featureRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -744,7 +744,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstReferenceEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
@@ -759,7 +759,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstReferenceEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
@@ -775,7 +775,7 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewEntry(mainRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(mainRef, featureTargetIDs[len(featureTargetIDs)-1]).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -786,35 +786,35 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstReferenceEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, latestEntryT, entry)
 	}
 
 	// Add annotation for feature entry
-	if err := NewAnnotation([]plumbing.Hash{latestEntryT.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{latestEntryT.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
-	latestEntry := latestEntryT.(*Entry)
+	latestEntry := latestEntryT.(*ReferenceEntry)
 	for _, commitID := range featureTargetIDs {
 		commit, err := repo.CommitObject(commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err := GetFirstEntryForCommit(repo, commit)
+		entry, annotations, err := GetFirstReferenceEntryForCommit(repo, commit)
 		assert.Nil(t, err)
 		assert.Equal(t, latestEntryT, entry)
-		assertAnnotationsReferToEntry(t, latestEntry, annotations)
+		assertAnnotationEntrysReferToEntry(t, latestEntry, annotations)
 	}
 }
 
-func TestGetEntriesInRange(t *testing.T) {
+func TestGetReferenceEntriesInRange(t *testing.T) {
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
-	// We add a mix of standard entries and annotations, establishing expected
+	// We add a mix of reference entries and annotations, establishing expected
 	// return values as we go along
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
@@ -825,12 +825,12 @@ func TestGetEntriesInRange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEntries := []*Entry{}
-	expectedAnnotationMap := map[plumbing.Hash][]*Annotation{}
+	expectedEntries := []*ReferenceEntry{}
+	expectedAnnotationMap := map[plumbing.Hash][]*AnnotationEntry{}
 
 	// Add some entries to main
 	for i := 0; i < 3; i++ {
-		if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -839,12 +839,12 @@ func TestGetEntriesInRange(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedEntries = append(expectedEntries, entry.(*Entry))
+		expectedEntries = append(expectedEntries, entry.(*ReferenceEntry))
 	}
 
 	// Add some annotations
 	for i := 0; i < 3; i++ {
-		if err := NewAnnotation([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -852,41 +852,41 @@ func TestGetEntriesInRange(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedAnnotationMap[expectedEntries[i].ID] = []*Annotation{annotation.(*Annotation)}
+		expectedAnnotationMap[expectedEntries[i].ID] = []*AnnotationEntry{annotation.(*AnnotationEntry)}
 	}
 
 	// Each entry has one annotation
-	entries, annotationMap, err := GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	entries, annotationMap, err := GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an entry and annotation for feature branch
-	if err := NewEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err := GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
-	if err := NewAnnotation([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	expectedEntries = append(expectedEntries, latestEntry.(*ReferenceEntry))
+	if err := NewAnnotationEntry([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedAnnotationMap[expectedEntries[len(expectedEntries)-1].ID] = []*Annotation{latestEntry.(*Annotation)}
+	expectedAnnotationMap[expectedEntries[len(expectedEntries)-1].ID] = []*AnnotationEntry{latestEntry.(*AnnotationEntry)}
 
 	// Expected values include the feature branch entry and annotation
-	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an annotation that refers to two valid entries
-	if err := NewAnnotation([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -894,36 +894,36 @@ func TestGetEntriesInRange(t *testing.T) {
 		t.Fatal(err)
 	}
 	// This annotation is relevant to both entries
-	annotation := latestEntry.(*Annotation)
+	annotation := latestEntry.(*AnnotationEntry)
 	expectedAnnotationMap[expectedEntries[0].ID] = append(expectedAnnotationMap[expectedEntries[0].ID], annotation)
 	expectedAnnotationMap[expectedEntries[1].ID] = append(expectedAnnotationMap[expectedEntries[1].ID], annotation)
 
-	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add a gittuf namespace entry and ensure it's returned as relevant
-	if err := NewEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
+	expectedEntries = append(expectedEntries, latestEntry.(*ReferenceEntry))
 
-	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 }
 
-func TestGetEntriesInRangeForRef(t *testing.T) {
+func TestGetReferenceEntriesInRangeForRef(t *testing.T) {
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
-	// We add a mix of standard entries and annotations, establishing expected
+	// We add a mix of reference entries and annotations, establishing expected
 	// return values as we go along
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
@@ -934,12 +934,12 @@ func TestGetEntriesInRangeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedEntries := []*Entry{}
-	expectedAnnotationMap := map[plumbing.Hash][]*Annotation{}
+	expectedEntries := []*ReferenceEntry{}
+	expectedAnnotationMap := map[plumbing.Hash][]*AnnotationEntry{}
 
 	// Add some entries to main
 	for i := 0; i < 3; i++ {
-		if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -948,12 +948,12 @@ func TestGetEntriesInRangeForRef(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedEntries = append(expectedEntries, entry.(*Entry))
+		expectedEntries = append(expectedEntries, entry.(*ReferenceEntry))
 	}
 
 	// Add some annotations
 	for i := 0; i < 3; i++ {
-		if err := NewAnnotation([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -961,35 +961,35 @@ func TestGetEntriesInRangeForRef(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedAnnotationMap[expectedEntries[i].ID] = []*Annotation{annotation.(*Annotation)}
+		expectedAnnotationMap[expectedEntries[i].ID] = []*AnnotationEntry{annotation.(*AnnotationEntry)}
 	}
 
 	// Each entry has one annotation
-	entries, annotationMap, err := GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	entries, annotationMap, err := GetReferenceEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an entry and annotation for feature branch
-	if err := NewEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err := GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := NewAnnotation([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
 	// Expected values do not change
-	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	entries, annotationMap, err = GetReferenceEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an annotation that refers to two valid entries
-	if err := NewAnnotation([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -997,58 +997,58 @@ func TestGetEntriesInRangeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	// This annotation is relevant to both entries
-	annotation := latestEntry.(*Annotation)
+	annotation := latestEntry.(*AnnotationEntry)
 	expectedAnnotationMap[expectedEntries[0].ID] = append(expectedAnnotationMap[expectedEntries[0].ID], annotation)
 	expectedAnnotationMap[expectedEntries[1].ID] = append(expectedAnnotationMap[expectedEntries[1].ID], annotation)
 
-	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	entries, annotationMap, err = GetReferenceEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add a gittuf namespace entry and ensure it's returned as relevant
-	if err := NewEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
+	expectedEntries = append(expectedEntries, latestEntry.(*ReferenceEntry))
 
-	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	entries, annotationMap, err = GetReferenceEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 }
 
-func TestAnnotationRefersTo(t *testing.T) {
+func TestAnnotationEntryRefersTo(t *testing.T) {
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	emptyBlobID := gitinterface.EmptyBlob()
 	emptyTreeID := gitinterface.EmptyTree()
 
 	tests := map[string]struct {
-		annotation     *Annotation
+		annotation     *AnnotationEntry
 		entryID        plumbing.Hash
 		expectedResult bool
 	}{
 		"annotation refers to single entry, returns true": {
-			annotation:     NewAnnotation([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
 			entryID:        emptyBlobID,
 			expectedResult: true,
 		},
 		"annotation refers to multiple entries, returns true": {
-			annotation:     NewAnnotation([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
 			entryID:        emptyBlobID,
 			expectedResult: true,
 		},
 		"annotation refers to single entry, returns false": {
-			annotation:     NewAnnotation([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]plumbing.Hash{emptyBlobID}, false, annotationMessage),
 			entryID:        plumbing.ZeroHash,
 			expectedResult: false,
 		},
 		"annotation refers to multiple entries, returns false": {
-			annotation:     NewAnnotation([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]plumbing.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
 			entryID:        plumbing.ZeroHash,
 			expectedResult: false,
 		},
@@ -1060,24 +1060,24 @@ func TestAnnotationRefersTo(t *testing.T) {
 	}
 }
 
-func TestEntryCreateCommitMessage(t *testing.T) {
+func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 	tests := map[string]struct {
-		entry           *Entry
+		entry           *ReferenceEntry
 		expectedMessage string
 	}{
 		"entry, fully resolved ref": {
-			entry: &Entry{
+			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
 				TargetID: plumbing.ZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
 		"entry, non-zero commit": {
-			entry: &Entry{
+			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
 				TargetID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
 	}
 
@@ -1091,50 +1091,50 @@ func TestEntryCreateCommitMessage(t *testing.T) {
 	}
 }
 
-func TestAnnotationCreateCommitMessage(t *testing.T) {
+func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 	tests := map[string]struct {
-		entry           *Annotation
+		entry           *AnnotationEntry
 		expectedMessage string
 	}{
 		"annotation, no message": {
-			entry: &Annotation{
+			entry: &AnnotationEntry{
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true"),
 		},
 		"annotation, with message": {
-			entry: &Annotation{
+			entry: &AnnotationEntry{
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, with multi-line message": {
-			entry: &Annotation{
+			entry: &AnnotationEntry{
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
 		},
 		"annotation, no message, skip false": {
-			entry: &Annotation{
+			entry: &AnnotationEntry{
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
-			entry: &Annotation{
+			entry: &AnnotationEntry{
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash, plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
 		},
 	}
 
@@ -1151,27 +1151,27 @@ func TestAnnotationCreateCommitMessage(t *testing.T) {
 	}
 }
 
-func TestParseRSLEntryMessage(t *testing.T) {
+func TestParseRSLEntryText(t *testing.T) {
 	tests := map[string]struct {
-		expectedEntry EntryType
+		expectedEntry Entry
 		expectedError error
 		message       string
 	}{
 		"entry, fully resolved ref": {
-			expectedEntry: &Entry{
+			expectedEntry: &ReferenceEntry{
 				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
 				TargetID: plumbing.ZeroHash,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
 		"entry, non-zero commit": {
-			expectedEntry: &Entry{
+			expectedEntry: &ReferenceEntry{
 				ID:       plumbing.ZeroHash,
 				RefName:  "refs/heads/main",
 				TargetID: plumbing.NewHash("abcdef12345678900987654321fedcbaabcdef12"),
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", EntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
 		"entry, missing header": {
 			expectedError: ErrInvalidRSLEntry,
@@ -1179,52 +1179,52 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"entry, missing information": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s\n\n%s: %s", EntryHeader, RefKey, "refs/heads/main"),
+			message:       fmt.Sprintf("%s\n\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main"),
 		},
 		"annotation, no message": {
-			expectedEntry: &Annotation{
+			expectedEntry: &AnnotationEntry{
 				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true"),
 		},
 		"annotation, with message": {
-			expectedEntry: &Annotation{
+			expectedEntry: &AnnotationEntry{
 				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, with multi-line message": {
-			expectedEntry: &Annotation{
+			expectedEntry: &AnnotationEntry{
 				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
 		},
 		"annotation, no message, skip false": {
-			expectedEntry: &Annotation{
+			expectedEntry: &AnnotationEntry{
 				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
-			expectedEntry: &Annotation{
+			expectedEntry: &AnnotationEntry{
 				ID:          plumbing.ZeroHash,
 				RSLEntryIDs: []plumbing.Hash{plumbing.ZeroHash, plumbing.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String(), EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String(), EntryIDKey, plumbing.ZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, missing header": {
 			expectedError: ErrInvalidRSLEntry,
@@ -1232,7 +1232,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 		},
 		"annotation, missing information": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationHeader, EntryIDKey, plumbing.ZeroHash.String()),
+			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationEntryHeader, EntryIDKey, plumbing.ZeroHash.String()),
 		},
 	}
 
@@ -1250,7 +1250,7 @@ func TestParseRSLEntryMessage(t *testing.T) {
 	}
 }
 
-func assertAnnotationsReferToEntry(t *testing.T, entry *Entry, annotations []*Annotation) {
+func assertAnnotationEntrysReferToEntry(t *testing.T, entry *ReferenceEntry, annotations []*AnnotationEntry) {
 	t.Helper()
 
 	for _, annotation := range annotations {

@@ -22,8 +22,8 @@ func TestVerifyRef(t *testing.T) {
 	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1)
-	entry := rsl.NewEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLEntryCommit(t, repo.r, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry)
 	entry.ID = entryID
 
 	tests := map[string]struct {

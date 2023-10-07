@@ -35,7 +35,7 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
-	return rsl.NewEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
+	return rsl.NewReferenceEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
 }
 
 // RecordRSLEntryForReferenceAtCommit is a special version of
@@ -70,7 +70,7 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
-	return rsl.NewEntry(absRefName, plumbing.NewHash(commitID)).Commit(r.r, signCommit)
+	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(commitID)).Commit(r.r, signCommit)
 }
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
@@ -84,7 +84,7 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refNames of the rslEntryIDs.
 
-	return rsl.NewAnnotation(rslEntryHashes, skip, message).Commit(r.r, signCommit)
+	return rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit)
 }
 
 // CheckRemoteRSLForUpdates checks if the RSL at the specified remote remote
