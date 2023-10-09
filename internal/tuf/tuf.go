@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package tuf
 
 // This package defines gittuf's take on TUF metadata. There are some minor

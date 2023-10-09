@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package persistent
 
 import "github.com/spf13/cobra"
