@@ -462,6 +462,111 @@ func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry
 	}
 }
 
+// GetEntriesInRange returns a list of standard entries between the specified
+// range and a map of annotations that refer to each standard entry in the
+// range. The annotations map is keyed by the ID of the standard entry, with the
+// value being a list of annotations that apply to that standard entry.
+func GetEntriesInRange(repo *git.Repository, firstID, lastID plumbing.Hash) ([]*Entry, map[plumbing.Hash][]*Annotation, error) {
+	return GetEntriesInRangeForRef(repo, firstID, lastID, "")
+}
+
+// GetEntriesInRangeForRef returns a list of standard entries for the ref
+// between the specified range and a map of annotations that refer to each
+// standard entry in the range. The annotations map is keyed by the ID of the
+// standard entry, with the value being a list of annotations that apply to that
+// standard entry.
+func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash, refName string) ([]*Entry, map[plumbing.Hash][]*Annotation, error) {
+	// We have to iterate from latest to get the annotations that refer to the
+	// last requested entry
+	iterator, err := GetLatestEntry(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allAnnotations := []*Annotation{}
+	for iterator.GetID() != lastID {
+		// Until we find the entry corresponding to lastID, we just store
+		// annotations
+		if annotation, isAnnotation := iterator.(*Annotation); isAnnotation {
+			allAnnotations = append(allAnnotations, annotation)
+		}
+
+		parent, err := GetParentForEntry(repo, iterator)
+		if err != nil {
+			return nil, nil, err
+		}
+		iterator = parent
+	}
+
+	entryStack := []*Entry{}
+	inRange := map[plumbing.Hash]bool{}
+	for iterator.GetID() != firstID {
+		// Here, all items are relevant until the one corresponding to first is
+		// found
+		switch it := iterator.(type) {
+		case *Entry:
+			if len(refName) == 0 || it.RefName == refName || strings.HasPrefix(it.RefName, GittufNamespacePrefix) {
+				// It's a relevant entry if:
+				// a) there's no refName set, or
+				// b) the entry's refName matches the set refName, or
+				// c) the entry is for a gittuf namespace
+				entryStack = append(entryStack, it)
+				inRange[it.ID] = true
+			}
+		case *Annotation:
+			allAnnotations = append(allAnnotations, it)
+		}
+
+		parent, err := GetParentForEntry(repo, iterator)
+		if err != nil {
+			return nil, nil, err
+		}
+		iterator = parent
+	}
+
+	// Handle the item corresponding to first explicitly
+	// If it's an annotation, ignore it as it refers to something before the
+	// range we care about
+	if entry, isEntry := iterator.(*Entry); isEntry {
+		if len(refName) == 0 || entry.RefName == refName || strings.HasPrefix(entry.RefName, GittufNamespacePrefix) {
+			// It's a relevant entry if:
+			// a) there's no refName set, or
+			// b) the entry's refName matches the set refName, or
+			// c) the entry is for a gittuf namespace
+			entryStack = append(entryStack, entry)
+			inRange[entry.ID] = true
+		}
+	}
+
+	// For each annotation, add the entry to each relevant entry it refers to
+	// Process annotations in reverse order so that annotations are listed in
+	// order of occurrence in the map
+	annotationMap := map[plumbing.Hash][]*Annotation{}
+	for i := len(allAnnotations) - 1; i >= 0; i-- {
+		annotation := allAnnotations[i]
+		for _, entryID := range annotation.RSLEntryIDs {
+			if _, relevant := inRange[entryID]; relevant {
+				// Annotation is relevant because the entry it refers to was in
+				// the specified range
+				if _, exists := annotationMap[entryID]; !exists {
+					annotationMap[entryID] = []*Annotation{}
+				}
+
+				annotationMap[entryID] = append(annotationMap[entryID], annotation)
+			}
+		}
+	}
+
+	// Reverse entryStack so that it's in order of occurrence rather than in
+	// order of walking back the RSL
+	allEntries := make([]*Entry, 0, len(entryStack))
+	for i := len(entryStack) - 1; i >= 0; i-- {
+		allEntries = append(allEntries, entryStack[i])
+	}
+
+	return allEntries, annotationMap, nil
+}
+
 func parseRSLEntryText(id plumbing.Hash, text string) (EntryType, error) {
 	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, AnnotationHeader) {

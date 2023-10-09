@@ -85,9 +85,8 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) err
 //
 // TODO: should the policy entry be inferred from the specified first entry?
 func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry *rsl.Entry, firstEntry *rsl.Entry, lastEntry *rsl.Entry, target string) error {
-	entryStack := []*rsl.Entry{lastEntry}
-
 	var currentPolicy *State
+
 	// 1. Load policy applicable at firstEntry
 	state, err := LoadStateForEntry(ctx, repo, initialPolicyEntry)
 	if err != nil {
@@ -96,36 +95,13 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	currentPolicy = state
 
 	// 2. Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
-	iteratorEntry := lastEntry
-	for {
-		if iteratorEntry.GetID() == firstEntry.ID {
-			break
-		}
-
-		parentEntryTmp, err := rsl.GetParentForEntry(repo, iteratorEntry)
-		if err != nil {
-			return err
-		}
-		parentEntry := parentEntryTmp.(*rsl.Entry) // TODO: handle annotations
-
-		if parentEntry.RefName == target || parentEntry.RefName == PolicyRef {
-			entryStack = append(entryStack, parentEntry)
-		}
-
-		iteratorEntry = parentEntry
+	entries, _, err := rsl.GetEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
+	if err != nil {
+		return err
 	}
 
-	// entryStack has a list of RSL entries in reverse order
-	entryQueue := make([]*rsl.Entry, 0, len(entryStack))
-	for j := len(entryStack) - 1; j >= 0; j-- {
-		// We reverse the entries so that they are chronologically sorted. If we
-		// process them in the reverse order, we have to go past each entry
-		// anyway to find the last policy entry to use. It also makes the entry
-		// processing easier to reason about.
-		entryQueue = append(entryQueue, entryStack[j])
-	}
-
-	for _, entry := range entryQueue {
+	// 3. Verify each entry
+	for _, entry := range entries {
 		// FIXME: we're not verifying policy RSL entry signatures because we
 		// need to establish how to fetch that info. An additional blocker is
 		// for managing special keys like root and targets keys. RSL entry

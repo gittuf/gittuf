@@ -808,6 +808,218 @@ func TestGetFirstEntryForCommit(t *testing.T) {
 	}
 }
 
+func TestGetEntriesInRange(t *testing.T) {
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+
+	// We add a mix of standard entries and annotations, establishing expected
+	// return values as we go along
+
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEntries := []*Entry{}
+	expectedAnnotationMap := map[plumbing.Hash][]*Annotation{}
+
+	// Add some entries to main
+	for i := 0; i < 3; i++ {
+		if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// We run GetLatestEntry so that the entry has its ID set as well
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedEntries = append(expectedEntries, entry.(*Entry))
+	}
+
+	// Add some annotations
+	for i := 0; i < 3; i++ {
+		if err := NewAnnotation([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		annotation, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedAnnotationMap[expectedEntries[i].ID] = []*Annotation{annotation.(*Annotation)}
+	}
+
+	// Each entry has one annotation
+	entries, annotationMap, err := GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add an entry and annotation for feature branch
+	if err := NewEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
+	if err := NewAnnotation([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedAnnotationMap[expectedEntries[len(expectedEntries)-1].ID] = []*Annotation{latestEntry.(*Annotation)}
+
+	// Expected values include the feature branch entry and annotation
+	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add an annotation that refers to two valid entries
+	if err := NewAnnotation([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This annotation is relevant to both entries
+	annotation := latestEntry.(*Annotation)
+	expectedAnnotationMap[expectedEntries[0].ID] = append(expectedAnnotationMap[expectedEntries[0].ID], annotation)
+	expectedAnnotationMap[expectedEntries[1].ID] = append(expectedAnnotationMap[expectedEntries[1].ID], annotation)
+
+	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add a gittuf namespace entry and ensure it's returned as relevant
+	if err := NewEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
+
+	entries, annotationMap, err = GetEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+}
+
+func TestGetEntriesInRangeForRef(t *testing.T) {
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+
+	// We add a mix of standard entries and annotations, establishing expected
+	// return values as we go along
+
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedEntries := []*Entry{}
+	expectedAnnotationMap := map[plumbing.Hash][]*Annotation{}
+
+	// Add some entries to main
+	for i := 0; i < 3; i++ {
+		if err := NewEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// We run GetLatestEntry so that the entry has its ID set as well
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedEntries = append(expectedEntries, entry.(*Entry))
+	}
+
+	// Add some annotations
+	for i := 0; i < 3; i++ {
+		if err := NewAnnotation([]plumbing.Hash{expectedEntries[i].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		annotation, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedAnnotationMap[expectedEntries[i].ID] = []*Annotation{annotation.(*Annotation)}
+	}
+
+	// Each entry has one annotation
+	entries, annotationMap, err := GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add an entry and annotation for feature branch
+	if err := NewEntry(anotherRefName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewAnnotation([]plumbing.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Expected values do not change
+	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add an annotation that refers to two valid entries
+	if err := NewAnnotation([]plumbing.Hash{expectedEntries[0].ID, expectedEntries[1].ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// This annotation is relevant to both entries
+	annotation := latestEntry.(*Annotation)
+	expectedAnnotationMap[expectedEntries[0].ID] = append(expectedAnnotationMap[expectedEntries[0].ID], annotation)
+	expectedAnnotationMap[expectedEntries[1].ID] = append(expectedAnnotationMap[expectedEntries[1].ID], annotation)
+
+	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+
+	// Add a gittuf namespace entry and ensure it's returned as relevant
+	if err := NewEntry("refs/gittuf/relevant", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+	latestEntry, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedEntries = append(expectedEntries, latestEntry.(*Entry))
+
+	entries, annotationMap, err = GetEntriesInRangeForRef(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedEntries, entries)
+	assert.Equal(t, expectedAnnotationMap, annotationMap)
+}
+
 func TestAnnotationRefersTo(t *testing.T) {
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	emptyBlobID := gitinterface.EmptyBlob()
