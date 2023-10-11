@@ -439,17 +439,7 @@ func TestPushRSL(t *testing.T) {
 		err = localRepo.PushRSL(context.Background(), remoteName)
 		assert.Nil(t, err)
 
-		remoteLatestEntry, err := rsl.GetLatestEntry(remoteRepo)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		localLatestEntry, err := rsl.GetLatestEntry(localRepo.r)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, localLatestEntry, remoteLatestEntry)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
 
 		// No updates, successful push
 		err = localRepo.PushRSL(context.Background(), remoteName)
