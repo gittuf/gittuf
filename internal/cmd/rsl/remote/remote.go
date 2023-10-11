@@ -4,6 +4,7 @@ package remote
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/check"
+	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/push"
 	"github.com/spf13/cobra"
 )
 
@@ -14,6 +15,7 @@ func New() *cobra.Command {
 	}
 
 	cmd.AddCommand(check.New())
+	cmd.AddCommand(push.New())
 
 	return cmd
 }
