@@ -9,9 +9,11 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
@@ -412,5 +414,73 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, hasUpdates)
 		assert.True(t, hasDiverged)
+	})
+}
+
+func TestPushRSL(t *testing.T) {
+	remoteName := "origin"
+
+	t.Run("successful push", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+
+		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo := createTestRepositoryWithPolicy(t)
+		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
+			Name: remoteName,
+			URLs: []string{remoteTmpDir},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushRSL(context.Background(), remoteName)
+		assert.Nil(t, err)
+
+		remoteLatestEntry, err := rsl.GetLatestEntry(remoteRepo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localLatestEntry, err := rsl.GetLatestEntry(localRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localLatestEntry, remoteLatestEntry)
+
+		// No updates, successful push
+		err = localRepo.PushRSL(context.Background(), remoteName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("divergent RSLs, unsuccessful push", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+
+		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.InitializeNamespace(remoteRepo); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo := createTestRepositoryWithPolicy(t)
+		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
+			Name: remoteName,
+			URLs: []string{remoteTmpDir},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushRSL(context.Background(), remoteName)
+		assert.ErrorIs(t, err, ErrPushingRSL)
 	})
 }

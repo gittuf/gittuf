@@ -14,7 +14,10 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
-var ErrCommitNotInRef = errors.New("specified commit is not in ref")
+var (
+	ErrCommitNotInRef = errors.New("specified commit is not in ref")
+	ErrPushingRSL     = errors.New("unable to push RSL")
+)
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
@@ -153,4 +156,14 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 		return false, false, nil
 	}
 	return true, true, nil
+}
+
+// PushRSL pushes the local RSL to the specified remote. As this push defaults
+// to fast-forward only, divergent RSL states are detected.
+func (r *Repository) PushRSL(ctx context.Context, remoteName string) error {
+	if err := gitinterface.Push(ctx, r.r, remoteName, []string{rsl.Ref}); err != nil {
+		return errors.Join(ErrPushingRSL, err)
+	}
+
+	return nil
 }
