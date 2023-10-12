@@ -299,6 +299,10 @@ func TestFetchRefSpec(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
+			t.Fatal(err)
+		}
+
 		// Create tmp dir for remote repo so we have a URL for it
 		tmpDir, err := os.MkdirTemp("", "gittuf")
 		if err != nil {
@@ -344,6 +348,10 @@ func TestFetchRefSpec(t *testing.T) {
 		// The local repo can be in-memory
 		repoLocal, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -396,6 +404,10 @@ func TestFetchRefSpec(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
+			t.Fatal(err)
+		}
+
 		// Create tmp dir for remote repo so we have a URL for it
 		tmpDir, err := os.MkdirTemp("", "gittuf")
 		if err != nil {
@@ -430,6 +442,10 @@ func TestFetch(t *testing.T) {
 		// The local repo can be in-memory
 		repoLocal, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -484,6 +500,10 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
+			t.Fatal(err)
+		}
+
 		// Create tmp dir for remote repo so we have a URL for it
 		tmpDir, err := os.MkdirTemp("", "gittuf")
 		if err != nil {
@@ -523,6 +543,10 @@ func TestFetch(t *testing.T) {
 		// The local repo can be in-memory
 		repoLocal, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
 
