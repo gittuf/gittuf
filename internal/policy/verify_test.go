@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -17,8 +18,10 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/jonboulle/clockwork"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +30,26 @@ import (
 // broadly, we need to rework the test setup here starting with
 // createTestRepository and the state creation helpers.
 
-const gpgKeyName = "gpg-privkey.asc"
+const (
+	testName  = "Jane Doe"
+	testEmail = "jane.doe@example.com"
+
+	gpgKeyName             = "gpg-privkey.asc"
+	gpgKeyNameUnauthorized = "gpg-privkey-2.asc"
+)
+
+var (
+	testGitConfig = &config.Config{
+		User: struct {
+			Name  string
+			Email string
+		}{
+			Name:  testName,
+			Email: testEmail,
+		},
+	}
+	testClock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+)
 
 func TestVerifyRef(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
@@ -66,32 +88,576 @@ func TestVerifyRefFull(t *testing.T) {
 }
 
 func TestVerifyRelativeForRef(t *testing.T) {
-	// FIXME: currently this test is nearly identical to the one for VerifyRef.
-	// This is because it's not trivial to create a bunch of test policy / RSL
-	// states cleanly. We need something that is easy to maintain and add cases
-	// to.
-	repo, _ := createTestRepository(t, createTestStateWithPolicy)
-	refName := "refs/heads/main"
+	t.Run("no recovery", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
 
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
 
-	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-	if err != nil {
-		t.Fatal(err)
-	}
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
-	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
-	entry.ID = entryID
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
 
-	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
-	assert.Nil(t, err)
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
 
-	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entry, policyEntry, refName)
-	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, entry, policyEntry, refName)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	})
+
+	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyNameUnauthorized)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit's tree
+		ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validCommit, err := repo.CommitObject(validCommitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommit := gitinterface.CreateCommitObject(testGitConfig, validCommit.TreeHash, []plumbing.Hash{commitIDs[0]}, "Revert invalid commit", testClock)
+		newCommit = common.SignTestCommit(t, repo, newCommit, gpgKeyName)
+		newCommitID, err := gitinterface.ApplyCommit(repo, newCommit, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, newCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit's tree
+		ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validCommit, err := repo.CommitObject(validCommitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommit := gitinterface.CreateCommitObject(testGitConfig, validCommit.TreeHash, []plumbing.Hash{commitIDs[0]}, "Revert invalid commit", testClock)
+		newCommit = common.SignTestCommit(t, repo, newCommit, gpgKeyNameUnauthorized)
+		newCommitID, err := gitinterface.ApplyCommit(repo, newCommit, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyNameUnauthorized)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, newCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		invalidEntryIDs := []plumbing.Hash{entryID}
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's still in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		invalidEntryIDs = append(invalidEntryIDs, entryID)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entries
+		annotation := rsl.NewAnnotationEntry(invalidEntryIDs, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		invalidEntryIDs := []plumbing.Hash{entryID}
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's still in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for only one invalid entry
+		annotation := rsl.NewAnnotationEntry(invalidEntryIDs, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// An invalid entry is not marked as skipped
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrInvalidEntryNotSkipped)
+	})
+
+	t.Run("with recovery, commit-same, recovered by authorized user, last good state is due to recovery", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		// Send it into invalid state again
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), validCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation = rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, validCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add some commits
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
+
+		// Add more commits, change the number of commits to have different trees
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 4, gpgKeyName)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the invalid last good commit
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), invalidLastGoodCommitID)); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to invalid last good commit
+		entry = rsl.NewReferenceEntry(refName, invalidLastGoodCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
+
+	t.Run("with recovery but recovered entry is also skipped, tree-same, recovered by authorized user", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		validCommitID := commitIDs[0] // track this for later
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyNameUnauthorized)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyNameUnauthorized)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Fix using the known-good commit's tree
+		ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		validCommit, err := repo.CommitObject(validCommitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommit := gitinterface.CreateCommitObject(testGitConfig, validCommit.TreeHash, []plumbing.Hash{commitIDs[0]}, "Revert invalid commit", testClock)
+		newCommit = common.SignTestCommit(t, repo, newCommit, gpgKeyName)
+		newCommitID, err := gitinterface.ApplyCommit(repo, newCommit, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		// Create a new entry moving branch back to valid commit
+		entry = rsl.NewReferenceEntry(refName, newCommitID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
+		entry.ID = entryID
+
+		// No error anymore
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		// Skip the recovery entry as well
+		annotation = rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyName)
+		annotation.ID = annotationID
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
 }
 
 func TestVerifyCommit(t *testing.T) {

@@ -36,7 +36,11 @@ const (
 	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
-var ErrUnauthorizedSignature = errors.New("unauthorized signature")
+var (
+	ErrUnauthorizedSignature  = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped = errors.New("entry expected to be unskipped is marked as skipped")
+)
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy.
@@ -94,35 +98,140 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	currentPolicy = state
 
 	// 2. Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
-	entries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
+	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
 	}
 
-	// 3. Verify each entry
+	// 3. Verify each entry, looking for a fix when an invalid entry is encountered
+	var invalidEntry *rsl.ReferenceEntry
+	var verificationErr error
 	for len(entries) != 0 {
-		// Pop entry from queue
-		entry := entries[0]
-		entries = entries[1:]
+		if invalidEntry == nil {
+			// Pop entry from queue
+			entry := entries[0]
+			entries = entries[1:]
 
-		if entry.RefName == PolicyRef {
-			// TODO: this is repetition if the firstEntry is for policy
-			newPolicy, err := LoadStateForEntry(ctx, repo, entry)
-			if err != nil {
-				return err
+			if entry.RefName == PolicyRef {
+				// TODO: this is repetition if the firstEntry is for policy
+				newPolicy, err := LoadStateForEntry(ctx, repo, entry)
+				if err != nil {
+					return err
+				}
+
+				if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
+					return err
+				}
+
+				currentPolicy = newPolicy
+				continue
 			}
 
-			if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
-				return err
-			}
+			if err := verifyEntry(ctx, repo, currentPolicy, entry); err != nil {
+				// If the invalid entry is never marked as skipped, we return err
+				if !entry.SkippedBy(annotations[entry.ID]) {
+					return err
+				}
 
-			currentPolicy = newPolicy
+				// The invalid entry's been marked as skipped but we still need
+				// to see if another entry fixed state for non-gittuf users
+				invalidEntry = entry
+				verificationErr = err
+			}
 			continue
 		}
 
-		if err := verifyEntry(ctx, repo, currentPolicy, entry); err != nil {
+		// This is only reached when we have an invalid state.
+		// First, the verification workflow determines the last good state for
+		// the ref. This is needed to evaluate whether a fix for the invalid
+		// state is available. After this is found, the workflow looks through
+		// the remaining entries in the queue to find the fix. Until the fix is
+		// found, entries encountered that are for other refs are added to a new
+		// queue. Entries that are for the same ref but not the fix are
+		// considered invalid. The workflow enters a valid state again when a)
+		// the fix entry (which hasn't also been revoked) is found, and b) all
+		// entries for the ref in the invalid range are marked as skipped by an
+		// annotation. If these conditions don't both hold, the workflow returns
+		// an error. After the fix is found, all remaining entries in the
+		// original queue are also added to the new queue. The new queue then
+		// takes the place of the original queue. This ensures that all entries
+		// are processed even when an invalid state is reached.
+
+		// 1. What's the last good state?
+		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, invalidEntry.RefName, invalidEntry.ID)
+		if err != nil {
 			return err
 		}
+		if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
+			return ErrLastGoodEntryIsSkipped
+		}
+		lastGoodEntryCommit, err := gitinterface.GetCommit(repo, lastGoodEntry.TargetID)
+		if err != nil {
+			return err
+		}
+		// gittuf requires the fix to point to a commit that is tree-same as the
+		// last good state
+		lastGoodTreeID := lastGoodEntryCommit.TreeHash
+
+		// 2. What entries do we have in the current verification set for the
+		// ref? The first one that is tree-same as lastGoodEntry's commit is the
+		// fix. Entries prior to that one in the queue are considered invalid
+		// and must be skipped
+		fixed := false
+		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
+		newEntryQueue := []*rsl.ReferenceEntry{}
+		for len(entries) != 0 {
+			newEntry := entries[0]
+			entries = entries[1:]
+
+			if newEntry.RefName != invalidEntry.RefName {
+				// Unrelated entry that must be processed in the outer loop
+				// Currently this is just policy entries
+				newEntryQueue = append(newEntryQueue, newEntry)
+				continue
+			}
+
+			newEntryCommit, err := gitinterface.GetCommit(repo, newEntry.TargetID)
+			if err != nil {
+				return err
+			}
+			if newEntryCommit.TreeHash == lastGoodTreeID {
+				// Fix found, we append the rest of the current verification set
+				// to the new entry queue
+				// But first, we must check that this fix hasn't been skipped
+				// If it has been skipped, it's not actually a fix and we need
+				// to keep looking
+				if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+					fixed = true
+					newEntryQueue = append(newEntryQueue, entries...)
+					break
+				}
+			}
+
+			// newEntry is not tree-same / commit-same, so it is automatically
+			// invalid, check that it's been marked as revoked
+			if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+				invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
+			}
+		}
+
+		if !fixed {
+			// If we haven't found a fix, return the original error
+			return verificationErr
+		}
+
+		if len(invalidIntermediateEntries) != 0 {
+			// We may have found a fix but if an invalid intermediate entry
+			// wasn't skipped, return error
+			return ErrInvalidEntryNotSkipped
+		}
+
+		// Reset these trackers to continue verification with rest of the queue
+		// We may encounter other issues
+		invalidEntry = nil
+		verificationErr = nil
+
+		entries = newEntryQueue
 	}
 
 	return nil
