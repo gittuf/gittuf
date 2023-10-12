@@ -100,19 +100,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	}
 
 	// 3. Verify each entry
-	for _, entry := range entries {
-		// FIXME: we're not verifying policy RSL entry signatures because we
-		// need to establish how to fetch that info. An additional blocker is
-		// for managing special keys like root and targets keys. RSL entry
-		// signatures are commit signatures. What do we do when metadata is
-		// signed using other methods? Do we instead flip the script and require
-		// metadata signatures to match git signing methods?
-		// UPDATE: This has likely been fixed. Policy RSL entries aren't
-		// verified. Instead, each policy state is internally verified AND each
-		// new policy state's root role signatures are verified with the prior
-		// policy's root role to ensure they have a threshold of valid
-		// signatures. This comment is being left in until this workflow is
-		// audited against the gittuf specification.
+	for len(entries) != 0 {
+		// Pop entry from queue
+		entry := entries[0]
+		entries = entries[1:]
+
 		if entry.RefName == PolicyRef {
 			// TODO: this is repetition if the firstEntry is for policy
 			newPolicy, err := LoadStateForEntry(ctx, repo, entry)
