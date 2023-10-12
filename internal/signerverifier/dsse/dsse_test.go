@@ -11,7 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,10 +54,10 @@ func TestVerifyEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Nil(t, VerifyEnvelope(context.Background(), env, []d.Verifier{verifier}, 1))
+	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{verifier}, 1))
 }
 
-func createSignedEnvelope() (*d.Envelope, error) {
+func createSignedEnvelope() (*sslibdsse.Envelope, error) {
 	privateKeyPath := filepath.Join("test-data", "test-key")
 	privateKeyBytes, err := os.ReadFile(privateKeyPath)
 	if err != nil {
@@ -72,10 +72,10 @@ func createSignedEnvelope() (*d.Envelope, error) {
 	message := []byte("test payload")
 	payload := base64.StdEncoding.EncodeToString(message)
 
-	env := &d.Envelope{
+	env := &sslibdsse.Envelope{
 		PayloadType: "application/vnd.gittuf+text",
 		Payload:     payload,
-		Signatures:  []d.Signature{},
+		Signatures:  []sslibdsse.Signature{},
 	}
 
 	env, err = SignEnvelope(context.Background(), env, signer)

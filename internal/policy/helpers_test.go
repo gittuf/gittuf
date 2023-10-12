@@ -16,7 +16,6 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
-	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 var testCtx = context.Background()
@@ -79,9 +78,8 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	}
 
 	return &State{
-		RootPublicKeys:      []*tuf.Key{key},
-		RootEnvelope:        rootEnv,
-		DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+		RootPublicKeys: []*tuf.Key{key},
+		RootEnvelope:   rootEnv,
 	}
 }
 
@@ -137,10 +135,9 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	}
 
 	return &State{
-		RootEnvelope:        rootEnv,
-		TargetsEnvelope:     targetsEnv,
-		DelegationEnvelopes: map[string]*sslibdsse.Envelope{}, // FIXME: this isn't the best fix. Instead, LoadState* methods should set this to nil when no delegated roles exist.
-		RootPublicKeys:      []*tuf.Key{key},
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []*tuf.Key{key},
 	}
 }
 

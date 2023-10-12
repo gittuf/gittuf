@@ -19,7 +19,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	d "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 const (
@@ -77,9 +77,9 @@ func InitializeNamespace(repo *git.Repository) error {
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	RootEnvelope        *d.Envelope
-	TargetsEnvelope     *d.Envelope
-	DelegationEnvelopes map[string]*d.Envelope
+	RootEnvelope        *sslibdsse.Envelope
+	TargetsEnvelope     *sslibdsse.Envelope
+	DelegationEnvelopes map[string]*sslibdsse.Envelope
 	RootPublicKeys      []*tuf.Key
 }
 
@@ -146,10 +146,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 		}
 	}
 
-	state := &State{
-		DelegationEnvelopes: map[string]*d.Envelope{},
-		RootPublicKeys:      []*tuf.Key{},
-	}
+	state := &State{}
 
 	metadataTree, err := repo.TreeObject(metadataTreeID)
 	if err != nil {
@@ -167,7 +164,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 			return nil, err
 		}
 
-		env := &d.Envelope{}
+		env := &sslibdsse.Envelope{}
 		if err := json.Unmarshal(contents, env); err != nil {
 			return nil, err
 		}
@@ -177,6 +174,10 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 		} else if entry.Name == fmt.Sprintf("%s.json", TargetsRoleName) {
 			state.TargetsEnvelope = env
 		} else {
+			if state.DelegationEnvelopes == nil {
+				state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+			}
+
 			state.DelegationEnvelopes[strings.TrimSuffix(entry.Name, ".json")] = env
 		}
 	}
@@ -190,6 +191,10 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 		key, err := tuf.LoadKeyFromBytes(contents)
 		if err != nil {
 			return nil, err
+		}
+
+		if state.RootPublicKeys == nil {
+			state.RootPublicKeys = []*tuf.Key{}
 		}
 
 		state.RootPublicKeys = append(state.RootPublicKeys, key)
@@ -363,7 +368,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
 func (s *State) Verify(ctx context.Context) error {
-	rootVerifiers := []d.Verifier{}
+	rootVerifiers := []sslibdsse.Verifier{}
 	for _, k := range s.RootPublicKeys {
 		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k)
 		if err != nil {
@@ -389,7 +394,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	targetsVerifiers := []d.Verifier{}
+	targetsVerifiers := []sslibdsse.Verifier{}
 	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
 		key := rootMetadata.Keys[keyID]
 		sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
@@ -407,7 +412,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return nil
 	}
 
-	delegationEnvelopes := map[string]*d.Envelope{}
+	delegationEnvelopes := map[string]*sslibdsse.Envelope{}
 	for k, v := range s.DelegationEnvelopes {
 		delegationEnvelopes[k] = v
 	}
@@ -450,7 +455,7 @@ func (s *State) Verify(ctx context.Context) error {
 		}
 		delete(delegationEnvelopes, delegation.Name)
 
-		delegationVerifiers := make([]d.Verifier, 0, len(delegation.KeyIDs))
+		delegationVerifiers := make([]sslibdsse.Verifier, 0, len(delegation.KeyIDs))
 		for _, keyID := range delegation.KeyIDs {
 			key := delegationKeys[keyID]
 			sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
@@ -507,7 +512,7 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 		commitMessage = DefaultCommitMessage
 	}
 
-	metadata := map[string]*d.Envelope{}
+	metadata := map[string]*sslibdsse.Envelope{}
 	metadata[RootRoleName] = s.RootEnvelope
 	if s.TargetsEnvelope != nil {
 		metadata[TargetsRoleName] = s.TargetsEnvelope
