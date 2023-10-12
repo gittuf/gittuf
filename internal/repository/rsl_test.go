@@ -428,7 +428,7 @@ func TestPushRSL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo := createTestRepositoryWithPolicy(t)
+		localRepo := createTestRepositoryWithPolicy(t, "")
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},
@@ -462,7 +462,7 @@ func TestPushRSL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo := createTestRepositoryWithPolicy(t)
+		localRepo := createTestRepositoryWithPolicy(t, "")
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},

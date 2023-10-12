@@ -66,10 +66,18 @@ func TestUnauthorizedKey(t *testing.T) {
 	})
 }
 
-func createTestRepositoryWithRoot(t *testing.T) (*Repository, []byte) {
+func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
 	t.Helper()
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	var (
+		repo *git.Repository
+		err  error
+	)
+	if location == "" {
+		repo, err = git.Init(memory.NewStorage(), memfs.New())
+	} else {
+		repo, err = git.PlainInit(location, true)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,10 +95,10 @@ func createTestRepositoryWithRoot(t *testing.T) (*Repository, []byte) {
 	return r, keyBytes
 }
 
-func createTestRepositoryWithPolicy(t *testing.T) *Repository {
+func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	t.Helper()
 
-	r, keyBytes := createTestRepositoryWithRoot(t)
+	r, keyBytes := createTestRepositoryWithRoot(t, location)
 
 	targetsPrivKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
 	if err != nil {
