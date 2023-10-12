@@ -84,21 +84,21 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 // specified remote. For more information on the Git refspec, please consult:
 // https://git-scm.com/book/en/v2/Git-Internals-The-Refspec.
 //
-// The refspecs are constructed to allow non-fast-forward fetches. This function
-// constructs a refspec such that the target is the same as the requested ref.
-// Also, the remote tracker for the ref is also always updated.
-func Fetch(ctx context.Context, repo *git.Repository, remoteName string, refs []string) error {
+// The fastForwardOnly flag controls if the constructed refspec allows
+// non-fast-forward fetches. The target of the refspec is the same as the
+// requested ref. Also, the remote tracker for the ref is also always updated.
+func Fetch(ctx context.Context, repo *git.Repository, remoteName string, refs []string, fastForwardOnly bool) error {
 	refSpecs := make([]config.RefSpec, 0, len(refs))
 	for _, r := range refs {
 		// Add the remote tracker destination
-		refSpec, err := RefSpec(repo, r, remoteName, false)
+		refSpec, err := RefSpec(repo, r, remoteName, fastForwardOnly)
 		if err != nil {
 			return err
 		}
 		refSpecs = append(refSpecs, refSpec)
 
 		// Add the regular destination
-		refSpec, err = RefSpec(repo, r, "", false)
+		refSpec, err = RefSpec(repo, r, "", fastForwardOnly)
 		if err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func CloneAndFetch(ctx context.Context, remoteURL, dir, initialBranch string, re
 		return nil, err
 	}
 
-	return fetchRefs(ctx, repo, refs)
+	return fetchRefs(ctx, repo, refs, true)
 }
 
 // CloneAndFetchToMemory clones an in-memory repository using the specified URL
@@ -127,7 +127,7 @@ func CloneAndFetchToMemory(ctx context.Context, remoteURL, initialBranch string,
 		return nil, err
 	}
 
-	return fetchRefs(ctx, repo, refs)
+	return fetchRefs(ctx, repo, refs, true)
 }
 
 func createCloneOptions(remoteURL, initialBranch string) *git.CloneOptions {
@@ -139,9 +139,9 @@ func createCloneOptions(remoteURL, initialBranch string) *git.CloneOptions {
 	return cloneOptions
 }
 
-func fetchRefs(ctx context.Context, repo *git.Repository, refs []string) (*git.Repository, error) {
+func fetchRefs(ctx context.Context, repo *git.Repository, refs []string, fastForwardOnly bool) (*git.Repository, error) {
 	if len(refs) > 0 {
-		err := Fetch(ctx, repo, DefaultRemoteName, refs)
+		err := Fetch(ctx, repo, DefaultRemoteName, refs, fastForwardOnly)
 		if err != nil {
 			return nil, err
 		}

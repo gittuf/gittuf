@@ -442,7 +442,7 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
 		// This time, the empty tree object must also be in the local repo
@@ -488,7 +488,7 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
 		assertLocalRefAndRemoteTrackerRef(t, repoLocal, refName, remoteName, remoteCommitID)
@@ -521,7 +521,7 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 	})
 }
