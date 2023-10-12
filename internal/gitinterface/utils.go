@@ -140,7 +140,7 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 		fastForwardOnly = true
 	}
 
-	// local is always refPath, destination depends on trackRemote
+	// local is always refPath, destination depends on remoteName
 	localPath := refPath
 	var remotePath string
 	if len(remoteName) > 0 {

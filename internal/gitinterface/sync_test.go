@@ -462,16 +462,19 @@ func TestFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false); err != nil {
+		remoteCommitID, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
 		assert.Nil(t, err)
 
 		// This time, the empty tree object must also be in the local repo
 		_, err = repoLocal.Object(plumbing.TreeObject, EmptyTree())
 		assert.Nil(t, err)
+
+		assertLocalRefAndRemoteTrackerRef(t, repoLocal, refName, remoteName, remoteCommitID)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -505,22 +508,15 @@ func TestFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false); err != nil {
+		remoteCommitID, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
 		assert.Nil(t, err)
 
-		refLocal, err := repoLocal.Reference(refNameTyped, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		refRemote, err := repoRemote.Reference(refNameTyped, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, refRemote.Hash(), refLocal.Hash())
+		assertLocalRefAndRemoteTrackerRef(t, repoLocal, refName, remoteName, remoteCommitID)
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
@@ -550,7 +546,7 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName})
 		assert.Nil(t, err)
 	})
 }
@@ -597,7 +593,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -649,7 +645,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, "", []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, "", []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -697,7 +693,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, nil, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -745,7 +741,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -797,7 +793,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -839,7 +835,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, nil, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -848,4 +844,22 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, mainCommitID, *localMainCommitID)
 	})
+}
+
+func assertLocalRefAndRemoteTrackerRef(t *testing.T, repo *git.Repository, refName, remoteName string, expectedCommitID plumbing.Hash) {
+	t.Helper()
+
+	refNameTyped := plumbing.ReferenceName(refName)
+	refRemoteNameTyped := plumbing.ReferenceName(RemoteRef(refName, remoteName))
+	localRef, err := repo.Reference(refNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedCommitID, localRef.Hash())
+
+	localRemoteTrackerRef, err := repo.Reference(refRemoteNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedCommitID, localRemoteTrackerRef.Hash())
 }
