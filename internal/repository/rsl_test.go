@@ -242,7 +242,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -292,7 +292,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -334,7 +334,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,7 +384,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 
 		// Clone remote repository
 		// TODO: this should be handled by the Repository package
-		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref}, false)
+		localR, err := gitinterface.CloneAndFetchToMemory(context.Background(), tmpDir, refName, []string{rsl.Ref})
 		if err != nil {
 			t.Fatal(err)
 		}

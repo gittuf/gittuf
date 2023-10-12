@@ -5,7 +5,6 @@ package gitinterface
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -31,11 +30,7 @@ func TestPushRefSpec(t *testing.T) {
 		}
 
 		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -79,11 +74,7 @@ func TestPushRefSpec(t *testing.T) {
 		}
 
 		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -128,11 +119,7 @@ func TestPushRefSpec(t *testing.T) {
 		}
 
 		// Create tmp dir for remote so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		_, err = git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -165,11 +152,7 @@ func TestPush(t *testing.T) {
 		}
 
 		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -213,11 +196,7 @@ func TestPush(t *testing.T) {
 		}
 
 		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -262,11 +241,7 @@ func TestPush(t *testing.T) {
 		}
 
 		// Create tmp dir for remote so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+		tmpDir := t.TempDir()
 
 		_, err = git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -299,12 +274,12 @@ func TestFetchRefSpec(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -347,12 +322,12 @@ func TestFetchRefSpec(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -396,12 +371,12 @@ func TestFetchRefSpec(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		_, err = git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -433,12 +408,12 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -462,16 +437,19 @@ func TestFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false); err != nil {
+		remoteCommitID, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
 		// This time, the empty tree object must also be in the local repo
 		_, err = repoLocal.Object(plumbing.TreeObject, EmptyTree())
 		assert.Nil(t, err)
+
+		assertLocalRefAndRemoteTrackerRef(t, repoLocal, refName, remoteName, remoteCommitID)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -481,12 +459,12 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		repoRemote, err := git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -505,22 +483,15 @@ func TestFetch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false); err != nil {
+		remoteCommitID, err := Commit(repoRemote, emptyTreeHash, refName, "Test commit", false)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
-		refLocal, err := repoLocal.Reference(refNameTyped, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		refRemote, err := repoRemote.Reference(refNameTyped, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, refRemote.Hash(), refLocal.Hash())
+		assertLocalRefAndRemoteTrackerRef(t, repoLocal, refName, remoteName, remoteCommitID)
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
@@ -530,12 +501,12 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create tmp dir for remote repo so we have a URL for it
-		tmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
+		if err := repoLocal.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, refNameTyped)); err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		// Create tmp dir for remote repo so we have a URL for it
+		tmpDir := t.TempDir()
 
 		_, err = git.PlainInit(tmpDir, true)
 		if err != nil {
@@ -550,7 +521,7 @@ func TestFetch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, false)
+		err = Fetch(context.Background(), repoLocal, remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 	})
 }
@@ -560,17 +531,8 @@ func TestCloneAndFetch(t *testing.T) {
 	anotherRefName := "refs/heads/feature"
 
 	t.Run("clone and fetch remote repository, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
-
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -597,7 +559,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -612,17 +574,8 @@ func TestCloneAndFetch(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
-
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -649,7 +602,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, "", []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, "", []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -664,17 +617,8 @@ func TestCloneAndFetch(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository with only one ref, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
-
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -697,7 +641,7 @@ func TestCloneAndFetch(t *testing.T) {
 		}
 
 		// Clone
-		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, nil, false)
+		localRepo, err := CloneAndFetch(context.Background(), remoteTmpDir, localTmpDir, refName, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -714,11 +658,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 	// refs := []config.RefSpec{config.RefSpec(fmt.Sprintf("%s:%s", anotherRefName, anotherRefName))}
 
 	t.Run("clone and fetch remote repository, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -745,7 +685,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -760,17 +700,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
-
-		localTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -797,7 +727,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone and fetch additional ref
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{anotherRefName}, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, "", []string{anotherRefName})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -812,11 +742,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository with only one ref, verify refs match", func(t *testing.T) {
-		remoteTmpDir, err := os.MkdirTemp("", "gittuf")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(remoteTmpDir) //nolint:errcheck
+		remoteTmpDir := t.TempDir()
 
 		// Create remote repo on disk so we can use its URL
 		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
@@ -839,7 +765,7 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		}
 
 		// Clone
-		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, nil, false)
+		localRepo, err := CloneAndFetchToMemory(context.Background(), remoteTmpDir, refName, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -848,4 +774,22 @@ func TestCloneAndFetchToMemory(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, mainCommitID, *localMainCommitID)
 	})
+}
+
+func assertLocalRefAndRemoteTrackerRef(t *testing.T, repo *git.Repository, refName, remoteName string, expectedCommitID plumbing.Hash) {
+	t.Helper()
+
+	refNameTyped := plumbing.ReferenceName(refName)
+	refRemoteNameTyped := plumbing.ReferenceName(RemoteRef(refName, remoteName))
+	localRef, err := repo.Reference(refNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedCommitID, localRef.Hash())
+
+	localRemoteTrackerRef, err := repo.Reference(refRemoteNameTyped, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedCommitID, localRemoteTrackerRef.Hash())
 }

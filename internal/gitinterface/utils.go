@@ -85,6 +85,15 @@ func AbsoluteReference(repo *git.Repository, target string) (string, error) {
 		return target, nil
 	}
 
+	if target == plumbing.HEAD.String() {
+		ref, err := repo.Reference(plumbing.HEAD, false)
+		if err != nil {
+			return "", err
+		}
+
+		return ref.Target().String(), nil
+	}
+
 	// Check if branch
 	refName := plumbing.NewBranchReferenceName(target)
 	_, err := repo.Reference(refName, false)
@@ -131,22 +140,11 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 		fastForwardOnly = true
 	}
 
-	// local is always refPath, destination depends on trackRemote
+	// local is always refPath, destination depends on remoteName
 	localPath := refPath
 	var remotePath string
 	if len(remoteName) > 0 {
-		if strings.HasPrefix(refPath, BranchRefPrefix) {
-			// refs/heads/<path> -> refs/remotes/<remote>/<path>
-			rest := strings.TrimPrefix(refPath, BranchRefPrefix)
-			remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
-		} else if strings.HasPrefix(refPath, TagRefPrefix) {
-			// refs/tags/<path> -> refs/tags/<path>
-			remotePath = refPath
-		} else {
-			// refs/<path> -> refs/remotes/<remote>/<path>
-			rest := strings.TrimPrefix(refPath, RefPrefix)
-			remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
-		}
+		remotePath = RemoteRef(refPath, remoteName)
 	} else {
 		remotePath = refPath
 	}
@@ -157,4 +155,22 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 	}
 
 	return config.RefSpec(refSpecString), nil
+}
+
+func RemoteRef(refName, remoteName string) string {
+	var remotePath string
+	if strings.HasPrefix(refName, BranchRefPrefix) {
+		// refs/heads/<path> -> refs/remotes/<remote>/<path>
+		rest := strings.TrimPrefix(refName, BranchRefPrefix)
+		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
+	} else if strings.HasPrefix(refName, TagRefPrefix) {
+		// refs/tags/<path> -> refs/tags/<path>
+		remotePath = refName
+	} else {
+		// refs/<path> -> refs/remotes/<remote>/<path>
+		rest := strings.TrimPrefix(refName, RefPrefix)
+		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
+	}
+
+	return remotePath
 }
