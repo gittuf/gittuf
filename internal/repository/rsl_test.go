@@ -474,3 +474,64 @@ func TestPushRSL(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPushingRSL)
 	})
 }
+
+func TestPullRSL(t *testing.T) {
+	remoteName := "origin"
+
+	t.Run("successful pull", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+		remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
+
+		localRepoR, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localRepoR}
+		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
+			Name: remoteName,
+			URLs: []string{remoteTmpDir},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PullRSL(context.Background(), remoteName)
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, rsl.Ref)
+
+		// No updates, successful pull
+		err = localRepo.PullRSL(context.Background(), remoteName)
+		assert.Nil(t, err)
+	})
+
+	// t.Run("divergent RSLs, unsuccessful pull", func(t *testing.T) {
+	// 	remoteTmpDir := t.TempDir()
+	// 	createTestRepositoryWithPolicy(t, remoteTmpDir)
+
+	// 	localRepoR, err := git.Init(memory.NewStorage(), memfs.New())
+	// 	if err != nil {
+	// 		t.Fatal(err)
+	// 	}
+	// 	localRepo := &Repository{r: localRepoR}
+
+	// 	if err := rsl.InitializeNamespace(localRepo.r); err != nil {
+	// 		t.Fatal(err)
+	// 	}
+
+	// 	if err := rsl.NewEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(localRepo.r, false); err != nil {
+	// 		t.Fatal(err)
+	// 	}
+
+	// 	if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
+	// 		Name: remoteName,
+	// 		URLs: []string{remoteTmpDir},
+	// 	}); err != nil {
+	// 		t.Fatal(err)
+	// 	}
+
+	// 	err = localRepo.PullRSL(context.Background(), remoteName)
+	// 	assert.ErrorIs(t, err, ErrPullingRSL)
+	// })
+	// FIXME: this may be a bug in how fast-forward only fetches are handled in
+	// go-git. See: https://github.com/go-git/go-git/issues/874
+}
