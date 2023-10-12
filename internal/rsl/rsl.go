@@ -103,6 +103,18 @@ func (e *ReferenceEntry) Commit(repo *git.Repository, sign bool) error {
 	return err
 }
 
+// Skipped returns true if any of the annotations mark the entry as
+// to-be-skipped.
+func (e *ReferenceEntry) SkippedBy(annotations []*AnnotationEntry) bool {
+	for _, annotation := range annotations {
+		if annotation.RefersTo(e.ID) && annotation.Skip {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (e *ReferenceEntry) createCommitMessage() (string, error) {
 	lines := []string{
 		ReferenceEntryHeader,
@@ -409,6 +421,36 @@ func GetLatestReferenceEntryForRefBefore(repo *git.Repository, refName string, a
 	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
 
 	return targetEntry, annotations, nil
+}
+
+// GetLatestUnskippedReferenceEntryForRef returns the latest reference entry for
+// the ref that does not have an annotation marking it as to-be-skipped. Entries
+// are searched from the latest entry in the RSL to include new annotations for
+// each reference entry tested for the ref.
+func GetLatestUnskippedReferenceEntryForRef(repo *git.Repository, refName string) (*ReferenceEntry, []*AnnotationEntry, error) {
+	return GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, plumbing.ZeroHash)
+}
+
+// GetLatestUnskippedReferenceEntryForRefBefore returns the first reference
+// entry for the ref before the anchor that does not have an annotation marking
+// it as to-be-skipped. Entries are searched from the latest entry in the RSL to
+// include new annotations for each reference entry tested for the ref. The only
+// reference entries for the ref considered are those that occur strictly before
+// the anchor entry in the RSL. Of these, the latest reference entry that is not
+// skipped by an annotation (before or after the anchor) is returned.
+func GetLatestUnskippedReferenceEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
+	for {
+		latestEntry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, refName, anchor)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if !latestEntry.SkippedBy(annotations) {
+			return latestEntry, annotations, nil
+		}
+
+		anchor = latestEntry.ID
+	}
 }
 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
