@@ -27,6 +27,8 @@ import (
 // broadly, we need to rework the test setup here starting with
 // createTestRepository and the state creation helpers.
 
+const gpgKeyName = "gpg-privkey.asc"
+
 func TestVerifyRef(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
@@ -35,9 +37,9 @@ func TestVerifyRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 
 	err := VerifyRef(context.Background(), repo, refName)
 	assert.Nil(t, err)
@@ -55,9 +57,9 @@ func TestVerifyRefFull(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 
 	err := VerifyRefFull(context.Background(), repo, refName)
 	assert.Nil(t, err)
@@ -80,9 +82,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 	entry.ID = entryID
 
 	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
@@ -104,9 +106,9 @@ func TestVerifyCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 	entry.ID = entryID
 
 	expectedStatus := make(map[string]string, len(commitIDs))
@@ -143,7 +145,7 @@ func TestVerifyCommit(t *testing.T) {
 	assert.Equal(t, expectedStatus, status)
 
 	// Add a commit but don't record it in the RSL
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
 
 	expectedStatus = map[string]string{commitIDs[0].String(): unableToFindPolicyMessage}
 	status = VerifyCommit(testCtx, repo, commitIDs[0].String())
@@ -154,20 +156,20 @@ func TestVerifyTag(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 	entry.ID = entryID
 
 	tagName := "v1"
-	tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+	tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyName)
 
 	expectedStatus := map[string]string{tagID.String(): unableToFindRSLEntryMessage}
 	status := VerifyTag(context.Background(), repo, []string{tagID.String()})
 	assert.Equal(t, expectedStatus, status)
 
 	entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 	entry.ID = entryID
 
 	// Use tag ID
@@ -194,9 +196,9 @@ func TestVerifyEntry(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyName)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 	entry.ID = entryID
 
 	err := verifyEntry(context.Background(), repo, state, entry)
@@ -215,16 +217,16 @@ func TestVerifyTagEntry(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyName)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		tagName := "v1"
-		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyName)
 
 		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -235,16 +237,16 @@ func TestVerifyTagEntry(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
 		refName := "refs/heads/main"
 
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyName)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		tagName := "v1"
-		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyName)
 
 		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -255,16 +257,16 @@ func TestVerifyTagEntry(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithTagPolicyForUnauthorizedTest)
 		refName := "refs/heads/main"
 
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyName)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		tagName := "v1"
-		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyName)
 
 		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -284,13 +286,13 @@ func TestGetCommits(t *testing.T) {
 	// FIXME: this setup with RSL entries can be formalized using another
 	// helper like createTestStateWithPolicy. The RSL could then also
 	// incorporate policy changes and so on.
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyName)
 	firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry)
+	firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyName)
 	firstEntry.ID = firstEntryID
 
 	secondEntry := rsl.NewReferenceEntry(refName, commitIDs[4])
-	secondEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, secondEntry)
+	secondEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, secondEntry, gpgKeyName)
 	secondEntry.ID = secondEntryID
 
 	expectedCommitIDs := []plumbing.Hash{commitIDs[1], commitIDs[2], commitIDs[3], commitIDs[4]}
@@ -325,11 +327,11 @@ func TestGetChangedPaths(t *testing.T) {
 	// FIXME: this setup with RSL entries can be formalized using another
 	// helper like createTestStateWithPolicy. The RSL could then also
 	// incorporate policy changes and so on.
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyName)
 	entries := []*rsl.ReferenceEntry{}
 	for _, commitID := range commitIDs {
 		entry := rsl.NewReferenceEntry(refName, commitID)
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 		entry.ID = entryID
 
 		entries = append(entries, entry)
