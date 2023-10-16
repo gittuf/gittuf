@@ -4,6 +4,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -76,6 +77,75 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 		},
 		Message:      commitMessage,
 		TreeHash:     gitinterface.EmptyTree(),
+		ParentHashes: []plumbing.Hash{ref.Hash()},
+	}
+
+	testCommit = SignTestCommit(t, repo, testCommit, keyName)
+
+	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return commitID
+}
+
+// CreateTestRSLAnnotationEntryCommit is a test helper used to create a
+// **signed** RSL annotation using the specified GPG key. It is used to
+// substitute for the default RSL annotation creation and signing mechanism
+// which relies on the user's Git config.
+func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, annotation *rsl.AnnotationEntry, keyName string) plumbing.Hash {
+	t.Helper()
+
+	// We do this manually because rsl.Commit() will not sign using our test key
+
+	lines := []string{
+		rsl.AnnotationEntryHeader,
+		"",
+	}
+
+	for _, entry := range annotation.RSLEntryIDs {
+		lines = append(lines, fmt.Sprintf("%s: %s", rsl.EntryIDKey, entry.String()))
+	}
+
+	if annotation.Skip {
+		lines = append(lines, fmt.Sprintf("%s: true", rsl.SkipKey))
+	} else {
+		lines = append(lines, fmt.Sprintf("%s: false", rsl.SkipKey))
+	}
+
+	if len(annotation.Message) != 0 {
+		var message strings.Builder
+		messageBlock := pem.Block{
+			Type:  rsl.AnnotationMessageBlockType,
+			Bytes: []byte(annotation.Message),
+		}
+		if err := pem.Encode(&message, &messageBlock); err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, strings.TrimSpace(message.String()))
+	}
+
+	commitMessage := strings.Join(lines, "\n")
+
+	ref, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCommit := &object.Commit{
+		Author: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Committer: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Message:      commitMessage,
+		TreeHash:     plumbing.ZeroHash,
 		ParentHashes: []plumbing.Hash{ref.Hash()},
 	}
 
