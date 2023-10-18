@@ -50,6 +50,12 @@ func InitializeNamespace(repo *git.Repository) error {
 		return ErrRSLExists
 	}
 
+	// Write empty tree into the object store as all RSL commits use that for
+	// the tree hash. If the tree isn't in the object store, syncs will fail.
+	if _, err := gitinterface.WriteTree(repo, nil); err != nil {
+		return err
+	}
+
 	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(Ref), plumbing.ZeroHash))
 }
 

@@ -3,18 +3,16 @@
 package remote
 
 import (
-	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/check"
-	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/push"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote/push"
 	"github.com/spf13/cobra"
 )
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remote",
-		Short: "Tools for managing remote RSLs",
+		Short: "Tools for managing remote policies",
 	}
 
-	cmd.AddCommand(check.New())
 	cmd.AddCommand(push.New())
 
 	return cmd

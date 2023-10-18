@@ -7,6 +7,7 @@ import (
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +21,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
+	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removepolicykey.New(o))
 
 	return cmd
