@@ -8,14 +8,14 @@ may be added or changed.
 
 ## Reach Alpha Milestone
 
-While gittuf is primarily an implementation, its design is documented in the
-[specification](/docs/specification.md). Therefore, as features are fleshed out
-and built, the two are updated together.
+The gittuf implementation is built based on the specification defined in the
+[design document](/docs/design-document.md). Therefore, as features are fleshed
+out and built, the two are updated together.
 
 Currently, gittuf is in a pre-alpha stage. Its core features are still being
 developed, and therefore the primary item on the roadmap is building gittuf to
 reach the alpha milestone. The gittuf alpha version must include support for the
-main specification document with features like policies for Git namespaces, file
+main design document with features like policies for Git namespaces, file
 namespaces, key distribution, the Reference State Log, and the ability to sync
 gittuf metadata with remote repositories.
 
@@ -44,11 +44,11 @@ transparent and auditable code review policy enforcement.
 
 ## Read Permissions
 
-gittuf's specification implements _write_ permission policies such as who can
-write to a Git reference or a file. This must be accompanied by support for
-_read_ permissions. This needs to be developed further as the feature can range
-from the ability to store secrets all the way to maintaining encrypted objects
-for certain Git references so only specific users can read that reference.
+gittuf's design implements _write_ permission policies such as who can write to
+a Git reference or a file. This must be accompanied by support for _read_
+permissions. This needs to be developed further as the feature can range from
+the ability to store secrets all the way to maintaining encrypted objects for
+certain Git references so only specific users can read that reference.
 
 ## Develop Hash Algorithm Agility Extension
 
