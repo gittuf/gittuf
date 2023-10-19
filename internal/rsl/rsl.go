@@ -17,10 +17,10 @@ import (
 const (
 	GittufNamespacePrefix      = "refs/gittuf/"
 	Ref                        = "refs/gittuf/reference-state-log"
-	EntryHeader                = "RSL Entry"
+	ReferenceEntryHeader       = "RSL Reference Entry"
 	RefKey                     = "ref"
 	TargetIDKey                = "targetID"
-	AnnotationHeader           = "RSL Annotation"
+	AnnotationEntryHeader      = "RSL Annotation Entry"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
 	EndMessage                 = "-----END MESSAGE-----"
@@ -66,13 +66,16 @@ func RemoteTrackerRef(remote string) string {
 	return fmt.Sprintf(remoteTrackerRef, remote)
 }
 
-type EntryType interface {
+// Entry is the abstract representation of an object in the RSL.
+type Entry interface {
 	GetID() plumbing.Hash
 	Commit(*git.Repository, bool) error
 	createCommitMessage() (string, error)
 }
 
-type Entry struct {
+// ReferenceEntry represents a record of a reference state in the RSL. It
+// implements the Entry interface.
+type ReferenceEntry struct {
 	// ID contains the Git hash for the commit corresponding to the entry.
 	ID plumbing.Hash
 
@@ -83,26 +86,26 @@ type Entry struct {
 	TargetID plumbing.Hash
 }
 
-// NewEntry returns an Entry object for a normal RSL entry.
-func NewEntry(refName string, targetID plumbing.Hash) *Entry {
-	return &Entry{RefName: refName, TargetID: targetID}
+// NewReferenceEntry returns a ReferenceEntry object for a normal RSL entry.
+func NewReferenceEntry(refName string, targetID plumbing.Hash) *ReferenceEntry {
+	return &ReferenceEntry{RefName: refName, TargetID: targetID}
 }
 
-func (e *Entry) GetID() plumbing.Hash {
+func (e *ReferenceEntry) GetID() plumbing.Hash {
 	return e.ID
 }
 
-// Commit creates a commit object in the RSL for the Entry.
-func (e *Entry) Commit(repo *git.Repository, sign bool) error {
+// Commit creates a commit object in the RSL for the ReferenceEntry.
+func (e *ReferenceEntry) Commit(repo *git.Repository, sign bool) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 
 	_, err := gitinterface.Commit(repo, gitinterface.EmptyTree(), Ref, message, sign)
 	return err
 }
 
-func (e *Entry) createCommitMessage() (string, error) {
+func (e *ReferenceEntry) createCommitMessage() (string, error) {
 	lines := []string{
-		EntryHeader,
+		ReferenceEntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", RefKey, e.RefName),
 		fmt.Sprintf("%s: %s", TargetIDKey, e.TargetID.String()),
@@ -110,7 +113,11 @@ func (e *Entry) createCommitMessage() (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-type Annotation struct {
+// AnnotationEntry is a type of RSL record that references prior items in the
+// RSL. It can be used to add extra information for the referenced items.
+// Annotations can also be used to "skip", i.e. revoke, the referenced items. It
+// implements the Entry interface.
+type AnnotationEntry struct {
 	// ID contains the Git hash for the commit corresponding to the annotation.
 	ID plumbing.Hash
 
@@ -124,18 +131,18 @@ type Annotation struct {
 	Message string
 }
 
-// NewAnnotation returns an Annotation object that applies to one or more prior
-// RSL entries.
-func NewAnnotation(rslEntryIDs []plumbing.Hash, skip bool, message string) *Annotation {
-	return &Annotation{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
+// NewAnnotationEntry returns an Annotation object that applies to one or more
+// prior RSL entries.
+func NewAnnotationEntry(rslEntryIDs []plumbing.Hash, skip bool, message string) *AnnotationEntry {
+	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
 }
 
-func (a *Annotation) GetID() plumbing.Hash {
+func (a *AnnotationEntry) GetID() plumbing.Hash {
 	return a.ID
 }
 
 // Commit creates a commit object in the RSL for the Annotation.
-func (a *Annotation) Commit(repo *git.Repository, sign bool) error {
+func (a *AnnotationEntry) Commit(repo *git.Repository, sign bool) error {
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
 		if _, err := GetEntry(repo, id); err != nil {
@@ -154,7 +161,7 @@ func (a *Annotation) Commit(repo *git.Repository, sign bool) error {
 
 // RefersTo returns true if the specified entryID is referred to by the
 // annotation.
-func (a *Annotation) RefersTo(entryID plumbing.Hash) bool {
+func (a *AnnotationEntry) RefersTo(entryID plumbing.Hash) bool {
 	for _, id := range a.RSLEntryIDs {
 		if id == entryID {
 			return true
@@ -164,9 +171,9 @@ func (a *Annotation) RefersTo(entryID plumbing.Hash) bool {
 	return false
 }
 
-func (a *Annotation) createCommitMessage() (string, error) {
+func (a *AnnotationEntry) createCommitMessage() (string, error) {
 	lines := []string{
-		AnnotationHeader,
+		AnnotationEntryHeader,
 		"",
 	}
 
@@ -196,7 +203,7 @@ func (a *Annotation) createCommitMessage() (string, error) {
 }
 
 // GetEntry returns the entry corresponding to entryID.
-func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
+func GetEntry(repo *git.Repository, entryID plumbing.Hash) (Entry, error) {
 	commitObj, err := repo.CommitObject(entryID)
 	if err != nil {
 		return nil, ErrRSLEntryNotFound
@@ -206,7 +213,7 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (EntryType, error) {
 }
 
 // GetParentForEntry returns the entry's parent RSL entry.
-func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error) {
+func GetParentForEntry(repo *git.Repository, entry Entry) (Entry, error) {
 	commitObj, err := repo.CommitObject(entry.GetID())
 	if err != nil {
 		return nil, err
@@ -223,24 +230,25 @@ func GetParentForEntry(repo *git.Repository, entry EntryType) (EntryType, error)
 	return GetEntry(repo, commitObj.ParentHashes[0])
 }
 
-// GetNonGittufParentForEntry returns the first RSL entry starting from the
-// specified entry's parent that is not for the gittuf namespace.
-func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, []*Annotation, error) {
+// GetNonGittufParentReferenceEntryForEntry returns the first RSL reference
+// entry starting from the specified entry's parent that is not for the gittuf
+// namespace.
+func GetNonGittufParentReferenceEntryForEntry(repo *git.Repository, entry Entry) (*ReferenceEntry, []*AnnotationEntry, error) {
 	it, err := GetParentForEntry(repo, entry)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	allAnnotations := []*Annotation{}
-	var targetEntry *Entry
+	allAnnotations := []*AnnotationEntry{}
+	var targetEntry *ReferenceEntry
 
 	for {
 		switch iterator := it.(type) {
-		case *Entry:
+		case *ReferenceEntry:
 			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
 				targetEntry = iterator
 			}
-		case *Annotation:
+		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, iterator)
 		}
 
@@ -261,7 +269,7 @@ func GetNonGittufParentForEntry(repo *git.Repository, entry EntryType) (*Entry, 
 }
 
 // GetLatestEntry returns the latest entry available locally in the RSL.
-func GetLatestEntry(repo *git.Repository) (EntryType, error) {
+func GetLatestEntry(repo *git.Repository) (Entry, error) {
 	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
 	if err != nil {
 		return nil, err
@@ -275,24 +283,24 @@ func GetLatestEntry(repo *git.Repository) (EntryType, error) {
 	return parseRSLEntryText(commitObj.Hash, commitObj.Message)
 }
 
-// GetLatestNonGittufEntry returns the first RSL entry that is not for the
-// gittuf namespace.
-func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
+// GetLatestNonGittufReferenceEntry returns the first reference entry that is
+// not for the gittuf namespace.
+func GetLatestNonGittufReferenceEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
 	it, err := GetLatestEntry(repo)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	allAnnotations := []*Annotation{}
-	var targetEntry *Entry
+	allAnnotations := []*AnnotationEntry{}
+	var targetEntry *ReferenceEntry
 
 	for {
 		switch iterator := it.(type) {
-		case *Entry:
+		case *ReferenceEntry:
 			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
 				targetEntry = iterator
 			}
-		case *Annotation:
+		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, iterator)
 		}
 
@@ -312,17 +320,18 @@ func GetLatestNonGittufEntry(repo *git.Repository) (*Entry, []*Annotation, error
 	return targetEntry, annotations, nil
 }
 
-// GetLatestEntryForRef returns the latest entry available locally in the RSL
-// for the specified refName.
-func GetLatestEntryForRef(repo *git.Repository, refName string) (*Entry, []*Annotation, error) {
-	return GetLatestEntryForRefBefore(repo, refName, plumbing.ZeroHash)
+// GetLatestReferenceEntryForRef returns the latest reference entry available
+// locally in the RSL for the specified refName.
+func GetLatestReferenceEntryForRef(repo *git.Repository, refName string) (*ReferenceEntry, []*AnnotationEntry, error) {
+	return GetLatestReferenceEntryForRefBefore(repo, refName, plumbing.ZeroHash)
 }
 
-// GetLatestEntryForRefBefore returns the latest entry available locally in the
-// RSL for the specified refName before the specified anchor.
-func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*Entry, []*Annotation, error) {
+// GetLatestReferenceEntryForRefBefore returns the latest reference entry
+// available locally in the RSL for the specified refName before the specified
+// anchor.
+func GetLatestReferenceEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
 	var (
-		iteratorT EntryType
+		iteratorT Entry
 		err       error
 	)
 
@@ -339,24 +348,24 @@ func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plu
 
 		// We have to set the iterator to the parent. The other option is to
 		// swap the refName check and parent in the loop below but that breaks
-		// GetLatestEntryForRef's behavior. By adding this one extra GetParent
-		// here, we avoid repetition.
+		// GetLatestReferenceEntryForRef's behavior. By adding this one extra
+		// GetParent here, we avoid repetition.
 		iteratorT, err = GetParentForEntry(repo, iteratorT)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
 
-	allAnnotations := []*Annotation{}
-	var targetEntry *Entry
+	allAnnotations := []*AnnotationEntry{}
+	var targetEntry *ReferenceEntry
 
 	for {
 		switch iterator := iteratorT.(type) {
-		case *Entry:
+		case *ReferenceEntry:
 			if iterator.RefName == refName {
 				targetEntry = iterator
 			}
-		case *Annotation:
+		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, iterator)
 		}
 
@@ -378,17 +387,17 @@ func GetLatestEntryForRefBefore(repo *git.Repository, refName string, anchor plu
 }
 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
-// *Entry as the first entry in the RSL cannot be an annotation.
-func GetFirstEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
+// a reference entry as the first entry in the RSL cannot be an annotation.
+func GetFirstEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
 	iteratorT, err := GetLatestEntry(repo)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	allAnnotations := []*Annotation{}
-	var firstEntry *Entry
+	allAnnotations := []*AnnotationEntry{}
+	var firstEntry *ReferenceEntry
 
-	if iterator, ok := iteratorT.(*Annotation); ok {
+	if iterator, ok := iteratorT.(*AnnotationEntry); ok {
 		allAnnotations = append(allAnnotations, iterator)
 	}
 
@@ -396,7 +405,7 @@ func GetFirstEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
 		parentT, err := GetParentForEntry(repo, iteratorT)
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
-				entry, ok := iteratorT.(*Entry)
+				entry, ok := iteratorT.(*ReferenceEntry)
 				if !ok {
 					// The first entry cannot be an annotation
 					return nil, nil, ErrInvalidRSLEntry
@@ -408,7 +417,7 @@ func GetFirstEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
 			return nil, nil, err
 		}
 
-		if annotation, ok := parentT.(*Annotation); ok {
+		if annotation, ok := parentT.(*AnnotationEntry); ok {
 			allAnnotations = append(allAnnotations, annotation)
 		}
 
@@ -420,19 +429,19 @@ func GetFirstEntry(repo *git.Repository) (*Entry, []*Annotation, error) {
 	return firstEntry, annotations, nil
 }
 
-// GetFirstEntryForCommit returns the first entry in the RSL that either records
-// the commit itself or a descendent of the commit. This establishes the first
-// time a commit was seen in the repository, irrespective of the ref it was
-// associated with, and we can infer things like the active developers who could
-// have signed the commit.
-func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry, []*Annotation, error) {
+// GetFirstReferenceEntryForCommit returns the first reference entry in the RSL
+// that either records the commit itself or a descendent of the commit. This
+// establishes the first time a commit was seen in the repository, irrespective
+// of the ref it was associated with, and we can infer things like the active
+// developers who could have signed the commit.
+func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit) (*ReferenceEntry, []*AnnotationEntry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
 	// checking the parent. The first pair where the parent entry is not
 	// descended from the target commit, we return the other entry in the pair.
 
-	firstEntry, firstAnnotations, err := GetLatestNonGittufEntry(repo)
+	firstEntry, firstAnnotations, err := GetLatestNonGittufReferenceEntry(repo)
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			return nil, nil, ErrNoRecordOfCommit
@@ -449,7 +458,7 @@ func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry
 	}
 
 	for {
-		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentForEntry(repo, firstEntry)
+		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentReferenceEntryForEntry(repo, firstEntry)
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
 				return firstEntry, firstAnnotations, nil
@@ -470,20 +479,21 @@ func GetFirstEntryForCommit(repo *git.Repository, commit *object.Commit) (*Entry
 	}
 }
 
-// GetEntriesInRange returns a list of standard entries between the specified
-// range and a map of annotations that refer to each standard entry in the
-// range. The annotations map is keyed by the ID of the standard entry, with the
-// value being a list of annotations that apply to that standard entry.
-func GetEntriesInRange(repo *git.Repository, firstID, lastID plumbing.Hash) ([]*Entry, map[plumbing.Hash][]*Annotation, error) {
-	return GetEntriesInRangeForRef(repo, firstID, lastID, "")
+// GetReferenceEntriesInRange returns a list of reference entries between the
+// specified range and a map of annotations that refer to each reference entry
+// in the range. The annotations map is keyed by the ID of the reference entry,
+// with the value being a list of annotations that apply to that reference
+// entry.
+func GetReferenceEntriesInRange(repo *git.Repository, firstID, lastID plumbing.Hash) ([]*ReferenceEntry, map[plumbing.Hash][]*AnnotationEntry, error) {
+	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "")
 }
 
-// GetEntriesInRangeForRef returns a list of standard entries for the ref
-// between the specified range and a map of annotations that refer to each
-// standard entry in the range. The annotations map is keyed by the ID of the
-// standard entry, with the value being a list of annotations that apply to that
-// standard entry.
-func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash, refName string) ([]*Entry, map[plumbing.Hash][]*Annotation, error) {
+// GetReferenceEntriesInRangeForRef returns a list of reference entries for the
+// ref between the specified range and a map of annotations that refer to each
+// reference entry in the range. The annotations map is keyed by the ID of the
+// reference entry, with the value being a list of annotations that apply to
+// that reference entry.
+func GetReferenceEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash, refName string) ([]*ReferenceEntry, map[plumbing.Hash][]*AnnotationEntry, error) {
 	// We have to iterate from latest to get the annotations that refer to the
 	// last requested entry
 	iterator, err := GetLatestEntry(repo)
@@ -491,11 +501,11 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 		return nil, nil, err
 	}
 
-	allAnnotations := []*Annotation{}
+	allAnnotations := []*AnnotationEntry{}
 	for iterator.GetID() != lastID {
 		// Until we find the entry corresponding to lastID, we just store
 		// annotations
-		if annotation, isAnnotation := iterator.(*Annotation); isAnnotation {
+		if annotation, isAnnotation := iterator.(*AnnotationEntry); isAnnotation {
 			allAnnotations = append(allAnnotations, annotation)
 		}
 
@@ -506,13 +516,13 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 		iterator = parent
 	}
 
-	entryStack := []*Entry{}
+	entryStack := []*ReferenceEntry{}
 	inRange := map[plumbing.Hash]bool{}
 	for iterator.GetID() != firstID {
 		// Here, all items are relevant until the one corresponding to first is
 		// found
 		switch it := iterator.(type) {
-		case *Entry:
+		case *ReferenceEntry:
 			if len(refName) == 0 || it.RefName == refName || strings.HasPrefix(it.RefName, GittufNamespacePrefix) {
 				// It's a relevant entry if:
 				// a) there's no refName set, or
@@ -521,7 +531,7 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 				entryStack = append(entryStack, it)
 				inRange[it.ID] = true
 			}
-		case *Annotation:
+		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, it)
 		}
 
@@ -535,7 +545,7 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 	// Handle the item corresponding to first explicitly
 	// If it's an annotation, ignore it as it refers to something before the
 	// range we care about
-	if entry, isEntry := iterator.(*Entry); isEntry {
+	if entry, isEntry := iterator.(*ReferenceEntry); isEntry {
 		if len(refName) == 0 || entry.RefName == refName || strings.HasPrefix(entry.RefName, GittufNamespacePrefix) {
 			// It's a relevant entry if:
 			// a) there's no refName set, or
@@ -549,7 +559,7 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 	// For each annotation, add the entry to each relevant entry it refers to
 	// Process annotations in reverse order so that annotations are listed in
 	// order of occurrence in the map
-	annotationMap := map[plumbing.Hash][]*Annotation{}
+	annotationMap := map[plumbing.Hash][]*AnnotationEntry{}
 	for i := len(allAnnotations) - 1; i >= 0; i-- {
 		annotation := allAnnotations[i]
 		for _, entryID := range annotation.RSLEntryIDs {
@@ -557,7 +567,7 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 				// Annotation is relevant because the entry it refers to was in
 				// the specified range
 				if _, exists := annotationMap[entryID]; !exists {
-					annotationMap[entryID] = []*Annotation{}
+					annotationMap[entryID] = []*AnnotationEntry{}
 				}
 
 				annotationMap[entryID] = append(annotationMap[entryID], annotation)
@@ -567,7 +577,7 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 
 	// Reverse entryStack so that it's in order of occurrence rather than in
 	// order of walking back the RSL
-	allEntries := make([]*Entry, 0, len(entryStack))
+	allEntries := make([]*ReferenceEntry, 0, len(entryStack))
 	for i := len(entryStack) - 1; i >= 0; i-- {
 		allEntries = append(allEntries, entryStack[i])
 	}
@@ -575,22 +585,22 @@ func GetEntriesInRangeForRef(repo *git.Repository, firstID, lastID plumbing.Hash
 	return allEntries, annotationMap, nil
 }
 
-func parseRSLEntryText(id plumbing.Hash, text string) (EntryType, error) {
+func parseRSLEntryText(id plumbing.Hash, text string) (Entry, error) {
 	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, AnnotationHeader) {
-		return parseAnnotationText(id, text)
+	if strings.HasPrefix(text, AnnotationEntryHeader) {
+		return parseAnnotationEntryText(id, text)
 	}
-	return parseEntryText(id, text)
+	return parseReferenceEntryText(id, text)
 }
 
-func parseEntryText(id plumbing.Hash, text string) (*Entry, error) {
+func parseReferenceEntryText(id plumbing.Hash, text string) (*ReferenceEntry, error) {
 	lines := strings.Split(text, "\n")
 	if len(lines) < 4 {
 		return nil, ErrInvalidRSLEntry
 	}
 	lines = lines[2:]
 
-	entry := &Entry{ID: id}
+	entry := &ReferenceEntry{ID: id}
 	for _, l := range lines {
 		l = strings.TrimSpace(l)
 
@@ -610,8 +620,8 @@ func parseEntryText(id plumbing.Hash, text string) (*Entry, error) {
 	return entry, nil
 }
 
-func parseAnnotationText(id plumbing.Hash, text string) (*Annotation, error) {
-	annotation := &Annotation{
+func parseAnnotationEntryText(id plumbing.Hash, text string) (*AnnotationEntry, error) {
+	annotation := &AnnotationEntry{
 		ID:          id,
 		RSLEntryIDs: []plumbing.Hash{},
 	}
@@ -653,8 +663,8 @@ func parseAnnotationText(id plumbing.Hash, text string) (*Annotation, error) {
 	return annotation, nil
 }
 
-func filterAnnotationsForRelevantAnnotations(allAnnotations []*Annotation, entryID plumbing.Hash) []*Annotation {
-	annotations := []*Annotation{}
+func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID plumbing.Hash) []*AnnotationEntry {
+	annotations := []*AnnotationEntry{}
 	for _, annotation := range allAnnotations {
 		annotation := annotation
 		if annotation.RefersTo(entryID) {

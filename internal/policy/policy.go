@@ -97,7 +97,7 @@ func LoadState(ctx context.Context, repo *git.Repository, rslEntryID plumbing.Ha
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy.
 func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error) {
-	e, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	e, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +107,8 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error)
 
 // LoadStateForEntry returns the State for a specified RSL entry for the policy
 // namespace.
-func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryType) (*State, error) {
-	entry, ok := e.(*rsl.Entry)
+func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.Entry) (*State, error) {
+	entry, ok := e.(*rsl.ReferenceEntry)
 	if !ok {
 		return nil, ErrNotRSLEntry
 	}
@@ -214,7 +214,7 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.EntryTyp
 // error is returned. Identifying the policy in this case is left to the calling
 // workflow.
 func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object.Commit) (*State, error) {
-	firstSeenEntry, _, err := rsl.GetFirstEntryForCommit(repo, commit)
+	firstSeenEntry, _, err := rsl.GetFirstReferenceEntryForCommit(repo, commit)
 	if err != nil {
 		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
 			return nil, nil
@@ -222,7 +222,7 @@ func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object
 		return nil, err
 	}
 
-	commitPolicyEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
+	commitPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +599,7 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 
 	// We must reset to original policy commit if err != nil from here onwards.
 
-	if err := rsl.NewEntry(PolicyRef, commitID).Commit(repo, signCommit); err != nil {
+	if err := rsl.NewReferenceEntry(PolicyRef, commitID).Commit(repo, signCommit); err != nil {
 		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
 	}
 

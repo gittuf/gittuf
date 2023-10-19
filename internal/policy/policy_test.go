@@ -92,7 +92,7 @@ func TestLoadCurrentState(t *testing.T) {
 func TestLoadStateForEntry(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	entry, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestStateCommit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	entry := tmpEntry.(*rsl.Entry)
+	entry := tmpEntry.(*rsl.ReferenceEntry)
 	assert.Equal(t, entry.TargetID, policyRef.Hash())
 }
 
@@ -244,7 +244,7 @@ func TestGetStateForCommit(t *testing.T) {
 	assert.Nil(t, state)
 
 	// Record RSL entry for commit
-	if err := rsl.NewEntry(refName, commitID).Commit(repo, false); err != nil {
+	if err := rsl.NewReferenceEntry(refName, commitID).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -262,7 +262,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := rsl.NewEntry(anotherRefName, newCommitID).Commit(repo, false); err != nil {
+	if err := rsl.NewReferenceEntry(anotherRefName, newCommitID).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -319,7 +319,7 @@ func TestGetStateForCommit(t *testing.T) {
 	}
 
 	// Record in RSL
-	if err := rsl.NewEntry(refName, newCommitID).Commit(repo, false); err != nil {
+	if err := rsl.NewReferenceEntry(refName, newCommitID).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 

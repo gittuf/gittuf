@@ -40,17 +40,17 @@ var (
 	testClock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 )
 
-// CreateTestRSLEntryCommit is a test helper used to create a **signed** RSL
-// entry using the GPG key stored in the repository. It is used to substitute
-// for the default RSL entry creation and signing mechanism which relies on the
-// user's Git config.
-func CreateTestRSLEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.Entry) plumbing.Hash {
+// CreateTestRSLReferenceEntryCommit is a test helper used to create a
+// **signed** reference entry using the GPG key stored in the repository. It is
+// used to substitute for the default RSL entry creation and signing mechanism
+// which relies on the user's Git config.
+func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.ReferenceEntry) plumbing.Hash {
 	t.Helper()
 
 	// We do this manually because rsl.Commit() will not sign using our test key
 
 	lines := []string{
-		rsl.EntryHeader,
+		rsl.ReferenceEntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", rsl.RefKey, entry.RefName),
 		fmt.Sprintf("%s: %s", rsl.TargetIDKey, entry.TargetID.String()),

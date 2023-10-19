@@ -36,8 +36,8 @@ func TestVerifyRef(t *testing.T) {
 	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
-	entry := rsl.NewEntry(refName, commitIDs[0])
-	common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 
 	err := VerifyRef(context.Background(), repo, refName)
 	assert.Nil(t, err)
@@ -56,8 +56,8 @@ func TestVerifyRefFull(t *testing.T) {
 	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
-	entry := rsl.NewEntry(refName, commitIDs[0])
-	common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 
 	err := VerifyRefFull(context.Background(), repo, refName)
 	assert.Nil(t, err)
@@ -75,14 +75,14 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	policyEntry, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
-	entry := rsl.NewEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	err = VerifyRelativeForRef(context.Background(), repo, policyEntry, policyEntry, entry, refName)
@@ -105,8 +105,8 @@ func TestVerifyCommit(t *testing.T) {
 	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
-	entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	expectedStatus := make(map[string]string, len(commitIDs))
@@ -155,8 +155,8 @@ func TestVerifyTag(t *testing.T) {
 	refName := "refs/heads/main"
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
-	entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	tagName := "v1"
@@ -166,8 +166,8 @@ func TestVerifyTag(t *testing.T) {
 	status := VerifyTag(context.Background(), repo, []string{tagID.String()})
 	assert.Equal(t, expectedStatus, status)
 
-	entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-	entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	// Use tag ID
@@ -195,8 +195,8 @@ func TestVerifyEntry(t *testing.T) {
 	refName := "refs/heads/main"
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1)
-	entry := rsl.NewEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 	entry.ID = entryID
 
 	err := verifyEntry(context.Background(), repo, state, entry)
@@ -216,15 +216,15 @@ func TestVerifyTagEntry(t *testing.T) {
 		refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
-		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		tagName := "v1"
 		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
 
-		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -236,15 +236,15 @@ func TestVerifyTagEntry(t *testing.T) {
 		refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
-		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		tagName := "v1"
 		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
 
-		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -256,15 +256,15 @@ func TestVerifyTagEntry(t *testing.T) {
 		refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3)
-		entry := rsl.NewEntry(refName, commitIDs[len(commitIDs)-1])
-		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		tagName := "v1"
 		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
 
-		entry = rsl.NewEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-		entryID = common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		err := verifyTagEntry(context.Background(), repo, policy, entry)
@@ -285,12 +285,12 @@ func TestGetCommits(t *testing.T) {
 	// helper like createTestStateWithPolicy. The RSL could then also
 	// incorporate policy changes and so on.
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5)
-	firstEntry := rsl.NewEntry(refName, commitIDs[0])
-	firstEntryID := common.CreateTestRSLEntryCommit(t, repo, firstEntry)
+	firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry)
 	firstEntry.ID = firstEntryID
 
-	secondEntry := rsl.NewEntry(refName, commitIDs[4])
-	secondEntryID := common.CreateTestRSLEntryCommit(t, repo, secondEntry)
+	secondEntry := rsl.NewReferenceEntry(refName, commitIDs[4])
+	secondEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, secondEntry)
 	secondEntry.ID = secondEntryID
 
 	expectedCommitIDs := []plumbing.Hash{commitIDs[1], commitIDs[2], commitIDs[3], commitIDs[4]}
@@ -326,10 +326,10 @@ func TestGetChangedPaths(t *testing.T) {
 	// helper like createTestStateWithPolicy. The RSL could then also
 	// incorporate policy changes and so on.
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2)
-	entries := []*rsl.Entry{}
+	entries := []*rsl.ReferenceEntry{}
 	for _, commitID := range commitIDs {
-		entry := rsl.NewEntry(refName, commitID)
-		entryID := common.CreateTestRSLEntryCommit(t, repo, entry)
+		entry := rsl.NewReferenceEntry(refName, commitID)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry)
 		entry.ID = entryID
 
 		entries = append(entries, entry)

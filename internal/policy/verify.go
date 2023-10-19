@@ -45,7 +45,7 @@ var (
 // using the latest policy.
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 	// 1. Get latest policy entry
-	policyEntry, _, err := rsl.GetLatestEntryForRef(repo, PolicyRef)
+	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
 	}
 
 	// 2. Find latest entry for target
-	latestEntry, _, err := rsl.GetLatestEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) err
 	}
 
 	// 2. Find latest entry for target
-	latestEntry, _, err := rsl.GetLatestEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) err
 // using the provided policy entry for the first entry.
 //
 // TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry *rsl.Entry, firstEntry *rsl.Entry, lastEntry *rsl.Entry, target string) error {
+func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var currentPolicy *State
 
 	// 1. Load policy applicable at firstEntry
@@ -97,7 +97,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	currentPolicy = state
 
 	// 2. Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
-	entries, _, err := rsl.GetEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
+	entries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
 	}
@@ -262,18 +262,18 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 			absPath = string(plumbing.NewTagReferenceName(tagObj.Name))
 		}
 
-		entry, _, err := rsl.GetLatestEntryForRef(repo, absPath)
+		entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, absPath)
 		if err != nil {
 			status[id] = unableToFindRSLEntryMessage
 			continue
 		}
 
-		if _, _, err := rsl.GetLatestEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
+		if _, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
 			status[id] = multipleTagRSLEntriesFoundMessage
 			continue
 		}
 
-		policyEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, PolicyRef, entry.ID)
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
 		if err != nil {
 			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
 			continue
@@ -333,7 +333,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
+func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
 	// TODO: discuss how / if we want to verify RSL entry signatures for the policy namespace
 	if entry.RefName == PolicyRef {
 		return nil
@@ -492,7 +492,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	return nil
 }
 
-func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.Entry) error {
+func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
 	// 1. Find authorized public keys for tag's RSL entry
 	trustedKeys, err := policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName))
 	if err != nil {
@@ -580,10 +580,10 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 // getCommits identifies the commits introduced to the entry's ref since the
 // last RSL entry for the same ref. These commits are then verified for file
 // policies.
-func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error) {
+func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]*object.Commit, error) {
 	firstEntry := false
 
-	priorRefEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err
@@ -606,7 +606,7 @@ func getCommits(repo *git.Repository, entry *rsl.Entry) ([]*object.Commit, error
 // Deprecated: this was introduced in a previous design. As it turns out, it is
 // flawed as we want changed paths per commit rather than all changed paths
 // between two RSL entries that span multiple commits.
-func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
+func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string, error) {
 	firstEntry := false
 
 	currentCommit, err := repo.CommitObject(entry.TargetID)
@@ -614,7 +614,7 @@ func getChangedPaths(repo *git.Repository, entry *rsl.Entry) ([]string, error) {
 		return nil, err
 	}
 
-	priorRefEntry, _, err := rsl.GetLatestEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err

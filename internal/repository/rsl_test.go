@@ -51,7 +51,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry, ok := entryType.(*rsl.Entry)
+	entry, ok := entryType.(*rsl.ReferenceEntry)
 	if !ok {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
@@ -79,7 +79,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry, ok = entryType.(*rsl.Entry)
+	entry, ok = entryType.(*rsl.ReferenceEntry)
 	if !ok {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
@@ -117,8 +117,8 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, refName, latestEntry.(*rsl.Entry).RefName)
-	assert.Equal(t, commitID, latestEntry.(*rsl.Entry).TargetID)
+	assert.Equal(t, refName, latestEntry.(*rsl.ReferenceEntry).RefName)
+	assert.Equal(t, commitID, latestEntry.(*rsl.ReferenceEntry).TargetID)
 
 	// Now checkout another branch, add another commit
 	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
@@ -188,9 +188,9 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.IsType(t, &rsl.Annotation{}, latestEntry)
+	assert.IsType(t, &rsl.AnnotationEntry{}, latestEntry)
 
-	annotation := latestEntry.(*rsl.Annotation)
+	annotation := latestEntry.(*rsl.AnnotationEntry)
 	assert.Equal(t, "test annotation", annotation.Message)
 	assert.Equal(t, []plumbing.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.False(t, annotation.Skip)
@@ -202,9 +202,9 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.IsType(t, &rsl.Annotation{}, latestEntry)
+	assert.IsType(t, &rsl.AnnotationEntry{}, latestEntry)
 
-	annotation = latestEntry.(*rsl.Annotation)
+	annotation = latestEntry.(*rsl.AnnotationEntry)
 	assert.Equal(t, "skip annotation", annotation.Message)
 	assert.Equal(t, []plumbing.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.True(t, annotation.Skip)
@@ -458,7 +458,7 @@ func TestPushRSL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, plumbing.ZeroHash).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
 		}
 
