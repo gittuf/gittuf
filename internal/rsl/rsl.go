@@ -234,14 +234,34 @@ func GetParentForEntry(repo *git.Repository, entry Entry) (Entry, error) {
 // entry starting from the specified entry's parent that is not for the gittuf
 // namespace.
 func GetNonGittufParentReferenceEntryForEntry(repo *git.Repository, entry Entry) (*ReferenceEntry, []*AnnotationEntry, error) {
-	it, err := GetParentForEntry(repo, entry)
+	it, err := GetLatestEntry(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	parentEntry, err := GetParentForEntry(repo, entry)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	allAnnotations := []*AnnotationEntry{}
-	var targetEntry *ReferenceEntry
 
+	for {
+		if annotation, isAnnotation := it.(*AnnotationEntry); isAnnotation {
+			allAnnotations = append(allAnnotations, annotation)
+		}
+
+		it, err = GetParentForEntry(repo, it)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if it.GetID() == parentEntry.GetID() {
+			break
+		}
+	}
+
+	var targetEntry *ReferenceEntry
 	for {
 		switch iterator := it.(type) {
 		case *ReferenceEntry:
@@ -330,20 +350,28 @@ func GetLatestReferenceEntryForRef(repo *git.Repository, refName string) (*Refer
 // available locally in the RSL for the specified refName before the specified
 // anchor.
 func GetLatestReferenceEntryForRefBefore(repo *git.Repository, refName string, anchor plumbing.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
-	var (
-		iteratorT Entry
-		err       error
-	)
+	allAnnotations := []*AnnotationEntry{}
 
-	if anchor.IsZero() {
-		iteratorT, err = GetLatestEntry(repo)
-		if err != nil {
-			return nil, nil, err
+	iteratorT, err := GetLatestEntry(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if !anchor.IsZero() {
+		for iteratorT.GetID() != anchor {
+			if annotation, isAnnotation := iteratorT.(*AnnotationEntry); isAnnotation {
+				allAnnotations = append(allAnnotations, annotation)
+			}
+
+			iteratorT, err = GetParentForEntry(repo, iteratorT)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-	} else {
-		iteratorT, err = GetEntry(repo, anchor)
-		if err != nil {
-			return nil, nil, err
+
+		// If the anchor is an annotation, track that
+		if annotation, isAnnotation := iteratorT.(*AnnotationEntry); isAnnotation {
+			allAnnotations = append(allAnnotations, annotation)
 		}
 
 		// We have to set the iterator to the parent. The other option is to
@@ -356,9 +384,7 @@ func GetLatestReferenceEntryForRefBefore(repo *git.Repository, refName string, a
 		}
 	}
 
-	allAnnotations := []*AnnotationEntry{}
 	var targetEntry *ReferenceEntry
-
 	for {
 		switch iterator := iteratorT.(type) {
 		case *ReferenceEntry:
