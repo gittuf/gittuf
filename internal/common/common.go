@@ -4,6 +4,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -41,10 +42,10 @@ var (
 )
 
 // CreateTestRSLReferenceEntryCommit is a test helper used to create a
-// **signed** reference entry using the GPG key stored in the repository. It is
-// used to substitute for the default RSL entry creation and signing mechanism
-// which relies on the user's Git config.
-func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.ReferenceEntry) plumbing.Hash {
+// **signed** reference entry using the specified GPG key. It is used to
+// substitute for the default RSL entry creation and signing mechanism which
+// relies on the user's Git config.
+func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.ReferenceEntry, keyName string) plumbing.Hash {
 	t.Helper()
 
 	// We do this manually because rsl.Commit() will not sign using our test key
@@ -79,7 +80,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 		ParentHashes: []plumbing.Hash{ref.Hash()},
 	}
 
-	testCommit = SignTestCommit(t, repo, testCommit)
+	testCommit = SignTestCommit(t, repo, testCommit, keyName)
 
 	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
 	if err != nil {
@@ -89,10 +90,79 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 	return commitID
 }
 
-// SignTestCommit signs the test commit using the test key stored in the
+// CreateTestRSLAnnotationEntryCommit is a test helper used to create a
+// **signed** RSL annotation using the specified GPG key. It is used to
+// substitute for the default RSL annotation creation and signing mechanism
+// which relies on the user's Git config.
+func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, annotation *rsl.AnnotationEntry, keyName string) plumbing.Hash {
+	t.Helper()
+
+	// We do this manually because rsl.Commit() will not sign using our test key
+
+	lines := []string{
+		rsl.AnnotationEntryHeader,
+		"",
+	}
+
+	for _, entry := range annotation.RSLEntryIDs {
+		lines = append(lines, fmt.Sprintf("%s: %s", rsl.EntryIDKey, entry.String()))
+	}
+
+	if annotation.Skip {
+		lines = append(lines, fmt.Sprintf("%s: true", rsl.SkipKey))
+	} else {
+		lines = append(lines, fmt.Sprintf("%s: false", rsl.SkipKey))
+	}
+
+	if len(annotation.Message) != 0 {
+		var message strings.Builder
+		messageBlock := pem.Block{
+			Type:  rsl.AnnotationMessageBlockType,
+			Bytes: []byte(annotation.Message),
+		}
+		if err := pem.Encode(&message, &messageBlock); err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, strings.TrimSpace(message.String()))
+	}
+
+	commitMessage := strings.Join(lines, "\n")
+
+	ref, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCommit := &object.Commit{
+		Author: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Committer: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Message:      commitMessage,
+		TreeHash:     plumbing.ZeroHash,
+		ParentHashes: []plumbing.Hash{ref.Hash()},
+	}
+
+	testCommit = SignTestCommit(t, repo, testCommit, keyName)
+
+	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return commitID
+}
+
+// SignTestCommit signs the test commit using the specified key stored in the
 // repository. Note that the GPG key is loaded relative to the package
 // containing the test.
-func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *object.Commit {
+func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit, keyName string) *object.Commit {
 	t.Helper()
 
 	commitEncoded := repo.Storer.NewEncodedObject()
@@ -104,7 +174,7 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 		t.Fatal(err)
 	}
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
+	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", keyName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,9 +193,10 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit) *
 	return commit
 }
 
-// SignTestTag signs the test tag using the test key stored in the repository.
-// Note that the GPG key is loaded relative to the package containing the test.
-func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag) *object.Tag {
+// SignTestTag signs the specified tag using the test key stored in the
+// repository.  Note that the GPG key is loaded relative to the package
+// containing the test.
+func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag, keyName string) *object.Tag {
 	t.Helper()
 
 	tagEncoded := repo.Storer.NewEncodedObject()
@@ -137,7 +208,7 @@ func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag) *object.Ta
 		t.Fatal(err)
 	}
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
+	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", keyName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,8 +231,9 @@ func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag) *object.Ta
 // specified Git ref in the provided repository. Parameter `n` determines how
 // many commits are added. Each commit is associated with a distinct tree. The
 // first commit contains a tree with one object (an empty blob), the second with
-// two objects (both empty blobs), and so on.
-func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int) []plumbing.Hash {
+// two objects (both empty blobs), and so on. Each commit is signed using the
+// specified key.
+func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int, keyName string) []plumbing.Hash {
 	t.Helper()
 
 	emptyBlobHash, err := gitinterface.WriteBlob(repo, []byte{})
@@ -205,7 +277,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
 		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
-		commit = SignTestCommit(t, repo, commit)
+		commit = SignTestCommit(t, repo, commit, keyName)
 		if _, err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}
@@ -223,7 +295,9 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	return commitIDs
 }
 
-func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, target plumbing.Hash) plumbing.Hash {
+// CreateTestSignedTag creates a signed tag in the repository pointing to the
+// target object. The tag is signed using the specified key.
+func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, target plumbing.Hash, keyName string) plumbing.Hash {
 	t.Helper()
 
 	targetObj, err := repo.Object(plumbing.AnyObject, target)
@@ -233,7 +307,7 @@ func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, tar
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)
 	tag := gitinterface.CreateTagObject(testGitConfig, targetObj, tagName, tagMessage, testClock)
-	tag = SignTestTag(t, repo, tag)
+	tag = SignTestTag(t, repo, tag, keyName)
 	tagHash, err := gitinterface.ApplyTag(repo, tag)
 	if err != nil {
 		t.Fatal(err)
