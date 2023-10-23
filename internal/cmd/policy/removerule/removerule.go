@@ -34,7 +34,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("rule-name") //nolint:errcheck
 }
 
-func (o *options) Run(cmd *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err

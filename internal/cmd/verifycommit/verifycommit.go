@@ -11,7 +11,7 @@ import (
 
 type options struct{}
 
-func (o *options) AddFlags(cmd *cobra.Command) {}
+func (o *options) AddFlags(_ *cobra.Command) {}
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := repository.LoadRepository()

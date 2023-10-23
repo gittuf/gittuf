@@ -29,7 +29,8 @@ func ReadKeyBytes(key string) ([]byte, error) {
 		err error
 	)
 
-	if strings.HasPrefix(key, GPGKeyPrefix) {
+	switch {
+	case strings.HasPrefix(key, GPGKeyPrefix):
 		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, GPGKeyPrefix)))
 
 		command := exec.Command("gpg", "--export", "--armor", fingerprint)
@@ -47,7 +48,7 @@ func ReadKeyBytes(key string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else if strings.HasPrefix(key, FulcioPrefix) {
+	case strings.HasPrefix(key, FulcioPrefix):
 		keyID := strings.TrimPrefix(key, FulcioPrefix)
 		ks := strings.Split(keyID, "::")
 		if len(ks) != 2 {
@@ -68,7 +69,7 @@ func ReadKeyBytes(key string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else {
+	default:
 		kb, err = os.ReadFile(key)
 		if err != nil {
 			return nil, err

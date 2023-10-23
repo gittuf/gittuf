@@ -32,10 +32,8 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 	_, err := os.Stat(dir)
 	if err == nil {
 		return nil, errors.Join(ErrCloningRepository, ErrDirExists)
-	} else {
-		if !os.IsNotExist(err) {
-			return nil, errors.Join(ErrCloningRepository, err)
-		}
+	} else if !os.IsNotExist(err) {
+		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
 	if err := os.Mkdir(dir, 0755); err != nil {

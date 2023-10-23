@@ -137,11 +137,12 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.Entry) (
 	)
 
 	for _, e := range policyRootTree.Entries {
-		if e.Name == metadataTreeEntryName {
+		switch e.Name {
+		case metadataTreeEntryName:
 			metadataTreeID = e.Hash
-		} else if e.Name == rootPublicKeysTreeEntryName {
+		case rootPublicKeysTreeEntryName:
 			keysTreeID = e.Hash
-		} else {
+		default:
 			return nil, ErrInvalidPolicyTree
 		}
 	}
@@ -169,11 +170,12 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.Entry) (
 			return nil, err
 		}
 
-		if entry.Name == fmt.Sprintf("%s.json", RootRoleName) {
+		switch entry.Name {
+		case fmt.Sprintf("%s.json", RootRoleName):
 			state.RootEnvelope = env
-		} else if entry.Name == fmt.Sprintf("%s.json", TargetsRoleName) {
+		case fmt.Sprintf("%s.json", TargetsRoleName):
 			state.TargetsEnvelope = env
-		} else {
+		default:
 			if state.DelegationEnvelopes == nil {
 				state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
 			}
@@ -471,16 +473,16 @@ func (s *State) Verify(ctx context.Context) error {
 		}
 
 		delegationMetadata := &tuf.TargetsMetadata{}
-		if delegationContents, err := delegationEnvelope.DecodeB64Payload(); err != nil {
+		delegationContents, err := delegationEnvelope.DecodeB64Payload()
+		if err != nil {
 			return err
-		} else {
-			if err := json.Unmarshal(delegationContents, delegationMetadata); err != nil {
-				return err
-			}
+		}
+		if err := json.Unmarshal(delegationContents, delegationMetadata); err != nil {
+			return err
+		}
 
-			if err := delegationMetadata.Validate(); err != nil {
-				return err
-			}
+		if err := delegationMetadata.Validate(); err != nil {
+			return err
 		}
 
 		if delegationMetadata.Delegations == nil {

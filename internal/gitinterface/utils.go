@@ -159,14 +159,15 @@ func RefSpec(repo *git.Repository, refName, remoteName string, fastForwardOnly b
 
 func RemoteRef(refName, remoteName string) string {
 	var remotePath string
-	if strings.HasPrefix(refName, BranchRefPrefix) {
+	switch {
+	case strings.HasPrefix(refName, BranchRefPrefix):
 		// refs/heads/<path> -> refs/remotes/<remote>/<path>
 		rest := strings.TrimPrefix(refName, BranchRefPrefix)
 		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)
-	} else if strings.HasPrefix(refName, TagRefPrefix) {
+	case strings.HasPrefix(refName, TagRefPrefix):
 		// refs/tags/<path> -> refs/tags/<path>
 		remotePath = refName
-	} else {
+	default:
 		// refs/<path> -> refs/remotes/<remote>/<path>
 		rest := strings.TrimPrefix(refName, RefPrefix)
 		remotePath = path.Join(RemoteRefPrefix, remoteName, rest)

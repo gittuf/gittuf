@@ -75,7 +75,7 @@ func TestGetCommitFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		paths, err := GetCommitFilePaths(repo, commit)
+		paths, err := GetCommitFilePaths(commit)
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test %s", name))
 		assert.Equal(t, test.expectedPaths, paths, fmt.Sprintf("unexpected list of files received: expected %v, got %v in test %s", test.expectedPaths, paths, name))
 	}
@@ -128,7 +128,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
@@ -165,7 +165,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
@@ -208,7 +208,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
@@ -250,7 +250,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"b"}, diffs)
 	})
@@ -292,7 +292,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"b"}, diffs)
 	})
@@ -334,7 +334,7 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetDiffFilePaths(repo, commitA, commitB)
+		diffs, err := GetDiffFilePaths(commitA, commitB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
