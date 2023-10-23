@@ -1,3 +1,22 @@
+linters:
+  enable:
+  - asciicheck
+  - errcheck
+  - errorlint
+  - gofmt
+  - goimports
+  - gosec
+  - gocritic
+  - importas
+  - prealloc
+  - revive
+  - misspell
+  - stylecheck
+  - tparallel
+  - unconvert
+  - unparam
+  - unused
+  - whitespace
 output:
   uniq-by-line: false
 run:
