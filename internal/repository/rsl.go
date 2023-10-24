@@ -17,6 +17,7 @@ import (
 var (
 	ErrCommitNotInRef = errors.New("specified commit is not in ref")
 	ErrPushingRSL     = errors.New("unable to push RSL")
+	ErrPullingRSL     = errors.New("unable to pull RSL")
 )
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
@@ -163,6 +164,16 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 func (r *Repository) PushRSL(ctx context.Context, remoteName string) error {
 	if err := gitinterface.Push(ctx, r.r, remoteName, []string{rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingRSL, err)
+	}
+
+	return nil
+}
+
+// PullRSL pulls RSL contents from the specified remote to the local RSL. The
+// fetch is marked as fast forward only to detect RSL divergence.
+func (r *Repository) PullRSL(ctx context.Context, remoteName string) error {
+	if err := gitinterface.Fetch(ctx, r.r, remoteName, []string{rsl.Ref}, true); err != nil {
+		return errors.Join(ErrPullingRSL, err)
 	}
 
 	return nil

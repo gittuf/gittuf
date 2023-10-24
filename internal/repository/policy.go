@@ -11,7 +11,10 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-var ErrPushingPolicy = errors.New("unable to push policy")
+var (
+	ErrPushingPolicy = errors.New("unable to push policy")
+	ErrPullingPolicy = errors.New("unable to pull policy")
+)
 
 // PushPolicy pushes the local gittuf policy to the specified remote. As this
 // push defaults to fast-forward only, divergent policy states are detected.
@@ -20,6 +23,17 @@ var ErrPushingPolicy = errors.New("unable to push policy")
 func (r *Repository) PushPolicy(ctx context.Context, remoteName string) error {
 	if err := gitinterface.Push(ctx, r.r, remoteName, []string{policy.PolicyRef, rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingPolicy, err)
+	}
+
+	return nil
+}
+
+// PullPolicy fetches gittuf policy from the specified remote. The fetches is
+// marked as fast forward only to detect divergence. Note that this also fetches
+// the RSL as the policy must be updated in sync with the RSL.
+func (r *Repository) PullPolicy(ctx context.Context, remoteName string) error {
+	if err := gitinterface.Fetch(ctx, r.r, remoteName, []string{policy.PolicyRef, rsl.Ref}, true); err != nil {
+		return errors.Join(ErrPullingPolicy, err)
 	}
 
 	return nil

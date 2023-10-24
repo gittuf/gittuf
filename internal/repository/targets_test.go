@@ -165,7 +165,7 @@ func TestAddKeyToTargets(t *testing.T) {
 func createTestRepositoryWithTargets(t *testing.T) (*Repository, []byte) {
 	t.Helper()
 
-	r, rootKeyBytes := createTestRepositoryWithRoot(t)
+	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
 
 	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
 	if err != nil {

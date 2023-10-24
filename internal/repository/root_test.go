@@ -18,7 +18,7 @@ import (
 
 func TestInitializeRoot(t *testing.T) {
 	// The helper also runs InitializeRoot for this test
-	r, rootKeyBytes := createTestRepositoryWithRoot(t)
+	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
 
 	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
@@ -44,7 +44,7 @@ func TestInitializeRoot(t *testing.T) {
 }
 
 func TestAddTopLevelTargetsKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t)
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	key, err := tuf.LoadKeyFromBytes(keyBytes)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 }
 
 func TestRemoveTopLevelTargetsKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t)
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	rootKey, err := tuf.LoadKeyFromBytes(keyBytes)
 	if err != nil {

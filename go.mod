@@ -1,9 +1,11 @@
 module github.com/gittuf/gittuf
 
-go 1.20
+go 1.21.3
+
+replace github.com/go-git/go-git/v5 => ./internal/third_party/go-git
 
 require (
-	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371
+	github.com/ProtonMail/go-crypto v0.0.0-20230923063757-afb1ddc0824c
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.9.0
 	github.com/jonboulle/clockwork v0.4.0
@@ -91,7 +93,7 @@ require (
 	github.com/sigstore/rekor v1.2.2 // indirect
 	github.com/sigstore/timestamp-authority v1.1.2 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/skeema/knownhosts v1.2.0 // indirect
+	github.com/skeema/knownhosts v1.2.1 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect

@@ -16,7 +16,7 @@ import (
 const gpgKeyName = "gpg-privkey.asc"
 
 func TestVerifyRef(t *testing.T) {
-	repo := createTestRepositoryWithPolicy(t)
+	repo := createTestRepositoryWithPolicy(t, "")
 
 	refName := "refs/heads/main"
 	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {

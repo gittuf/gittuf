@@ -3,6 +3,7 @@
 package remote
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote/pull"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote/push"
 	"github.com/spf13/cobra"
 )
@@ -13,6 +14,7 @@ func New() *cobra.Command {
 		Short: "Tools for managing remote policies",
 	}
 
+	cmd.AddCommand(pull.New())
 	cmd.AddCommand(push.New())
 
 	return cmd
