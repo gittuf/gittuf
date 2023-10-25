@@ -10,8 +10,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
+	"github.com/gittuf/gittuf/internal/third_party/go-git"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/config"
 )
 
 var (

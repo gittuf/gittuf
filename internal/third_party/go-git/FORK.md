@@ -1,4 +1,4 @@
-# Fork of github.com/go-git/go-git/v5
+# Fork of github.com/gittuf/gittuf/internal/third_party/go-git
 
 This package is a fork of go-git v5.9.0 with a patch submitted to change
 behavior in `fetch`. Specifically, one of the checks performed to determine if

@@ -1,6 +1,6 @@
 package cache
 
-import "github.com/go-git/go-git/v5/plumbing"
+import "github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
 
 const (
 	Byte FileSize = 1 << (iota * 10)

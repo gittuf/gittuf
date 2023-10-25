@@ -9,12 +9,12 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/third_party/go-git"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/config"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/storage/memory"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/jonboulle/clockwork"
 )
 

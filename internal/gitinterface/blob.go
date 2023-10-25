@@ -6,9 +6,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/gittuf/gittuf/internal/third_party/go-git"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/storage/memory"
 )
 
 var ErrWrittenBlobLengthMismatch = errors.New("length of blob written does not match length of contents")

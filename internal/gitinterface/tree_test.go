@@ -5,11 +5,11 @@ package gitinterface
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/third_party/go-git"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/filemode"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/storage/memory"
 	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/filemode"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
