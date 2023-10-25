@@ -5,7 +5,7 @@ package gitinterface
 import (
 	"time"
 
-	"github.com/go-git/go-git/v5/config"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/config"
 	"github.com/jonboulle/clockwork"
 )
 

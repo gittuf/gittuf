@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/third_party/go-git/internal/path_util"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/config"
+	gioutil "github.com/gittuf/gittuf/internal/third_party/go-git/utils/ioutil"
 	"github.com/go-git/go-billy/v5"
-	"github.com/go-git/go-git/v5/internal/path_util"
-	"github.com/go-git/go-git/v5/plumbing/format/config"
-	gioutil "github.com/go-git/go-git/v5/utils/ioutil"
 )
 
 const (

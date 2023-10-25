@@ -4,9 +4,9 @@ import (
 	"container/list"
 	"io"
 
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/storer"
-	"github.com/go-git/go-git/v5/storage"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/storer"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/storage"
 )
 
 type commitPreIterator struct {

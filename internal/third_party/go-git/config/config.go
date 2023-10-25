@@ -11,9 +11,9 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/gittuf/gittuf/internal/third_party/go-git/internal/url"
+	format "github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/config"
 	"github.com/go-git/go-billy/v5/osfs"
-	"github.com/go-git/go-git/v5/internal/url"
-	format "github.com/go-git/go-git/v5/plumbing/format/config"
 )
 
 const (

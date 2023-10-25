@@ -9,10 +9,10 @@ import (
 	"math"
 	"strings"
 
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/filemode"
-	fdiff "github.com/go-git/go-git/v5/plumbing/format/diff"
-	"github.com/go-git/go-git/v5/utils/diff"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/filemode"
+	fdiff "github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/diff"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/diff"
 
 	dmp "github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -283,8 +283,8 @@ func printStat(fileStats []FileStat) string {
 	for _, fs := range fileStats {
 		addn := float64(fs.Addition)
 		deln := float64(fs.Deletion)
-		addc := int(math.Floor(addn/scaleFactor))
-		delc := int(math.Floor(deln/scaleFactor))
+		addc := int(math.Floor(addn / scaleFactor))
+		delc := int(math.Floor(deln / scaleFactor))
 		if addc < 0 {
 			addc = 0
 		}

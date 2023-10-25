@@ -6,8 +6,8 @@ import (
 	"errors"
 	"io"
 
-	"github.com/go-git/go-git/v5/plumbing/hash"
-	"github.com/go-git/go-git/v5/utils/binary"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/hash"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/binary"
 )
 
 var (

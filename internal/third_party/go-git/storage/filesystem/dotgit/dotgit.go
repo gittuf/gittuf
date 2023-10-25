@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/hash"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/storage"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/ioutil"
 	"github.com/go-git/go-billy/v5/osfs"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/hash"
-	"github.com/go-git/go-git/v5/storage"
-	"github.com/go-git/go-git/v5/utils/ioutil"
 
 	"github.com/go-git/go-billy/v5"
 )
