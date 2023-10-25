@@ -21,16 +21,10 @@ developed, please refer to the [roadmap] and the issue tracker for more details.
 
 ## Installation
 
-gittuf requires Go 1.20 or higher.
+gittuf requires Go 1.21 or higher.
 
-The tool can be installed using `go install` as follows:
-
-```bash
-$ go install github.com/gittuf/gittuf@latest
-```
-
-Alternatively, you can clone the repository and run `make`. This will also run
-the test suite prior to installing gittuf.
+Currently, gittuf needs to be built from source. After cloning the repository,
+run `make`. This will also run the test suite prior to installing gittuf.
 
 ```bash
 $ git clone https://github.com/gittuf/gittuf
