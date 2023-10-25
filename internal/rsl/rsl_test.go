@@ -43,6 +43,15 @@ func TestInitializeNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Check if RSL with zero hash is treated as uninitialized
+		err = InitializeNamespace(repo)
+		assert.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now with something added, validate that we cannot initialize the RSL again
 		err = InitializeNamespace(repo)
 		assert.ErrorIs(t, err, ErrRSLExists)
 	})
