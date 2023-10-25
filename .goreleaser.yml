@@ -1,0 +1,54 @@
+project_name: gittuf
+
+builds:
+- id: gittuf
+  mod_timestamp: '{{ .CommitTimestamp }}'
+  env:
+  - CGO_ENABLED=0
+  flags:
+  - -trimpath
+  goos:
+  - linux
+  - darwin
+  - freebsd
+  - windows
+  goarch:
+  - amd64
+  - arm64
+  ldflags:
+  - "-s -w"
+  - "-extldflags=-zrelro"
+  - "-extldflags=-znow"
+  - "-buildid= -X github.com/gittuf/gittuf/internal/version.gitVersion={{ .Version }}"
+
+archives:
+- id: binary
+  format: binary
+  allow_different_binary_count: true
+
+gomod:
+  proxy: true
+
+changelog:
+  skip: true
+
+signs:
+- cmd: cosign
+  env:
+  - COSIGN_YES=true
+  certificate: '${artifact}.pem'
+  signature: '${artifact}.sig'
+  args:
+  - sign-blob
+  - '--output-certificate=${certificate}'
+  - '--output-signature=${signature}'
+  - '${artifact}'
+  artifacts: binary
+  output: true
+
+release:
+  prerelease: allow
+  github:
+    owner: gittuf
+    name: gittuf
+  draft: true
