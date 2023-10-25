@@ -42,11 +42,11 @@ var (
 // InitializeNamespace creates a git ref for the reference state log. Initially,
 // the entry has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
-	if _, err := repo.Reference(plumbing.ReferenceName(Ref), true); err != nil {
+	if ref, err := repo.Reference(plumbing.ReferenceName(Ref), true); err != nil {
 		if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return err
 		}
-	} else {
+	} else if !ref.Hash().IsZero() {
 		return ErrRSLExists
 	}
 

@@ -56,11 +56,11 @@ var ErrPolicyExists = errors.New("cannot initialize Policy namespace as it exist
 // has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
 	for _, name := range []string{PolicyRef /*, PolicyStagingRef*/} {
-		if _, err := repo.Reference(plumbing.ReferenceName(name), true); err != nil {
+		if ref, err := repo.Reference(plumbing.ReferenceName(name), true); err != nil {
 			if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 				return err
 			}
-		} else {
+		} else if !ref.Hash().IsZero() {
 			return ErrPolicyExists
 		}
 	}

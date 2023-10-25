@@ -57,6 +57,15 @@ func TestInitializeNamespace(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Check if policy with zero hash is treated as uninitialized
+		err = InitializeNamespace(repo)
+		assert.Nil(t, err)
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(PolicyRef, gitinterface.EmptyBlob())); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now with something added, validate that we cannot initialize the policy again
 		err = InitializeNamespace(repo)
 		assert.ErrorIs(t, err, ErrPolicyExists)
 	})
