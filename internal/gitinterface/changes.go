@@ -13,7 +13,7 @@ import (
 // GetCommitFilePaths returns all the file paths of the provided commit object.
 // This strictly enumerates all the files recursively in the commit object's
 // tree.
-func GetCommitFilePaths(repo *git.Repository, commit *object.Commit) ([]string, error) {
+func GetCommitFilePaths(commit *object.Commit) ([]string, error) {
 	filesIter, err := commit.Files()
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 
 	if len(commit.ParentHashes) == 0 {
 		// No parent, return all file paths for commit
-		return GetCommitFilePaths(repo, commit)
+		return GetCommitFilePaths(commit)
 	}
 
 	parentCommit, err := repo.CommitObject(commit.ParentHashes[0])
@@ -59,21 +59,21 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 		return nil, err
 	}
 
-	return GetDiffFilePaths(repo, commit, parentCommit)
+	return GetDiffFilePaths(commit, parentCommit)
 }
 
 // GetDiffFilePaths enumerates all the changed file paths between the two
 // commits. If one of the commits is nil, the other commit's tree is enumerated.
-func GetDiffFilePaths(repo *git.Repository, commitA, commitB *object.Commit) ([]string, error) {
+func GetDiffFilePaths(commitA, commitB *object.Commit) ([]string, error) {
 	if commitA == nil && commitB == nil {
 		return nil, fmt.Errorf("both commits cannot be empty")
 	}
 
 	if commitA == nil {
-		return GetCommitFilePaths(repo, commitB)
+		return GetCommitFilePaths(commitB)
 	}
 	if commitB == nil {
-		return GetCommitFilePaths(repo, commitA)
+		return GetCommitFilePaths(commitA)
 	}
 
 	treeA, err := commitA.Tree()

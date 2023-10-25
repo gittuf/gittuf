@@ -31,7 +31,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("message") //nolint:errcheck
 }
 
-func (o *options) Run(cmd *cobra.Command, args []string) error {
+func (o *options) Run(_ *cobra.Command, args []string) error {
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err

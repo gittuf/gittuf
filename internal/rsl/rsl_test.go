@@ -1252,10 +1252,8 @@ func TestParseRSLEntryText(t *testing.T) {
 			entry, err := parseRSLEntryText(plumbing.ZeroHash, test.message)
 			if err != nil {
 				assert.ErrorIs(t, err, test.expectedError)
-			} else {
-				if !assert.Equal(t, test.expectedEntry, entry) {
-					t.Errorf("expected\n%+v\n\ngot\n%+v", test.expectedEntry, entry)
-				}
+			} else if !assert.Equal(t, test.expectedEntry, entry) {
+				t.Errorf("expected\n%+v\n\ngot\n%+v", test.expectedEntry, entry)
 			}
 		})
 	}

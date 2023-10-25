@@ -404,7 +404,6 @@ func GetLatestReferenceEntryForRefBefore(repo *git.Repository, refName string, a
 		if err != nil {
 			return nil, nil, err
 		}
-
 	}
 
 	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)

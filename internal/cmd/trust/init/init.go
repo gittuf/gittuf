@@ -14,12 +14,9 @@ type options struct {
 	p *persistent.Options
 }
 
-func (o *options) AddFlags(cmd *cobra.Command) {
-	// This method currently does nothing but maintaining an empty body for
-	// consistency.
-}
+func (o *options) AddFlags(_ *cobra.Command) {}
 
-func (o *options) Run(cmd *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err

@@ -217,7 +217,6 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		assert.Equal(t, test.keys, keys, fmt.Sprintf("policy keys for path '%s' don't match expected keys in test '%s'", test.path, name))
 	}
-
 }
 
 func TestGetStateForCommit(t *testing.T) {

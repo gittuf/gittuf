@@ -86,7 +86,7 @@ func TestWriteBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blobID, err := WriteBlob(repo, []byte(writeContents))
+	blobID, err := WriteBlob(repo, writeContents)
 	if err != nil {
 		t.Error(err)
 	}

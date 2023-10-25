@@ -346,8 +346,8 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	var (
 		trustedKeys           []*tuf.Key
 		err                   error
-		gitNamespaceVerified  bool = false
-		pathNamespaceVerified bool = true // Assume paths are verified until we find out otherwise
+		gitNamespaceVerified  = false
+		pathNamespaceVerified = true // Assume paths are verified until we find out otherwise
 	)
 
 	// 1. Find authorized public keys for entry's ref
@@ -624,7 +624,7 @@ func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string,
 	}
 
 	if firstEntry {
-		return gitinterface.GetCommitFilePaths(repo, currentCommit)
+		return gitinterface.GetCommitFilePaths(currentCommit)
 	}
 
 	priorCommit, err := repo.CommitObject(priorRefEntry.TargetID)
@@ -632,5 +632,5 @@ func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string,
 		return nil, err
 	}
 
-	return gitinterface.GetDiffFilePaths(repo, currentCommit, priorCommit)
+	return gitinterface.GetDiffFilePaths(currentCommit, priorCommit)
 }
