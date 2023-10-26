@@ -18,7 +18,7 @@ require (
 	github.com/sergi/go-diff v1.3.1
 	github.com/sigstore/cosign/v2 v2.2.0
 	github.com/sigstore/gitsign v0.7.1
-	github.com/sigstore/sigstore v1.7.4
+	github.com/sigstore/sigstore v1.7.5
 	github.com/skeema/knownhosts v1.2.1
 	github.com/spf13/cobra v1.7.0
 	github.com/stretchr/testify v1.8.4
