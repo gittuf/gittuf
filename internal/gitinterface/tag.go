@@ -31,7 +31,7 @@ func IsTag(repo *git.Repository, target string) bool {
 		}
 	}
 
-	_, err = repo.TagObject(plumbing.NewHash(target))
+	_, err = GetTag(repo, plumbing.NewHash(target))
 	return err == nil
 }
 
@@ -124,6 +124,11 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 	}
 
 	return ErrUnknownSigningMethod
+}
+
+// GetTag returns the requested tag object.
+func GetTag(repo *git.Repository, commitID plumbing.Hash) (*object.Tag, error) {
+	return repo.TagObject(commitID)
 }
 
 func signTag(tag *object.Tag) (string, error) {

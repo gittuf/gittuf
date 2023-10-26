@@ -204,7 +204,7 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 
 // GetEntry returns the entry corresponding to entryID.
 func GetEntry(repo *git.Repository, entryID plumbing.Hash) (Entry, error) {
-	commitObj, err := repo.CommitObject(entryID)
+	commitObj, err := gitinterface.GetCommit(repo, entryID)
 	if err != nil {
 		return nil, ErrRSLEntryNotFound
 	}
@@ -214,7 +214,7 @@ func GetEntry(repo *git.Repository, entryID plumbing.Hash) (Entry, error) {
 
 // GetParentForEntry returns the entry's parent RSL entry.
 func GetParentForEntry(repo *git.Repository, entry Entry) (Entry, error) {
-	commitObj, err := repo.CommitObject(entry.GetID())
+	commitObj, err := gitinterface.GetCommit(repo, entry.GetID())
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +295,7 @@ func GetLatestEntry(repo *git.Repository) (Entry, error) {
 		return nil, err
 	}
 
-	commitObj, err := repo.CommitObject(ref.Hash())
+	commitObj, err := gitinterface.GetCommit(repo, ref.Hash())
 	if err != nil {
 		return nil, ErrRSLEntryNotFound
 	}

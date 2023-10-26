@@ -49,7 +49,7 @@ func TestWriteTree(t *testing.T) {
 		t.Error(err)
 	}
 
-	tree, err := repo.TreeObject(treeHash)
+	tree, err := GetTree(repo, treeHash)
 	if err != nil {
 		t.Error(err)
 	}

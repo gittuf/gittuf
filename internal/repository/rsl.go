@@ -55,7 +55,7 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 		return err
 	}
 
-	commit, err := r.r.CommitObject(plumbing.NewHash(commitID))
+	commit, err := gitinterface.GetCommit(r.r, plumbing.NewHash(commitID))
 	if err != nil {
 		return err
 	}
@@ -129,11 +129,11 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 	}
 
 	// Next, check if remote is ahead of local
-	remoteCommit, err := r.r.CommitObject(remoteRefState.Hash())
+	remoteCommit, err := gitinterface.GetCommit(r.r, remoteRefState.Hash())
 	if err != nil {
 		return false, false, err
 	}
-	localCommit, err := r.r.CommitObject(localRefState.Hash())
+	localCommit, err := gitinterface.GetCommit(r.r, localRefState.Hash())
 	if err != nil {
 		return false, false, err
 	}

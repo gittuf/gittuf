@@ -62,7 +62,7 @@ func GetCommitsBetweenRange(repo *git.Repository, commitNewID, commitOldID plumb
 
 	commits := make([]*object.Commit, 0, len(commitRange))
 	for _, commitID := range commitRange {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := GetCommit(repo, commitID)
 		if err != nil {
 			if errors.Is(err, plumbing.ErrObjectNotFound) {
 				// Returned for non-commit objects

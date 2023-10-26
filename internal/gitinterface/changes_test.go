@@ -70,7 +70,7 @@ func TestGetCommitFilePaths(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		commit, err := repo.CommitObject(commitID)
+		commit, err := GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,11 +119,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,11 +156,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,11 +199,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -241,11 +241,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,11 +283,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -325,11 +325,11 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitA, err := repo.CommitObject(cAID)
+		commitA, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		commitB, err := repo.CommitObject(cBID)
+		commitB, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -378,7 +378,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +411,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -450,7 +450,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -488,7 +488,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -526,7 +526,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -564,7 +564,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cBID)
+		commit, err := GetCommit(repo, cBID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -588,7 +588,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := repo.CommitObject(cAID)
+		commit, err := GetCommit(repo, cAID)
 		if err != nil {
 			t.Fatal(err)
 		}

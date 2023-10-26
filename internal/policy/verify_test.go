@@ -298,7 +298,7 @@ func TestGetCommits(t *testing.T) {
 	expectedCommitIDs := []plumbing.Hash{commitIDs[1], commitIDs[2], commitIDs[3], commitIDs[4]}
 	expectedCommits := make([]*object.Commit, 0, len(expectedCommitIDs))
 	for _, commitID := range expectedCommitIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}

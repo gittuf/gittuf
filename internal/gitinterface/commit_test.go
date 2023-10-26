@@ -145,7 +145,7 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	firstCommitID := ref.Hash()
-	firstCommit, err := repo.CommitObject(firstCommitID)
+	firstCommit, err := GetCommit(repo, firstCommitID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondCommitID := ref.Hash()
-	secondCommit, err := repo.CommitObject(secondCommitID)
+	secondCommit, err := GetCommit(repo, secondCommitID)
 	if err != nil {
 		t.Fatal(err)
 	}

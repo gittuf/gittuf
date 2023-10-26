@@ -243,7 +243,7 @@ func TestGetStateForCommit(t *testing.T) {
 	}
 
 	// No RSL entry for commit => no state yet
-	commit, err := repo.CommitObject(commitID)
+	commit, err := gitinterface.GetCommit(repo, commitID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newCommit, err := repo.CommitObject(newCommitID)
+	newCommit, err := gitinterface.GetCommit(repo, newCommitID)
 	if err != nil {
 		t.Fatal(err)
 	}

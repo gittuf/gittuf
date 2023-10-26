@@ -75,7 +75,7 @@ func TestNewReferenceEntry(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotEqual(t, plumbing.ZeroHash, ref.Hash())
 
-	commitObj, err := repo.CommitObject(ref.Hash())
+	commitObj, err := gitinterface.GetCommit(repo, ref.Hash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -94,7 +94,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	commitObj, err = repo.CommitObject(ref.Hash())
+	commitObj, err = gitinterface.GetCommit(repo, ref.Hash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -697,7 +697,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 
 	// Right now, the RSL has no entries.
 	for _, commitID := range initialTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -716,7 +716,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, commitID := range initialTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -745,7 +745,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 
 	// The RSL hasn't seen these new commits, however.
 	for _, commitID := range featureTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -760,7 +760,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	// At this point, searching for any of the original commits' entry should
 	// return the first RSL entry.
 	for _, commitID := range initialTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -775,7 +775,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, commitID := range featureTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -802,7 +802,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	// Testing for any of the feature commits should return the feature branch
 	// entry, not the main branch entry.
 	for _, commitID := range featureTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -819,7 +819,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 
 	latestEntry := latestEntryT.(*ReferenceEntry)
 	for _, commitID := range featureTargetIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := gitinterface.GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}
