@@ -1,8 +1,6 @@
-# gittuf Specification
+# gittuf Design Document
 
 Last Modified: July 11, 2023
-
-Version: 0.1.0-draft
 
 ## Introduction
 
@@ -29,8 +27,8 @@ to the "default" workflows in this document.
 
 ## Definitions
 
-The gittuf specification uses several terms or phrases in specific ways
-throughout the document. These are defined here.
+This document uses several terms or phrases in specific ways. These are defined
+here.
 
 ### Git Reference (Ref)
 
@@ -59,6 +57,43 @@ identified by the tip or last entry of the
 [reference state log](#reference-state-log-rsl). Note that when inspecting
 changes to the state of the repository, a workflow may only consider state
 updates relevant to a particular ref.
+
+## Threat Model
+
+gittuf considers a standard Git setting, i.e., a version control system that
+manages a repository in a distributed fashion. Individual developers have local
+copies of the repository, to which they commit their work. There is also a
+remote repository, hosted on a Git server, which serves as a synchronization
+point: developers push their contributions to the remote repository, and fetch
+other developers' contributions from the remote repository. Most organizations
+that own a repository find it useful to define the developers' read and write
+permissions on various portions of the repository, based on an access control
+policy. Unfortunately, Git repositories do not support fine-grained read and
+write access control policies. This is one place where gittuf adds value.
+
+The threat model departs from this standard Git setting in that gittuf reduces
+the trust needed in the various system actors. Such a model accounts for the
+fact that some of these actors may act maliciously.
+
+First, gittuf's design assumes that the Git server which manages the remote Git
+repository is not trustworthy. The server does respond to push and pull requests
+from clients (i.e., developers), since a non-responsive server would be easily
+detected and replaced. However, the server may try to modify data that is stored
+in the repository or may try to tamper with the client pull and push requests,
+for example by dropping push requests, or serving stale data to pull requests.
+Such behavior models a compromised or faulty server.
+
+Second, gittuf's design assumes that developers are not trusted to act within
+the confines defined by the access control policy. For example, developers may
+try to write into folders where they are not authorized to write, or may try to
+merge changes into branches where they do not have permission to do so. They may
+also try to read parts of the repository which they are not allowed to read.
+Such behavior models developers who make mistakes, or developers whose account
+has been compromised, or even disgruntled employees.
+
+Note: the threat model considers violations of read access control policies as
+in-scope, but gittuf currently does not protect against such violations. This
+feature is part of gittuf's [roadmap](/docs/roadmap.md).
 
 ## gittuf
 
@@ -98,9 +133,9 @@ to guarantee the freshness of the RSL. This is because the timestamp role in the
 context of gittuf at most provides a non-repudiation guarantee for each claim of
 the RSL's tip. The use of an online timestamp does not guarantee that actors
 will receive the correct RSL tip. This may evolve in future versions of the
-gittuf specification.
+gittuf design.
 
-#### Normal RSL Entries
+#### RSL Reference Entries
 
 These entries are the standard variety described above. They contain the name of
 the reference they apply to and a commit ID. As such, they have the following
@@ -623,7 +658,7 @@ be carried out given its overhead and high chances of detection.
 
 Finally, while gittuf primarily uses TUF's root of trust and delegations, it is
 possible that TUF's timestamp role can be leveraged to further mitigate fork*
-attacks. A future version of the gittuf specification may explore the use of the
+attacks. A future version of the gittuf design may explore the use of the
 timestamp role in this context.
 
 #### An authorized key is compromised
