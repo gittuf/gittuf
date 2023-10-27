@@ -302,8 +302,8 @@ func (s *ShallowStorage) SetShallow(commits []plumbing.Hash) error {
 	return nil
 }
 
-func (s ShallowStorage) Shallow() ([]plumbing.Hash, error) {
-	return s, nil
+func (s *ShallowStorage) Shallow() ([]plumbing.Hash, error) {
+	return *s, nil
 }
 
 type ModuleStorage map[string]*Storage

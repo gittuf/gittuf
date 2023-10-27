@@ -12,7 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/storer"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/ioutil"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/sync"
-	billy "github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5"
 )
 
 var (

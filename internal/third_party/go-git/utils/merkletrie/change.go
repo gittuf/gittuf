@@ -42,7 +42,7 @@ type Change struct {
 }
 
 // Action is convenience method that returns what Action c represents.
-func (c *Change) Action() (Action, error) {
+func (c Change) Action() (Action, error) {
 	if c.From == nil && c.To == nil {
 		return Action(0), fmt.Errorf("malformed change: nil from and to")
 	}

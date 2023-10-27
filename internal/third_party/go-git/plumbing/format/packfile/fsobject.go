@@ -7,7 +7,7 @@ import (
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/cache"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/idxfile"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/utils/ioutil"
-	billy "github.com/go-git/go-billy/v5"
+	"github.com/go-git/go-billy/v5"
 )
 
 // FSObject is an object from the packfile on the filesystem.

@@ -3,7 +3,6 @@ package git
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -23,7 +22,6 @@ import (
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/cache"
 	formatcfg "github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/config"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/format/packfile"
-	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/hash"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/storer"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/storage"
@@ -266,7 +264,7 @@ func PlainInitWithOptions(path string, opts *PlainInitOptions) (*Repository, err
 	}
 
 	if opts != nil {
-		if opts.ObjectFormat == formatcfg.SHA256 && hash.CryptoType != crypto.SHA256 {
+		if opts.ObjectFormat == formatcfg.SHA256 {
 			return nil, ErrSHA256NotSupported
 		}
 
