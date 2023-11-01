@@ -42,6 +42,17 @@ review system. This integration, in combination with support for
 [in-toto attestations](#integrate-in-toto-attestations) would allow for
 transparent and auditable code review policy enforcement.
 
+## Support Developer Teams
+
+gittuf currently identifies each developer by their signing key or identity.
+Policies grant permissions to each individual developer. Eventually, gittuf must
+support declaring teams of developers, with policies granting permissions to
+those teams as a whole. Further, thresholds on required authorizations for
+policies must be granular enough to apply across team boundaries. For example, it
+must be possible to require two members of the development team and one member
+of the security team to sign off on a change. This is not the same as a total
+threshold of three across the members of the development and security teams.
+
 ## Read Permissions
 
 gittuf's design implements _write_ permission policies such as who can write to
