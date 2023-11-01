@@ -88,7 +88,7 @@ func FetchRefSpec(ctx context.Context, repo *git.Repository, remoteName string, 
 // non-fast-forward fetches. The target of the refspec is the same as the
 // requested ref. Also, the remote tracker for the ref is also always updated.
 func Fetch(ctx context.Context, repo *git.Repository, remoteName string, refs []string, fastForwardOnly bool) error {
-	refSpecs := make([]config.RefSpec, 0, len(refs))
+	refSpecs := make([]config.RefSpec, 0, len(refs)*2)
 	for _, r := range refs {
 		// Add the remote tracker destination
 		refSpec, err := RefSpec(repo, r, remoteName, fastForwardOnly)
