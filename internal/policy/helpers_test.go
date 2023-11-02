@@ -26,6 +26,12 @@ var rootKeyBytes []byte
 //go:embed test-data/root.pub
 var rootPubKeyBytes []byte
 
+//go:embed test-data/targets-1
+var targets1KeyBytes []byte
+
+//go:embed test-data/targets-1.pub
+var targets1PubKeyBytes []byte
+
 //go:embed test-data/gpg-pubkey.asc
 var gpgPubKeyBytes []byte
 

@@ -18,9 +18,12 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/jonboulle/clockwork"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
@@ -968,4 +971,173 @@ func TestStateVerifyNewState(t *testing.T) {
 		err = currentPolicy.VerifyNewState(context.Background(), newPolicy)
 		assert.ErrorContains(t, err, "do not match threshold")
 	})
+}
+
+func TestVerifier(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootPubKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commit := gitinterface.CreateCommitObject(common.TestGitConfig, gitinterface.EmptyTree(), []plumbing.Hash{plumbing.ZeroHash}, "Test commit", common.TestClock)
+	commit = common.SignTestCommit(t, repo, commit, gpgKeyName)
+	// We need to do this because tag expects a valid target object
+	commitID, err := gitinterface.WriteCommit(repo, commit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commit, err = repo.CommitObject(commitID) // FIXME: gitinterface.GetCommit
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tag := gitinterface.CreateTagObject(common.TestGitConfig, commit, "test-tag", "test-tag", common.TestClock)
+	tag = common.SignTestTag(t, repo, tag, gpgKeyName)
+
+	attestation, err := dsse.CreateEnvelope(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attestation, err = dsse.SignEnvelope(context.Background(), attestation, rootSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	invalidAttestation, err := dsse.CreateEnvelope(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalidAttestation, err = dsse.SignEnvelope(context.Background(), invalidAttestation, targetsSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	attestationWithTwoSigs, err := dsse.CreateEnvelope(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attestationWithTwoSigs, err = dsse.SignEnvelope(context.Background(), attestationWithTwoSigs, rootSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	attestationWithTwoSigs, err = dsse.SignEnvelope(context.Background(), attestationWithTwoSigs, targetsSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]struct {
+		keys          []*tuf.Key
+		threshold     int
+		gitObject     object.Object
+		attestation   *sslibdsse.Envelope
+		expectedError error
+	}{
+		"commit, no attestation, valid key, threshold 1": {
+			keys:      []*tuf.Key{gpgKey},
+			threshold: 1,
+			gitObject: commit,
+		},
+		"commit, no attestation, valid key, threshold 2": {
+			keys:          []*tuf.Key{gpgKey},
+			threshold:     2,
+			gitObject:     commit,
+			expectedError: ErrVerifierConditionsUnmet,
+		},
+		"commit, attestation, valid key, threshold 1": {
+			keys:        []*tuf.Key{gpgKey},
+			threshold:   1,
+			gitObject:   commit,
+			attestation: attestation,
+		},
+		"commit, attestation, valid keys, threshold 2": {
+			keys:        []*tuf.Key{gpgKey, rootPubKey},
+			threshold:   2,
+			gitObject:   commit,
+			attestation: attestation,
+		},
+		"commit, invalid signed attestation, threshold 2": {
+			keys:          []*tuf.Key{gpgKey, rootPubKey},
+			threshold:     2,
+			gitObject:     commit,
+			attestation:   invalidAttestation,
+			expectedError: ErrVerifierConditionsUnmet,
+		},
+		"commit, attestation, valid keys, threshold 3": {
+			keys:        []*tuf.Key{gpgKey, rootPubKey, targetsPubKey},
+			threshold:   3,
+			gitObject:   commit,
+			attestation: attestationWithTwoSigs,
+		},
+		"tag, no attestation, valid key, threshold 1": {
+			keys:      []*tuf.Key{gpgKey},
+			threshold: 1,
+			gitObject: tag,
+		},
+		"tag, no attestation, valid key, threshold 2": {
+			keys:          []*tuf.Key{gpgKey},
+			threshold:     2,
+			gitObject:     tag,
+			expectedError: ErrVerifierConditionsUnmet,
+		},
+		"tag, attestation, valid key, threshold 1": {
+			keys:        []*tuf.Key{gpgKey},
+			threshold:   1,
+			gitObject:   tag,
+			attestation: attestation,
+		},
+		"tag, attestation, valid keys, threshold 2": {
+			keys:        []*tuf.Key{gpgKey, rootPubKey},
+			threshold:   2,
+			gitObject:   tag,
+			attestation: attestation,
+		},
+		"tag, invalid signed attestation, threshold 2": {
+			keys:          []*tuf.Key{gpgKey, rootPubKey},
+			threshold:     2,
+			gitObject:     tag,
+			attestation:   invalidAttestation,
+			expectedError: ErrVerifierConditionsUnmet,
+		},
+		"tag, attestation, valid keys, threshold 3": {
+			keys:        []*tuf.Key{gpgKey, rootPubKey, targetsPubKey},
+			threshold:   3,
+			gitObject:   tag,
+			attestation: attestationWithTwoSigs,
+		},
+	}
+
+	for name, test := range tests {
+		verifier := Verifier{name: "test-verifier", keys: test.keys, threshold: test.threshold}
+		err := verifier.Verify(context.Background(), test.gitObject, test.attestation)
+		if test.expectedError == nil {
+			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+		} else {
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("incorrect error received in test '%s'", name))
+		}
+	}
 }

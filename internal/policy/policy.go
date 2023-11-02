@@ -366,6 +366,77 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 	}
 }
 
+func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
+	if err := s.Verify(ctx); err != nil {
+		return nil, err
+	}
+
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+
+	allPublicKeys := targetsMetadata.Delegations.Keys
+	// each entry is a list of delegations from a particular metadata file
+	groupedDelegations := [][]tuf.Delegation{
+		targetsMetadata.Delegations.Roles,
+	}
+
+	var currentDelegationGroup []tuf.Delegation
+	verifiers := []*Verifier{}
+	for {
+		if len(groupedDelegations) == 0 {
+			return verifiers, nil
+		}
+
+		currentDelegationGroup = groupedDelegations[0]
+		groupedDelegations = groupedDelegations[1:]
+
+		for {
+			if len(currentDelegationGroup) <= 1 {
+				// Only allow rule found in the current group
+				break
+			}
+
+			delegation := currentDelegationGroup[0]
+			currentDelegationGroup = currentDelegationGroup[1:]
+
+			if delegation.Matches(path) {
+				verifier := &Verifier{
+					name:      delegation.Name,
+					keys:      make([]*tuf.Key, 0, len(delegation.KeyIDs)),
+					threshold: delegation.Threshold,
+				}
+				for _, keyID := range delegation.KeyIDs {
+					key := allPublicKeys[keyID]
+					verifier.keys = append(verifier.keys, key)
+				}
+				verifiers = append(verifiers, verifier)
+
+				if s.HasTargetsRole(delegation.Name) {
+					delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+					if err != nil {
+						return nil, err
+					}
+					for keyID, key := range delegatedMetadata.Delegations.Keys {
+						allPublicKeys[keyID] = key
+					}
+
+					// Add the current metadata's further delegations upfront to
+					// be depth-first
+					groupedDelegations = append([][]tuf.Delegation{delegatedMetadata.Delegations.Roles}, groupedDelegations...)
+
+					if delegation.Terminating {
+						// Stop processing current delegation group, but proceed
+						// with other groups
+						break
+					}
+				}
+			}
+		}
+	}
+}
+
 // Verify performs a self-contained verification of all the metadata in the
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
