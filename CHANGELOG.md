@@ -2,6 +2,10 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## Next
+
+* Add support to RSL to find unskipped entries
+
 ## v0.1.0
 
 * Implemented reference state log (RSL)

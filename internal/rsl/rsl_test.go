@@ -1042,6 +1042,149 @@ func TestGetReferenceEntriesInRangeForRef(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 }
 
+func TestGetLatestUnskippedReferenceEntryForRef(t *testing.T) {
+	refName := "refs/heads/main"
+
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	entryIDs := []plumbing.Hash{}
+
+	// Add an entry
+	if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Latest unskipped entry is the one we just added
+	e, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryIDs = append(entryIDs, e.GetID())
+
+	entry, annotations, err := GetLatestUnskippedReferenceEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
+
+	// Add another entry
+	if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Record latest entry's ID
+	e, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryIDs = append(entryIDs, e.GetID())
+
+	// Latest unskipped entry is the newest one
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
+
+	// Skip the second one
+	if err := NewAnnotationEntry([]plumbing.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now the latest unskipped entry should be the first one
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[0], entry.GetID())
+
+	// Skip the first one too to trigger error
+	if err := NewAnnotationEntry([]plumbing.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
+	assert.Nil(t, entry)
+	assert.Empty(t, annotations)
+	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+}
+
+func TestGetLatestUnskippedReferenceEntryForRefBefore(t *testing.T) {
+	refName := "refs/heads/main"
+
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	entryIDs := []plumbing.Hash{}
+
+	// Add an entry
+	if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Latest unskipped entry is the one we just added
+	e, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryIDs = append(entryIDs, e.GetID())
+
+	// We use zero hash because we have just the one entry
+	entry, annotations, err := GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, plumbing.ZeroHash)
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[0], entry.GetID())
+
+	// Add another entry
+	if err := NewReferenceEntry(refName, plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Record latest entry's ID
+	e, err = GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryIDs = append(entryIDs, e.GetID())
+
+	// Latest unskipped before the current entry is the first entry
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, entryIDs[1])
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[0], entry.GetID())
+
+	// Skip the second one
+	if err := NewAnnotationEntry([]plumbing.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now even the latest unskipped entry with zero hash should return the first one
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, plumbing.ZeroHash)
+	assert.Nil(t, err)
+	assert.Empty(t, annotations)
+	assert.Equal(t, entryIDs[0], entry.GetID())
+
+	// Skip the first one too to trigger error
+	if err := NewAnnotationEntry([]plumbing.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, plumbing.ZeroHash)
+	assert.Nil(t, entry)
+	assert.Empty(t, annotations)
+	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+}
+
 func TestAnnotationEntryRefersTo(t *testing.T) {
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	emptyBlobID := gitinterface.EmptyBlob()
