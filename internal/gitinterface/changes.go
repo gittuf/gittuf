@@ -54,7 +54,7 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 		return GetCommitFilePaths(commit)
 	}
 
-	parentCommit, err := repo.CommitObject(commit.ParentHashes[0])
+	parentCommit, err := GetCommit(repo, commit.ParentHashes[0])
 	if err != nil {
 		return nil, err
 	}

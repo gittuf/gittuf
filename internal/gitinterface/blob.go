@@ -8,6 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/third_party/go-git"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
+	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/storage/memory"
 )
 
@@ -15,7 +16,7 @@ var ErrWrittenBlobLengthMismatch = errors.New("length of blob written does not m
 
 // ReadBlob returns the contents of a the blob referenced by blobID.
 func ReadBlob(repo *git.Repository, blobID plumbing.Hash) ([]byte, error) {
-	blob, err := repo.BlobObject(blobID)
+	blob, err := GetBlob(repo, blobID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,6 +50,11 @@ func WriteBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 	}
 
 	return repo.Storer.SetEncodedObject(obj)
+}
+
+// GetBlob returns the requested blob object.
+func GetBlob(repo *git.Repository, commitID plumbing.Hash) (*object.Blob, error) {
+	return repo.BlobObject(commitID)
 }
 
 // EmptyBlob returns the hash of an empty blob in a Git repository.

@@ -131,12 +131,17 @@ func KnowsCommit(repo *git.Repository, commitID plumbing.Hash, commit *object.Co
 		return true, nil
 	}
 
-	commitUnderTest, err := repo.CommitObject(commitID)
+	commitUnderTest, err := GetCommit(repo, commitID)
 	if err != nil {
 		return false, err
 	}
 
 	return commit.IsAncestor(commitUnderTest)
+}
+
+// GetCommit returns the requested commit object.
+func GetCommit(repo *git.Repository, commitID plumbing.Hash) (*object.Commit, error) {
+	return repo.CommitObject(commitID)
 }
 
 func signCommit(commit *object.Commit) (string, error) {

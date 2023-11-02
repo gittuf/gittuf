@@ -166,7 +166,7 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 			status[id] = unableToResolveRevisionMessage
 			continue
 		}
-		commit, err := repo.CommitObject(*rev)
+		commit, err := gitinterface.GetCommit(repo, *rev)
 		if err != nil {
 			if errors.Is(err, plumbing.ErrObjectNotFound) {
 				status[id] = nonCommitMessage
@@ -254,7 +254,7 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 
 			// Must be a hash
 			// verifyTagEntry also finds the tag object, wasteful?
-			tagObj, err := repo.TagObject(plumbing.NewHash(id))
+			tagObj, err := gitinterface.GetTag(repo, plumbing.NewHash(id))
 			if err != nil {
 				status[id] = nonTagMessage
 				continue
@@ -362,7 +362,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	}
 
 	// 2. Find commit object for the RSL entry
-	commitObj, err := repo.CommitObject(entry.ID)
+	commitObj, err := gitinterface.GetCommit(repo, entry.ID)
 	if err != nil {
 		return err
 	}
@@ -512,7 +512,7 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 	}
 
 	// 2. Find commit object for the RSL entry
-	commitObj, err := repo.CommitObject(entry.ID)
+	commitObj, err := gitinterface.GetCommit(repo, entry.ID)
 	if err != nil {
 		return err
 	}
@@ -542,7 +542,7 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 
 	// 4. Verify tag object
 	tagObjVerified := false
-	tagObj, err := repo.TagObject(entry.TargetID)
+	tagObj, err := gitinterface.GetTag(repo, entry.TargetID)
 	if err != nil {
 		// Likely indicates the ref is not pointing to a tag object
 		// What about lightweight tags?
@@ -609,7 +609,7 @@ func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]*object.Comm
 func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string, error) {
 	firstEntry := false
 
-	currentCommit, err := repo.CommitObject(entry.TargetID)
+	currentCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +627,7 @@ func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string,
 		return gitinterface.GetCommitFilePaths(currentCommit)
 	}
 
-	priorCommit, err := repo.CommitObject(priorRefEntry.TargetID)
+	priorCommit, err := gitinterface.GetCommit(repo, priorRefEntry.TargetID)
 	if err != nil {
 		return nil, err
 	}

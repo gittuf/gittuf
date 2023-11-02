@@ -54,7 +54,7 @@ func TestTag(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "8b195348588d8a48060ec8d5436459b825a1b352", tagHash.String())
 
-	tag, err := repo.TagObject(tagHash)
+	tag, err := GetTag(repo, tagHash)
 	if err != nil {
 		t.Fatal(err)
 	}

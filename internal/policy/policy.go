@@ -117,12 +117,12 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	policyCommit, err := repo.CommitObject(entry.TargetID)
+	policyCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
 	if err != nil {
 		return nil, err
 	}
 
-	policyRootTree, err := repo.TreeObject(policyCommit.TreeHash)
+	policyRootTree, err := gitinterface.GetTree(repo, policyCommit.TreeHash)
 	if err != nil {
 		return nil, err
 	}
@@ -149,12 +149,12 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 
 	state := &State{}
 
-	metadataTree, err := repo.TreeObject(metadataTreeID)
+	metadataTree, err := gitinterface.GetTree(repo, metadataTreeID)
 	if err != nil {
 		return nil, err
 	}
 
-	keysTree, err := repo.TreeObject(keysTreeID)
+	keysTree, err := gitinterface.GetTree(repo, keysTreeID)
 	if err != nil {
 		return nil, err
 	}

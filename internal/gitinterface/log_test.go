@@ -68,7 +68,7 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 
 	allCommits := make([]*object.Commit, 0, len(commitIDs))
 	for _, commitID := range commitIDs {
-		commit, err := repo.CommitObject(commitID)
+		commit, err := GetCommit(repo, commitID)
 		if err != nil {
 			t.Fatal(err)
 		}

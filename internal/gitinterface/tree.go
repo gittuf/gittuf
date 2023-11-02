@@ -33,6 +33,11 @@ func WriteTree(repo *git.Repository, entries []object.TreeEntry) (plumbing.Hash,
 	return repo.Storer.SetEncodedObject(obj)
 }
 
+// GetTree returns the requested tree object.
+func GetTree(repo *git.Repository, commitID plumbing.Hash) (*object.Tree, error) {
+	return repo.TreeObject(commitID)
+}
+
 // EmptyTree returns the hash of an empty tree in a Git repository.
 // Note: it is generated on the fly rather than stored as a constant to support
 // SHA-256 repositories in future.

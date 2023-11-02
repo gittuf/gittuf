@@ -94,7 +94,7 @@ func TestWriteBlob(t *testing.T) {
 	expectedHash := plumbing.NewHash("999c05e9578e5d244920306842f516789a2498f7")
 	assert.Equal(t, expectedHash, blobID)
 
-	obj, err := repo.BlobObject(blobID)
+	obj, err := GetBlob(repo, blobID)
 	if err != nil {
 		t.Fatal(err)
 	}
