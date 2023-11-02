@@ -5,6 +5,7 @@ package repository
 import (
 	"errors"
 
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/third_party/go-git"
@@ -32,6 +33,10 @@ func LoadRepository() (*Repository, error) {
 
 func (r *Repository) InitializeNamespaces() error {
 	if err := rsl.InitializeNamespace(r.r); err != nil {
+		return err
+	}
+
+	if err := attestations.InitializeNamespace(r.r); err != nil {
 		return err
 	}
 
