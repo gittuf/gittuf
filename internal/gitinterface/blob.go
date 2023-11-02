@@ -53,8 +53,8 @@ func WriteBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 }
 
 // GetBlob returns the requested blob object.
-func GetBlob(repo *git.Repository, commitID plumbing.Hash) (*object.Blob, error) {
-	return repo.BlobObject(commitID)
+func GetBlob(repo *git.Repository, blobID plumbing.Hash) (*object.Blob, error) {
+	return repo.BlobObject(blobID)
 }
 
 // EmptyBlob returns the hash of an empty blob in a Git repository.

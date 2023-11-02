@@ -127,8 +127,8 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 }
 
 // GetTag returns the requested tag object.
-func GetTag(repo *git.Repository, commitID plumbing.Hash) (*object.Tag, error) {
-	return repo.TagObject(commitID)
+func GetTag(repo *git.Repository, tagID plumbing.Hash) (*object.Tag, error) {
+	return repo.TagObject(tagID)
 }
 
 func signTag(tag *object.Tag) (string, error) {
