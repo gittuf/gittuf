@@ -86,33 +86,33 @@ type State struct {
 // LoadState returns the State of the repository's policy corresponding to the
 // rslEntryID.
 func LoadState(ctx context.Context, repo *git.Repository, rslEntryID plumbing.Hash) (*State, error) {
-	e, err := rsl.GetEntry(repo, rslEntryID)
+	entry, err := rsl.GetEntry(repo, rslEntryID)
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, e)
+	refEntry, ok := entry.(*rsl.ReferenceEntry)
+	if !ok {
+		return nil, ErrNotRSLEntry
+	}
+
+	return LoadStateForEntry(ctx, repo, refEntry)
 }
 
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy.
 func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error) {
-	e, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, e)
+	return LoadStateForEntry(ctx, repo, entry)
 }
 
-// LoadStateForEntry returns the State for a specified RSL entry for the policy
-// namespace.
-func LoadStateForEntry(ctx context.Context, repo *git.Repository, e rsl.Entry) (*State, error) {
-	entry, ok := e.(*rsl.ReferenceEntry)
-	if !ok {
-		return nil, ErrNotRSLEntry
-	}
-
+// LoadStateForEntry returns the State for a specified RSL reference entry for
+// the policy namespace.
+func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
 	if entry.RefName != PolicyRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
