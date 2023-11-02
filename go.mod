@@ -10,6 +10,7 @@ require (
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
+	github.com/in-toto/attestation v0.1.1-0.20231030161412-99d851228fe2
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/kevinburke/ssh_config v1.2.0
@@ -26,6 +27,7 @@ require (
 	golang.org/x/crypto v0.14.0
 	golang.org/x/net v0.17.0
 	golang.org/x/sys v0.13.0
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -123,7 +125,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230803162519-f966b187b2e5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230807174057-1744710a1577 // indirect
 	google.golang.org/grpc v1.57.1 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
