@@ -3,6 +3,7 @@
 package gitinterface
 
 import (
+	"container/heap"
 	"fmt"
 	"sort"
 
@@ -36,17 +37,58 @@ func GetCommitFilePaths(commit *object.Commit) ([]string, error) {
 
 // GetFilePathsChangedByCommit returns the paths changed by the commit relative
 // to its parent commit. If the commit is a merge commit, i.e., it has more than
-// one parent, no changes are returned.
-//
-// Currently, this function does not verify that the tree for a merge commit
-// matches one of its parents. In a future version, this behavior may change and
-// return an error if a multi-parent commit seems invalid.
+// one parent, check if the commit is the same as at least one of its parents.
+// If there is a matching parent, we return no changes. If there is no matching
+// parent commit, we return the changes between the commit and each of its parents.
 func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([]string, error) {
 	if len(commit.ParentHashes) > 1 {
-		// merge commits are expected not to introduce changes themselves
-		// TODO: should we check that the merge commit's tree matches one of its
-		// parents (usually the last)?
-		return nil, nil
+		// Merge commit: compare with each parent and aggregate changes
+
+		// Create a map to store all changes
+
+		contains := make(map[string]bool)
+
+		// keeping a heap of diffs so that we can pop them in sorted order
+
+		diffs := &diffHeap{}
+		heap.Init(diffs)
+
+		// We are iterating backwards since if there is a matching parent commit,
+		// it is likely to be the last one.
+		for parentHashIndex := len(commit.ParentHashes) - 1; parentHashIndex >= 0; parentHashIndex-- {
+			parentCommit, err := GetCommit(repo, commit.ParentHashes[parentHashIndex])
+			if err != nil {
+				return nil, err
+			}
+			// If the commit tree hash is the same as the parent tree hash, there are no changes
+			if commit.TreeHash == parentCommit.TreeHash {
+				return nil, nil
+			}
+
+			// Get the diff file paths between the commit and its parent
+			diff, err := GetDiffFilePaths(commit, parentCommit)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, change := range diff {
+				// if we have not already added this change
+				if !contains[change] {
+					heap.Push(diffs, change)
+				}
+				// Add changes to the map
+				contains[change] = true
+			}
+		}
+
+		// Convert the heap to a slice
+		changes := make([]string, len(contains))
+
+		for pos := 0; diffs.Len() > 0; pos++ {
+			changes[pos] = heap.Pop(diffs).(string)
+		}
+
+		return changes, nil
 	}
 
 	if len(commit.ParentHashes) == 0 {
@@ -118,4 +160,24 @@ func diff(treeA, treeB *object.Tree) ([]string, error) {
 	})
 
 	return paths, nil
+}
+
+type diffHeap []string
+
+func (h diffHeap) Len() int           { return len(h) }
+func (h diffHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h diffHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *diffHeap) Push(x any) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(string))
+}
+
+func (h *diffHeap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }

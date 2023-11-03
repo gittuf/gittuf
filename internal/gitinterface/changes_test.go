@@ -597,4 +597,138 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
+
+	t.Run("merge commit with commit matching parent", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents
+		cM := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commit, err := GetCommit(repo, cMID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Nil(t, diffs)
+	})
+
+	t.Run("merge commit with no matching parent", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := WriteTree(repo, []object.TreeEntry{{Name: "c", Mode: filemode.Regular, Hash: blobIDs[2]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and a different tree
+		cM := CreateCommitObject(testGitConfig, treeC, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commit, err := GetCommit(repo, cMID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b", "c"}, diffs)
+	})
+
+	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[2]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and an overlapping tree
+		cM := CreateCommitObject(testGitConfig, treeC, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commit, err := GetCommit(repo, cMID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		assert.Nil(t, err)
+		// The expected result may vary depending on how your function handles conflicts
+		assert.Equal(t, []string{"a"}, diffs)
+	})
 }
