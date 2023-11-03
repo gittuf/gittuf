@@ -43,7 +43,7 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 		}
 	}
 
-	commit := CreateCommitObject(gitConfig, treeHash, curRef.Hash(), message, clock)
+	commit := CreateCommitObject(gitConfig, treeHash, []plumbing.Hash{curRef.Hash()}, message, clock)
 
 	if sign {
 		signature, err := signCommit(commit)
@@ -103,7 +103,7 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 }
 
 // CreateCommitObject returns a commit object using the specified parameters.
-func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHash plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
+func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parentHashes []plumbing.Hash, message string, clock clockwork.Clock) *object.Commit {
 	author := object.Signature{
 		Name:  gitConfig.User.Name,
 		Email: gitConfig.User.Email,
@@ -116,8 +116,14 @@ func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parent
 		TreeHash:  treeHash,
 		Message:   message,
 	}
-	if !parentHash.IsZero() {
-		commit.ParentHashes = []plumbing.Hash{parentHash}
+
+	if len(parentHashes) > 0 {
+		commit.ParentHashes = make([]plumbing.Hash, 0, len(parentHashes))
+	}
+	for _, parentHash := range parentHashes {
+		if !parentHash.IsZero() {
+			commit.ParentHashes = append(commit.ParentHashes, parentHash)
+		}
 	}
 
 	return commit

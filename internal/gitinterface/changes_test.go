@@ -65,7 +65,7 @@ func TestGetCommitFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		c := CreateCommitObject(testGitConfig, treeHash, plumbing.ZeroHash, "Test commit", testClock)
+		c := CreateCommitObject(testGitConfig, treeHash, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		commitID, err := WriteCommit(repo, c)
 		if err != nil {
 			t.Fatal(err)
@@ -107,13 +107,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -144,13 +144,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -187,13 +187,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -229,13 +229,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -271,13 +271,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -313,13 +313,13 @@ func TestGetDiffFilePaths(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, plumbing.ZeroHash, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -366,13 +366,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -399,13 +399,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -438,13 +438,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -476,13 +476,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -514,13 +514,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -552,13 +552,13 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB := CreateCommitObject(testGitConfig, treeB, cAID, "Test commit", testClock)
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
 		cBID, err := WriteCommit(repo, cB)
 		if err != nil {
 			t.Fatal(err)
@@ -582,7 +582,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cA := CreateCommitObject(testGitConfig, treeA, plumbing.ZeroHash, "Test commit", testClock)
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 		cAID, err := WriteCommit(repo, cA)
 		if err != nil {
 			t.Fatal(err)
