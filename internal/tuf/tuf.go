@@ -7,9 +7,13 @@ package tuf
 // however, is inspired by or cloned from the go-tuf implementation.
 
 import (
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"path"
 
@@ -30,11 +34,33 @@ type Key = signerverifier.SSLibKey
 // contents of the bytes. The key contents are expected to be in the custom
 // securesystemslib format.
 func LoadKeyFromBytes(contents []byte) (*Key, error) {
-	// FIXME: this assumes keys are stored in securesystemslib format.
-	// RSA keys are stored in PEM format.
 	var key *Key
-	if err := json.Unmarshal(contents, &key); err != nil {
-		return nil, err
+	err := json.Unmarshal(contents, &key)
+
+	// If there is an error in unmarshalling the contents into a key
+	if err != nil {
+		block, _ := pem.Decode(contents)
+		if block == nil {
+			return nil, errors.New("failed to parse key")
+		}
+		// Parse the public key from the PEM block
+		parsedKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		// Assert that the parsed key is an RSA public key
+		rsaKey, ok := parsedKey.(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New("not an RSA key")
+		}
+		// If all the above steps are successful, assign the parsed RSA key to the key variable
+		key = &Key{
+			KeyType: "rsa",
+			KeyVal: signerverifier.KeyVal{
+				Public: base64.StdEncoding.EncodeToString(rsaKey.N.Bytes()),
+			},
+			Scheme: "rsassa-pss-sha256", // TODO : What should be the Scheme?
+		}
 	}
 
 	if len(key.KeyID) == 0 {
