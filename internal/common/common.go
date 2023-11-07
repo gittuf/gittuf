@@ -276,7 +276,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
-		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], ref.Hash(), "Test commit", testClock)
+		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], []plumbing.Hash{ref.Hash()}, "Test commit", testClock)
 		commit = SignTestCommit(t, repo, commit, keyName)
 		if _, err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)

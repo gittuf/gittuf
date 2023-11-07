@@ -24,14 +24,45 @@ import (
 )
 
 func TestCreateCommitObject(t *testing.T) {
-	commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, plumbing.ZeroHash, "Test commit", testClock)
+	t.Run("zero commit and zero parent", func(t *testing.T) {
+		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
 
-	enc := memory.NewStorage().NewEncodedObject()
-	if err := commit.Encode(enc); err != nil {
-		t.Error(err)
-	}
+		enc := memory.NewStorage().NewEncodedObject()
+		if err := commit.Encode(enc); err != nil {
+			t.Error(err)
+		}
 
-	assert.Equal(t, "22ddfd55fb5fba7b37b50b068d1527a1b0f9f561", enc.Hash().String())
+		assert.Equal(t, "22ddfd55fb5fba7b37b50b068d1527a1b0f9f561", enc.Hash().String())
+	})
+
+	t.Run("zero commit and single non-zero parent", func(t *testing.T) {
+		pHashes := []plumbing.Hash{EmptyTree()}
+		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, pHashes, "Test commit", testClock)
+
+		enc := memory.NewStorage().NewEncodedObject()
+		if err := commit.Encode(enc); err != nil {
+			t.Error(err)
+		}
+
+		for parentHashInd := range commit.ParentHashes {
+			assert.Equal(t, pHashes[parentHashInd], commit.ParentHashes[parentHashInd])
+		}
+	})
+
+	t.Run("zero commit and multiple parents", func(t *testing.T) {
+		pHashes := []plumbing.Hash{EmptyTree(), EmptyTree()}
+
+		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, pHashes, "Test commit", testClock)
+
+		enc := memory.NewStorage().NewEncodedObject()
+		if err := commit.Encode(enc); err != nil {
+			t.Error(err)
+		}
+
+		for parentHashInd := range commit.ParentHashes {
+			assert.Equal(t, pHashes[parentHashInd], commit.ParentHashes[parentHashInd])
+		}
+	})
 }
 
 func TestVerifyCommitSignature(t *testing.T) {
