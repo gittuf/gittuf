@@ -229,7 +229,7 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 		return ErrIncorrectVerificationKey
 	}
 
-	rekor, err := gitsignRekor.New(signerverifier.RekorServer)
+	rekor, err := gitsignRekor.NewWithOptions(ctx, signerverifier.RekorServer)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
 	}

@@ -17,7 +17,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.7.1-0.20230801180332-1e75bb347966
 	github.com/sergi/go-diff v1.3.1
 	github.com/sigstore/cosign/v2 v2.2.1
-	github.com/sigstore/gitsign v0.7.1
+	github.com/sigstore/gitsign v0.8.0
 	github.com/sigstore/sigstore v1.7.5
 	github.com/skeema/knownhosts v1.2.1
 	github.com/spf13/cobra v1.8.0
@@ -47,7 +47,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/github/smimesign v0.2.0 // indirect
 	github.com/go-chi/chi v4.1.2+incompatible // indirect
-	github.com/go-git/go-git/v5 v5.9.0 // indirect
+	github.com/go-git/go-git/v5 v5.10.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/analysis v0.21.4 // indirect
@@ -131,6 +131,7 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.1 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
