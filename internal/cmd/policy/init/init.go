@@ -5,6 +5,7 @@ package init
 import (
 	"os"
 
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/repository"
@@ -42,9 +43,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize policy file",
-		RunE:  o.Run,
+		Use:     "init",
+		Short:   "Initialize policy file",
+		PreRunE: common.CheckIfSigningViable,
+		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)
 

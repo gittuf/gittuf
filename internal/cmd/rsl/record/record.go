@@ -44,10 +44,11 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "record",
-		Short: "Record latest state of a Git reference in the RSL",
-		Args:  cobra.ExactArgs(1),
-		RunE:  o.Run,
+		Use:     "record",
+		Short:   "Record latest state of a Git reference in the RSL",
+		Args:    cobra.ExactArgs(1),
+		PreRunE: common.CheckIfSigningViable,
+		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)
 

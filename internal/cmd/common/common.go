@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -77,6 +79,12 @@ func ReadKeyBytes(key string) ([]byte, error) {
 	}
 
 	return kb, nil
+}
+
+func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
+	_, _, err := gitinterface.GetSigningCommand()
+
+	return err
 }
 
 func EvalMode() bool {

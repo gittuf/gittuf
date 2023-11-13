@@ -3,6 +3,7 @@
 package annotate
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -43,10 +44,11 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "annotate",
-		Short: "Annotate prior RSL entries",
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  o.Run,
+		Use:     "annotate",
+		Short:   "Annotate prior RSL entries",
+		Args:    cobra.MinimumNArgs(1),
+		PreRunE: common.CheckIfSigningViable,
+		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)
 
