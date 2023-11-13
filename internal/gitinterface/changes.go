@@ -3,10 +3,10 @@
 package gitinterface
 
 import (
-	"container/heap"
 	"fmt"
 	"sort"
 
+	"github.com/gittuf/gittuf/internal/datastructures"
 	"github.com/gittuf/gittuf/internal/third_party/go-git"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
 )
@@ -50,8 +50,9 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 
 		// keeping a heap of diffs so that we can pop them in sorted order
 
-		diffs := &diffHeap{}
-		heap.Init(diffs)
+		diffs := datastructures.NewHeap[string](func(a, b interface{}) bool {
+			return a.(string) < b.(string)
+		})
 
 		// We are iterating backwards since if there is a matching parent commit,
 		// it is likely to be the last one.
@@ -74,7 +75,7 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 			for _, change := range diff {
 				// if we have not already added this change
 				if !contains[change] {
-					heap.Push(diffs, change)
+					diffs.Push(change)
 				}
 				// Add changes to the map
 				contains[change] = true
@@ -85,7 +86,7 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 		changes := make([]string, len(contains))
 
 		for pos := 0; diffs.Len() > 0; pos++ {
-			changes[pos] = heap.Pop(diffs).(string)
+			changes[pos] = diffs.Pop()
 		}
 
 		return changes, nil
@@ -160,24 +161,4 @@ func diff(treeA, treeB *object.Tree) ([]string, error) {
 	})
 
 	return paths, nil
-}
-
-type diffHeap []string
-
-func (h diffHeap) Len() int           { return len(h) }
-func (h diffHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h diffHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
-
-func (h *diffHeap) Push(x any) {
-	// Push and Pop use pointer receivers because they modify the slice's length,
-	// not just its contents.
-	*h = append(*h, x.(string))
-}
-
-func (h *diffHeap) Pop() any {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
 }
