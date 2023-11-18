@@ -53,6 +53,17 @@ must be possible to require two members of the development team and one member
 of the security team to sign off on a change. This is not the same as a total
 threshold of three across the members of the development and security teams.
 
+## Support For Different Hats (Roles)
+
+Related to the concept of teams, is the concept that a single developer might be
+on different teams and wish to choose how an action is perceived.  Suppose Alice
+is both a maintainer and also on the security team.  She sometimes may be
+approving something she authored (wearing her maintainer hat) and other times
+doing a security review of a dependency (wearing her security hat).  It is
+reasonable that she may want to control how a statement of trust by her is used.
+These could naturally be linked to the teams for which a statement should be
+trusted.
+
 ## Read Permissions
 
 gittuf's design implements _write_ permission policies such as who can write to
