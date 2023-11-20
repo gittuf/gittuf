@@ -10,6 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 // InitializeTargets is the interface for the user to create the specified
@@ -57,6 +58,9 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 	if targetsRoleName == policy.TargetsRoleName {
 		state.TargetsEnvelope = env
 	} else {
+		if state.DelegationEnvelopes == nil {
+			state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+		}
 		state.DelegationEnvelopes[targetsRoleName] = env
 	}
 
