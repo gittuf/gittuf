@@ -138,15 +138,19 @@ gittuf design.
 #### RSL Reference Entries
 
 These entries are the standard variety described above. They contain the name of
-the reference they apply to and a commit ID. As such, they have the following
+the reference they apply to and a target ID. As such, they have the following
 structure.
 
 ```
 RSL Entry
 
 ref: <ref name>
-commit: <commit ID>
+targetID: <target ID>
 ```
+
+The `targetID` is typically the ID of a commit for references that are branches.
+However, for entries that record the state of a Git tag, `targetID` is the ID of
+the annotated tag object.
 
 #### RSL Annotation Entries
 
