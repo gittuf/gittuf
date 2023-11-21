@@ -251,6 +251,45 @@ MUST track the state of this reference so that the policy namespace is protected
 from reference state attacks. Further, RSL entries are used to identify
 historical policy states that may apply to older changes.
 
+### Attestations
+
+gittuf makes use of the signing capability provided by Git for commits and tags
+significantly. However, it is sometimes necessary to attach more than a single
+signature to a Git object or repository action. For example, a policy may
+require more than one developer to sign off and approve a change such as merging
+something to the `main` branch. To support these workflows (while also remaining
+compatible with standard Git clients), gittuf uses the concept of "detached
+authorizations", implemented using signed
+[in-toto attestations](https://github.com/in-toto/attestation). Attestations are
+tracked in the custom gittuf namespace: `refs/gittuf/attestations`.
+
+#### Reference Authorization
+
+A reference authorization is an attestation that accompanies an RSL reference
+entry, allowing additional developers to issue signatures authorizing the change
+to the Git reference in question. Its structure is similar to that of a
+reference entry:
+
+```
+TargetRef    string
+FromTargetID string
+ToTargetID   string
+```
+
+The `TargetRef` is the Git reference the authorization is for, while
+`FromTargetID` and `ToTargetID` record the change in the state of the reference
+authorized by the attestation (as Git hashes). The information pertaining to the
+prior state of the Git reference is explicitly recorded in the attestation
+unlike a standard RSL reference entry. This is because this information can be
+implicitly identified using the RSL by examining the previous entry for the
+reference in question. If the authorization is for a brand new reference (say a
+new branch or tag), `FromTargetID` must be set to zero.
+
+Reference authorizations are stored in a directory called
+`reference-authorizations` in the attestations namespace. Each authorization
+must have the in-toto predicate type:
+`https://gittuf.dev/reference-authorization/v<VERSION>`.
+
 ## Example
 
 Consider project `foo`'s Git repository maintained by Alice and Bob. Alice and
@@ -486,7 +525,11 @@ available state entry is `D`:
          to established authorized signers for new policy. Ignore expiration
          date checks. If verification passes, update `P` to new policy state.
    1. Verify the second state entry was signed by an authorized key as defined
-      in P.
+      in P. If the gittuf policy requires more than one signature, search for a
+      reference authorization attestation for the same change. Verify the
+      signatures on the attestation are issued by authorized keys to meet the
+      threshold, ignoring any signatures from the same key as the one used to
+      sign the entry.
    1. Enumerate all commits between that recorded in the first state and the
       second state with the signing key used for each commit. Verify each
       commit's signature using public key recorded in `P`.
