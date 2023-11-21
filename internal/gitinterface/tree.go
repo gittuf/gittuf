@@ -4,6 +4,7 @@ package gitinterface
 
 import (
 	"errors"
+	"io"
 	"path"
 	"sort"
 	"strings"
@@ -47,6 +48,35 @@ func EmptyTree() plumbing.Hash {
 	tree.Encode(obj) //nolint:errcheck
 
 	return obj.Hash()
+}
+
+// GetAllFilesInTree returns all filepaths and the corresponding hash in the
+// specified tree.
+func GetAllFilesInTree(tree *object.Tree) (map[string]plumbing.Hash, error) {
+	treeWalker := object.NewTreeWalker(tree, true, nil)
+	defer treeWalker.Close()
+
+	files := map[string]plumbing.Hash{}
+
+	for {
+		// This is based on FilesIter in go-git. That implementation loads each
+		// blob which we don't want to do.
+		name, entry, err := treeWalker.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+
+		if entry.Mode == filemode.Dir || entry.Mode == filemode.Submodule {
+			continue
+		}
+
+		files[name] = entry.Hash
+	}
+
+	return files, nil
 }
 
 // TreeBuilder is used to create multi-level trees in a repository.

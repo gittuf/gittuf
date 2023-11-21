@@ -67,6 +67,39 @@ func TestEmptyTree(t *testing.T) {
 	assert.Equal(t, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", hash.String())
 }
 
+func TestGetAllFilesInTree(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyBlobID, err := WriteBlob(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedFiles := map[string]plumbing.Hash{
+		"foo":            emptyBlobID,
+		"bar/foo":        emptyBlobID,
+		"foobar/foo/bar": emptyBlobID,
+	}
+
+	treeBuilder := NewTreeBuilder(repo)
+	rootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(expectedFiles)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootTree, err := GetTree(repo, rootTreeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := GetAllFilesInTree(rootTree)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedFiles, files)
+}
+
 func TestTreeBuilder(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
