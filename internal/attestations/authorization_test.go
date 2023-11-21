@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewAuthorizationAttestation(t *testing.T) {
+func TestNewReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := plumbing.ZeroHash.String()
 
-	authorization, err := NewAuthorizationAttestation(testRef, testID, testID)
+	authorization, err := NewReferenceAuthorization(testRef, testID, testID)
 	assert.Nil(t, err)
 
 	// Check value of statement type
@@ -33,7 +33,7 @@ func TestNewAuthorizationAttestation(t *testing.T) {
 	assert.Equal(t, authorization.Subject[0].Digest[digestGitCommitKey], testID)
 
 	// Check predicate type
-	assert.Equal(t, AuthorizationPredicateType, authorization.PredicateType)
+	assert.Equal(t, ReferenceAuthorizationPredicateType, authorization.PredicateType)
 
 	// Check predicate
 	predicate := authorization.Predicate.AsMap()
@@ -42,12 +42,12 @@ func TestNewAuthorizationAttestation(t *testing.T) {
 	assert.Equal(t, predicate["fromTargetID"], testID)
 }
 
-func TestSetAuthorizationAttestation(t *testing.T) {
+func TestSetReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := plumbing.ZeroHash.String()
-	mainZeroZero := createAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
-	featureZeroZero := createAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
+	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
+	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -57,24 +57,24 @@ func TestSetAuthorizationAttestation(t *testing.T) {
 	attestations := &Attestations{}
 
 	// Add auth for first branch
-	err = attestations.SetAuthorizationAttestation(repo, mainZeroZero, testRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
 	// Add auth for the other branch
-	err = attestations.SetAuthorizationAttestation(repo, featureZeroZero, testAnotherRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 }
 
-func TestRemoveAuthorizationAttestation(t *testing.T) {
+func TestRemoveReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := plumbing.ZeroHash.String()
-	mainZeroZero := createAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
-	featureZeroZero := createAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
+	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
+	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -83,37 +83,37 @@ func TestRemoveAuthorizationAttestation(t *testing.T) {
 
 	attestations := &Attestations{}
 
-	err = attestations.SetAuthorizationAttestation(repo, mainZeroZero, testRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
-	err = attestations.SetAuthorizationAttestation(repo, featureZeroZero, testAnotherRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
-	err = attestations.RemoveAuthorizationAttestation(testAnotherRef, testID, testID)
+	err = attestations.RemoveReferenceAuthorization(testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
-	err = attestations.RemoveAuthorizationAttestation(testRef, testID, testID)
+	err = attestations.RemoveReferenceAuthorization(testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.NotContains(t, attestations.authorizations, AuthorizationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.authorizations, AuthorizationPath(testAnotherRef, testID, testID))
+	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
+	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 }
 
-func TestGetAuthorizationAttestationFor(t *testing.T) {
+func TestGetReferenceAuthorizationFor(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := plumbing.ZeroHash.String()
-	mainZeroZero := createAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
-	featureZeroZero := createAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
+	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
+	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -122,45 +122,45 @@ func TestGetAuthorizationAttestationFor(t *testing.T) {
 
 	attestations := &Attestations{}
 
-	err = attestations.SetAuthorizationAttestation(repo, mainZeroZero, testRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = attestations.SetAuthorizationAttestation(repo, featureZeroZero, testAnotherRef, testID, testID)
+	err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mainAuth, err := attestations.GetAuthorizationAttestationFor(repo, testRef, testID, testID)
+	mainAuth, err := attestations.GetReferenceAuthorizationFor(repo, testRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Equal(t, mainZeroZero, mainAuth)
 
-	featureAuth, err := attestations.GetAuthorizationAttestationFor(repo, testAnotherRef, testID, testID)
+	featureAuth, err := attestations.GetReferenceAuthorizationFor(repo, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Equal(t, featureZeroZero, featureAuth)
 }
 
-func TestValidateAuthorization(t *testing.T) {
+func TestValidateReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := plumbing.ZeroHash.String()
-	mainZeroZero := createAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
-	featureZeroZero := createAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
+	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
+	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
-	err := validateAuthorization(mainZeroZero, testRef, testID, testID)
+	err := validateReferenceAuthorization(mainZeroZero, testRef, testID, testID)
 	assert.Nil(t, err)
 
-	err = validateAuthorization(featureZeroZero, testAnotherRef, testID, testID)
+	err = validateReferenceAuthorization(featureZeroZero, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
 
-	err = validateAuthorization(mainZeroZero, testAnotherRef, testID, testID)
+	err = validateReferenceAuthorization(mainZeroZero, testAnotherRef, testID, testID)
 	assert.ErrorIs(t, err, ErrInvalidAuthorization)
 }
 
-func createAuthorizationAttestationEnvelopes(t *testing.T, refName, fromID, toID string) *sslibdsse.Envelope {
+func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fromID, toID string) *sslibdsse.Envelope {
 	t.Helper()
 
-	authorization, err := NewAuthorizationAttestation(refName, fromID, toID)
+	authorization, err := NewReferenceAuthorization(refName, fromID, toID)
 	if err != nil {
 		t.Fatal(err)
 	}

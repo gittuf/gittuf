@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	AuthorizationPredicateType = "https://gittuf.dev/authorization/v0.1"
-	digestGitCommitKey         = "gitCommit"
-	toTargetIDKey              = "toTargetID"
-	fromTargetIDKey            = "fromTargetID"
-	targetRefKey               = "targetRef"
+	ReferenceAuthorizationPredicateType = "https://gittuf.dev/reference-authorization/v0.1"
+	digestGitCommitKey                  = "gitCommit"
+	toTargetIDKey                       = "toTargetID"
+	fromTargetIDKey                     = "fromTargetID"
+	targetRefKey                        = "targetRef"
 )
 
 var (
@@ -29,22 +29,22 @@ var (
 	ErrAuthorizationNotFound = errors.New("requested authorization not found")
 )
 
-// Authorization is a lightweight record of a detached authorization in a gittuf
-// repository. It is meant to be used as a "predicate" in an in-toto
+// ReferenceAuthorization is a lightweight record of a detached authorization in
+// a gittuf repository. It is meant to be used as a "predicate" in an in-toto
 // attestation.
-type Authorization struct {
+type ReferenceAuthorization struct {
 	TargetRef    string `json:"targetRef"`
 	FromTargetID string `json:"fromTargetID"`
 	ToTargetID   string `json:"toTargetID"`
 }
 
-// NewAuthorizationAttestation creates a new authorization for the provided
-// information. The authorization is embedded in an in-toto "statement" and
-// returned with the appropriate "predicate type" set. The `fromTargetID` and
-// `toTargetID` specify the change to `targetRef` that is to be authorized by
-// invoking this function.
-func NewAuthorizationAttestation(targetRef, fromTargetID, toTargetID string) (*ita.Statement, error) {
-	predicate := &Authorization{
+// NewReferenceAuthorization creates a new reference authorization for the
+// provided information. The authorization is embedded in an in-toto "statement"
+// and returned with the appropriate "predicate type" set. The `fromTargetID`
+// and `toTargetID` specify the change to `targetRef` that is to be authorized
+// by invoking this function.
+func NewReferenceAuthorization(targetRef, fromTargetID, toTargetID string) (*ita.Statement, error) {
+	predicate := &ReferenceAuthorization{
 		TargetRef:    targetRef,
 		FromTargetID: fromTargetID,
 		ToTargetID:   toTargetID,
@@ -72,15 +72,15 @@ func NewAuthorizationAttestation(targetRef, fromTargetID, toTargetID string) (*i
 				Digest: map[string]string{digestGitCommitKey: toTargetID},
 			},
 		},
-		PredicateType: AuthorizationPredicateType,
+		PredicateType: ReferenceAuthorizationPredicateType,
 		Predicate:     predicateStruct,
 	}, nil
 }
 
-// SetAuthorizationAttestation writes the new authorization attestation to the
-// object store and tracks it in the current attestations state.
-func (a *Attestations) SetAuthorizationAttestation(repo *git.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
-	if err := validateAuthorization(env, refName, fromID, toID); err != nil {
+// SetReferenceAuthorization writes the new reference authorization attestation
+// to the object store and tracks it in the current attestations state.
+func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
+	if err := validateReferenceAuthorization(env, refName, fromID, toID); err != nil {
 		return err
 	}
 
@@ -94,31 +94,31 @@ func (a *Attestations) SetAuthorizationAttestation(repo *git.Repository, env *ss
 		return err
 	}
 
-	if a.authorizations == nil {
-		a.authorizations = map[string]plumbing.Hash{}
+	if a.referenceAuthorizations == nil {
+		a.referenceAuthorizations = map[string]plumbing.Hash{}
 	}
 
-	a.authorizations[AuthorizationPath(refName, fromID, toID)] = blobID
+	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)] = blobID
 	return nil
 }
 
-// RemoveAuthorizationAttestation removes a set authorization attestation
-// entirely. The object, however, isn't removed from the object store as prior
-// states may still need it.
-func (a *Attestations) RemoveAuthorizationAttestation(refName, fromID, toID string) error {
-	authPath := AuthorizationPath(refName, fromID, toID)
-	if _, has := a.authorizations[authPath]; !has {
+// RemoveReferenceAuthorization removes a set reference authorization
+// attestation entirely. The object, however, isn't removed from the object
+// store as prior states may still need it.
+func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string) error {
+	authPath := ReferenceAuthorizationPath(refName, fromID, toID)
+	if _, has := a.referenceAuthorizations[authPath]; !has {
 		return ErrAuthorizationNotFound
 	}
 
-	delete(a.authorizations, authPath)
+	delete(a.referenceAuthorizations, authPath)
 	return nil
 }
 
-// GetAuthorizationAttestationFor returns the requested authorization
+// GetReferenceAuthorizationFor returns the requested reference authorization
 // attestation (with its signatures).
-func (a *Attestations) GetAuthorizationAttestationFor(repo *git.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.authorizations[AuthorizationPath(refName, fromID, toID)]
+func (a *Attestations) GetReferenceAuthorizationFor(repo *git.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
+	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)]
 	if !has {
 		return nil, ErrAuthorizationNotFound
 	}
@@ -133,20 +133,20 @@ func (a *Attestations) GetAuthorizationAttestationFor(repo *git.Repository, refN
 		return nil, err
 	}
 
-	if err := validateAuthorization(env, refName, fromID, toID); err != nil {
+	if err := validateReferenceAuthorization(env, refName, fromID, toID); err != nil {
 		return nil, err
 	}
 
 	return env, nil
 }
 
-// AuthorizationPath constructs the expected path on-disk for the authorization
-// attestation.
-func AuthorizationPath(refName, fromID, toID string) string {
+// ReferenceAuthorizationPath constructs the expected path on-disk for the
+// reference authorization attestation.
+func ReferenceAuthorizationPath(refName, fromID, toID string) string {
 	return path.Join(refName, fmt.Sprintf("%s-%s", fromID, toID))
 }
 
-func validateAuthorization(env *sslibdsse.Envelope, refName, fromID, toID string) error {
+func validateReferenceAuthorization(env *sslibdsse.Envelope, refName, fromID, toID string) error {
 	payload, err := env.DecodeB64Payload()
 	if err != nil {
 		return err

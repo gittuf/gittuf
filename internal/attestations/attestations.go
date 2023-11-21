@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	Ref                         = "refs/gittuf/attestations"
-	authorizationsTreeEntryName = "authorizations"
-	initialCommitMessage        = "Initial commit"
-	defaultCommitMessage        = "Update attestations"
+	Ref                                  = "refs/gittuf/attestations"
+	referenceAuthorizationsTreeEntryName = "reference-authorizations"
+	initialCommitMessage                 = "Initial commit"
+	defaultCommitMessage                 = "Update attestations"
 )
 
 var ErrAttestationsExist = errors.New("cannot initialize attestations namespace as it exists already")
@@ -45,14 +45,14 @@ func InitializeNamespace(repo *git.Repository) error {
 
 // Attestations tracks all the attestations in a gittuf repository.
 type Attestations struct {
-	// authorizations maps each authorized action to the blob ID of the
+	// referenceAuthorizations maps each authorized action to the blob ID of the
 	// attestation. The key is a path of the form
 	// `<ref-path>/<from-id>-<to-id>`, where `ref-path` is the absolute ref path
 	// such as `refs/heads/main` and `from-id` and `to-id` determine how the ref
 	// in question moved. For example, the key
 	// `refs/heads/main/<commit-A>-<commit-B>` indicates the authorization is
 	// for the action of moving `refs/heads/main` from `commit-A` to `commit-B`.
-	authorizations map[string]plumbing.Hash
+	referenceAuthorizations map[string]plumbing.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -97,7 +97,7 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 
 	var authorizationsTreeID plumbing.Hash
 	for _, e := range attestationsRootTree.Entries {
-		if e.Name == authorizationsTreeEntryName {
+		if e.Name == referenceAuthorizationsTreeEntryName {
 			authorizationsTreeID = e.Hash
 		}
 	}
@@ -107,9 +107,9 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 		return nil, err
 	}
 
-	attestations := &Attestations{authorizations: map[string]plumbing.Hash{}}
+	attestations := &Attestations{referenceAuthorizations: map[string]plumbing.Hash{}}
 
-	attestations.authorizations, err = gitinterface.GetAllFilesInTree(authorizationsTree)
+	attestations.referenceAuthorizations, err = gitinterface.GetAllFilesInTree(authorizationsTree)
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +129,12 @@ func (a *Attestations) Commit(repo *git.Repository, commitMessage string, signCo
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Add authorizations tree
-	authorizationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(a.authorizations)
+	authorizationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(a.referenceAuthorizations)
 	if err != nil {
 		return err
 	}
 	attestationsTreeEntries = append(attestationsTreeEntries, object.TreeEntry{
-		Name: authorizationsTreeEntryName,
+		Name: referenceAuthorizationsTreeEntryName,
 		Mode: filemode.Dir,
 		Hash: authorizationsTreeID,
 	})

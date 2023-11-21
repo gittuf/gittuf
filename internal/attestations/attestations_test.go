@@ -59,7 +59,7 @@ func TestInitializeNamespace(t *testing.T) {
 func TestLoadCurrentAttestations(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := plumbing.ZeroHash.String()
-	testAttestation, err := NewAuthorizationAttestation(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 
 		attestations, err := LoadCurrentAttestations(repo)
 		assert.Nil(t, err)
-		assert.Empty(t, attestations.authorizations)
+		assert.Empty(t, attestations.referenceAuthorizations)
 	})
 
 	t.Run("with RSL entry but empty", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 
 		attestations, err := LoadCurrentAttestations(repo)
 		assert.Nil(t, err)
-		assert.Empty(t, attestations.authorizations)
+		assert.Empty(t, attestations.referenceAuthorizations)
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
@@ -134,9 +134,9 @@ func TestLoadCurrentAttestations(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		authorizations := map[string]plumbing.Hash{AuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
-		attestations := &Attestations{authorizations: authorizations}
+		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
@@ -152,14 +152,14 @@ func TestLoadCurrentAttestations(t *testing.T) {
 
 		attestations, err = LoadCurrentAttestations(repo)
 		assert.Nil(t, err)
-		assert.Equal(t, authorizations, attestations.authorizations)
+		assert.Equal(t, authorizations, attestations.referenceAuthorizations)
 	})
 }
 
 func TestLoadAttestationsForEntry(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := plumbing.ZeroHash.String()
-	testAttestation, err := NewAuthorizationAttestation(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 
 		attestations, err := LoadAttestationsForEntry(repo, entry.(*rsl.ReferenceEntry))
 		assert.Nil(t, err)
-		assert.Empty(t, attestations.authorizations)
+		assert.Empty(t, attestations.referenceAuthorizations)
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
@@ -224,9 +224,9 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		authorizations := map[string]plumbing.Hash{AuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
-		attestations := &Attestations{authorizations: authorizations}
+		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
@@ -247,14 +247,14 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 
 		attestations, err = LoadAttestationsForEntry(repo, entry.(*rsl.ReferenceEntry))
 		assert.Nil(t, err)
-		assert.Equal(t, authorizations, attestations.authorizations)
+		assert.Equal(t, authorizations, attestations.referenceAuthorizations)
 	})
 }
 
 func TestAttestationsCommit(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := plumbing.ZeroHash.String()
-	testAttestation, err := NewAuthorizationAttestation(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,8 +291,8 @@ func TestAttestationsCommit(t *testing.T) {
 	}
 	assert.Equal(t, gitinterface.EmptyTree(), commit.TreeHash)
 
-	authorizations := map[string]plumbing.Hash{AuthorizationPath(testRef, testID, testID): blobID}
-	attestations := &Attestations{authorizations: authorizations}
+	authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+	attestations := &Attestations{referenceAuthorizations: authorizations}
 
 	if err := attestations.Commit(repo, "Test commit", false); err != nil {
 		t.Error(err)
@@ -313,11 +313,11 @@ func TestAttestationsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 1, len(rootTree.Entries))
-	assert.Equal(t, authorizationsTreeEntryName, rootTree.Entries[0].Name)
+	assert.Equal(t, referenceAuthorizationsTreeEntryName, rootTree.Entries[0].Name)
 
 	// We don't need to check every level of the tree because we do it in the
 	// tree builder API
 	attestations, err = LoadCurrentAttestations(repo)
 	assert.Nil(t, err)
-	assert.Equal(t, attestations.authorizations, authorizations)
+	assert.Equal(t, attestations.referenceAuthorizations, authorizations)
 }
