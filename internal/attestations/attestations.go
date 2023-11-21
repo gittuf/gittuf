@@ -109,11 +109,8 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 
 	attestations := &Attestations{authorizations: map[string]plumbing.Hash{}}
 
-	filesIter := authorizationsTree.Files()
-	if err := filesIter.ForEach(func(f *object.File) error {
-		attestations.authorizations[f.Name] = f.Blob.Hash
-		return nil
-	}); err != nil {
+	attestations.authorizations, err = gitinterface.GetAllFilesInTree(authorizationsTree)
+	if err != nil {
 		return nil, err
 	}
 
