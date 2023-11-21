@@ -3,10 +3,9 @@
 package policy
 
 import (
-	"errors"
-
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -675,23 +674,25 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 		delegationTargetsMetadata[name] = targetsMetadata
 	}
 
-	delegationsQueue := topLevelTargetsMetadata.Delegations.Roles
+	delegationsStack := topLevelTargetsMetadata.Delegations.Roles
 
 	for {
-		if len(delegationsQueue) == 0 {
+		if len(delegationsStack) == 0 {
 			return tuf.Delegation{}, ErrDelegationNotFound
 		}
 
-		delegation := delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
+		delegation := delegationsStack[0]
+		delegationsStack = delegationsStack[1:]
 
 		if delegation.Name == roleName {
 			return delegation, nil
 		}
 
 		if s.HasTargetsRole(delegation.Name) {
-			// TODO: clarifying terminating / reachability
-			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
+			if delegation.Terminating {
+				delegationsStack = delegationTargetsMetadata[delegation.Name].Delegations.Roles
+			}
+			delegationsStack = append(delegationTargetsMetadata[delegation.Name].Delegations.Roles, delegationsStack...)
 		}
 	}
 }
