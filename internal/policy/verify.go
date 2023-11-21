@@ -16,7 +16,6 @@ import (
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing"
 	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
 	"github.com/gittuf/gittuf/internal/tuf"
-
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -37,9 +36,7 @@ const (
 	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
-var (
-	ErrUnauthorizedSignature = errors.New("unauthorized signature")
-)
+var ErrUnauthorizedSignature = errors.New("unauthorized signature")
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy.
@@ -405,8 +402,6 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 			return err
 		}
 
-		// TODO: evaluate if this can be done once for the earliest commit in
-		// the set being verified if we had them ordered.
 		var commitPolicy *State
 		commitPolicy, err = GetStateForCommit(ctx, repo, commit)
 		if err != nil {
