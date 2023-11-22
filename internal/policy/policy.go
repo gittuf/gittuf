@@ -674,15 +674,15 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 		delegationTargetsMetadata[name] = targetsMetadata
 	}
 
-	delegationsStack := topLevelTargetsMetadata.Delegations.Roles
+	delegationsToCheck := topLevelTargetsMetadata.Delegations.Roles
 
 	for {
-		if len(delegationsStack) == 0 {
+		if len(delegationsToCheck) == 0 {
 			return tuf.Delegation{}, ErrDelegationNotFound
 		}
 
-		delegation := delegationsStack[0]
-		delegationsStack = delegationsStack[1:]
+		delegation := delegationsToCheck[0]
+		delegationsToCheck = delegationsToCheck[1:]
 
 		if delegation.Name == roleName {
 			return delegation, nil
@@ -690,9 +690,9 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 
 		if s.HasTargetsRole(delegation.Name) {
 			if delegation.Terminating {
-				delegationsStack = delegationTargetsMetadata[delegation.Name].Delegations.Roles
+				delegationsToCheck = delegationTargetsMetadata[delegation.Name].Delegations.Roles
 			}
-			delegationsStack = append(delegationTargetsMetadata[delegation.Name].Delegations.Roles, delegationsStack...)
+			delegationsToCheck = append(delegationTargetsMetadata[delegation.Name].Delegations.Roles[:len(delegationTargetsMetadata[delegation.Name].Delegations.Roles)-1], delegationsToCheck...)
 		}
 	}
 }
