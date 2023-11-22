@@ -210,8 +210,8 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 			}
 
 			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				// We encounter this for key types that can be used for metadata
-				// but not Git objects
+				// We encounter this for key types that can be used for gittuf
+				// policy metadata but not Git objects
 				continue
 			}
 
@@ -372,6 +372,11 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 			gitNamespaceVerified = true
 			break
 		}
+		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			// We encounter this for key types that can be used for gittuf
+			// policy metadata but not Git objects
+			continue
+		}
 		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
 			// Unexpected error
 			return err
@@ -453,6 +458,11 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 					verifiedKeyID = key.KeyID
 					break
 				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					// We encounter this for key types that can be used for
+					// gittuf policy metadata but not Git objects
+					continue
+				}
 				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
 					// Unexpected error
 					return err
@@ -522,6 +532,8 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 			break
 		}
 		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			// We encounter this for key types that can be used for gittuf
+			// policy metadata but not Git objects
 			continue
 		}
 		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
@@ -556,6 +568,8 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 			break
 		}
 		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			// We encounter this for key types that can be used for gittuf
+			// policy metadata but not Git objects
 			continue
 		}
 		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
