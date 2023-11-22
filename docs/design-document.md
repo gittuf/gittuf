@@ -589,10 +589,23 @@ reverses all the changes made in the reverted commit. This is needed when "good"
 commits that must be retained are interspersed with "bad" commits that must be
 rejected.
 
-In both cases, new RSL entries and annotations may be used to record the
-incident or to skip the invalid RSL entries corresponding to the rejected
-changes. TODO: should these new RSL entries come from authorized users for the
-affected namespace?
+In both cases, new RSL entries and annotations must be used to record the
+incident and skip the invalid RSL entries corresponding to the rejected changes.
+
+gittuf, by default, prefers the second option, with an explicit revert commit
+that is tree-same as the last good commit. This ensures that a client can always
+fast-forward to a fix rather than rewind. By resetting the affected branch to a
+prior good commit, Git clients that have already pulled in the invalid commit
+will not reset as well. Instead, they will assume they are ahead of the remote
+in question and will continue to use the bad commit as the latest commit.
+
+When the gittuf verification workflow encounters an RSL entry for some Git
+reference that does not meet policy, it looks to see if a subsequent entry for
+the same reference contains a fix that aligns with the last known good state.
+Any intermediate entries between the original invalid entry and the fix for the
+reference in question are also considered to be invalid. Therefore, in addition
+to the fix RSL entry, gittuf also expects skip annotations for the original
+invalid entry and intermediate entries for the reference.
 
 #### M2: Create RSL entry on behalf of another user
 
