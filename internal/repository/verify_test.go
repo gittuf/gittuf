@@ -64,4 +64,11 @@ func TestVerifyRef(t *testing.T) {
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		}
 	}
+
+	// Add another commit
+	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyName)
+	err := repo.VerifyRef(context.Background(), refName, true)
+	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
+	err = repo.VerifyRef(context.Background(), refName, false)
+	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 }
