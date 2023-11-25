@@ -202,4 +202,32 @@ func TestClone(t *testing.T) {
 		_, err = Clone(context.Background(), remoteTmpDir, dirName, "")
 		assert.ErrorIs(t, err, ErrDirExists)
 	})
+
+	t.Run("successful clone without specifying dir, with trailing slashes in repository path", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+
+		if err := os.Chdir(localTmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		repo, err := Clone(context.Background(), remoteTmpDir+"//", "", "")
+		assert.Nil(t, err)
+		head, err := repo.r.Head()
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, commitID, head.Hash())
+
+		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
+		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+	})
 }
