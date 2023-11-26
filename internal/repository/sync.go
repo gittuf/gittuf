@@ -26,7 +26,10 @@ var (
 func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
 	if dir == "" {
 		// FIXME: my understanding is backslashes are not used in URLs but I haven't dived into the RFCs to check yet
-		split := strings.Split(strings.TrimSpace(strings.ReplaceAll(remoteURL, "\\", "/")), "/")
+		modifiedURL := strings.ReplaceAll(remoteURL, "\\", "/")
+		modifiedURL = strings.TrimRight(strings.TrimSpace(modifiedURL), "/") // Trim spaces and trailing slashes if any
+
+		split := strings.Split(modifiedURL, "/")
 		dir = strings.TrimSuffix(split[len(split)-1], ".git")
 	}
 	_, err := os.Stat(dir)
