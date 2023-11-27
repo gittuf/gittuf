@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 
@@ -20,6 +19,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
+
+	"github.com/go-git/go-billy/v5/memfs"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
@@ -336,4 +337,96 @@ func TestGetStateForCommit(t *testing.T) {
 	state, err = GetStateForCommit(context.Background(), repo, newCommit)
 	assert.Nil(t, err)
 	assert.Equal(t, firstState, state)
+}
+
+func TestFindDelegationEntry(t *testing.T) {
+	t.Run("no delegation", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
+
+		entry, err := state.findDelegationEntry("random")
+		assert.ErrorIs(t, err, ErrDelegationNotFound)
+		assert.Equal(t, entry, tuf.Delegation{})
+	})
+	t.Run("simple delegation", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
+		state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+
+		topLevelDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "1"}}}
+		topLevelMetadata := tuf.TargetsMetadata{Delegations: topLevelDelegations}
+
+		topLevelEnv, err := dsse.CreateEnvelope(topLevelMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = topLevelEnv
+		state.DelegationEnvelopes["targets"] = topLevelEnv
+
+		secondLevelDelegations := &tuf.Delegations{}
+		secondLevelMetadata := tuf.TargetsMetadata{Delegations: secondLevelDelegations}
+		secondLevelEnv, err := dsse.CreateEnvelope(secondLevelMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.DelegationEnvelopes["1"] = secondLevelEnv
+
+		entry, err := state.findDelegationEntry("1")
+		assert.Nil(t, err)
+		assert.Equal(t, tuf.Delegation{Name: "1"}, entry)
+	})
+	t.Run("delegation with multiple roles", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
+		state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+
+		topLevelDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "1"}, {Name: "2"}}}
+		topLevelMetadata := tuf.TargetsMetadata{Delegations: topLevelDelegations}
+
+		topLevelEnv, err := dsse.CreateEnvelope(topLevelMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = topLevelEnv
+		state.DelegationEnvelopes["targets"] = topLevelEnv
+
+		delegationOneDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "3"}, {Name: "4"}}}
+		delegationOneMetadata := tuf.TargetsMetadata{Delegations: delegationOneDelegations}
+		delegationOneEnv, err := dsse.CreateEnvelope(delegationOneMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.DelegationEnvelopes["1"] = delegationOneEnv
+
+		delegationThreeMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
+		delegationThreeEnv, err := dsse.CreateEnvelope(delegationThreeMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.DelegationEnvelopes["3"] = delegationThreeEnv
+
+		delegationFourMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
+		delegationFourEnv, err := dsse.CreateEnvelope(delegationFourMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.DelegationEnvelopes["4"] = delegationFourEnv
+
+		delegationTwoMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
+		delegationTwoEnv, err := dsse.CreateEnvelope(delegationTwoMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.DelegationEnvelopes["2"] = delegationTwoEnv
+
+		entry, err := state.findDelegationEntry("4")
+
+		assert.Nil(t, err)
+
+		assert.Equal(t, tuf.Delegation{Name: "4"}, entry)
+	})
 }
