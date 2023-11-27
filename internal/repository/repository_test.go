@@ -11,9 +11,9 @@ import (
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
-	"github.com/gittuf/gittuf/internal/third_party/go-git"
-	"github.com/gittuf/gittuf/internal/third_party/go-git/storage/memory"
 	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
