@@ -339,94 +339,28 @@ func TestGetStateForCommit(t *testing.T) {
 	assert.Equal(t, firstState, state)
 }
 
-func TestFindDelegationEntry(t *testing.T) {
+func TestStateFindDelegationEntry(t *testing.T) {
+	// Test case when no delegation is found
 	t.Run("no delegation", func(t *testing.T) {
 		state := createTestStateWithPolicy(t)
-
 		entry, err := state.findDelegationEntry("random")
 		assert.ErrorIs(t, err, ErrDelegationNotFound)
-		assert.Equal(t, entry, tuf.Delegation{})
+		assert.Nil(t, entry)
 	})
+
+	// Test case for a simple delegation
 	t.Run("simple delegation", func(t *testing.T) {
-		state := createTestStateWithPolicy(t)
-		state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
-
-		topLevelDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "1"}}}
-		topLevelMetadata := tuf.TargetsMetadata{Delegations: topLevelDelegations}
-
-		topLevelEnv, err := dsse.CreateEnvelope(topLevelMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.TargetsEnvelope = topLevelEnv
-		state.DelegationEnvelopes["targets"] = topLevelEnv
-
-		secondLevelDelegations := &tuf.Delegations{}
-		secondLevelMetadata := tuf.TargetsMetadata{Delegations: secondLevelDelegations}
-		secondLevelEnv, err := dsse.CreateEnvelope(secondLevelMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.DelegationEnvelopes["1"] = secondLevelEnv
-
+		state := createTestStateWithDelegatedPolicies(t)
 		entry, err := state.findDelegationEntry("1")
 		assert.Nil(t, err)
-		assert.Equal(t, tuf.Delegation{Name: "1"}, entry)
+		assert.Equal(t, &tuf.Delegation{Name: "1", Paths: []string{"path1/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
 	})
+
+	// Test case for a delegation with multiple roles
 	t.Run("delegation with multiple roles", func(t *testing.T) {
-		state := createTestStateWithPolicy(t)
-		state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
-
-		topLevelDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "1"}, {Name: "2"}}}
-		topLevelMetadata := tuf.TargetsMetadata{Delegations: topLevelDelegations}
-
-		topLevelEnv, err := dsse.CreateEnvelope(topLevelMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.TargetsEnvelope = topLevelEnv
-		state.DelegationEnvelopes["targets"] = topLevelEnv
-
-		delegationOneDelegations := &tuf.Delegations{Roles: []tuf.Delegation{{Name: "3"}, {Name: "4"}}}
-		delegationOneMetadata := tuf.TargetsMetadata{Delegations: delegationOneDelegations}
-		delegationOneEnv, err := dsse.CreateEnvelope(delegationOneMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.DelegationEnvelopes["1"] = delegationOneEnv
-
-		delegationThreeMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
-		delegationThreeEnv, err := dsse.CreateEnvelope(delegationThreeMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.DelegationEnvelopes["3"] = delegationThreeEnv
-
-		delegationFourMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
-		delegationFourEnv, err := dsse.CreateEnvelope(delegationFourMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.DelegationEnvelopes["4"] = delegationFourEnv
-
-		delegationTwoMetadata := tuf.TargetsMetadata{Delegations: &tuf.Delegations{}}
-		delegationTwoEnv, err := dsse.CreateEnvelope(delegationTwoMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		state.DelegationEnvelopes["2"] = delegationTwoEnv
-
+		state := createTestStateWithDelegatedPolicies(t)
 		entry, err := state.findDelegationEntry("4")
-
 		assert.Nil(t, err)
-
-		assert.Equal(t, tuf.Delegation{Name: "4"}, entry)
+		assert.Equal(t, &tuf.Delegation{Name: "4", Paths: []string{"path1/subpath2/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
 	})
 }

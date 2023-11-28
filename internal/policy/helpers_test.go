@@ -4,9 +4,8 @@ package policy
 
 import (
 	"context"
-	"testing"
-
 	_ "embed"
+	"testing"
 
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 var testCtx = context.Background()
@@ -139,6 +139,118 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		TargetsEnvelope: targetsEnv,
 		RootPublicKeys:  []*tuf.Key{key},
 	}
+}
+
+func createTestStateWithDelegatedPolicies(t *testing.T) *State {
+	t.Helper()
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	rootMetadata = AddTargetsKey(rootMetadata, key)
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the root targets metadata
+	targetsMetadata := InitializeTargetsMetadata()
+
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "1", []*tuf.Key{gpgKey}, []string{"path1/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "2", []*tuf.Key{gpgKey}, []string{"path2/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the targets envelope
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the second level of delegations
+	delegation1Metadata := InitializeTargetsMetadata()
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"path1/subpath1/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"path1/subpath2/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the delegation envelope
+	delegation1Env, err := dsse.CreateEnvelope(delegation1Metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegation1Env, err = dsse.SignEnvelope(context.Background(), delegation1Env, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create the empty delegation envelope for delegation 2, 3, and 4
+	emptyEnv, err := dsse.CreateEnvelope(InitializeTargetsMetadata())
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyEnv, err = dsse.SignEnvelope(context.Background(), emptyEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	curState := &State{
+		RootEnvelope:        rootEnv,
+		TargetsEnvelope:     targetsEnv,
+		DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+		RootPublicKeys:      []*tuf.Key{key},
+	}
+
+	// Add the delegation envelopes to the state
+
+	curState.DelegationEnvelopes["targets"] = targetsEnv
+	curState.DelegationEnvelopes["1"] = delegation1Env
+	curState.DelegationEnvelopes["2"] = emptyEnv
+	curState.DelegationEnvelopes["3"] = emptyEnv
+	curState.DelegationEnvelopes["4"] = emptyEnv
+
+	// delegation structure
+	//
+	//   targets
+	//     /\
+	//    1  2
+	//   /\
+	//  3  4
+
+	return curState
 }
 
 func createTestStateWithTagPolicy(t *testing.T) *State {

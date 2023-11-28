@@ -3,10 +3,9 @@
 package policy
 
 import (
-	"errors"
-
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -654,10 +653,10 @@ func (s *State) HasTargetsRole(roleName string) bool {
 	return ok
 }
 
-func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
+func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 	topLevelTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
-		return tuf.Delegation{}, err
+		return nil, err
 	}
 
 	delegationTargetsMetadata := map[string]*tuf.TargetsMetadata{}
@@ -666,11 +665,11 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 
 		envBytes, err := env.DecodeB64Payload()
 		if err != nil {
-			return tuf.Delegation{}, err
+			return nil, err
 		}
 
 		if err := json.Unmarshal(envBytes, targetsMetadata); err != nil {
-			return tuf.Delegation{}, err
+			return nil, err
 		}
 		delegationTargetsMetadata[name] = targetsMetadata
 	}
@@ -679,10 +678,10 @@ func (s *State) findDelegationEntry(roleName string) (tuf.Delegation, error) {
 
 	for {
 		if len(delegationsQueue) == 0 {
-			return tuf.Delegation{}, ErrDelegationNotFound
+			return nil, ErrDelegationNotFound
 		}
 
-		delegation := delegationsQueue[0]
+		delegation := &delegationsQueue[0]
 		delegationsQueue = delegationsQueue[1:]
 
 		if delegation.Name == roleName {
