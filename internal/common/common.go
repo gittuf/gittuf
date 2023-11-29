@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	testGitConfig = &config.Config{
+	TestGitConfig = &config.Config{
 		User: struct {
 			Name  string
 			Email string
@@ -38,7 +38,7 @@ var (
 			Email: testEmail,
 		},
 	}
-	testClock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
+	TestClock = clockwork.NewFakeClockAt(time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC))
 )
 
 // CreateTestRSLReferenceEntryCommit is a test helper used to create a
@@ -68,12 +68,12 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 		Author: object.Signature{
 			Name:  testName,
 			Email: testEmail,
-			When:  testClock.Now(),
+			When:  TestClock.Now(),
 		},
 		Committer: object.Signature{
 			Name:  testName,
 			Email: testEmail,
-			When:  testClock.Now(),
+			When:  TestClock.Now(),
 		},
 		Message:      commitMessage,
 		TreeHash:     gitinterface.EmptyTree(),
@@ -137,12 +137,12 @@ func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, anno
 		Author: object.Signature{
 			Name:  testName,
 			Email: testEmail,
-			When:  testClock.Now(),
+			When:  TestClock.Now(),
 		},
 		Committer: object.Signature{
 			Name:  testName,
 			Email: testEmail,
-			When:  testClock.Now(),
+			When:  TestClock.Now(),
 		},
 		Message:      commitMessage,
 		TreeHash:     plumbing.ZeroHash,
@@ -276,7 +276,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
-		commit := gitinterface.CreateCommitObject(testGitConfig, treeHashes[i], []plumbing.Hash{ref.Hash()}, "Test commit", testClock)
+		commit := gitinterface.CreateCommitObject(TestGitConfig, treeHashes[i], []plumbing.Hash{ref.Hash()}, "Test commit", TestClock)
 		commit = SignTestCommit(t, repo, commit, keyName)
 		if _, err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
@@ -306,7 +306,7 @@ func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, tar
 	}
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)
-	tag := gitinterface.CreateTagObject(testGitConfig, targetObj, tagName, tagMessage, testClock)
+	tag := gitinterface.CreateTagObject(TestGitConfig, targetObj, tagName, tagMessage, TestClock)
 	tag = SignTestTag(t, repo, tag, keyName)
 	tagHash, err := gitinterface.ApplyTag(repo, tag)
 	if err != nil {
