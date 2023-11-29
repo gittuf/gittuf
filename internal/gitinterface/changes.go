@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/gittuf/gittuf/internal/third_party/go-git"
-	"github.com/gittuf/gittuf/internal/third_party/go-git/plumbing/object"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // GetCommitFilePaths returns all the file paths of the provided commit object.
