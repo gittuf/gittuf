@@ -83,7 +83,22 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 	})
 
 	t.Run("Pass in wrong order", func(t *testing.T) {
-		// TODO: is this expected behavior?
+		// Passing in the wrong order and getting a different result is expected behavior. We can show this with a simple example
+
+		//     7
+		//    ↙ ↘
+		//   5   6
+		//   ↓   ↓
+		//   3   4
+		//   ↓   ↓
+		//   1   2
+		//    ↘ ↙
+		//     0
+
+		// If we pass in 7 and 1, we expect to get 7, 6, 5, 4, 3, and 2
+		// If we pass in 1 and 7, we should expect nothing since every node that
+		// is in the subtree of 1 is also in the subtree of 7
+
 		commits, err := GetCommitsBetweenRange(repo, commitIDs[0], commitIDs[4])
 		assert.Nil(t, err)
 		assert.Empty(t, commits)
