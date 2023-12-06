@@ -28,8 +28,12 @@ using [GoReleaser]. The signature for these binaries are generated using
 and verify the gittuf release:
 
 ```sh
+# Modify these values as necessary.
+# One of: amd64, arm64
 ARCH=amd64
+# One of: linux, darwin, freebsd, windows
 OS=linux
+# https://github.com/gittuf/gittuf/releases
 VERSION=0.1.0
 cd $(mktemp -d)
 
