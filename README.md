@@ -27,11 +27,16 @@ using [GoReleaser]. The signature for these binaries are generated using
 [cosign] installed on your system, then you will be able to securely download
 and verify the gittuf release:
 
+> [!NOTE]
+> For `windows` make sure to consider the `.exe` extension, for the binary,
+> signature and certificate file. Similarly, `sudo install` and the destination
+> path must be modified as well.
+
 ```sh
 # Modify these values as necessary.
 # One of: amd64, arm64
 ARCH=amd64
-# One of: linux, darwin, freebsd, windows
+# One of: linux, darwin, freebsd
 OS=linux
 # https://github.com/gittuf/gittuf/releases
 VERSION=0.1.0
@@ -44,7 +49,7 @@ curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_$
 cosign verify-blob \
     --certificate gittuf_${VERSION}_${OS}_${ARCH}.pem \
     --signature gittuf_${VERSION}_${OS}_${ARCH}.sig \
-    --certificate-identity-regexp https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v${VERSION} \
+    --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v${VERSION} \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
     gittuf_${VERSION}_${OS}_${ARCH}
 
