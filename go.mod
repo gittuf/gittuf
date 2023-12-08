@@ -8,10 +8,10 @@ require (
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/in-toto/attestation v1.0.1
 	github.com/jonboulle/clockwork v0.4.0
-	github.com/secure-systems-lab/go-securesystemslib v0.7.1-0.20230801180332-1e75bb347966
+	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/sigstore/cosign/v2 v2.2.2
 	github.com/sigstore/gitsign v0.8.0
-	github.com/sigstore/sigstore v1.7.6
+	github.com/sigstore/sigstore v1.8.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/protobuf v1.31.0

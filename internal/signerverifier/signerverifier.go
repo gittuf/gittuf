@@ -10,12 +10,13 @@ import (
 )
 
 const (
-	ED25519KeyType = sslibsv.ED25519KeyType
-	ECDSAKeyType   = sslibsv.ECDSAKeyType
-	RSAKeyType     = sslibsv.RSAKeyType
-	GPGKeyType     = "gpg"
-	FulcioKeyType  = "sigstore-oidc"
-	RekorServer    = "https://rekor.sigstore.dev"
+	ED25519KeyType  = sslibsv.ED25519KeyType
+	ECDSAKeyType    = sslibsv.ECDSAKeyType
+	RSAKeyType      = sslibsv.RSAKeyType
+	GPGKeyType      = "gpg"
+	FulcioKeyType   = "sigstore-oidc"
+	FulcioKeyScheme = "fulcio"
+	RekorServer     = "https://rekor.sigstore.dev"
 )
 
 func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.SignerVerifier, error) {
