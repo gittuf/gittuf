@@ -3,6 +3,9 @@
 package root
 
 import (
+	"log/slog"
+	"os"
+
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
@@ -14,11 +17,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type options struct {
+	verbose bool
+}
+
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolVar(&o.verbose, "verbose", false, "enable verbose logging")
+}
+
 func New() *cobra.Command {
+	o := &options{}
 	cmd := &cobra.Command{
 		Use:   "gittuf",
 		Short: "A security layer for Git repositories, powered by TUF",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			level := slog.LevelInfo
+
+			if o.verbose {
+				level = slog.LevelDebug
+			}
+
+			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+		},
 	}
+
+	o.AddFlags(cmd)
 
 	cmd.AddCommand(clone.New())
 	cmd.AddCommand(trust.New())
