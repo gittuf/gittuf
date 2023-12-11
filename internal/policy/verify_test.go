@@ -66,8 +66,9 @@ func TestVerifyRef(t *testing.T) {
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 
-	err := VerifyRef(context.Background(), repo, refName)
+	currentTip, err := VerifyRef(context.Background(), repo, refName)
 	assert.Nil(t, err)
+	assert.Equal(t, commitIDs[0], currentTip)
 }
 
 func TestVerifyRefFull(t *testing.T) {
@@ -86,8 +87,9 @@ func TestVerifyRefFull(t *testing.T) {
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyName)
 
-	err := VerifyRefFull(context.Background(), repo, refName)
+	currentTip, err := VerifyRefFull(context.Background(), repo, refName)
 	assert.Nil(t, err)
+	assert.Equal(t, commitIDs[0], currentTip)
 }
 
 func TestVerifyRelativeForRef(t *testing.T) {

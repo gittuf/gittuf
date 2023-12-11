@@ -47,44 +47,46 @@ var (
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
-// using the latest policy.
-func VerifyRef(ctx context.Context, repo *git.Repository, target string) error {
+// using the latest policy. The expected Git ID for the ref in the latest RSL
+// entry is returned if the policy verification is successful.
+func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// 1. Get latest policy entry
 	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 	policyState, err := LoadStateForEntry(ctx, repo, policyEntry)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
 	// 2. Find latest entry for target
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
-	return verifyEntry(ctx, repo, policyState, latestEntry)
+	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, latestEntry)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
-// entry.
-func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) error {
+// entry. The expected Git ID for the ref in the latest RSL entry is returned if
+// the policy verification is successful.
+func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// 1. Trace RSL back to the start
 	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
 	// 2. Find latest entry for target
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
-		return err
+		return plumbing.ZeroHash, err
 	}
 
 	// 3. Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
-	return VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
