@@ -6,8 +6,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
@@ -15,9 +13,6 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
-
-//go:embed test-data/gpg-pubkey.asc
-var gpgPubKeyBytes []byte
 
 func TestInitializeTargets(t *testing.T) {
 	// The helper also runs InitializeTargets for this test
@@ -160,26 +155,4 @@ func TestAddKeyToTargets(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
-}
-
-func createTestRepositoryWithTargets(t *testing.T) (*Repository, []byte) {
-	t.Helper()
-
-	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
-
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := r.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-
-	err = r.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return r, targetsKeyBytes
 }

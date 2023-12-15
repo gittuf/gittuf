@@ -5,7 +5,6 @@ package repository
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -24,18 +23,6 @@ func TestClone(t *testing.T) {
 		t.Fatal(err)
 	}
 	remoteRepo := &Repository{r: remoteR}
-	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
 		t.Fatal(err)
 	}
