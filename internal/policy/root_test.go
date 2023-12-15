@@ -29,25 +29,62 @@ func TestInitializeRootMetadata(t *testing.T) {
 	assert.Equal(t, []string{key.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
 }
 
-func TestAddTargetsKey(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+func TestAddRootKey(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1.pub"))
+	newRootKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	rootMetadata = AddRootKey(rootMetadata, newRootKey)
+
+	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
+	assert.Equal(t, []string{key.KeyID, newRootKey.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
+}
+
+func TestRemoveRootKey(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	newRootKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata = AddRootKey(rootMetadata, newRootKey)
+
+	rootMetadata, err = DeleteRootKey(rootMetadata, newRootKey.KeyID)
+
+	assert.Nil(t, err)
+	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
+	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
+	assert.Equal(t, []string{key.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
+
+	rootMetadata, err = DeleteRootKey(rootMetadata, key.KeyID)
+
+	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
+	assert.Nil(t, rootMetadata)
+}
+
+func TestAddTargetsKey(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,29 +95,19 @@ func TestAddTargetsKey(t *testing.T) {
 }
 
 func TestDeleteTargetsKey(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1.pub"))
+	targetsKey1, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsKey1, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsKeyBytes, err = os.ReadFile(filepath.Join("test-data", "targets-2.pub"))
+	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-2.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}

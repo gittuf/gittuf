@@ -4,9 +4,11 @@ package trust
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +23,9 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
+	cmd.AddCommand(addrootkey.New(o))
 	cmd.AddCommand(removepolicykey.New(o))
+	cmd.AddCommand(removerootkey.New(o))
 
 	remoteCmd := remote.New()
 	cmd.AddCommand(remoteCmd)
