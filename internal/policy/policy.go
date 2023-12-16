@@ -370,6 +370,20 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 		return nil, err
 	}
 
+	rootVerifier := s.getRootVerifier()
+	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
+		return nil, err
+	}
+
+	targetsVerifier, err := s.getTargetsVerifier()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope); err != nil {
+		return nil, err
+	}
+
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
 		return nil, err
@@ -727,6 +741,28 @@ func (s *State) HasTargetsRole(roleName string) bool {
 
 	_, ok := s.DelegationEnvelopes[roleName]
 	return ok
+}
+
+func (s *State) getRootVerifier() *Verifier {
+	return &Verifier{
+		keys:      s.RootPublicKeys,
+		threshold: len(s.RootPublicKeys),
+	}
+}
+
+func (s *State) getTargetsVerifier() (*Verifier, error) {
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	verifier := &Verifier{keys: make([]*tuf.Key, 0, len(rootMetadata.Roles[TargetsRoleName].KeyIDs))}
+	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
+		verifier.keys = append(verifier.keys, rootMetadata.Keys[keyID])
+	}
+	verifier.threshold = rootMetadata.Roles[TargetsRoleName].Threshold
+
+	return verifier, nil
 }
 
 func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
