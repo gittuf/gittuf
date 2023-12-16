@@ -770,9 +770,9 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 	}
 
 	if attestation != nil {
-		// combining the attestation and the git object we still do not have
-		// sufficient signatures
 		if (1 + len(attestation.Signatures)) < v.threshold {
+			// Combining the attestation and the git object we still do not have
+			// sufficient signatures
 			return ErrVerifierConditionsUnmet
 		}
 	}
@@ -832,6 +832,8 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 	verifiers := make([]sslibdsse.Verifier, 0, len(v.keys)-1)
 	for _, key := range v.keys {
 		if key.KeyID == keyIDUsed {
+			// Do not create a DSSE verifier for the key used to verify the Git
+			// signature
 			continue
 		}
 

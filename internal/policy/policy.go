@@ -413,6 +413,11 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 				verifiers = append(verifiers, verifier)
 
 				if s.HasTargetsRole(delegation.Name) {
+					env := s.DelegationEnvelopes[delegation.Name]
+					if err := verifier.Verify(ctx, nil, env); err != nil {
+						return nil, err
+					}
+
 					delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
 					if err != nil {
 						return nil, err
