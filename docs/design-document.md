@@ -75,6 +75,7 @@ This is done by verifying the digital signature attached to the action,
 which must match the public key associated with the actor who is supposed to have made the change.
 
 ### State
+
 The term "State" refers to the latest values or conditions of the tracked references 
 (like branches and tags) in a Git repository.
 These are determined by the most recent entries in the [reference state log](#reference-state-log-rsl).
@@ -82,7 +83,8 @@ These are determined by the most recent entries in the [reference state log](#re
 When analyzing changes within the repository, attention is given specifically to the updates 
 pertinent to each individual reference, ensuring a focused review of changes for each branch or tag separately.
 
-#### Example: 
+#### Example
+
 If a Git repository has two branches, `main` and `feature`, the state of the main 
 branch might be defined by the latest commit, say Commit A. Similarly, the feature branch's state 
 could be determined by a different commit, Commit B. When reviewing the repository's history, 
