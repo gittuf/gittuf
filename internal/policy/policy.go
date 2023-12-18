@@ -11,8 +11,6 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
-	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -203,20 +201,8 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 
 	// TODO: verify root from original state? We have consecutive verification
 	// in place elsewhere.
-	rootVerifier := state.getRootVerifier()
-	if err := rootVerifier.Verify(ctx, nil, state.RootEnvelope); err != nil {
+	if err := state.Verify(ctx); err != nil {
 		return nil, err
-	}
-
-	if state.TargetsEnvelope != nil {
-		targetsVerifier, err := state.getTargetsVerifier()
-		if err != nil {
-			return nil, err
-		}
-
-		if err := targetsVerifier.Verify(ctx, nil, state.TargetsEnvelope); err != nil {
-			return nil, err
-		}
 	}
 
 	return state, nil
@@ -471,28 +457,11 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 	}
 }
 
-// Verify performs a self-contained verification of all the metadata in the
-// State starting from the Root. Any metadata that is unreachable in the
-// delegations graph returns an error.
-//
-// Deprecated: we want to avoid promiscuous delegations where multiple roles may
-// delegate to the same role and we can't clarify up front which role's trusted
-// keys we must use. We only know if a delegated role is trusted when we're
-// actively walking the graph for a specific path. See:
-// https://github.com/theupdateframework/specification/issues/19,
-// https://github.com/theupdateframework/specification/issues/214, and
-// https://github.com/theupdateframework/python-tuf/issues/660.
+// Verify verifies the signatures of the Root role and the top level Targets
+// role if it exists.
 func (s *State) Verify(ctx context.Context) error {
-	rootVerifiers := []sslibdsse.Verifier{}
-	for _, k := range s.RootPublicKeys {
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k)
-		if err != nil {
-			return err
-		}
-
-		rootVerifiers = append(rootVerifiers, sv)
-	}
-	if err := dsse.VerifyEnvelope(ctx, s.RootEnvelope, rootVerifiers, len(rootVerifiers)); err != nil {
+	rootVerifier := s.getRootVerifier()
+	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -500,125 +469,21 @@ func (s *State) Verify(ctx context.Context) error {
 		return nil
 	}
 
-	rootMetadata := &tuf.RootMetadata{}
-	rootContents, err := s.RootEnvelope.DecodeB64Payload()
+	targetsVerifier, err := s.getTargetsVerifier()
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(rootContents, rootMetadata); err != nil {
-		return err
-	}
 
-	targetsVerifiers := []sslibdsse.Verifier{}
-	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
-		key := rootMetadata.Keys[keyID]
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
-		if err != nil {
-			return err
-		}
-
-		targetsVerifiers = append(targetsVerifiers, sv)
-	}
-	if err := dsse.VerifyEnvelope(ctx, s.TargetsEnvelope, targetsVerifiers, rootMetadata.Roles[TargetsRoleName].Threshold); err != nil {
-		return err
-	}
-
-	if len(s.DelegationEnvelopes) == 0 {
-		return nil
-	}
-
-	delegationEnvelopes := map[string]*sslibdsse.Envelope{}
-	for k, v := range s.DelegationEnvelopes {
-		delegationEnvelopes[k] = v
-	}
-
-	targetsMetadata := &tuf.TargetsMetadata{}
-	targetsContents, err := s.TargetsEnvelope.DecodeB64Payload()
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(targetsContents, targetsMetadata); err != nil {
-		return err
-	}
-
-	if err := targetsMetadata.Validate(); err != nil {
-		return err
-	}
-
-	// Note: If targetsMetadata.Delegations == nil while delegationEnvelopes is
-	// not empty, we probably want to error out. This should panic.
-	delegationKeys := targetsMetadata.Delegations.Keys
-	delegationsQueue := targetsMetadata.Delegations.Roles
-
-	// We can likely process top level targets and all delegated envelopes in
-	// the loop below by combining the two but this separated model seems easier
-	// to reason about. Else, we define a custom starting delegation from root
-	// to targets in the queue and start this loop from there.
-
-	for {
-		if len(delegationsQueue) == 0 {
-			break
-		}
-
-		delegation := delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
-
-		delegationEnvelope, ok := delegationEnvelopes[delegation.Name]
-		if !ok {
-			// Delegation does not have an envelope to verify
-			continue
-		}
-		delete(delegationEnvelopes, delegation.Name)
-
-		delegationVerifiers := make([]sslibdsse.Verifier, 0, len(delegation.KeyIDs))
-		for _, keyID := range delegation.KeyIDs {
-			key := delegationKeys[keyID]
-			sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
-			if err != nil {
-				return err
-			}
-
-			delegationVerifiers = append(delegationVerifiers, sv)
-		}
-
-		if err := dsse.VerifyEnvelope(ctx, delegationEnvelope, delegationVerifiers, delegation.Threshold); err != nil {
-			return err
-		}
-
-		delegationMetadata := &tuf.TargetsMetadata{}
-		delegationContents, err := delegationEnvelope.DecodeB64Payload()
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(delegationContents, delegationMetadata); err != nil {
-			return err
-		}
-
-		if err := delegationMetadata.Validate(); err != nil {
-			return err
-		}
-
-		if delegationMetadata.Delegations == nil {
-			continue
-		}
-
-		for keyID, key := range delegationMetadata.Delegations.Keys {
-			delegationKeys[keyID] = key
-		}
-
-		delegationsQueue = append(delegationsQueue, delegationMetadata.Delegations.Roles...)
-	}
-
-	if len(delegationEnvelopes) != 0 {
-		return ErrDanglingDelegationMetadata
-	}
-
-	return nil
+	return targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope)
 }
 
 // Commit verifies and writes the State to the policy namespace. It also creates
 // an RSL entry recording the new tip of the policy namespace.
 func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool) error {
+	if err := s.Verify(ctx); err != nil {
+		return err
+	}
+
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
@@ -764,6 +629,9 @@ func (s *State) HasTargetsRole(roleName string) bool {
 }
 
 func (s *State) getRootVerifier() *Verifier {
+	// TODO: validate against the root metadata itself?
+	// This eventually goes back to how the very first root is bootstrapped
+	// See: https://github.com/gittuf/gittuf/issues/117
 	return &Verifier{
 		keys:      s.RootPublicKeys,
 		threshold: len(s.RootPublicKeys),
