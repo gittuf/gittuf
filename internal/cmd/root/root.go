@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/gittuf/gittuf/internal/cmd/addhooks"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
@@ -44,6 +45,7 @@ func New() *cobra.Command {
 
 	o.AddFlags(cmd)
 
+	cmd.AddCommand(addhooks.New())
 	cmd.AddCommand(clone.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
