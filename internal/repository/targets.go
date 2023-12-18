@@ -20,10 +20,6 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 	if err != nil {
 		return err
 	}
-	keyID, err := sv.KeyID()
-	if err != nil {
-		return err
-	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
@@ -33,15 +29,12 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 		return ErrCannotReinitialize
 	}
 
-	// Verify if targetsKeyBytes is authorized to sign for the role
-	authorizedKeyIDs, err := state.FindAuthorizedSigningKeyIDs(ctx, targetsRoleName)
-	if err != nil {
-		return err
-	}
-
-	if !isKeyAuthorized(authorizedKeyIDs, keyID) {
-		return ErrUnauthorizedKey
-	}
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/theupdateframework/specification/issues/19,
+	// https://github.com/theupdateframework/specification/issues/214, and
+	// https://github.com/theupdateframework/python-tuf/issues/660.
 
 	targetsMetadata := policy.InitializeTargetsMetadata()
 
@@ -76,10 +69,6 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 	if err != nil {
 		return err
 	}
-	keyID, err := sv.KeyID()
-	if err != nil {
-		return err
-	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
@@ -89,13 +78,12 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 		return policy.ErrMetadataNotFound
 	}
 
-	authorizedKeyIDsForRole, err := state.FindAuthorizedSigningKeyIDs(ctx, targetsRoleName)
-	if err != nil {
-		return err
-	}
-	if !isKeyAuthorized(authorizedKeyIDsForRole, keyID) {
-		return ErrUnauthorizedKey
-	}
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/theupdateframework/specification/issues/19,
+	// https://github.com/theupdateframework/specification/issues/214, and
+	// https://github.com/theupdateframework/python-tuf/issues/660.
 
 	authorizedKeys := []*tuf.Key{}
 	for _, kb := range authorizedKeysBytes {
@@ -147,10 +135,6 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 	if err != nil {
 		return err
 	}
-	keyID, err := sv.KeyID()
-	if err != nil {
-		return err
-	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
@@ -160,13 +144,12 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 		return policy.ErrMetadataNotFound
 	}
 
-	authorizedKeyIDsForRole, err := state.FindAuthorizedSigningKeyIDs(ctx, targetsRoleName)
-	if err != nil {
-		return err
-	}
-	if !isKeyAuthorized(authorizedKeyIDsForRole, keyID) {
-		return ErrUnauthorizedKey
-	}
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/theupdateframework/specification/issues/19,
+	// https://github.com/theupdateframework/specification/issues/214, and
+	// https://github.com/theupdateframework/python-tuf/issues/660.
 
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
@@ -208,10 +191,6 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte
 	if err != nil {
 		return err
 	}
-	keyID, err := sv.KeyID()
-	if err != nil {
-		return err
-	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
@@ -221,13 +200,12 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte
 		return policy.ErrMetadataNotFound
 	}
 
-	authorizedKeyIDsForRole, err := state.FindAuthorizedSigningKeyIDs(ctx, targetsRoleName)
-	if err != nil {
-		return err
-	}
-	if !isKeyAuthorized(authorizedKeyIDsForRole, keyID) {
-		return ErrUnauthorizedKey
-	}
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/theupdateframework/specification/issues/19,
+	// https://github.com/theupdateframework/specification/issues/214, and
+	// https://github.com/theupdateframework/python-tuf/issues/660.
 
 	authorizedKeys := []*tuf.Key{}
 	keyIDs := ""
