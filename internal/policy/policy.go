@@ -201,10 +201,6 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 		state.RootPublicKeys = append(state.RootPublicKeys, key)
 	}
 
-	if err := state.Verify(ctx); err != nil {
-		return nil, err
-	}
-
 	return state, nil
 }
 
@@ -282,6 +278,14 @@ func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
 
 // FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
 // keys trusted to sign for the specified role.
+//
+// Deprecated: we want to avoid promiscuous delegations where multiple roles may
+// delegate to the same role and we can't clarify up front which role's trusted
+// keys we must use. We only know if a delegated role is trusted when we're
+// actively walking the graph for a specific path. See:
+// https://github.com/theupdateframework/specification/issues/19,
+// https://github.com/theupdateframework/specification/issues/214, and
+// https://github.com/theupdateframework/python-tuf/issues/660.
 func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
@@ -371,10 +375,6 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
-	if err := s.Verify(ctx); err != nil {
-		return nil, err
-	}
-
 	// TODO: verify root from original state
 	rootVerifier := s.getRootVerifier()
 	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
@@ -464,6 +464,14 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 // Verify performs a self-contained verification of all the metadata in the
 // State starting from the Root. Any metadata that is unreachable in the
 // delegations graph returns an error.
+//
+// Deprecated: we want to avoid promiscuous delegations where multiple roles may
+// delegate to the same role and we can't clarify up front which role's trusted
+// keys we must use. We only know if a delegated role is trusted when we're
+// actively walking the graph for a specific path. See:
+// https://github.com/theupdateframework/specification/issues/19,
+// https://github.com/theupdateframework/specification/issues/214, and
+// https://github.com/theupdateframework/python-tuf/issues/660.
 func (s *State) Verify(ctx context.Context) error {
 	rootVerifiers := []sslibdsse.Verifier{}
 	for _, k := range s.RootPublicKeys {
@@ -601,10 +609,6 @@ func (s *State) Verify(ctx context.Context) error {
 // Commit verifies and writes the State to the policy namespace. It also creates
 // an RSL entry recording the new tip of the policy namespace.
 func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool) error {
-	if err := s.Verify(ctx); err != nil {
-		return err
-	}
-
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
@@ -771,6 +775,16 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 	return verifier, nil
 }
 
+// findDelegationEntry finds the delegation entry for some role in the parent
+// role.
+//
+// Deprecated: we want to avoid promiscuous delegations where multiple roles may
+// delegate to the same role and we can't clarify up front which role's trusted
+// keys we must use. We only know if a delegated role is trusted when we're
+// actively walking the graph for a specific path. See:
+// https://github.com/theupdateframework/specification/issues/19,
+// https://github.com/theupdateframework/specification/issues/214, and
+// https://github.com/theupdateframework/python-tuf/issues/660.
 func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 	topLevelTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
@@ -807,7 +821,6 @@ func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 		}
 
 		if s.HasTargetsRole(delegation.Name) {
-			// TODO: clarifying terminating / reachability
 			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
 		}
 	}
