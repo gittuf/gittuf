@@ -197,48 +197,58 @@ func TestStateGetRootMetadata(t *testing.T) {
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
-	state := createTestStateWithPolicy(t)
+	t.Run("with policy", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	tests := map[string]struct {
-		path      string
-		verifiers []*Verifier
-	}{
-		"verifiers for refs/heads/main": {
-			path: "git:refs/heads/main",
-			verifiers: []*Verifier{{
-				name:      "protect-main",
-				keys:      []*tuf.Key{gpgKey},
-				threshold: 1,
-			}},
-		},
-		"verifiers for files": {
-			path: "file:1",
-			verifiers: []*Verifier{{
-				name:      "protect-files-1-and-2",
-				keys:      []*tuf.Key{gpgKey},
-				threshold: 1,
-			}},
-		},
-		"verifiers for unprotected branch": {
-			path:      "git:refs/heads/unprotected",
-			verifiers: []*Verifier{},
-		},
-		"verifiers for unprotected files": {
-			path:      "file:unprotected",
-			verifiers: []*Verifier{},
-		},
-	}
+		tests := map[string]struct {
+			path      string
+			verifiers []*Verifier
+		}{
+			"verifiers for refs/heads/main": {
+				path: "git:refs/heads/main",
+				verifiers: []*Verifier{{
+					name:      "protect-main",
+					keys:      []*tuf.Key{gpgKey},
+					threshold: 1,
+				}},
+			},
+			"verifiers for files": {
+				path: "file:1",
+				verifiers: []*Verifier{{
+					name:      "protect-files-1-and-2",
+					keys:      []*tuf.Key{gpgKey},
+					threshold: 1,
+				}},
+			},
+			"verifiers for unprotected branch": {
+				path:      "git:refs/heads/unprotected",
+				verifiers: []*Verifier{},
+			},
+			"verifiers for unprotected files": {
+				path:      "file:unprotected",
+				verifiers: []*Verifier{},
+			},
+		}
 
-	for name, test := range tests {
-		verifiers, err := state.FindVerifiersForPath(context.Background(), test.path)
-		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-		assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
-	}
+		for name, test := range tests {
+			verifiers, err := state.FindVerifiersForPath(context.Background(), test.path)
+			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+			assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
+		}
+	})
+
+	t.Run("without policy", func(t *testing.T) {
+		state := createTestStateWithOnlyRoot(t)
+
+		verifiers, err := state.FindVerifiersForPath(context.Background(), "test-path")
+		assert.Nil(t, verifiers)
+		assert.ErrorIs(t, err, ErrMetadataNotFound)
+	})
 }
 
 func TestStateFindPublicKeysForPath(t *testing.T) {
