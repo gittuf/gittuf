@@ -314,6 +314,8 @@ func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string
 
 // FindPublicKeysForPath identifies the trusted keys for the path. If the path
 // protected in gittuf policy, the trusted keys are returned.
+//
+// Deprecated: use FindVerifiersForPath.
 func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.Key, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
@@ -365,11 +367,15 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 	}
 }
 
+// FindVerifiersForPath identifies the trusted set of verifiers for the
+// specified path. While walking the delegation graph for the path, signatures
+// for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
 	}
 
+	// TODO: verify root from original state
 	rootVerifier := s.getRootVerifier()
 	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
 		return nil, err
