@@ -201,6 +201,24 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 		state.RootPublicKeys = append(state.RootPublicKeys, key)
 	}
 
+	// TODO: verify root from original state? We have consecutive verification
+	// in place elsewhere.
+	rootVerifier := state.getRootVerifier()
+	if err := rootVerifier.Verify(ctx, nil, state.RootEnvelope); err != nil {
+		return nil, err
+	}
+
+	if state.TargetsEnvelope != nil {
+		targetsVerifier, err := state.getTargetsVerifier()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := targetsVerifier.Verify(ctx, nil, state.TargetsEnvelope); err != nil {
+			return nil, err
+		}
+	}
+
 	return state, nil
 }
 
@@ -375,21 +393,13 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
-	// TODO: verify root from original state
-	rootVerifier := s.getRootVerifier()
-	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
-		return nil, err
+	if !s.HasTargetsRole(TargetsRoleName) {
+		// No policies exist
+		return nil, ErrMetadataNotFound
 	}
 
-	targetsVerifier, err := s.getTargetsVerifier()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope); err != nil {
-		return nil, err
-	}
-
+	// This envelope is verified when state is loaded, as this is
+	// the start for all delegation graph searches
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
 		return nil, err
