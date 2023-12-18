@@ -780,50 +780,53 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 	var keyIDUsed string
 	gitObjectVerified := false
 
-	// First, verify the gitObject's signature
-	switch o := gitObject.(type) {
-	case *object.Commit:
-		for _, key := range v.keys {
-			err := gitinterface.VerifyCommitSignature(ctx, o, key)
-			if err == nil {
-				// Signature verification succeeded
-				keyIDUsed = key.KeyID
-				gitObjectVerified = true
-				break
+	// First, verify the gitObject's signature if one is presented
+	if gitObject != nil {
+		switch o := gitObject.(type) {
+		case *object.Commit:
+			for _, key := range v.keys {
+				err := gitinterface.VerifyCommitSignature(ctx, o, key)
+				if err == nil {
+					// Signature verification succeeded
+					keyIDUsed = key.KeyID
+					gitObjectVerified = true
+					break
+				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					continue
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					return err
+				}
 			}
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				continue
+		case *object.Tag:
+			for _, key := range v.keys {
+				err := gitinterface.VerifyTagSignature(ctx, o, key)
+				if err == nil {
+					// Signature verification succeeded
+					keyIDUsed = key.KeyID
+					gitObjectVerified = true
+					break
+				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					continue
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					return err
+				}
 			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				return err
-			}
+		default:
+			return ErrUnknownObjectType
 		}
-	case *object.Tag:
-		for _, key := range v.keys {
-			err := gitinterface.VerifyTagSignature(ctx, o, key)
-			if err == nil {
-				// Signature verification succeeded
-				keyIDUsed = key.KeyID
-				gitObjectVerified = true
-				break
-			}
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				continue
-			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				return err
-			}
-		}
-	default:
-		return ErrUnknownObjectType
 	}
 
-	// If threshold is 1, we can return
+	// If threshold is 1 and the Git signature is verified, we can return
 	if v.threshold == 1 && gitObjectVerified {
 		return nil
 	}
 
-	// Second, verify signatures on the attestation
+	// Second, verify signatures on the attestation, subtracting the threshold
+	// by 1 to account for a verified git signature
 	envelopeThreshold := v.threshold
 	if gitObjectVerified {
 		envelopeThreshold--
