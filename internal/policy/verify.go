@@ -759,18 +759,20 @@ func (v *Verifier) Threshold() int {
 
 // Verify is used to check for a threshold of signatures using the verifier. The
 // threshold of signatures may be met using a combination of at most one Git
-// signature and in-toto attestation signatures.
-func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestation *sslibdsse.Envelope) error {
+// signature and signatures embedded in a DSSE envelope. Verify does not inspect
+// the envelope's payload, but instead only verifies the signatures. The caller
+// must ensure the validity of the envelope's contents.
+func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *sslibdsse.Envelope) error {
 	if v.threshold < 1 {
 		return ErrInvalidVerifier
 	}
 
-	if gitObject == nil && attestation == nil {
+	if gitObject == nil && env == nil {
 		return ErrVerifierConditionsUnmet
 	}
 
-	if attestation != nil {
-		if (1 + len(attestation.Signatures)) < v.threshold {
+	if env != nil {
+		if (1 + len(env.Signatures)) < v.threshold {
 			// Combining the attestation and the git object we still do not have
 			// sufficient signatures
 			return ErrVerifierConditionsUnmet
@@ -847,7 +849,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 		verifiers = append(verifiers, verifier)
 	}
 
-	if err := dsse.VerifyEnvelope(ctx, attestation, verifiers, envelopeThreshold); err != nil {
+	if err := dsse.VerifyEnvelope(ctx, env, verifiers, envelopeThreshold); err != nil {
 		return ErrVerifierConditionsUnmet
 	}
 
