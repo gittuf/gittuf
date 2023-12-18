@@ -145,23 +145,33 @@ func TestStateKeys(t *testing.T) {
 }
 
 func TestStateVerify(t *testing.T) {
-	state := createTestStateWithOnlyRoot(t)
+	t.Run("only root", func(t *testing.T) {
+		state := createTestStateWithOnlyRoot(t)
 
-	if err := state.Verify(context.Background()); err != nil {
-		t.Error(err)
-	}
+		if err := state.Verify(testCtx); err != nil {
+			t.Error(err)
+		}
 
-	rootKeys := []*tuf.Key{}
-	copy(rootKeys, state.RootPublicKeys)
-	state.RootPublicKeys = []*tuf.Key{}
+		rootKeys := []*tuf.Key{}
+		copy(rootKeys, state.RootPublicKeys)
+		state.RootPublicKeys = []*tuf.Key{}
 
-	err := state.Verify(context.Background())
-	assert.NotNil(t, err)
+		err := state.Verify(context.Background())
+		assert.NotNil(t, err)
 
-	state.RootPublicKeys = rootKeys
-	state.RootEnvelope.Signatures = []sslibdsse.Signature{}
-	err = state.Verify(context.Background())
-	assert.NotNil(t, err)
+		state.RootPublicKeys = rootKeys
+		state.RootEnvelope.Signatures = []sslibdsse.Signature{}
+		err = state.Verify(context.Background())
+		assert.NotNil(t, err)
+	})
+
+	t.Run("with policy", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
+
+		if err := state.Verify(testCtx); err != nil {
+			t.Error(err)
+		}
+	})
 }
 
 func TestStateCommit(t *testing.T) {
