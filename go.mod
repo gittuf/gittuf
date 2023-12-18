@@ -1,6 +1,6 @@
 module github.com/gittuf/gittuf
 
-go 1.21.3
+go 1.21.5
 
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230923063757-afb1ddc0824c
