@@ -85,6 +85,21 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
 	assert.Equal(t, testHash, entry.TargetID)
+
+	err = repo.RecordRSLEntryForReference("main", false)
+	assert.Nil(t, err)
+
+	rslRef, err = repo.r.Reference(rsl.Ref, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entryType, err = rsl.GetEntry(repo.r, rslRef.Hash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// check that a duplicate entry has not been created
+	assert.Equal(t, entry.GetID(), entryType.GetID())
 }
 
 func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
@@ -148,6 +163,22 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 
 	err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), false)
 	assert.Nil(t, err)
+
+	latestEntry, err = rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	latestEntryID := latestEntry.GetID()
+
+	// Now try and duplicate that
+	err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), false)
+	assert.Nil(t, err)
+
+	latestEntry, err = rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, latestEntryID, latestEntry.GetID())
 }
 
 func TestRecordRSLAnnotation(t *testing.T) {

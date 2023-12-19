@@ -33,6 +33,14 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 		return err
 	}
 
+	isDuplicate, err := r.isDuplicateEntry(absRefName, ref.Hash())
+	if err != nil {
+		return err
+	}
+	if isDuplicate {
+		return nil
+	}
+
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
@@ -66,6 +74,14 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 		return err
 	} else if !knows {
 		return ErrCommitNotInRef
+	}
+
+	isDuplicate, err := r.isDuplicateEntry(absRefName, commit.ID())
+	if err != nil {
+		return err
+	}
+	if isDuplicate {
+		return nil
 	}
 
 	// TODO: once policy verification is in place, the signing key used by
@@ -177,4 +193,19 @@ func (r *Repository) PullRSL(ctx context.Context, remoteName string) error {
 	}
 
 	return nil
+}
+
+// isDuplicateEntry checks if the latest unskipped entry for the ref has the
+// same target ID Note that it's legal for the RSL to have target A, then B,
+// then A again, this is not considered a duplicate entry
+func (r *Repository) isDuplicateEntry(refName string, targetID plumbing.Hash) (bool, error) {
+	latestUnskippedEntry, _, err := rsl.GetLatestUnskippedReferenceEntryForRef(r.r, refName)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return latestUnskippedEntry.TargetID == targetID, nil
 }
