@@ -1,25 +1,24 @@
-name: Bug Report
-description: File a bug report
-title: "[Bug]: "
-labels: ["bug"]
+name: Issue
+description: Open a discussion for gittuf workflows or a feature request
+labels: ["discussion"]
 assignees:
   - adityasaky
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thanks for taking the time to file this issue!
   - type: textarea
-    id: what-happened
+    id: Description
     attributes:
-      label: What happened?
-      description: Also tell us, what did you expect to happen? Please include the version or revision of gittuf.
+      label: Add a description
+      description: Please provide some details about what you'd like to discuss. If relevant, please include the version or revision of gittuf.
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Relevant log output
+      label: Relevant log output if the discussion pertains to existing gittuf functionality
       description: Please copy and paste the stack trace if it's available. This will be automatically formatted into code, so no need for backticks.
       render: Shell
   - type: checkboxes
