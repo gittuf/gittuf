@@ -6,6 +6,7 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230923063757-afb1ddc0824c
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.11.0
+	github.com/in-toto/attestation v0.1.1-0.20231030161412-99d851228fe2
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/secure-systems-lab/go-securesystemslib v0.7.1-0.20230801180332-1e75bb347966
 	github.com/sigstore/cosign/v2 v2.2.2
@@ -13,6 +14,7 @@ require (
 	github.com/sigstore/sigstore v1.7.6
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -119,7 +121,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231120223509-83a465c0220f // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
