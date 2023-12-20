@@ -89,9 +89,8 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 
 	if len(attestationsRootTree.Entries) == 0 {
 		// This happens in the initial commit for the attestations namespace,
-		// with no entries in the tree at all
-		// An RSL entry isn't created by default for that entry but if one is,
-		// we don't want to panic.
+		// where there are no entries in the tree yet.
+		// This is expected, and there is nothing more to check so return a zero Attestations state.
 		return &Attestations{}, nil
 	}
 
