@@ -17,7 +17,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"branch",
 		"b",
 		"",
-		"Specify branch to check out",
+		"specify branch to check out",
 	)
 }
 
