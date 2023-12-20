@@ -20,7 +20,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"force",
 		"f",
 		false,
-		"Overwrite hooks, if they already exist",
+		"overwrite hooks, if they already exist",
 	)
 }
 
