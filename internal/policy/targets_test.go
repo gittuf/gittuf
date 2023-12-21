@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
@@ -87,8 +88,8 @@ func TestAddKeyToTargets(t *testing.T) {
 	}
 
 	fulcioKey := &tuf.Key{
-		KeyType: sslibsv.SigstoreKeyType,
-		Scheme:  sslibsv.SigstoreKeyScheme,
+		KeyType: signerverifier.FulcioKeyType,
+		Scheme:  signerverifier.FulcioKeyScheme,
 		KeyVal:  sslibsv.KeyVal{Identity: "jane.doe@example.com", Issuer: "https://github.com/login/oauth"},
 		KeyID:   "jane.doe@example.com::https://github.com/login/oauth",
 	}

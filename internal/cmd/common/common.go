@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/spf13/cobra"
@@ -59,8 +60,8 @@ func ReadKeyBytes(key string) ([]byte, error) {
 
 		fulcioKey := &sslibsv.SSLibKey{
 			KeyID:   keyID,
-			KeyType: sslibsv.SigstoreKeyType,
-			Scheme:  sslibsv.SigstoreKeyScheme,
+			KeyType: signerverifier.FulcioKeyType,
+			Scheme:  signerverifier.FulcioKeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: ks[0],
 				Issuer:   ks[1],
