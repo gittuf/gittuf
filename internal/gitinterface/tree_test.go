@@ -117,11 +117,13 @@ func TestTreeBuilder(t *testing.T) {
 
 	t.Run("no blobs", func(t *testing.T) {
 		treeBuilder := NewTreeBuilder(repo)
-		_, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
-		assert.ErrorIs(t, err, ErrNoEntries)
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		assert.Nil(t, err)
+		assert.Equal(t, EmptyTree(), treeID)
 
-		_, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]plumbing.Hash{})
-		assert.ErrorIs(t, err, ErrNoEntries)
+		treeID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]plumbing.Hash{})
+		assert.Nil(t, err)
+		assert.Equal(t, EmptyTree(), treeID)
 	})
 
 	t.Run("both blobs in the root directory", func(t *testing.T) {
