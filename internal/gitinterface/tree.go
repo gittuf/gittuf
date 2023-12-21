@@ -16,8 +16,6 @@ import (
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-var ErrNoEntries = errors.New("no entries specified to write tree")
-
 // WriteTree creates a Git tree with the specified entries. It sorts the entries
 // prior to creating the tree.
 func WriteTree(repo *git.Repository, entries []object.TreeEntry) (plumbing.Hash, error) {
@@ -95,10 +93,6 @@ func NewTreeBuilder(repo *git.Repository) *TreeBuilder {
 // WriteRootTreeFromBlobIDs accepts a map of paths to their blob IDs and returns
 // the root tree ID that contains these files.
 func (t *TreeBuilder) WriteRootTreeFromBlobIDs(files map[string]plumbing.Hash) (plumbing.Hash, error) {
-	if len(files) == 0 {
-		return plumbing.ZeroHash, ErrNoEntries
-	}
-
 	rootNodeKey := ""
 	t.trees = map[string]*object.Tree{rootNodeKey: {}}
 	t.entries = map[string]*object.TreeEntry{}
