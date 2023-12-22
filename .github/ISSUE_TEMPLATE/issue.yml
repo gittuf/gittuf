@@ -1,8 +1,6 @@
-name: Issue
+name: Discussion / Feature Request
 description: Open a discussion for gittuf workflows or a feature request
 labels: ["discussion"]
-assignees:
-  - adityasaky
 body:
   - type: markdown
     attributes:
