@@ -32,9 +32,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 	// TODO: verify is role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
-	// See: https://github.com/theupdateframework/specification/issues/19,
-	// https://github.com/theupdateframework/specification/issues/214, and
-	// https://github.com/theupdateframework/python-tuf/issues/660.
+	// See: https://github.com/gittuf/gittuf/issues/246.
 
 	targetsMetadata := policy.InitializeTargetsMetadata()
 
@@ -81,9 +79,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 	// TODO: verify is role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
-	// See: https://github.com/theupdateframework/specification/issues/19,
-	// https://github.com/theupdateframework/specification/issues/214, and
-	// https://github.com/theupdateframework/python-tuf/issues/660.
+	// See: https://github.com/gittuf/gittuf/issues/246.
 
 	authorizedKeys := []*tuf.Key{}
 	for _, kb := range authorizedKeysBytes {
@@ -147,9 +143,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 	// TODO: verify is role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
-	// See: https://github.com/theupdateframework/specification/issues/19,
-	// https://github.com/theupdateframework/specification/issues/214, and
-	// https://github.com/theupdateframework/python-tuf/issues/660.
+	// See: https://github.com/gittuf/gittuf/issues/246.
 
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
@@ -203,9 +197,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte
 	// TODO: verify is role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
-	// See: https://github.com/theupdateframework/specification/issues/19,
-	// https://github.com/theupdateframework/specification/issues/214, and
-	// https://github.com/theupdateframework/python-tuf/issues/660.
+	// See: https://github.com/gittuf/gittuf/issues/246.
 
 	authorizedKeys := []*tuf.Key{}
 	keyIDs := ""

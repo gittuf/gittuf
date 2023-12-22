@@ -199,8 +199,6 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 		state.RootPublicKeys = append(state.RootPublicKeys, key)
 	}
 
-	// TODO: verify root from original state? We have consecutive verification
-	// in place elsewhere.
 	if err := state.Verify(ctx); err != nil {
 		return nil, err
 	}
@@ -283,10 +281,13 @@ func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
 // FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
 // keys trusted to sign for the specified role.
 //
-// Deprecated: we want to avoid promiscuous delegations where multiple roles may
-// delegate to the same role and we can't clarify up front which role's trusted
-// keys we must use. We only know if a delegated role is trusted when we're
-// actively walking the graph for a specific path. See:
+// Deprecated: diamond delegations are legal in policy. So, role A and role B
+// can both independently delegate to role C, and they *don't* need to specify
+// the same set of keys / threshold. So, when signing role C, we actually can't
+// determine if the keys being used to sign it are valid. It depends strictly on
+// how role C is reached, whether via role A or role B. In turn, that depends on
+// the exact namespace being verified. In TUF, this issue is known as
+// "promiscuous delegations". See:
 // https://github.com/theupdateframework/specification/issues/19,
 // https://github.com/theupdateframework/specification/issues/214, and
 // https://github.com/theupdateframework/python-tuf/issues/660.
@@ -656,10 +657,13 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 // findDelegationEntry finds the delegation entry for some role in the parent
 // role.
 //
-// Deprecated: we want to avoid promiscuous delegations where multiple roles may
-// delegate to the same role and we can't clarify up front which role's trusted
-// keys we must use. We only know if a delegated role is trusted when we're
-// actively walking the graph for a specific path. See:
+// Deprecated: diamond delegations are legal in policy. So, role A and role B
+// can both independently delegate to role C, and they *don't* need to specify
+// the same set of keys / threshold. So, when signing role C, we actually can't
+// determine if the keys being used to sign it are valid. It depends strictly on
+// how role C is reached, whether via role A or role B. In turn, that depends on
+// the exact namespace being verified. In TUF, this issue is known as
+// "promiscuous delegations". See:
 // https://github.com/theupdateframework/specification/issues/19,
 // https://github.com/theupdateframework/specification/issues/214, and
 // https://github.com/theupdateframework/python-tuf/issues/660.
