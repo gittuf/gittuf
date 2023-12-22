@@ -8,16 +8,15 @@ import (
 )
 
 type options struct {
-	full bool
+	latestOnly bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(
-		&o.full,
-		"full",
-		"f",
+	cmd.Flags().BoolVar(
+		&o.latestOnly,
+		"latest-only",
 		false,
-		"perform verification from the start of the RSL",
+		"perform verification against latest entry in the RSL",
 	)
 }
 
@@ -26,7 +25,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return repo.VerifyRef(cmd.Context(), args[0], o.full)
+	return repo.VerifyRef(cmd.Context(), args[0], o.latestOnly)
 }
 
 func New() *cobra.Command {
