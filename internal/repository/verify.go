@@ -20,7 +20,7 @@ import (
 // another is to create a new RSL entry for the current state.
 var ErrRefStateDoesNotMatchRSL = errors.New("Git reference's current state does not match latest RSL entry") //nolint:stylecheck
 
-func (r *Repository) VerifyRef(ctx context.Context, target string, full bool) error {
+func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bool) error {
 	var (
 		expectedTip plumbing.Hash
 		err         error
@@ -31,10 +31,10 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, full bool) er
 		return err
 	}
 
-	if full {
-		expectedTip, err = policy.VerifyRefFull(ctx, r.r, target)
-	} else {
+	if latestOnly {
 		expectedTip, err = policy.VerifyRef(ctx, r.r, target)
+	} else {
+		expectedTip, err = policy.VerifyRefFull(ctx, r.r, target)
 	}
 	if err != nil {
 		return err

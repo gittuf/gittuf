@@ -29,35 +29,35 @@ func TestVerifyRef(t *testing.T) {
 	entry.ID = entryID
 
 	tests := map[string]struct {
-		target string
-		full   bool
-		err    error
+		target     string
+		latestOnly bool
+		err        error
 	}{
 		"absolute ref, not full": {
-			target: "refs/heads/main",
-			full:   false,
+			target:     "refs/heads/main",
+			latestOnly: true,
 		},
 		"absolute ref, full": {
-			target: "refs/heads/main",
-			full:   true,
+			target:     "refs/heads/main",
+			latestOnly: false,
 		},
 		"relative ref, not full": {
-			target: "main",
-			full:   false,
+			target:     "main",
+			latestOnly: true,
 		},
 		"relative ref, full": {
-			target: "main",
-			full:   true,
+			target:     "main",
+			latestOnly: false,
 		},
 		"unknown ref, full": {
-			target: "refs/heads/unknown",
-			full:   true,
-			err:    rsl.ErrRSLEntryNotFound,
+			target:     "refs/heads/unknown",
+			latestOnly: false,
+			err:        rsl.ErrRSLEntryNotFound,
 		},
 	}
 
 	for name, test := range tests {
-		err := repo.VerifyRef(context.Background(), test.target, test.full)
+		err := repo.VerifyRef(context.Background(), test.target, test.latestOnly)
 		if test.err != nil {
 			assert.ErrorIs(t, err, test.err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
