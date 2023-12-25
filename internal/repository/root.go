@@ -203,7 +203,10 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Adding policy key...")
-	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
+	rootMetadata, err = policy.AddTargetsKey(rootMetadata, targetsKey)
+	if err != nil {
+		return fmt.Errorf("failed to add targets key: %w", err)
+	}
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
