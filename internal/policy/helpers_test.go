@@ -100,7 +100,10 @@ func createTestStateWithPolicy(t *testing.T) *State {
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	rootMetadata = AddTargetsKey(rootMetadata, key)
+	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -158,7 +161,10 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	rootMetadata = AddTargetsKey(rootMetadata, key)
+	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {

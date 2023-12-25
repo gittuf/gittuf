@@ -4,6 +4,7 @@ package policy
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -11,8 +12,9 @@ import (
 
 var ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")
 
-// InitializeRootMetadata creates a new instance of tuf.RootMetadata with
-// default values.
+// InitializeRootMetadata initializes a new instance of tuf.RootMetadata with
+// default values and a given key. The default values are version set to 1,
+// expiry date set to one year from now, and the provided key is added.
 func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
 	rootMetadata := tuf.NewRootMetadata()
 	rootMetadata.SetVersion(1)
@@ -73,35 +75,49 @@ func DeleteRootKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetad
 	return rootMetadata, nil
 }
 
-// AddTargetsKey adds targetsKey as a trusted public key in rootMetadata for the
-// top level Targets role.
-func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) *tuf.RootMetadata {
+// AddTargetsKey function is used to add the 'targetsKey' as a trusted public key in 'rootMetadata'
+// for the top level Targets role.
+func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, fmt.Errorf("rootMetadata is nil")
+	}
+	if targetsKey == nil {
+		return nil, fmt.Errorf("targetsKey is nil")
+	}
+
 	rootMetadata.Keys[targetsKey.KeyID] = targetsKey
+
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		rootMetadata.AddRole(TargetsRoleName, tuf.Role{
 			KeyIDs:    []string{targetsKey.KeyID},
 			Threshold: 1,
 		})
-		return rootMetadata
+		return rootMetadata, nil
 	}
 
 	targetsRole := rootMetadata.Roles[TargetsRoleName]
 	for _, keyID := range targetsRole.KeyIDs {
 		if keyID == targetsKey.KeyID {
-			return rootMetadata
+			return rootMetadata, nil
 		}
 	}
 
 	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKey.KeyID)
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
-	return rootMetadata
+	return rootMetadata, nil
 }
 
-// DeleteTargetsKey removes keyID from the list of trusted top level Targets
-// public keys in rootMetadata. It does not remove the key entry itself as it
-// does not check if other roles can be verified using the same key.
+// DeleteTargetsKey removes 'keyID' from trusted public keys for top level Targets
+// role in 'rootMetadata'. Note: It doesn't remove the key entry itself as it doesn't
+// check if other roles can use the same key.
 func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, fmt.Errorf("rootMetadata is nil")
+	}
+	if keyID == "" {
+		return nil, fmt.Errorf("keyID is empty")
+	}
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		return rootMetadata, nil
 	}
@@ -111,12 +127,15 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 	if len(targetsRole.KeyIDs) <= targetsRole.Threshold {
 		return nil, ErrCannotMeetThreshold
 	}
+
 	for i, k := range targetsRole.KeyIDs {
-		if k == keyID {
-			targetsRole.KeyIDs = append(targetsRole.KeyIDs[:i], targetsRole.KeyIDs[i+1:]...)
-			break
+		if k != keyID {
+			continue
 		}
+		targetsRole.KeyIDs = append(targetsRole.KeyIDs[:i], targetsRole.KeyIDs[i+1:]...)
+		break
 	}
+
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
 	return rootMetadata, nil
