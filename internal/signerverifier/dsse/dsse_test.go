@@ -5,15 +5,21 @@ package dsse
 import (
 	"context"
 	"encoding/base64"
-	"os"
-	"path/filepath"
 	"testing"
+
+	_ "embed"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
+
+//go:embed test-data/test-key
+var signingKeyBytes []byte
+
+//go:embed test-data/test-key.pub
+var publicKeyBytes []byte
 
 func TestCreateEnvelope(t *testing.T) {
 	rootMetadata := tuf.NewRootMetadata()
@@ -29,18 +35,22 @@ func TestSignEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NotEmpty(t, env.Signatures)
+	assert.Len(t, env.Signatures, 1)
+	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
+
+	// Try signing with the same key to ensure a new signature isn't appended
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err = SignEnvelope(context.Background(), env, signer)
+	assert.Nil(t, err)
+	assert.Len(t, env.Signatures, 1)
 	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
 }
 
 func TestVerifyEnvelope(t *testing.T) {
 	env, err := createSignedEnvelope()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	publicKeyPath := filepath.Join("test-data", "test-key.pub")
-	publicKeyBytes, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,13 +68,7 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func createSignedEnvelope() (*sslibdsse.Envelope, error) {
-	privateKeyPath := filepath.Join("test-data", "test-key")
-	privateKeyBytes, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		return nil, err
-	}
-
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(privateKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
 	if err != nil {
 		return nil, err
 	}
