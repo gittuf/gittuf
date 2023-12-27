@@ -181,12 +181,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	// Create the root targets metadata
 	targetsMetadata := InitializeTargetsMetadata()
 
-	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "1", []*tuf.Key{gpgKey}, []string{"path1/*"})
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "1", []*tuf.Key{key}, []string{"file:1/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "2", []*tuf.Key{gpgKey}, []string{"path2/*"})
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "2", []*tuf.Key{key}, []string{"file:2/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,12 +203,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Create the second level of delegations
 	delegation1Metadata := InitializeTargetsMetadata()
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"path1/subpath1/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"path1/subpath2/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
