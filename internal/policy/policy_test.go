@@ -9,18 +9,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/storage/memory"
-
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-git/v5/plumbing"
-
 	"github.com/go-git/go-billy/v5/memfs"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage/memory"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
@@ -398,7 +396,7 @@ func TestStateFindDelegationEntry(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t)
 		entry, err := state.findDelegationEntry("1")
 		assert.Nil(t, err)
-		assert.Equal(t, &tuf.Delegation{Name: "1", Paths: []string{"path1/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
+		assert.Equal(t, &tuf.Delegation{Name: "1", Paths: []string{"file:1/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"}, Threshold: 1}}, entry)
 	})
 
 	// Test case for a delegation with multiple roles
@@ -406,6 +404,6 @@ func TestStateFindDelegationEntry(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t)
 		entry, err := state.findDelegationEntry("4")
 		assert.Nil(t, err)
-		assert.Equal(t, &tuf.Delegation{Name: "4", Paths: []string{"path1/subpath2/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
+		assert.Equal(t, &tuf.Delegation{Name: "4", Paths: []string{"file:1/subpath2/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
 	})
 }
