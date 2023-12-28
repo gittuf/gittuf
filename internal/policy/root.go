@@ -27,6 +27,52 @@ func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
 	return rootMetadata
 }
 
+// AddRootKey adds rootKey as a trusted public key in rootMetadata for the
+// Root role.
+func AddRootKey(rootMetadata *tuf.RootMetadata, rootKey *tuf.Key) *tuf.RootMetadata {
+	if _, ok := rootMetadata.Roles[RootRoleName]; !ok {
+		return rootMetadata
+	}
+
+	rootMetadata.AddKey(rootKey)
+
+	rootRole := rootMetadata.Roles[RootRoleName]
+
+	for _, keyID := range rootRole.KeyIDs {
+		if keyID == rootKey.KeyID {
+			return rootMetadata
+		}
+	}
+
+	rootRole.KeyIDs = append(rootRole.KeyIDs, rootKey.KeyID)
+	rootMetadata.Roles[RootRoleName] = rootRole
+
+	return rootMetadata
+}
+
+// DeleteRootKey removes keyID from the list of trusted Root
+// public keys in rootMetadata. It does not remove the key entry itself as it
+// does not check if other roles can be verified using the same key.
+func DeleteRootKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetadata, error) {
+	if _, ok := rootMetadata.Roles[RootRoleName]; !ok {
+		return rootMetadata, nil
+	}
+
+	rootRole := rootMetadata.Roles[RootRoleName]
+	if len(rootRole.KeyIDs) <= rootRole.Threshold {
+		return nil, ErrCannotMeetThreshold
+	}
+	for i, k := range rootRole.KeyIDs {
+		if k == keyID {
+			rootRole.KeyIDs = append(rootRole.KeyIDs[:i], rootRole.KeyIDs[i+1:]...)
+			break
+		}
+	}
+	rootMetadata.Roles[RootRoleName] = rootRole
+
+	return rootMetadata, nil
+}
+
 // AddTargetsKey adds targetsKey as a trusted public key in rootMetadata for the
 // top level Targets role.
 func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) *tuf.RootMetadata {

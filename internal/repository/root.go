@@ -53,6 +53,114 @@ func (r *Repository) InitializeRoot(ctx context.Context, rootKeyBytes []byte, si
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
+// AddRootKey is the interface for the user to add an authorized key
+// for the Root role.
+func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyBytes []byte, signCommit bool) error {
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		return err
+	}
+	rootKeyID, err := sv.KeyID()
+	if err != nil {
+		return err
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		return err
+	}
+
+	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKeyID) {
+		return ErrUnauthorizedKey
+	}
+
+	newRootKey, err := tuf.LoadKeyFromBytes(newrootKeyBytes)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata = policy.AddRootKey(rootMetadata, newRootKey)
+
+	rootMetadata.SetVersion(rootMetadata.Version + 1)
+	rootMetadataBytes, err := json.Marshal(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	env := state.RootEnvelope
+	env.Signatures = []sslibdsse.Signature{}
+	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
+
+	env, err = dsse.SignEnvelope(ctx, env, sv)
+	if err != nil {
+		return err
+	}
+
+	state.RootEnvelope = env
+
+	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.KeyID)
+
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
+
+// RemoveRootKey is the interface for the user to de-authorize a key
+// trusted to sign the Root role.
+func (r *Repository) RemoveRootKey(ctx context.Context, rootKeyBytes []byte, keyID string, signCommit bool) error {
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		return err
+	}
+	rootKeyID, err := sv.KeyID()
+	if err != nil {
+		return err
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		return err
+	}
+
+	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKeyID) {
+		return ErrUnauthorizedKey
+	}
+
+	rootMetadata, err = policy.DeleteRootKey(rootMetadata, keyID)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata.SetVersion(rootMetadata.Version + 1)
+	rootMetadataBytes, err := json.Marshal(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	env := state.RootEnvelope
+	env.Signatures = []sslibdsse.Signature{}
+	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
+
+	env, err = dsse.SignEnvelope(ctx, env, sv)
+	if err != nil {
+		return err
+	}
+
+	state.RootEnvelope = env
+
+	commitMessage := fmt.Sprintf("Remove root key '%s' from root", rootKeyID)
+
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
+
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
 func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, targetsKeyBytes []byte, signCommit bool) error {

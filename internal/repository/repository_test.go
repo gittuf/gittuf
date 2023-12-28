@@ -4,13 +4,8 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -41,17 +36,7 @@ func TestUnauthorizedKey(t *testing.T) {
 	}
 
 	r := &Repository{r: repo}
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := r.InitializeRoot(context.Background(), keyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
+	if err := r.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,76 +49,4 @@ func TestUnauthorizedKey(t *testing.T) {
 		err := r.RemoveTopLevelTargetsKey(context.Background(), targetsKeyBytes, "some key ID", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
-}
-
-func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
-	t.Helper()
-
-	var (
-		repo *git.Repository
-		err  error
-	)
-	if location == "" {
-		repo, err = git.Init(memory.NewStorage(), memfs.New())
-	} else {
-		repo, err = git.PlainInit(location, true)
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := &Repository{r: repo}
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := r.InitializeRoot(context.Background(), keyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-
-	return r, keyBytes
-}
-
-func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
-	t.Helper()
-
-	r, keyBytes := createTestRepositoryWithRoot(t, location)
-
-	targetsPrivKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsPubKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := r.AddTopLevelTargetsKey(context.Background(), keyBytes, targetsPubKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := r.InitializeTargets(context.Background(), targetsPrivKeyBytes, policy.TargetsRoleName, false); err != nil {
-		t.Fatal(err)
-	}
-
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kb, err := json.Marshal(gpgKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authorizedKeys := [][]byte{kb}
-
-	if err := r.AddDelegation(context.Background(), targetsPrivKeyBytes, policy.TargetsRoleName, "protect-main", authorizedKeys, []string{"git:refs/heads/main"}, false); err != nil {
-		t.Fatal(err)
-	}
-
-	return r
 }
