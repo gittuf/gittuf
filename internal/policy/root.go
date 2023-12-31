@@ -4,13 +4,17 @@ package policy
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
-var ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")
+var (
+	ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")
+	ErrRootMetadataNil     = errors.New("rootMetadata is nil")
+	ErrTargetsKeyNil       = errors.New("targetsKey is nil")
+	ErrKeyIDEmpty          = errors.New("keyID is empty")
+)
 
 // InitializeRootMetadata initializes a new instance of tuf.RootMetadata with
 // default values and a given key. The default values are version set to 1,
@@ -79,10 +83,10 @@ func DeleteRootKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetad
 // for the top level Targets role.
 func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.RootMetadata, error) {
 	if rootMetadata == nil {
-		return nil, fmt.Errorf("rootMetadata is nil")
+		return nil, ErrRootMetadataNil
 	}
 	if targetsKey == nil {
-		return nil, fmt.Errorf("targetsKey is nil")
+		return nil, ErrTargetsKeyNil
 	}
 
 	rootMetadata.Keys[targetsKey.KeyID] = targetsKey
@@ -109,14 +113,14 @@ func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.Ro
 }
 
 // DeleteTargetsKey removes 'keyID' from trusted public keys for top level Targets
-// role in 'rootMetadata'. Note: It doesn't remove the key entry itself as it doesn't
-// check if other roles can use the same key.
+// role in 'rootMetadata'. Note: It doesn't remove the key entry itself as it
+// doesn't check if other roles can use the same key.
 func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetadata, error) {
 	if rootMetadata == nil {
-		return nil, fmt.Errorf("rootMetadata is nil")
+		return nil, ErrRootMetadataNil
 	}
 	if keyID == "" {
-		return nil, fmt.Errorf("keyID is empty")
+		return nil, ErrKeyIDEmpty
 	}
 	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
 		return rootMetadata, nil
