@@ -120,13 +120,9 @@ func TestDeleteTargetsKey(t *testing.T) {
 	assert.Nil(t, err)
 
 	_, err = DeleteTargetsKey(nil, targetsKey1.KeyID)
-	if err == nil {
-		t.Fatal("expected error when rootMetadata is nil")
-	}
+	assert.ErrorIs(t, err, ErrRootMetadataNil, "expected error when rootMetadata is nil")
 	_, err = DeleteTargetsKey(rootMetadata, "")
-	if err == nil {
-		t.Fatal("expected error when keyID is empty")
-	}
+	assert.ErrorIs(t, err, ErrKeyIDEmpty, "expected error when keyID is empty")
 	rootMetadata, err = DeleteTargetsKey(rootMetadata, targetsKey1.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey1, rootMetadata.Keys[targetsKey1.KeyID])
