@@ -4,6 +4,7 @@ package gitinterface
 
 import (
 	"context"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -15,7 +16,9 @@ import (
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
+	rekorSSH "github.com/sigstore/rekor/pkg/pki/ssh"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -24,6 +27,8 @@ var (
 	ErrUnableToSign               = errors.New("unable to sign Git object")
 	ErrIncorrectVerificationKey   = errors.New("incorrect key provided to verify signature")
 	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
+	ErrVerifyingSSHSignature      = errors.New("unable to verify SSH signature")
+	ErrInvalidSignature           = errors.New("unable to parse signature / signature has unexpected header")
 )
 
 type SigningMethod int
@@ -38,6 +43,12 @@ const (
 	DefaultSigningProgramGPG  string = "gpg"
 	DefaultSigningProgramSSH  string = "ssh-keygen"
 	DefaultSigningProgramX509 string = "gpgsm"
+)
+
+const (
+	magicHeaderSSHSignature string = "SSHSIG"
+	pemTypeSSHSignature     string = "SSH SIGNATURE"
+	namespaceSSHSignature   string = "git"
 )
 
 func GetSigningCommand() (string, []string, error) {
@@ -252,8 +263,71 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 	}
 
 	if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
-		return ErrIncorrectVerificationKey
+		return errors.Join(ErrIncorrectVerificationKey, err)
 	}
 
 	return nil
+}
+
+// verifySSHKeySignature verifies Git signatures issued by SSH keys.
+func verifySSHKeySignature(key *tuf.Key, data, signature []byte) error {
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+	if err != nil {
+		return errors.Join(ErrVerifyingSSHSignature, err)
+	}
+
+	publicKey, err := ssh.NewPublicKey(verifier.Public())
+	if err != nil {
+		return errors.Join(ErrVerifyingSSHSignature, err)
+	}
+
+	sshSignature, err := decodeSSHSignature(signature)
+	if err != nil {
+		return errors.Join(ErrVerifyingSSHSignature, err)
+	}
+
+	if err := publicKey.Verify(data, sshSignature); err != nil {
+		return errors.Join(ErrIncorrectVerificationKey, err)
+	}
+
+	return nil
+}
+
+// decodeSSHSignature unpacks the PEM encoded SSH signature into its components.
+// It extracts the signature bytes and returns an ssh.Signature object. This
+// helper is inspired by the SSH signature decode routine in Rekor, with
+// modifications for the git namespace.
+func decodeSSHSignature(signatureBytes []byte) (*ssh.Signature, error) {
+	block, _ := pem.Decode(signatureBytes)
+	if block == nil {
+		return nil, ErrInvalidSignature
+	}
+
+	if block.Type != pemTypeSSHSignature {
+		return nil, ErrInvalidSignature
+	}
+
+	wrappedSig := &rekorSSH.WrappedSig{}
+	if err := ssh.Unmarshal(block.Bytes, wrappedSig); err != nil {
+		return nil, err
+	}
+
+	if wrappedSig.Version != 1 {
+		return nil, ErrInvalidSignature
+	}
+
+	if string(wrappedSig.MagicHeader[:]) != magicHeaderSSHSignature {
+		return nil, ErrInvalidSignature
+	}
+
+	if wrappedSig.Namespace != namespaceSSHSignature {
+		return nil, ErrInvalidSignature
+	}
+
+	sshSig := &ssh.Signature{}
+	if err := ssh.Unmarshal([]byte(wrappedSig.Signature), sshSig); err != nil {
+		return nil, err
+	}
+
+	return sshSig, nil
 }
