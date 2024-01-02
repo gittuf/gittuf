@@ -16,7 +16,7 @@ import (
 
 func TestInitializeTargets(t *testing.T) {
 	// The helper also runs InitializeTargets for this test
-	r, _ := createTestRepositoryWithTargets(t)
+	r := createTestRepositoryWithPolicy(t, "")
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
 	if err != nil {
@@ -25,13 +25,13 @@ func TestInitializeTargets(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Equal(t, 1, targetsMetadata.Version)
+	assert.Equal(t, 2, targetsMetadata.Version)
 	assert.Empty(t, targetsMetadata.Targets)
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }
 
 func TestAddDelegation(t *testing.T) {
-	r, targetsKeyBytes := createTestRepositoryWithTargets(t)
+	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
 	if err != nil {
@@ -47,9 +47,15 @@ func TestAddDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Empty(t, targetsMetadata.Delegations.Keys)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
+	assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 
 	err = r.AddDelegation(context.Background(), targetsKeyBytes, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
@@ -63,7 +69,7 @@ func TestAddDelegation(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
-	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
+	assert.Equal(t, 3, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
@@ -74,7 +80,7 @@ func TestAddDelegation(t *testing.T) {
 }
 
 func TestRemoveDelegation(t *testing.T) {
-	r, targetsKeyBytes := createTestRepositoryWithTargets(t)
+	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
 	if err != nil {
@@ -96,7 +102,7 @@ func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
-	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
+	assert.Equal(t, 3, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
@@ -116,12 +122,12 @@ func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
-	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
+	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }
 
 func TestAddKeyToTargets(t *testing.T) {
-	r, targetsKeyBytes := createTestRepositoryWithTargets(t)
+	r := createTestRepositoryWithPolicy(t, "")
 
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -142,7 +148,8 @@ func TestAddKeyToTargets(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Empty(t, targetsMetadata.Delegations.Keys)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
+	assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 
 	err = r.AddKeyToTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
