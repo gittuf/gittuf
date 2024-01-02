@@ -80,6 +80,11 @@ type State struct {
 	RootPublicKeys      []*tuf.Key
 }
 
+type DelegationWithDepth struct {
+	Delegation tuf.Delegation
+	Depth      int
+}
+
 // LoadState returns the State of the repository's policy corresponding to the
 // rslEntryID.
 func LoadState(ctx context.Context, repo *git.Repository, rslEntryID plumbing.Hash) (*State, error) {
@@ -627,6 +632,53 @@ func (s *State) HasTargetsRole(roleName string) bool {
 
 	_, ok := s.DelegationEnvelopes[roleName]
 	return ok
+}
+
+// ListRules returns a list of all the rules as an array of the delegations in a pre order traversal of the
+// delegation tree, with the depth of each delegation.
+func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDepth, error) {
+	state, err := LoadCurrentState(ctx, repo)
+	if err != nil {
+		return nil, err
+	}
+
+	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+
+	delegationsToSearch := []*DelegationWithDepth{}
+	allDelegations := []*DelegationWithDepth{}
+
+	for _, topLevelDelegation := range topLevelTargetsMetadata.Delegations.Roles {
+		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
+	}
+
+	for len(delegationsToSearch) > 0 {
+		currentDelegation := delegationsToSearch[0]
+		delegationsToSearch = delegationsToSearch[1:]
+
+		// allDelegations will be the returned list of all the delegations in pre-order traversal, no delegations will be popped off
+		allDelegations = append(allDelegations, currentDelegation)
+		if state.HasTargetsRole(currentDelegation.Delegation.Name) {
+			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.Name)
+			if err != nil {
+				return nil, err
+			}
+
+			delegationsToSearch = append([]*DelegationWithDepth{{Delegation: currentMetadata.Delegations.Roles[len(currentMetadata.Delegations.Roles)-1], Depth: currentDelegation.Depth + 1}}, delegationsToSearch...)
+			for _, delegation := range currentMetadata.Delegations.Roles {
+				if delegation.Name == AllowRuleName {
+					continue
+				}
+				// delegationsToSearch will contain the same delegations of allDelegations,
+				// but at every iteration, the next delegation will be popped off, leaving us at the end with no delegations.
+				delegationsToSearch = append([]*DelegationWithDepth{{Delegation: delegation, Depth: currentDelegation.Depth + 1}}, delegationsToSearch...)
+			}
+		}
+	}
+
+	return allDelegations, nil
 }
 
 func (s *State) getRootVerifier() *Verifier {

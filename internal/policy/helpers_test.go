@@ -159,6 +159,11 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
+	gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rootMetadata := InitializeRootMetadata(key)
 
@@ -169,11 +174,6 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,12 +203,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Create the second level of delegations
 	delegation1Metadata := InitializeTargetsMetadata()
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgkey}, []string{"file:1/subpath1/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgkey}, []string{"file:1/subpath2/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,16 +223,6 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	// Create the empty delegation envelope for delegation 2, 3, and 4
-	emptyEnv, err := dsse.CreateEnvelope(InitializeTargetsMetadata())
-	if err != nil {
-		t.Fatal(err)
-	}
-	emptyEnv, err = dsse.SignEnvelope(context.Background(), emptyEnv, signer)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	curState := &State{
 		RootEnvelope:        rootEnv,
 		TargetsEnvelope:     targetsEnv,
@@ -242,11 +232,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Add the delegation envelopes to the state
 
-	curState.DelegationEnvelopes["targets"] = targetsEnv
 	curState.DelegationEnvelopes["1"] = delegation1Env
-	curState.DelegationEnvelopes["2"] = emptyEnv
-	curState.DelegationEnvelopes["3"] = emptyEnv
-	curState.DelegationEnvelopes["4"] = emptyEnv
 
 	// delegation structure
 	//
