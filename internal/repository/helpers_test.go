@@ -86,20 +86,3 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 
 	return r
 }
-
-func createTestRepositoryWithTargets(t *testing.T) (*Repository, []byte) {
-	t.Helper()
-
-	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
-
-	if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKeyBytes, false); err != nil {
-		t.Fatal(err)
-	}
-
-	err := r.InitializeTargets(testCtx, targetsKeyBytes, policy.TargetsRoleName, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return r, targetsKeyBytes
-}
