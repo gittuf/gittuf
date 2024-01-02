@@ -11,8 +11,6 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
-	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -282,6 +280,17 @@ func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
 
 // FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
 // keys trusted to sign for the specified role.
+//
+// Deprecated: diamond delegations are legal in policy. So, role A and role B
+// can both independently delegate to role C, and they *don't* need to specify
+// the same set of keys / threshold. So, when signing role C, we actually can't
+// determine if the keys being used to sign it are valid. It depends strictly on
+// how role C is reached, whether via role A or role B. In turn, that depends on
+// the exact namespace being verified. In TUF, this issue is known as
+// "promiscuous delegations". See:
+// https://github.com/theupdateframework/specification/issues/19,
+// https://github.com/theupdateframework/specification/issues/214, and
+// https://github.com/theupdateframework/python-tuf/issues/660.
 func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
@@ -314,6 +323,8 @@ func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string
 
 // FindPublicKeysForPath identifies the trusted keys for the path. If the path
 // protected in gittuf policy, the trusted keys are returned.
+//
+// Deprecated: use FindVerifiersForPath.
 func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.Key, error) {
 	if err := s.Verify(ctx); err != nil {
 		return nil, err
@@ -365,11 +376,17 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 	}
 }
 
+// FindVerifiersForPath identifies the trusted set of verifiers for the
+// specified path. While walking the delegation graph for the path, signatures
+// for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
-	if err := s.Verify(ctx); err != nil {
-		return nil, err
+	if !s.HasTargetsRole(TargetsRoleName) {
+		// No policies exist
+		return nil, ErrMetadataNotFound
 	}
 
+	// This envelope is verified when state is loaded, as this is
+	// the start for all delegation graph searches
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
 		return nil, err
@@ -413,6 +430,11 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 				verifiers = append(verifiers, verifier)
 
 				if s.HasTargetsRole(delegation.Name) {
+					env := s.DelegationEnvelopes[delegation.Name]
+					if err := verifier.Verify(ctx, nil, env); err != nil {
+						return nil, err
+					}
+
 					delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
 					if err != nil {
 						return nil, err
@@ -436,20 +458,11 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 	}
 }
 
-// Verify performs a self-contained verification of all the metadata in the
-// State starting from the Root. Any metadata that is unreachable in the
-// delegations graph returns an error.
+// Verify verifies the signatures of the Root role and the top level Targets
+// role if it exists.
 func (s *State) Verify(ctx context.Context) error {
-	rootVerifiers := []sslibdsse.Verifier{}
-	for _, k := range s.RootPublicKeys {
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k)
-		if err != nil {
-			return err
-		}
-
-		rootVerifiers = append(rootVerifiers, sv)
-	}
-	if err := dsse.VerifyEnvelope(ctx, s.RootEnvelope, rootVerifiers, len(rootVerifiers)); err != nil {
+	rootVerifier := s.getRootVerifier()
+	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -457,120 +470,12 @@ func (s *State) Verify(ctx context.Context) error {
 		return nil
 	}
 
-	rootMetadata := &tuf.RootMetadata{}
-	rootContents, err := s.RootEnvelope.DecodeB64Payload()
+	targetsVerifier, err := s.getTargetsVerifier()
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(rootContents, rootMetadata); err != nil {
-		return err
-	}
 
-	targetsVerifiers := []sslibdsse.Verifier{}
-	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
-		key := rootMetadata.Keys[keyID]
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
-		if err != nil {
-			return err
-		}
-
-		targetsVerifiers = append(targetsVerifiers, sv)
-	}
-	if err := dsse.VerifyEnvelope(ctx, s.TargetsEnvelope, targetsVerifiers, rootMetadata.Roles[TargetsRoleName].Threshold); err != nil {
-		return err
-	}
-
-	if len(s.DelegationEnvelopes) == 0 {
-		return nil
-	}
-
-	delegationEnvelopes := map[string]*sslibdsse.Envelope{}
-	for k, v := range s.DelegationEnvelopes {
-		delegationEnvelopes[k] = v
-	}
-
-	targetsMetadata := &tuf.TargetsMetadata{}
-	targetsContents, err := s.TargetsEnvelope.DecodeB64Payload()
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(targetsContents, targetsMetadata); err != nil {
-		return err
-	}
-
-	if err := targetsMetadata.Validate(); err != nil {
-		return err
-	}
-
-	// Note: If targetsMetadata.Delegations == nil while delegationEnvelopes is
-	// not empty, we probably want to error out. This should panic.
-	delegationKeys := targetsMetadata.Delegations.Keys
-	delegationsQueue := targetsMetadata.Delegations.Roles
-
-	// We can likely process top level targets and all delegated envelopes in
-	// the loop below by combining the two but this separated model seems easier
-	// to reason about. Else, we define a custom starting delegation from root
-	// to targets in the queue and start this loop from there.
-
-	for {
-		if len(delegationsQueue) == 0 {
-			break
-		}
-
-		delegation := delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
-
-		delegationEnvelope, ok := delegationEnvelopes[delegation.Name]
-		if !ok {
-			// Delegation does not have an envelope to verify
-			continue
-		}
-		delete(delegationEnvelopes, delegation.Name)
-
-		delegationVerifiers := make([]sslibdsse.Verifier, 0, len(delegation.KeyIDs))
-		for _, keyID := range delegation.KeyIDs {
-			key := delegationKeys[keyID]
-			sv, err := signerverifier.NewSignerVerifierFromTUFKey(key)
-			if err != nil {
-				return err
-			}
-
-			delegationVerifiers = append(delegationVerifiers, sv)
-		}
-
-		if err := dsse.VerifyEnvelope(ctx, delegationEnvelope, delegationVerifiers, delegation.Threshold); err != nil {
-			return err
-		}
-
-		delegationMetadata := &tuf.TargetsMetadata{}
-		delegationContents, err := delegationEnvelope.DecodeB64Payload()
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(delegationContents, delegationMetadata); err != nil {
-			return err
-		}
-
-		if err := delegationMetadata.Validate(); err != nil {
-			return err
-		}
-
-		if delegationMetadata.Delegations == nil {
-			continue
-		}
-
-		for keyID, key := range delegationMetadata.Delegations.Keys {
-			delegationKeys[keyID] = key
-		}
-
-		delegationsQueue = append(delegationsQueue, delegationMetadata.Delegations.Roles...)
-	}
-
-	if len(delegationEnvelopes) != 0 {
-		return ErrDanglingDelegationMetadata
-	}
-
-	return nil
+	return targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope)
 }
 
 // Commit verifies and writes the State to the policy namespace. It also creates
@@ -724,6 +629,44 @@ func (s *State) HasTargetsRole(roleName string) bool {
 	return ok
 }
 
+func (s *State) getRootVerifier() *Verifier {
+	// TODO: validate against the root metadata itself?
+	// This eventually goes back to how the very first root is bootstrapped
+	// See: https://github.com/gittuf/gittuf/issues/117
+	return &Verifier{
+		keys:      s.RootPublicKeys,
+		threshold: len(s.RootPublicKeys),
+	}
+}
+
+func (s *State) getTargetsVerifier() (*Verifier, error) {
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	verifier := &Verifier{keys: make([]*tuf.Key, 0, len(rootMetadata.Roles[TargetsRoleName].KeyIDs))}
+	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
+		verifier.keys = append(verifier.keys, rootMetadata.Keys[keyID])
+	}
+	verifier.threshold = rootMetadata.Roles[TargetsRoleName].Threshold
+
+	return verifier, nil
+}
+
+// findDelegationEntry finds the delegation entry for some role in the parent
+// role.
+//
+// Deprecated: diamond delegations are legal in policy. So, role A and role B
+// can both independently delegate to role C, and they *don't* need to specify
+// the same set of keys / threshold. So, when signing role C, we actually can't
+// determine if the keys being used to sign it are valid. It depends strictly on
+// how role C is reached, whether via role A or role B. In turn, that depends on
+// the exact namespace being verified. In TUF, this issue is known as
+// "promiscuous delegations". See:
+// https://github.com/theupdateframework/specification/issues/19,
+// https://github.com/theupdateframework/specification/issues/214, and
+// https://github.com/theupdateframework/python-tuf/issues/660.
 func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 	topLevelTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
@@ -760,7 +703,6 @@ func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 		}
 
 		if s.HasTargetsRole(delegation.Name) {
-			// TODO: clarifying terminating / reachability
 			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
 		}
 	}

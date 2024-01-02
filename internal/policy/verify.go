@@ -759,20 +759,22 @@ func (v *Verifier) Threshold() int {
 
 // Verify is used to check for a threshold of signatures using the verifier. The
 // threshold of signatures may be met using a combination of at most one Git
-// signature and in-toto attestation signatures.
-func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestation *sslibdsse.Envelope) error {
+// signature and signatures embedded in a DSSE envelope. Verify does not inspect
+// the envelope's payload, but instead only verifies the signatures. The caller
+// must ensure the validity of the envelope's contents.
+func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *sslibdsse.Envelope) error {
 	if v.threshold < 1 {
 		return ErrInvalidVerifier
 	}
 
-	if gitObject == nil && attestation == nil {
+	if gitObject == nil && env == nil {
 		return ErrVerifierConditionsUnmet
 	}
 
-	if attestation != nil {
-		// combining the attestation and the git object we still do not have
-		// sufficient signatures
-		if (1 + len(attestation.Signatures)) < v.threshold {
+	if env != nil {
+		if (1 + len(env.Signatures)) < v.threshold {
+			// Combining the attestation and the git object we still do not have
+			// sufficient signatures
 			return ErrVerifierConditionsUnmet
 		}
 	}
@@ -780,50 +782,53 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 	var keyIDUsed string
 	gitObjectVerified := false
 
-	// First, verify the gitObject's signature
-	switch o := gitObject.(type) {
-	case *object.Commit:
-		for _, key := range v.keys {
-			err := gitinterface.VerifyCommitSignature(ctx, o, key)
-			if err == nil {
-				// Signature verification succeeded
-				keyIDUsed = key.KeyID
-				gitObjectVerified = true
-				break
+	// First, verify the gitObject's signature if one is presented
+	if gitObject != nil {
+		switch o := gitObject.(type) {
+		case *object.Commit:
+			for _, key := range v.keys {
+				err := gitinterface.VerifyCommitSignature(ctx, o, key)
+				if err == nil {
+					// Signature verification succeeded
+					keyIDUsed = key.KeyID
+					gitObjectVerified = true
+					break
+				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					continue
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					return err
+				}
 			}
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				continue
+		case *object.Tag:
+			for _, key := range v.keys {
+				err := gitinterface.VerifyTagSignature(ctx, o, key)
+				if err == nil {
+					// Signature verification succeeded
+					keyIDUsed = key.KeyID
+					gitObjectVerified = true
+					break
+				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					continue
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					return err
+				}
 			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				return err
-			}
+		default:
+			return ErrUnknownObjectType
 		}
-	case *object.Tag:
-		for _, key := range v.keys {
-			err := gitinterface.VerifyTagSignature(ctx, o, key)
-			if err == nil {
-				// Signature verification succeeded
-				keyIDUsed = key.KeyID
-				gitObjectVerified = true
-				break
-			}
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				continue
-			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				return err
-			}
-		}
-	default:
-		return ErrUnknownObjectType
 	}
 
-	// If threshold is 1, we can return
+	// If threshold is 1 and the Git signature is verified, we can return
 	if v.threshold == 1 && gitObjectVerified {
 		return nil
 	}
 
-	// Second, verify signatures on the attestation
+	// Second, verify signatures on the attestation, subtracting the threshold
+	// by 1 to account for a verified git signature
 	envelopeThreshold := v.threshold
 	if gitObjectVerified {
 		envelopeThreshold--
@@ -832,6 +837,8 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 	verifiers := make([]sslibdsse.Verifier, 0, len(v.keys)-1)
 	for _, key := range v.keys {
 		if key.KeyID == keyIDUsed {
+			// Do not create a DSSE verifier for the key used to verify the Git
+			// signature
 			continue
 		}
 
@@ -842,7 +849,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, attestat
 		verifiers = append(verifiers, verifier)
 	}
 
-	if err := dsse.VerifyEnvelope(ctx, attestation, verifiers, envelopeThreshold); err != nil {
+	if err := dsse.VerifyEnvelope(ctx, env, verifiers, envelopeThreshold); err != nil {
 		return ErrVerifierConditionsUnmet
 	}
 
