@@ -16,7 +16,16 @@ import (
 
 func TestInitializeTargets(t *testing.T) {
 	// The helper also runs InitializeTargets for this test
-	r := createTestRepositoryWithPolicy(t, "")
+	r, _ := createTestRepositoryWithRoot(t, "")
+
+	if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKeyBytes, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := r.InitializeTargets(testCtx, targetsKeyBytes, policy.TargetsRoleName, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
 	if err != nil {
@@ -25,7 +34,7 @@ func TestInitializeTargets(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Equal(t, 2, targetsMetadata.Version)
+	assert.Equal(t, 1, targetsMetadata.Version)
 	assert.Empty(t, targetsMetadata.Targets)
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }
@@ -54,7 +63,6 @@ func TestAddDelegation(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 
@@ -69,6 +77,8 @@ func TestAddDelegation(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
+	assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
 	assert.Equal(t, 3, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
