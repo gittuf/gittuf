@@ -113,6 +113,18 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 		}
 
 		return nil
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+		tagContents, err := getTagBytesWithoutSignature(tag)
+		if err != nil {
+			return errors.Join(ErrVerifyingSSHSignature, err)
+		}
+		tagSignature := []byte(tag.PGPSignature)
+
+		if err := verifySSHKeySignature(key, tagContents, tagSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
 	case signerverifier.FulcioKeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
@@ -120,7 +132,11 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 		}
 		tagSignature := []byte(tag.PGPSignature)
 
-		return verifyGitsignSignature(ctx, key, tagContents, tagSignature)
+		if err := verifyGitsignSignature(ctx, key, tagContents, tagSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
 	}
 
 	return ErrUnknownSigningMethod

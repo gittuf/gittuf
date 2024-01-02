@@ -89,6 +89,18 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 		}
 
 		return nil
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+		commitContents, err := getCommitBytesWithoutSignature(commit)
+		if err != nil {
+			return errors.Join(ErrVerifyingSSHSignature, err)
+		}
+		commitSignature := []byte(commit.PGPSignature)
+
+		if err := verifySSHKeySignature(key, commitContents, commitSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
 	case signerverifier.FulcioKeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
@@ -96,7 +108,11 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 		}
 		commitSignature := []byte(commit.PGPSignature)
 
-		return verifyGitsignSignature(ctx, key, commitContents, commitSignature)
+		if err := verifyGitsignSignature(ctx, key, commitContents, commitSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
 	}
 
 	return ErrUnknownSigningMethod
