@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -27,17 +28,20 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	if err != nil {
 		return err
 	}
+	slog.Debug("Fetched reference path for", "refName", refName)
 
 	ref, err := r.r.Reference(plumbing.ReferenceName(absRefName), true)
 	if err != nil {
 		return err
 	}
+	slog.Debug("Fetched reference", "refName", absRefName)
 
 	isDuplicate, err := r.isDuplicateEntry(absRefName, ref.Hash())
 	if err != nil {
 		return err
 	}
 	if isDuplicate {
+		slog.Debug("Duplicate entry for Git reference")
 		return nil
 	}
 
@@ -57,16 +61,19 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 	if err != nil {
 		return err
 	}
+	slog.Debug("Fetched reference path for", "refName", refName)
 
 	ref, err := r.r.Reference(plumbing.ReferenceName(absRefName), true)
 	if err != nil {
 		return err
 	}
+	slog.Debug("Fetched reference", "refName", absRefName)
 
 	commit, err := gitinterface.GetCommit(r.r, plumbing.NewHash(commitID))
 	if err != nil {
 		return err
 	}
+	slog.Debug("Fetched commit", "commit", commit)
 
 	// Even in eval mode, we ought to only create RSL entries for commits
 	// actually in the specified ref.
@@ -81,6 +88,7 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 		return err
 	}
 	if isDuplicate {
+		slog.Debug("Duplicate entry for Git reference")
 		return nil
 	}
 
@@ -97,6 +105,7 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 	for _, id := range rslEntryIDs {
 		rslEntryHashes = append(rslEntryHashes, plumbing.NewHash(id))
 	}
+	slog.Debug("Populated slice with RSL entry ID hashes")
 
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refNames of the rslEntryIDs.
@@ -121,16 +130,19 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 		}
 		return false, false, err
 	}
+	slog.Debug("Fetched remote git repository", "repo", remoteName)
 
 	remoteRefState, err := r.r.Reference(plumbing.ReferenceName(trackerRef), true)
 	if err != nil {
 		return false, false, err
 	}
+	slog.Debug("Fetched reference for remote repository", "refName", remoteRefState)
 
 	localRefState, err := r.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
 	if err != nil {
 		return false, false, err
 	}
+	slog.Debug("Created reference for local repository", "refName", localRefState)
 
 	// Check if local is nil and exit appropriately
 	if localRefState.Hash().IsZero() {

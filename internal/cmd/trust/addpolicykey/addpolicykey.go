@@ -3,6 +3,7 @@
 package addpolicykey
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -42,7 +43,13 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKeyBytes, true)
+	err = repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKeyBytes, true)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("Added authorized key for top level Targets role / policy file")
+	return nil
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

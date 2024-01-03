@@ -5,6 +5,7 @@ package push
 import (
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
+	"log/slog"
 )
 
 type options struct {
@@ -16,7 +17,13 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.PushRSL(cmd.Context(), args[0])
+	err = repo.PushRSL(cmd.Context(), args[0])
+	if err != nil {
+		return err
+	}
+	slog.Info("RSL pushed to", "remote", args[0])
+
+	return nil
 }
 
 func New() *cobra.Command {

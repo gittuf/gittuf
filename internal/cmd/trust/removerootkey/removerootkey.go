@@ -3,6 +3,7 @@
 package removerootkey
 
 import (
+	"log/slog"
 	"os"
 	"strings"
 
@@ -38,7 +39,13 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.RemoveRootKey(cmd.Context(), rootKeyBytes, strings.ToLower(o.rootKeyID), true)
+	err = repo.RemoveRootKey(cmd.Context(), rootKeyBytes, strings.ToLower(o.rootKeyID), true)
+	if err != nil {
+		return err
+	}
+	slog.Info("Removed authorized key for root role", "keyID", o.rootKeyID)
+
+	return nil
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

@@ -3,6 +3,8 @@
 package pull
 
 import (
+	"log/slog"
+
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +18,13 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.PullRSL(cmd.Context(), args[0])
+	err = repo.PullRSL(cmd.Context(), args[0])
+	if err != nil {
+		return err
+	}
+	slog.Info("Pulled RSL from", "remote", args[0])
+
+	return nil
 }
 
 func New() *cobra.Command {

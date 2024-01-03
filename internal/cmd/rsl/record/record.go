@@ -4,6 +4,7 @@ package record
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/repository"
@@ -35,10 +36,22 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 			return common.ErrNotInEvalMode
 		}
 
-		return repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, true)
+		err = repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, true)
+		if err != nil {
+			return err
+		}
+		slog.Info("Added the RSL entry for Git reference", "commitID", o.commitID)
+
+		return nil
 	}
 
-	return repo.RecordRSLEntryForReference(args[0], true)
+	err = repo.RecordRSLEntryForReference(args[0], true)
+	if err != nil {
+		return err
+	}
+	slog.Info("Added the RSL entry for Git reference", "refName", args[0])
+
+	return nil
 }
 
 func New() *cobra.Command {

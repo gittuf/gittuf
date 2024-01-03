@@ -3,6 +3,8 @@
 package annotate
 
 import (
+	"log/slog"
+
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
@@ -38,7 +40,13 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RecordRSLAnnotation(args, o.skip, o.message, true)
+	err = repo.RecordRSLAnnotation(args, o.skip, o.message, true)
+	if err != nil {
+		return err
+	}
+	slog.Info("Added RSL annotation")
+
+	return nil
 }
 
 func New() *cobra.Command {

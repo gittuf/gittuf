@@ -5,6 +5,7 @@ package addhooks
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
@@ -31,6 +32,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	err = repo.UpdateHook(repository.HookPrePush, prePushScript, o.force)
+	if err == nil {
+		slog.Info("Hook updated", "type", repository.HookPrePush)
+	}
 	var hookErr *repository.ErrHookExists
 	if errors.As(err, &hookErr) {
 		fmt.Fprintf(

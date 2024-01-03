@@ -5,6 +5,7 @@ package clone
 import (
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
+	"log/slog"
 )
 
 type options struct {
@@ -27,6 +28,11 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		dir = args[1]
 	}
 	_, err := repository.Clone(cmd.Context(), args[0], dir, o.branch)
+
+	if err == nil {
+		slog.Info("Repository cloned", "repository", args[0])
+	}
+
 	return err
 }
 
