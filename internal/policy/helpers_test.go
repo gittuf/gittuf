@@ -159,11 +159,6 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	rootMetadata := InitializeRootMetadata(key)
 
@@ -174,6 +169,11 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

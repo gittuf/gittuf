@@ -429,7 +429,7 @@ func TestStateFindDelegationEntry(t *testing.T) {
 }
 
 func TestListRules(t *testing.T) {
-	t.Run("t1", func(t *testing.T) {
+	t.Run("no delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
 		rules, err := ListRules(context.Background(), repo)
@@ -477,7 +477,7 @@ func TestListRules(t *testing.T) {
 		}
 		assert.Equal(t, expectedRules, rules)
 	})
-	t.Run("t2", func(t *testing.T) {
+	t.Run("with delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
 		rules, err := ListRules(context.Background(), repo)
@@ -499,19 +499,6 @@ func TestListRules(t *testing.T) {
 			},
 			{
 				Delegation: tuf.Delegation{
-					Name:        "4",
-					Paths:       []string{"file:1/subpath2/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
-					},
-				},
-				Depth: 1,
-			},
-			{
-				Delegation: tuf.Delegation{
 					Name:        "3",
 					Paths:       []string{"file:1/subpath1/*"},
 					Terminating: false,
@@ -525,17 +512,18 @@ func TestListRules(t *testing.T) {
 			},
 			{
 				Delegation: tuf.Delegation{
-					Name:        "gittuf-allow-rule",
-					Paths:       []string{"*"},
-					Terminating: true,
+					Name:        "4",
+					Paths:       []string{"file:1/subpath2/*"},
+					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{},
+						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
 						Threshold: 1,
 					},
 				},
 				Depth: 1,
 			},
+
 			{
 				Delegation: tuf.Delegation{
 					Name:        "2",
