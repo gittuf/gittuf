@@ -461,19 +461,6 @@ func TestListRules(t *testing.T) {
 				},
 				Depth: 0,
 			},
-			{
-				Delegation: tuf.Delegation{
-					Name:        "gittuf-allow-rule",
-					Paths:       []string{"*"},
-					Terminating: true,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
 		}
 		assert.Equal(t, expectedRules, rules)
 	})
@@ -532,19 +519,6 @@ func TestListRules(t *testing.T) {
 					Custom:      nil,
 					Role: tuf.Role{
 						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
-			{
-				Delegation: tuf.Delegation{
-					Name:        "gittuf-allow-rule",
-					Paths:       []string{"*"},
-					Terminating: true,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{},
 						Threshold: 1,
 					},
 				},

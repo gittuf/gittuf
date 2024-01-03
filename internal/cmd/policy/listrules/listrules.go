@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -30,9 +29,6 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	// The order is a pre-order traversal of the delegation tree, so that the parent is always before the children.
 
 	for _, curRule := range rules {
-		if curRule.Delegation.Name == policy.AllowRuleName {
-			continue
-		}
 		fmt.Printf(strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.Name)
 		gitpaths, filepaths := []string{}, []string{}
 		for _, path := range curRule.Delegation.Paths {
