@@ -670,7 +670,6 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 			// we are iterating in reverse order to preserve the order of the delegations,
 			// since we are pushing them to the front of delegations to search
 			for curDelegationIndex := len(currentMetadata.Delegations.Roles) - 1; curDelegationIndex >= 0; curDelegationIndex-- {
-
 				delegation := currentMetadata.Delegations.Roles[curDelegationIndex]
 
 				if delegation.Name == AllowRuleName {
