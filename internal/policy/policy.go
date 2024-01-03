@@ -652,6 +652,9 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 	allDelegations := []*DelegationWithDepth{}
 
 	for _, topLevelDelegation := range topLevelTargetsMetadata.Delegations.Roles {
+		if topLevelDelegation.Name == AllowRuleName {
+			continue
+		}
 		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
 	}
 
@@ -667,17 +670,18 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 				return nil, err
 			}
 
-			// we are iterating in reverse order to preserve the order of the delegations,
-			// since we are pushing them to the front of delegations to search
-			for curDelegationIndex := len(currentMetadata.Delegations.Roles) - 1; curDelegationIndex >= 0; curDelegationIndex-- {
-				delegation := currentMetadata.Delegations.Roles[curDelegationIndex]
-
+			// We construct localDelegations first so that we preserve the order
+			// of delegations in currentMetadata in delegationsToSearch
+			localDelegations := []*DelegationWithDepth{}
+			for _, delegation := range currentMetadata.Delegations.Roles {
 				if delegation.Name == AllowRuleName {
 					continue
 				}
-				// delegationsToSearch will contain the same delegations as allDelegations,
-				// but at every iteration, the next delegation will be popped off, leaving us at the end with no delegations in delegationsToSearch.
-				delegationsToSearch = append([]*DelegationWithDepth{{Delegation: delegation, Depth: currentDelegation.Depth + 1}}, delegationsToSearch...)
+				localDelegations = append(localDelegations, &DelegationWithDepth{Delegation: delegation, Depth: currentDelegation.Depth + 1})
+			}
+
+			if len(localDelegations) > 0 {
+				delegationsToSearch = append(localDelegations, delegationsToSearch...)
 			}
 		}
 	}
