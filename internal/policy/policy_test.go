@@ -427,3 +427,104 @@ func TestStateFindDelegationEntry(t *testing.T) {
 		assert.Equal(t, &tuf.Delegation{Name: "4", Paths: []string{"file:1/subpath2/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
 	})
 }
+
+func TestListRules(t *testing.T) {
+	t.Run("no delegations", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		rules, err := ListRules(context.Background(), repo)
+		assert.Nil(t, err)
+		expectedRules := []*DelegationWithDepth{
+			{
+				Delegation: tuf.Delegation{
+					Name:        "protect-main",
+					Paths:       []string{"git:refs/heads/main"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						Threshold: 1,
+					},
+				},
+				Depth: 0,
+			},
+			{
+				Delegation: tuf.Delegation{
+					Name:        "protect-files-1-and-2",
+					Paths:       []string{"file:1", "file:2"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						Threshold: 1,
+					},
+				},
+				Depth: 0,
+			},
+		}
+		assert.Equal(t, expectedRules, rules)
+	})
+	t.Run("with delegations", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
+
+		rules, err := ListRules(context.Background(), repo)
+
+		assert.Nil(t, err)
+		expectedRules := []*DelegationWithDepth{
+			{
+				Delegation: tuf.Delegation{
+					Name:        "1",
+					Paths:       []string{"file:1/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
+						Threshold: 1,
+					},
+				},
+				Depth: 0,
+			},
+			{
+				Delegation: tuf.Delegation{
+					Name:        "3",
+					Paths:       []string{"file:1/subpath1/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						Threshold: 1,
+					},
+				},
+				Depth: 1,
+			},
+			{
+				Delegation: tuf.Delegation{
+					Name:        "4",
+					Paths:       []string{"file:1/subpath2/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						Threshold: 1,
+					},
+				},
+				Depth: 1,
+			},
+
+			{
+				Delegation: tuf.Delegation{
+					Name:        "2",
+					Paths:       []string{"file:2/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tuf.Role{
+						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
+						Threshold: 1,
+					},
+				},
+				Depth: 0,
+			},
+		}
+		assert.Equal(t, expectedRules, rules)
+	})
+}

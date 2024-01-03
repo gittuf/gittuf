@@ -223,16 +223,6 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	// Create the empty delegation envelope for delegation 2, 3, and 4
-	emptyEnv, err := dsse.CreateEnvelope(InitializeTargetsMetadata())
-	if err != nil {
-		t.Fatal(err)
-	}
-	emptyEnv, err = dsse.SignEnvelope(context.Background(), emptyEnv, signer)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	curState := &State{
 		RootEnvelope:        rootEnv,
 		TargetsEnvelope:     targetsEnv,
@@ -242,11 +232,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Add the delegation envelopes to the state
 
-	curState.DelegationEnvelopes["targets"] = targetsEnv
 	curState.DelegationEnvelopes["1"] = delegation1Env
-	curState.DelegationEnvelopes["2"] = emptyEnv
-	curState.DelegationEnvelopes["3"] = emptyEnv
-	curState.DelegationEnvelopes["4"] = emptyEnv
 
 	// delegation structure
 	//

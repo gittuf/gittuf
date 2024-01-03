@@ -38,3 +38,7 @@ func (r *Repository) PullPolicy(ctx context.Context, remoteName string) error {
 
 	return nil
 }
+
+func (r *Repository) ListRules(ctx context.Context) ([]*policy.DelegationWithDepth, error) {
+	return policy.ListRules(ctx, r.r)
+}
