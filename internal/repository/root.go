@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -21,24 +22,29 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	if err := r.InitializeNamespaces(); err != nil {
 		return err
 	}
+	slog.Debug("Initialized gittuf namespaces")
 
 	rawKey := signer.Public()
 	publicKey, err := sslibsv.NewKey(rawKey)
 	if err != nil {
 		return err
 	}
+	slog.Debug("Loaded root signer")
 
 	rootMetadata := policy.InitializeRootMetadata(publicKey)
+	slog.Debug("Initialized root metadata")
 
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
 		return nil
 	}
+	slog.Debug("Created DSSE envelope with root metadata")
 
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
 	}
+	slog.Debug("Signed DSSE envelope via signer verifier")
 
 	state := &policy.State{
 		RootPublicKeys: []*tuf.Key{publicKey},
@@ -47,7 +53,13 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 
 	commitMessage := "Initialize root of trust"
 
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	err = state.Commit(ctx, r.r, commitMessage, signCommit)
+	if err != nil {
+		return err
+	}
+	slog.Debug("Committed policy state")
+
+	return nil
 }
 
 // AddRootKey is the interface for the user to add an authorized key
@@ -62,6 +74,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	if err != nil {
 		return err
 	}
+	slog.Debug("Loaded current policy state")
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -88,6 +101,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	if err != nil {
 		return err
 	}
+	slog.Debug("Signed DSSE envelope via signer verifier")
 
 	state.RootEnvelope = env
 
@@ -104,7 +118,13 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 
 	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.KeyID)
 
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	err = state.Commit(ctx, r.r, commitMessage, signCommit)
+	if err != nil {
+		return err
+	}
+	slog.Debug("Committed policy state")
+
+	return nil
 }
 
 // RemoveRootKey is the interface for the user to de-authorize a key
@@ -119,6 +139,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	if err != nil {
 		return err
 	}
+	slog.Debug("Loaded current policy state")
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -148,6 +169,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	if err != nil {
 		return err
 	}
+	slog.Debug("Signed DSSE envelope via signer verifier")
 
 	newRootPublicKeys := []*tuf.Key{}
 	for _, key := range state.RootPublicKeys {
@@ -161,7 +183,13 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 
 	commitMessage := fmt.Sprintf("Remove root key '%s' from root", keyID)
 
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	err = state.Commit(ctx, r.r, commitMessage, signCommit)
+	if err != nil {
+		return err
+	}
+	slog.Debug("Committed policy state")
+
+	return nil
 }
 
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
@@ -176,6 +204,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	if err != nil {
 		return err
 	}
+	slog.Debug("Loaded current policy state")
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -187,6 +216,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
+	slog.Debug("Added policy key to the gittuf root", "ID", targetsKey.KeyID)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
@@ -202,12 +232,19 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	if err != nil {
 		return err
 	}
+	slog.Debug("Signed DSSE envelope via signer verifier")
 
 	state.RootEnvelope = env
 
 	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.KeyID)
 
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	err = state.Commit(ctx, r.r, commitMessage, signCommit)
+	if err != nil {
+		return err
+	}
+	slog.Debug("Committed policy state")
+
+	return nil
 }
 
 // RemoveTopLevelTargetsKey is the interface for the user to de-authorize a key
@@ -222,6 +259,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	if err != nil {
 		return err
 	}
+	slog.Debug("Loaded policy state")
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -236,8 +274,10 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	if err != nil {
 		return err
 	}
+	slog.Debug("Removed policy key from gittuf root", "ID", targetsKeyID)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
+
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err
@@ -251,10 +291,18 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	if err != nil {
 		return err
 	}
+	slog.Debug("Signed DSSE envelope via signer verifier")
 
 	state.RootEnvelope = env
 
 	commitMessage := fmt.Sprintf("Remove policy key '%s' from root", targetsKeyID)
 
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	err = state.Commit(ctx, r.r, commitMessage, signCommit)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Committed policy state")
+
+	return nil
 }

@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -42,6 +43,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 	if err := os.Mkdir(dir, 0755); err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
+	slog.Debug("Created directory", "directory", dir)
 
 	refs := []string{rsl.Ref, policy.PolicyRef}
 
@@ -52,6 +54,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		}
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
+	slog.Debug("Cloned repository with refs", "repository", remoteURL)
 	head, err := r.Reference(plumbing.HEAD, false)
 	if err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 )
@@ -35,11 +36,13 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 	if tree == nil {
 		return fmt.Errorf("worktree is nil, can't update hooks")
 	}
+	slog.Debug("Fetched repository's worktree")
 	repoRoot := tree.Filesystem.Root()
 	hookFolder := path.Join(repoRoot, ".git", "hooks")
 	if err := os.MkdirAll(hookFolder, 0o750); err != nil {
 		return fmt.Errorf("making sure folder exist: %w", err)
 	}
+	slog.Debug("Created .git/hooks directory in root")
 
 	hookFile := path.Join(hookFolder, string(hookType))
 	hookExists, err := doesFileExist(hookFile)
