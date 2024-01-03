@@ -173,7 +173,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,12 +203,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Create the second level of delegations
 	delegation1Metadata := InitializeTargetsMetadata()
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgkey}, []string{"file:1/subpath1/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgkey}, []string{"file:1/subpath2/*"})
+	delegation1Metadata, err = AddOrUpdateDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"})
 	if err != nil {
 		t.Fatal(err)
 	}
