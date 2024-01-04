@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -50,7 +51,7 @@ var (
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
-	// 1. Get latest policy entry
+	// Get latest policy entry
 	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -60,56 +61,73 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 		return plumbing.ZeroHash, err
 	}
 
-	// 2. Find latest entry for target
+	// Find latest entry for target
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
-	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, latestEntry)
+	attestationsState, err := attestations.LoadCurrentAttestations(repo)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
 func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
-	// 1. Trace RSL back to the start
+	// Trace RSL back to the start
 	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
-	// 2. Find latest entry for target
+	// Find latest entry for target
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
-	// 3. Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
+	// Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
+	// Also, attestations is initially nil because we haven't seen any yet
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, nil, firstEntry, latestEntry, target)
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 //
 // TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
-	var currentPolicy *State
+func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+	var (
+		currentPolicy       *State
+		currentAttestations *attestations.Attestations
+	)
 
-	// 1. Load policy applicable at firstEntry
+	// Load policy applicable at firstEntry
 	state, err := LoadStateForEntry(ctx, repo, initialPolicyEntry)
 	if err != nil {
 		return err
 	}
 	currentPolicy = state
 
-	// 2. Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
+	if initialAttestationsEntry != nil {
+		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+		if err != nil {
+			return err
+		}
+		currentAttestations = attestationsState
+	}
+
+	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
 	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
 	}
 
-	// 3. Verify each entry, looking for a fix when an invalid entry is encountered
+	// Verify each entry, looking for a fix when an invalid entry is encountered
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
 	for len(entries) != 0 {
@@ -133,7 +151,17 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 				continue
 			}
 
-			if err := verifyEntry(ctx, repo, currentPolicy, entry); err != nil {
+			if entry.RefName == attestations.Ref {
+				newAttestationsState, err := attestations.LoadAttestationsForEntry(repo, entry)
+				if err != nil {
+					return err
+				}
+
+				currentAttestations = newAttestationsState
+				continue
+			}
+
+			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
 				// If the invalid entry is never marked as skipped, we return err
 				if !entry.SkippedBy(annotations[entry.ID]) {
 					return err
@@ -437,9 +465,8 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
-	// TODO: discuss how / if we want to verify RSL entry signatures for the policy namespace
-	if entry.RefName == PolicyRef {
+func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
 
@@ -452,7 +479,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		pathNamespaceVerified = true // Assume paths are verified until we find out otherwise
 	)
 
-	// 1. Find authorized verifiers for entry's ref
+	// Find authorized verifiers for entry's ref
 	verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("git:%s", entry.RefName)) // FIXME: "git:" shouldn't be here
 	if err != nil {
 		return err
@@ -463,15 +490,23 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		gitNamespaceVerified = true
 	}
 
-	// 2. Find commit object for the RSL entry
+	// Find commit object for the RSL entry
 	commitObj, err := gitinterface.GetCommit(repo, entry.ID)
 	if err != nil {
 		return err
 	}
 
-	// 3. Use each verifier to verify signature
+	var authorizationAttestation *sslibdsse.Envelope
+	if attestationsState != nil {
+		authorizationAttestation, err = getAuthorizationAttestation(repo, attestationsState, entry)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Use each verifier to verify signature
 	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, commitObj, nil)
+		err := verifier.Verify(ctx, commitObj, authorizationAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			gitNamespaceVerified = true
@@ -487,7 +522,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
 	}
 
-	// 4. Verify modified files
+	// Verify modified files
 
 	// First, get all commits between the current and last entry for the ref.
 	commits, err := getCommits(repo, entry) // note: this is ordered by commit ID
@@ -553,7 +588,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 			}
 
 			for _, verifier := range verifiers {
-				err := verifier.Verify(ctx, commit, nil)
+				err := verifier.Verify(ctx, commit, authorizationAttestation)
 				if err == nil {
 					// Signature verification succeeded
 					pathsVerified[j] = true
@@ -679,6 +714,35 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 	}
 
 	return nil
+}
+
+func getAuthorizationAttestation(repo *git.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, error) {
+	firstEntry := false
+
+	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil, err
+		}
+
+		firstEntry = true
+	}
+
+	fromID := plumbing.ZeroHash
+	if !firstEntry {
+		fromID = priorRefEntry.TargetID
+	}
+
+	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entry.TargetID.String())
+	if err != nil {
+		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return attestation, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the
