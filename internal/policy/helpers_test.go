@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -45,6 +46,9 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 		t.Fatal(err)
 	}
 	if err := rsl.InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+	if err := attestations.InitializeNamespace(repo); err != nil {
 		t.Fatal(err)
 	}
 
