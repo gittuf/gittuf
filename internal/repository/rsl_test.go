@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/eval"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -103,6 +104,8 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 }
 
 func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
+	t.Setenv(eval.EvalModeKey, "1")
+
 	r, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
 		t.Fatal(err)
