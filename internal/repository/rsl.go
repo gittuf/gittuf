@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/gittuf/gittuf/internal/eval"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/config"
@@ -53,6 +54,11 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 // the specified Git reference at the specified commit. If the commit is not in
 // that ref, an entry is not created.
 func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signCommit bool) error {
+	// Double check that gittuf is in eval mode
+	if !eval.InEvalMode() {
+		return eval.ErrNotInEvalMode
+	}
+
 	absRefName, err := gitinterface.AbsoluteReference(r.r, refName)
 	if err != nil {
 		return err

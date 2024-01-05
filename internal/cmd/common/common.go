@@ -20,10 +20,7 @@ import (
 const (
 	GPGKeyPrefix = "gpg:"
 	FulcioPrefix = "fulcio:"
-	EvalModeKey  = "GITTUF_EVAL"
 )
-
-var ErrNotInEvalMode = fmt.Errorf("this feature is only available with eval mode, and can UNDERMINE repository security; override by setting %s=1", EvalModeKey)
 
 // ReadKeyBytes returns public key bytes using the custom securesystemslib
 // format. It uses the underlying gpg binary to import a PGP key.
@@ -155,8 +152,4 @@ func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
 	_, _, err := gitinterface.GetSigningCommand()
 
 	return err
-}
-
-func EvalMode() bool {
-	return os.Getenv(EvalModeKey) == "1"
 }

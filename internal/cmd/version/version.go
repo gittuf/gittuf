@@ -5,7 +5,7 @@ package version
 import (
 	"fmt"
 
-	"github.com/gittuf/gittuf/internal/cmd/common"
+	"github.com/gittuf/gittuf/internal/eval"
 	"github.com/gittuf/gittuf/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -21,8 +21,8 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 	}
 	fmt.Printf("gittuf version %s\n", v)
 
-	if common.EvalMode() {
-		fmt.Printf("gittuf is operating in eval mode. Override by setting %s=0.\n", common.EvalModeKey)
+	if eval.InEvalMode() {
+		fmt.Printf("gittuf is operating in eval mode. Override by setting %s=0.\n", eval.EvalModeKey)
 	}
 
 	return nil

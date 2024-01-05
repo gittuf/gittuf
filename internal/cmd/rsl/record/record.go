@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
+	"github.com/gittuf/gittuf/internal/eval"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +21,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"commit",
 		"c",
 		"",
-		fmt.Sprintf("commit ID (eval mode only, set %s=1)", common.EvalModeKey),
+		fmt.Sprintf("commit ID (eval mode only, set %s=1)", eval.EvalModeKey),
 	)
 }
 
@@ -31,8 +32,8 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 	}
 
 	if len(o.commitID) > 0 {
-		if !common.EvalMode() {
-			return common.ErrNotInEvalMode
+		if !eval.InEvalMode() {
+			return eval.ErrNotInEvalMode
 		}
 
 		return repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, true)
