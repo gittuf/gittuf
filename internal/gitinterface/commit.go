@@ -56,6 +56,51 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 	return ApplyCommit(repo, commit, curRef)
 }
 
+// CommitUsingSpecificKey creates a new commit in the repository for the
+// specified parameters. The commit is signed using the PEM encoded SSH or GPG
+// private key. This function is expected for use in tests and gittuf's
+// eval mode. In standard workflows, Commit() must be used instead which infers
+// the signing key from the user's Git config.
+func CommitUsingSpecificKey(repo *git.Repository, treeHash plumbing.Hash, targetRef, message string, signingKeyPEMBytes []byte) (plumbing.Hash, error) {
+	// Fetch gitConfig for author / committer information
+	gitConfig, err := getGitConfig(repo)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	targetRefTyped := plumbing.ReferenceName(targetRef)
+	curRef, err := repo.Reference(targetRefTyped, true)
+	if err != nil {
+		// FIXME: this is a bit messy
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			// Set empty ref
+			if err := repo.Storer.SetReference(plumbing.NewHashReference(targetRefTyped, plumbing.ZeroHash)); err != nil {
+				return plumbing.ZeroHash, err
+			}
+			curRef, err = repo.Reference(targetRefTyped, true)
+			if err != nil {
+				return plumbing.ZeroHash, err
+			}
+		} else {
+			return plumbing.ZeroHash, err
+		}
+	}
+
+	commit := CreateCommitObject(gitConfig, treeHash, []plumbing.Hash{curRef.Hash()}, message, clock)
+
+	commitContents, err := getCommitBytesWithoutSignature(commit)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	signature, err := signGitObjectUsingKey(commitContents, signingKeyPEMBytes)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+	commit.PGPSignature = signature
+
+	return ApplyCommit(repo, commit, curRef)
+}
+
 // ApplyCommit writes a commit object in the repository and updates the
 // specified reference to point to the commit.
 func ApplyCommit(repo *git.Repository, commit *object.Commit, curRef *plumbing.Reference) (plumbing.Hash, error) {
