@@ -4,6 +4,7 @@ package record
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/eval"
@@ -11,18 +12,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	commitFlagName = "commit"
+)
+
 type options struct {
-	commitID string
+	commitID       string
+	signingKeyPath string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(
 		&o.commitID,
-		"commit",
+		commitFlagName,
 		"c",
 		"",
 		fmt.Sprintf("commit ID (eval mode only, set %s=1)", eval.EvalModeKey),
 	)
+
+	cmd.Flags().StringVarP(
+		&o.signingKeyPath,
+		"signing-key",
+		"k",
+		"",
+		fmt.Sprintf("path to PEM encoded SSH or GPG signing key (eval mode only, set %s=1)", eval.EvalModeKey),
+	)
+
+	cmd.MarkFlagsRequiredTogether("commit", "signing-key")
 }
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
@@ -36,7 +52,12 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 			return eval.ErrNotInEvalMode
 		}
 
-		return repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, true)
+		signingKeyBytes, err := os.ReadFile(o.signingKeyPath)
+		if err != nil {
+			return err
+		}
+
+		return repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, signingKeyBytes)
 	}
 
 	return repo.RecordRSLEntryForReference(args[0], true)
@@ -48,10 +69,19 @@ func New() *cobra.Command {
 		Use:     "record",
 		Short:   "Record latest state of a Git reference in the RSL",
 		Args:    cobra.ExactArgs(1),
-		PreRunE: common.CheckIfSigningViable,
+		PreRunE: checkIfSigningViable,
 		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)
 
 	return cmd
+}
+
+func checkIfSigningViable(cmd *cobra.Command, args []string) error {
+	commitFlag := cmd.Flag(commitFlagName)
+	if commitFlag.Value.String() != "" {
+		return nil
+	}
+
+	return common.CheckIfSigningViable(cmd, args)
 }
