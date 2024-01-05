@@ -5,14 +5,17 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/hiddeco/sshsig"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
@@ -44,7 +47,13 @@ const (
 	DefaultSigningProgramGPG  string = "gpg"
 	DefaultSigningProgramSSH  string = "ssh-keygen"
 	DefaultSigningProgramX509 string = "gpgsm"
-	namespaceSSHSignature     string = "git"
+)
+
+const (
+	namespaceSSHSignature      string = "git"
+	gpgPrivateKeyPEMHeader     string = "PGP PRIVATE KEY"
+	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
+	rsaPrivateKeyPEMHeader     string = "RSA PRIVATE KEY"
 )
 
 func GetSigningCommand() (string, []string, error) {
@@ -209,6 +218,57 @@ func signGitObject(contents []byte) (string, error) {
 	}
 
 	return string(sig), nil
+}
+
+func signGitObjectUsingKey(contents, pemKeyBytes []byte) (string, error) {
+	block, _ := pem.Decode(pemKeyBytes)
+	if block == nil {
+		// openpgp implements its own armor-decode method, pem.Decode considers
+		// the input invalid. We haven't tested if this is universal, so in case
+		// pem.Decode does succeed on a GPG key, we catch it below.
+		return signGitObjectUsingGPGKey(contents, pemKeyBytes)
+	}
+
+	switch block.Type {
+	case gpgPrivateKeyPEMHeader:
+		return signGitObjectUsingGPGKey(contents, pemKeyBytes)
+	case opensshPrivateKeyPEMHeader, rsaPrivateKeyPEMHeader:
+		return signGitObjectUsingSSHKey(contents, pemKeyBytes)
+	}
+
+	return "", ErrUnknownSigningMethod
+}
+
+func signGitObjectUsingGPGKey(contents, pemKeyBytes []byte) (string, error) {
+	reader := bytes.NewReader(contents)
+
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(pemKeyBytes))
+	if err != nil {
+		return "", err
+	}
+
+	sig := new(strings.Builder)
+	if err := openpgp.ArmoredDetachSign(sig, keyring[0], reader, nil); err != nil {
+		return "", err
+	}
+
+	return sig.String(), nil
+}
+
+func signGitObjectUsingSSHKey(contents, pemKeyBytes []byte) (string, error) {
+	signer, err := ssh.ParsePrivateKey(pemKeyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	sshSig, err := sshsig.Sign(bytes.NewReader(contents), signer, sshsig.HashSHA512, namespaceSSHSignature)
+	if err != nil {
+		return "", err
+	}
+
+	sigBytes := sshsig.Armor(sshSig)
+
+	return string(sigBytes), nil
 }
 
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
