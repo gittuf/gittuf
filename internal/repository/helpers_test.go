@@ -30,6 +30,12 @@ var targetsKeyBytes []byte
 //go:embed test-data/targets.pub
 var targetsPubKeyBytes []byte
 
+//go:embed test-data/rsa-ssh-key
+var rsaKeyBytes []byte
+
+//go:embed test-data/ecdsa-ssh-key
+var ecdsaKeyBytes []byte
+
 var testCtx = context.Background()
 
 func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
