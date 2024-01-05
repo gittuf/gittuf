@@ -856,11 +856,13 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
+		commit, err := gitinterface.GetCommit(repo, commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		// Create authorization for this change
-		// TODO: determine authorization format, this requires the target commit
-		// ID instead of something that could be determined ahead of time like
-		// the tree ID
-		authorization, err := attestations.NewReferenceAuthorization(refName, plumbing.ZeroHash.String(), commitIDs[0].String())
+		authorization, err := attestations.NewReferenceAuthorization(refName, plumbing.ZeroHash.String(), commit.TreeHash.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -878,7 +880,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, plumbing.ZeroHash.String(), commitIDs[0].String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, plumbing.ZeroHash.String(), commit.TreeHash.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {

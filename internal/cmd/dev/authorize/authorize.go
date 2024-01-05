@@ -14,6 +14,7 @@ import (
 
 type options struct {
 	signingKey string
+	fromRef    string
 	revoke     bool
 }
 
@@ -27,6 +28,15 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
 
+	cmd.Flags().StringVarP(
+		&o.fromRef,
+		"from-ref",
+		"f",
+		"",
+		"ref to authorize merging changes from",
+	)
+	cmd.MarkFlagRequired("from-ref") //nolint:errcheck
+
 	cmd.Flags().BoolVarP(
 		&o.revoke,
 		"revoke",
@@ -37,6 +47,10 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
@@ -53,13 +67,13 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 
 	if o.revoke {
 		if len(args) < 3 {
-			return fmt.Errorf("insufficient parameters for revoking authorization, requires <targetRef> <fromID> <toID>")
+			return fmt.Errorf("insufficient parameters for revoking authorization, requires <targetRef> <fromID> <targetTreeID>")
 		}
 
 		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true)
 	}
 
-	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], true)
+	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true)
 }
 
 func New() *cobra.Command {
