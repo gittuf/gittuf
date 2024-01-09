@@ -37,7 +37,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	newRootKeyBytes, err := common.ReadKeyBytes(o.newRootKey)
+	newRootKeyBytes, err := common.ReadKeyBytes(o.newRootKey) //nolint:staticcheck
 	if err != nil {
 		return err
 	}
