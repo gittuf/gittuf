@@ -342,6 +342,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 
 	allPublicKeys := targetsMetadata.Delegations.Keys
 	delegationsQueue := targetsMetadata.Delegations.Roles
+	seenRoles := map[string]bool{TargetsRoleName: true}
 
 	trustedKeys := []*tuf.Key{}
 	for {
@@ -358,11 +359,18 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 				trustedKeys = append(trustedKeys, key)
 			}
 
+			if _, seen := seenRoles[delegation.Name]; seen {
+				continue
+			}
+
 			if s.HasTargetsRole(delegation.Name) {
 				delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
 				if err != nil {
 					return nil, err
 				}
+
+				seenRoles[delegation.Name] = true
+
 				for keyID, key := range delegatedMetadata.Delegations.Keys {
 					allPublicKeys[keyID] = key
 				}
@@ -403,6 +411,8 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 		targetsMetadata.Delegations.Roles,
 	}
 
+	seenRoles := map[string]bool{TargetsRoleName: true}
+
 	var currentDelegationGroup []tuf.Delegation
 	verifiers := []*Verifier{}
 	for {
@@ -434,6 +444,10 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 				}
 				verifiers = append(verifiers, verifier)
 
+				if _, seen := seenRoles[delegation.Name]; seen {
+					continue
+				}
+
 				if s.HasTargetsRole(delegation.Name) {
 					env := s.DelegationEnvelopes[delegation.Name]
 					if err := verifier.Verify(ctx, nil, env); err != nil {
@@ -444,6 +458,9 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 					if err != nil {
 						return nil, err
 					}
+
+					seenRoles[delegation.Name] = true
+
 					for keyID, key := range delegatedMetadata.Delegations.Keys {
 						allPublicKeys[keyID] = key
 					}
@@ -658,17 +675,26 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
 	}
 
+	seenRoles := map[string]bool{TargetsRoleName: true}
+
 	for len(delegationsToSearch) > 0 {
 		currentDelegation := delegationsToSearch[0]
 		delegationsToSearch = delegationsToSearch[1:]
 
 		// allDelegations will be the returned list of all the delegations in pre-order traversal, no delegations will be popped off
 		allDelegations = append(allDelegations, currentDelegation)
+
+		if _, seen := seenRoles[currentDelegation.Delegation.Name]; seen {
+			continue
+		}
+
 		if state.HasTargetsRole(currentDelegation.Delegation.Name) {
 			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.Name)
 			if err != nil {
 				return nil, err
 			}
+
+			seenRoles[currentDelegation.Delegation.Name] = true
 
 			// We construct localDelegations first so that we preserve the order
 			// of delegations in currentMetadata in delegationsToSearch
@@ -750,6 +776,8 @@ func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 
 	delegationsQueue := topLevelTargetsMetadata.Delegations.Roles
 
+	seenRoles := map[string]bool{TargetsRoleName: true}
+
 	for {
 		if len(delegationsQueue) == 0 {
 			return nil, ErrDelegationNotFound
@@ -762,8 +790,13 @@ func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
 			return delegation, nil
 		}
 
+		if _, seen := seenRoles[delegation.Name]; seen {
+			continue
+		}
+
 		if s.HasTargetsRole(delegation.Name) {
 			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
+			seenRoles[delegation.Name] = true
 		}
 	}
 }
