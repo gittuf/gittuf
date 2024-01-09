@@ -5,9 +5,7 @@ package gitinterface
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	_ "embed"
-	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,8 +20,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/hiddeco/sshsig"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
-	rekorSSH "github.com/sigstore/rekor/pkg/pki/ssh"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ssh"
 )
@@ -351,24 +349,12 @@ func createTestSSHSignedCommits(t *testing.T) []*object.Commit {
 			t.Fatal(err)
 		}
 
-		signature, err := signer.Sign(rand.Reader, commitBytes)
+		sshSig, err := sshsig.Sign(bytes.NewReader(commitBytes), signer, sshsig.HashSHA512, namespaceSSHSignature)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		wrappedSig := rekorSSH.WrappedSig{
-			Version:       1,
-			PublicKey:     string(signer.PublicKey().Marshal()),
-			Namespace:     namespaceSSHSignature,
-			HashAlgorithm: "sha512",
-			Signature:     string(ssh.Marshal(signature)),
-		}
-		copy(wrappedSig.MagicHeader[:], []byte(magicHeaderSSHSignature))
-
-		sigBytes := pem.EncodeToMemory(&pem.Block{
-			Type:  pemTypeSSHSignature,
-			Bytes: ssh.Marshal(wrappedSig),
-		})
+		sigBytes := sshsig.Armor(sshSig)
 		testCommit.PGPSignature = string(sigBytes)
 
 		testCommits = append(testCommits, testCommit)

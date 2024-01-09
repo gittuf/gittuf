@@ -3,20 +3,21 @@
 package gitinterface
 
 import (
+	"bytes"
 	"context"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 
+	"github.com/hiddeco/sshsig"
+
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
-	rekorSSH "github.com/sigstore/rekor/pkg/pki/ssh"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"golang.org/x/crypto/ssh"
 )
@@ -43,12 +44,7 @@ const (
 	DefaultSigningProgramGPG  string = "gpg"
 	DefaultSigningProgramSSH  string = "ssh-keygen"
 	DefaultSigningProgramX509 string = "gpgsm"
-)
-
-const (
-	magicHeaderSSHSignature string = "SSHSIG"
-	pemTypeSSHSignature     string = "SSH SIGNATURE"
-	namespaceSSHSignature   string = "git"
+	namespaceSSHSignature     string = "git"
 )
 
 func GetSigningCommand() (string, []string, error) {
@@ -281,53 +277,14 @@ func verifySSHKeySignature(key *tuf.Key, data, signature []byte) error {
 		return errors.Join(ErrVerifyingSSHSignature, err)
 	}
 
-	sshSignature, err := decodeSSHSignature(signature)
+	sshSignature, err := sshsig.Unarmor(signature)
 	if err != nil {
 		return errors.Join(ErrVerifyingSSHSignature, err)
 	}
 
-	if err := publicKey.Verify(data, sshSignature); err != nil {
+	if err := sshsig.Verify(bytes.NewReader(data), sshSignature, publicKey, sshSignature.HashAlgorithm, namespaceSSHSignature); err != nil {
 		return errors.Join(ErrIncorrectVerificationKey, err)
 	}
 
 	return nil
-}
-
-// decodeSSHSignature unpacks the PEM encoded SSH signature into its components.
-// It extracts the signature bytes and returns an ssh.Signature object. This
-// helper is inspired by the SSH signature decode routine in Rekor, with
-// modifications for the git namespace.
-func decodeSSHSignature(signatureBytes []byte) (*ssh.Signature, error) {
-	block, _ := pem.Decode(signatureBytes)
-	if block == nil {
-		return nil, ErrInvalidSignature
-	}
-
-	if block.Type != pemTypeSSHSignature {
-		return nil, ErrInvalidSignature
-	}
-
-	wrappedSig := &rekorSSH.WrappedSig{}
-	if err := ssh.Unmarshal(block.Bytes, wrappedSig); err != nil {
-		return nil, err
-	}
-
-	if wrappedSig.Version != 1 {
-		return nil, ErrInvalidSignature
-	}
-
-	if string(wrappedSig.MagicHeader[:]) != magicHeaderSSHSignature {
-		return nil, ErrInvalidSignature
-	}
-
-	if wrappedSig.Namespace != namespaceSSHSignature {
-		return nil, ErrInvalidSignature
-	}
-
-	sshSig := &ssh.Signature{}
-	if err := ssh.Unmarshal([]byte(wrappedSig.Signature), sshSig); err != nil {
-		return nil, err
-	}
-
-	return sshSig, nil
 }
