@@ -3,6 +3,8 @@
 package tuf
 
 import (
+	_ "embed"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,19 +13,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//go:embed test-data/test-key.pub
+var customEncodedPublicKeyBytes []byte
+
+//go:embed test-data/test-key.pem
+var pemEncodedPublicKeyBytes []byte
+
 func TestLoadKeyFromBytes(t *testing.T) {
-	publicKeyPath := filepath.Join("test-data", "test-key.pub")
-	publicKeyBytes, err := os.ReadFile(publicKeyPath)
-	if err != nil {
-		t.Fatal(err)
+	expectedPublicKey := "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f"
+	expectedKeyID := "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"
+
+	// Right now this struct is unnecessary, but it's a smaller diff if we add
+	// more to this test like different key algorithms, etc.
+	tests := map[string]struct {
+		keyBytes []byte
+	}{
+		"legacy serialization format key": {keyBytes: customEncodedPublicKeyBytes},
+		"PEM encoded key":                 {keyBytes: pemEncodedPublicKeyBytes},
 	}
 
-	key, err := LoadKeyFromBytes(publicKeyBytes)
-	if err != nil {
-		t.Error(err)
+	for name, test := range tests {
+		key, err := LoadKeyFromBytes(test.keyBytes)
+		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+		assert.Equal(t, expectedPublicKey, key.KeyVal.Public)
+		assert.Equal(t, expectedKeyID, key.KeyID)
 	}
-	assert.Equal(t, "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f", key.KeyVal.Public)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", key.KeyID)
 }
 
 func TestRootMetadata(t *testing.T) {

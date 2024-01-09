@@ -30,9 +30,18 @@ type Key = signerverifier.SSLibKey
 // contents of the bytes. The key contents are expected to be in the custom
 // securesystemslib format.
 func LoadKeyFromBytes(contents []byte) (*Key, error) {
-	// FIXME: this assumes keys are stored in securesystemslib format.
-	// RSA keys are stored in PEM format.
-	var key *Key
+	var (
+		key *Key
+		err error
+	)
+
+	// Try to load PEM encoded key
+	key, err = signerverifier.LoadKey(contents)
+	if err == nil {
+		return key, nil
+	}
+
+	// Compatibility with old, custom serialization format if err != nil above
 	if err := json.Unmarshal(contents, &key); err != nil {
 		return nil, err
 	}
