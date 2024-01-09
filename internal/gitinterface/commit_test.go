@@ -5,6 +5,9 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	_ "embed"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,8 +23,22 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	rekorSSH "github.com/sigstore/rekor/pkg/pki/ssh"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ssh"
 )
+
+//go:embed test-data/rsa-ssh-key.pem
+var rsaSSHPublicKeyBytes []byte
+
+//go:embed test-data/rsa-ssh-key
+var rsaSSHPrivateKeyBytes []byte
+
+//go:embed test-data/ecdsa-ssh-key.pem
+var ecdsaSSHPublicKeyBytes []byte
+
+//go:embed test-data/ecdsa-ssh-key
+var ecdsaSSHPrivateKeyBytes []byte
 
 func TestCreateCommitObject(t *testing.T) {
 	t.Run("zero commit and zero parent", func(t *testing.T) {
@@ -111,6 +128,8 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 		TreeHash: plumbing.NewHash("4b825dc642cb6eb9a060e54bf8d69288fbee4904"),
 	}
 
+	sshCommits := createTestSSHSignedCommits(t)
+
 	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +147,16 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 			Identity: "aditya@saky.in",
 			Issuer:   "https://github.com/login/oauth",
 		},
+	}
+
+	rsaKey, err := sslibsv.LoadKey(rsaSSHPublicKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ecdsaKey, err := sslibsv.LoadKey(ecdsaSSHPublicKeyBytes)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	t.Run("gpg signed commit", func(t *testing.T) {
@@ -148,6 +177,22 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 
 	t.Run("use gitsign signed commit with gpg key", func(t *testing.T) {
 		err := VerifyCommitSignature(context.Background(), gitsignSignedCommit, gpgKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+	})
+
+	t.Run("use ssh signed commits with corresponding keys", func(t *testing.T) {
+		err := VerifyCommitSignature(context.Background(), sshCommits[0], rsaKey)
+		assert.Nil(t, err)
+
+		err = VerifyCommitSignature(context.Background(), sshCommits[1], ecdsaKey)
+		assert.Nil(t, err)
+	})
+
+	t.Run("use ssh signed commits with wrong keys", func(t *testing.T) {
+		err := VerifyCommitSignature(context.Background(), sshCommits[0], ecdsaKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+
+		err = VerifyCommitSignature(context.Background(), sshCommits[1], rsaKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 }
@@ -272,4 +317,62 @@ func createTestSignedCommit(t *testing.T) *object.Commit {
 	testCommit.PGPSignature = sig.String()
 
 	return testCommit
+}
+
+func createTestSSHSignedCommits(t *testing.T) []*object.Commit {
+	t.Helper()
+
+	testCommits := []*object.Commit{}
+
+	signingKeys := [][]byte{rsaSSHPrivateKeyBytes, ecdsaSSHPrivateKeyBytes}
+
+	for _, keyBytes := range signingKeys {
+		testCommit := &object.Commit{
+			Author: object.Signature{
+				Name:  testName,
+				Email: testEmail,
+				When:  testClock.Now(),
+			},
+			Committer: object.Signature{
+				Name:  testName,
+				Email: testEmail,
+				When:  testClock.Now(),
+			},
+			Message:  "Test commit",
+			TreeHash: EmptyTree(),
+		}
+
+		commitBytes, err := getCommitBytesWithoutSignature(testCommit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer, err := ssh.ParsePrivateKey(keyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signature, err := signer.Sign(rand.Reader, commitBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		wrappedSig := rekorSSH.WrappedSig{
+			Version:       1,
+			PublicKey:     string(signer.PublicKey().Marshal()),
+			Namespace:     namespaceSSHSignature,
+			HashAlgorithm: "sha512",
+			Signature:     string(ssh.Marshal(signature)),
+		}
+		copy(wrappedSig.MagicHeader[:], []byte(magicHeaderSSHSignature))
+
+		sigBytes := pem.EncodeToMemory(&pem.Block{
+			Type:  pemTypeSSHSignature,
+			Bytes: ssh.Marshal(wrappedSig),
+		})
+		testCommit.PGPSignature = string(sigBytes)
+
+		testCommits = append(testCommits, testCommit)
+	}
+
+	return testCommits
 }
