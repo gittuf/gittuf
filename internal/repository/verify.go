@@ -73,9 +73,9 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	return r.verifyRefTip(target, expectedTip)
 }
 
-func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
+func (r *Repository) VerifyCommit(ctx context.Context, applyFilePolicies bool, ids ...string) map[string]string {
 	slog.Debug("Verifying commit signature...")
-	return policy.VerifyCommit(ctx, r.r, ids...)
+	return policy.VerifyCommit(ctx, r.r, applyFilePolicies, ids...)
 }
 
 func (r *Repository) VerifyTag(ctx context.Context, ids []string) map[string]string {

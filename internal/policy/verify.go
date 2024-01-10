@@ -30,6 +30,7 @@ const (
 	unableToLoadPolicyMessageFmt      = "unable to load applicable gittuf policy: %s"
 	unableToFindPolicyMessage         = "unable to find applicable gittuf policy"
 	goodSignatureMessageFmt           = "good signature from key '%s:%s'"
+	goodApplyFilePoliciesMessage      = "commit is allowed to modify all paths it is modifying"
 	goodTagSignatureMessage           = "good signature for RSL entry and tag"
 	goodSignatureMessageForRSLEntry   = "good signature for RSL entry"
 	badSignatureMessageForRSLEntry    = "bad signature for RSL entry"
@@ -353,7 +354,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 // consumed directly by the user, as this is used for a special, user-invoked
 // workflow. gittuf's other verification workflows are currently not expected to
 // use this function.
-func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[string]string {
+func VerifyCommit(ctx context.Context, repo *git.Repository, applyFilePolicies bool, ids ...string) map[string]string {
 	status := make(map[string]string, len(ids))
 	commits := make(map[string]*object.Commit, len(ids))
 
@@ -400,10 +401,6 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 			continue
 		}
 
-		// TODO: Add `applyFilePolicies` flag that uses the commitPolicy to
-		// check that the commit signature is from a key trusted for all the
-		// paths modified by the commit.
-
 		keys, err := commitPolicy.PublicKeys()
 		if err != nil {
 			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
@@ -430,6 +427,19 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 
 		if !verified {
 			status[id] = noPublicKeyMessage
+		}
+
+		// This flag tells us to check if the file paths modified by the commit are allowed by the policy
+		if applyFilePolicies {
+			applyFilePoliciesErr := goodApplyFilePoliciesMessage
+			badPaths, err := checkCommitAgainstModifiedPaths(ctx, repo, commit, commitPolicy)
+			if err != nil {
+				applyFilePoliciesErr = err.Error()
+			} else if len(badPaths) > 0 {
+				applyFilePoliciesErr = fmt.Sprintf("commit is not allowed to modify the following paths: %s", strings.Join(badPaths, ", "))
+			}
+
+			status[id] = fmt.Sprintf("Verification status: %s. File policy application status: %s", status[id], applyFilePoliciesErr)
 		}
 	}
 
@@ -979,4 +989,41 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *ssl
 	}
 
 	return nil
+}
+
+func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, commit *object.Commit, commitPolicy *State) ([]string, error) {
+	filePaths, err := gitinterface.GetFilePathsChangedByCommit(repo, commit)
+	if err != nil {
+		return nil, err
+	}
+
+	badPaths := []string{}
+	for _, path := range filePaths {
+		verifiers, err := commitPolicy.FindVerifiersForPath(fmt.Sprintf("file:%s", path))
+		if err != nil {
+			return nil, err
+		}
+
+		goodKey := false
+
+		// Verify the keys associated with the commit. If verification fails, add the path to the list of bad paths.
+
+		for _, verifier := range verifiers {
+			err := verifier.Verify(ctx, commit, commitPolicy.TargetsEnvelope)
+
+			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+				// We encounter this for key types that can be used for gittuf
+				// policy metadata but not Git objects
+				continue
+			}
+			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+				// Unexpected error
+				break
+			}
+		}
+		if !goodKey {
+			badPaths = append(badPaths, path)
+		}
+	}
+	return badPaths, nil
 }

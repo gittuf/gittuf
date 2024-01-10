@@ -711,7 +711,7 @@ func TestVerifyCommit(t *testing.T) {
 	}
 
 	// Verify all commit signatures
-	status := VerifyCommit(testCtx, repo, commitIDStrings...)
+	status := VerifyCommit(testCtx, repo, false, commitIDStrings...)
 	assert.Equal(t, expectedStatus, status)
 
 	if err := repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
@@ -723,7 +723,7 @@ func TestVerifyCommit(t *testing.T) {
 		"HEAD":  fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
 		refName: fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
 	}
-	status = VerifyCommit(testCtx, repo, "HEAD", refName)
+	status = VerifyCommit(testCtx, repo, false, "HEAD", refName)
 	assert.Equal(t, expectedStatus, status)
 
 	// Try a tag
@@ -733,14 +733,38 @@ func TestVerifyCommit(t *testing.T) {
 	}
 
 	expectedStatus = map[string]string{tagHash.String(): nonCommitMessage}
-	status = VerifyCommit(testCtx, repo, tagHash.String())
+	status = VerifyCommit(testCtx, repo, false, tagHash.String())
 	assert.Equal(t, expectedStatus, status)
 
 	// Add a commit but don't record it in the RSL
 	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
 	expectedStatus = map[string]string{commitIDs[0].String(): unableToFindPolicyMessage}
-	status = VerifyCommit(testCtx, repo, commitIDs[0].String())
+	status = VerifyCommit(testCtx, repo, false, commitIDs[0].String())
+	assert.Equal(t, expectedStatus, status)
+
+	// Add regular commits, but now check if commit is allowed to modify the files it is modifying
+	// this test should fail for the last commit, since it is not allowed to modify the file it is modifying
+
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+	entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+	entry.ID = entryID
+
+	expectedStatus = make(map[string]string, len(commitIDs))
+	commitIDStrings = make([]string, 0, len(commitIDs))
+
+	for index, c := range commitIDs {
+		commitIDStrings = append(commitIDStrings, c.String())
+		expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), goodApplyFilePoliciesMessage)
+
+		if c.String() == commitIDs[2].String() || c.String() == commitIDs[1].String() {
+			expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), fmt.Sprintf("commit is not allowed to modify the following paths: %d", index+1))
+		}
+	}
+
+	// Verify all commit signatures
+	status = VerifyCommit(testCtx, repo, true, commitIDStrings...)
 	assert.Equal(t, expectedStatus, status)
 }
 

@@ -9,9 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct{}
+type options struct {
+	applyFilePolicies bool
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVarP(
+		&o.applyFilePolicies,
+		"apply-file-policies",
+		"a",
+		false,
+		"check if the file paths modified by the commit are allowed by the policy",
+	)
+}
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := repository.LoadRepository()
@@ -19,7 +29,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	status := repo.VerifyCommit(cmd.Context(), args...)
+	status := repo.VerifyCommit(cmd.Context(), o.applyFilePolicies, args...)
 
 	for _, id := range args {
 		fmt.Printf("%s: %s\n", id, status[id])
