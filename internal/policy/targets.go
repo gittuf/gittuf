@@ -23,7 +23,7 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 }
 
 // AddDelegation adds a new delegation to TargetsMetadata.
-func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string) (*tuf.TargetsMetadata, error) {
+func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
@@ -42,7 +42,7 @@ func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, author
 		Terminating: false,
 		Role: tuf.Role{
 			KeyIDs:    authorizedKeyIDs,
-			Threshold: 1,
+			Threshold: threshold,
 		},
 	}
 	allDelegations = append(allDelegations[:len(allDelegations)-1], newDelegation, AllowRule())
@@ -53,9 +53,13 @@ func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, author
 }
 
 // UpdateDelegation is used to amend a delegation in TargetsMetadata.
-func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string) (*tuf.TargetsMetadata, error) {
+func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
+	}
+
+	if len(authorizedKeys) < threshold {
+		return nil, ErrCannotMeetThreshold
 	}
 
 	authorizedKeyIDs := []string{}
@@ -78,7 +82,10 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
-			delegation.Role = tuf.Role{KeyIDs: authorizedKeyIDs, Threshold: 1}
+			delegation.Role = tuf.Role{
+				KeyIDs:    authorizedKeyIDs,
+				Threshold: threshold,
+			}
 		}
 
 		allDelegations = append(allDelegations, delegation)

@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")
+	ErrCannotMeetThreshold = errors.New("insufficient keys to meet threshold")
 	ErrRootMetadataNil     = errors.New("rootMetadata is nil")
 	ErrRootKeyNil          = errors.New("root key not found")
+	ErrTargetsMetadataNil  = errors.New("targetsMetadata not found")
 	ErrTargetsKeyNil       = errors.New("targetsKey is nil")
 	ErrKeyIDEmpty          = errors.New("keyID is empty")
 )
@@ -141,6 +142,23 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 	}
 	targetsRole.KeyIDs = newKeyIDs
 
+	rootMetadata.Roles[TargetsRoleName] = targetsRole
+
+	return rootMetadata, nil
+}
+
+// UpdateTargetsThreshold sets the threshold for the top level Targets role.
+func UpdateTargetsThreshold(rootMetadata *tuf.RootMetadata, threshold int) (*tuf.RootMetadata, error) {
+	targetsRole, ok := rootMetadata.Roles[TargetsRoleName]
+	if !ok {
+		return nil, ErrTargetsMetadataNil
+	}
+
+	if len(targetsRole.KeyIDs) < threshold {
+		return nil, ErrCannotMeetThreshold
+	}
+
+	targetsRole.Threshold = threshold
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
 	return rootMetadata, nil

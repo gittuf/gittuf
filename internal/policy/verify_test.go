@@ -780,20 +780,22 @@ func TestVerifyTag(t *testing.T) {
 }
 
 func TestVerifyEntry(t *testing.T) {
-	// FIXME: currently this test is nearly identical to the one for VerifyRef.
-	// This is because it's not trivial to create a bunch of test policy / RSL
-	// states cleanly. We need something that is easy to maintain and add cases
-	// to.
-	repo, state := createTestRepository(t, createTestStateWithPolicy)
-	refName := "refs/heads/main"
+	t.Run("successful verification", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
-	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-	entry.ID = entryID
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
 
-	err := verifyEntry(context.Background(), repo, state, entry)
-	assert.Nil(t, err)
+		err := verifyEntry(context.Background(), repo, state, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("successful verification with higher threshold", func(t *testing.T) {
+		createTestRepository(t, createTestStateWithThresholdPolicy)
+	})
 
 	// FIXME: test for file policy passing for situations where a commit is seen
 	// by the RSL before its signing key is rotated out. This commit should be

@@ -120,12 +120,12 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	}
 
 	targetsMetadata := InitializeTargetsMetadata()
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-files-1-and-2", []*tuf.Key{gpgKey}, []string{"file:1", "file:2"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-files-1-and-2", []*tuf.Key{gpgKey}, []string{"file:1", "file:2"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,12 +189,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	// Create the root targets metadata
 	targetsMetadata := InitializeTargetsMetadata()
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "1", []*tuf.Key{key}, []string{"file:1/*"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "1", []*tuf.Key{key}, []string{"file:1/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "2", []*tuf.Key{key}, []string{"file:2/*"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "2", []*tuf.Key{key}, []string{"file:2/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,12 +211,12 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Create the second level of delegations
 	delegation1Metadata := InitializeTargetsMetadata()
-	delegation1Metadata, err = AddDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"})
+	delegation1Metadata, err = AddDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	delegation1Metadata, err = AddDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"})
+	delegation1Metadata, err = AddDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +257,48 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	return curState
 }
 
+func createTestStateWithThresholdPolicy(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 2 for existing rule with the added key
+	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	return state
+}
+
 func createTestStateWithTagPolicy(t *testing.T) *State {
 	t.Helper()
 
@@ -270,7 +312,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{gpgKey}, []string{"git:refs/tags/*"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{gpgKey}, []string{"git:refs/tags/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +350,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{rootKey}, []string{"git:refs/tags/*"})
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{rootKey}, []string{"git:refs/tags/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
