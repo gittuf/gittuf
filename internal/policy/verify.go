@@ -884,7 +884,7 @@ func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, 
 		// Verify the keys associated with the commit. If verification fails, add the path to the list of bad paths.
 
 		for _, verifier := range verifiers {
-			verifier.Verify(ctx, commit, commitPolicy.TargetsEnvelope)
+			err := verifier.Verify(ctx, commit, commitPolicy.TargetsEnvelope)
 
 			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
 				// We encounter this for key types that can be used for gittuf
