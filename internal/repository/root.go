@@ -286,3 +286,57 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
+
+// UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
+// required for the top level Targets role.
+func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current root metadata...")
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		return err
+	}
+
+	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKeyID) {
+		return ErrUnauthorizedKey
+	}
+
+	slog.Debug("Updating policy threshold...")
+	rootMetadata, err = policy.UpdateTargetsThreshold(rootMetadata, threshold)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata.SetVersion(rootMetadata.Version + 1)
+	rootMetadataBytes, err := json.Marshal(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	env := state.RootEnvelope
+	env.Signatures = []sslibdsse.Signature{}
+	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
+
+	slog.Debug(fmt.Sprintf("Signing updated root metadata using '%s'...", rootKeyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	state.RootEnvelope = env
+
+	commitMessage := fmt.Sprintf("Update policy threshold to %d", threshold)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
