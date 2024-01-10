@@ -43,8 +43,8 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 	return r.verifyRefTip(target, expectedTip)
 }
 
-func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
-	return policy.VerifyCommit(ctx, r.r, ids...)
+func (r *Repository) VerifyCommit(ctx context.Context, applyFilePolicies bool, ids ...string) map[string]string {
+	return policy.VerifyCommit(ctx, r.r, applyFilePolicies, ids...)
 }
 
 func (r *Repository) VerifyTag(ctx context.Context, ids []string) map[string]string {
