@@ -740,7 +740,6 @@ func TestVerifyCommit(t *testing.T) {
 		if c.String() == commitIDs[2].String() || c.String() == commitIDs[1].String() {
 			expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), fmt.Sprintf("commit is not allowed to modify the following paths: %d", index+1))
 		}
-
 	}
 
 	// Verify all commit signatures
