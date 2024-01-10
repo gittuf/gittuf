@@ -865,6 +865,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *ssl
 
 	return nil
 }
+
 func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, commit *object.Commit, commitPolicy *State) ([]string, error) {
 	filePaths, err := gitinterface.GetFilePathsChangedByCommit(repo, commit)
 	if err != nil {
@@ -873,7 +874,6 @@ func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, 
 
 	badPaths := []string{}
 	for _, path := range filePaths {
-
 		keys, err := commitPolicy.FindPublicKeysForPath(ctx, fmt.Sprintf("file:%s", path))
 		if err != nil {
 			return nil, err
