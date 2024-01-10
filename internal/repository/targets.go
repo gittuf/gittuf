@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/policy"
@@ -13,9 +14,14 @@ import (
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
+var ErrInvalidPolicyName = errors.New("invalid rule or policy file name, cannot be 'root'")
+
 // InitializeTargets is the interface for the user to create the specified
 // policy file.
 func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []byte, targetsRoleName string, signCommit bool) error {
+	if targetsRoleName == policy.RootRoleName {
+		return ErrInvalidPolicyName
+	}
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes)
 	if err != nil {
 		return err
@@ -63,6 +69,10 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
 func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, ruleName string, authorizedKeysBytes [][]byte, rulePatterns []string, signCommit bool) error {
+	if ruleName == policy.RootRoleName {
+		return ErrInvalidPolicyName
+	}
+
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
 	if err != nil {
 		return err
