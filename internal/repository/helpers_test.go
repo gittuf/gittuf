@@ -5,11 +5,11 @@ package repository
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -68,7 +68,12 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 
 	r, keyBytes := createTestRepositoryWithRoot(t, location)
 
-	if err := r.AddTopLevelTargetsKey(testCtx, keyBytes, targetsPubKeyBytes, false); err != nil {
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddTopLevelTargetsKey(testCtx, keyBytes, targetsPubKey, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,13 +85,8 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kb, err := json.Marshal(gpgKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authorizedKeys := [][]byte{kb}
 
-	if err := r.AddDelegation(testCtx, targetsKeyBytes, policy.TargetsRoleName, "protect-main", authorizedKeys, []string{"git:refs/heads/main"}, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsKeyBytes, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, false); err != nil {
 		t.Fatal(err)
 	}
 

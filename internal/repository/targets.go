@@ -68,7 +68,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, ruleName string, authorizedKeysBytes [][]byte, rulePatterns []string, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -90,16 +90,6 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
-
-	authorizedKeys := []*tuf.Key{}
-	for _, kb := range authorizedKeysBytes {
-		key, err := tuf.LoadKeyFromBytes(kb)
-		if err != nil {
-			return err
-		}
-
-		authorizedKeys = append(authorizedKeys, key)
-	}
 
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
@@ -190,7 +180,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 
 // AddKeyToTargets is the interface for a user to add a trusted key to the
 // gittuf policy.
-func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, authorizedKeysBytes [][]byte, signCommit bool) error {
+func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
 	if err != nil {
 		return err
@@ -209,15 +199,8 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	authorizedKeys := []*tuf.Key{}
 	keyIDs := ""
-	for _, kb := range authorizedKeysBytes {
-		key, err := tuf.LoadKeyFromBytes(kb)
-		if err != nil {
-			return err
-		}
-
-		authorizedKeys = append(authorizedKeys, key)
+	for _, key := range authorizedKeys {
 		keyIDs += fmt.Sprintf("\n%s:%s", key.KeyType, key.KeyID)
 	}
 

@@ -37,12 +37,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	targetsKeyBytes, err := common.ReadKeyBytes(o.targetsKey) //nolint:staticcheck
+	targetsKey, err := common.LoadPublicKey(o.targetsKey)
 	if err != nil {
 		return err
 	}
 
-	return repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKeyBytes, true)
+	return repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKey, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

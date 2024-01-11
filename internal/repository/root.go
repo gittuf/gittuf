@@ -55,7 +55,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, rootKeyBytes []byte, si
 
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
-func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyBytes []byte, signCommit bool) error {
+func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes []byte, newRootKey *tuf.Key, signCommit bool) error {
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
 	if err != nil {
 		return err
@@ -77,11 +77,6 @@ func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyByt
 
 	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKeyID) {
 		return ErrUnauthorizedKey
-	}
-
-	newRootKey, err := tuf.LoadKeyFromBytes(newrootKeyBytes)
-	if err != nil {
-		return err
 	}
 
 	rootMetadata = policy.AddRootKey(rootMetadata, newRootKey)
@@ -163,7 +158,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, rootKeyBytes []byte, key
 
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
-func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, targetsKeyBytes []byte, signCommit bool) error {
+func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes []byte, targetsKey *tuf.Key, signCommit bool) error {
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
 	if err != nil {
 		return err
@@ -185,11 +180,6 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 
 	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKeyID) {
 		return ErrUnauthorizedKey
-	}
-
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		return err
 	}
 
 	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
