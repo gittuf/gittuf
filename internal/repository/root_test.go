@@ -61,7 +61,7 @@ func TestAddRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddRootKey(context.Background(), keyBytes, targetsKeyBytes, false)
+	err = r.AddRootKey(context.Background(), keyBytes, newRootKey, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
@@ -91,7 +91,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddRootKey(context.Background(), keyBytes, keyBytes, false)
+	err = r.AddRootKey(context.Background(), keyBytes, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddRootKey(context.Background(), keyBytes, targetsKeyBytes, false)
+	err = r.AddRootKey(context.Background(), keyBytes, newRootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, keyBytes, false)
+	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, key, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
@@ -184,7 +184,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, keyBytes, false)
+	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, targetsKeyBytes, false)
+	err = r.AddTopLevelTargetsKey(context.Background(), keyBytes, targetsKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}

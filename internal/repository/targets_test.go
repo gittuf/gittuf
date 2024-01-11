@@ -5,7 +5,6 @@ package repository
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
@@ -15,11 +14,16 @@ import (
 )
 
 func TestInitializeTargets(t *testing.T) {
+	targetsKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	t.Run("successful initialization", func(t *testing.T) {
 		// The helper also runs InitializeTargets for this test
 		r, _ := createTestRepositoryWithRoot(t, "")
 
-		if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKeyBytes, false); err != nil {
+		if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKey, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -43,7 +47,7 @@ func TestInitializeTargets(t *testing.T) {
 	t.Run("invalid role name", func(t *testing.T) {
 		r, _ := createTestRepositoryWithRoot(t, "")
 
-		if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKeyBytes, false); err != nil {
+		if err := r.AddTopLevelTargetsKey(testCtx, rootKeyBytes, targetsKey, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -56,13 +60,13 @@ func TestAddDelegation(t *testing.T) {
 	t.Run("valid rule / delegation name", func(t *testing.T) {
 		r := createTestRepositoryWithPolicy(t, "")
 
-		targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+		targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		ruleName := "test-rule"
-		authorizedKeyBytes := [][]byte{targetsKeyBytes}
+		authorizedKeyBytes := []*tuf.Key{targetsPubKey}
 		rulePatterns := []string{"git:branch=main"}
 
 		state, err := policy.LoadCurrentState(context.Background(), r.r)
@@ -91,7 +95,7 @@ func TestAddDelegation(t *testing.T) {
 
 		targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 		assert.Nil(t, err)
-		assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
+		assert.Contains(t, targetsMetadata.Delegations.Keys, targetsPubKey.KeyID)
 		assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
 		assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
 		assert.Equal(t, 3, len(targetsMetadata.Delegations.Roles))
@@ -99,7 +103,7 @@ func TestAddDelegation(t *testing.T) {
 			Name:        ruleName,
 			Paths:       rulePatterns,
 			Terminating: false,
-			Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
+			Role:        tuf.Role{KeyIDs: []string{targetsPubKey.KeyID}, Threshold: 1},
 		})
 		assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 	})
@@ -115,13 +119,13 @@ func TestAddDelegation(t *testing.T) {
 func TestRemoveDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ruleName := "test-rule"
-	authorizedKeyBytes := [][]byte{targetsKeyBytes}
+	authorizedKeyBytes := []*tuf.Key{targetsPubKey}
 	rulePatterns := []string{"git:branch=main"}
 
 	err = r.AddDelegation(context.Background(), targetsKeyBytes, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
@@ -134,13 +138,13 @@ func TestRemoveDelegation(t *testing.T) {
 
 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsPubKey.KeyID)
 	assert.Equal(t, 3, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{targetsKey.KeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: []string{targetsPubKey.KeyID}, Threshold: 1},
 	})
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 
@@ -154,7 +158,7 @@ func TestRemoveDelegation(t *testing.T) {
 
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
 	assert.Nil(t, err)
-	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsKey.KeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, targetsPubKey.KeyID)
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 }
@@ -162,17 +166,17 @@ func TestRemoveDelegation(t *testing.T) {
 func TestAddKeyToTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	kb, err := json.Marshal(gpgKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	authorizedKeysBytes := [][]byte{targetsKeyBytes, kb}
+	authorizedKeysBytes := []*tuf.Key{targetsPubKey, gpgKey}
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
 	if err != nil {

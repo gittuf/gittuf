@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
@@ -41,7 +42,12 @@ func TestUnauthorizedKey(t *testing.T) {
 	}
 
 	t.Run("test add targets key", func(t *testing.T) {
-		err := r.AddTopLevelTargetsKey(context.Background(), targetsKeyBytes, targetsKeyBytes, false)
+		key, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = r.AddTopLevelTargetsKey(context.Background(), targetsKeyBytes, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 

@@ -3,7 +3,6 @@
 package common
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,85 +21,9 @@ const (
 	FulcioPrefix = "fulcio:"
 )
 
-// ReadKeyBytes returns public key bytes using the custom securesystemslib
-// format. It uses the underlying gpg binary to import a PGP key.
-//
-// Deprecated: With key format standardization, we can use tuf.Key for public
-// keys. Use LoadKey to get a tuf.Key object directly. This deprecation can only
-// be complete with API changes in repository to handle a signer object for the
-// private key bits. Then, we'll have retired passing around key bytes
-// altogether.
-func ReadKeyBytes(key string) ([]byte, error) {
-	var (
-		kb  []byte
-		err error
-	)
-
-	switch {
-	case strings.HasPrefix(key, GPGKeyPrefix):
-		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, GPGKeyPrefix)))
-
-		command := exec.Command("gpg", "--export", "--armor", fingerprint)
-		stdOut, err := command.Output()
-		if err != nil {
-			return nil, err
-		}
-
-		pgpKey, err := gpg.LoadGPGKeyFromBytes(stdOut)
-		if err != nil {
-			return nil, err
-		}
-
-		kb, err = json.Marshal(pgpKey)
-		if err != nil {
-			return nil, err
-		}
-	case strings.HasPrefix(key, FulcioPrefix):
-		keyID := strings.TrimPrefix(key, FulcioPrefix)
-		ks := strings.Split(keyID, "::")
-		if len(ks) != 2 {
-			return nil, fmt.Errorf("incorrect format for fulcio identity")
-		}
-
-		fulcioKey := &sslibsv.SSLibKey{
-			KeyID:   keyID,
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
-			KeyVal: sslibsv.KeyVal{
-				Identity: ks[0],
-				Issuer:   ks[1],
-			},
-		}
-
-		kb, err = json.Marshal(fulcioKey)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		kb, err = os.ReadFile(key)
-		if err != nil {
-			return nil, err
-		}
-
-		// With PEM support, we can't assume this is right. For support in the
-		// interim, we load the key and serialize it again.
-		keyObj, err := tuf.LoadKeyFromBytes(kb)
-		if err != nil {
-			return nil, err
-		}
-
-		kb, err = json.Marshal(keyObj)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return kb, nil
-}
-
-// LoadKey returns a tuf.Key object for a PGP / Sigstore Fulcio / SSH (on-disk)
-// key for use in gittuf metadata.
-func LoadKey(key string) (*tuf.Key, error) {
+// LoadPublicKey returns a tuf.Key object for a PGP / Sigstore Fulcio / SSH
+// (on-disk) key for use in gittuf metadata.
+func LoadPublicKey(key string) (*tuf.Key, error) {
 	var keyObj *tuf.Key
 
 	switch {
@@ -142,6 +65,10 @@ func LoadKey(key string) (*tuf.Key, error) {
 		keyObj, err = tuf.LoadKeyFromBytes(kb)
 		if err != nil {
 			return nil, err
+		}
+
+		if keyObj.KeyVal.Private != "" {
+			keyObj.KeyVal.Private = ""
 		}
 	}
 
