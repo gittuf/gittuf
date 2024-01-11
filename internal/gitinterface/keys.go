@@ -54,6 +54,7 @@ const (
 	gpgPrivateKeyPEMHeader     string = "PGP PRIVATE KEY"
 	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
 	rsaPrivateKeyPEMHeader     string = "RSA PRIVATE KEY"
+	genericPrivateKeyPEMHeader string = "PRIVATE KEY"
 )
 
 func GetSigningCommand() (string, []string, error) {
@@ -232,7 +233,7 @@ func signGitObjectUsingKey(contents, pemKeyBytes []byte) (string, error) {
 	switch block.Type {
 	case gpgPrivateKeyPEMHeader:
 		return signGitObjectUsingGPGKey(contents, pemKeyBytes)
-	case opensshPrivateKeyPEMHeader, rsaPrivateKeyPEMHeader:
+	case opensshPrivateKeyPEMHeader, rsaPrivateKeyPEMHeader, genericPrivateKeyPEMHeader:
 		return signGitObjectUsingSSHKey(contents, pemKeyBytes)
 	}
 
