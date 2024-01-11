@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/gittuf/gittuf/internal/eval"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/config"
@@ -52,7 +53,12 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 // gittuf is explicitly set in eval mode. This interface adds an RSL entry for
 // the specified Git reference at the specified commit. If the commit is not in
 // that ref, an entry is not created.
-func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signCommit bool) error {
+func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signingKeyBytes []byte) error {
+	// Double check that gittuf is in eval mode
+	if !eval.InEvalMode() {
+		return eval.ErrNotInEvalMode
+	}
+
 	absRefName, err := gitinterface.AbsoluteReference(r.r, refName)
 	if err != nil {
 		return err
@@ -87,7 +93,7 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
-	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(commitID)).Commit(r.r, signCommit)
+	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(commitID)).CommitUsingSpecificKey(r.r, signingKeyBytes)
 }
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
