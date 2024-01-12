@@ -39,7 +39,7 @@ func TestSignEnvelope(t *testing.T) {
 	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
 
 	// Try signing with the same key to ensure a new signature isn't appended
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestVerifyEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func createSignedEnvelope() (*sslibdsse.Envelope, error) {
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}
