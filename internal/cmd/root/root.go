@@ -41,7 +41,8 @@ func New() *cobra.Command {
 
 			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 		},
-		SilenceUsage: true,
+		SilenceUsage:      true,
+		DisableAutoGenTag: true,
 	}
 
 	o.AddFlags(cmd)
