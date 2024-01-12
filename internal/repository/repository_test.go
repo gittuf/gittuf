@@ -6,6 +6,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -36,8 +37,18 @@ func TestUnauthorizedKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	r := &Repository{r: repo}
-	if err := r.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
+	if err := r.InitializeRoot(context.Background(), rootSigner, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,12 +58,12 @@ func TestUnauthorizedKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = r.AddTopLevelTargetsKey(context.Background(), targetsKeyBytes, key, false)
+		err = r.AddTopLevelTargetsKey(context.Background(), targetsSigner, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
 	t.Run("test remove targets key", func(t *testing.T) {
-		err := r.RemoveTopLevelTargetsKey(context.Background(), targetsKeyBytes, "some key ID", false)
+		err := r.RemoveTopLevelTargetsKey(context.Background(), targetsSigner, "some key ID", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }
