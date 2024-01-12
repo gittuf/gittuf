@@ -60,11 +60,12 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:     "authorize",
-		Short:   "Add or revoke reference authorization",
-		Args:    cobra.MinimumNArgs(1),
-		PreRunE: common.CheckIfSigningViable,
-		RunE:    o.Run,
+		Use:               "authorize",
+		Short:             "Add or revoke reference authorization",
+		Args:              cobra.MinimumNArgs(1),
+		PreRunE:           common.CheckIfSigningViable,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

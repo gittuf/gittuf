@@ -44,10 +44,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:     "remove-policy-key",
-		Short:   "Remove Policy key from gittuf root of trust",
-		PreRunE: common.CheckIfSigningViable,
-		RunE:    o.Run,
+		Use:               "remove-policy-key",
+		Short:             "Remove Policy key from gittuf root of trust",
+		PreRunE:           common.CheckIfSigningViable,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

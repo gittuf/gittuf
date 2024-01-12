@@ -22,10 +22,11 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "pull <remote>",
-		Short: "Pull RSL from the specified remote",
-		Args:  cobra.ExactArgs(1),
-		RunE:  o.Run,
+		Use:               "pull <remote>",
+		Short:             "Pull RSL from the specified remote",
+		Args:              cobra.ExactArgs(1),
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 
 	return cmd

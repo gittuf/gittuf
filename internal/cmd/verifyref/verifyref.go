@@ -31,10 +31,11 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "verify-ref",
-		Short: "Tools for verifying gittuf policies",
-		Args:  cobra.ExactArgs(1),
-		RunE:  o.Run,
+		Use:               "verify-ref",
+		Short:             "Tools for verifying gittuf policies",
+		Args:              cobra.ExactArgs(1),
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

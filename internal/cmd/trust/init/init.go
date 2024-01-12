@@ -34,10 +34,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:     "init",
-		Short:   "Initialize gittuf root of trust for repository",
-		PreRunE: common.CheckIfSigningViable,
-		RunE:    o.Run,
+		Use:               "init",
+		Short:             "Initialize gittuf root of trust for repository",
+		PreRunE:           common.CheckIfSigningViable,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

@@ -10,8 +10,9 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remote",
-		Short: "Tools for managing remote policies",
+		Use:               "remote",
+		Short:             "Tools for managing remote policies",
+		DisableAutoGenTag: true,
 	}
 
 	cmd.AddCommand(pull.New())

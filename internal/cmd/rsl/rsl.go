@@ -11,8 +11,9 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rsl",
-		Short: "Tools to manage the repository's reference state log",
+		Use:               "rsl",
+		Short:             "Tools to manage the repository's reference state log",
+		DisableAutoGenTag: true,
 	}
 
 	cmd.AddCommand(annotate.New())

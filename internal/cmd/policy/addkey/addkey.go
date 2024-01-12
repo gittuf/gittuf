@@ -62,11 +62,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:     "add-key",
-		Short:   "Add a trusted key to a policy file",
-		Long:    `This command allows users to add a trusted key to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
-		PreRunE: common.CheckIfSigningViable,
-		RunE:    o.Run,
+		Use:               "add-key",
+		Short:             "Add a trusted key to a policy file",
+		Long:              `This command allows users to add a trusted key to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		PreRunE:           common.CheckIfSigningViable,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

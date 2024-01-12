@@ -62,9 +62,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "list-rules",
-		Short: "List rules for the current state",
-		RunE:  o.Run,
+		Use:               "list-rules",
+		Short:             "List rules for the current state",
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 
