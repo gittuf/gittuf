@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -34,6 +35,12 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 		repo *git.Repository
 		err  error
 	)
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if location == "" {
 		repo, err = git.Init(memory.NewStorage(), memfs.New())
 	} else {
@@ -45,7 +52,7 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 
 	r := &Repository{r: repo}
 
-	if err := r.InitializeRoot(testCtx, rootKeyBytes, false); err != nil {
+	if err := r.InitializeRoot(testCtx, signer, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,16 +64,26 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 
 	r, keyBytes := createTestRepositoryWithRoot(t, location)
 
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.AddTopLevelTargetsKey(testCtx, keyBytes, targetsPubKey, false); err != nil {
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.InitializeTargets(testCtx, targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -75,7 +92,7 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 		t.Fatal(err)
 	}
 
-	if err := r.AddDelegation(testCtx, targetsKeyBytes, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, false); err != nil {
 		t.Fatal(err)
 	}
 

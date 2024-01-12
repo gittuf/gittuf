@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -18,13 +17,9 @@ var ErrInvalidPolicyName = errors.New("invalid rule or policy file name, cannot 
 
 // InitializeTargets is the interface for the user to create the specified
 // policy file.
-func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []byte, targetsRoleName string, signCommit bool) error {
+func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
 	if targetsRoleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes)
-	if err != nil {
-		return err
 	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
@@ -47,7 +42,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 		return nil
 	}
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
 	}
@@ -68,14 +63,9 @@ func (r *Repository) InitializeTargets(ctx context.Context, targetsKeyBytes []by
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
-	}
-
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
-	if err != nil {
-		return err
 	}
 
 	state, err := policy.LoadCurrentState(ctx, r.r)
@@ -108,7 +98,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 		return nil
 	}
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
 	}
@@ -126,12 +116,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signingKeyBytes []byte, 
 
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
-func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, ruleName string, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
-	if err != nil {
-		return err
-	}
-
+func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -162,7 +147,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 		return nil
 	}
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
 	}
@@ -180,12 +165,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signingKeyBytes []byt
 
 // AddKeyToTargets is the interface for a user to add a trusted key to the
 // gittuf policy.
-func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
-	if err != nil {
-		return err
-	}
-
+func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -221,7 +201,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signingKeyBytes []byte
 		return nil
 	}
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
 	}

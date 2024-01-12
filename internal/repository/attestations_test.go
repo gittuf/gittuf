@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -29,6 +30,16 @@ func TestAddReferenceAuthorization(t *testing.T) {
 
 	repo := &Repository{r: r}
 
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if err := repo.InitializeNamespaces(); err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +48,7 @@ func TestAddReferenceAuthorization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = repo.AddReferenceAuthorization(context.Background(), rootKeyBytes, absRefName, false)
+	err = repo.AddReferenceAuthorization(context.Background(), rootSigner, absRefName, false)
 	assert.Nil(t, err)
 
 	allAttestations, err := attestations.LoadCurrentAttestations(repo.r)
@@ -52,7 +63,7 @@ func TestAddReferenceAuthorization(t *testing.T) {
 	assert.Equal(t, 1, len(env.Signatures))
 
 	// Add authorization using the short ref name and different signer
-	err = repo.AddReferenceAuthorization(context.Background(), targetsKeyBytes, refName, false)
+	err = repo.AddReferenceAuthorization(context.Background(), targetsSigner, refName, false)
 	assert.Nil(t, err)
 
 	allAttestations, err = attestations.LoadCurrentAttestations(repo.r)
@@ -70,6 +81,11 @@ func TestAddReferenceAuthorization(t *testing.T) {
 func TestRemoveReferenceAuthorization(t *testing.T) {
 	absRefName := "refs/heads/main"
 	commitID := plumbing.ZeroHash.String()
+
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	r, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -89,7 +105,7 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = repo.AddReferenceAuthorization(context.Background(), rootKeyBytes, absRefName, false)
+	err = repo.AddReferenceAuthorization(context.Background(), rootSigner, absRefName, false)
 	assert.Nil(t, err)
 
 	allAttestations, err := attestations.LoadCurrentAttestations(repo.r)
@@ -103,7 +119,7 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 	}
 	assert.Equal(t, 1, len(env.Signatures))
 
-	err = repo.RemoveReferenceAuthorization(rootKeyBytes, absRefName, commitID, commitID, false)
+	err = repo.RemoveReferenceAuthorization(context.Background(), rootSigner, absRefName, commitID, commitID, false)
 	assert.Nil(t, err)
 
 	allAttestations, err = attestations.LoadCurrentAttestations(repo.r)
