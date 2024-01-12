@@ -4,9 +4,9 @@ package signerverifier
 
 import (
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const (
