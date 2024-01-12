@@ -6,8 +6,6 @@ import (
 	"context"
 	"testing"
 
-	_ "embed"
-
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"

@@ -5,8 +5,6 @@ package policy
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -117,21 +115,13 @@ func TestStateKeys(t *testing.T) {
 	state := createTestStateWithPolicy(t)
 
 	expectedKeys := map[string]*tuf.Key{}
-	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedKeys[rootKey.KeyID] = rootKey
 
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,11 +252,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 func TestStateFindPublicKeysForPath(t *testing.T) {
 	state := createTestStateWithPolicy(t)
 
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,11 +346,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,39 +4,28 @@ package repository
 
 import (
 	"context"
-	_ "embed"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-//go:embed test-data/gpg-pubkey.asc
-var gpgPubKeyBytes []byte
+var (
+	gpgKeyBytes        = artifacts.GPGKey1Private
+	gpgPubKeyBytes     = artifacts.GPGKey1Public
+	rootKeyBytes       = artifacts.SSLibKey1Private
+	targetsKeyBytes    = artifacts.SSLibKey2Private
+	targetsPubKeyBytes = artifacts.SSLibKey2Public
+	rsaKeyBytes        = artifacts.SSHRSAPrivate
+	ecdsaKeyBytes      = artifacts.SSHECDSAPrivate
 
-//go:embed test-data/gpg-privkey.asc
-var gpgKeyBytes []byte
-
-//go:embed test-data/root
-var rootKeyBytes []byte
-
-//go:embed test-data/targets
-var targetsKeyBytes []byte
-
-//go:embed test-data/targets.pub
-var targetsPubKeyBytes []byte
-
-//go:embed test-data/rsa-ssh-key
-var rsaKeyBytes []byte
-
-//go:embed test-data/ecdsa-ssh-key
-var ecdsaKeyBytes []byte
-
-var testCtx = context.Background()
+	testCtx = context.Background()
+)
 
 func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
 	t.Helper()

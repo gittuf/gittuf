@@ -4,7 +4,6 @@ package repository
 
 import (
 	"context"
-	_ "embed"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
