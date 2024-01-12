@@ -7,19 +7,17 @@ import (
 	"encoding/base64"
 	"testing"
 
-	_ "embed"
-
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed test-data/test-key
-var signingKeyBytes []byte
-
-//go:embed test-data/test-key.pub
-var publicKeyBytes []byte
+var (
+	signingKeyBytes = artifacts.SSLibKey1Private
+	publicKeyBytes  = artifacts.SSLibKey1Public
+)
 
 func TestCreateEnvelope(t *testing.T) {
 	rootMetadata := tuf.NewRootMetadata()

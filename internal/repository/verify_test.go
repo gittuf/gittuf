@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const gpgKeyName = "gpg-privkey.asc"
-
 func TestVerifyRef(t *testing.T) {
 	repo := createTestRepositoryWithPolicy(t, "")
 
@@ -23,9 +21,9 @@ func TestVerifyRef(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyName)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyName)
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
 	entry.ID = entryID
 
 	tests := map[string]struct {
@@ -66,7 +64,7 @@ func TestVerifyRef(t *testing.T) {
 	}
 
 	// Add another commit
-	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyName)
+	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
 	err := repo.VerifyRef(context.Background(), refName, true)
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 	err = repo.VerifyRef(context.Background(), refName, false)

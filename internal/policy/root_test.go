@@ -3,8 +3,6 @@
 package policy
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -12,12 +10,7 @@ import (
 )
 
 func TestInitializeRootMetadata(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,12 +100,7 @@ func TestDeleteTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsKeyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-2.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsKey2, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	targetsKey2, err := tuf.LoadKeyFromBytes(targets2KeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

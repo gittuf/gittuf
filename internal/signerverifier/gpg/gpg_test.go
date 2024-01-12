@@ -3,19 +3,15 @@
 package gpg
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadGPGKeyFromBytes(t *testing.T) {
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	keyBytes := artifacts.GPGKey1Public
 
 	key, err := LoadGPGKeyFromBytes(keyBytes)
 	assert.Nil(t, err)

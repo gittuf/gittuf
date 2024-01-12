@@ -5,8 +5,6 @@ package gitinterface
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -76,12 +74,7 @@ func TestTag(t *testing.T) {
 func TestVerifyTagSignature(t *testing.T) {
 	gpgSignedTag := createTestSignedTag(t)
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(keyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,12 +128,7 @@ func createTestSignedTag(t *testing.T) *object.Tag {
 		t.Fatal(err)
 	}
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(signingKeyBytes))
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(gpgPrivateKey))
 	if err != nil {
 		t.Fatal(err)
 	}
