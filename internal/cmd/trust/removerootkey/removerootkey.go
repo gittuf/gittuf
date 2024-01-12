@@ -37,8 +37,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(rootKeyBytes)
+	if err != nil {
+		return err
+	}
 
-	return repo.RemoveRootKey(cmd.Context(), rootKeyBytes, strings.ToLower(o.rootKeyID), true)
+	return repo.RemoveRootKey(cmd.Context(), signer, strings.ToLower(o.rootKeyID), true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

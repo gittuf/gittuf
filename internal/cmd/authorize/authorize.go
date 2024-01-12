@@ -45,16 +45,20 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(keyBytes)
+	if err != nil {
+		return err
+	}
 
 	if o.revoke {
 		if len(args) < 3 {
 			return fmt.Errorf("insufficient parameters for revoking authorization, requires <targetRef> <fromID> <toID>")
 		}
 
-		return repo.RemoveReferenceAuthorization(keyBytes, args[0], args[1], args[2], true)
+		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true)
 	}
 
-	return repo.AddReferenceAuthorization(cmd.Context(), keyBytes, args[0], true)
+	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], true)
 }
 
 func New() *cobra.Command {

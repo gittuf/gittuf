@@ -36,8 +36,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(keyBytes)
+	if err != nil {
+		return err
+	}
 
-	return repo.InitializeTargets(cmd.Context(), keyBytes, o.policyName, true)
+	return repo.InitializeTargets(cmd.Context(), signer, o.policyName, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

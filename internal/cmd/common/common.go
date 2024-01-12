@@ -72,6 +72,18 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 	return keyObj, nil
 }
 
+// LoadSigner loads a signer for the specified key bytes. The key must be
+// encoded either in a standard PEM format. For now, the custom securesystemslib
+// format is also supported.
+func LoadSigner(keyBytes []byte) (sslibdsse.SignerVerifier, error) {
+	signer, err := sslibsv.NewSignerVerifierFromPEM(keyBytes)
+	if err == nil {
+		return signer, nil
+	}
+
+	return signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+}
+
 func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
 	_, _, err := gitinterface.GetSigningCommand()
 
