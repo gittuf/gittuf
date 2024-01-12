@@ -45,8 +45,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(keyBytes)
+	if err != nil {
+		return err
+	}
 
-	return repo.RemoveDelegation(cmd.Context(), keyBytes, o.policyName, o.ruleName, true)
+	return repo.RemoveDelegation(cmd.Context(), signer, o.policyName, o.ruleName, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

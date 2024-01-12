@@ -46,6 +46,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(keyBytes)
+	if err != nil {
+		return err
+	}
 
 	authorizedKeys := []*tuf.Key{}
 	for _, key := range o.authorizedKeys {
@@ -57,7 +61,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		authorizedKeys = append(authorizedKeys, key)
 	}
 
-	return repo.AddKeyToTargets(cmd.Context(), keyBytes, o.policyName, authorizedKeys, true)
+	return repo.AddKeyToTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

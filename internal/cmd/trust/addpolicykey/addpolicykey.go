@@ -36,13 +36,17 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(rootKeyBytes)
+	if err != nil {
+		return err
+	}
 
 	targetsKey, err := common.LoadPublicKey(o.targetsKey)
 	if err != nil {
 		return err
 	}
 
-	return repo.AddTopLevelTargetsKey(cmd.Context(), rootKeyBytes, targetsKey, true)
+	return repo.AddTopLevelTargetsKey(cmd.Context(), signer, targetsKey, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
