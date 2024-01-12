@@ -13,8 +13,8 @@ import (
 	"errors"
 	"path"
 
+	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const specVersion = "1.0"
@@ -117,10 +117,6 @@ func (r *RootMetadata) AddKey(key *Key) {
 		r.Keys = map[string]*Key{}
 	}
 
-	if key.KeyVal.Private != "" {
-		key.KeyVal.Private = ""
-	}
-
 	r.Keys[key.KeyID] = key
 }
 
@@ -183,10 +179,6 @@ type Delegations struct {
 func (d *Delegations) AddKey(key *Key) {
 	if d.Keys == nil {
 		d.Keys = map[string]*Key{}
-	}
-
-	if key.KeyVal.Private != "" {
-		key.KeyVal.Private = ""
 	}
 
 	d.Keys[key.KeyID] = key

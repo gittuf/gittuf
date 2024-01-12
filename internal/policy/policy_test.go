@@ -14,13 +14,13 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 

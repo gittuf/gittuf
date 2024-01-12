@@ -11,8 +11,9 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/spf13/cobra"
 )
 
@@ -65,10 +66,6 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 		keyObj, err = tuf.LoadKeyFromBytes(kb)
 		if err != nil {
 			return nil, err
-		}
-
-		if keyObj.KeyVal.Private != "" {
-			keyObj.KeyVal.Private = ""
 		}
 	}
 
