@@ -149,9 +149,9 @@ func NewSignerVerifierFromPEM(keyBytes []byte) (dsse.SignerVerifier, error) {
 			return nil, err
 		}
 		return &ED25519SignerVerifier{
-			private: k,
-			public:  publicKey.(ed25519.PublicKey),
-			keyID:   sslibKey.KeyID,
+			PrivateKey: k,
+			PublicKey:  publicKey.(ed25519.PublicKey),
+			ID:         sslibKey.KeyID,
 		}, nil
 
 	case ed25519.PublicKey:
@@ -160,8 +160,8 @@ func NewSignerVerifierFromPEM(keyBytes []byte) (dsse.SignerVerifier, error) {
 			return nil, err
 		}
 		return &ED25519SignerVerifier{
-			public: k,
-			keyID:  sslibKey.KeyID,
+			PublicKey: k,
+			ID:        sslibKey.KeyID,
 		}, nil
 
 	case *ecdsa.PrivateKey:
