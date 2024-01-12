@@ -14,9 +14,9 @@ const ED25519KeyType = "ed25519"
 // ED25519SignerVerifier is a dsse.SignerVerifier compliant interface to sign
 // and verify signatures using ED25519 keys.
 type ED25519SignerVerifier struct {
-	keyID   string
-	private ed25519.PrivateKey
-	public  ed25519.PublicKey
+	ID         string
+	PrivateKey ed25519.PrivateKey
+	PublicKey  ed25519.PublicKey
 }
 
 // NewED25519SignerVerifierFromSSLibKey creates an Ed25519SignerVerifier from an
@@ -32,24 +32,24 @@ func NewED25519SignerVerifierFromSSLibKey(key *SSLibKey) (*ED25519SignerVerifier
 	}
 
 	return &ED25519SignerVerifier{
-		keyID:  key.KeyID,
-		public: ed25519.PublicKey(public),
+		ID:        key.KeyID,
+		PublicKey: ed25519.PublicKey(public),
 	}, nil
 }
 
 // Sign creates a signature for `data`.
 func (sv *ED25519SignerVerifier) Sign(ctx context.Context, data []byte) ([]byte, error) {
-	if len(sv.private) == 0 {
+	if len(sv.PrivateKey) == 0 {
 		return nil, ErrNotPrivateKey
 	}
 
-	signature := ed25519.Sign(sv.private, data)
+	signature := ed25519.Sign(sv.PrivateKey, data)
 	return signature, nil
 }
 
 // Verify verifies the `sig` value passed in against `data`.
 func (sv *ED25519SignerVerifier) Verify(ctx context.Context, data []byte, sig []byte) error {
-	if ok := ed25519.Verify(sv.public, data, sig); ok {
+	if ok := ed25519.Verify(sv.PublicKey, data, sig); ok {
 		return nil
 	}
 	return ErrSignatureVerificationFailed
@@ -58,13 +58,13 @@ func (sv *ED25519SignerVerifier) Verify(ctx context.Context, data []byte, sig []
 // KeyID returns the identifier of the key used to create the
 // ED25519SignerVerifier instance.
 func (sv *ED25519SignerVerifier) KeyID() (string, error) {
-	return sv.keyID, nil
+	return sv.ID, nil
 }
 
 // Public returns the public portion of the key used to create the
 // ED25519SignerVerifier instance.
 func (sv *ED25519SignerVerifier) Public() crypto.PublicKey {
-	return sv.public
+	return sv.PublicKey
 }
 
 // LoadED25519KeyFromFile returns an SSLibKey instance for an ED25519 key stored
