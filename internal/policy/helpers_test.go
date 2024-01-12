@@ -62,7 +62,7 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}

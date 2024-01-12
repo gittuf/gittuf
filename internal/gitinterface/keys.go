@@ -328,7 +328,7 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 
 // verifySSHKeySignature verifies Git signatures issued by SSH keys.
 func verifySSHKeySignature(key *tuf.Key, data, signature []byte) error {
-	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
 	if err != nil {
 		return errors.Join(ErrVerifyingSSHSignature, err)
 	}
