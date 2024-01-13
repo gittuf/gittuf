@@ -510,3 +510,21 @@ func TestListRules(t *testing.T) {
 		assert.Equal(t, expectedRules, rules)
 	})
 }
+
+func TestStateHasFileRule(t *testing.T) {
+	t.Run("with file rules", func(t *testing.T) {
+		state := createTestStateWithPolicy(t)
+
+		hasFileRule, err := state.hasFileRule()
+		assert.Nil(t, err)
+		assert.True(t, hasFileRule)
+	})
+
+	t.Run("with no file rules", func(t *testing.T) {
+		state := createTestStateWithOnlyRoot(t)
+
+		hasFileRule, err := state.hasFileRule()
+		assert.Nil(t, err)
+		assert.False(t, hasFileRule)
+	})
+}

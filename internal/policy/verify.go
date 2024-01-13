@@ -453,7 +453,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	)
 
 	// 1. Find authorized verifiers for entry's ref
-	verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("git:%s", entry.RefName)) // FIXME: "git:" shouldn't be here
+	verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
 	if err != nil {
 		return err
 	}
@@ -485,6 +485,15 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 	if !gitNamespaceVerified {
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
+	}
+
+	hasFileRule, err := policy.hasFileRule()
+	if err != nil {
+		return err
+	}
+
+	if !hasFileRule {
+		return nil
 	}
 
 	// 4. Verify modified files
@@ -520,7 +529,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		pathsVerified := make([]bool, len(paths))
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for j, path := range paths {
-			verifiers, err := commitPolicy.FindVerifiersForPath(ctx, fmt.Sprintf("file:%s", path)) // FIXME: "file:" shouldn't be here
+			verifiers, err := commitPolicy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", fileRuleScheme, path))
 			if err != nil {
 				return err
 			}
