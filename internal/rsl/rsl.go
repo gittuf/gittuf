@@ -105,7 +105,7 @@ func (e *ReferenceEntry) Commit(repo *git.Repository, sign bool) error {
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
 // ReferenceEmpty. The commit is signed using the provided PEM encoded SSH or
-// GPG private key. This is only intended for use in gittuf's eval mode.
+// GPG private key. This is only intended for use in gittuf's developer mode.
 func (e *ReferenceEntry) CommitUsingSpecificKey(repo *git.Repository, signingKeyBytes []byte) error {
 	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
 

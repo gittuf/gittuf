@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/eval"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -104,7 +104,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 }
 
 func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
-	t.Setenv(eval.EvalModeKey, "1")
+	t.Setenv(dev.DevModeKey, "1")
 
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"

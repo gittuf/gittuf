@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/eval"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		commitFlagName,
 		"c",
 		"",
-		fmt.Sprintf("commit ID (eval mode only, set %s=1)", eval.EvalModeKey),
+		fmt.Sprintf("commit ID (developer mode only, set %s=1)", dev.DevModeKey),
 	)
 
 	cmd.Flags().StringVarP(
@@ -35,7 +35,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"signing-key",
 		"k",
 		"",
-		fmt.Sprintf("path to PEM encoded SSH or GPG signing key (eval mode only, set %s=1)", eval.EvalModeKey),
+		fmt.Sprintf("path to PEM encoded SSH or GPG signing key (developer mode only, set %s=1)", dev.DevModeKey),
 	)
 
 	cmd.MarkFlagsRequiredTogether("commit", "signing-key")
@@ -48,8 +48,8 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 	}
 
 	if len(o.commitID) > 0 {
-		if !eval.InEvalMode() {
-			return eval.ErrNotInEvalMode
+		if !dev.InDevMode() {
+			return dev.ErrNotInDevMode
 		}
 
 		signingKeyBytes, err := os.ReadFile(o.signingKeyPath)
