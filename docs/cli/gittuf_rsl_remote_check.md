@@ -15,7 +15,10 @@ gittuf rsl remote check <remote> [flags]
 ### Options inherited from parent commands
 
 ```
-      --verbose   enable verbose logging
+      --profile                      enable CPU and memory profiling
+      --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
+      --profile-memory-file string   file to store memory profile (default "memory.prof")
+      --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO
