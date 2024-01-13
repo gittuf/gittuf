@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
 	"github.com/gittuf/gittuf/internal/cmd/authorize"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
+	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
@@ -50,6 +51,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addhooks.New())
 	cmd.AddCommand(authorize.New())
 	cmd.AddCommand(clone.New())
+	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
 	cmd.AddCommand(rsl.New())
