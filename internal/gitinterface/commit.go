@@ -59,8 +59,8 @@ func Commit(repo *git.Repository, treeHash plumbing.Hash, targetRef string, mess
 // CommitUsingSpecificKey creates a new commit in the repository for the
 // specified parameters. The commit is signed using the PEM encoded SSH or GPG
 // private key. This function is expected for use in tests and gittuf's
-// eval mode. In standard workflows, Commit() must be used instead which infers
-// the signing key from the user's Git config.
+// developer mode. In standard workflows, Commit() must be used instead which
+// infers the signing key from the user's Git config.
 func CommitUsingSpecificKey(repo *git.Repository, treeHash plumbing.Hash, targetRef, message string, signingKeyPEMBytes []byte) (plumbing.Hash, error) {
 	// Fetch gitConfig for author / committer information
 	gitConfig, err := getGitConfig(repo)
