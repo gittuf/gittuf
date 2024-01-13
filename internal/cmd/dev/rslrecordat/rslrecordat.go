@@ -37,10 +37,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
