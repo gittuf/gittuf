@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -19,8 +20,13 @@ var ErrNotSigningKey = errors.New("expected signing key")
 
 // AddReferenceAuthorization adds a reference authorization attestation to the
 // repository for the specified ref. The from ID is identified using the RSL
-// while the to ID is set to the current status of the ref.
+// while the to ID is set to the current status of the ref. Currently, this is
+// limited to developer mode.
 func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	targetRef, err := gitinterface.AbsoluteReference(r.r, targetRef)
 	if err != nil {
 		return err
@@ -90,14 +96,17 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
-// their key.
+// their key. Currently, this is limited to developer mode.
 func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, fromID, toID string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	// Ensure only the key that created a reference authorization can remove it
 	_, err := signer.Sign(ctx, nil)
 	if err != nil {
 		return errors.Join(ErrNotSigningKey, err)
 	}
-
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
