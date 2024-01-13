@@ -21,8 +21,11 @@ gittuf policy add-key [flags]
 ### Options inherited from parent commands
 
 ```
-  -k, --signing-key string   signing key to use to sign policy file
-      --verbose              enable verbose logging
+      --profile                      enable CPU and memory profiling
+      --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
+      --profile-memory-file string   file to store memory profile (default "memory.prof")
+  -k, --signing-key string           signing key to use to sign policy file
+      --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO

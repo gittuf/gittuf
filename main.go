@@ -7,11 +7,16 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/gittuf/gittuf/internal/cmd/profile"
 	"github.com/gittuf/gittuf/internal/cmd/root"
 )
 
 func main() {
 	defer func() {
+		if err := profile.StopProfiling(); err != nil {
+			fmt.Fprintf(os.Stderr, "unexpected profiling error: %s\n", err.Error())
+		}
+
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "unexpected error: %s\n\n", fmt.Sprint(r))
 			debug.PrintStack()
