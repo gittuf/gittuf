@@ -37,6 +37,9 @@ const (
 
 	rootPublicKeysTreeEntryName = "keys"
 	metadataTreeEntryName       = "metadata"
+
+	gitReferenceRuleScheme = "git"
+	fileRuleScheme         = "file"
 )
 
 var (
@@ -713,6 +716,51 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 	}
 
 	return allDelegations, nil
+}
+
+// hasFileRule returns true if the policy state has a single rule in any targets
+// role with the file namespace scheme. Note that this function has no concept
+// of role reachability, as it is not invoked for a specific path. So, it might
+// return true even if the role in question is not reachable for some path (or
+// at all).
+func (s *State) hasFileRule() (bool, error) {
+	if s.TargetsEnvelope == nil {
+		// No top level targets, we don't need to check for delegated roles
+		return false, nil
+	}
+
+	targetsRole, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return false, err
+	}
+
+	rolesToCheck := []*tuf.TargetsMetadata{targetsRole}
+
+	// This doesn't consider whether a delegated role is reachable because we
+	// don't know what artifact path this is for
+	for roleName := range s.DelegationEnvelopes {
+		delegatedRole, err := s.GetTargetsMetadata(roleName)
+		if err != nil {
+			return false, err
+		}
+		rolesToCheck = append(rolesToCheck, delegatedRole)
+	}
+
+	for _, role := range rolesToCheck {
+		for _, delegation := range role.Delegations.Roles {
+			if delegation.Name == AllowRuleName {
+				continue
+			}
+
+			for _, path := range delegation.Paths {
+				if strings.HasPrefix(path, "file:") {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (s *State) getRootVerifier() *Verifier {
