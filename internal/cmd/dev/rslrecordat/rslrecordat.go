@@ -12,13 +12,13 @@ import (
 )
 
 type options struct {
-	commitID       string
+	targetID       string
 	signingKeyPath string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(
-		&o.commitID,
+		&o.targetID,
 		"target",
 		"t",
 		"",
@@ -47,7 +47,7 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RecordRSLEntryForReferenceAtCommit(args[0], o.commitID, signingKeyBytes)
+	return repo.RecordRSLEntryForReferenceAtTarget(args[0], o.targetID, signingKeyBytes)
 }
 
 func New() *cobra.Command {

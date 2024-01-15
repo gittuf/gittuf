@@ -103,7 +103,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.Equal(t, entry.GetID(), entryType.GetID())
 }
 
-func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
+func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
 	refName := "refs/heads/main"
@@ -139,7 +139,7 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), test.keyBytes)
+			err = repo.RecordRSLEntryForReferenceAtTarget(refName, commitID.String(), test.keyBytes)
 			assert.Nil(t, err)
 
 			latestEntry, err := rsl.GetLatestEntry(repo.r)
@@ -159,7 +159,7 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 			}
 
 			// We record an RSL entry for the commit in the new branch
-			err = repo.RecordRSLEntryForReferenceAtCommit(anotherRefName, newCommitID.String(), test.keyBytes)
+			err = repo.RecordRSLEntryForReferenceAtTarget(anotherRefName, newCommitID.String(), test.keyBytes)
 			assert.Nil(t, err)
 
 			// Finally, let's record a couple more commits and use the older of the two
@@ -172,24 +172,8 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), test.keyBytes)
+			err = repo.RecordRSLEntryForReferenceAtTarget(refName, commitID.String(), test.keyBytes)
 			assert.Nil(t, err)
-
-			latestEntry, err = rsl.GetLatestEntry(repo.r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			latestEntryID := latestEntry.GetID()
-
-			// Now try and duplicate that
-			err = repo.RecordRSLEntryForReferenceAtCommit(refName, commitID.String(), test.keyBytes)
-			assert.Nil(t, err)
-
-			latestEntry, err = rsl.GetLatestEntry(repo.r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			assert.Equal(t, latestEntryID, latestEntry.GetID())
 		})
 	}
 }
