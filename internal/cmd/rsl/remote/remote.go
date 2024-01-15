@@ -11,8 +11,9 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remote",
-		Short: "Tools for managing remote RSLs",
+		Use:               "remote",
+		Short:             "Tools for managing remote RSLs",
+		DisableAutoGenTag: true,
 	}
 
 	cmd.AddCommand(check.New())

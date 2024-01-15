@@ -16,8 +16,9 @@ import (
 func New() *cobra.Command {
 	o := &persistent.Options{}
 	cmd := &cobra.Command{
-		Use:   "policy",
-		Short: "Tools to manage gittuf policies",
+		Use:               "policy",
+		Short:             "Tools to manage gittuf policies",
+		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)
 

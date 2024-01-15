@@ -19,3 +19,6 @@ test :
 
 fmt :
 	go fmt ./...
+
+generate :
+	go generate ./...

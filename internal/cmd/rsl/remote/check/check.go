@@ -40,10 +40,11 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "check <remote>",
-		Short: "Check remote RSL for updates, for development use only",
-		Args:  cobra.ExactArgs(1),
-		RunE:  o.Run,
+		Use:               "check <remote>",
+		Short:             "Check remote RSL for updates, for development use only",
+		Args:              cobra.ExactArgs(1),
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 
 	return cmd

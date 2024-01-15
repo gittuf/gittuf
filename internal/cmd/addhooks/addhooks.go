@@ -46,9 +46,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "add-hooks",
-		Short: "Add git hooks that automatically create and sync RSL.",
-		RunE:  o.Run,
+		Use:               "add-hooks",
+		Short:             "Add git hooks that automatically create and sync RSL.",
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

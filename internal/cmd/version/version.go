@@ -31,9 +31,10 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "version",
-		Short: "Version of gittuf",
-		RunE:  o.Run,
+		Use:               "version",
+		Short:             "Version of gittuf",
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 
