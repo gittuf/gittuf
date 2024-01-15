@@ -1,9 +1,9 @@
-## gittuf authorize
+## gittuf dev authorize
 
-Add or revoke reference authorization
+Add or revoke reference authorization (developer mode only, set GITTUF_DEV=1)
 
 ```
-gittuf authorize [flags]
+gittuf dev authorize [flags]
 ```
 
 ### Options
@@ -22,5 +22,5 @@ gittuf authorize [flags]
 
 ### SEE ALSO
 
-* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
+* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
 

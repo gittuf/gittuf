@@ -9,9 +9,7 @@ gittuf rsl record [flags]
 ### Options
 
 ```
-  -c, --commit string        commit ID (eval mode only, set GITTUF_EVAL=1)
-  -h, --help                 help for record
-  -k, --signing-key string   path to PEM encoded SSH or GPG signing key (eval mode only, set GITTUF_EVAL=1)
+  -h, --help   help for record
 ```
 
 ### Options inherited from parent commands

@@ -11,9 +11,9 @@ A security layer for Git repositories, powered by TUF
 
 ### SEE ALSO
 
-* [gittuf add-hooks](gittuf_add-hooks.md)	 - Add git hooks that automatically create and sync RSL.
-* [gittuf authorize](gittuf_authorize.md)	 - Add or revoke reference authorization
+* [gittuf add-hooks](gittuf_add-hooks.md)	 - Add git hooks that automatically create and sync RSL
 * [gittuf clone](gittuf_clone.md)	 - Clone repository and its gittuf references
+* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log
 * [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
