@@ -51,8 +51,7 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 // RecordRSLEntryForReferenceAtCommit is a special version of
 // RecordRSLEntryForReference used for evaluation. It is only invoked when
 // gittuf is explicitly set in developer mode. This interface adds an RSL entry
-// for the specified Git reference at the specified commit. If the commit is not
-// in that ref, an entry is not created.
+// for the specified Git reference at the specified commit.
 func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signingKeyBytes []byte) error {
 	// Double check that gittuf is in developer mode
 	if !dev.InDevMode() {
@@ -64,22 +63,9 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 		return err
 	}
 
-	ref, err := r.r.Reference(plumbing.ReferenceName(absRefName), true)
-	if err != nil {
-		return err
-	}
-
 	commit, err := gitinterface.GetCommit(r.r, plumbing.NewHash(commitID))
 	if err != nil {
 		return err
-	}
-
-	// Even in developer mode, we ought to only create RSL entries for commits
-	// actually in the specified ref.
-	if knows, err := gitinterface.KnowsCommit(r.r, ref.Hash(), commit); err != nil {
-		return err
-	} else if !knows {
-		return ErrCommitNotInRef
 	}
 
 	isDuplicate, err := r.isDuplicateEntry(absRefName, commit.ID())
