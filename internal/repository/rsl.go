@@ -48,11 +48,10 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	return rsl.NewReferenceEntry(absRefName, ref.Hash()).Commit(r.r, signCommit)
 }
 
-// RecordRSLEntryForReferenceAtCommit is a special version of
+// RecordRSLEntryForReferenceAtTarget is a special version of
 // RecordRSLEntryForReference used for evaluation. It is only invoked when
-// gittuf is explicitly set in developer mode. This interface adds an RSL entry
-// for the specified Git reference at the specified commit.
-func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID string, signingKeyBytes []byte) error {
+// gittuf is explicitly set in developer mode.
+func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName string, targetID string, signingKeyBytes []byte) error {
 	// Double check that gittuf is in developer mode
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
@@ -63,23 +62,10 @@ func (r *Repository) RecordRSLEntryForReferenceAtCommit(refName string, commitID
 		return err
 	}
 
-	commit, err := gitinterface.GetCommit(r.r, plumbing.NewHash(commitID))
-	if err != nil {
-		return err
-	}
-
-	isDuplicate, err := r.isDuplicateEntry(absRefName, commit.ID())
-	if err != nil {
-		return err
-	}
-	if isDuplicate {
-		return nil
-	}
-
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
-	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(commitID)).CommitUsingSpecificKey(r.r, signingKeyBytes)
+	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(targetID)).CommitUsingSpecificKey(r.r, signingKeyBytes)
 }
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
