@@ -91,6 +91,17 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 
 	state.RootEnvelope = env
 
+	found := false
+	for _, key := range state.RootPublicKeys {
+		if key.KeyID == newRootKey.KeyID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		state.RootPublicKeys = append(state.RootPublicKeys, newRootKey)
+	}
+
 	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.KeyID)
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
@@ -138,9 +149,17 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 		return err
 	}
 
-	state.RootEnvelope = env
+	newRootPublicKeys := []*tuf.Key{}
+	for _, key := range state.RootPublicKeys {
+		if key.KeyID != keyID {
+			newRootPublicKeys = append(newRootPublicKeys, key)
+		}
+	}
 
-	commitMessage := fmt.Sprintf("Remove root key '%s' from root", rootKeyID)
+	state.RootEnvelope = env
+	state.RootPublicKeys = newRootPublicKeys
+
+	commitMessage := fmt.Sprintf("Remove root key '%s' from root", keyID)
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }

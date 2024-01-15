@@ -225,3 +225,31 @@ func TestAddKeyToTargets(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
 }
+
+func TestSignTargets(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	// Add root key as a targets key
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPubKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, rootPubKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add signature to targets
+	err = r.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, false)
+	assert.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(state.TargetsEnvelope.Signatures))
+}

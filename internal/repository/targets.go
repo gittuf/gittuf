@@ -198,12 +198,12 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -213,6 +213,45 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	commitMessage := fmt.Sprintf("Add keys to policy '%s'\n%s", targetsRoleName, keyIDs)
+
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
+
+// SignTargets adds a signature to specified Targets role's envelope. Note that
+// the metadata itself is not modified, so its version remains the same.
+func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	var env *sslibdsse.Envelope
+	if targetsRoleName == policy.TargetsRoleName {
+		env = state.TargetsEnvelope
+	} else {
+		env = state.DelegationEnvelopes[targetsRoleName]
+	}
+
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Add signature from key '%s' to policy '%s'", keyID, targetsRoleName)
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
