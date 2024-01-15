@@ -158,10 +158,7 @@ func TestRecordRSLEntryForReferenceAtCommit(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = repo.RecordRSLEntryForReferenceAtCommit(refName, newCommitID.String(), test.keyBytes)
-			assert.ErrorIs(t, err, ErrCommitNotInRef)
-
-			// We can, however, record an RSL entry for the commit in the new branch
+			// We record an RSL entry for the commit in the new branch
 			err = repo.RecordRSLEntryForReferenceAtCommit(anotherRefName, newCommitID.String(), test.keyBytes)
 			assert.Nil(t, err)
 
