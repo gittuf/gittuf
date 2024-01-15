@@ -43,7 +43,7 @@ var (
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
 	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constrains not met")
+	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -772,19 +772,30 @@ func (v *Verifier) Threshold() int {
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
 func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *sslibdsse.Envelope) error {
-	if v.threshold < 1 {
+	if v.threshold < 1 || len(v.keys) < 1 {
 		return ErrInvalidVerifier
 	}
 
-	if gitObject == nil && env == nil {
-		return ErrVerifierConditionsUnmet
-	}
-
-	if env != nil {
-		if (1 + len(env.Signatures)) < v.threshold {
-			// Combining the attestation and the git object we still do not have
-			// sufficient signatures
+	if gitObject == nil {
+		if env == nil {
+			// Nothing to verify, but fail closed
 			return ErrVerifierConditionsUnmet
+		} else if len(env.Signatures) < v.threshold {
+			// Envelope doesn't have enough signatures to meet threshold
+			return ErrVerifierConditionsUnmet
+		}
+	} else {
+		if env == nil {
+			if v.threshold > 1 {
+				// Single valid signature at most, so cannot meet threshold
+				return ErrVerifierConditionsUnmet
+			}
+		} else {
+			if (1 + len(env.Signatures)) < v.threshold {
+				// Combining the attestation and the git object we still do not
+				// have sufficient signatures
+				return ErrVerifierConditionsUnmet
+			}
 		}
 	}
 
@@ -837,13 +848,13 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *ssl
 	}
 
 	// Second, verify signatures on the attestation, subtracting the threshold
-	// by 1 to account for a verified git signature
+	// by 1 to account for a verified Git signature
 	envelopeThreshold := v.threshold
 	if gitObjectVerified {
 		envelopeThreshold--
 	}
 
-	verifiers := make([]sslibdsse.Verifier, 0, len(v.keys)-1)
+	verifiers := make([]sslibdsse.Verifier, 0, len(v.keys))
 	for _, key := range v.keys {
 		if key.KeyID == keyIDUsed {
 			// Do not create a DSSE verifier for the key used to verify the Git
