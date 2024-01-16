@@ -10,7 +10,7 @@ gittuf policy init [flags]
 
 ```
   -h, --help                 help for init
-      --policy-name string   policy file to create (default "targets")
+      --policy-name string   name of policy file to create (default "targets")
 ```
 
 ### Options inherited from parent commands
