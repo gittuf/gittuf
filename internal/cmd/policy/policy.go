@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(listrules.New())
 	cmd.AddCommand(removerule.New(o))
+	cmd.AddCommand(sign.New(o))
 
 	remoteCmd := remote.New()
 	cmd.AddCommand(remoteCmd)

@@ -486,7 +486,11 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 // Verify verifies the signatures of the Root role and the top level Targets
 // role if it exists.
 func (s *State) Verify(ctx context.Context) error {
-	rootVerifier := s.getRootVerifier()
+	rootVerifier, err := s.getRootVerifier()
+	if err != nil {
+		return err
+	}
+
 	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
 		return err
 	}
@@ -763,14 +767,19 @@ func (s *State) hasFileRule() (bool, error) {
 	return false, nil
 }
 
-func (s *State) getRootVerifier() *Verifier {
+func (s *State) getRootVerifier() (*Verifier, error) {
 	// TODO: validate against the root metadata itself?
 	// This eventually goes back to how the very first root is bootstrapped
 	// See: https://github.com/gittuf/gittuf/issues/117
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Verifier{
 		keys:      s.RootPublicKeys,
-		threshold: len(s.RootPublicKeys),
-	}
+		threshold: rootMetadata.Roles[RootRoleName].Threshold,
+	}, nil
 }
 
 func (s *State) getTargetsVerifier() (*Verifier, error) {

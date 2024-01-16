@@ -73,6 +73,7 @@ func TestAddRootKey(t *testing.T) {
 	assert.Equal(t, 2, rootMetadata.Version)
 	assert.Equal(t, []string{originalKeyID, newRootKey.KeyID}, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
+	assert.Equal(t, 2, len(state.RootPublicKeys))
 
 	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
@@ -85,22 +86,12 @@ func TestRemoveRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	originalSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = r.AddRootKey(testCtx, sv, rootKey, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	newRootKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = r.AddRootKey(testCtx, sv, newRootKey, false)
+	err = r.AddRootKey(testCtx, originalSigner, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +100,31 @@ func TestRemoveRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We should have no additions as we tried to add the same key
+	assert.Equal(t, 2, rootMetadata.Version)
+	assert.Equal(t, 1, len(state.RootPublicKeys))
+	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+
+	newRootKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.AddRootKey(testCtx, originalSigner, newRootKey, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err = policy.LoadCurrentState(testCtx, r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootMetadata, err = state.GetRootMetadata()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,10 +132,24 @@ func TestRemoveRootKey(t *testing.T) {
 	assert.Equal(t, 3, rootMetadata.Version)
 	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKey.KeyID)
 	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, newRootKey.KeyID)
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Equal(t, 2, len(state.RootPublicKeys))
+
+	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
-	err = r.RemoveRootKey(testCtx, sv, rootKey.KeyID, false)
+	err = r.RemoveRootKey(testCtx, originalSigner, rootKey.KeyID, false)
+	// Self root revocation currently is not supported
+	// This is linked to the policy package comment about using prior state for
+	// getRootVerifier
+	assert.ErrorIs(t, err, policy.ErrVerifierConditionsUnmet)
+
+	newSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// We can use the newly added root key to revoke the old one though
+	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
 	assert.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r)
@@ -136,7 +164,10 @@ func TestRemoveRootKey(t *testing.T) {
 
 	assert.Equal(t, 4, rootMetadata.Version)
 	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, newRootKey.KeyID)
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 1, len(state.RootPublicKeys))
+
+	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
 	assert.Nil(t, err)
 }
 
