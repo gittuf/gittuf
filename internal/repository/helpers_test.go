@@ -4,39 +4,29 @@ package repository
 
 import (
 	"context"
-	_ "embed"
-	"encoding/json"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/storage/memory"
 )
 
-//go:embed test-data/gpg-pubkey.asc
-var gpgPubKeyBytes []byte
+var (
+	gpgKeyBytes        = artifacts.GPGKey1Private
+	gpgPubKeyBytes     = artifacts.GPGKey1Public
+	rootKeyBytes       = artifacts.SSLibKey1Private
+	targetsKeyBytes    = artifacts.SSLibKey2Private
+	targetsPubKeyBytes = artifacts.SSLibKey2Public
+	rsaKeyBytes        = artifacts.SSHRSAPrivate
+	ecdsaKeyBytes      = artifacts.SSHECDSAPrivate
 
-//go:embed test-data/gpg-privkey.asc
-var gpgKeyBytes []byte
-
-//go:embed test-data/root
-var rootKeyBytes []byte
-
-//go:embed test-data/targets
-var targetsKeyBytes []byte
-
-//go:embed test-data/targets.pub
-var targetsPubKeyBytes []byte
-
-//go:embed test-data/rsa-ssh-key
-var rsaKeyBytes []byte
-
-//go:embed test-data/ecdsa-ssh-key
-var ecdsaKeyBytes []byte
-
-var testCtx = context.Background()
+	testCtx = context.Background()
+)
 
 func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
 	t.Helper()
@@ -45,6 +35,12 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 		repo *git.Repository
 		err  error
 	)
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	if location == "" {
 		repo, err = git.Init(memory.NewStorage(), memfs.New())
 	} else {
@@ -56,7 +52,7 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 
 	r := &Repository{r: repo}
 
-	if err := r.InitializeRoot(testCtx, rootKeyBytes, false); err != nil {
+	if err := r.InitializeRoot(testCtx, signer, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -68,11 +64,26 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 
 	r, keyBytes := createTestRepositoryWithRoot(t, location)
 
-	if err := r.AddTopLevelTargetsKey(testCtx, keyBytes, targetsPubKeyBytes, false); err != nil {
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.InitializeTargets(testCtx, targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -80,13 +91,8 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kb, err := json.Marshal(gpgKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authorizedKeys := [][]byte{kb}
 
-	if err := r.AddDelegation(testCtx, targetsKeyBytes, policy.TargetsRoleName, "protect-main", authorizedKeys, []string{"git:refs/heads/main"}, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, false); err != nil {
 		t.Fatal(err)
 	}
 

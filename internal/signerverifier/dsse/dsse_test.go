@@ -7,19 +7,17 @@ import (
 	"encoding/base64"
 	"testing"
 
-	_ "embed"
-
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
-//go:embed test-data/test-key
-var signingKeyBytes []byte
-
-//go:embed test-data/test-key.pub
-var publicKeyBytes []byte
+var (
+	signingKeyBytes = artifacts.SSLibKey1Private
+	publicKeyBytes  = artifacts.SSLibKey1Public
+)
 
 func TestCreateEnvelope(t *testing.T) {
 	rootMetadata := tuf.NewRootMetadata()
@@ -39,7 +37,7 @@ func TestSignEnvelope(t *testing.T) {
 	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
 
 	// Try signing with the same key to ensure a new signature isn't appended
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +57,7 @@ func TestVerifyEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +66,7 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func createSignedEnvelope() (*sslibdsse.Envelope, error) {
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

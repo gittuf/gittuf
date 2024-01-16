@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
@@ -63,18 +64,22 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	signer, err := common.LoadSigner(keyBytes)
+	if err != nil {
+		return err
+	}
 
-	authorizedKeysBytes := [][]byte{}
+	authorizedKeys := []*tuf.Key{}
 	for _, key := range o.authorizedKeys {
-		kb, err := common.ReadKeyBytes(key) //nolint:staticcheck
+		key, err := common.LoadPublicKey(key)
 		if err != nil {
 			return err
 		}
 
-		authorizedKeysBytes = append(authorizedKeysBytes, kb)
+		authorizedKeys = append(authorizedKeys, key)
 	}
 
-	return repo.AddDelegation(cmd.Context(), keyBytes, o.policyName, o.ruleName, authorizedKeysBytes, o.rulePatterns, true)
+	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedKeys, o.rulePatterns, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

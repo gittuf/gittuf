@@ -9,24 +9,21 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
-func (r *Repository) InitializeRoot(ctx context.Context, rootKeyBytes []byte, signCommit bool) error {
+func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
 	if err := r.InitializeNamespaces(); err != nil {
 		return err
 	}
 
-	publicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		return err
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	rawKey := signer.Public()
+	publicKey, err := sslibsv.NewKey(rawKey)
 	if err != nil {
 		return err
 	}
@@ -55,12 +52,8 @@ func (r *Repository) InitializeRoot(ctx context.Context, rootKeyBytes []byte, si
 
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
-func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyBytes []byte, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
-	if err != nil {
-		return err
-	}
-	rootKeyID, err := sv.KeyID()
+func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey *tuf.Key, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
@@ -79,11 +72,6 @@ func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyByt
 		return ErrUnauthorizedKey
 	}
 
-	newRootKey, err := tuf.LoadKeyFromBytes(newrootKeyBytes)
-	if err != nil {
-		return err
-	}
-
 	rootMetadata = policy.AddRootKey(rootMetadata, newRootKey)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
@@ -96,7 +84,7 @@ func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyByt
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
 	}
@@ -110,12 +98,8 @@ func (r *Repository) AddRootKey(ctx context.Context, rootKeyBytes, newrootKeyByt
 
 // RemoveRootKey is the interface for the user to de-authorize a key
 // trusted to sign the Root role.
-func (r *Repository) RemoveRootKey(ctx context.Context, rootKeyBytes []byte, keyID string, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
-	if err != nil {
-		return err
-	}
-	rootKeyID, err := sv.KeyID()
+func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
@@ -149,7 +133,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, rootKeyBytes []byte, key
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
 	}
@@ -163,12 +147,8 @@ func (r *Repository) RemoveRootKey(ctx context.Context, rootKeyBytes []byte, key
 
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
-func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, targetsKeyBytes []byte, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
-	if err != nil {
-		return err
-	}
-	rootKeyID, err := sv.KeyID()
+func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey *tuf.Key, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
@@ -187,11 +167,6 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 		return ErrUnauthorizedKey
 	}
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		return err
-	}
-
 	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
@@ -204,7 +179,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
 	}
@@ -218,12 +193,8 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, rootKeyBytes, ta
 
 // RemoveTopLevelTargetsKey is the interface for the user to de-authorize a key
 // trusted to sign the top level Targets role / policy file.
-func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, rootKeyBytes []byte, targetsKeyID string, signCommit bool) error {
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
-	if err != nil {
-		return err
-	}
-	rootKeyID, err := sv.KeyID()
+func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKeyID string, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
@@ -257,7 +228,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, rootKeyBytes 
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
-	env, err = dsse.SignEnvelope(ctx, env, sv)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
 	}

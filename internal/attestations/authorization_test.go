@@ -5,8 +5,6 @@ package attestations
 import (
 	"testing"
 
-	_ "embed"
-
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"

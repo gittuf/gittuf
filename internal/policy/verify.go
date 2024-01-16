@@ -420,7 +420,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 			continue
 		}
 
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k)
+		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k) //nolint:staticcheck
 		if err != nil {
 			return err
 		}
@@ -842,7 +842,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *ssl
 			continue
 		}
 
-		verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key)
+		verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
 		if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
 			return err
 		}

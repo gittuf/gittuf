@@ -4,13 +4,13 @@ package policy
 
 import (
 	"context"
-	_ "embed"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -18,22 +18,18 @@ import (
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
-var testCtx = context.Background()
-
-//go:embed test-data/root
-var rootKeyBytes []byte
-
-//go:embed test-data/root.pub
-var rootPubKeyBytes []byte
-
-//go:embed test-data/targets-1
-var targets1KeyBytes []byte
-
-//go:embed test-data/targets-1.pub
-var targets1PubKeyBytes []byte
-
-//go:embed test-data/gpg-pubkey.asc
-var gpgPubKeyBytes []byte
+var (
+	testCtx                 = context.Background()
+	rootKeyBytes            = artifacts.SSLibKey1Private
+	rootPubKeyBytes         = artifacts.SSLibKey1Public
+	targets1KeyBytes        = artifacts.SSLibKey2Private
+	targets1PubKeyBytes     = artifacts.SSLibKey2Public
+	targets2KeyBytes        = artifacts.SSLibKey3Private
+	targets2PubKeyBytes     = artifacts.SSLibKey3Public
+	gpgKeyBytes             = artifacts.GPGKey1Private
+	gpgPubKeyBytes          = artifacts.GPGKey1Public
+	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
+)
 
 func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*git.Repository, *State) {
 	t.Helper()
@@ -62,7 +58,7 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +88,7 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +146,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +262,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +296,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}

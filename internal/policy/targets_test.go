@@ -3,14 +3,12 @@
 package policy
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,19 +22,11 @@ func TestInitializeTargetsMetadata(t *testing.T) {
 func TestAddOrUpdateDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1.pub"))
+	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	key1, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keyBytes, err = os.ReadFile(filepath.Join("test-data", "targets-2.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	key2, err := tuf.LoadKeyFromBytes(keyBytes)
+	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,11 +49,7 @@ func TestAddOrUpdateDelegation(t *testing.T) {
 func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "targets-1.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

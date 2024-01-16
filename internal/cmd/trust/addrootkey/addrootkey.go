@@ -36,13 +36,17 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-
-	newRootKeyBytes, err := common.ReadKeyBytes(o.newRootKey) //nolint:staticcheck
+	signer, err := common.LoadSigner(rootKeyBytes)
 	if err != nil {
 		return err
 	}
 
-	return repo.AddRootKey(cmd.Context(), rootKeyBytes, newRootKeyBytes, true)
+	newRootKey, err := common.LoadPublicKey(o.newRootKey)
+	if err != nil {
+		return err
+	}
+
+	return repo.AddRootKey(cmd.Context(), signer, newRootKey, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

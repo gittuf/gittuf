@@ -10,6 +10,8 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
@@ -18,18 +20,33 @@ import (
 func TestClone(t *testing.T) {
 	remoteTmpDir := t.TempDir()
 
+	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	remoteR, err := git.PlainInit(remoteTmpDir, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	remoteRepo := &Repository{r: remoteR}
-	if err := remoteRepo.InitializeRoot(context.Background(), rootKeyBytes, false); err != nil {
+	if err := remoteRepo.InitializeRoot(context.Background(), rootSigner, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootKeyBytes, targetsPubKeyBytes, false); err != nil {
+	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootSigner, targetsPubKey, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.InitializeTargets(context.Background(), targetsKeyBytes, policy.TargetsRoleName, false); err != nil {
+	if err := remoteRepo.InitializeTargets(context.Background(), targetsSigner, policy.TargetsRoleName, false); err != nil {
 		t.Fatal(err)
 	}
 	emptyTreeHash, err := gitinterface.WriteTree(remoteRepo.r, nil)

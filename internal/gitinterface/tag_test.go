@@ -5,21 +5,19 @@ package gitinterface
 import (
 	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -76,12 +74,7 @@ func TestTag(t *testing.T) {
 func TestVerifyTagSignature(t *testing.T) {
 	gpgSignedTag := createTestSignedTag(t)
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(keyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,12 +128,7 @@ func createTestSignedTag(t *testing.T) *object.Tag {
 		t.Fatal(err)
 	}
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(signingKeyBytes))
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(gpgPrivateKey))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,9 +5,6 @@ package gitinterface
 import (
 	"bytes"
 	"context"
-	_ "embed"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -15,28 +12,26 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/hiddeco/sshsig"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ssh"
 )
 
-//go:embed test-data/rsa-ssh-key.pem
-var rsaSSHPublicKeyBytes []byte
-
-//go:embed test-data/rsa-ssh-key
-var rsaSSHPrivateKeyBytes []byte
-
-//go:embed test-data/ecdsa-ssh-key.pem
-var ecdsaSSHPublicKeyBytes []byte
-
-//go:embed test-data/ecdsa-ssh-key
-var ecdsaSSHPrivateKeyBytes []byte
+var (
+	rsaSSHPublicKeyBytes    = artifacts.SSHRSAPublic
+	rsaSSHPrivateKeyBytes   = artifacts.SSHRSAPrivate
+	ecdsaSSHPublicKeyBytes  = artifacts.SSHECDSAPublic
+	ecdsaSSHPrivateKeyBytes = artifacts.SSHECDSAPrivate
+	gpgPublicKey            = artifacts.GPGKey1Public
+	gpgPrivateKey           = artifacts.GPGKey1Private
+)
 
 func TestCreateCommitObject(t *testing.T) {
 	t.Run("zero commit and zero parent", func(t *testing.T) {
@@ -128,12 +123,7 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 
 	sshCommits := createTestSSHSignedCommits(t)
 
-	keyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(keyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,12 +288,7 @@ func createTestSignedCommit(t *testing.T) *object.Commit {
 		t.Fatal(err)
 	}
 
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-privkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(signingKeyBytes))
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(gpgPrivateKey))
 	if err != nil {
 		t.Fatal(err)
 	}

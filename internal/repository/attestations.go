@@ -10,9 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
@@ -22,7 +20,7 @@ var ErrNotSigningKey = errors.New("expected signing key")
 // AddReferenceAuthorization adds a reference authorization attestation to the
 // repository for the specified ref. The from ID is identified using the RSL
 // while the to ID is set to the current status of the ref.
-func (r *Repository) AddReferenceAuthorization(ctx context.Context, keyBytes []byte, targetRef string, signCommit bool) error {
+func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef string, signCommit bool) error {
 	targetRef, err := gitinterface.AbsoluteReference(r.r, targetRef)
 	if err != nil {
 		return err
@@ -76,11 +74,6 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, keyBytes []b
 		}
 	}
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes)
-	if err != nil {
-		return err
-	}
-
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -98,15 +91,16 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, keyBytes []b
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
 // their key.
-func (r *Repository) RemoveReferenceAuthorization(keyBytes []byte, targetRef, fromID, toID string, signCommit bool) error {
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
+func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, fromID, toID string, signCommit bool) error {
+	// Ensure only the key that created a reference authorization can remove it
+	_, err := signer.Sign(ctx, nil)
+	if err != nil {
+		return errors.Join(ErrNotSigningKey, err)
+	}
+
+	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
-	}
-	if key.KeyVal.Private == "" {
-		// The authorization removal process must be authenticated using the
-		// original signing key
-		return ErrNotSigningKey
 	}
 
 	targetRef, err = gitinterface.AbsoluteReference(r.r, targetRef)
@@ -132,7 +126,7 @@ func (r *Repository) RemoveReferenceAuthorization(keyBytes []byte, targetRef, fr
 	for _, signature := range env.Signatures {
 		// This handles cases where the envelope may unintentionally have
 		// multiple signatures from the same key
-		if signature.KeyID != key.KeyID {
+		if signature.KeyID != keyID {
 			newSignatures = append(newSignatures, signature)
 		}
 	}
@@ -151,7 +145,7 @@ func (r *Repository) RemoveReferenceAuthorization(keyBytes []byte, targetRef, fr
 		}
 	}
 
-	commitMessage := fmt.Sprintf("Remove reference authorization for '%s' from '%s' to '%s' by '%s'", targetRef, fromID, toID, key.KeyID)
+	commitMessage := fmt.Sprintf("Remove reference authorization for '%s' from '%s' to '%s' by '%s'", targetRef, fromID, toID, keyID)
 
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }

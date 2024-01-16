@@ -3,17 +3,25 @@
 package gitinterface
 
 import (
+	"bytes"
 	"io"
-	"os"
-	"path/filepath"
 	"testing"
 
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	format "github.com/go-git/go-git/v5/plumbing/format/config"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
+)
+
+var (
+	testConfig1 = artifacts.GitConfig1
+	testConfig2 = artifacts.GitConfig2
+	testConfig3 = artifacts.GitConfig3
+	testConfig4 = artifacts.GitConfig4
+	testConfig5 = artifacts.GitConfig5
 )
 
 func TestGetSigningInfo(t *testing.T) {
@@ -24,7 +32,7 @@ func TestGetSigningInfo(t *testing.T) {
 
 	tests := map[string]struct {
 		c                   *config.Config
-		configFile          string
+		configFile          []byte
 		wantedSigningMethod SigningMethod
 		wantedKeyInfo       string
 		wantedProgram       string
@@ -46,7 +54,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:          filepath.Join("test-data", "config-1"),
+			configFile:          testConfig1,
 			wantedSigningMethod: SigningMethodGPG,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "gpg",
@@ -76,7 +84,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:          filepath.Join("test-data", "config-2"),
+			configFile:          testConfig2,
 			wantedSigningMethod: SigningMethodSSH,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "ssh-keygen",
@@ -106,7 +114,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:          filepath.Join("test-data", "config-3"),
+			configFile:          testConfig3,
 			wantedSigningMethod: SigningMethodX509,
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "gpgsm",
@@ -127,7 +135,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:    filepath.Join("test-data", "config-4"),
+			configFile:    testConfig4,
 			expectedError: ErrSigningKeyNotSpecified,
 		},
 		"unknown signing method": {
@@ -155,7 +163,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:    filepath.Join("test-data", "config-5"),
+			configFile:    testConfig5,
 			expectedError: ErrUnknownSigningMethod,
 		},
 	}
@@ -166,7 +174,7 @@ func TestGetSigningInfo(t *testing.T) {
 		}
 
 		getGitConfigFromCommand = func() (io.Reader, error) {
-			return os.Open(test.configFile)
+			return bytes.NewReader(test.configFile), nil
 		}
 
 		signingMethod, keyInfo, program, err := getSigningInfo()

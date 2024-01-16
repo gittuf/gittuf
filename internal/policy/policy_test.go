@@ -5,8 +5,6 @@ package policy
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -14,13 +12,13 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -117,21 +115,13 @@ func TestStateKeys(t *testing.T) {
 	state := createTestStateWithPolicy(t)
 
 	expectedKeys := map[string]*tuf.Key{}
-	rootKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	expectedKeys[rootKey.KeyID] = rootKey
 
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,11 +252,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 func TestStateFindPublicKeysForPath(t *testing.T) {
 	state := createTestStateWithPolicy(t)
 
-	gpgKeyBytes, err := os.ReadFile(filepath.Join("test-data", "gpg-pubkey.asc"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,11 +346,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", "root"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}

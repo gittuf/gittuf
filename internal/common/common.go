@@ -7,8 +7,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -45,7 +43,7 @@ var (
 // **signed** reference entry using the specified GPG key. It is used to
 // substitute for the default RSL entry creation and signing mechanism which
 // relies on the user's Git config.
-func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.ReferenceEntry, keyName string) plumbing.Hash {
+func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry *rsl.ReferenceEntry, signingKeyBytes []byte) plumbing.Hash {
 	t.Helper()
 
 	// We do this manually because rsl.Commit() will not sign using our test key
@@ -80,7 +78,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 		ParentHashes: []plumbing.Hash{ref.Hash()},
 	}
 
-	testCommit = SignTestCommit(t, repo, testCommit, keyName)
+	testCommit = SignTestCommit(t, repo, testCommit, signingKeyBytes)
 
 	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
 	if err != nil {
@@ -94,7 +92,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *git.Repository, entry
 // **signed** RSL annotation using the specified GPG key. It is used to
 // substitute for the default RSL annotation creation and signing mechanism
 // which relies on the user's Git config.
-func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, annotation *rsl.AnnotationEntry, keyName string) plumbing.Hash {
+func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, annotation *rsl.AnnotationEntry, signingKeyBytes []byte) plumbing.Hash {
 	t.Helper()
 
 	// We do this manually because rsl.Commit() will not sign using our test key
@@ -149,7 +147,7 @@ func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, anno
 		ParentHashes: []plumbing.Hash{ref.Hash()},
 	}
 
-	testCommit = SignTestCommit(t, repo, testCommit, keyName)
+	testCommit = SignTestCommit(t, repo, testCommit, signingKeyBytes)
 
 	commitID, err := gitinterface.ApplyCommit(repo, testCommit, ref)
 	if err != nil {
@@ -162,7 +160,7 @@ func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *git.Repository, anno
 // SignTestCommit signs the test commit using the specified key stored in the
 // repository. Note that the GPG key is loaded relative to the package
 // containing the test.
-func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit, keyName string) *object.Commit {
+func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit, signingKeyBytes []byte) *object.Commit {
 	t.Helper()
 
 	commitEncoded := repo.Storer.NewEncodedObject()
@@ -170,11 +168,6 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit, k
 		t.Fatal(err)
 	}
 	r, err := commitEncoded.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", keyName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +189,7 @@ func SignTestCommit(t *testing.T, repo *git.Repository, commit *object.Commit, k
 // SignTestTag signs the specified tag using the test key stored in the
 // repository.  Note that the GPG key is loaded relative to the package
 // containing the test.
-func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag, keyName string) *object.Tag {
+func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag, signingKeyBytes []byte) *object.Tag {
 	t.Helper()
 
 	tagEncoded := repo.Storer.NewEncodedObject()
@@ -204,11 +197,6 @@ func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag, keyName st
 		t.Fatal(err)
 	}
 	r, err := tagEncoded.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	signingKeyBytes, err := os.ReadFile(filepath.Join("test-data", keyName))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +221,7 @@ func SignTestTag(t *testing.T, repo *git.Repository, tag *object.Tag, keyName st
 // first commit contains a tree with one object (an empty blob), the second with
 // two objects (both empty blobs), and so on. Each commit is signed using the
 // specified key.
-func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int, keyName string) []plumbing.Hash {
+func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName string, n int, signingKeyBytes []byte) []plumbing.Hash {
 	t.Helper()
 
 	emptyBlobHash, err := gitinterface.WriteBlob(repo, []byte{})
@@ -277,7 +265,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 	commitIDs := []plumbing.Hash{}
 	for i := 0; i < n; i++ {
 		commit := gitinterface.CreateCommitObject(TestGitConfig, treeHashes[i], []plumbing.Hash{ref.Hash()}, "Test commit", TestClock)
-		commit = SignTestCommit(t, repo, commit, keyName)
+		commit = SignTestCommit(t, repo, commit, signingKeyBytes)
 		if _, err := gitinterface.ApplyCommit(repo, commit, ref); err != nil {
 			t.Fatal(err)
 		}
@@ -297,7 +285,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *git.Repository, refName s
 
 // CreateTestSignedTag creates a signed tag in the repository pointing to the
 // target object. The tag is signed using the specified key.
-func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, target plumbing.Hash, keyName string) plumbing.Hash {
+func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, target plumbing.Hash, signingKeyBytes []byte) plumbing.Hash {
 	t.Helper()
 
 	targetObj, err := repo.Object(plumbing.AnyObject, target)
@@ -307,7 +295,7 @@ func CreateTestSignedTag(t *testing.T, repo *git.Repository, tagName string, tar
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)
 	tag := gitinterface.CreateTagObject(TestGitConfig, targetObj, tagName, tagMessage, TestClock)
-	tag = SignTestTag(t, repo, tag, keyName)
+	tag = SignTestTag(t, repo, tag, signingKeyBytes)
 	tagHash, err := gitinterface.ApplyTag(repo, tag)
 	if err != nil {
 		t.Fatal(err)
