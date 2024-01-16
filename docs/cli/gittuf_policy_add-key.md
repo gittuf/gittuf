@@ -15,7 +15,7 @@ gittuf policy add-key [flags]
 ```
       --authorize-key stringArray   authorized public key for rule
   -h, --help                        help for add-key
-      --policy-name string          policy file to add rule to (default "targets")
+      --policy-name string          name of policy file to add key to (default "targets")
 ```
 
 ### Options inherited from parent commands

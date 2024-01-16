@@ -26,7 +26,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"policy file to add rule to",
+		"name of policy file to add rule to",
 	)
 
 	cmd.Flags().StringVar(

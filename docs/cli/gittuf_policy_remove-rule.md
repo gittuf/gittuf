@@ -10,7 +10,7 @@ gittuf policy remove-rule [flags]
 
 ```
   -h, --help                 help for remove-rule
-      --policy-name string   policy file to remove rule from (default "targets")
+      --policy-name string   name of policy file to remove rule from (default "targets")
       --rule-name string     name of rule
 ```
 

@@ -14,7 +14,7 @@ gittuf policy sign [flags]
 
 ```
   -h, --help                 help for sign
-      --policy-name string   policy file to sign (default "targets")
+      --policy-name string   name of policy file to sign (default "targets")
 ```
 
 ### Options inherited from parent commands
