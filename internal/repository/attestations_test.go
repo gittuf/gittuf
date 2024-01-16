@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -16,6 +17,8 @@ import (
 )
 
 func TestAddReferenceAuthorization(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	refName := "main"
 	absRefName := "refs/heads/main"
 	commitID := plumbing.ZeroHash.String()
@@ -79,6 +82,8 @@ func TestAddReferenceAuthorization(t *testing.T) {
 }
 
 func TestRemoveReferenceAuthorization(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	absRefName := "refs/heads/main"
 	commitID := plumbing.ZeroHash.String()
 

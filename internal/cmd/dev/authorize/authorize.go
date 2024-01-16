@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +66,7 @@ func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:               "authorize",
-		Short:             "Add or revoke reference authorization",
+		Short:             fmt.Sprintf("Add or revoke reference authorization (developer mode only, set %s=1)", dev.DevModeKey),
 		Args:              cobra.MinimumNArgs(1),
 		PreRunE:           common.CheckIfSigningViable,
 		RunE:              o.Run,

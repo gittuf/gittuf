@@ -1,6 +1,6 @@
 ## gittuf add-hooks
 
-Add git hooks that automatically create and sync RSL.
+Add git hooks that automatically create and sync RSL
 
 ```
 gittuf add-hooks [flags]

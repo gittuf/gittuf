@@ -1,0 +1,26 @@
+## gittuf dev
+
+Developer mode commands
+
+### Synopsis
+
+These commands are meant to be used to aid gittuf development, and are not expected to be used during standard workflows. If used, they can undermine repository security. To proceed, set GITTUF_DEV=1.
+
+### Options
+
+```
+  -h, --help   help for dev
+```
+
+### Options inherited from parent commands
+
+```
+      --verbose   enable verbose logging
+```
+
+### SEE ALSO
+
+* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
+* [gittuf dev authorize](gittuf_dev_authorize.md)	 - Add or revoke reference authorization (developer mode only, set GITTUF_DEV=1)
+* [gittuf dev rsl-record](gittuf_dev_rsl-record.md)	 - Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
+
