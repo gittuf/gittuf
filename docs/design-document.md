@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: July 11, 2023
+Last Modified: November 27, 2023
 
 ## Introduction
 
