@@ -3,7 +3,7 @@ module github.com/gittuf/gittuf
 go 1.21.5
 
 require (
-	github.com/ProtonMail/go-crypto v0.0.0-20230923063757-afb1ddc0824c
+	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.11.0
 	github.com/hiddeco/sshsig v0.1.0
