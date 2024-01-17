@@ -15,7 +15,7 @@ gittuf policy add-rule [flags]
 ```
       --authorize-key stringArray   authorized public key for rule
   -h, --help                        help for add-rule
-      --policy-name string          policy file to add rule to (default "targets")
+      --policy-name string          name of policy file to add rule to (default "targets")
       --rule-name string            name of rule
       --rule-pattern stringArray    patterns used to identify namespaces rule applies to
 ```

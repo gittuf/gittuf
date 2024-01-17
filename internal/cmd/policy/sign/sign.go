@@ -22,7 +22,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"policy file to sign",
+		"name of policy file to sign",
 	)
 }
 
