@@ -129,6 +129,9 @@ func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string
 func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var currentPolicy *State
 
+	// Enable policyStateCache during verification
+	enablePolicyStateCache = true
+
 	// 1. Load policy applicable at firstEntry
 	state, err := LoadStateForEntry(ctx, repo, initialPolicyEntry)
 	if err != nil {

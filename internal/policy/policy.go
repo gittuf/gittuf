@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -48,9 +50,17 @@ var (
 	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
 	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
 	ErrDelegationNotFound         = errors.New("required delegation entry not found")
+	ErrPolicyExists               = errors.New("cannot initialize Policy namespace as it exists already")
 )
 
-var ErrPolicyExists = errors.New("cannot initialize Policy namespace as it exists already")
+var (
+	// policyStateCache tracks states previously loaded using their RSL entry ID
+	// as the key
+	policyStateCache = map[plumbing.Hash]*State{}
+	// enablePolicyStateCache is set to true only during verification workflows,
+	// where policy state is never mutated
+	enablePolicyStateCache = false
+)
 
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
 // has a zero hash.
@@ -81,6 +91,8 @@ type State struct {
 	TargetsEnvelope     *sslibdsse.Envelope
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
 	RootPublicKeys      []*tuf.Key
+
+	verifiersCache map[string][]*Verifier
 }
 
 type DelegationWithDepth struct {
@@ -118,6 +130,13 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error)
 // LoadStateForEntry returns the State for a specified RSL reference entry for
 // the policy namespace.
 func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	if enablePolicyStateCache {
+		if state, cacheHit := policyStateCache[entry.ID]; cacheHit {
+			// Cache hit for entire state
+			return state, nil
+		}
+	}
+
 	if entry.RefName != PolicyRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
@@ -209,6 +228,10 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 
 	if err := state.Verify(ctx); err != nil {
 		return nil, err
+	}
+
+	if enablePolicyStateCache {
+		policyStateCache[entry.ID] = state
 	}
 
 	return state, nil
@@ -397,6 +420,15 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
+	if dev.InDevMode() && featureflags.UsePolicyPathCache {
+		if s.verifiersCache == nil {
+			s.verifiersCache = map[string][]*Verifier{}
+		} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
+			// Cache hit for this path in this policy
+			return verifiers, nil
+		}
+	}
+
 	if !s.HasTargetsRole(TargetsRoleName) {
 		// No policies exist
 		return nil, ErrMetadataNotFound
@@ -421,6 +453,9 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 	verifiers := []*Verifier{}
 	for {
 		if len(groupedDelegations) == 0 {
+			if dev.InDevMode() && featureflags.UsePolicyPathCache {
+				s.verifiersCache[path] = verifiers
+			}
 			return verifiers, nil
 		}
 

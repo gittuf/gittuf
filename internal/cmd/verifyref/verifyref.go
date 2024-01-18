@@ -6,13 +6,15 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	latestOnly bool
-	fromEntry  string
+	latestOnly         bool
+	fromEntry          string
+	usePolicyPathCache bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -31,6 +33,24 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive("latest-only", "from-entry")
+
+	cmd.Flags().BoolVar(
+		&o.usePolicyPathCache,
+		"use-policy-path-cache",
+		false,
+		fmt.Sprintf("use policy path cache during verification (developer mode only, set %s=1)", dev.DevModeKey),
+	)
+}
+
+func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
+	if o.usePolicyPathCache {
+		if !dev.InDevMode() {
+			return dev.ErrNotInDevMode
+		}
+
+		featureflags.UsePolicyPathCache = true
+	}
+	return nil
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -56,6 +76,7 @@ func New() *cobra.Command {
 		Use:               "verify-ref",
 		Short:             "Tools for verifying gittuf policies",
 		Args:              cobra.ExactArgs(1),
+		PreRunE:           o.PreRunE,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

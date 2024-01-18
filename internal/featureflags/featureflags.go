@@ -6,3 +6,7 @@ package featureflags
 // of go-git for interactions with the underlying repository where both are
 // supported.
 var UseGitBinary = false
+
+// UsePolicyPathCache allows the user to indicate that during verification, the
+// verifiers identified for some path must be cached for the policy state.
+var UsePolicyPathCache = false
