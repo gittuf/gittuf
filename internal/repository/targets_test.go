@@ -253,3 +253,55 @@ func TestSignTargets(t *testing.T) {
 
 	assert.Equal(t, 2, len(state.TargetsEnvelope.Signatures))
 }
+func TestRemoveKeysFromTargets(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authorizedKeys := []*tuf.Key{targetsKey, gpgKey}
+
+	state, err := policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, gpgKey.KeyID)
+	assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
+
+	err = r.AddKeyToTargets(context.Background(), targetsSigner, policy.TargetsRoleName, authorizedKeys, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
+
+	err = r.RemoveKeyFromTargets(context.Background(), targetsSigner, policy.TargetsRoleName, authorizedKeys, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(targetsMetadata.Delegations.Keys))
+}

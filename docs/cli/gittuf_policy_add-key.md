@@ -1,10 +1,10 @@
 ## gittuf policy add-key
 
-Add a trusted key to a policy file
+Add trusted keys to a policy file
 
 ### Synopsis
 
-This command allows users to add a trusted key to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
+This command allows users to add trusted keys to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
 
 ```
 gittuf policy add-key [flags]

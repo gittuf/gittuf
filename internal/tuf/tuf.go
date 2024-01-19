@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path"
 
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
@@ -19,9 +20,7 @@ import (
 
 const specVersion = "1.0"
 
-var (
-	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
-)
+var ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 
 // Key defines the structure for how public keys are stored in TUF metadata.
 type Key = signerverifier.SSLibKey
@@ -182,6 +181,16 @@ func (d *Delegations) AddKey(key *Key) {
 	}
 
 	d.Keys[key.KeyID] = key
+}
+
+func (d *Delegations) RemoveKey(keyID string) error {
+	if _, ok := d.Keys[keyID]; !ok {
+		return fmt.Errorf("key %s, is not in this rule", keyID)
+	}
+
+	delete(d.Keys, keyID)
+
+	return nil
 }
 
 // AddDelegation adds a new delegation.

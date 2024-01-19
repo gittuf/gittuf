@@ -18,7 +18,7 @@ Tools to manage gittuf policies
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf policy add-key](gittuf_policy_add-key.md)	 - Add a trusted key to a policy file
+* [gittuf policy add-key](gittuf_policy_add-key.md)	 - Add trusted keys to a policy file
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state

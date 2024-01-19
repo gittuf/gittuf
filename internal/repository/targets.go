@@ -255,3 +255,55 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
+
+func (r *Repository) RemoveKeyFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/gittuf/gittuf/issues/246.
+
+	keyIDs := ""
+	for _, key := range authorizedKeys {
+		keyIDs += fmt.Sprintf("\n%s:%s", key.KeyType, key.KeyID)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	targetsMetadata, err = policy.RemoveKeysFromTargets(targetsMetadata, authorizedKeys)
+	if err != nil {
+		return err
+	}
+
+	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return nil
+	}
+
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return nil
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Removed keys from policy '%s'\n%s", targetsRoleName, keyIDs)
+
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}

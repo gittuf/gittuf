@@ -126,12 +126,13 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 	delegations := &Delegations{}
 
-	t.Run("test AddKey", func(t *testing.T) {
+	t.Run("test AddKey and RemoveKey", func(t *testing.T) {
 		assert.Nil(t, delegations.Keys)
 		delegations.AddKey(key)
 		assert.Equal(t, key, delegations.Keys[key.KeyID])
+		err := delegations.RemoveKey(key.KeyID)
+		assert.ErrorIs(t, err, nil)
 	})
-
 	t.Run("test AddDelegation", func(t *testing.T) {
 		assert.Nil(t, delegations.Roles)
 		d := Delegation{

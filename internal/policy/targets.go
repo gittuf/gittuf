@@ -101,6 +101,16 @@ func AddKeyToTargets(targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf
 	return targetsMetadata, nil
 }
 
+func RemoveKeysFromTargets(targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf.Key) (*tuf.TargetsMetadata, error) {
+	for _, key := range authorizedKeys {
+		if err := targetsMetadata.Delegations.RemoveKey(key.KeyID); err != nil {
+			return nil, err
+		}
+	}
+
+	return targetsMetadata, nil
+}
+
 // AllowRule returns the default, last rule for all policy files.
 func AllowRule() tuf.Delegation {
 	return tuf.Delegation{
