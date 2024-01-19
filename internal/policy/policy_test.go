@@ -86,11 +86,10 @@ func TestLoadState(t *testing.T) {
 func TestLoadCurrentState(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	loadedState, err := LoadCurrentState(context.Background(), repo)
+	loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
 	if err != nil {
 		t.Error(err)
 	}
-
 	assert.Equal(t, state, loadedState)
 }
 
@@ -334,7 +333,7 @@ func TestGetStateForCommit(t *testing.T) {
 	assert.Equal(t, firstState, state)
 
 	// Update policy, record in RSL
-	secondState, err := LoadCurrentState(context.Background(), repo) // secondState := firstState will modify firstState as well
+	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := firstState will modify firstState as well
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -366,6 +365,9 @@ func TestGetStateForCommit(t *testing.T) {
 	if err := secondState.Commit(context.Background(), repo, "Second state", false); err != nil {
 		t.Fatal(err)
 	}
+	if err := Apply(context.Background(), repo, false); err != nil {
+		t.Fatal(err)
+	}
 
 	// Merge feature branch commit into main
 	curRef, err := repo.Reference(plumbing.ReferenceName(refName), true)
@@ -392,7 +394,7 @@ func TestListRules(t *testing.T) {
 	t.Run("no delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-		rules, err := ListRules(context.Background(), repo)
+		rules, err := ListRules(context.Background(), repo, PolicyRef)
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
 			{
@@ -427,7 +429,7 @@ func TestListRules(t *testing.T) {
 	t.Run("with delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
-		rules, err := ListRules(context.Background(), repo)
+		rules, err := ListRules(context.Background(), repo, PolicyRef)
 
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
@@ -504,5 +506,78 @@ func TestStateHasFileRule(t *testing.T) {
 		hasFileRule, err := state.hasFileRule()
 		assert.Nil(t, err)
 		assert.False(t, hasFileRule)
+	})
+}
+
+func TestApply(t *testing.T) {
+	t.Run("single addition", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = AddTargetsKey(rootMetadata, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.RootEnvelope = rootEnv
+
+		if err := state.Commit(context.Background(), repo, "Added target key to root", false); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
+		assert.NotEqual(t, staging, policy)
+
+		err = Apply(testCtx, repo, false)
+
+		assert.Nil(t, err)
+
+		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// After Apply, the policy ref was fast-forward merged with the staging ref
+
+		assert.Equal(t, staging, policy)
 	})
 }

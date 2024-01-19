@@ -10,9 +10,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct{}
+type options struct {
+	targetRef string
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.targetRef,
+		"targetRef",
+		"",
+		"to specify which ref should be inspected",
+	)
+	cmd.MarkFlagRequired("targetRef") //nolint:errcheck
+}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := repository.LoadRepository()
@@ -20,7 +30,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	rules, err := repo.ListRules(cmd.Context())
+	rules, err := repo.ListRules(cmd.Context(), o.targetRef)
 	if err != nil {
 		return err
 	}

@@ -63,7 +63,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
