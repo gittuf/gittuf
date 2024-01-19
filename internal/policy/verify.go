@@ -89,6 +89,25 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (pl
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
 }
 
+// VerifyFromRef bootstraps the information needed in order to call VerifyRelativeForRef,
+// used when performing verification starting from a certain RSL entry.
+func VerifyFromRef(ctx context.Context, repo *git.Repository, target string, from string) (plumbing.Hash, error) {
+	// 1. Trace RSL back to the entry for the from ref
+	fromEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, from)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// 2. Find latest entry for target
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// 3. Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, fromEntry, fromEntry, latestEntry, target)
+}
+
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 //
