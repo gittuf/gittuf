@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -25,7 +28,7 @@ var (
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []*tuf.Key) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -45,7 +48,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, 0o755); err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
@@ -64,8 +67,41 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
+	sort.Slice(expectedRootKeys, func(i, j int) bool {
+		return expectedRootKeys[i].KeyID < expectedRootKeys[j].KeyID
+	})
+
 	repository := &Repository{r: r}
 
 	slog.Debug("Verifying HEAD...")
+	if len(expectedRootKeys) > 0 {
+		state, err := policy.LoadCurrentState(ctx, r)
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+		rootMetadata, err := state.GetRootMetadata()
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+		if len(rootMetadata.Roles[policy.RootRoleName].KeyIDs) != len(expectedRootKeys) {
+			expectedRootKeysIds := []string{}
+
+			for _, key := range expectedRootKeys {
+				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
+			}
+
+			return repository, errors.Join(ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+		}
+		for keyIndex := range expectedRootKeys {
+			expectedRootKeysIds := []string{}
+
+			for _, key := range expectedRootKeys {
+				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
+			}
+			if !reflect.DeepEqual(rootMetadata.Keys[rootMetadata.Roles[policy.RootRoleName].KeyIDs[keyIndex]], expectedRootKeys[keyIndex]) {
+				return repository, errors.Join(ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+			}
+		}
+	}
 	return repository, repository.VerifyRef(ctx, head.Target().String(), true)
 }
