@@ -9,9 +9,10 @@ gittuf verify-ref [flags]
 ### Options
 
 ```
-      --from string   start point for verification
-  -h, --help          help for verify-ref
-      --latest-only   perform verification against latest entry in the RSL
+      --from-commit string   perform verification from specified commit
+      --from-entry string    perform verification from specified RSL entry
+  -h, --help                 help for verify-ref
+      --latest-only          perform verification against latest entry in the RSL
 ```
 
 ### Options inherited from parent commands
