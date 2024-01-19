@@ -49,7 +49,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	refs := []string{rsl.Ref, policy.PolicyRef}
+	refs := []string{rsl.Ref, policy.PolicyStagingRef, policy.PolicyRef}
 
 	slog.Debug("Cloning repository...")
 	r, err := gitinterface.CloneAndFetch(ctx, remoteURL, dir, initialBranch, refs)

@@ -27,7 +27,7 @@ func TestInitializeRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestAddRootKey(t *testing.T) {
 	err = r.AddRootKey(testCtx, sv, newRootKey, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,10 +96,11 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestRemoveRootKey(t *testing.T) {
 	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	err = r.AddTopLevelTargetsKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +244,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +276,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +301,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 2, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}

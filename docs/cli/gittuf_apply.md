@@ -1,16 +1,15 @@
-## gittuf policy list-rules
+## gittuf apply
 
-List rules for the current state
+applies work in progress changes to the policy state to the current policy state
 
 ```
-gittuf policy list-rules [flags]
+gittuf apply [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help               help for list-rules
-      --targetRef string   to specify which ref should be inspected
+  -h, --help   help for apply
 ```
 
 ### Options inherited from parent commands
@@ -19,11 +18,10 @@ gittuf policy list-rules [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign policy file
       --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO
 
-* [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
+* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 
