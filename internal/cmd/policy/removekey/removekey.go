@@ -9,6 +9,8 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
@@ -41,22 +43,32 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	keyBytes, err := os.ReadFile(o.p.SigningKey)
+	signingKeyBytes, err := os.ReadFile(o.p.SigningKey)
 	if err != nil {
 		return err
 	}
 
-	authorizedKeysBytes := [][]byte{}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
+	if err != nil {
+		return err
+	}
+
+	authorizedKeys := []*tuf.Key{}
 	for _, key := range o.authorizedKeys {
-		kb, err := common.ReadKeyBytes(key) //nolint:staticcheck
+		keyBytes, err := os.ReadFile(key)
 		if err != nil {
 			return err
 		}
 
-		authorizedKeysBytes = append(authorizedKeysBytes, kb)
+		key, err := tuf.LoadKeyFromBytes(keyBytes)
+		if err != nil {
+			return err
+		}
+
+		authorizedKeys = append(authorizedKeys, key)
 	}
 
-	return repo.RemoveKeyFromTargets(cmd.Context(), keyBytes, o.policyName, authorizedKeysBytes, true)
+	return repo.RemoveKeyFromTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
