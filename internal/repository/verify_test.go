@@ -55,7 +55,7 @@ func TestVerifyRef(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		err := repo.VerifyRef(context.Background(), test.target, test.latestOnly)
+		err := repo.VerifyRef(context.Background(), test.target, test.latestOnly, "")
 		if test.err != nil {
 			assert.ErrorIs(t, err, test.err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
@@ -65,8 +65,8 @@ func TestVerifyRef(t *testing.T) {
 
 	// Add another commit
 	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
-	err := repo.VerifyRef(context.Background(), refName, true)
+	err := repo.VerifyRef(context.Background(), refName, true, "")
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
-	err = repo.VerifyRef(context.Background(), refName, false)
+	err = repo.VerifyRef(context.Background(), refName, false, "")
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 }
