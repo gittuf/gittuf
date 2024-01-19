@@ -9,6 +9,7 @@ import (
 
 type options struct {
 	latestOnly bool
+	from       string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -18,6 +19,15 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		false,
 		"perform verification against latest entry in the RSL",
 	)
+
+	cmd.Flags().StringVar(
+		&o.from,
+		"from",
+		"",
+		"start point for verification",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive("latest-only", "from")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -25,7 +35,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return repo.VerifyRef(cmd.Context(), args[0], o.latestOnly)
+	return repo.VerifyRef(cmd.Context(), args[0], o.latestOnly, o.from)
 }
 
 func New() *cobra.Command {

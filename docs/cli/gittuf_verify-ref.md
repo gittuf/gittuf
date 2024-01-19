@@ -9,6 +9,7 @@ gittuf verify-ref [flags]
 ### Options
 
 ```
+      --from string   start point for verification
   -h, --help          help for verify-ref
       --latest-only   perform verification against latest entry in the RSL
 ```
