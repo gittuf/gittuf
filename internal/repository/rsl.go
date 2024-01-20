@@ -123,16 +123,7 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 	}
 
 	// Next, check if remote is ahead of local
-	remoteCommit, err := gitinterface.GetCommit(r.r, remoteRefState.Hash())
-	if err != nil {
-		return false, false, err
-	}
-	localCommit, err := gitinterface.GetCommit(r.r, localRefState.Hash())
-	if err != nil {
-		return false, false, err
-	}
-
-	knows, err := gitinterface.KnowsCommit(r.r, remoteCommit.Hash, localCommit)
+	knows, err := gitinterface.KnowsCommit(r.r, remoteRefState.Hash(), localRefState.Hash())
 	if err != nil {
 		return false, false, err
 	}
@@ -143,7 +134,7 @@ func (r *Repository) CheckRemoteRSLForUpdates(ctx context.Context, remoteName st
 	// If not ancestor, local may be ahead or they may have diverged
 	// If remote is ancestor, only local is ahead, no updates
 	// If remote is not ancestor, the two have diverged, local needs to pull updates
-	knows, err = gitinterface.KnowsCommit(r.r, localCommit.Hash, remoteCommit)
+	knows, err = gitinterface.KnowsCommit(r.r, localRefState.Hash(), remoteRefState.Hash())
 	if err != nil {
 		return false, false, err
 	}

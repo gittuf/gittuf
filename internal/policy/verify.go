@@ -322,7 +322,7 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 			continue
 		}
 
-		commitPolicy, err := GetStateForCommit(ctx, repo, commit)
+		commitPolicy, err := GetStateForCommit(ctx, repo, commit.ID())
 		if err != nil {
 			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
 			continue
@@ -532,18 +532,18 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	// 4. Verify modified files
 
 	// First, get all commits between the current and last entry for the ref.
-	commits, err := getCommits(repo, entry) // note: this is ordered by commit ID
+	commitIDs, err := getCommits(repo, entry) // note: this is ordered by commit ID
 	if err != nil {
 		return err
 	}
 
-	commitsVerified := make([]bool, len(commits))
-	for i, commit := range commits {
+	commitsVerified := make([]bool, len(commitIDs))
+	for i, commitID := range commitIDs {
 		// Assume the commit's paths are verified, if a path is left unverified,
 		// we flip this later.
 		commitsVerified[i] = true
 
-		paths, err := gitinterface.GetFilePathsChangedByCommit(repo, commit)
+		paths, err := gitinterface.GetFilePathsChangedByCommit(repo, commitID)
 		if err != nil {
 			return err
 		}
@@ -581,6 +581,11 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 			if pathsVerified[j] {
 				continue
+			}
+
+			commit, err := gitinterface.GetCommit(repo, commitID)
+			if err != nil {
+				return err
 			}
 
 			for _, verifier := range verifiers {
@@ -715,7 +720,7 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 // getCommits identifies the commits introduced to the entry's ref since the
 // last RSL entry for the same ref. These commits are then verified for file
 // policies.
-func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]*object.Commit, error) {
+func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]plumbing.Hash, error) {
 	firstEntry := false
 
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)

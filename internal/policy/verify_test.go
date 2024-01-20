@@ -887,23 +887,14 @@ func TestGetCommits(t *testing.T) {
 	secondEntry.ID = secondEntryID
 
 	expectedCommitIDs := []plumbing.Hash{commitIDs[1], commitIDs[2], commitIDs[3], commitIDs[4]}
-	expectedCommits := make([]*object.Commit, 0, len(expectedCommitIDs))
-	for _, commitID := range expectedCommitIDs {
-		commit, err := gitinterface.GetCommit(repo, commitID)
-		if err != nil {
-			t.Fatal(err)
-		}
 
-		expectedCommits = append(expectedCommits, commit)
-	}
-
-	sort.Slice(expectedCommits, func(i, j int) bool {
-		return expectedCommits[i].ID().String() < expectedCommits[j].ID().String()
+	sort.Slice(expectedCommitIDs, func(i, j int) bool {
+		return expectedCommitIDs[i].String() < expectedCommitIDs[j].String()
 	})
 
-	commits, err := getCommits(repo, secondEntry)
+	commitIDs, err := getCommits(repo, secondEntry)
 	assert.Nil(t, err)
-	assert.Equal(t, expectedCommits, commits)
+	assert.Equal(t, expectedCommitIDs, commitIDs)
 }
 
 func TestGetChangedPaths(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 const (
@@ -328,7 +327,20 @@ func GetLatestEntry(repo *git.Repository) (Entry, error) {
 // GetLatestNonGittufReferenceEntry returns the first reference entry that is
 // not for the gittuf namespace.
 func GetLatestNonGittufReferenceEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
-	it, err := GetLatestEntry(repo)
+	return GetLatestNonGittufReferenceEntryFrom(repo, plumbing.ZeroHash)
+}
+
+func GetLatestNonGittufReferenceEntryFrom(repo *git.Repository, anchor plumbing.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
+	var (
+		it  Entry
+		err error
+	)
+
+	if anchor.IsZero() {
+		it, err = GetLatestEntry(repo)
+	} else {
+		it, err = GetEntry(repo, anchor)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -511,7 +523,7 @@ func GetFirstEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, e
 // establishes the first time a commit was seen in the repository, irrespective
 // of the ref it was associated with, and we can infer things like the active
 // developers who could have signed the commit.
-func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit) (*ReferenceEntry, []*AnnotationEntry, error) {
+func GetFirstReferenceEntryForCommit(repo *git.Repository, commitID plumbing.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
@@ -526,7 +538,7 @@ func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit
 		return nil, nil, err
 	}
 
-	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.TargetID, commit)
+	knowsCommit, err := gitinterface.KnowsCommit(repo, firstEntry.TargetID, commitID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -543,7 +555,7 @@ func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit
 			return nil, nil, err
 		}
 
-		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.TargetID, commit)
+		knowsCommit, err := gitinterface.KnowsCommit(repo, iteratorEntry.TargetID, commitID)
 		if err != nil {
 			return nil, nil, err
 		}

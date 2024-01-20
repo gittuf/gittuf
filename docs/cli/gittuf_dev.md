@@ -18,6 +18,7 @@ These commands are meant to be used to aid gittuf development, and are not expec
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+      --use-git-binary               use Git binary for some operations (developer mode only, set GITTUF_DEV=1)
       --verbose                      enable verbose logging
 ```
 

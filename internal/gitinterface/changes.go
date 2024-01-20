@@ -5,9 +5,14 @@ package gitinterface
 import (
 	"container/heap"
 	"fmt"
+	"os/exec"
 	"sort"
+	"strings"
 
+	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -40,7 +45,16 @@ func GetCommitFilePaths(commit *object.Commit) ([]string, error) {
 // one parent, check if the commit is the same as at least one of its parents.
 // If there is a matching parent, we return no changes. If there is no matching
 // parent commit, we return the changes between the commit and each of its parents.
-func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([]string, error) {
+func GetFilePathsChangedByCommit(repo *git.Repository, commitID plumbing.Hash) ([]string, error) {
+	if featureflags.UseGitBinary {
+		return GetFilePathsChangedByCommitUsingBinary(repo, commitID)
+	}
+
+	commit, err := GetCommit(repo, commitID)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(commit.ParentHashes) > 1 {
 		// Merge commit: compare with each parent and aggregate changes
 
@@ -102,6 +116,92 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 	}
 
 	return GetDiffFilePaths(commit, parentCommit)
+}
+
+// GetFilePathsChangedByCommitUsingBinary is an implementation of
+// GetFilePathsChangedByCommit that uses the Git binary instead of go-git.
+func GetFilePathsChangedByCommitUsingBinary(_ *git.Repository, commitID plumbing.Hash) ([]string, error) {
+	if !dev.InDevMode() {
+		return nil, dev.ErrNotInDevMode
+	}
+
+	// Identify the number of parents
+	command := exec.Command("git", "rev-parse", fmt.Sprintf("%s^@", commitID.String())) //nolint:gosec
+	stdOut, err := command.Output()
+	if err != nil {
+		return nil, err
+	}
+	stdOutString := strings.TrimSpace(string(stdOut))
+
+	if stdOutString == "" {
+		// No parent, return all file paths for commit
+		command := exec.Command("git", "ls-tree", "--name-only", "-r", commitID.String()) //nolint:gosec
+		stdOut, err := command.Output()
+		if err != nil {
+			return nil, err
+		}
+
+		stdOutString := strings.TrimSpace(string(stdOut))
+		paths := strings.Split(stdOutString, "\n")
+		return paths, nil
+	}
+
+	parentCommitIDs := strings.Split(stdOutString, "\n")
+	if len(parentCommitIDs) > 1 {
+		// Check if tree matches last commit
+		command := exec.Command("git", "diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1], commitID.String()) //nolint:gosec
+		stdOut, err := command.Output()
+		if err != nil {
+			return nil, err
+		}
+		stdOutString := strings.TrimSpace(string(stdOut))
+		if stdOutString == "" {
+			return nil, nil
+		}
+
+		pathSet := map[string]bool{}
+		for _, parentCommitID := range parentCommitIDs {
+			command := exec.Command("git", "diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID, commitID.String()) //nolint:gosec
+			stdOut, err := command.Output()
+			if err != nil {
+				return nil, err
+			}
+
+			stdOutString := strings.TrimSpace(string(stdOut))
+			paths := strings.Split(stdOutString, "\n")
+			for _, path := range paths {
+				if path == "" {
+					continue
+				}
+				pathSet[path] = true
+			}
+		}
+
+		paths := make([]string, 0, len(pathSet))
+		for path := range pathSet {
+			paths = append(paths, path)
+		}
+
+		sort.Slice(paths, func(i, j int) bool {
+			return paths[i] < paths[j]
+		})
+
+		return paths, nil
+	}
+
+	command = exec.Command("git", "diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String()) //nolint:gosec
+	stdOut, err = command.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	stdOutString = strings.TrimSpace(string(stdOut))
+	if stdOutString == "" {
+		return nil, nil
+	}
+
+	paths := strings.Split(stdOutString, "\n")
+	return paths, nil
 }
 
 // GetDiffFilePaths enumerates all the changed file paths between the two

@@ -295,11 +295,7 @@ func TestGetStateForCommit(t *testing.T) {
 	}
 
 	// No RSL entry for commit => no state yet
-	commit, err := gitinterface.GetCommit(repo, commitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := GetStateForCommit(context.Background(), repo, commit)
+	state, err := GetStateForCommit(context.Background(), repo, commitID)
 	assert.Nil(t, err)
 	assert.Nil(t, state)
 
@@ -308,7 +304,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err = GetStateForCommit(context.Background(), repo, commit)
+	state, err = GetStateForCommit(context.Background(), repo, commitID)
 	assert.Nil(t, err)
 	assert.Equal(t, firstState, state)
 
@@ -326,12 +322,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newCommit, err := gitinterface.GetCommit(repo, newCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
 	assert.Nil(t, err)
 	assert.Equal(t, firstState, state)
 
@@ -381,7 +372,7 @@ func TestGetStateForCommit(t *testing.T) {
 
 	// Check that for this commit ID, the first state is returned and not the
 	// second
-	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
 	assert.Nil(t, err)
 	assert.Equal(t, firstState, state)
 }

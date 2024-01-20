@@ -4,8 +4,10 @@ package gitinterface
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -378,12 +380,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
@@ -411,12 +408,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
@@ -450,12 +442,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
@@ -488,12 +475,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"b"}, diffs)
 	})
@@ -526,12 +508,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"b"}, diffs)
 	})
@@ -564,12 +541,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cBID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cBID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
 	})
@@ -588,12 +560,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cAID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cAID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
@@ -629,12 +596,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cMID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cMID)
 		assert.Nil(t, err)
 		assert.Nil(t, diffs)
 	})
@@ -675,12 +637,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cMID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		diffs, err := GetFilePathsChangedByCommit(repo, cMID)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b", "c"}, diffs)
 	})
@@ -721,12 +678,362 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commit, err := GetCommit(repo, cMID)
+		diffs, err := GetFilePathsChangedByCommit(repo, cMID)
+		assert.Nil(t, err)
+		// The expected result may vary depending on how your function handles conflicts
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+}
+
+func TestGetFilePathsChangedByCommitUsingBinary(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	tmpDir := t.TempDir()
+	repo, err := git.PlainInit(tmpDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(currentDir) //nolint:errcheck
+
+	blobIDs := []plumbing.Hash{}
+	for i := 0; i < 3; i++ {
+		blobID, err := WriteBlob(repo, []byte(fmt.Sprintf("%d", i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		blobIDs = append(blobIDs, blobID)
+	}
+
+	t.Run("modify single file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		diffs, err := GetFilePathsChangedByCommit(repo, commit)
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("rename single file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "b", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("swap two files around", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("create new file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("delete file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("modify file and create new file", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[2]},
+			{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cBID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("no parent", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{
+			{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, nil, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cAID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("merge commit with commit matching parent", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents
+		cM := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cMID)
+		assert.Nil(t, err)
+		assert.Nil(t, diffs)
+	})
+
+	t.Run("merge commit with no matching parent", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "b", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := WriteTree(repo, []object.TreeEntry{{Name: "c", Mode: filemode.Regular, Hash: blobIDs[2]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and a different tree
+		cM := CreateCommitObject(testGitConfig, treeC, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cMID)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b", "c"}, diffs)
+	})
+
+	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
+		treeA, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := WriteTree(repo, []object.TreeEntry{{Name: "a", Mode: filemode.Regular, Hash: blobIDs[2]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA := CreateCommitObject(testGitConfig, treeA, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+		cAID, err := WriteCommit(repo, cA)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB := CreateCommitObject(testGitConfig, treeB, []plumbing.Hash{cAID}, "Test commit", testClock)
+		cBID, err := WriteCommit(repo, cB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and an overlapping tree
+		cM := CreateCommitObject(testGitConfig, treeC, []plumbing.Hash{cAID, cBID}, "Merge commit", testClock)
+
+		cMID, err := WriteCommit(repo, cM)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := GetFilePathsChangedByCommitUsingBinary(repo, cMID)
 		assert.Nil(t, err)
 		// The expected result may vary depending on how your function handles conflicts
 		assert.Equal(t, []string{"a"}, diffs)
