@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -20,7 +21,7 @@ import (
 // another is to create a new RSL entry for the current state.
 var ErrRefStateDoesNotMatchRSL = errors.New("Git reference's current state does not match latest RSL entry") //nolint:stylecheck
 
-func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bool, from string) error {
+func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bool) error {
 	var (
 		expectedTip plumbing.Hash
 		err         error
@@ -31,15 +32,31 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 		return err
 	}
 
-	switch {
-	case from != "":
-		expectedTip, err = policy.VerifyFromRef(ctx, r.r, target, from)
-	case latestOnly:
+	if latestOnly {
 		expectedTip, err = policy.VerifyRef(ctx, r.r, target)
-	default:
+	} else {
 		expectedTip, err = policy.VerifyRefFull(ctx, r.r, target)
 	}
+	if err != nil {
+		return err
+	}
 
+	return r.verifyRefTip(target, expectedTip)
+}
+
+func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	var err error
+
+	target, err = gitinterface.AbsoluteReference(r.r, target)
+	if err != nil {
+		return err
+	}
+
+	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, plumbing.NewHash(entryID))
 	if err != nil {
 		return err
 	}
