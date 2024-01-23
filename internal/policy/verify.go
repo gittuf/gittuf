@@ -515,21 +515,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 			return err
 		}
 
-		var commitPolicy *State
-		commitPolicy, err = GetStateForCommit(ctx, repo, commit)
-		if err != nil {
-			return err
-		}
-		if commitPolicy == nil {
-			// the commit hasn't been seen in any refs in the repository, use
-			// specified policy
-			commitPolicy = policy
-		}
-
 		pathsVerified := make([]bool, len(paths))
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for j, path := range paths {
-			verifiers, err := commitPolicy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", fileRuleScheme, path))
+			verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", fileRuleScheme, path))
 			if err != nil {
 				return err
 			}
