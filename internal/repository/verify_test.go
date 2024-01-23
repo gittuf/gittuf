@@ -147,3 +147,76 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	err = repo.VerifyRefFromEntry(testCtx, refName, violatingEntryID.String())
 	assert.ErrorIs(t, err, policy.ErrUnauthorizedSignature)
 }
+
+func TestVerifyRefFromCommit(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	repo := createTestRepositoryWithPolicy(t, "")
+
+	refName := "refs/heads/main"
+	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Policy violation
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgUnauthorizedKeyBytes)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgUnauthorizedKeyBytes)
+	violatingCommitID := commitIDs[0]
+
+	// No policy violation
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
+	goodCommitID := commitIDs[0]
+
+	// No policy violation (latest)
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
+
+	tests := map[string]struct {
+		target       string
+		fromCommitID plumbing.Hash
+		err          error
+	}{
+		"absolute ref, from non-violating": {
+			target:       "refs/heads/main",
+			fromCommitID: goodCommitID,
+		},
+		"absolute ref, from violating": {
+			target:       "refs/heads/main",
+			fromCommitID: violatingCommitID,
+			err:          policy.ErrUnauthorizedSignature,
+		},
+		"relative ref, from non-violating": {
+			target:       "main",
+			fromCommitID: goodCommitID,
+		},
+		"relative ref, from violating": {
+			target:       "main",
+			fromCommitID: violatingCommitID,
+			err:          policy.ErrUnauthorizedSignature,
+		},
+	}
+
+	for name, test := range tests {
+		err := repo.VerifyRefFromCommit(testCtx, test.target, test.fromCommitID.String())
+		if test.err != nil {
+			assert.ErrorIs(t, err, test.err, fmt.Sprintf("unexpected error in test '%s'", name))
+		} else {
+			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+		}
+	}
+
+	// Add another commit
+	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+
+	// Verifying from only good commit tells us ref does not match RSL
+	err := repo.VerifyRefFromCommit(testCtx, refName, goodCommitID.String())
+	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
+
+	// Verifying from violating commit tells us unauthorized signature
+	err = repo.VerifyRefFromCommit(testCtx, refName, violatingCommitID.String())
+	assert.ErrorIs(t, err, policy.ErrUnauthorizedSignature)
+}

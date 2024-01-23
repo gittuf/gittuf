@@ -10,6 +10,7 @@ import (
 type options struct {
 	latestOnly bool
 	fromEntry  string
+	fromCommit string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -27,7 +28,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"perform verification from specified RSL entry",
 	)
 
-	cmd.MarkFlagsMutuallyExclusive("latest-only", "from-entry")
+	cmd.Flags().StringVar(
+		&o.fromCommit,
+		"from-commit",
+		"",
+		"perform verification from specified commit",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive("latest-only", "from-entry", "from-commit")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -38,6 +46,10 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 
 	if o.fromEntry != "" {
 		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry)
+	}
+
+	if o.fromCommit != "" {
+		return repo.VerifyRefFromCommit(cmd.Context(), args[0], o.fromCommit)
 	}
 
 	return repo.VerifyRef(cmd.Context(), args[0], o.latestOnly)
