@@ -8,6 +8,7 @@ import (
 	"time"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -130,8 +131,8 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Nil(t, delegations.Keys)
 		delegations.AddKey(key)
 		assert.Equal(t, key, delegations.Keys[key.KeyID])
-		err := delegations.RemoveKey(key.KeyID)
-		assert.ErrorIs(t, err, nil)
+		delegations.RemoveKey(key.KeyID)
+		assert.Equal(t, map[string]*signerverifier.SSLibKey{}, delegations.Keys)
 	})
 	t.Run("test AddDelegation", func(t *testing.T) {
 		assert.Nil(t, delegations.Roles)

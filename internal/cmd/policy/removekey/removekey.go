@@ -25,14 +25,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"policy file to add rule to",
+		"policy file to remove key from",
 	)
 
 	cmd.Flags().StringArrayVar(
 		&o.authorizedKeys,
 		"authorize-key",
 		[]string{},
-		"authorized public key for rule",
+		"authorized public keys to remove from rule",
 	)
 	cmd.MarkFlagRequired("authorize-key") //nolint:errcheck
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -123,7 +124,19 @@ func TestRemoveKeyFromTargets(t *testing.T) {
 	}
 
 	t.Run("remove single key", func(t *testing.T) {
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+
 		targetsMetadata := InitializeTargetsMetadata()
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(testCtx, targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := &State{TargetsEnvelope: targetsEnv}
 
 		assert.Nil(t, targetsMetadata.Delegations.Keys)
 
@@ -132,13 +145,25 @@ func TestRemoveKeyFromTargets(t *testing.T) {
 		assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
 
-		targetsMetadata, err = RemoveKeysFromTargets(targetsMetadata, []*tuf.Key{gpgKey})
+		targetsMetadata, err = RemoveKeysFromTargets(s, targetsMetadata, []*tuf.Key{gpgKey})
 		assert.Nil(t, err)
 		assert.Equal(t, 0, len(targetsMetadata.Delegations.Keys))
 	})
 
 	t.Run("add multiple keys and remove multiple keys", func(t *testing.T) {
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+
 		targetsMetadata := InitializeTargetsMetadata()
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(testCtx, targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := &State{TargetsEnvelope: targetsEnv}
 
 		assert.Nil(t, targetsMetadata.Delegations.Keys)
 
@@ -149,7 +174,7 @@ func TestRemoveKeyFromTargets(t *testing.T) {
 		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
 		assert.Equal(t, targetsKey, targetsMetadata.Delegations.Keys[targetsKey.KeyID])
 
-		targetsMetadata, err = RemoveKeysFromTargets(targetsMetadata, []*tuf.Key{gpgKey, targetsKey})
+		targetsMetadata, err = RemoveKeysFromTargets(s, targetsMetadata, []*tuf.Key{gpgKey, targetsKey})
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])

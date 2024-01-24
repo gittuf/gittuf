@@ -722,6 +722,44 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 	return allDelegations, nil
 }
 
+func (s *State) CountofKeyUse(key *tuf.Key) (int, error) {
+	if s.TargetsEnvelope == nil {
+		// No top level targets, we don't need to check for delegated roles
+		return 0, nil
+	}
+
+	targetsRole, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return 0, err
+	}
+
+	rolesToCheck := []*tuf.TargetsMetadata{targetsRole}
+
+	// This doesn't consider whether a delegated role is reachable because we
+	// don't know what artifact path this is for
+	for roleName := range s.DelegationEnvelopes {
+		delegatedRole, err := s.GetTargetsMetadata(roleName)
+		if err != nil {
+			return 0, err
+		}
+		rolesToCheck = append(rolesToCheck, delegatedRole)
+	}
+
+	rulesUsingKey := 0
+
+	for _, role := range rolesToCheck {
+		for _, delegation := range role.Delegations.Roles {
+			for _, keyID := range delegation.KeyIDs {
+				if key.KeyID == keyID {
+					rulesUsingKey++
+				}
+			}
+		}
+	}
+
+	return rulesUsingKey, nil
+}
+
 // hasFileRule returns true if the policy state has a single rule in any targets
 // role with the file namespace scheme. Note that this function has no concept
 // of role reachability, as it is not invoked for a specific path. So, it might

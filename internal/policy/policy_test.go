@@ -530,3 +530,31 @@ func TestStateHasFileRule(t *testing.T) {
 		assert.False(t, hasFileRule)
 	})
 }
+
+func TestStateCountofKeyUse(t *testing.T) {
+	t.Run("with file rules", func(t *testing.T) {
+		gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := createTestStateWithPolicy(t)
+
+		count, err := state.CountofKeyUse(gpgkey)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, count)
+	})
+
+	t.Run("with no file rules", func(t *testing.T) {
+		gpgkey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := createTestStateWithOnlyRoot(t)
+
+		count, err := state.CountofKeyUse(gpgkey)
+		assert.Nil(t, err)
+		assert.Equal(t, 0, count)
+	})
+}

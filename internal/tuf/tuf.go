@@ -11,7 +11,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"path"
 
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
@@ -183,14 +182,10 @@ func (d *Delegations) AddKey(key *Key) {
 	d.Keys[key.KeyID] = key
 }
 
-func (d *Delegations) RemoveKey(keyID string) error {
-	if _, ok := d.Keys[keyID]; !ok {
-		return fmt.Errorf("key %s, is not in this rule", keyID)
+func (d *Delegations) RemoveKey(keyID string) {
+	if _, ok := d.Keys[keyID]; ok {
+		delete(d.Keys, keyID)
 	}
-
-	delete(d.Keys, keyID)
-
-	return nil
 }
 
 // AddDelegation adds a new delegation.

@@ -280,7 +280,7 @@ func (r *Repository) RemoveKeyFromTargets(ctx context.Context, signer sslibdsse.
 		return err
 	}
 
-	targetsMetadata, err = policy.RemoveKeysFromTargets(targetsMetadata, authorizedKeys)
+	targetsMetadata, err = policy.RemoveKeysFromTargets(state, targetsMetadata, authorizedKeys)
 	if err != nil {
 		return err
 	}
