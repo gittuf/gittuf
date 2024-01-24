@@ -512,13 +512,27 @@ func GetFirstEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, e
 // of the ref it was associated with, and we can infer things like the active
 // developers who could have signed the commit.
 func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit) (*ReferenceEntry, []*AnnotationEntry, error) {
+	return GetFirstReferenceEntryForCommitInRef(repo, commit, "")
+}
+
+func GetFirstReferenceEntryForCommitInRef(repo *git.Repository, commit *object.Commit, refName string) (*ReferenceEntry, []*AnnotationEntry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
 	// checking the parent. The first pair where the parent entry is not
 	// descended from the target commit, we return the other entry in the pair.
 
-	firstEntry, firstAnnotations, err := GetLatestNonGittufReferenceEntry(repo)
+	var (
+		firstEntry       *ReferenceEntry
+		firstAnnotations []*AnnotationEntry
+		err              error
+	)
+
+	if refName == "" {
+		firstEntry, firstAnnotations, err = GetLatestNonGittufReferenceEntry(repo)
+	} else {
+		firstEntry, firstAnnotations, err = GetLatestReferenceEntryForRef(repo, refName)
+	}
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			return nil, nil, ErrNoRecordOfCommit
@@ -535,7 +549,16 @@ func GetFirstReferenceEntryForCommit(repo *git.Repository, commit *object.Commit
 	}
 
 	for {
-		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentReferenceEntryForEntry(repo, firstEntry)
+		var (
+			iteratorEntry       *ReferenceEntry
+			iteratorAnnotations []*AnnotationEntry
+		)
+
+		if refName == "" {
+			iteratorEntry, iteratorAnnotations, err = GetNonGittufParentReferenceEntryForEntry(repo, firstEntry)
+		} else {
+			iteratorEntry, iteratorAnnotations, err = GetLatestReferenceEntryForRefBefore(repo, refName, firstEntry.ID)
+		}
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
 				return firstEntry, firstAnnotations, nil

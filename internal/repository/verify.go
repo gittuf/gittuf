@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -36,6 +38,56 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 	} else {
 		expectedTip, err = policy.VerifyRefFull(ctx, r.r, target)
 	}
+	if err != nil {
+		return err
+	}
+
+	return r.verifyRefTip(target, expectedTip)
+}
+
+func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	var err error
+
+	target, err = gitinterface.AbsoluteReference(r.r, target)
+	if err != nil {
+		return err
+	}
+
+	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, plumbing.NewHash(entryID))
+	if err != nil {
+		return err
+	}
+
+	return r.verifyRefTip(target, expectedTip)
+}
+
+func (r *Repository) VerifyRefFromCommit(ctx context.Context, target, commitID string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	var err error
+
+	target, err = gitinterface.AbsoluteReference(r.r, target)
+	if err != nil {
+		return err
+	}
+
+	commit, err := gitinterface.GetCommit(r.r, plumbing.NewHash(commitID))
+	if err != nil {
+		return err
+	}
+
+	entry, _, err := rsl.GetFirstReferenceEntryForCommitInRef(r.r, commit, target)
+	if err != nil {
+		return err
+	}
+
+	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, entry.ID)
 	if err != nil {
 		return err
 	}

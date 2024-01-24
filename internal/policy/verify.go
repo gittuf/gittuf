@@ -89,6 +89,39 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (pl
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
 }
 
+// VerifyRefFromEntry performs verification for the reference from a specific
+// RSL entry. The expected Git ID for the ref in the latest RSL entry is
+// returned if the policy verification is successful.
+func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string, entryID plumbing.Hash) (plumbing.Hash, error) {
+	// 1. Load starting point entry
+	fromEntryT, err := rsl.GetEntry(repo, entryID)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// TODO: we should instead find the latest ref entry before the entryID and
+	// use that
+	fromEntry, isRefEntry := fromEntryT.(*rsl.ReferenceEntry)
+	if !isRefEntry {
+		return plumbing.ZeroHash, err
+	}
+
+	// 2. Find latest entry for target
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// 3. Find policy entry before the starting point entry
+	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// 4. Do a relative verify from start entry to the latest entry
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyEntry, fromEntry, latestEntry, target)
+}
+
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 //

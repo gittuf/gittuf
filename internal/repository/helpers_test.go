@@ -17,14 +17,15 @@ import (
 )
 
 var (
-	gpgKeyBytes        = artifacts.GPGKey1Private
-	gpgPubKeyBytes     = artifacts.GPGKey1Public
-	rootKeyBytes       = artifacts.SSLibKey1Private
-	rootPubKeyBytes    = artifacts.SSLibKey1Public
-	targetsKeyBytes    = artifacts.SSLibKey2Private
-	targetsPubKeyBytes = artifacts.SSLibKey2Public
-	rsaKeyBytes        = artifacts.SSHRSAPrivate
-	ecdsaKeyBytes      = artifacts.SSHECDSAPrivate
+	gpgKeyBytes             = artifacts.GPGKey1Private
+	gpgPubKeyBytes          = artifacts.GPGKey1Public
+	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
+	rootKeyBytes            = artifacts.SSLibKey1Private
+	rootPubKeyBytes         = artifacts.SSLibKey1Public
+	targetsKeyBytes         = artifacts.SSLibKey2Private
+	targetsPubKeyBytes      = artifacts.SSLibKey2Public
+	rsaKeyBytes             = artifacts.SSHRSAPrivate
+	ecdsaKeyBytes           = artifacts.SSHECDSAPrivate
 
 	testCtx = context.Background()
 )

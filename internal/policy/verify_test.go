@@ -87,6 +87,35 @@ func TestVerifyRefFull(t *testing.T) {
 	assert.Equal(t, commitIDs[0], currentTip)
 }
 
+func TestVerifyRefFromEntry(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+	refName := "refs/heads/main"
+
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Policy violation
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
+	entry := rsl.NewReferenceEntry(refName, commitIDs[2])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+
+	// Not policy violation by itself
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+	entry = rsl.NewReferenceEntry(refName, commitIDs[2])
+	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+	// Not policy violation by itself
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+	entry = rsl.NewReferenceEntry(refName, commitIDs[1])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+	// Verification passes because it's from a non-violating state only
+	currentTip, err := VerifyRefFromEntry(testCtx, repo, refName, entryID)
+	assert.Nil(t, err)
+	assert.Equal(t, commitIDs[1], currentTip)
+}
+
 func TestVerifyRelativeForRef(t *testing.T) {
 	t.Run("no recovery", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
