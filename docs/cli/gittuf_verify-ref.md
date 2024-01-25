@@ -9,8 +9,9 @@ gittuf verify-ref [flags]
 ### Options
 
 ```
-  -h, --help          help for verify-ref
-      --latest-only   perform verification against latest entry in the RSL
+      --from-entry string   perform verification from specified RSL entry (developer mode only, set GITTUF_DEV=1)
+  -h, --help                help for verify-ref
+      --latest-only         perform verification against latest entry in the RSL
 ```
 
 ### Options inherited from parent commands
