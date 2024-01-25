@@ -125,6 +125,9 @@ func TestRemoveKeyFromTargets(t *testing.T) {
 
 	t.Run("remove single key", func(t *testing.T) {
 		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		targetsMetadata := InitializeTargetsMetadata()
 		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
@@ -152,7 +155,9 @@ func TestRemoveKeyFromTargets(t *testing.T) {
 
 	t.Run("add multiple keys and remove multiple keys", func(t *testing.T) {
 		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-
+		if err != nil {
+			t.Fatal(err)
+		}
 		targetsMetadata := InitializeTargetsMetadata()
 		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 		if err != nil {

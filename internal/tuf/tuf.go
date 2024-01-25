@@ -183,9 +183,7 @@ func (d *Delegations) AddKey(key *Key) {
 }
 
 func (d *Delegations) RemoveKey(keyID string) {
-	if _, ok := d.Keys[keyID]; ok {
-		delete(d.Keys, keyID)
-	}
+	delete(d.Keys, keyID)
 }
 
 // AddDelegation adds a new delegation.
