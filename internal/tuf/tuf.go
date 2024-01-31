@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
@@ -196,11 +197,38 @@ func (d *Delegations) AddDelegation(delegation Delegation) {
 // Matches checks if any of the delegation's patterns match the target.
 func (d *Delegation) Matches(target string) bool {
 	for _, pattern := range d.Paths {
-		if ok, _ := path.Match(pattern, target); ok {
+		// if matches, _ := path.Match(pattern, target); matches {
+		if patternMatchesTarget(pattern, target) {
 			return true
 		}
 	}
 	return false
+}
+
+func patternMatchesTarget(pattern, target string) bool {
+	patternParts := strings.Split(pattern, "/")
+	targetParts := strings.Split(target, "/")
+
+	if len(patternParts) > len(targetParts) {
+		return false
+	}
+
+	if patternParts[len(patternParts)-1] == "*" {
+		// foo/* matches foo/bar, foo/bar/foobar, ...
+		patternParts = patternParts[:len(patternParts)-1]
+	} else {
+		if len(patternParts) < len(targetParts) {
+			return false
+		}
+	}
+
+	for i := 0; i < len(patternParts); i++ {
+		if ok, _ := path.Match(patternParts[i], targetParts[i]); !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Delegation defines the schema for a single delegation entry. It differs from

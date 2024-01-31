@@ -145,3 +145,48 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Contains(t, delegations.Roles, d)
 	})
 }
+
+func TestDelegationMatches(t *testing.T) {
+	tests := map[string]struct {
+		pathPatterns   []string
+		target         string
+		expectedResult bool
+	}{
+		"single pattern, wildcard matches same directory": {
+			pathPatterns:   []string{"foo/*"},
+			target:         "foo/bar",
+			expectedResult: true,
+		},
+		"single pattern, wildcard matches subdirectory": {
+			pathPatterns:   []string{"foo/*"},
+			target:         "foo/bar/foobar",
+			expectedResult: true,
+		},
+		"single pattern, wildcard does not match": {
+			pathPatterns:   []string{"foo/*"},
+			target:         "foo",
+			expectedResult: false,
+		},
+		"single pattern, no wildcard": {
+			pathPatterns:   []string{"foo/bar"},
+			target:         "foo/bar/foobar",
+			expectedResult: false,
+		},
+		"single pattern, wildcard in the middle": {
+			pathPatterns:   []string{"foo/*/foobar"},
+			target:         "foo/bar/foobar",
+			expectedResult: true,
+		},
+		"single pattern, wildcard in the middle and end": {
+			pathPatterns:   []string{"foo/*/bar/*"},
+			target:         "foo/bar/bar/foobar",
+			expectedResult: true,
+		},
+	}
+
+	for name, test := range tests {
+		delegation := Delegation{Paths: test.pathPatterns}
+		result := delegation.Matches(test.target)
+		assert.Equal(t, test.expectedResult, result, fmt.Sprintf("unexpected result in test '%s'", name))
+	}
+}
