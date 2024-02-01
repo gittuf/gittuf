@@ -159,6 +159,26 @@ func GetFilePathsChangedByCommitUsingBinary(_ *git.Repository, commitID plumbing
 			return nil, nil
 		}
 
+		// Check if merge-tree aligns
+		args := append([]string{"merge-tree"}, parentCommitIDs...)
+		command = exec.Command("git", args...)
+		stdOut, err = command.Output()
+		if err != nil {
+			return nil, err
+		}
+		mergeTreeID := strings.TrimSpace(string(stdOut))
+
+		command = exec.Command("git", "show", "--format=%T", commitID.String())
+		stdOut, err = command.Output()
+		if err != nil {
+			return nil, err
+		}
+		commitTreeID := strings.TrimSpace(string(stdOut))
+
+		if mergeTreeID == commitTreeID {
+			return nil, nil
+		}
+
 		pathSet := map[string]bool{}
 		for _, parentCommitID := range parentCommitIDs {
 			command := exec.Command("git", "diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID, commitID.String()) //nolint:gosec
