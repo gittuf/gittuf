@@ -5,6 +5,7 @@ package gitinterface
 import (
 	"context"
 	"errors"
+	"os"
 
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -131,7 +132,10 @@ func CloneAndFetchToMemory(ctx context.Context, remoteURL, initialBranch string,
 }
 
 func createCloneOptions(remoteURL, initialBranch string) *git.CloneOptions {
-	cloneOptions := &git.CloneOptions{URL: remoteURL}
+	cloneOptions := &git.CloneOptions{
+		URL:      remoteURL,
+		Progress: os.Stdout,
+	}
 	if len(initialBranch) > 0 {
 		cloneOptions.ReferenceName = plumbing.ReferenceName(initialBranch)
 	}
