@@ -10,3 +10,7 @@ var UseGitBinary = false
 // UsePolicyPathCache allows the user to indicate that during verification, the
 // verifiers identified for some path must be cached for the policy state.
 var UsePolicyPathCache = false
+
+// SkipFilePolicies does not check for file policy violations even if file
+// policies exist.
+var SkipFilePolicies = false

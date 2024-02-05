@@ -15,6 +15,7 @@ type options struct {
 	latestOnly         bool
 	fromEntry          string
 	usePolicyPathCache bool
+	skipFilePolicies   bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -40,6 +41,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		false,
 		fmt.Sprintf("use policy path cache during verification (developer mode only, set %s=1)", dev.DevModeKey),
 	)
+
+	cmd.Flags().BoolVar(
+		&o.skipFilePolicies,
+		"skip-file-policies",
+		false,
+		fmt.Sprintf("skip file policies (developer mode only, set %s=1)", dev.DevModeKey),
+	)
 }
 
 func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
@@ -50,6 +58,15 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 
 		featureflags.UsePolicyPathCache = true
 	}
+
+	if o.skipFilePolicies {
+		if !dev.InDevMode() {
+			return dev.ErrNotInDevMode
+		}
+
+		featureflags.SkipFilePolicies = true
+	}
+
 	return nil
 }
 

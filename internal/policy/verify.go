@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -521,6 +522,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 
 	if !gitNamespaceVerified {
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
+	}
+
+	if featureflags.SkipFilePolicies {
+		return nil
 	}
 
 	hasFileRule, err := policy.hasFileRule()

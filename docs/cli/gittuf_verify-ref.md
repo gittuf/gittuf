@@ -12,6 +12,7 @@ gittuf verify-ref [flags]
       --from-entry string       perform verification from specified RSL entry (developer mode only, set GITTUF_DEV=1)
   -h, --help                    help for verify-ref
       --latest-only             perform verification against latest entry in the RSL
+      --skip-file-policies      skip file policies (developer mode only, set GITTUF_DEV=1)
       --use-policy-path-cache   use policy path cache during verification (developer mode only, set GITTUF_DEV=1)
 ```
 
