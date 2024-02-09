@@ -51,15 +51,6 @@ var (
 	ErrPolicyExists               = errors.New("cannot initialize Policy namespace as it exists already")
 )
 
-var (
-	// policyStateCache tracks states previously loaded using their RSL entry ID
-	// as the key
-	policyStateCache = map[plumbing.Hash]*State{}
-	// enablePolicyStateCache is set to true only during verification workflows,
-	// where policy state is never mutated
-	enablePolicyStateCache = false
-)
-
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
 // has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
@@ -128,13 +119,6 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error)
 // LoadStateForEntry returns the State for a specified RSL reference entry for
 // the policy namespace.
 func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	if enablePolicyStateCache {
-		if state, cacheHit := policyStateCache[entry.ID]; cacheHit {
-			// Cache hit for entire state
-			return state, nil
-		}
-	}
-
 	if entry.RefName != PolicyRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
@@ -226,10 +210,6 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 
 	if err := state.Verify(ctx); err != nil {
 		return nil, err
-	}
-
-	if enablePolicyStateCache {
-		policyStateCache[entry.ID] = state
 	}
 
 	return state, nil
