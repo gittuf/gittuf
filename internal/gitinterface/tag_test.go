@@ -30,7 +30,7 @@ func TestTag(t *testing.T) {
 	refName := "refs/heads/main"
 	tagName := "v0.1.0"
 	clock = testClock
-	getGitConfig = func(repo *git.Repository) (*config.Config, error) {
+	getGitConfig = func(_ *git.Repository) (*config.Config, error) {
 		return testGitConfig, nil
 	}
 
