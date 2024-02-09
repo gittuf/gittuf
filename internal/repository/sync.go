@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -25,6 +26,8 @@ var (
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
 func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
+	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
+
 	if dir == "" {
 		// FIXME: my understanding is backslashes are not used in URLs but I haven't dived into the RFCs to check yet
 		modifiedURL := strings.ReplaceAll(remoteURL, "\\", "/")
@@ -33,6 +36,8 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		split := strings.Split(modifiedURL, "/")
 		dir = strings.TrimSuffix(split[len(split)-1], ".git")
 	}
+
+	slog.Debug("Checking if local directory exists for repository...")
 	_, err := os.Stat(dir)
 	if err == nil {
 		return nil, errors.Join(ErrCloningRepository, ErrDirExists)
@@ -43,10 +48,10 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 	if err := os.Mkdir(dir, 0755); err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
-	slog.Debug("Created directory", "directory", dir)
 
 	refs := []string{rsl.Ref, policy.PolicyRef}
 
+	slog.Debug("Cloning repository...")
 	r, err := gitinterface.CloneAndFetch(ctx, remoteURL, dir, initialBranch, refs)
 	if err != nil {
 		if e := os.RemoveAll(dir); e != nil {
@@ -54,12 +59,13 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		}
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
-	slog.Debug("Cloned repository with refs", "repository", remoteURL)
 	head, err := r.Reference(plumbing.HEAD, false)
 	if err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
 	repository := &Repository{r: r}
+
+	slog.Debug("Verifying HEAD...")
 	return repository, repository.VerifyRef(ctx, head.Target().String(), true)
 }

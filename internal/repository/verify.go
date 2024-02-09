@@ -5,6 +5,8 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -27,10 +29,13 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 		err         error
 	)
 
+	slog.Debug("Identifying absolute reference path...")
 	target, err = gitinterface.AbsoluteReference(r.r, target)
 	if err != nil {
 		return err
 	}
+
+	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", target))
 
 	if latestOnly {
 		expectedTip, err = policy.VerifyRef(ctx, r.r, target)
@@ -41,6 +46,7 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 		return err
 	}
 
+	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
 	return r.verifyRefTip(target, expectedTip)
 }
 
@@ -51,24 +57,29 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 
 	var err error
 
+	slog.Debug("Identifying absolute reference path...")
 	target, err = gitinterface.AbsoluteReference(r.r, target)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", target, entryID))
 	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, plumbing.NewHash(entryID))
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
 	return r.verifyRefTip(target, expectedTip)
 }
 
 func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
+	slog.Debug("Verifying commit signature...")
 	return policy.VerifyCommit(ctx, r.r, ids...)
 }
 
 func (r *Repository) VerifyTag(ctx context.Context, ids []string) map[string]string {
+	slog.Debug("Verifying tag signature...")
 	return policy.VerifyTag(ctx, r.r, ids)
 }
 

@@ -29,6 +29,10 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 	// TODO: rely on go-git to find .git folder, once
 	// https://github.com/go-git/go-git/issues/977 is available.
 	// Note, until then gittuf does not support separate git dir.
+
+	slog.Debug("Adding gittuf hooks...")
+
+	slog.Debug("Loading repository worktree...")
 	tree, err := r.r.Worktree()
 	if err != nil {
 		return fmt.Errorf("reading worktree: %w", err)
@@ -36,13 +40,12 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 	if tree == nil {
 		return fmt.Errorf("worktree is nil, can't update hooks")
 	}
-	slog.Debug("Fetched repository's worktree")
+
 	repoRoot := tree.Filesystem.Root()
 	hookFolder := path.Join(repoRoot, ".git", "hooks")
 	if err := os.MkdirAll(hookFolder, 0o750); err != nil {
 		return fmt.Errorf("making sure folder exist: %w", err)
 	}
-	slog.Debug("Created .git/hooks directory in root")
 
 	hookFile := path.Join(hookFolder, string(hookType))
 	hookExists, err := doesFileExist(hookFile)
@@ -56,6 +59,7 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 		}
 	}
 
+	slog.Debug("Writing hooks...")
 	if err := os.WriteFile(hookFile, content, 0o700); err != nil { // nolint:gosec
 		return fmt.Errorf("writing %s hook: %w", hookType, err)
 	}
