@@ -45,7 +45,7 @@ Repository
 |-- refs
 |   |
 |   |-- heads
-|   |   |-- master (refers to commit C)
+|   |   |-- main (refers to commit C)
 |   |   |-- feature-x (refers to commit E)
 |   |
 |   |-- tags
@@ -57,7 +57,7 @@ Repository
 |-- objects
     |-- A [Initial commit]
     |-- B [Version 1.0 release]
-    |-- C [More changes on master]
+    |-- C [More changes on main]
     |-- D [Initial commit on feature-x]
     |-- E [More changes on feature-x]
     |-- v1.0 [Tag object referring to commit B]
@@ -66,7 +66,7 @@ Repository
 
 ### Actors
 
-In a Git repository, an 'actor' is any user who makes changes to the repository.
+In a Git repository, an "actor" is any user who makes changes to the repository.
 These changes can involve any part of the repository, such as modifying files,
 branches or tags. In the gittuf system, each actor is identified by a unique
 signing key that they use to sign their contributions. This means that when a
@@ -79,23 +79,12 @@ actor who is supposed to have made the change.
 
 ### State
 
-The term "State" refers to the latest values or conditions of the tracked
+The term "state" refers to the latest values or conditions of the tracked
 references (like branches and tags) in a Git repository.  These are determined
 by the most recent entries in the [reference state
-log](#reference-state-log-rsl).
-
-When analyzing changes within the repository, attention is given specifically to
-the updates pertinent to each individual reference, ensuring a focused review of
-changes for each branch or tag separately.
-
-#### Example
-
-If a Git repository has two branches, `main` and `feature`, the state of the
-main branch might be defined by the latest commit, say Commit A. Similarly, the
-feature branch's state could be determined by a different commit, Commit B. When
-reviewing the repository's history, changes in the main branch are tracked up to
-Commit A, while for the feature branch, up to Commit B.  This method allows for
-a clear and separate examination of the evolution of each branch.
+log](#reference-state-log-rsl). Note that when verifying changes in the
+repository, a workflow may only verify specific references rather than all state
+updates in the reference state log.
 
 ## Threat Model
 
