@@ -6,6 +6,9 @@ Contributions to gittuf can be of several types:
   enhancements to the implementation
 * new issues or feature requests
 
+[Join our community](https://github.com/gittuf/community/?tab=readme-ov-file#join-us)
+to get started!
+
 ## Contributor Workflow
 
 When submitting changes to the gittuf docs or implementation, contributors must
