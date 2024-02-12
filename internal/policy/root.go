@@ -79,7 +79,7 @@ func DeleteRootKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetad
 	return rootMetadata, nil
 }
 
-// AddTargetsKey function is used to add the 'targetsKey' as a trusted public key in 'rootMetadata'
+// AddTargetsKey adds the 'targetsKey' as a trusted public key in 'rootMetadata'
 // for the top level Targets role.
 func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.RootMetadata, error) {
 	if rootMetadata == nil {
@@ -112,9 +112,9 @@ func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.Ro
 	return rootMetadata, nil
 }
 
-// DeleteTargetsKey removes 'keyID' from trusted public keys for top level Targets
-// role in 'rootMetadata'. Note: It doesn't remove the key entry itself as it
-// doesn't check if other roles can use the same key.
+// DeleteTargetsKey removes the key matching 'keyID' from trusted public keys
+// for top level Targets role in 'rootMetadata'. Note: It doesn't remove the key
+// entry itself as it doesn't check if other roles can use the same key.
 func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetadata, error) {
 	if rootMetadata == nil {
 		return nil, ErrRootMetadataNil
@@ -132,13 +132,13 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 		return nil, ErrCannotMeetThreshold
 	}
 
-	for i, k := range targetsRole.KeyIDs {
+	newKeyIDs := []string{}
+	for _, k := range targetsRole.KeyIDs {
 		if k != keyID {
-			continue
+			newKeyIDs = append(newKeyIDs, k)
 		}
-		targetsRole.KeyIDs = append(targetsRole.KeyIDs[:i], targetsRole.KeyIDs[i+1:]...)
-		break
 	}
+	targetsRole.KeyIDs = newKeyIDs
 
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
