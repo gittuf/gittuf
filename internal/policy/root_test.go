@@ -82,7 +82,14 @@ func TestAddTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata = AddTargetsKey(rootMetadata, targetsKey)
+	_, err = AddTargetsKey(nil, targetsKey)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	_, err = AddTargetsKey(rootMetadata, nil)
+	assert.ErrorIs(t, err, ErrTargetsKeyNil)
+
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey)
+	assert.Nil(t, err)
 	assert.Equal(t, targetsKey, rootMetadata.Keys[targetsKey.KeyID])
 	assert.Equal(t, []string{targetsKey.KeyID}, rootMetadata.Roles[TargetsRoleName].KeyIDs)
 }
@@ -105,8 +112,16 @@ func TestDeleteTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata = AddTargetsKey(rootMetadata, targetsKey1)
-	rootMetadata = AddTargetsKey(rootMetadata, targetsKey2)
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey1)
+	assert.Nil(t, err)
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey2)
+	assert.Nil(t, err)
+
+	_, err = DeleteTargetsKey(nil, targetsKey1.KeyID)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	_, err = DeleteTargetsKey(rootMetadata, "")
+	assert.ErrorIs(t, err, ErrKeyIDEmpty)
 
 	rootMetadata, err = DeleteTargetsKey(rootMetadata, targetsKey1.KeyID)
 	assert.Nil(t, err)
