@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -398,9 +399,11 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
 	if s.verifiersCache == nil {
+		slog.Debug("Initializing path cache in policy...")
 		s.verifiersCache = map[string][]*Verifier{}
 	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
 		// Cache hit for this path in this policy
+		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
 		return verifiers, nil
 	}
 
