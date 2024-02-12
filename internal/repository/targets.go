@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -22,6 +23,12 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 		return ErrInvalidPolicyName
 	}
 
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -35,6 +42,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
+	slog.Debug("Creating initial rule file...")
 	targetsMetadata := policy.InitializeTargetsMetadata()
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
@@ -42,6 +50,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 		return nil
 	}
 
+	slog.Debug(fmt.Sprintf("Signing initial rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
@@ -58,6 +67,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 	commitMessage := fmt.Sprintf("Initialize policy '%s'", targetsRoleName)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
@@ -68,6 +78,12 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		return ErrInvalidPolicyName
 	}
 
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -81,11 +97,13 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
+	slog.Debug("Loading current rule file...")
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Adding rule to rule file...")
 	targetsMetadata, err = policy.AddOrUpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns)
 	if err != nil {
 		return err
@@ -98,6 +116,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		return nil
 	}
 
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
@@ -111,12 +130,19 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 	commitMessage := fmt.Sprintf("Add rule '%s' to policy '%s'", ruleName, targetsRoleName)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
 func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -130,11 +156,13 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
+	slog.Debug("Loading current rule file...")
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Removing rule from rule file...")
 	targetsMetadata, err = policy.RemoveDelegation(targetsMetadata, ruleName)
 	if err != nil {
 		return err
@@ -147,6 +175,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 		return nil
 	}
 
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
@@ -160,12 +189,19 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
 // AddKeyToTargets is the interface for a user to add a trusted key to the
 // gittuf policy.
 func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -184,11 +220,13 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 		keyIDs += fmt.Sprintf("\n%s:%s", key.KeyType, key.KeyID)
 	}
 
+	slog.Debug("Loading current rule file...")
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Adding rule to rule file...")
 	targetsMetadata, err = policy.AddKeyToTargets(targetsMetadata, authorizedKeys)
 	if err != nil {
 		return err
@@ -201,6 +239,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 		return err
 	}
 
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -214,12 +253,14 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 
 	commitMessage := fmt.Sprintf("Add keys to policy '%s'\n%s", targetsRoleName, keyIDs)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
 func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
@@ -240,6 +281,7 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 		env = state.DelegationEnvelopes[targetsRoleName]
 	}
 
+	slog.Debug(fmt.Sprintf("Signing rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -253,5 +295,6 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to policy '%s'", keyID, targetsRoleName)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }

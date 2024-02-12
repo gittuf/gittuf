@@ -4,6 +4,8 @@ package repository
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -21,6 +23,8 @@ type Repository struct {
 }
 
 func LoadRepository() (*Repository, error) {
+	slog.Debug("Loading Git repository...")
+
 	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return nil, err
@@ -32,14 +36,17 @@ func LoadRepository() (*Repository, error) {
 }
 
 func (r *Repository) InitializeNamespaces() error {
+	slog.Debug(fmt.Sprintf("Initializing RSL reference '%s'...", rsl.Ref))
 	if err := rsl.InitializeNamespace(r.r); err != nil {
 		return err
 	}
 
+	slog.Debug(fmt.Sprintf("Initializing attestations reference '%s'...", attestations.Ref))
 	if err := attestations.InitializeNamespace(r.r); err != nil {
 		return err
 	}
 
+	slog.Debug(fmt.Sprintf("Initializing policy reference '%s'...", policy.PolicyRef))
 	return policy.InitializeNamespace(r.r)
 }
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -51,21 +52,26 @@ var (
 // entry is returned if the policy verification is successful.
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// 1. Get latest policy entry
+	slog.Debug("Identifying latest policy entry...")
 	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
+
+	slog.Debug("Loading policy...")
 	policyState, err := LoadStateForEntry(ctx, repo, policyEntry)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
 	// 2. Find latest entry for target
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
+	slog.Debug("Verifying entry...")
 	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, latestEntry)
 }
 
@@ -74,18 +80,21 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 // the policy verification is successful.
 func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// 1. Trace RSL back to the start
+	slog.Debug("Identifying first RSL entry...")
 	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
 	// 2. Find latest entry for target
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
 	// 3. Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
+	slog.Debug("Verifying all entries...")
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, firstEntry, latestEntry, target)
 }
 
@@ -94,6 +103,7 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (pl
 // returned if the policy verification is successful.
 func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string, entryID plumbing.Hash) (plumbing.Hash, error) {
 	// 1. Load starting point entry
+	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(repo, entryID)
 	if err != nil {
 		return plumbing.ZeroHash, err
@@ -107,18 +117,21 @@ func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string
 	}
 
 	// 2. Find latest entry for target
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
 	// 3. Find policy entry before the starting point entry
+	slog.Debug("Identifying applicable policy entry...")
 	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
 
 	// 4. Do a relative verify from start entry to the latest entry
+	slog.Debug("Verifying all entries...")
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyEntry, fromEntry, latestEntry, target)
 }
 
@@ -130,6 +143,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	var currentPolicy *State
 
 	// 1. Load policy applicable at firstEntry
+	slog.Debug("Loading policy...")
 	state, err := LoadStateForEntry(ctx, repo, initialPolicyEntry)
 	if err != nil {
 		return err
@@ -137,6 +151,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	currentPolicy = state
 
 	// 2. Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
+	slog.Debug("Identifying all entries in range...")
 	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
@@ -151,6 +166,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			entry := entries[0]
 			entries = entries[1:]
 
+			slog.Debug(fmt.Sprintf("Verifying entry '%s'...", entry.ID.String()))
+
+			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
 				// TODO: this is repetition if the firstEntry is for policy
 				newPolicy, err := LoadStateForEntry(ctx, repo, entry)
@@ -158,15 +176,19 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 					return err
 				}
 
+				slog.Debug("Verifying new policy using current policy...")
 				if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
 					return err
 				}
 
+				slog.Debug("Updating current policy...")
 				currentPolicy = newPolicy
 				continue
 			}
 
+			slog.Debug("Verifying changes...")
 			if err := verifyEntry(ctx, repo, currentPolicy, entry); err != nil {
+				slog.Debug("Violation found, checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
 				if !entry.SkippedBy(annotations[entry.ID]) {
 					return err
@@ -174,6 +196,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 				// The invalid entry's been marked as skipped but we still need
 				// to see if another entry fixed state for non-gittuf users
+				slog.Debug("Entry has been revoked, searching for fix entry...")
 				invalidEntry = entry
 				verificationErr = err
 			}
@@ -197,10 +220,12 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 		// are processed even when an invalid state is reached.
 
 		// 1. What's the last good state?
+		slog.Debug("Identifying last valid state...")
 		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, invalidEntry.RefName, invalidEntry.ID)
 		if err != nil {
 			return err
 		}
+		slog.Debug("Verifying identified last valid entry has not been revoked...")
 		if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
 			return ErrLastGoodEntryIsSkipped
 		}
@@ -223,6 +248,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			newEntry := entries[0]
 			entries = entries[1:]
 
+			slog.Debug(fmt.Sprintf("Inspecting entry '%s' to see if it's a fix entry...", newEntry.ID.String()))
+
+			slog.Debug("Checking if entry is for the affected reference...")
 			if newEntry.RefName != invalidEntry.RefName {
 				// Unrelated entry that must be processed in the outer loop
 				// Currently this is just policy entries
@@ -234,13 +262,17 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			if err != nil {
 				return err
 			}
+
+			slog.Debug("Checking if entry is tree-same with last valid state...")
 			if newEntryCommit.TreeHash == lastGoodTreeID {
 				// Fix found, we append the rest of the current verification set
 				// to the new entry queue
 				// But first, we must check that this fix hasn't been skipped
 				// If it has been skipped, it's not actually a fix and we need
 				// to keep looking
+				slog.Debug("Verifying potential fix entry has not been revoked...")
 				if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+					slog.Debug("Fix entry found, proceeding with regular verification workflow...")
 					fixed = true
 					newEntryQueue = append(newEntryQueue, entries...)
 					break
@@ -249,6 +281,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 			// newEntry is not tree-same / commit-same, so it is automatically
 			// invalid, check that it's been marked as revoked
+			slog.Debug("Checking non-fix entry has been revoked as well...")
 			if !newEntry.SkippedBy(annotations[newEntry.ID]) {
 				invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
 			}

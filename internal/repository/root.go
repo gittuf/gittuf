@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -28,6 +29,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
+	slog.Debug("Creating initial root metadata...")
 	rootMetadata := policy.InitializeRootMetadata(publicKey)
 
 	env, err := dsse.CreateEnvelope(rootMetadata)
@@ -35,6 +37,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return nil
 	}
 
+	slog.Debug(fmt.Sprintf("Signing initial root metadata using '%s'...", publicKey.KeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return nil
@@ -47,6 +50,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 
 	commitMessage := "Initialize root of trust"
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
@@ -58,11 +62,13 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		return err
 	}
 
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		return err
@@ -72,6 +78,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		return ErrUnauthorizedKey
 	}
 
+	slog.Debug("Adding root key...")
 	rootMetadata = policy.AddRootKey(rootMetadata, newRootKey)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
@@ -84,6 +91,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
+	slog.Debug(fmt.Sprintf("Signing updated root metadata using '%s'...", rootKeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -104,6 +112,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 
 	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.KeyID)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
@@ -115,11 +124,13 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 		return err
 	}
 
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		return err
@@ -129,6 +140,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 		return ErrUnauthorizedKey
 	}
 
+	slog.Debug("Removing root key...")
 	rootMetadata, err = policy.DeleteRootKey(rootMetadata, keyID)
 	if err != nil {
 		return err
@@ -144,6 +156,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
+	slog.Debug(fmt.Sprintf("Signing updated root metadata using '%s'...", rootKeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -161,6 +174,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 
 	commitMessage := fmt.Sprintf("Remove root key '%s' from root", keyID)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
@@ -172,11 +186,13 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 		return err
 	}
 
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		return err
@@ -186,6 +202,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 		return ErrUnauthorizedKey
 	}
 
+	slog.Debug("Adding policy key...")
 	rootMetadata = policy.AddTargetsKey(rootMetadata, targetsKey)
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
@@ -198,6 +215,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
+	slog.Debug(fmt.Sprintf("Signing updated root metadata using '%s'...", rootKeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -207,6 +225,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 
 	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.KeyID)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
@@ -218,11 +237,13 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 		return err
 	}
 
+	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r)
 	if err != nil {
 		return err
 	}
 
+	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		return err
@@ -232,12 +253,14 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 		return ErrUnauthorizedKey
 	}
 
+	slog.Debug("Removing policy key...")
 	rootMetadata, err = policy.DeleteTargetsKey(rootMetadata, targetsKeyID)
 	if err != nil {
 		return err
 	}
 
 	rootMetadata.SetVersion(rootMetadata.Version + 1)
+
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err
@@ -247,6 +270,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
+	slog.Debug(fmt.Sprintf("Signing updated root metadata using '%s'...", rootKeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -256,5 +280,6 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 
 	commitMessage := fmt.Sprintf("Remove policy key '%s' from root", targetsKeyID)
 
+	slog.Debug("Committing policy...")
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
