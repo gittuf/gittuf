@@ -39,24 +39,52 @@ default, Git defines two of refs: branches (heads) and tags. Git allows for the
 creation of other arbitrary refs that users can store other information as long
 as they are formatted using Git's object types.
 
+```
+Repository
+|
+|-- refs
+|   |
+|   |-- heads
+|   |   |-- main (refers to commit C)
+|   |   |-- feature-x (refers to commit E)
+|   |
+|   |-- tags
+|   |   |-- v1.0 (refers to tag v1.0)
+|   |
+|   |-- arbitrary
+|       |-- custom-ref (formatted as Git object type)
+|
+|-- objects
+    |-- A [Initial commit]
+    |-- B [Version 1.0 release]
+    |-- C [More changes on main]
+    |-- D [Initial commit on feature-x]
+    |-- E [More changes on feature-x]
+    |-- v1.0 [Tag object referring to commit B]
+```
+
+
 ### Actors
 
-In the context of a Git repository, an actor is any user who contributes changes
-to the repository. This may be to any file tracked by the repository in any Git
-ref. In gittuf, actors are identified by the signing keys they use when
-contributing to the repository. A policy that grants an actor the ability to
-make a certain change in fact grants it to the holder of their signing key.
-Verification of any action performed in the repository depends, among other
-factors, on the successful verification of the action's signature using the
-expected actor's public or verification key.
+In a Git repository, an "actor" is any user who makes changes to the repository.
+These changes can involve any part of the repository, such as modifying files,
+branches or tags. In the gittuf system, each actor is identified by a unique
+signing key that they use to sign their contributions. This means that when a
+policy allows an actor to make certain changes, it's actually allowing the
+person who has the specific signing key to make those changes. To maintain
+security, all actions made in the repository, such as adding or modifying files,
+are checked for authenticity. This is done by verifying the digital signature
+attached to the action, which must match the public key associated with the
+actor who is supposed to have made the change.
 
 ### State
 
-State describes the expected values for tracked refs of the repository. It is
-identified by the tip or last entry of the
-[reference state log](#reference-state-log-rsl). Note that when inspecting
-changes to the state of the repository, a workflow may only consider state
-updates relevant to a particular ref.
+The term "state" refers to the latest values or conditions of the tracked
+references (like branches and tags) in a Git repository.  These are determined
+by the most recent entries in the [reference state
+log](#reference-state-log-rsl). Note that when verifying changes in the
+repository, a workflow may only verify specific references rather than all state
+updates in the reference state log.
 
 ## Threat Model
 
