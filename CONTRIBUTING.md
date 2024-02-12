@@ -6,7 +6,8 @@ Contributions to gittuf can be of several types:
   enhancements to the implementation
 * new issues or feature requests
 
-You can also join our community in #gittuf in [OpenSSF Slack](https://openssf.slack.com/) and/or our monthly gittuf Community Meetings, which take place the first Friday of the month at 17:00 UTC ([your timezone](https://time.is/1700_UTC)). Here are the prior [meeting notes](https://docs.google.com/document/d/1tXFCVUHsICLpLKxcGvhzBDUWmpsY1LQvysFaX6AJRkk/edit#heading=h.9m0zi4b0wnne) to get oriented.
+[Join our community](https://github.com/gittuf/community/?tab=readme-ov-file#join-us)
+to get started!
 
 ## Contributor Workflow
 
