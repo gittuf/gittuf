@@ -242,10 +242,12 @@ func TestClone(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
+
 		publicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		repo, err := Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{publicKey})
 		assert.Nil(t, err)
 		head, err := repo.r.Head()
@@ -272,6 +274,7 @@ func TestClone(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
+
 		expectedPublicKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
 		if err != nil {
 			t.Fatal(err)
@@ -280,7 +283,9 @@ func TestClone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		_, err = Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{expectedPublicKey})
-		assert.ErrorIs(t, err, ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", []string{expectedPublicKey.KeyID}, []string{actualPublicKey.KeyID}))
+		targetErr := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", []string{expectedPublicKey.KeyID}, []string{actualPublicKey.KeyID})
+		assert.ErrorIs(t, err, ErrCloningRepository, targetErr)
 	})
 }
