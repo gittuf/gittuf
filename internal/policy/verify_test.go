@@ -983,7 +983,7 @@ func TestStateVerifyNewState(t *testing.T) {
 		}
 
 		err = currentPolicy.VerifyNewState(context.Background(), newPolicy)
-		assert.ErrorContains(t, err, "do not match threshold")
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
 }
 

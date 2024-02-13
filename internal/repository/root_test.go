@@ -137,18 +137,12 @@ func TestRemoveRootKey(t *testing.T) {
 	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
-	err = r.RemoveRootKey(testCtx, originalSigner, rootKey.KeyID, false)
-	// Self root revocation currently is not supported
-	// This is linked to the policy package comment about using prior state for
-	// getRootVerifier
-	assert.ErrorIs(t, err, policy.ErrVerifierConditionsUnmet)
-
 	newSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// We can use the newly added root key to revoke the old one though
+	// We can use the newly added root key to revoke the old one
 	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
 	assert.Nil(t, err)
 

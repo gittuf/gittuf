@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -51,7 +53,9 @@ var (
 	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
 	ErrDelegationNotFound         = errors.New("required delegation entry not found")
 	ErrPolicyExists               = errors.New("cannot initialize Policy namespace as it exists already")
+	ErrPolicyNotFound             = errors.New("cannot find policy")
 	ErrDuplicatedRuleName         = errors.New("two rules with same name found in policy")
+	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
 )
 
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
@@ -94,133 +98,58 @@ type DelegationWithDepth struct {
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
-// rslEntryID.
-func LoadState(ctx context.Context, repo *git.Repository, rslEntryID plumbing.Hash) (*State, error) {
-	entry, err := rsl.GetEntry(repo, rslEntryID)
+// entry. It verifies the root of trust for the state from the initial policy
+// entry in the RSL.
+func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
 		return nil, err
 	}
 
-	refEntry, ok := entry.(*rsl.ReferenceEntry)
-	if !ok {
-		return nil, ErrNotRSLEntry
+	// This assumes the first entry is for the policy ref
+	initialState, err := loadStateForEntry(ctx, repo, firstEntry)
+	if err != nil {
+		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, refEntry)
+	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, entry.ID, PolicyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(allPolicyEntries) == 0 {
+		return nil, ErrPolicyNotFound
+	}
+
+	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstEntry.ID))
+	verifiedState := initialState
+	for _, entry := range allPolicyEntries[1:] {
+		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID))
+		currentState, err := loadStateForEntry(ctx, repo, entry)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := verifiedState.VerifyNewState(ctx, currentState); err != nil {
+			return nil, err
+		}
+
+		verifiedState = currentState
+	}
+
+	return verifiedState, nil
 }
 
 // LoadCurrentState returns the State corresponding to the repository's current
-// active policy.
+// active policy. It verifies the root of trust for the state starting from the
+// initial policy entry in the RSL.
 func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error) {
-	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, entry)
-}
-
-// LoadStateForEntry returns the State for a specified RSL reference entry for
-// the policy namespace.
-func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	if entry.RefName != PolicyRef {
-		return nil, rsl.ErrRSLEntryDoesNotMatchRef
-	}
-
-	policyCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
-	if err != nil {
-		return nil, err
-	}
-
-	policyRootTree, err := gitinterface.GetTree(repo, policyCommit.TreeHash)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(policyRootTree.Entries) > 2 {
-		return nil, ErrInvalidPolicyTree
-	}
-
-	var (
-		metadataTreeID plumbing.Hash
-		keysTreeID     plumbing.Hash
-	)
-
-	for _, e := range policyRootTree.Entries {
-		switch e.Name {
-		case metadataTreeEntryName:
-			metadataTreeID = e.Hash
-		case rootPublicKeysTreeEntryName:
-			keysTreeID = e.Hash
-		default:
-			return nil, ErrInvalidPolicyTree
-		}
-	}
-
-	state := &State{}
-
-	metadataTree, err := gitinterface.GetTree(repo, metadataTreeID)
-	if err != nil {
-		return nil, err
-	}
-
-	keysTree, err := gitinterface.GetTree(repo, keysTreeID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range metadataTree.Entries {
-		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
-		if err != nil {
-			return nil, err
-		}
-
-		env := &sslibdsse.Envelope{}
-		if err := json.Unmarshal(contents, env); err != nil {
-			return nil, err
-		}
-
-		switch entry.Name {
-		case fmt.Sprintf("%s.json", RootRoleName):
-			state.RootEnvelope = env
-		case fmt.Sprintf("%s.json", TargetsRoleName):
-			state.TargetsEnvelope = env
-		default:
-			if state.DelegationEnvelopes == nil {
-				state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
-			}
-
-			state.DelegationEnvelopes[strings.TrimSuffix(entry.Name, ".json")] = env
-		}
-	}
-
-	for _, entry := range keysTree.Entries {
-		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := tuf.LoadKeyFromBytes(contents)
-		if err != nil {
-			return nil, err
-		}
-
-		if state.RootPublicKeys == nil {
-			state.RootPublicKeys = []*tuf.Key{}
-		}
-
-		state.RootPublicKeys = append(state.RootPublicKeys, key)
-	}
-
-	if err := state.loadRuleNames(); err != nil {
-		return nil, err
-	}
-
-	if err := state.Verify(ctx); err != nil {
-		return nil, err
-	}
-
-	return state, nil
+	return LoadState(ctx, repo, latestEntry)
 }
 
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
@@ -243,7 +172,7 @@ func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object
 		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, commitPolicyEntry)
+	return LoadState(ctx, repo, commitPolicyEntry)
 }
 
 // PublicKeys returns all the public keys associated with a state.
@@ -293,49 +222,6 @@ func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
 	}
 
 	return allKeys, nil
-}
-
-// FindAuthorizedSigningKeyIDs traverses the policy metadata to identify the
-// keys trusted to sign for the specified role.
-//
-// Deprecated: diamond delegations are legal in policy. So, role A and role B
-// can both independently delegate to role C, and they *don't* need to specify
-// the same set of keys / threshold. So, when signing role C, we actually can't
-// determine if the keys being used to sign it are valid. It depends strictly on
-// how role C is reached, whether via role A or role B. In turn, that depends on
-// the exact namespace being verified. In TUF, this issue is known as
-// "promiscuous delegations". See:
-// https://github.com/theupdateframework/specification/issues/19,
-// https://github.com/theupdateframework/specification/issues/214, and
-// https://github.com/theupdateframework/python-tuf/issues/660.
-func (s *State) FindAuthorizedSigningKeyIDs(ctx context.Context, roleName string) ([]string, error) {
-	if err := s.Verify(ctx); err != nil {
-		return nil, err
-	}
-
-	rootMetadata, err := s.GetRootMetadata()
-	if err != nil {
-		return nil, err
-	}
-
-	if roleName == RootRoleName {
-		return rootMetadata.Roles[RootRoleName].KeyIDs, nil
-	}
-
-	if roleName == TargetsRoleName {
-		if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
-			return nil, ErrDelegationNotFound
-		}
-
-		return rootMetadata.Roles[TargetsRoleName].KeyIDs, nil
-	}
-
-	entry, err := s.findDelegationEntry(roleName)
-	if err != nil {
-		return nil, err
-	}
-
-	return entry.KeyIDs, nil
 }
 
 // FindPublicKeysForPath identifies the trusted keys for the path. If the path
@@ -404,7 +290,7 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
-func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
+func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 	if s.verifiersCache == nil {
 		slog.Debug("Initializing path cache in policy...")
 		s.verifiersCache = map[string][]*Verifier{}
@@ -471,11 +357,6 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 				}
 
 				if s.HasTargetsRole(delegation.Name) {
-					env := s.DelegationEnvelopes[delegation.Name]
-					if err := verifier.Verify(ctx, nil, env); err != nil {
-						return nil, err
-					}
-
 					delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
 					if err != nil {
 						return nil, err
@@ -502,16 +383,18 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 	}
 }
 
-// Verify verifies the signatures of the Root role and the top level Targets
-// role if it exists.
+// Verify verifies the contents of the State for internal consistency.
+// Specifically, it checks that the root keys in the root role match the ones
+// stored on disk in the state. Further, it also verifies the signatures of the
+// top level Targets role and all reachable delegated Targets roles. Any
+// unreachable role returns an error.
 func (s *State) Verify(ctx context.Context) error {
-	rootVerifier, err := s.getRootVerifier()
+	rootKeys, err := s.GetRootKeys()
 	if err != nil {
 		return err
 	}
-
-	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
-		return err
+	if !verifyRootKeysMatch(rootKeys, s.RootPublicKeys) {
+		return ErrUnableToMatchRootKeys
 	}
 
 	if s.TargetsEnvelope == nil {
@@ -523,7 +406,71 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	return targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope)
+	if err := targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope); err != nil {
+		return err
+	}
+
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	reachedDelegations := map[string]bool{}
+	for delegatedRoleName := range s.DelegationEnvelopes {
+		reachedDelegations[delegatedRoleName] = false
+	}
+
+	delegationsQueue := targetsMetadata.Delegations.Roles
+	delegationKeys := targetsMetadata.Delegations.Keys
+	for {
+		// The last entry in the queue is always the allow rule, which we don't
+		// process during DFS
+		if len(delegationsQueue) <= 1 {
+			break
+		}
+
+		delegation := delegationsQueue[0]
+		delegationsQueue = delegationsQueue[1:]
+
+		if s.HasTargetsRole(delegation.Name) {
+			reachedDelegations[delegation.Name] = true
+
+			env := s.DelegationEnvelopes[delegation.Name]
+
+			keys := []*tuf.Key{}
+			for _, keyID := range delegation.KeyIDs {
+				keys = append(keys, delegationKeys[keyID])
+			}
+
+			verifier := &Verifier{
+				name:      delegation.Name,
+				keys:      keys,
+				threshold: delegation.Threshold,
+			}
+
+			if err := verifier.Verify(ctx, nil, env); err != nil {
+				return err
+			}
+
+			delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+			if err != nil {
+				return err
+			}
+
+			delegationsQueue = append(delegatedMetadata.Delegations.Roles, delegationsQueue...)
+			for keyID, key := range delegatedMetadata.Delegations.Keys {
+				delegationKeys[keyID] = key
+			}
+		}
+	}
+
+	for _, reached := range reachedDelegations {
+		if !reached {
+			return ErrDanglingDelegationMetadata
+		}
+	}
+
+	return nil
 }
 
 // Commit verifies and writes the State to the policy namespace. It also creates
@@ -629,6 +576,25 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 	}
 
 	return nil
+}
+
+func (s *State) GetRootKeys() ([]*tuf.Key, error) {
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+
+	rootKeys := make([]*tuf.Key, 0, len(rootMetadata.Roles[RootRoleName].KeyIDs))
+	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs {
+		key, has := rootMetadata.Keys[keyID]
+		if !has {
+			return nil, ErrRootKeyNil
+		}
+
+		rootKeys = append(rootKeys, key)
+	}
+
+	return rootKeys, nil
 }
 
 // GetRootMetadata returns the deserialized payload of the State's RootEnvelope.
@@ -841,9 +807,6 @@ func (s *State) hasFileRule() (bool, error) {
 }
 
 func (s *State) getRootVerifier() (*Verifier, error) {
-	// TODO: validate against the root metadata itself?
-	// This eventually goes back to how the very first root is bootstrapped
-	// See: https://github.com/gittuf/gittuf/issues/117
 	rootMetadata, err := s.GetRootMetadata()
 	if err != nil {
 		return nil, err
@@ -870,63 +833,124 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 	return verifier, nil
 }
 
-// findDelegationEntry finds the delegation entry for some role in the parent
-// role.
-//
-// Deprecated: diamond delegations are legal in policy. So, role A and role B
-// can both independently delegate to role C, and they *don't* need to specify
-// the same set of keys / threshold. So, when signing role C, we actually can't
-// determine if the keys being used to sign it are valid. It depends strictly on
-// how role C is reached, whether via role A or role B. In turn, that depends on
-// the exact namespace being verified. In TUF, this issue is known as
-// "promiscuous delegations". See:
-// https://github.com/theupdateframework/specification/issues/19,
-// https://github.com/theupdateframework/specification/issues/214, and
-// https://github.com/theupdateframework/python-tuf/issues/660.
-func (s *State) findDelegationEntry(roleName string) (*tuf.Delegation, error) {
-	topLevelTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+// loadStateForEntry returns the State for a specified RSL reference entry for
+// the policy namespace. This helper is focused on reading the Git object store
+// and loading the policy contents. Typically, LoadCurrentState of LoadState
+// must be used. The exception is VerifyRelative... which performs root
+// verification between consecutive policy states.
+func loadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	if entry.RefName != PolicyRef {
+		return nil, rsl.ErrRSLEntryDoesNotMatchRef
+	}
+
+	policyCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
 	if err != nil {
 		return nil, err
 	}
 
-	delegationTargetsMetadata := map[string]*tuf.TargetsMetadata{}
-	for name, env := range s.DelegationEnvelopes {
-		targetsMetadata := &tuf.TargetsMetadata{}
+	policyRootTree, err := gitinterface.GetTree(repo, policyCommit.TreeHash)
+	if err != nil {
+		return nil, err
+	}
 
-		envBytes, err := env.DecodeB64Payload()
+	if len(policyRootTree.Entries) > 2 {
+		return nil, ErrInvalidPolicyTree
+	}
+
+	var (
+		metadataTreeID plumbing.Hash
+		keysTreeID     plumbing.Hash
+	)
+
+	for _, e := range policyRootTree.Entries {
+		switch e.Name {
+		case metadataTreeEntryName:
+			metadataTreeID = e.Hash
+		case rootPublicKeysTreeEntryName:
+			keysTreeID = e.Hash
+		default:
+			return nil, ErrInvalidPolicyTree
+		}
+	}
+
+	state := &State{}
+
+	metadataTree, err := gitinterface.GetTree(repo, metadataTreeID)
+	if err != nil {
+		return nil, err
+	}
+
+	keysTree, err := gitinterface.GetTree(repo, keysTreeID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range metadataTree.Entries {
+		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := json.Unmarshal(envBytes, targetsMetadata); err != nil {
+		env := &sslibdsse.Envelope{}
+		if err := json.Unmarshal(contents, env); err != nil {
 			return nil, err
 		}
-		delegationTargetsMetadata[name] = targetsMetadata
-	}
 
-	delegationsQueue := topLevelTargetsMetadata.Delegations.Roles
+		switch entry.Name {
+		case fmt.Sprintf("%s.json", RootRoleName):
+			state.RootEnvelope = env
+		case fmt.Sprintf("%s.json", TargetsRoleName):
+			state.TargetsEnvelope = env
+		default:
+			if state.DelegationEnvelopes == nil {
+				state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+			}
 
-	seenRoles := map[string]bool{TargetsRoleName: true}
-
-	for {
-		if len(delegationsQueue) == 0 {
-			return nil, ErrDelegationNotFound
-		}
-
-		delegation := &delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
-
-		if delegation.Name == roleName {
-			return delegation, nil
-		}
-
-		if _, seen := seenRoles[delegation.Name]; seen {
-			continue
-		}
-
-		if s.HasTargetsRole(delegation.Name) {
-			delegationsQueue = append(delegationsQueue, delegationTargetsMetadata[delegation.Name].Delegations.Roles...)
-			seenRoles[delegation.Name] = true
+			state.DelegationEnvelopes[strings.TrimSuffix(entry.Name, ".json")] = env
 		}
 	}
+
+	for _, entry := range keysTree.Entries {
+		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
+		if err != nil {
+			return nil, err
+		}
+
+		key, err := tuf.LoadKeyFromBytes(contents)
+		if err != nil {
+			return nil, err
+		}
+
+		if state.RootPublicKeys == nil {
+			state.RootPublicKeys = []*tuf.Key{}
+		}
+
+		state.RootPublicKeys = append(state.RootPublicKeys, key)
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		return nil, err
+	}
+
+	if err := state.Verify(ctx); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+func verifyRootKeysMatch(keys1, keys2 []*tuf.Key) bool {
+	if len(keys1) != len(keys2) {
+		return false
+	}
+
+	sort.Slice(keys1, func(i, j int) bool {
+		return keys1[i].KeyID < keys1[j].KeyID
+	})
+
+	sort.Slice(keys2, func(i, j int) bool {
+		return keys2[i].KeyID < keys2[j].KeyID
+	})
+
+	return reflect.DeepEqual(keys1, keys2)
 }

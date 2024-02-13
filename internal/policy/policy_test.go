@@ -18,7 +18,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
-	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -71,12 +70,12 @@ func TestInitializeNamespace(t *testing.T) {
 func TestLoadState(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
+	entry, err := rsl.GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	loadedState, err := LoadState(context.Background(), repo, rslRef.Hash())
+	loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
 	if err != nil {
 		t.Error(err)
 	}
@@ -103,7 +102,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loadedState, err := LoadStateForEntry(context.Background(), repo, entry)
+	loadedState, err := loadStateForEntry(context.Background(), repo, entry)
 	if err != nil {
 		t.Error(err)
 	}
@@ -145,19 +144,18 @@ func TestStateVerify(t *testing.T) {
 
 		state.RootPublicKeys = nil
 		err := state.Verify(testCtx)
-		assert.ErrorIs(t, err, ErrInvalidVerifier)
-	})
-
-	t.Run("only root, remove signatures", func(t *testing.T) {
-		state := createTestStateWithOnlyRoot(t)
-
-		state.RootEnvelope.Signatures = []sslibdsse.Signature{}
-		err := state.Verify(testCtx)
-		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+		assert.ErrorIs(t, err, ErrUnableToMatchRootKeys)
 	})
 
 	t.Run("with policy", func(t *testing.T) {
 		state := createTestStateWithPolicy(t)
+
+		err := state.Verify(testCtx)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with delegated policy", func(t *testing.T) {
+		state := createTestStateWithDelegatedPolicies(t)
 
 		err := state.Verify(testCtx)
 		assert.Nil(t, err)
@@ -236,7 +234,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		}
 
 		for name, test := range tests {
-			verifiers, err := state.FindVerifiersForPath(context.Background(), test.path)
+			verifiers, err := state.FindVerifiersForPath(test.path)
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 			assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
 		}
@@ -245,7 +243,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 	t.Run("without policy", func(t *testing.T) {
 		state := createTestStateWithOnlyRoot(t)
 
-		verifiers, err := state.FindVerifiersForPath(context.Background(), "test-path")
+		verifiers, err := state.FindVerifiersForPath("test-path")
 		assert.Nil(t, verifiers)
 		assert.ErrorIs(t, err, ErrMetadataNotFound)
 	})
@@ -384,32 +382,6 @@ func TestGetStateForCommit(t *testing.T) {
 	state, err = GetStateForCommit(context.Background(), repo, newCommit)
 	assert.Nil(t, err)
 	assert.Equal(t, firstState, state)
-}
-
-func TestStateFindDelegationEntry(t *testing.T) {
-	// Test case when no delegation is found
-	t.Run("no delegation", func(t *testing.T) {
-		state := createTestStateWithPolicy(t)
-		entry, err := state.findDelegationEntry("random")
-		assert.ErrorIs(t, err, ErrDelegationNotFound)
-		assert.Nil(t, entry)
-	})
-
-	// Test case for a simple delegation
-	t.Run("simple delegation", func(t *testing.T) {
-		state := createTestStateWithDelegatedPolicies(t)
-		entry, err := state.findDelegationEntry("1")
-		assert.Nil(t, err)
-		assert.Equal(t, &tuf.Delegation{Name: "1", Paths: []string{"file:1/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"}, Threshold: 1}}, entry)
-	})
-
-	// Test case for a delegation with multiple roles
-	t.Run("delegation with multiple roles", func(t *testing.T) {
-		state := createTestStateWithDelegatedPolicies(t)
-		entry, err := state.findDelegationEntry("4")
-		assert.Nil(t, err)
-		assert.Equal(t, &tuf.Delegation{Name: "4", Paths: []string{"file:1/subpath2/*"}, Terminating: false, Role: tuf.Role{KeyIDs: []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"}, Threshold: 1}}, entry)
-	})
 }
 
 func TestListRules(t *testing.T) {
