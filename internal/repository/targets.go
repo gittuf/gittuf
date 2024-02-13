@@ -104,7 +104,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Adding rule to rule file...")
-	targetsMetadata, err = policy.AddOrUpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns)
+	targetsMetadata, err = policy.AddDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns)
 	if err != nil {
 		return err
 	}
@@ -134,6 +134,70 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	return state.Commit(ctx, r.r, commitMessage, signCommit)
 }
 
+// UpdateDelegation is the interface for the user to update a rule to gittuf
+// policy.
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, signCommit bool) error {
+	if ruleName == policy.RootRoleName {
+		return ErrInvalidPolicyName
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current rule file...")
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	// TODO: verify is role can be signed using the presented key. This requires
+	// the user to pass in the delegating role as well as we do not want to
+	// assume which role is the delegating role (diamond delegations are legal).
+	// See: https://github.com/gittuf/gittuf/issues/246.
+
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating rule in rule file...")
+	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns)
+	if err != nil {
+		return err
+	}
+
+	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return nil
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Update rule '%s' in policy '%s'", ruleName, targetsRoleName)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
+
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
 func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
@@ -147,6 +211,8 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	if err != nil {
 		return err
 	}
+
+	slog.Debug("Loading current rule file...")
 	if !state.HasTargetsRole(targetsRoleName) {
 		return policy.ErrMetadataNotFound
 	}
@@ -156,7 +222,6 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	slog.Debug("Loading current rule file...")
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
 		return err

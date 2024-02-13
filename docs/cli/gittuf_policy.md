@@ -28,4 +28,5 @@ Tools to manage gittuf policies
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
+* [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
 

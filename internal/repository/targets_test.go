@@ -131,6 +131,45 @@ func TestAddDelegation(t *testing.T) {
 	})
 }
 
+func TestUpdateDelegation(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, false)
+	assert.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(context.Background(), r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
+		Name:        "protect-main",
+		Paths:       []string{"git:refs/heads/main"},
+		Terminating: false,
+		Role:        tuf.Role{KeyIDs: []string{gpgKey.KeyID, targetsKey.KeyID}, Threshold: 1},
+	})
+}
+
 func TestRemoveDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
