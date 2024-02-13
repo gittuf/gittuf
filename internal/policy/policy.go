@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -50,6 +51,7 @@ var (
 	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
 	ErrDelegationNotFound         = errors.New("required delegation entry not found")
 	ErrPolicyExists               = errors.New("cannot initialize Policy namespace as it exists already")
+	ErrDuplicatedRuleName         = errors.New("two rules with same name found in policy")
 )
 
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
@@ -83,6 +85,7 @@ type State struct {
 	RootPublicKeys      []*tuf.Key
 
 	verifiersCache map[string][]*Verifier
+	ruleNames      *set.Set[string]
 }
 
 type DelegationWithDepth struct {
@@ -207,6 +210,10 @@ func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 		}
 
 		state.RootPublicKeys = append(state.RootPublicKeys, key)
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		return nil, err
 	}
 
 	if err := state.Verify(ctx); err != nil {
@@ -668,6 +675,60 @@ func (s *State) HasTargetsRole(roleName string) bool {
 
 	_, ok := s.DelegationEnvelopes[roleName]
 	return ok
+}
+
+func (s *State) HasRuleName(name string) bool {
+	return s.ruleNames.Has(name)
+}
+
+func (s *State) loadRuleNames() error {
+	if s.TargetsEnvelope == nil {
+		return nil
+	}
+
+	s.ruleNames = set.NewSet[string]()
+
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	for _, rule := range targetsMetadata.Delegations.Roles {
+		if rule.Name == AllowRuleName {
+			continue
+		}
+
+		if s.ruleNames.Has(rule.Name) {
+			return ErrDuplicatedRuleName
+		}
+
+		s.ruleNames.Add(rule.Name)
+	}
+
+	if len(s.DelegationEnvelopes) == 0 {
+		return nil
+	}
+
+	for delegatedRoleName := range s.DelegationEnvelopes {
+		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName)
+		if err != nil {
+			return err
+		}
+
+		for _, rule := range delegatedMetadata.Delegations.Roles {
+			if rule.Name == AllowRuleName {
+				continue
+			}
+
+			if s.ruleNames.Has(rule.Name) {
+				return ErrDuplicatedRuleName
+			}
+
+			s.ruleNames.Add(rule.Name)
+		}
+	}
+
+	return nil
 }
 
 // ListRules returns a list of all the rules as an array of the delegations in a

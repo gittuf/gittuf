@@ -88,6 +88,13 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	if err != nil {
 		return err
 	}
+
+	slog.Debug("Checking if rule with same name exists...")
+	if state.HasRuleName(ruleName) {
+		return policy.ErrDuplicatedRuleName
+	}
+
+	slog.Debug("Loading current rule file...")
 	if !state.HasTargetsRole(targetsRoleName) {
 		return policy.ErrMetadataNotFound
 	}
@@ -97,7 +104,6 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	slog.Debug("Loading current rule file...")
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
 		return err
