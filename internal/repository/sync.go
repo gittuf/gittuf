@@ -87,25 +87,25 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		}
 
 		if len(rootMetadata.Roles[policy.RootRoleName].KeyIDs) != len(expectedRootKeys) {
-			expectedRootKeysIds := []string{}
+			expectedRootKeysIDs := []string{}
 
 			for _, key := range expectedRootKeys {
-				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
+				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
 			}
 
-			err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+			err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
 
 		for keyIndex := range expectedRootKeys {
-			expectedRootKeysIds := []string{}
+			expectedRootKeysIDs := []string{}
 
 			for _, key := range expectedRootKeys {
-				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
+				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
 			}
 
 			if !reflect.DeepEqual(rootMetadata.Keys[rootMetadata.Roles[policy.RootRoleName].KeyIDs[keyIndex]], expectedRootKeys[keyIndex]) {
-				err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+				err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 				return repository, errors.Join(ErrCloningRepository, err)
 			}
 		}
