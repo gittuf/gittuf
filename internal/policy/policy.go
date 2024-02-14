@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -48,9 +49,8 @@ var (
 	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
 	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
 	ErrDelegationNotFound         = errors.New("required delegation entry not found")
+	ErrPolicyExists               = errors.New("cannot initialize Policy namespace as it exists already")
 )
-
-var ErrPolicyExists = errors.New("cannot initialize Policy namespace as it exists already")
 
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
 // has a zero hash.
@@ -81,6 +81,8 @@ type State struct {
 	TargetsEnvelope     *sslibdsse.Envelope
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
 	RootPublicKeys      []*tuf.Key
+
+	verifiersCache map[string][]*Verifier
 }
 
 type DelegationWithDepth struct {
@@ -396,6 +398,15 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
 func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verifier, error) {
+	if s.verifiersCache == nil {
+		slog.Debug("Initializing path cache in policy...")
+		s.verifiersCache = map[string][]*Verifier{}
+	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
+		// Cache hit for this path in this policy
+		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
+		return verifiers, nil
+	}
+
 	if !s.HasTargetsRole(TargetsRoleName) {
 		// No policies exist
 		return nil, ErrMetadataNotFound
@@ -420,6 +431,7 @@ func (s *State) FindVerifiersForPath(ctx context.Context, path string) ([]*Verif
 	verifiers := []*Verifier{}
 	for {
 		if len(groupedDelegations) == 0 {
+			s.verifiersCache[path] = verifiers
 			return verifiers, nil
 		}
 
