@@ -76,6 +76,8 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 	slog.Debug("Verifying HEAD...")
 	if len(expectedRootKeys) > 0 {
+
+		slog.Debug("Getting root keys...")
 		state, err := policy.LoadCurrentState(ctx, r)
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
@@ -97,6 +99,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
 
+		slog.Debug("Verifing if root keys are expected root keys...")
 		for keyIndex := range expectedRootKeys {
 			expectedRootKeysIDs := []string{}
 
