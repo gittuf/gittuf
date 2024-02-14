@@ -76,7 +76,6 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 	slog.Debug("Verifying HEAD...")
 	if len(expectedRootKeys) > 0 {
-
 		slog.Debug("Getting root keys...")
 		state, err := policy.LoadCurrentState(ctx, r)
 		if err != nil {
