@@ -744,39 +744,90 @@ func TestVerifyCommit(t *testing.T) {
 }
 
 func TestVerifyTag(t *testing.T) {
-	repo, _ := createTestRepository(t, createTestStateWithPolicy)
-	refName := "refs/heads/main"
+	t.Run("normal test", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
-	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-	entry.ID = entryID
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
 
-	tagName := "v1"
-	tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
 
-	expectedStatus := map[string]string{tagID.String(): unableToFindRSLEntryMessage}
-	status := VerifyTag(context.Background(), repo, []string{tagID.String()})
-	assert.Equal(t, expectedStatus, status)
+		expectedStatus := map[string]string{tagID.String(): unableToFindRSLEntryMessage}
+		status := VerifyTag(context.Background(), repo, []string{tagID.String()})
+		assert.Equal(t, expectedStatus, status)
 
-	entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
-	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-	entry.ID = entryID
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
 
-	// Use tag ID
-	expectedStatus = map[string]string{tagID.String(): goodTagSignatureMessage}
-	status = VerifyTag(context.Background(), repo, []string{tagID.String()})
-	assert.Equal(t, expectedStatus, status)
+		// Use tag ID
+		expectedStatus = map[string]string{tagID.String(): goodTagSignatureMessage}
+		status = VerifyTag(context.Background(), repo, []string{tagID.String()})
+		assert.Equal(t, expectedStatus, status)
 
-	// Use tagName
-	expectedStatus = map[string]string{tagName: goodTagSignatureMessage}
-	status = VerifyTag(context.Background(), repo, []string{tagName})
-	assert.Equal(t, expectedStatus, status)
+		// Use tagName
+		expectedStatus = map[string]string{tagName: goodTagSignatureMessage}
+		status = VerifyTag(context.Background(), repo, []string{tagName})
+		assert.Equal(t, expectedStatus, status)
 
-	// Use refs path for tagName
-	expectedStatus = map[string]string{string(plumbing.NewTagReferenceName(tagName)): goodTagSignatureMessage}
-	status = VerifyTag(context.Background(), repo, []string{string(plumbing.NewTagReferenceName(tagName))})
-	assert.Equal(t, expectedStatus, status)
+		// Use refs path for tagName
+		expectedStatus = map[string]string{string(plumbing.NewTagReferenceName(tagName)): goodTagSignatureMessage}
+		status = VerifyTag(context.Background(), repo, []string{string(plumbing.NewTagReferenceName(tagName))})
+		assert.Equal(t, expectedStatus, status)
+	})
+
+	t.Run("tag verification with changed tag", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-2], gpgKeyBytes)
+
+		// Use tag ID
+		expectedStatus := map[string]string{tagID.String(): "verifying RSL entry failed, tag reference set to unexpected target"}
+		status := VerifyTag(context.Background(), repo, []string{tagID.String()})
+		assert.Equal(t, expectedStatus, status)
+	})
+
+	t.Run("tag verification with multiple RSL entries", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		expectedStatus := map[string]string{tagID.String(): multipleTagRSLEntriesFoundMessage}
+		status := VerifyTag(context.Background(), repo, []string{tagID.String()})
+		assert.Equal(t, expectedStatus, status)
+	})
 }
 
 func TestVerifyEntry(t *testing.T) {
