@@ -20,15 +20,15 @@ import (
 )
 
 var (
-	ErrCloningRepository = errors.New("unable to clone repository")
-	ErrDirExists         = errors.New("directory exists")
+	ErrCloningRepository            = errors.New("unable to clone repository")
+	ErrDirExists                    = errors.New("directory exists")
+	ClonedAndExpectedKeysDoNotMatch = "cloned root keys do not match the expected keys.\\n Expected keys = %s, \\n Actual Keys = %s\""
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository. If called with the expected
 // root keys, it will verify that the cloned root keys match the expected ones.
-// TODO: resolve how root keys are trusted / bootstrapped.
 func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []*tuf.Key) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
@@ -76,8 +76,11 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 	slog.Debug("Verifying HEAD...")
 	if len(expectedRootKeys) > 0 {
-		slog.Debug("Getting root keys...")
-		state, err := policy.LoadCurrentState(ctx, r)
+		slog.Debug("Loading embedded root keys...")
+
+		firstRSLEntry, _, _ := rsl.GetFirstEntry(r)
+
+		state, err := policy.LoadState(ctx, r, firstRSLEntry.GetID())
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
@@ -94,7 +97,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
 			}
 
-			err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+			err := fmt.Errorf(ClonedAndExpectedKeysDoNotMatch, expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
 
@@ -107,7 +110,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 			}
 
 			if !reflect.DeepEqual(rootMetadata.Keys[rootMetadata.Roles[policy.RootRoleName].KeyIDs[keyIndex]], expectedRootKeys[keyIndex]) {
-				err := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+				err := fmt.Errorf(ClonedAndExpectedKeysDoNotMatch, expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 				return repository, errors.Join(ErrCloningRepository, err)
 			}
 		}

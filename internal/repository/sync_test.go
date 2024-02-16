@@ -235,6 +235,7 @@ func TestClone(t *testing.T) {
 		}
 		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
 	})
+
 	t.Run("successful clone without specifying dir, with expected root keys", func(t *testing.T) {
 		localTmpDir := t.TempDir()
 
@@ -267,6 +268,7 @@ func TestClone(t *testing.T) {
 		}
 		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
 	})
+
 	t.Run("unsuccessful clone without specifying dir, with expected root keys not equaling root keys", func(t *testing.T) {
 		localTmpDir := t.TempDir()
 
@@ -285,7 +287,7 @@ func TestClone(t *testing.T) {
 		}
 
 		_, err = Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{expectedPublicKey})
-		targetErr := fmt.Errorf("cloned root keys do not match the expected keys.\n Expected keys = %s, \n Actual Keys = %s", []string{expectedPublicKey.KeyID}, []string{actualPublicKey.KeyID})
+		targetErr := fmt.Errorf(ClonedAndExpectedKeysDoNotMatch, []string{expectedPublicKey.KeyID}, []string{actualPublicKey.KeyID})
 		assert.ErrorIs(t, err, ErrCloningRepository, targetErr)
 	})
 }
