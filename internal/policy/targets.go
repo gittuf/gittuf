@@ -22,9 +22,38 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 	return targetsMetadata
 }
 
-// AddOrUpdateDelegation is used to add or amend a delegation in
-// TargetsMetadata.
-func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string) (*tuf.TargetsMetadata, error) {
+// AddDelegation adds a new delegation to TargetsMetadata.
+func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string) (*tuf.TargetsMetadata, error) {
+	if ruleName == AllowRuleName {
+		return nil, ErrCannotManipulateAllowRule
+	}
+
+	authorizedKeyIDs := []string{}
+	for _, key := range authorizedKeys {
+		targetsMetadata.Delegations.AddKey(key)
+
+		authorizedKeyIDs = append(authorizedKeyIDs, key.KeyID)
+	}
+
+	allDelegations := targetsMetadata.Delegations.Roles
+	newDelegation := tuf.Delegation{
+		Name:        ruleName,
+		Paths:       rulePatterns,
+		Terminating: false,
+		Role: tuf.Role{
+			KeyIDs:    authorizedKeyIDs,
+			Threshold: 1,
+		},
+	}
+	allDelegations = append(allDelegations[:len(allDelegations)-1], newDelegation, AllowRule())
+
+	targetsMetadata.Delegations.Roles = allDelegations
+
+	return targetsMetadata, nil
+}
+
+// UpdateDelegation is used to amend a delegation in TargetsMetadata.
+func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
@@ -37,35 +66,23 @@ func AddOrUpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string
 	}
 
 	allDelegations := []tuf.Delegation{}
-
-	existingDelegation := false
 	for _, delegation := range targetsMetadata.Delegations.Roles {
 		if delegation.Name == AllowRuleName {
 			break
 		}
 
+		if delegation.Name != ruleName {
+			allDelegations = append(allDelegations, delegation)
+			continue
+		}
+
 		if delegation.Name == ruleName {
-			// update existing delegation
-			existingDelegation = true
 			delegation.Paths = rulePatterns
 			delegation.Role = tuf.Role{KeyIDs: authorizedKeyIDs, Threshold: 1}
 		}
 
 		allDelegations = append(allDelegations, delegation)
 	}
-
-	if !existingDelegation {
-		allDelegations = append(allDelegations, tuf.Delegation{
-			Name:        ruleName,
-			Paths:       rulePatterns,
-			Terminating: false,
-			Role: tuf.Role{
-				KeyIDs:    authorizedKeyIDs,
-				Threshold: 1,
-			},
-		})
-	}
-
 	allDelegations = append(allDelegations, AllowRule())
 
 	targetsMetadata.Delegations.Roles = allDelegations

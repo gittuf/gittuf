@@ -344,7 +344,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}) // just a dummy rule
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}) // just a dummy rule
 	if err != nil {
 		t.Fatal(err)
 	}
