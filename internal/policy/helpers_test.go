@@ -139,11 +139,17 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	return &State{
+	state := &State{
 		RootEnvelope:    rootEnv,
 		TargetsEnvelope: targetsEnv,
 		RootPublicKeys:  []*tuf.Key{key},
 	}
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
 }
 
 func createTestStateWithDelegatedPolicies(t *testing.T) *State {
@@ -244,6 +250,10 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	//   /\
 	//  3  4
 
+	if err := curState.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
 	return curState
 }
 
@@ -278,6 +288,10 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	}
 	state.TargetsEnvelope = targetsEnv
 
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
 	return state
 }
 
@@ -311,6 +325,10 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	state.TargetsEnvelope = targetsEnv
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
 
 	return state
 }
