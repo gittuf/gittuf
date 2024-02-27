@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	ErrCloningRepository = errors.New("unable to clone repository")
-	ErrDirExists         = errors.New("directory exists")
+	ErrCloningRepository            = errors.New("unable to clone repository")
+	ErrDirExists                    = errors.New("directory exists")
+	ClonedAndExpectedKeysDoNotMatch = errors.New(ErrCloningRepository.Error() + ", " + "cloned root keys do not match the expected keys.")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
@@ -74,32 +75,35 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	repository := &Repository{r: r}
 
 	slog.Debug("Verifying HEAD...")
+
 	if len(expectedRootKeys) > 0 {
 		state, err := policy.LoadCurrentState(ctx, r)
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
-		rootMetadata, err := state.GetRootMetadata()
+		rootKeys, err := state.GetRootKeys()
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
-		if len(rootMetadata.Roles[policy.RootRoleName].KeyIDs) != len(expectedRootKeys) {
-			expectedRootKeysIds := []string{}
+
+		if len(rootKeys) != len(expectedRootKeys) {
+			expectedRootKeysIDs := []string{}
 
 			for _, key := range expectedRootKeys {
-				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
+				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
 			}
 
-			return repository, errors.Join(ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+			return repository, ClonedAndExpectedKeysDoNotMatch
 		}
-		for keyIndex := range expectedRootKeys {
-			expectedRootKeysIds := []string{}
+		slog.Debug("Verifying if root keys are expected root keys...")
+		for keyid := range rootKeys {
+			if !reflect.DeepEqual(rootKeys[keyid], expectedRootKeys[keyid]) {
+				expectedRootKeysIDs := []string{}
+				for _, key := range expectedRootKeys {
+					expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
+				}
 
-			for _, key := range expectedRootKeys {
-				expectedRootKeysIds = append(expectedRootKeysIds, key.KeyID)
-			}
-			if !reflect.DeepEqual(rootMetadata.Keys[rootMetadata.Roles[policy.RootRoleName].KeyIDs[keyIndex]], expectedRootKeys[keyIndex]) {
-				return repository, errors.Join(ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", expectedRootKeysIds, rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+				return repository, ClonedAndExpectedKeysDoNotMatch
 			}
 		}
 	}

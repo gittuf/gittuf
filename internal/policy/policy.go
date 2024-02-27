@@ -761,6 +761,19 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 	return allDelegations, nil
 }
 
+func (s *State) GetRootKeyIds() ([]string, error) {
+	var keyIDs []string
+	keys, err := s.GetRootKeys()
+	if err != nil {
+		return []string{}, err
+	}
+
+	for _, key := range keys {
+		keyIDs = append(keyIDs, key.KeyID)
+	}
+	return keyIDs, nil
+}
+
 // hasFileRule returns true if the policy state has a single rule in any targets
 // role with the file namespace scheme. Note that this function has no concept
 // of role reachability, as it is not invoked for a specific path. So, it might

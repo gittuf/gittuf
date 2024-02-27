@@ -4,7 +4,6 @@ package repository
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 
@@ -276,11 +275,7 @@ func TestClone(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		actualPublicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
 		_, err = Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{expectedPublicKey})
-		assert.ErrorIs(t, err, ErrCloningRepository, fmt.Errorf("root keys are not the keys that were expected,\n Expected keys = %s, \n Actual Keys = %s", []string{expectedPublicKey.KeyID}, []string{actualPublicKey.KeyID}))
+		assert.ErrorIs(t, err, ClonedAndExpectedKeysDoNotMatch)
 	})
 }
