@@ -22,7 +22,7 @@ import (
 var (
 	ErrCloningRepository            = errors.New("unable to clone repository")
 	ErrDirExists                    = errors.New("directory exists")
-	ClonedAndExpectedKeysDoNotMatch = "cloned root keys do not match the expected keys.\\n Expected keys = %s, \\n Actual Keys = %s\""
+	ClonedAndExpectedKeysDoNotMatch = errors.New(ErrCloningRepository.Error() + ", " + "cloned root keys do not match the expected keys.")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
@@ -85,33 +85,25 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 			return repository, errors.Join(ErrCloningRepository, err)
 		}
 
-		rootMetadata, err := state.GetRootMetadata()
-		if err != nil {
-			return repository, errors.Join(ErrCloningRepository, err)
-		}
-
-		if len(rootMetadata.Roles[policy.RootRoleName].KeyIDs) != len(expectedRootKeys) {
+		if len(state.GetRootKeys()) != len(expectedRootKeys) {
 			expectedRootKeysIDs := []string{}
 
 			for _, key := range expectedRootKeys {
 				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
 			}
 
-			err := fmt.Errorf(ClonedAndExpectedKeysDoNotMatch, expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
-			return repository, errors.Join(ErrCloningRepository, err)
+			return repository, ClonedAndExpectedKeysDoNotMatch
 		}
 
-		slog.Debug("Verifing if root keys are expected root keys...")
-		for keyIndex := range expectedRootKeys {
-			expectedRootKeysIDs := []string{}
+		slog.Debug("Verifying if root keys are expected root keys...")
+		for keyid := range state.GetRootKeys() {
+			if !reflect.DeepEqual(state.GetRootKeys()[keyid], expectedRootKeys[keyid]) {
+				expectedRootKeysIDs := []string{}
+				for _, key := range expectedRootKeys {
+					expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
+				}
 
-			for _, key := range expectedRootKeys {
-				expectedRootKeysIDs = append(expectedRootKeysIDs, key.KeyID)
-			}
-
-			if !reflect.DeepEqual(rootMetadata.Keys[rootMetadata.Roles[policy.RootRoleName].KeyIDs[keyIndex]], expectedRootKeys[keyIndex]) {
-				err := fmt.Errorf(ClonedAndExpectedKeysDoNotMatch, expectedRootKeysIDs, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
-				return repository, errors.Join(ErrCloningRepository, err)
+				return repository, ClonedAndExpectedKeysDoNotMatch
 			}
 		}
 	}
