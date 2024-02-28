@@ -276,6 +276,6 @@ func TestClone(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{expectedPublicKey})
-		assert.ErrorIs(t, err, ClonedAndExpectedKeysDoNotMatch)
+		assert.ErrorIs(t, err, ErrClonedAndExpectedKeysDoNotMatch)
 	})
 }
