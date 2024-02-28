@@ -12,6 +12,7 @@ import (
 var (
 	ErrCannotMeetThreshold = errors.New("removing key will drop authorized keys below threshold")
 	ErrRootMetadataNil     = errors.New("rootMetadata is nil")
+	ErrRootKeyNil          = errors.New("root key not found")
 	ErrTargetsKeyNil       = errors.New("targetsKey is nil")
 	ErrKeyIDEmpty          = errors.New("keyID is empty")
 )

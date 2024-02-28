@@ -52,14 +52,8 @@ var (
 // entry is returned if the policy verification is successful.
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// 1. Get latest policy entry
-	slog.Debug("Identifying latest policy entry...")
-	policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-	if err != nil {
-		return plumbing.ZeroHash, err
-	}
-
 	slog.Debug("Loading policy...")
-	policyState, err := LoadStateForEntry(ctx, repo, policyEntry)
+	policyState, err := LoadCurrentState(ctx, repo)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -143,8 +137,8 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	var currentPolicy *State
 
 	// 1. Load policy applicable at firstEntry
-	slog.Debug("Loading policy...")
-	state, err := LoadStateForEntry(ctx, repo, initialPolicyEntry)
+	slog.Debug("Loading initial policy...")
+	state, err := LoadState(ctx, repo, initialPolicyEntry)
 	if err != nil {
 		return err
 	}
@@ -171,7 +165,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
 				// TODO: this is repetition if the firstEntry is for policy
-				newPolicy, err := LoadStateForEntry(ctx, repo, entry)
+				newPolicy, err := loadStateForEntry(ctx, repo, entry)
 				if err != nil {
 					return err
 				}
@@ -449,7 +443,7 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 			continue
 		}
 
-		policy, err := LoadStateForEntry(ctx, repo, policyEntry)
+		policy, err := LoadState(ctx, repo, policyEntry)
 		if err != nil {
 			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
 			continue
@@ -468,33 +462,12 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 // VerifyNewState ensures that when a new policy is encountered, its root role
 // is signed by keys trusted in the current policy.
 func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
-	currentRoot, err := s.GetRootMetadata()
+	rootVerifier, err := s.getRootVerifier()
 	if err != nil {
 		return err
 	}
 
-	rootKeyIDs := currentRoot.Roles[RootRoleName].KeyIDs
-	rootThreshold := currentRoot.Roles[RootRoleName].Threshold
-
-	verifiers := make([]sslibdsse.Verifier, 0, len(rootKeyIDs))
-	for _, keyID := range rootKeyIDs {
-		k, ok := currentRoot.Keys[keyID]
-		if !ok {
-			// This is almost certainly an issue but we can be a little
-			// permissive and let failure happen in case the threshold isn't
-			// met
-			continue
-		}
-
-		sv, err := signerverifier.NewSignerVerifierFromTUFKey(k) //nolint:staticcheck
-		if err != nil {
-			return err
-		}
-
-		verifiers = append(verifiers, sv)
-	}
-
-	return dsse.VerifyEnvelope(ctx, newPolicy.RootEnvelope, verifiers, rootThreshold)
+	return rootVerifier.Verify(ctx, nil, newPolicy.RootEnvelope)
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified
@@ -519,7 +492,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 	)
 
 	// 1. Find authorized verifiers for entry's ref
-	verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
+	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
 	if err != nil {
 		return err
 	}
@@ -584,7 +557,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, entry
 		pathsVerified := make([]bool, len(paths))
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for j, path := range paths {
-			verifiers, err := policy.FindVerifiersForPath(ctx, fmt.Sprintf("%s:%s", fileRuleScheme, path))
+			verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
 			if err != nil {
 				return err
 			}
