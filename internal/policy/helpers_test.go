@@ -281,7 +281,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	}
 
 	// Set threshold = 2 for existing rule with the added key
-	targetsMetadata, err = AddOrUpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
 	if err != nil {
 		t.Fatal(err)
 	}

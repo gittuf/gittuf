@@ -142,7 +142,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
 // policy.
-func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, signCommit bool) error {
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -174,7 +174,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Updating rule in rule file...")
-	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns)
+	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, threshold)
 	if err != nil {
 		return err
 	}
