@@ -15,6 +15,7 @@ require (
 	github.com/sigstore/sigstore v1.8.2
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
+	github.com/tzvetkoff-go/fnmatch v0.0.0-20220210160758-879480b5e662
 	golang.org/x/crypto v0.20.0
 	google.golang.org/protobuf v1.32.0
 )
