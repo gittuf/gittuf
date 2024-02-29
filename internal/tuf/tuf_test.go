@@ -192,6 +192,16 @@ func TestDelegationMatches(t *testing.T) {
 			target:   "foo/bar/baz/foobar.txt",
 			expected: true,
 		},
+		"artifact in arbitrary directory, does not match": {
+			patterns: []string{"*.txt"},
+			target:   "foo/bar/foobar.txtfile",
+			expected: false,
+		},
+		"arbitrary directory, does not match": {
+			patterns: []string{"*_test"},
+			target:   "foo/bar_test/foobar",
+			expected: false,
+		},
 	}
 
 	for name, test := range tests {
