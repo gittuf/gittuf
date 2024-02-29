@@ -11,10 +11,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"path"
 
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+	"github.com/tzvetkoff-go/fnmatch"
 )
 
 const specVersion = "1.0"
@@ -193,16 +193,6 @@ func (d *Delegations) AddDelegation(delegation Delegation) {
 	d.Roles = append(d.Roles, delegation)
 }
 
-// Matches checks if any of the delegation's patterns match the target.
-func (d *Delegation) Matches(target string) bool {
-	for _, pattern := range d.Paths {
-		if ok, _ := path.Match(pattern, target); ok {
-			return true
-		}
-	}
-	return false
-}
-
 // Delegation defines the schema for a single delegation entry. It differs from
 // the standard TUF schema by allowing a `custom` field to record details
 // pertaining to the delegation.
@@ -212,4 +202,14 @@ type Delegation struct {
 	Terminating bool             `json:"terminating"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`
 	Role
+}
+
+// Matches checks if any of the delegation's patterns match the target.
+func (d *Delegation) Matches(target string) bool {
+	for _, pattern := range d.Paths {
+		if matches := fnmatch.Match(pattern, target); matches {
+			return true
+		}
+	}
+	return false
 }
