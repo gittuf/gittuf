@@ -687,7 +687,7 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 	}
 
 	if entry.RefName != plumbing.NewTagReferenceName(tagObj.Name).String() {
-		return fmt.Errorf(plumbing.NewTagReferenceName(entry.RefName).String())
+		return fmt.Errorf("verifying RSL entry failed, tag name does not match expected tag name from RSL")
 	}
 
 	if len(tagObj.PGPSignature) == 0 {
