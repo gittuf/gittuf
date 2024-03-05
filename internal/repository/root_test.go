@@ -258,3 +258,58 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
+
+func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddTopLevelTargetsKey(testCtx, sv, key, false); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := policy.LoadCurrentState(testCtx, r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
+
+	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 2, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
+	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
+}

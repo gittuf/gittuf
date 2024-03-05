@@ -100,7 +100,7 @@ func TestAddDelegation(t *testing.T) {
 		assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 		assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 
-		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
+		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(context.Background(), r.r)
@@ -126,7 +126,7 @@ func TestAddDelegation(t *testing.T) {
 	t.Run("invalid rule name", func(t *testing.T) {
 		r := createTestRepositoryWithPolicy(t, "")
 
-		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, policy.RootRoleName, nil, nil, false)
+		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, policy.RootRoleName, nil, nil, 1, false)
 		assert.ErrorIs(t, err, ErrInvalidPolicyName)
 	})
 }
@@ -148,7 +148,7 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, false)
+	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)
@@ -187,7 +187,7 @@ func TestRemoveDelegation(t *testing.T) {
 	authorizedKeyBytes := []*tuf.Key{targetsPubKey}
 	rulePatterns := []string{"git:branch=main"}
 
-	err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, false)
+	err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(context.Background(), r.r)

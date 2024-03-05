@@ -18,6 +18,7 @@ gittuf policy add-rule [flags]
       --policy-name string          name of policy file to add rule to (default "targets")
       --rule-name string            name of rule
       --rule-pattern stringArray    patterns used to identify namespaces rule applies to
+      --threshold int               threshold of required valid signatures (default 1)
 ```
 
 ### Options inherited from parent commands
