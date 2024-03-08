@@ -780,7 +780,7 @@ func TestVerifyTag(t *testing.T) {
 		assert.Equal(t, expectedStatus, status)
 	})
 
-	t.Run("tag verification with mismatched TargetID", func(t *testing.T) {
+	t.Run("tag verification with changed tag", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -792,15 +792,14 @@ func TestVerifyTag(t *testing.T) {
 		tagName := "v1"
 		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
 
-		tagName2 := "v2"
-		tagID2 := common.CreateTestSignedTag(t, repo, tagName2, commitIDs[len(commitIDs)-1], gpgKeyBytes)
-
-		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID2)
+		entry = rsl.NewReferenceEntry(string(plumbing.NewTagReferenceName(tagName)), tagID)
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
+		common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-2], gpgKeyBytes)
+
 		// Use tag ID
-		expectedStatus := map[string]string{tagID.String(): "verifying RSL entry failed, tag name does not match expected tag name from RSL"}
+		expectedStatus := map[string]string{tagID.String(): fmt.Sprintf("verifying RSL entry failed, %s", ErrUnauthorizedSignature.Error())}
 		status := VerifyTag(context.Background(), repo, []string{tagID.String()})
 		assert.Equal(t, expectedStatus, status)
 	})
