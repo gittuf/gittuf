@@ -6,7 +6,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os/exec"
 
+	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
@@ -193,17 +196,46 @@ func CreateCommitObject(gitConfig *config.Config, treeHash plumbing.Hash, parent
 // KnowsCommit indicates if the commit under test, identified by commitID, has a
 // path to commit. If commit is the same as the commit under test or if commit
 // is an ancestor of commit under test, KnowsCommit returns true.
-func KnowsCommit(repo *git.Repository, commitID plumbing.Hash, commit *object.Commit) (bool, error) {
-	if commitID == commit.Hash {
+func KnowsCommit(repo *git.Repository, commitDescendantID, commitAncestorID plumbing.Hash) (bool, error) {
+	if featureflags.UseGitBinary {
+		return KnowsCommitUsingBinary(repo, commitDescendantID, commitAncestorID)
+	}
+
+	if commitAncestorID == commitDescendantID {
 		return true, nil
 	}
 
-	commitUnderTest, err := GetCommit(repo, commitID)
+	commitDescendant, err := GetCommit(repo, commitDescendantID)
 	if err != nil {
 		return false, err
 	}
 
-	return commit.IsAncestor(commitUnderTest)
+	commitAncestor, err := GetCommit(repo, commitAncestorID)
+	if err != nil {
+		return false, err
+	}
+
+	return commitAncestor.IsAncestor(commitDescendant)
+}
+
+// KnowsCommitUsingBinary is an implementation of KnowsCommit that uses the Git
+// binary instead of go-git.
+func KnowsCommitUsingBinary(_ *git.Repository, commitDescendantID, commitAncestorID plumbing.Hash) (bool, error) {
+	if !dev.InDevMode() {
+		return false, dev.ErrNotInDevMode
+	}
+
+	if commitAncestorID == commitDescendantID {
+		return true, nil
+	}
+
+	cmd := exec.Command("git", "merge-base", "--is-ancestor", commitAncestorID.String(), commitDescendantID.String()) //nolint:gosec
+	if err := cmd.Run(); err != nil {
+		// non-zero returned if not ancestor
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // GetCommit returns the requested commit object.

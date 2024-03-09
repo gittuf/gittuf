@@ -5,11 +5,13 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
@@ -209,10 +211,6 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	firstCommitID := ref.Hash()
-	firstCommit, err := GetCommit(repo, firstCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	if _, err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
 		t.Fatal(err)
@@ -222,36 +220,106 @@ func TestKnowsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondCommitID := ref.Hash()
-	secondCommit, err := GetCommit(repo, secondCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	t.Run("check if second commit knows first", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, secondCommitID, firstCommit)
+		knows, err := KnowsCommit(repo, secondCommitID, firstCommitID)
 		assert.Nil(t, err)
 		assert.True(t, knows)
 	})
 
 	t.Run("check that first commit does not know second", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, firstCommitID, secondCommit)
+		knows, err := KnowsCommit(repo, firstCommitID, secondCommitID)
 		assert.Nil(t, err)
 		assert.False(t, knows)
 	})
 
 	t.Run("check that both commits know themselves", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, firstCommitID, firstCommit)
+		knows, err := KnowsCommit(repo, firstCommitID, firstCommitID)
 		assert.Nil(t, err)
 		assert.True(t, knows)
 
-		knows, err = KnowsCommit(repo, secondCommitID, secondCommit)
+		knows, err = KnowsCommit(repo, secondCommitID, secondCommitID)
 		assert.Nil(t, err)
 		assert.True(t, knows)
 	})
 
 	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, plumbing.ZeroHash, firstCommit)
+		knows, err := KnowsCommit(repo, plumbing.ZeroHash, firstCommitID)
 		assert.ErrorIs(t, err, plumbing.ErrObjectNotFound)
+		assert.False(t, knows)
+	})
+}
+
+func TestKnowsCommitUsingBinary(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	tmpDir := t.TempDir()
+	repo, err := git.PlainInit(tmpDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(currentDir) //nolint:errcheck
+
+	refName := "refs/heads/main"
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeHash, err := WriteTree(repo, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Commit(repo, emptyTreeHash, refName, "First commit", false); err != nil {
+		t.Fatal(err)
+	}
+	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstCommitID := ref.Hash()
+
+	if _, err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
+		t.Fatal(err)
+	}
+	ref, err = repo.Reference(plumbing.ReferenceName(refName), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondCommitID := ref.Hash()
+
+	t.Run("check if second commit knows first", func(t *testing.T) {
+		knows, err := KnowsCommitUsingBinary(repo, secondCommitID, firstCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that first commit does not know second", func(t *testing.T) {
+		knows, err := KnowsCommitUsingBinary(repo, firstCommitID, secondCommitID)
+		assert.Nil(t, err)
+		assert.False(t, knows)
+	})
+
+	t.Run("check that both commits know themselves", func(t *testing.T) {
+		knows, err := KnowsCommitUsingBinary(repo, firstCommitID, firstCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+
+		knows, err = KnowsCommitUsingBinary(repo, secondCommitID, secondCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
+		knows, _ := KnowsCommitUsingBinary(repo, plumbing.ZeroHash, firstCommitID)
 		assert.False(t, knows)
 	})
 }

@@ -158,8 +158,9 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error)
 // been seen in the repository previously, no policy state is returned. Also, no
 // error is returned. Identifying the policy in this case is left to the calling
 // workflow.
-func GetStateForCommit(ctx context.Context, repo *git.Repository, commit *object.Commit) (*State, error) {
-	firstSeenEntry, _, err := rsl.GetFirstReferenceEntryForCommit(repo, commit)
+func GetStateForCommit(ctx context.Context, repo *git.Repository, commitID plumbing.Hash) (*State, error) {
+	// TODO: Search only before?
+	firstSeenEntry, _, err := rsl.GetFirstReferenceEntryForCommit(repo, commitID)
 	if err != nil {
 		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
 			return nil, nil

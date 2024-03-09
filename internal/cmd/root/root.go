@@ -3,6 +3,7 @@
 package root
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/gittuf/gittuf/internal/cmd/verifytag"
 	"github.com/gittuf/gittuf/internal/cmd/version"
+	devmode "github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/featureflags"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +28,7 @@ type options struct {
 	profile           bool
 	cpuProfileFile    string
 	memoryProfileFile string
+	useGitBinary      bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -55,6 +59,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"memory.prof",
 		"file to store memory profile",
 	)
+
+	cmd.PersistentFlags().BoolVar(
+		&o.useGitBinary,
+		"use-git-binary",
+		false,
+		fmt.Sprintf("use Git binary for some operations (developer mode only, set %s=1)", devmode.DevModeKey),
+	)
 }
 
 func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
@@ -72,6 +83,15 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 	// Start profiling if flag is set
 	if o.profile {
 		return profile.StartProfiling(o.cpuProfileFile, o.memoryProfileFile)
+	}
+
+	// Toggle gitinterface flag to use Git binary if flag is set
+	if o.useGitBinary {
+		if !devmode.InDevMode() {
+			return devmode.ErrNotInDevMode
+		}
+
+		featureflags.UseGitBinary = true
 	}
 
 	return nil
