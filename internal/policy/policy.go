@@ -893,11 +893,12 @@ func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool, policyF
 		// search all policy files we want to apply
 		for _, policyFile := range policyFiles {
 			// mutate the state based on policy file
-			if policyFile == TargetsRoleName {
+			switch policyFile {
+			case TargetsRoleName:
 				nextPolicy.TargetsEnvelope = currentStagingState.TargetsEnvelope
-			} else if policyFile == "root-keys" {
+			case "root-keys":
 				nextPolicy.RootPublicKeys = currentStagingState.RootPublicKeys
-			} else {
+			default:
 				found := false
 				for policyFileName, metadata := range currentStagingState.DelegationEnvelopes {
 					if policyFileName == policyFile {
@@ -911,6 +912,7 @@ func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool, policyF
 					return fmt.Errorf("policy item %s was not found", policyFile)
 				}
 			}
+
 		}
 
 		// verify if the state can be made from the previous one, does this break the state or not?
