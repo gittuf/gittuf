@@ -9,8 +9,9 @@ gittuf clone [flags]
 ### Options
 
 ```
-  -b, --branch string   specify branch to check out
-  -h, --help            help for clone
+  -b, --branch string              specify branch to check out
+  -e, --expectedRootKeys strings   specify expected root keys in cloned repo
+  -h, --help                       help for clone
 ```
 
 ### Options inherited from parent commands

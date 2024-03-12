@@ -8,24 +8,28 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
 var (
-	ErrCloningRepository = errors.New("unable to clone repository")
-	ErrDirExists         = errors.New("directory exists")
+	ErrCloningRepository               = errors.New("unable to clone repository")
+	ErrDirExists                       = errors.New("directory exists")
+	ErrClonedAndExpectedKeysDoNotMatch = errors.New(ErrCloningRepository.Error() + ", " + "cloned root keys do not match the expected keys.")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []*tuf.Key) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -45,7 +49,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	if err := os.Mkdir(dir, 0755); err != nil {
+	if err := os.Mkdir(dir, 0o755); err != nil {
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
@@ -64,8 +68,33 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
+	sort.Slice(expectedRootKeys, func(i, j int) bool {
+		return expectedRootKeys[i].KeyID < expectedRootKeys[j].KeyID
+	})
+
 	repository := &Repository{r: r}
 
 	slog.Debug("Verifying HEAD...")
+
+	if len(expectedRootKeys) > 0 {
+		state, err := policy.LoadCurrentState(ctx, r)
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+		rootKeys, err := state.GetRootKeys()
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+
+		if len(rootKeys) != len(expectedRootKeys) {
+			return repository, ErrClonedAndExpectedKeysDoNotMatch
+		}
+		slog.Debug("Verifying if root keys are expected root keys...")
+		for keyid := range rootKeys {
+			if !reflect.DeepEqual(rootKeys[keyid], expectedRootKeys[keyid]) {
+				return repository, ErrClonedAndExpectedKeysDoNotMatch
+			}
+		}
+	}
 	return repository, repository.VerifyRef(ctx, head.Target().String(), true)
 }
