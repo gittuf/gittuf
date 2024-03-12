@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -141,6 +142,87 @@ func TestAddKeyToTargets(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 2, len(targetsMetadata.Delegations.Keys))
 		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
+		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
+	})
+}
+
+func TestRemoveKeyFromTargets(t *testing.T) {
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fulcioKey := &tuf.Key{
+		KeyType: signerverifier.FulcioKeyType,
+		Scheme:  signerverifier.FulcioKeyScheme,
+		KeyVal:  sslibsv.KeyVal{Identity: "jane.doe@example.com", Issuer: "https://github.com/login/oauth"},
+		KeyID:   "jane.doe@example.com::https://github.com/login/oauth",
+	}
+
+	targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("remove single key", func(t *testing.T) {
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata := InitializeTargetsMetadata()
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(testCtx, targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := &State{TargetsEnvelope: targetsEnv}
+
+		assert.Nil(t, targetsMetadata.Delegations.Keys)
+
+		targetsMetadata, err = AddKeyToTargets(targetsMetadata, []*tuf.Key{gpgKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
+		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
+
+		targetsMetadata, err = RemoveKeysFromTargets(s, targetsMetadata, []*tuf.Key{gpgKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 0, len(targetsMetadata.Delegations.Keys))
+	})
+
+	t.Run("add multiple keys and remove multiple keys", func(t *testing.T) {
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsMetadata := InitializeTargetsMetadata()
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(testCtx, targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s := &State{TargetsEnvelope: targetsEnv}
+
+		assert.Nil(t, targetsMetadata.Delegations.Keys)
+
+		targetsMetadata, err = AddKeyToTargets(targetsMetadata, []*tuf.Key{gpgKey, fulcioKey, targetsKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 3, len(targetsMetadata.Delegations.Keys))
+		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
+		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
+		assert.Equal(t, targetsKey, targetsMetadata.Delegations.Keys[targetsKey.KeyID])
+
+		targetsMetadata, err = RemoveKeysFromTargets(s, targetsMetadata, []*tuf.Key{gpgKey, targetsKey})
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(targetsMetadata.Delegations.Keys))
 		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
 	})
 }

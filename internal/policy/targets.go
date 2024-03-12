@@ -11,7 +11,10 @@ import (
 
 const AllowRuleName = "gittuf-allow-rule"
 
-var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+var (
+	ErrCannotManipulateAllowRule          = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrCannotRemoveKeyUsedByMultipleRules = errors.New("cannot remove key, used by multiple rules")
+)
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
 func InitializeTargetsMetadata() *tuf.TargetsMetadata {
@@ -120,6 +123,23 @@ func RemoveDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string) (*t
 func AddKeyToTargets(targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf.Key) (*tuf.TargetsMetadata, error) {
 	for _, key := range authorizedKeys {
 		targetsMetadata.Delegations.AddKey(key)
+	}
+
+	return targetsMetadata, nil
+}
+
+func RemoveKeysFromTargets(s *State, targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf.Key) (*tuf.TargetsMetadata, error) {
+	for _, key := range authorizedKeys {
+		count, err := s.CountofKeyUse(key)
+		if err != nil {
+			return nil, err
+		}
+
+		if count > 1 {
+			return nil, ErrCannotRemoveKeyUsedByMultipleRules
+		}
+
+		targetsMetadata.Delegations.RemoveKey(key.KeyID)
 	}
 
 	return targetsMetadata, nil

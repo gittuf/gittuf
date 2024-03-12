@@ -19,9 +19,7 @@ import (
 
 const specVersion = "1.0"
 
-var (
-	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
-)
+var ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 
 // Key defines the structure for how public keys are stored in TUF metadata.
 type Key = signerverifier.SSLibKey
@@ -182,6 +180,10 @@ func (d *Delegations) AddKey(key *Key) {
 	}
 
 	d.Keys[key.KeyID] = key
+}
+
+func (d *Delegations) RemoveKey(keyID string) {
+	delete(d.Keys, keyID)
 }
 
 // AddDelegation adds a new delegation.
