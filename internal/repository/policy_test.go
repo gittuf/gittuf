@@ -29,7 +29,7 @@ func TestPushPolicy(t *testing.T) {
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
 
-		if err := policy.Apply(context.Background(), localRepo.r, false); err != nil {
+		if err := policy.Apply(context.Background(), localRepo.r, false, []string{"."}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -70,7 +70,7 @@ func TestPushPolicy(t *testing.T) {
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
 
-		if err := policy.Apply(context.Background(), localRepo.r, false); err != nil {
+		if err := policy.Apply(context.Background(), localRepo.r, false, []string{"."}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -92,7 +92,7 @@ func TestPullPolicy(t *testing.T) {
 	t.Run("successful pull", func(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
-		if err := policy.Apply(context.Background(), remoteRepo.r, false); err != nil {
+		if err := policy.Apply(context.Background(), remoteRepo.r, false, []string{"."}); err != nil {
 			t.Fatal(err)
 		}
 

@@ -18,10 +18,9 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&o.targetRef,
 		"targetRef",
-		"",
+		"policy",
 		"to specify which ref should be inspected",
 	)
-	cmd.MarkFlagRequired("targetRef") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {

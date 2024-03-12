@@ -196,6 +196,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			if entry.RefName == PolicyStagingRef {
 				continue
 			}
+
 			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
 				// TODO: this is repetition if the firstEntry is for policy
