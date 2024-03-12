@@ -362,10 +362,10 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondState.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(context.Background(), repo, "Second state", false); err != nil {
+	if err := secondState.Commit(context.Background(), repo, "Second state", false, PolicyStagingRef); err != nil {
 		t.Fatal(err)
 	}
-	if err := Apply(context.Background(), repo, false); err != nil {
+	if err := Apply(context.Background(), repo, []string{"."}, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -510,40 +510,41 @@ func TestStateHasFileRule(t *testing.T) {
 }
 
 func TestApply(t *testing.T) {
-	t.Run("single addition", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	t.Run("single addition, applying using file name", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		rootMetadata, err := state.GetRootMetadata()
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		rootMetadata, err = AddTargetsKey(rootMetadata, key)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "3", []*tuf.Key{key}, []string{"file:3"}, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 		if err != nil {
 			t.Fatal(err)
 		}
-		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		state.RootEnvelope = rootEnv
+		state.TargetsEnvelope = targetsEnv
 
-		if err := state.Commit(context.Background(), repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(context.Background(), repo, "Added delegation", false, PolicyStagingRef); err != nil {
 			t.Fatal(err)
 		}
 
@@ -560,7 +561,9 @@ func TestApply(t *testing.T) {
 		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
 		assert.NotEqual(t, staging, policy)
 
-		err = Apply(testCtx, repo, false)
+		assert.NotEqual(t, staging.TargetsEnvelope, policy.TargetsEnvelope)
+
+		err = Apply(testCtx, repo, []string{TargetsRoleName}, false)
 
 		assert.Nil(t, err)
 
@@ -576,7 +579,82 @@ func TestApply(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// After Apply, the policy ref was fast-forward merged with the staging ref
+		// After Apply, a new commit was created that took the changes to targets from
+		// policy-staging, and added them to policy
+
+		assert.Equal(t, staging, policy)
+	})
+	t.Run("single addition, applying using '.' ", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "3", []*tuf.Key{key}, []string{"file:3"}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = targetsEnv
+
+		if err := state.Commit(context.Background(), repo, "Added delegation", false, PolicyStagingRef); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
+		assert.NotEqual(t, staging, policy)
+
+		assert.NotEqual(t, staging.TargetsEnvelope, policy.TargetsEnvelope)
+
+		err = Apply(testCtx, repo, []string{"."}, false)
+
+		assert.Nil(t, err)
+
+		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// After Apply, a new commit was created that took the changes to targets from
+		// policy-staging, and added them to policy
 
 		assert.Equal(t, staging, policy)
 	})

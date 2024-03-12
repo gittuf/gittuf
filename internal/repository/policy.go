@@ -44,8 +44,8 @@ func (r *Repository) PullPolicy(ctx context.Context, remoteName string) error {
 	return nil
 }
 
-func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
-	return policy.Apply(ctx, r.r, signRSLEntry)
+func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool, args []string) error {
+	return policy.Apply(ctx, r.r, args, signRSLEntry)
 }
 
 func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {

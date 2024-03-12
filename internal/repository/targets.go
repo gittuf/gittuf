@@ -68,7 +68,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	commitMessage := fmt.Sprintf("Initialize policy '%s'", targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
@@ -137,7 +137,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	commitMessage := fmt.Sprintf("Add rule '%s' to policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
@@ -201,7 +201,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	commitMessage := fmt.Sprintf("Update rule '%s' in policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
@@ -261,7 +261,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // AddKeyToTargets is the interface for a user to add a trusted key to the
@@ -325,7 +325,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 	commitMessage := fmt.Sprintf("Add keys to policy '%s'\n%s", targetsRoleName, keyIDs)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // SignTargets adds a signature to specified Targets role's envelope. Note that
@@ -367,5 +367,5 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to policy '%s'", keyID, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }

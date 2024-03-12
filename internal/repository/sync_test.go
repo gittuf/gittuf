@@ -49,7 +49,7 @@ func TestClone(t *testing.T) {
 	if err := remoteRepo.InitializeTargets(context.Background(), targetsSigner, policy.TargetsRoleName, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := policy.Apply(context.Background(), remoteRepo.r, false); err != nil {
+	if err := policy.Apply(context.Background(), remoteRepo.r, []string{"."}, false); err != nil {
 		t.Fatal(err)
 	}
 	emptyTreeHash, err := gitinterface.WriteTree(remoteRepo.r, nil)

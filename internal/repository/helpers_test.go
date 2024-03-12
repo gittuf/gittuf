@@ -58,7 +58,7 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 		t.Fatal(err)
 	}
 
-	if err := policy.Apply(testCtx, repo, false); err != nil {
+	if err := policy.Apply(testCtx, repo, []string{"."}, false); err != nil {
 		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
 	}
 
@@ -102,7 +102,7 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 		t.Fatal(err)
 	}
 
-	if err := policy.Apply(testCtx, r.r, false); err != nil {
+	if err := policy.Apply(testCtx, r.r, []string{"."}, false); err != nil {
 		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
 	}
 

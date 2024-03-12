@@ -148,110 +148,7 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository, ref string) (*S
 		return nil, err
 	}
 
-	return LoadStateForEntry(ctx, repo, entry)
-}
-
-// LoadStateForEntry returns the State for a specified RSL reference entry for
-// the policy namespace.
-func LoadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	if entry.RefName != PolicyRef && entry.RefName != PolicyStagingRef {
-		return nil, rsl.ErrRSLEntryDoesNotMatchRef
-	}
-
-	policyCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
-	if err != nil {
-		return nil, err
-	}
-
-	policyRootTree, err := gitinterface.GetTree(repo, policyCommit.TreeHash)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(policyRootTree.Entries) > 2 {
-		return nil, ErrInvalidPolicyTree
-	}
-
-	var (
-		metadataTreeID plumbing.Hash
-		keysTreeID     plumbing.Hash
-	)
-
-	for _, e := range policyRootTree.Entries {
-		switch e.Name {
-		case metadataTreeEntryName:
-			metadataTreeID = e.Hash
-		case rootPublicKeysTreeEntryName:
-			keysTreeID = e.Hash
-		default:
-			return nil, ErrInvalidPolicyTree
-		}
-	}
-
-	state := &State{}
-
-	metadataTree, err := gitinterface.GetTree(repo, metadataTreeID)
-	if err != nil {
-		return nil, err
-	}
-
-	keysTree, err := gitinterface.GetTree(repo, keysTreeID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, entry := range metadataTree.Entries {
-		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
-		if err != nil {
-			return nil, err
-		}
-
-		env := &sslibdsse.Envelope{}
-		if err := json.Unmarshal(contents, env); err != nil {
-			return nil, err
-		}
-
-		switch entry.Name {
-		case fmt.Sprintf("%s.json", RootRoleName):
-			state.RootEnvelope = env
-		case fmt.Sprintf("%s.json", TargetsRoleName):
-			state.TargetsEnvelope = env
-		default:
-			if state.DelegationEnvelopes == nil {
-				state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
-			}
-
-			state.DelegationEnvelopes[strings.TrimSuffix(entry.Name, ".json")] = env
-		}
-	}
-
-	for _, entry := range keysTree.Entries {
-		contents, err := gitinterface.ReadBlob(repo, entry.Hash)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := tuf.LoadKeyFromBytes(contents)
-		if err != nil {
-			return nil, err
-		}
-
-		if state.RootPublicKeys == nil {
-			state.RootPublicKeys = []*tuf.Key{}
-		}
-
-		state.RootPublicKeys = append(state.RootPublicKeys, key)
-	}
-
-	if err := state.loadRuleNames(); err != nil {
-		return nil, err
-	}
-
-	if err := state.Verify(ctx); err != nil {
-		return nil, err
-	}
-
-	return state, nil
+	return loadStateForEntry(ctx, repo, entry)
 }
 
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
@@ -576,8 +473,8 @@ func (s *State) Verify(ctx context.Context) error {
 }
 
 // Commit verifies and writes the State to the policy-staging namespace. It also creates
-// an RSL entry recording the new tip of the policy-staging namespace.
-func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool) error {
+// an RSL entry recording the new tip of the targetRef namespace.
+func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool, targetRef string) error {
 	if err := s.Verify(ctx); err != nil {
 		return err
 	}
@@ -660,21 +557,21 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 		return err
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(targetRef), true)
 	if err != nil {
 		return err
 	}
 	originalCommitID := ref.Hash()
 
-	commitID, err := gitinterface.Commit(repo, policyRootTreeID, PolicyStagingRef, commitMessage, signCommit)
+	commitID, err := gitinterface.Commit(repo, policyRootTreeID, targetRef, commitMessage, signCommit)
 	if err != nil {
 		return err
 	}
 
 	// We must reset to original policy commit if err != nil from here onwards.
 
-	if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
-		return gitinterface.ResetDueToError(err, repo, PolicyStagingRef, originalCommitID)
+	if err := rsl.NewReferenceEntry(targetRef, commitID).Commit(repo, signCommit); err != nil {
+		return gitinterface.ResetDueToError(err, repo, targetRef, originalCommitID)
 	}
 
 	return nil
@@ -925,7 +822,7 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 // the policy staging ref is valid. This prevents invalid changes to the policy
 // taking affect, and allowing new changes, that until signed by multiple users
 // would be invalid to be made, by utilizing the policy staging ref.
-func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
+func Apply(ctx context.Context, repo *git.Repository, policyFiles []string, signRSLEntry bool) error {
 	// Get the reference for the PolicyRef
 	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
 	if err != nil {
@@ -947,7 +844,10 @@ func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
 	}
 
 	policyCommit, err := gitinterface.GetCommit(repo, policyRef.Hash())
-	if err == nil {
+	if !errors.Is(err, plumbing.ErrObjectNotFound) {
+		if err != nil {
+			return err
+		}
 		// This check ensures that the policy staging branch is a direct forward progression of the policy branch,
 		// preventing any overwrites of policy history and maintaining a linear policy evolution, since a
 		// fast-forward merge does not work with a non-linear history.
@@ -963,22 +863,69 @@ func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
 		}
 	}
 
-	// using LoadCurrentState to verify if the PolicyStagingRef's latest state is valid
-	_, err = LoadCurrentState(ctx, repo, PolicyStagingRef)
-	if err != nil {
-		return fmt.Errorf("failed to load current state: %w", err)
-	}
+	if len(policyFiles) == 1 && policyFiles[0] == "." {
+		// using LoadCurrentState to verify if the PolicyStagingRef's latest state is valid
+		_, err = LoadCurrentState(ctx, repo, PolicyStagingRef)
+		if err != nil {
+			return fmt.Errorf("failed to load current state: %w", err)
+		}
+		// Update the reference for the base to point to the new commit
+		newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
+		if err := repo.Storer.SetReference(newPolicyRef); err != nil {
+			return fmt.Errorf("failed to set new policy reference: %w", err)
+		}
 
-	// Update the reference for the base to point to the new commit
-	newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
-	if err := repo.Storer.SetReference(newPolicyRef); err != nil {
-		return fmt.Errorf("failed to set new policy reference: %w", err)
-	}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, signRSLEntry); err != nil {
+			return gitinterface.ResetDueToError(err, repo, PolicyRef, policyRef.Hash())
+		}
+	} else {
+		currentPolicyState, err := LoadCurrentState(ctx, repo, PolicyRef)
+		if err != nil {
+			return err
+		}
 
-	if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, signRSLEntry); err != nil {
-		return gitinterface.ResetDueToError(err, repo, PolicyRef, policyRef.Hash())
-	}
+		nextPolicy, err := LoadCurrentState(ctx, repo, PolicyRef)
+		if err != nil {
+			return err
+		}
 
+		currentStagingState, err := LoadCurrentState(ctx, repo, PolicyStagingRef)
+		if err != nil {
+			return err
+		}
+		// search all policy files we want to apply
+		for _, policyFile := range policyFiles {
+			// mutate the state based on policy file
+			switch policyFile {
+			case TargetsRoleName:
+				nextPolicy.TargetsEnvelope = currentStagingState.TargetsEnvelope
+			case "root-keys":
+				nextPolicy.RootPublicKeys = currentStagingState.RootPublicKeys
+			default:
+				found := false
+				for policyFileName, metadata := range currentStagingState.DelegationEnvelopes {
+					if policyFileName == policyFile {
+						found = true
+						nextPolicy.DelegationEnvelopes[policyFileName] = metadata
+						break
+					}
+				}
+
+				if !found {
+					return fmt.Errorf("policy item %s was not found", policyFile)
+				}
+			}
+		}
+
+		// verify if the state can be made from the previous one, does this break the state or not?
+		if err := currentPolicyState.VerifyNewState(ctx, nextPolicy); err != nil {
+			return err
+		}
+		// commit the new policy into the policy ref, updating the policy state
+		if err := nextPolicy.Commit(ctx, repo, "merged policy-staging into policy", signRSLEntry, PolicyRef); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
