@@ -912,7 +912,6 @@ func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool, policyF
 					return fmt.Errorf("policy item %s was not found", policyFile)
 				}
 			}
-
 		}
 
 		// verify if the state can be made from the previous one, does this break the state or not?
