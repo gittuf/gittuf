@@ -38,7 +38,7 @@ func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:               "log",
-		Short:             "Displays the Reference State Log",
+		Short:             "Display the Reference State Log",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

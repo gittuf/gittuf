@@ -1,6 +1,6 @@
 ## gittuf rsl log
 
-Displays the Reference State Log
+Display the Reference State Log
 
 ```
 gittuf rsl log [flags]

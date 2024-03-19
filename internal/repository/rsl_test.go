@@ -590,8 +590,6 @@ func TestGetRSLEntryLog(t *testing.T) {
 	}
 
 	slices.Reverse(expected)
-
 	assert.Equal(t, expected, entries)
-
 	assert.Equal(t, map[plumbing.Hash][]*rsl.AnnotationEntry{}, annotationMap)
 }
