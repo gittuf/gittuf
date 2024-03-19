@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/dev"
@@ -560,4 +561,35 @@ func TestPullRSL(t *testing.T) {
 		err = localRepo.PullRSL(context.Background(), remoteName)
 		assert.ErrorIs(t, err, ErrPullingRSL)
 	})
+}
+
+func TestGetRSLEntryLog(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	mainRef := "refs/heads/main"
+	if err := r.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(mainRef), plumbing.ZeroHash)); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, annotationMap, err := GetRSLEntryLog(r)
+	assert.Nil(t, err)
+
+	firstEntry, _, err := rsl.GetFirstEntry(r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lastEntry, err := rsl.GetLatestEntry(r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected, _, err := rsl.GetReferenceEntriesInRange(r.r, firstEntry.GetID(), lastEntry.GetID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slices.Reverse(expected)
+	assert.Equal(t, expected, entries)
+	assert.Equal(t, map[plumbing.Hash][]*rsl.AnnotationEntry{}, annotationMap)
 }

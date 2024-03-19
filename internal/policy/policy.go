@@ -621,6 +621,11 @@ func (s *State) GetTargetsMetadata(roleName string) (*tuf.TargetsMetadata, error
 		}
 		e = env
 	}
+
+	if e == nil {
+		return nil, ErrMetadataNotFound
+	}
+
 	payloadBytes, err := e.DecodeB64Payload()
 	if err != nil {
 		return nil, err
@@ -704,6 +709,10 @@ func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDept
 	state, err := LoadCurrentState(ctx, repo)
 	if err != nil {
 		return nil, err
+	}
+
+	if !state.HasTargetsRole(TargetsRoleName) {
+		return nil, nil
 	}
 
 	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
