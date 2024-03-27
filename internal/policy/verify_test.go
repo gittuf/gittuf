@@ -1199,7 +1199,7 @@ func TestVerifier(t *testing.T) {
 
 	for name, test := range tests {
 		verifier := Verifier{name: "test-verifier", keys: test.keys, threshold: test.threshold}
-		err := verifier.Verify(context.Background(), test.gitObject, test.attestation)
+		err := verifier.Verify(context.Background(), test.gitObject, test.attestation, "")
 		if test.expectedError == nil {
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
