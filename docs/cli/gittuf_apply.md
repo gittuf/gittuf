@@ -1,15 +1,13 @@
-## gittuf apply
-
 applies work in progress changes to the policy state to the current policy state
 
 ```
-gittuf apply [flags]
+gittuf apply [policy file(s) | '.' for all policy files] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for apply
+  -h, --help   help for apply 
 ```
 
 ### Options inherited from parent commands
