@@ -406,7 +406,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if err := targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope); err != nil {
+	if err := targetsVerifier.Verify(ctx, nil, s.TargetsEnvelope, ""); err != nil {
 		return err
 	}
 
@@ -448,7 +448,7 @@ func (s *State) Verify(ctx context.Context) error {
 				threshold: delegation.Threshold,
 			}
 
-			if err := verifier.Verify(ctx, nil, env); err != nil {
+			if err := verifier.Verify(ctx, nil, env, ""); err != nil {
 				return err
 			}
 

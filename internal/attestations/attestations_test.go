@@ -312,8 +312,9 @@ func TestAttestationsCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, 1, len(rootTree.Entries))
-	assert.Equal(t, referenceAuthorizationsTreeEntryName, rootTree.Entries[0].Name)
+	assert.Equal(t, 2, len(rootTree.Entries))
+	assert.Equal(t, authenticationEvidenceTreeEntryName, rootTree.Entries[0].Name)
+	assert.Equal(t, referenceAuthorizationsTreeEntryName, rootTree.Entries[1].Name)
 
 	// We don't need to check every level of the tree because we do it in the
 	// tree builder API

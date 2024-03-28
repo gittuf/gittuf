@@ -791,7 +791,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(context.Background(), repo, state, nil, entry)
+		err := verifyEntry(context.Background(), repo, state, nil, "", entry)
 		assert.Nil(t, err)
 	})
 
@@ -834,6 +834,11 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		attentionLatestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, attestations.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
 		if err != nil {
 			t.Fatal(err)
@@ -843,7 +848,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
 		assert.Nil(t, err)
 	})
 
@@ -1199,7 +1204,7 @@ func TestVerifier(t *testing.T) {
 
 	for name, test := range tests {
 		verifier := Verifier{name: "test-verifier", keys: test.keys, threshold: test.threshold}
-		err := verifier.Verify(context.Background(), test.gitObject, test.attestation)
+		err := verifier.Verify(context.Background(), test.gitObject, test.attestation, "")
 		if test.expectedError == nil {
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
