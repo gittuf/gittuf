@@ -67,6 +67,13 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 		return plumbing.ZeroHash, err
 	}
 
+	// Finding latest attestations commit ID
+	slog.Debug("Getting current set of attestations commit ID...")
+	attentionLatestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
 	// Find latest set of attestations
 	slog.Debug("Loading current set of attestations...")
 	attestationsState, err := attestations.LoadCurrentAttestations(repo)
@@ -75,7 +82,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 	}
 
 	slog.Debug("Verifying entry...")
-	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry)
+	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, attentionLatestEntry.TargetID.String(), latestEntry)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -154,8 +161,9 @@ func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string
 // TODO: should the policy entry be inferred from the specified first entry?
 func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var (
-		currentPolicy       *State
-		currentAttestations *attestations.Attestations
+		currentPolicy               *State
+		currentAttestations         *attestations.Attestations
+		currentAttestationsCommitID string
 	)
 
 	// Load policy applicable at firstEntry
@@ -219,11 +227,12 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 				}
 
 				currentAttestations = newAttestationsState
+				currentAttestationsCommitID = entry.TargetID.String()
 				continue
 			}
 
 			slog.Debug("Verifying changes...")
-			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
+			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, currentAttestationsCommitID, entry); err != nil {
 				slog.Debug("Violation found, checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
 				if !entry.SkippedBy(annotations[entry.ID]) {
@@ -353,7 +362,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 // have an entry in the returned status. The status is currently meant to be
 // consumed directly by the user, as this is used for a special, user-invoked
 // workflow. gittuf's other verification workflows are currently not expected to
-// use this function.
+// use this function. TODO doc should be changed now that verifyEntry uses this for verifying authorization evidence attestations
 func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[string]string {
 	status := make(map[string]string, len(ids))
 	commits := make(map[string]*object.Commit, len(ids))
@@ -518,7 +527,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, attestationCommitID string, entry *rsl.ReferenceEntry) error {
 	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
@@ -568,7 +577,9 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 				return err
 			}
 
-			if err := json.Unmarshal(payload, &authEvidence); err == nil {
+			verification := VerifyCommit(ctx, repo, attestationCommitID)
+
+			if err := json.Unmarshal(payload, &authEvidence); err == nil && verification[attestationCommitID] == goodSignatureMessageFmt {
 				authEvidencePushActorID = authEvidence.PushActor
 			}
 		}

@@ -791,7 +791,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(context.Background(), repo, state, nil, entry)
+		err := verifyEntry(context.Background(), repo, state, nil, "", entry)
 		assert.Nil(t, err)
 	})
 
@@ -834,6 +834,11 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		attentionLatestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, attestations.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
 		if err != nil {
 			t.Fatal(err)
@@ -843,7 +848,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
 		assert.Nil(t, err)
 	})
 
