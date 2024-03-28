@@ -8,6 +8,9 @@ import (
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -28,6 +31,7 @@ func TestPushPolicy(t *testing.T) {
 		}
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
+
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},
@@ -39,11 +43,91 @@ func TestPushPolicy(t *testing.T) {
 		assert.Nil(t, err)
 
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
 
 		// No updates, successful push
 		err = localRepo.PushPolicy(context.Background(), remoteName)
 		assert.Nil(t, err)
+	})
+
+	t.Run("No changes to policy, but changes to policy staging", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+
+		remoteRepo, err := git.PlainInit(remoteTmpDir, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo := createTestRepositoryWithPolicy(t, "")
+
+		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
+			Name: remoteName,
+			URLs: []string{remoteTmpDir},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushPolicy(context.Background(), remoteName)
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
+
+		// No updates, successful push
+		err = localRepo.PushPolicy(context.Background(), remoteName)
+		assert.Nil(t, err)
+
+		// Create changes in policy staging
+		newKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Load current staging state
+		currentStagingState, err := policy.LoadCurrentState(context.Background(), localRepo.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := currentStagingState.GetRootMetadata()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata = policy.AddRootKey(rootMetadata, newKey)
+
+		env, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, signer)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentStagingState.RootEnvelope = env
+
+		// Commit changes to policy staging
+		if err := currentStagingState.Commit(context.Background(), localRepo.r, "Add new key to root", false, policy.PolicyStagingRef); err != nil {
+			t.Fatal(err)
+		}
+
+		// check that push works, even when no changes have been made to policy
+		err = localRepo.PushPolicy(context.Background(), remoteName)
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
 	})
 
 	t.Run("divergent policies, unsuccessful push", func(t *testing.T) {
@@ -63,6 +147,7 @@ func TestPushPolicy(t *testing.T) {
 		}
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
+
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},
@@ -98,6 +183,7 @@ func TestPullPolicy(t *testing.T) {
 		assert.Nil(t, err)
 
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, rsl.Ref)
 
 		// No updates, successful push

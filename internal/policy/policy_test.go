@@ -86,11 +86,10 @@ func TestLoadState(t *testing.T) {
 func TestLoadCurrentState(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	loadedState, err := LoadCurrentState(context.Background(), repo)
+	loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
 	if err != nil {
 		t.Error(err)
 	}
-
 	assert.Equal(t, state, loadedState)
 }
 
@@ -334,7 +333,7 @@ func TestGetStateForCommit(t *testing.T) {
 	assert.Equal(t, firstState, state)
 
 	// Update policy, record in RSL
-	secondState, err := LoadCurrentState(context.Background(), repo) // secondState := firstState will modify firstState as well
+	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := firstState will modify firstState as well
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +362,10 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondState.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(context.Background(), repo, "Second state", false); err != nil {
+	if err := secondState.Commit(context.Background(), repo, "Second state", false, PolicyStagingRef); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(context.Background(), repo, false, []string{"."}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -392,7 +394,7 @@ func TestListRules(t *testing.T) {
 	t.Run("no delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-		rules, err := ListRules(context.Background(), repo)
+		rules, err := ListRules(context.Background(), repo, PolicyRef)
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
 			{
@@ -427,7 +429,7 @@ func TestListRules(t *testing.T) {
 	t.Run("with delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
-		rules, err := ListRules(context.Background(), repo)
+		rules, err := ListRules(context.Background(), repo, PolicyRef)
 
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
@@ -504,5 +506,156 @@ func TestStateHasFileRule(t *testing.T) {
 		hasFileRule, err := state.hasFileRule()
 		assert.Nil(t, err)
 		assert.False(t, hasFileRule)
+	})
+}
+
+func TestApply(t *testing.T) {
+	t.Run("single addition, applying using file name", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "3", []*tuf.Key{key}, []string{"file:3"}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = targetsEnv
+
+		if err := state.Commit(context.Background(), repo, "Added delegation", false, PolicyStagingRef); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
+		assert.NotEqual(t, staging, policy)
+
+		assert.NotEqual(t, staging.TargetsEnvelope, policy.TargetsEnvelope)
+
+		err = Apply(testCtx, repo, false, []string{TargetsRoleName})
+
+		assert.Nil(t, err)
+
+		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// After Apply, a new commit was created that took the changes to targets from
+		// policy-staging, and added them to policy
+
+		assert.Equal(t, staging, policy)
+	})
+	t.Run("single addition, applying using '.' ", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "3", []*tuf.Key{key}, []string{"file:3"}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = targetsEnv
+
+		if err := state.Commit(context.Background(), repo, "Added delegation", false, PolicyStagingRef); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
+		assert.NotEqual(t, staging, policy)
+
+		assert.NotEqual(t, staging.TargetsEnvelope, policy.TargetsEnvelope)
+
+		err = Apply(testCtx, repo, false, []string{"."})
+
+		assert.Nil(t, err)
+
+		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// After Apply, a new commit was created that took the changes to targets from
+		// policy-staging, and added them to policy
+
+		assert.Equal(t, staging, policy)
 	})
 }
