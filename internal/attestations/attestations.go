@@ -194,3 +194,58 @@ func (a *Attestations) Commit(repo *git.Repository, commitMessage string, signCo
 
 	return nil
 }
+
+// CommitUsingSpecificKey is a testing version of the Commit function
+func (a *Attestations) CommitUsingSpecificKey(repo *git.Repository, commitMessage string, signingKeyPEMBytes []byte) error {
+	if len(commitMessage) == 0 {
+		commitMessage = defaultCommitMessage
+	}
+
+	attestationsTreeEntries := []object.TreeEntry{}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+
+	// Add authorizations tree
+	authorizationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(a.referenceAuthorizations)
+	if err != nil {
+		return err
+	}
+	attestationsTreeEntries = append(attestationsTreeEntries, object.TreeEntry{
+		Name: referenceAuthorizationsTreeEntryName,
+		Mode: filemode.Dir,
+		Hash: authorizationsTreeID,
+	})
+
+	authenticationTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(a.authenticationEvidence)
+	if err != nil {
+		return err
+	}
+	attestationsTreeEntries = append(attestationsTreeEntries, object.TreeEntry{
+		Name: authenticationEvidenceTreeEntryName,
+		Mode: filemode.Dir,
+		Hash: authenticationTreeID,
+	})
+
+	attestationsTreeID, err := gitinterface.WriteTree(repo, attestationsTreeEntries)
+	if err != nil {
+		return err
+	}
+
+	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
+	if err != nil {
+		return err
+	}
+	priorCommitID := ref.Hash()
+
+	commitID, err := gitinterface.CommitUsingSpecificKey(repo, attestationsTreeID, Ref, commitMessage, signingKeyPEMBytes)
+	if err != nil {
+		return err
+	}
+
+	// We must reset to original attestation commit if err != nil from here onwards.
+
+	if err := rsl.NewReferenceEntry(Ref, commitID).CommitUsingSpecificKey(repo, signingKeyPEMBytes); err != nil {
+		return gitinterface.ResetDueToError(err, repo, Ref, priorCommitID)
+	}
+
+	return nil
+}

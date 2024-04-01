@@ -26,8 +26,11 @@ const (
 )
 
 var (
-	ErrInvalidAuthorization  = errors.New("authorization attestation does not match expected details")
+	ErrInvalidAuthorization = errors.New("authorization attestation does not match expected details")
+	ErrInvalidEvidence      = errors.New("evidence attestation does not match expected details")
+
 	ErrAuthorizationNotFound = errors.New("requested authorization not found")
+	ErrEvidenceNotFound      = errors.New("requested evidence not found")
 )
 
 // ReferenceAuthorization is a lightweight record of a detached authorization in
@@ -216,20 +219,33 @@ func (a *Attestations) SetAuthenticationEvidence(repo *git.Repository, env *ssli
 		return err
 	}
 
-	if a.referenceAuthorizations == nil {
-		a.referenceAuthorizations = map[string]plumbing.Hash{}
+	if a.authenticationEvidence == nil {
+		a.authenticationEvidence = map[string]plumbing.Hash{}
 	}
 
-	a.referenceAuthorizations[AuthenticationEvidencePath(refName, fromID, toID)] = blobID
+	a.authenticationEvidence[AuthenticationEvidencePath(refName, fromID, toID)] = blobID
+	return nil
+}
+
+// RemoveAuthenticationEvidence removes a set authentication evidence
+// attestation entirely. The object, however, isn't removed from the object
+// store as prior states may still need it.
+func (a *Attestations) RemoveAuthenticationEvidence(refName, fromID, toID string) error {
+	authPath := ReferenceAuthorizationPath(refName, fromID, toID)
+	if _, has := a.authenticationEvidence[authPath]; !has {
+		return ErrEvidenceNotFound
+	}
+
+	delete(a.authenticationEvidence, authPath)
 	return nil
 }
 
 // GetAuthenticationEvidenceFor returns the requested authentication evidence
 // attestation (with its signatures).
 func (a *Attestations) GetAuthenticationEvidenceFor(repo *git.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.referenceAuthorizations[AuthenticationEvidencePath(refName, fromID, toID)]
+	blobID, has := a.authenticationEvidence[AuthenticationEvidencePath(refName, fromID, toID)]
 	if !has {
-		return nil, ErrAuthorizationNotFound
+		return nil, ErrEvidenceNotFound
 	}
 
 	envBytes, err := gitinterface.ReadBlob(repo, blobID)
@@ -299,21 +315,21 @@ func validateAuthenticationEvidence(env *sslibdsse.Envelope, refName, fromID, to
 	}
 
 	if attestation.Subject[0].Digest[digestGitCommitKey] != toID {
-		return ErrInvalidAuthorization
+		return ErrInvalidEvidence
 	}
 
 	predicate := attestation.Predicate.AsMap()
 
 	if predicate[toTargetIDKey] != toID {
-		return ErrInvalidAuthorization
+		return ErrInvalidEvidence
 	}
 
 	if predicate[fromTargetIDKey] != fromID {
-		return ErrInvalidAuthorization
+		return ErrInvalidEvidence
 	}
 
 	if predicate[targetRefKey] != refName {
-		return ErrInvalidAuthorization
+		return ErrInvalidEvidence
 	}
 
 	return nil

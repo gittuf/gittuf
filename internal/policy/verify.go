@@ -20,6 +20,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -571,7 +572,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 		}
 
 		if authenticationAttestation != nil {
-			var authEvidence attestations.AuthenticationEvidence
+			var statement ita.Statement
 			payload, err := authenticationAttestation.DecodeB64Payload()
 			if err != nil {
 				return err
@@ -579,8 +580,8 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 
 			verification := VerifyCommit(ctx, repo, attestationCommitID)
 
-			if err := json.Unmarshal(payload, &authEvidence); err == nil && verification[attestationCommitID] == goodSignatureMessageFmt {
-				authEvidencePushActorID = authEvidence.PushActor
+			if err := json.Unmarshal(payload, &statement); err == nil && (verification[attestationCommitID] == goodSignatureMessageFmt || verification[attestationCommitID] == unableToFindPolicyMessage) {
+				authEvidencePushActorID = statement.Predicate.AsMap()["pushActor"].(string)
 			}
 		}
 	}
@@ -815,16 +816,17 @@ func getAuthorizationAttestation(repo *git.Repository, attestationsState *attest
 
 	referenceAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entry.TargetID.String())
 	if err != nil {
-		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
-			return nil, nil, nil
+		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
+			return nil, nil, err
 		}
-
-		return nil, nil, err
 	}
+	v := attestations.AuthenticationEvidencePath(rsl.Ref, fromID.String(), fromID.String())
 
-	authenticationAttestation, err := attestationsState.GetAuthenticationEvidenceFor(repo, entry.RefName, fromID.String(), entry.TargetID.String())
+	fmt.Println(v)
+
+	authenticationAttestation, err := attestationsState.GetAuthenticationEvidenceFor(repo, rsl.Ref, entry.ID.String(), entry.ID.String())
 	if err != nil {
-		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
+		if errors.Is(err, attestations.ErrEvidenceNotFound) {
 			return nil, nil, nil
 		}
 

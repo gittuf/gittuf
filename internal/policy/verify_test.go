@@ -852,6 +852,112 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
+	t.Run("successful verification with first user, then changed pusher using authentication evidence to make verification unsuccessful", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicyAndAttestationProtection)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// good state before change, authorized user is the gpg key, targets1 is the unauthorized key
+		err := verifyEntry(context.Background(), repo, state, nil, "", entry)
+		assert.Nil(t, err)
+
+		key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		authorization, err := attestations.NewAuthenticationEvidence(rsl.Ref, entryID.String(), entryID.String(), string(key.KeyID))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		att := &attestations.Attestations{}
+
+		if err = att.SetAuthenticationEvidence(repo, env, rsl.Ref, entryID.String(), entryID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = att.CommitUsingSpecificKey(repo, "", gpgKeyBytes)
+
+		assert.Nil(t, err)
+
+		attentionLatestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, attestations.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = verifyEntry(context.Background(), repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
+
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+	})
+	t.Run("successful verification with first user, then changed pusher using authentication evidence to make verification unsuccessful, but authentication was signed with bad key", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicyAndAttestationProtection)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// good state before change, authorized user is the gpg key, targets1 is the unauthorized key
+		err := verifyEntry(context.Background(), repo, state, nil, "", entry)
+		assert.Nil(t, err)
+
+		key, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		authorization, err := attestations.NewAuthenticationEvidence(rsl.Ref, entryID.String(), entryID.String(), string(key.KeyID))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		att := &attestations.Attestations{}
+
+		if err = att.SetAuthenticationEvidence(repo, env, rsl.Ref, entryID.String(), entryID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = att.CommitUsingSpecificKey(repo, "", gpgUnauthorizedKeyBytes)
+
+		assert.Nil(t, err)
+
+		attentionLatestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, attestations.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = verifyEntry(context.Background(), repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
+
+		assert.NotNil(t, err) // this should be not nil, but no error is being returned, even though the attestation is being committed with an unauthorized key.
+
+	})
 	// FIXME: test for file policy passing for situations where a commit is seen
 	// by the RSL before its signing key is rotated out. This commit should be
 	// trusted for merges under the new policy because it predates the policy

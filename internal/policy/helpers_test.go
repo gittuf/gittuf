@@ -156,6 +156,76 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	return state
 }
 
+func createTestStateWithPolicyAndAttestationProtection(t *testing.T) *State {
+	t.Helper()
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-files-1-and-2", []*tuf.Key{gpgKey}, []string{"file:1", "file:2"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-attestations", []*tuf.Key{gpgKey}, []string{"git:refs/gittuf/attestations"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []*tuf.Key{key},
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
 func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	t.Helper()
 
