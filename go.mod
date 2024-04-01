@@ -5,7 +5,7 @@ go 1.22
 require (
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/go-git/go-billy/v5 v5.5.0
-	github.com/go-git/go-git/v5 v5.11.1-0.20240221104814-686a0f7a4928
+	github.com/go-git/go-git/v5 v5.12.0
 	github.com/hiddeco/sshsig v0.1.0
 	github.com/in-toto/attestation v1.0.1
 	github.com/jonboulle/clockwork v0.4.0
@@ -98,7 +98,7 @@ require (
 	github.com/sigstore/rekor v1.3.5 // indirect
 	github.com/sigstore/timestamp-authority v1.2.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/skeema/knownhosts v1.2.1 // indirect
+	github.com/skeema/knownhosts v1.2.2 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
@@ -120,7 +120,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/mod v0.15.0 // indirect
-	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
