@@ -200,14 +200,14 @@ func TestSetAuthenticationEvidence(t *testing.T) {
 	// Add auth for first branch
 	err = attestations.SetAuthenticationEvidence(repo, mainZeroZero, testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.NotContains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.NotContains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 
 	// Add auth for the other branch
 	err = attestations.SetAuthenticationEvidence(repo, featureZeroZero, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 }
 
 func TestRemoveAuthenticationEvidence(t *testing.T) {
@@ -227,23 +227,23 @@ func TestRemoveAuthenticationEvidence(t *testing.T) {
 
 	err = attestations.SetAuthenticationEvidence(repo, mainZeroZero, testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.NotContains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.NotContains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 
 	err = attestations.SetAuthenticationEvidence(repo, featureZeroZero, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 
 	err = attestations.RemoveAuthenticationEvidence(testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.NotContains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.NotContains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 
 	err = attestations.RemoveAuthenticationEvidence(testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.NotContains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testRef, testID, testID))
-	assert.NotContains(t, attestations.referenceAuthorizations, AuthenticationEvidencePath(testAnotherRef, testID, testID))
+	assert.NotContains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testRef, testID, testID))
+	assert.NotContains(t, attestations.authenticationEvidence, AuthenticationEvidencePath(testAnotherRef, testID, testID))
 }
 
 func TestGetAuthenticationEvidenceFor(t *testing.T) {
@@ -294,8 +294,9 @@ func TestValidateAuthorizationEvidence(t *testing.T) {
 	assert.Nil(t, err)
 
 	err = validateAuthenticationEvidence(mainZeroZero, testAnotherRef, testID, testID)
-	assert.ErrorIs(t, err, ErrInvalidAuthorization)
+	assert.ErrorIs(t, err, ErrInvalidEvidence)
 }
+
 func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fromID, toID string) *sslibdsse.Envelope {
 	t.Helper()
 
@@ -310,6 +311,7 @@ func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fro
 
 	return env
 }
+
 func createAuthenticationEvidenceAttestationEnvelopes(t *testing.T, refName, fromID, toID, pushActor string) *sslibdsse.Envelope {
 	t.Helper()
 

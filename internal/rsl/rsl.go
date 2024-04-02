@@ -17,6 +17,7 @@ import (
 const (
 	GittufNamespacePrefix      = "refs/gittuf/"
 	Ref                        = "refs/gittuf/reference-state-log"
+	attestationRef             = "refs/gittuf/attestations"
 	ReferenceEntryHeader       = "RSL Reference Entry"
 	RefKey                     = "ref"
 	TargetIDKey                = "targetID"
@@ -287,7 +288,7 @@ func GetNonGittufParentReferenceEntryForEntry(repo *git.Repository, entry Entry)
 	for {
 		switch iterator := it.(type) {
 		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) || strings.HasPrefix(iterator.RefName, attestationRef) {
 				targetEntry = iterator
 			}
 		case *AnnotationEntry:
@@ -339,7 +340,7 @@ func GetLatestNonGittufReferenceEntry(repo *git.Repository) (*ReferenceEntry, []
 	for {
 		switch iterator := it.(type) {
 		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) || strings.HasPrefix(iterator.RefName, attestationRef) {
 				targetEntry = iterator
 			}
 		case *AnnotationEntry:

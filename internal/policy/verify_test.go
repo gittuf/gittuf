@@ -865,7 +865,6 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 
 		key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -900,10 +899,16 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		attRef, err := repo.Reference(plumbing.ReferenceName(attestations.Ref), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		attEntry := rsl.NewReferenceEntry(attestations.Ref, attRef.Hash())
+		common.CreateTestRSLReferenceEntryCommit(t, repo, attEntry, gpgKeyBytes)
+
 		err = verifyEntry(context.Background(), repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
 
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
-
 	})
 	t.Run("successful verification with first user, then changed pusher using authentication evidence to make verification unsuccessful, but authentication was signed with bad key", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicyAndAttestationProtection)
@@ -918,7 +923,6 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 
 		key, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -953,10 +957,16 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		attRef, err := repo.Reference(plumbing.ReferenceName(attestations.Ref), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		attEntry := rsl.NewReferenceEntry(attestations.Ref, attRef.Hash())
+		common.CreateTestRSLReferenceEntryCommit(t, repo, attEntry, gpgKeyBytes)
+
 		err = verifyEntry(context.Background(), repo, state, currentAttestations, attentionLatestEntry.TargetID.String(), entry)
 
-		assert.NotNil(t, err) // this should be not nil, but no error is being returned, even though the attestation is being committed with an unauthorized key.
-
+		assert.Equal(t, err.Error(), noPublicKeyMessage)
 	})
 	// FIXME: test for file policy passing for situations where a commit is seen
 	// by the RSL before its signing key is rotated out. This commit should be

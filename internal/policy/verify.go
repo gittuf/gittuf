@@ -580,8 +580,12 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 
 			verification := VerifyCommit(ctx, repo, attestationCommitID)
 
-			if err := json.Unmarshal(payload, &statement); err == nil && (verification[attestationCommitID] == goodSignatureMessageFmt || verification[attestationCommitID] == unableToFindPolicyMessage) {
+			if err = json.Unmarshal(payload, &statement); err == nil && strings.HasPrefix(verification[attestationCommitID], goodSignatureMessageFmt[:len(goodSignatureMessageFmt)-8]) {
 				authEvidencePushActorID = statement.Predicate.AsMap()["pushActor"].(string)
+			} else if err != nil {
+				return err
+			} else {
+				return fmt.Errorf(verification[attestationCommitID])
 			}
 		}
 	}
@@ -592,6 +596,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 		if err == nil {
 			// Signature verification succeeded
 			gitNamespaceVerified = true
+			fmt.Println("HI")
 			break
 		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
 			// Unexpected error
@@ -820,17 +825,12 @@ func getAuthorizationAttestation(repo *git.Repository, attestationsState *attest
 			return nil, nil, err
 		}
 	}
-	v := attestations.AuthenticationEvidencePath(rsl.Ref, fromID.String(), fromID.String())
-
-	fmt.Println(v)
 
 	authenticationAttestation, err := attestationsState.GetAuthenticationEvidenceFor(repo, rsl.Ref, entry.ID.String(), entry.ID.String())
 	if err != nil {
-		if errors.Is(err, attestations.ErrEvidenceNotFound) {
-			return nil, nil, nil
+		if !errors.Is(err, attestations.ErrEvidenceNotFound) {
+			return nil, nil, err
 		}
-
-		return nil, nil, err
 	}
 	return referenceAttestation, authenticationAttestation, nil
 }
