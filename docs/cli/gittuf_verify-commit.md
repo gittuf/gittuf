@@ -9,7 +9,8 @@ gittuf verify-commit [flags]
 ### Options
 
 ```
-  -h, --help   help for verify-commit
+  -a, --apply-file-policies   check if the file paths modified by the commit are allowed by the policy
+  -h, --help                  help for verify-commit
 ```
 
 ### Options inherited from parent commands
