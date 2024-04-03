@@ -202,6 +202,21 @@ func TestDelegationMatches(t *testing.T) {
 			target:   "foo/bar_test/foobar",
 			expected: false,
 		},
+		"no patterns": {
+			patterns: nil,
+			target:   "foo",
+			expected: false,
+		},
+		"pattern with multiple consecutive wildcards, matches": {
+			patterns: []string{"foo/*/*/*.txt"},
+			target:   "foo/bar/baz/qux.txt",
+			expected: true,
+		},
+		"pattern with multiple non-consecutive wildcards, matches": {
+			patterns: []string{"foo/*/baz/*.txt"},
+			target:   "foo/bar/baz/qux.txt",
+			expected: true,
+		},
 	}
 
 	for name, test := range tests {
