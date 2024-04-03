@@ -997,6 +997,21 @@ func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, 
 		return nil, err
 	}
 
+	attestationState, err := attestations.LoadCurrentAttestations(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	firstSeenEntry, _, err := rsl.GetFirstReferenceEntryForCommit(repo, commit)
+	if err != nil {
+		return nil, err
+	}
+
+	referenceAttesation, err := getAuthorizationAttestation(repo, attestationState, firstSeenEntry)
+	if err != nil {
+		return nil, err
+	}
+
 	badPaths := []string{}
 	for _, path := range filePaths {
 		verifiers, err := commitPolicy.FindVerifiersForPath(fmt.Sprintf("file:%s", path))
@@ -1009,14 +1024,15 @@ func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, 
 		// Verify the keys associated with the commit. If verification fails, add the path to the list of bad paths.
 
 		for _, verifier := range verifiers {
-			err := verifier.Verify(ctx, commit, commitPolicy.TargetsEnvelope)
-
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			err := verifier.Verify(ctx, commit, referenceAttesation)
+			if err == nil {
+				goodKey = true
+				break
+			} else if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
 				// We encounter this for key types that can be used for gittuf
 				// policy metadata but not Git objects
 				continue
-			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+			} else if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
 				// Unexpected error
 				break
 			}

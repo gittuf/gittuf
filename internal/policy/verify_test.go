@@ -691,81 +691,138 @@ func TestVerifyRelativeForRef(t *testing.T) {
 }
 
 func TestVerifyCommit(t *testing.T) {
-	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
-	entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-	entry.ID = entryID
+	t.Run("basic verifaction of a commit", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
 
-	expectedStatus := make(map[string]string, len(commitIDs))
-	commitIDStrings := make([]string, 0, len(commitIDs))
-	for _, c := range commitIDs {
-		commitIDStrings = append(commitIDStrings, c.String())
-		expectedStatus[c.String()] = fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID)
-	}
-
-	// Verify all commit signatures
-	status := VerifyCommit(testCtx, repo, false, commitIDStrings...)
-	assert.Equal(t, expectedStatus, status)
-
-	if err := repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
-		t.Fatal(err)
-	}
-
-	// Verify signature for HEAD and branch
-	expectedStatus = map[string]string{
-		"HEAD":  fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
-		refName: fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
-	}
-	status = VerifyCommit(testCtx, repo, false, "HEAD", refName)
-	assert.Equal(t, expectedStatus, status)
-
-	// Try a tag
-	tagHash, err := gitinterface.Tag(repo, commitIDs[len(commitIDs)-1], "v1", "Test tag", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expectedStatus = map[string]string{tagHash.String(): nonCommitMessage}
-	status = VerifyCommit(testCtx, repo, false, tagHash.String())
-	assert.Equal(t, expectedStatus, status)
-
-	// Add a commit but don't record it in the RSL
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
-
-	expectedStatus = map[string]string{commitIDs[0].String(): unableToFindPolicyMessage}
-	status = VerifyCommit(testCtx, repo, false, commitIDs[0].String())
-	assert.Equal(t, expectedStatus, status)
-
-	// Add regular commits, but now check if commit is allowed to modify the files it is modifying
-	// this test should fail for the last commit, since it is not allowed to modify the file it is modifying
-
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
-	entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
-	entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-	entry.ID = entryID
-
-	expectedStatus = make(map[string]string, len(commitIDs))
-	commitIDStrings = make([]string, 0, len(commitIDs))
-
-	for index, c := range commitIDs {
-		commitIDStrings = append(commitIDStrings, c.String())
-		expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), goodApplyFilePoliciesMessage)
-
-		if c.String() == commitIDs[2].String() || c.String() == commitIDs[1].String() {
-			expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), fmt.Sprintf("commit is not allowed to modify the following paths: %d", index+1))
+		expectedStatus := make(map[string]string, len(commitIDs))
+		commitIDStrings := make([]string, 0, len(commitIDs))
+		for _, c := range commitIDs {
+			commitIDStrings = append(commitIDStrings, c.String())
+			expectedStatus[c.String()] = fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID)
 		}
-	}
 
-	// Verify all commit signatures
-	status = VerifyCommit(testCtx, repo, true, commitIDStrings...)
-	assert.Equal(t, expectedStatus, status)
+		// Verify all commit signatures
+		status := VerifyCommit(testCtx, repo, false, commitIDStrings...)
+		assert.Equal(t, expectedStatus, status)
+
+		if err := repo.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(refName))); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify signature for HEAD and branch
+		expectedStatus = map[string]string{
+			"HEAD":  fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
+			refName: fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID),
+		}
+		status = VerifyCommit(testCtx, repo, false, "HEAD", refName)
+		assert.Equal(t, expectedStatus, status)
+
+		// Try a tag
+		tagHash, err := gitinterface.Tag(repo, commitIDs[len(commitIDs)-1], "v1", "Test tag", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedStatus = map[string]string{tagHash.String(): nonCommitMessage}
+		status = VerifyCommit(testCtx, repo, false, tagHash.String())
+		assert.Equal(t, expectedStatus, status)
+
+		// Add a commit but don't record it in the RSL
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		expectedStatus = map[string]string{commitIDs[0].String(): unableToFindPolicyMessage}
+		status = VerifyCommit(testCtx, repo, false, commitIDs[0].String())
+		assert.Equal(t, expectedStatus, status)
+
+		// Add regular commits, but now check if commit is allowed to modify the files it is modifying
+		// this test should fail for the last commit, since it is not allowed to modify the file it is modifying
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		expectedStatus = make(map[string]string, len(commitIDs))
+		commitIDStrings = make([]string, 0, len(commitIDs))
+
+		for index, c := range commitIDs {
+			commitIDStrings = append(commitIDStrings, c.String())
+			expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), goodApplyFilePoliciesMessage)
+
+			if c.String() == commitIDs[2].String() {
+				expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), fmt.Sprintf("commit is not allowed to modify the following paths: %d", index+1))
+			}
+		}
+
+		// Verify all commit signatures
+		status = VerifyCommit(testCtx, repo, true, commitIDStrings...)
+		assert.Equal(t, expectedStatus, status)
+	})
+
+	t.Run("verification with a higher threshold for a commit", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicy)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		// Create authorization for this change
+		// TODO: determine authorization format, this requires the target commit
+		// ID instead of something that could be determined ahead of time like
+		// the tree ID
+		authorization, err := attestations.NewReferenceAuthorization(refName, plumbing.ZeroHash.String(), commitIDs[len(commitIDs)-1].String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, plumbing.ZeroHash.String(), commitIDs[0].String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		expectedStatus := make(map[string]string, len(commitIDs))
+		commitIDStrings := make([]string, 0, len(commitIDs))
+		for _, c := range commitIDs {
+			commitIDStrings = append(commitIDStrings, c.String())
+			expectedStatus[c.String()] = fmt.Sprintf("Verification status: %s. File policy application status: %s", fmt.Sprintf(goodSignatureMessageFmt, gpgKey.KeyType, gpgKey.KeyID), goodApplyFilePoliciesMessage)
+		}
+
+		// Verify all commit signatures
+		status := VerifyCommit(testCtx, repo, true, commitIDStrings...)
+		assert.Equal(t, expectedStatus, status)
+	})
 }
 
 func TestVerifyTag(t *testing.T) {
