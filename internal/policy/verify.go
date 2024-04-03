@@ -1025,14 +1025,14 @@ func checkCommitAgainstModifiedPaths(ctx context.Context, repo *git.Repository, 
 
 		for _, verifier := range verifiers {
 			err := verifier.Verify(ctx, commit, referenceAttesation)
-			if err == nil {
+			switch {
+			case err == nil:
 				goodKey = true
-				break
-			} else if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+			case errors.Is(err, gitinterface.ErrUnknownSigningMethod):
 				// We encounter this for key types that can be used for gittuf
 				// policy metadata but not Git objects
 				continue
-			} else if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+			case !errors.Is(err, gitinterface.ErrIncorrectVerificationKey):
 				// Unexpected error
 				break
 			}
