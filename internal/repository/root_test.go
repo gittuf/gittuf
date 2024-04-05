@@ -260,6 +260,53 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestUpdateRootThreshold(t *testing.T) {
+	r, _ := createTestRepositoryWithRoot(t, "")
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].Threshold)
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddRootKey(testCtx, signer, secondKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateRootThreshold(testCtx, signer, 2, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].Threshold)
+}
+
 func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
