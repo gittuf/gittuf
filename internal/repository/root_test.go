@@ -314,3 +314,37 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	assert.Equal(t, 2, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
 	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
 }
+
+func TestSignRoot(t *testing.T) {
+	r, _ := createTestRepositoryWithRoot(t, "")
+
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add targets key as a root key
+	secondKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.AddRootKey(testCtx, rootSigner, secondKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	secondSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add signature to root
+	err = r.SignRoot(testCtx, secondSigner, false)
+	assert.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
+}

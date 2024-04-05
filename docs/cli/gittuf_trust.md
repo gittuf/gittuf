@@ -27,5 +27,6 @@ Tools for gittuf's root of trust
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
+* [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust
 * [gittuf trust update-policy-threshold](gittuf_trust_update-policy-threshold.md)	 - Update Policy threshold in the gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 

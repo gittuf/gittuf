@@ -215,6 +215,36 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+// SignRoot adds a signature to the Root envelope. Note that the metadata itself
+// is not modified, so its version remains the same.
+func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	env := state.RootEnvelope
+
+	slog.Debug(fmt.Sprintf("Signing root metadata using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	state.RootEnvelope = env
+
+	commitMessage := fmt.Sprintf("Add signature from key '%s' to root metadata", keyID)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(ctx, r.r, commitMessage, signCommit)
+}
+
 func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.RootMetadata, error) {
 	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
