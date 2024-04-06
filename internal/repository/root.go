@@ -51,7 +51,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	commitMessage := "Initialize root of trust"
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
 
 // AddRootKey is the interface for the user to add an authorized key
@@ -63,7 +63,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -249,5 +249,5 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	state.RootEnvelope = env
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(ctx, r.r, commitMessage, signCommit, policy.PolicyStagingRef)
 }
