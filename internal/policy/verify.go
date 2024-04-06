@@ -736,6 +736,15 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 		return err
 	}
 
+	entryTagRef, err := repo.Reference(plumbing.ReferenceName(entry.RefName), true)
+	if err != nil {
+		return err
+	}
+
+	if entry.TargetID != entryTagRef.Hash() && entry.TargetID != tagObj.Target {
+		return fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
+	}
+
 	if len(tagObj.PGPSignature) == 0 {
 		return fmt.Errorf(noSignatureMessage)
 	}
