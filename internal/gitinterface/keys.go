@@ -62,26 +62,41 @@ func GetSigningCommand() (string, []string, error) {
 
 	signingMethod, keyInfo, program, err := getSigningInfo()
 	if err != nil {
-		return "", []string{}, err
+		return "", nil, err
 	}
 
 	switch signingMethod {
 	case SigningMethodGPG:
-		args = []string{
-			"-bsau", keyInfo, // b -> detach-sign, s -> sign, a -> armor, u -> local-user
+		if len(keyInfo) == 0 {
+			args = []string{
+				"-bsa", // b -> detach-sign, s -> sign, a -> armor
+			}
+		} else {
+			args = []string{
+				"-bsau", keyInfo, // b -> detach-sign, s -> sign, a -> armor, u -> local-user
+			}
 		}
 	case SigningMethodSSH:
+		if len(keyInfo) == 0 {
+			return "", nil, ErrSigningKeyNotSpecified
+		}
 		args = []string{
 			"-Y", "sign",
-			"-n", "git",
+			"-n", "git", // Git namespace
 			"-f", keyInfo,
 		}
 	case SigningMethodX509:
-		args = []string{
-			"-bsau", keyInfo,
+		if len(keyInfo) == 0 {
+			args = []string{
+				"-bsa", // b -> detach-sign, s -> sign, a -> armor
+			}
+		} else {
+			args = []string{
+				"-bsau", keyInfo, // b -> detach-sign, s -> sign, a -> armor, u -> local-user
+			}
 		}
 	default:
-		return "", []string{}, ErrUnknownSigningMethod
+		return "", nil, ErrUnknownSigningMethod
 	}
 
 	return program, args, nil
@@ -98,10 +113,7 @@ func getSigningInfo() (SigningMethod, string, string, error) {
 		return -1, "", "", err
 	}
 
-	keyInfo, err := getSigningKeyInfo(gitConfig)
-	if err != nil {
-		return -1, "", "", err
-	}
+	keyInfo := getSigningKeyInfo(gitConfig)
 
 	program := getSigningProgram(gitConfig, signingMethod)
 
@@ -125,12 +137,12 @@ func getSigningMethod(gitConfig map[string]string) (SigningMethod, error) {
 	return -1, ErrUnknownSigningMethod
 }
 
-func getSigningKeyInfo(gitConfig map[string]string) (string, error) {
+func getSigningKeyInfo(gitConfig map[string]string) string {
 	keyInfo, ok := gitConfig["user.signingkey"]
 	if !ok {
-		return "", ErrSigningKeyNotSpecified
+		return ""
 	}
-	return keyInfo, nil
+	return keyInfo
 }
 
 func getSigningProgram(gitConfig map[string]string, signingMethod SigningMethod) string {

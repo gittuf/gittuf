@@ -21,7 +21,6 @@ var (
 	testConfig2 = artifacts.GitConfig2
 	testConfig3 = artifacts.GitConfig3
 	testConfig4 = artifacts.GitConfig4
-	testConfig5 = artifacts.GitConfig5
 )
 
 func TestGetSigningInfo(t *testing.T) {
@@ -119,25 +118,6 @@ func TestGetSigningInfo(t *testing.T) {
 			wantedKeyInfo:       "abcdef",
 			wantedProgram:       "gpgsm",
 		},
-		"unknown signing key": {
-			c: &config.Config{
-				Raw: &format.Config{
-					Sections: format.Sections{
-						&format.Section{
-							Name: "user",
-							Options: format.Options{
-								&format.Option{
-									Key:   "foo",
-									Value: "bar",
-								},
-							},
-						},
-					},
-				},
-			},
-			configFile:    testConfig4,
-			expectedError: ErrSigningKeyNotSpecified,
-		},
 		"unknown signing method": {
 			c: &config.Config{
 				Raw: &format.Config{
@@ -163,7 +143,7 @@ func TestGetSigningInfo(t *testing.T) {
 					},
 				},
 			},
-			configFile:    testConfig5,
+			configFile:    testConfig4,
 			expectedError: ErrUnknownSigningMethod,
 		},
 	}

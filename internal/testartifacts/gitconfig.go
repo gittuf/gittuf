@@ -15,6 +15,3 @@ var GitConfig3 []byte
 
 //go:embed testdata/gitconfigs/config-4
 var GitConfig4 []byte
-
-//go:embed testdata/gitconfigs/config-5
-var GitConfig5 []byte

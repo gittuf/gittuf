@@ -1,1 +1,2 @@
-user.foo bar
+user.signingkey abcdef
+gpg.format abcdef
