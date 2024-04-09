@@ -7,7 +7,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/hiddeco/sshsig v0.1.0
-	github.com/in-toto/attestation v1.0.1
+	github.com/in-toto/attestation v1.0.2
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/secure-systems-lab/go-securesystemslib v0.8.1-0.20240108171218-da429971be5a
 	github.com/sigstore/cosign/v2 v2.2.3
