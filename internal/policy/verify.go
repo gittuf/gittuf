@@ -792,7 +792,12 @@ func getAuthorizationAttestation(repo *git.Repository, attestationsState *attest
 		fromID = priorRefEntry.TargetID
 	}
 
-	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entry.TargetID.String())
+	currentCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
+	if err != nil {
+		return nil, err
+	}
+
+	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), currentCommit.TreeHash.String())
 	if err != nil {
 		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
 			return nil, nil

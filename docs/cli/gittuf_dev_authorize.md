@@ -9,6 +9,7 @@ gittuf dev authorize [flags]
 ### Options
 
 ```
+  -f, --from-ref string      ref to authorize merging changes from
   -h, --help                 help for authorize
   -r, --revoke               revoke existing authorization
   -k, --signing-key string   signing key to use for creating or revoking an authorization

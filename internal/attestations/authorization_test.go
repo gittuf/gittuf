@@ -27,17 +27,17 @@ func TestNewReferenceAuthorization(t *testing.T) {
 
 	// Check subject contents
 	assert.Equal(t, 1, len(authorization.Subject))
-	assert.Contains(t, authorization.Subject[0].Digest, digestGitCommitKey)
-	assert.Equal(t, authorization.Subject[0].Digest[digestGitCommitKey], testID)
+	assert.Contains(t, authorization.Subject[0].Digest, digestGitTreeKey)
+	assert.Equal(t, authorization.Subject[0].Digest[digestGitTreeKey], testID)
 
 	// Check predicate type
 	assert.Equal(t, ReferenceAuthorizationPredicateType, authorization.PredicateType)
 
 	// Check predicate
 	predicate := authorization.Predicate.AsMap()
-	assert.Equal(t, predicate["targetRef"], testRef)
-	assert.Equal(t, predicate["toTargetID"], testID)
-	assert.Equal(t, predicate["fromTargetID"], testID)
+	assert.Equal(t, predicate[targetRefKey], testRef)
+	assert.Equal(t, predicate[targetTreeIDKey], testID)
+	assert.Equal(t, predicate[fromRevisionIDKey], testID)
 }
 
 func TestSetReferenceAuthorization(t *testing.T) {

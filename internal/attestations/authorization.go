@@ -18,10 +18,10 @@ import (
 
 const (
 	ReferenceAuthorizationPredicateType = "https://gittuf.dev/reference-authorization/v0.1"
-	digestGitCommitKey                  = "gitCommit"
-	toTargetIDKey                       = "toTargetID"
-	fromTargetIDKey                     = "fromTargetID"
+	digestGitTreeKey                    = "gitTree"
 	targetRefKey                        = "targetRef"
+	fromRevisionIDKey                   = "fromRevisionID"
+	targetTreeIDKey                     = "targetTreeID"
 )
 
 var (
@@ -33,9 +33,9 @@ var (
 // a gittuf repository. It is meant to be used as a "predicate" in an in-toto
 // attestation.
 type ReferenceAuthorization struct {
-	TargetRef    string `json:"targetRef"`
-	FromTargetID string `json:"fromTargetID"`
-	ToTargetID   string `json:"toTargetID"`
+	TargetRef      string `json:"targetRef"`
+	FromRevisionID string `json:"fromRevisionID"`
+	TargetTreeID   string `json:"targetTreeID"`
 }
 
 // NewReferenceAuthorization creates a new reference authorization for the
@@ -43,11 +43,11 @@ type ReferenceAuthorization struct {
 // and returned with the appropriate "predicate type" set. The `fromTargetID`
 // and `toTargetID` specify the change to `targetRef` that is to be authorized
 // by invoking this function.
-func NewReferenceAuthorization(targetRef, fromTargetID, toTargetID string) (*ita.Statement, error) {
+func NewReferenceAuthorization(targetRef, fromRevisionID, targetTreeID string) (*ita.Statement, error) {
 	predicate := &ReferenceAuthorization{
-		TargetRef:    targetRef,
-		FromTargetID: fromTargetID,
-		ToTargetID:   toTargetID,
+		TargetRef:      targetRef,
+		FromRevisionID: fromRevisionID,
+		TargetTreeID:   targetTreeID,
 	}
 
 	predicateBytes, err := json.Marshal(predicate)
@@ -69,7 +69,7 @@ func NewReferenceAuthorization(targetRef, fromTargetID, toTargetID string) (*ita
 		Type: ita.StatementTypeUri,
 		Subject: []*ita.ResourceDescriptor{
 			{
-				Digest: map[string]string{digestGitCommitKey: toTargetID},
+				Digest: map[string]string{digestGitTreeKey: targetTreeID},
 			},
 		},
 		PredicateType: ReferenceAuthorizationPredicateType,
@@ -79,8 +79,8 @@ func NewReferenceAuthorization(targetRef, fromTargetID, toTargetID string) (*ita
 
 // SetReferenceAuthorization writes the new reference authorization attestation
 // to the object store and tracks it in the current attestations state.
-func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
-	if err := validateReferenceAuthorization(env, refName, fromID, toID); err != nil {
+func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *sslibdsse.Envelope, refName, fromRevisionID, targetTreeID string) error {
+	if err := validateReferenceAuthorization(env, refName, fromRevisionID, targetTreeID); err != nil {
 		return err
 	}
 
@@ -98,15 +98,15 @@ func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *ssli
 		a.referenceAuthorizations = map[string]plumbing.Hash{}
 	}
 
-	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)] = blobID
+	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromRevisionID, targetTreeID)] = blobID
 	return nil
 }
 
 // RemoveReferenceAuthorization removes a set reference authorization
 // attestation entirely. The object, however, isn't removed from the object
 // store as prior states may still need it.
-func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string) error {
-	authPath := ReferenceAuthorizationPath(refName, fromID, toID)
+func (a *Attestations) RemoveReferenceAuthorization(refName, fromRevisionID, targetTreeID string) error {
+	authPath := ReferenceAuthorizationPath(refName, fromRevisionID, targetTreeID)
 	if _, has := a.referenceAuthorizations[authPath]; !has {
 		return ErrAuthorizationNotFound
 	}
@@ -117,8 +117,8 @@ func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string
 
 // GetReferenceAuthorizationFor returns the requested reference authorization
 // attestation (with its signatures).
-func (a *Attestations) GetReferenceAuthorizationFor(repo *git.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)]
+func (a *Attestations) GetReferenceAuthorizationFor(repo *git.Repository, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
+	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromRevisionID, targetTreeID)]
 	if !has {
 		return nil, ErrAuthorizationNotFound
 	}
@@ -133,7 +133,7 @@ func (a *Attestations) GetReferenceAuthorizationFor(repo *git.Repository, refNam
 		return nil, err
 	}
 
-	if err := validateReferenceAuthorization(env, refName, fromID, toID); err != nil {
+	if err := validateReferenceAuthorization(env, refName, fromRevisionID, targetTreeID); err != nil {
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func ReferenceAuthorizationPath(refName, fromID, toID string) string {
 	return path.Join(refName, fmt.Sprintf("%s-%s", fromID, toID))
 }
 
-func validateReferenceAuthorization(env *sslibdsse.Envelope, refName, fromID, toID string) error {
+func validateReferenceAuthorization(env *sslibdsse.Envelope, targetRef, fromRevisionID, targetTreeID string) error {
 	payload, err := env.DecodeB64Payload()
 	if err != nil {
 		return err
@@ -157,21 +157,21 @@ func validateReferenceAuthorization(env *sslibdsse.Envelope, refName, fromID, to
 		return err
 	}
 
-	if attestation.Subject[0].Digest[digestGitCommitKey] != toID {
+	if attestation.Subject[0].Digest[digestGitTreeKey] != targetTreeID {
 		return ErrInvalidAuthorization
 	}
 
 	predicate := attestation.Predicate.AsMap()
 
-	if predicate[toTargetIDKey] != toID {
+	if predicate[targetTreeIDKey] != targetTreeID {
 		return ErrInvalidAuthorization
 	}
 
-	if predicate[fromTargetIDKey] != fromID {
+	if predicate[fromRevisionIDKey] != fromRevisionID {
 		return ErrInvalidAuthorization
 	}
 
-	if predicate[targetRefKey] != refName {
+	if predicate[targetRefKey] != targetRef {
 		return ErrInvalidAuthorization
 	}
 

@@ -19,15 +19,24 @@ import (
 var ErrNotSigningKey = errors.New("expected signing key")
 
 // AddReferenceAuthorization adds a reference authorization attestation to the
-// repository for the specified ref. The from ID is identified using the RSL
-// while the to ID is set to the current status of the ref. Currently, this is
-// limited to developer mode.
-func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef string, signCommit bool) error {
+// repository for the specified target ref. The from ID is identified using the
+// last RSL entry for the target ref. The to ID is that of the expected Git tree
+// created by merging the feature ref into the target ref. The commit used to
+// calculate the merge tree ID is identified using the RSL for the feature ref.
+// Currently, this is limited to developer mode.
+func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	targetRef, err := gitinterface.AbsoluteReference(r.r, targetRef)
+	var err error
+
+	targetRef, err = gitinterface.AbsoluteReference(r.r, targetRef)
+	if err != nil {
+		return err
+	}
+
+	featureRef, err = gitinterface.AbsoluteReference(r.r, featureRef)
 	if err != nil {
 		return err
 	}
@@ -38,13 +47,14 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	var (
-		fromID string
-		toID   string
+		fromID          string
+		featureCommitID string
+		toID            string
 	)
 
-	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, targetRef)
+	latestTargetEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, targetRef)
 	if err == nil {
-		fromID = latestEntry.TargetID.String()
+		fromID = latestTargetEntry.TargetID.String()
 	} else {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return err
@@ -52,11 +62,19 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		fromID = plumbing.ZeroHash.String()
 	}
 
-	ref, err := r.r.Reference(plumbing.ReferenceName(targetRef), true)
+	latestFeatureEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, featureRef)
+	if err != nil {
+		// We don't have an RSL entry for the feature ref to use to approve the
+		// merge
+		return err
+	}
+	featureCommitID = latestFeatureEntry.TargetID.String()
+
+	mergeTreeID, err := gitinterface.GetMergeTree(r.r, fromID, featureCommitID)
 	if err != nil {
 		return err
 	}
-	toID = ref.Hash().String()
+	toID = mergeTreeID
 
 	// Does a reference authorization already exist for the parameters?
 	hasAuthorization := false

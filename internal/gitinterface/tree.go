@@ -5,10 +5,12 @@ package gitinterface
 import (
 	"errors"
 	"io"
+	"os/exec"
 	"path"
 	"sort"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
@@ -75,6 +77,21 @@ func GetAllFilesInTree(tree *object.Tree) (map[string]plumbing.Hash, error) {
 	}
 
 	return files, nil
+}
+
+func GetMergeTree(_ *git.Repository, commitAID, commitBID string) (string, error) {
+	if !dev.InDevMode() {
+		return "", dev.ErrNotInDevMode
+	}
+
+	command := exec.Command("git", "merge-tree", commitAID, commitBID) //nolint:gosec
+	stdOut, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+
+	stdOutString := strings.TrimSpace(string(stdOut))
+	return stdOutString, nil
 }
 
 // TreeBuilder is used to create multi-level trees in a repository.
