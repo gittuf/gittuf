@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -14,10 +15,13 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/google/go-github/v61/github"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 var ErrNotSigningKey = errors.New("expected signing key")
+
+var githubClient *github.Client
 
 // AddReferenceAuthorization adds a reference authorization attestation to the
 // repository for the specified target ref. The from ID is identified using the
@@ -194,4 +198,120 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 
 	slog.Debug("Committing attestations...")
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
+}
+
+// AddGitHubPullRequestAttestationForCommit identifies the pull request for a
+// specified commit ID and triggers AddGitHubPullRequestAttestationForNumber for
+// that pull request. Currently, the authentication token for the GitHub API is
+// read from the GITHUB_TOKEN environment variable.
+func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	client := getGitHubClient()
+
+	slog.Debug("Identifying GitHub pull requests for commit...")
+	pullRequests, _, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repository, commitID, nil)
+	if err != nil {
+		return err
+	}
+
+	baseBranch, err = gitinterface.AbsoluteReference(r.r, baseBranch)
+	if err != nil {
+		return err
+	}
+
+	for _, pullRequest := range pullRequests {
+		slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", *pullRequest.Number))
+		pullRequestBranch := plumbing.NewBranchReferenceName(*pullRequest.Base.Ref).String()
+
+		// pullRequest.Merged is not set on this endpoint for some reason
+		if pullRequest.MergedAt != nil && pullRequestBranch == baseBranch {
+			return r.addGitHubPullRequestAttestation(ctx, signer, owner, repository, pullRequest, signCommit)
+		}
+	}
+
+	return fmt.Errorf("pull request not found for commit")
+}
+
+// AddGitHubPullRequestAttestationForNumber wraps the API response for the
+// specified pull request in an in-toto attestation. `pullRequestID` must be the
+// number of the pull request. Currently, the authentication token for the
+// GitHub API is read from the GITHUB_TOKEN environment variable.
+func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	client := getGitHubClient()
+
+	slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequestNumber))
+	pullRequest, _, err := client.PullRequests.Get(ctx, owner, repository, pullRequestNumber)
+	if err != nil {
+		return err
+	}
+
+	return r.addGitHubPullRequestAttestation(ctx, signer, owner, repository, pullRequest, signCommit)
+}
+
+func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequest *github.PullRequest, signCommit bool) error {
+	var (
+		targetRef      string
+		targetCommitID string
+	)
+
+	if pullRequest.MergedAt == nil {
+		// not yet merged
+		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Head.User.Login, *pullRequest.Head.User.ID, *pullRequest.Head.Ref)
+		targetCommitID = *pullRequest.Head.SHA
+	} else {
+		// merged
+		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Base.User.Login, *pullRequest.Base.User.ID, *pullRequest.Base.Ref)
+		targetCommitID = *pullRequest.MergeCommitSHA
+	}
+
+	slog.Debug("Creating GitHub pull request attestation...")
+	statement, err := attestations.NewGitHubPullRequestAttestation(owner, repository, *pullRequest.Number, targetCommitID, pullRequest)
+	if err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(statement)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing GitHub pull request attestation using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	if err := allAttestations.SetGitHubPullRequestAuthorization(r.r, env, targetRef, targetCommitID); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add GitHub pull request attestation for '%s' at '%s'\n\nSource: https://github.com/%s/%s/pull/%d\n", targetRef, targetCommitID, owner, repository, *pullRequest.Number)
+
+	slog.Debug("Committing attestations...")
+	return allAttestations.Commit(r.r, commitMessage, signCommit)
+}
+
+func getGitHubClient() *github.Client {
+	if githubClient == nil {
+		githubClient = github.NewClient(nil).WithAuthToken(os.Getenv("GITHUB_TOKEN"))
+	}
+
+	return githubClient
 }

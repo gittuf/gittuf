@@ -5,6 +5,7 @@ package dev
 import (
 	"fmt"
 
+	"github.com/gittuf/gittuf/internal/cmd/dev/attestgithub"
 	"github.com/gittuf/gittuf/internal/cmd/dev/authorize"
 	"github.com/gittuf/gittuf/internal/cmd/dev/rslrecordat"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -20,6 +21,7 @@ func New() *cobra.Command {
 	}
 
 	cmd.AddCommand(authorize.New())
+	cmd.AddCommand(attestgithub.New())
 	cmd.AddCommand(rslrecordat.New())
 
 	return cmd
