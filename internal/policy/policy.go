@@ -99,59 +99,34 @@ type DelegationWithDepth struct {
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
-// policy-staging ref, that entry is verified in isolation and returned.
+// policy-staging ref, that entry is returned with no verification.
 func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	firstEntry, _, err := rsl.GetFirstEntry(repo)
+	// Verify prior roots and get the latest applicable policy state
+	currentPolicyState, err := verifySuccessiveRootsAndLoadLatestPolicyState(ctx, repo, entry)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to verify roots of trust for policy states: %w", err)
 	}
 
-	// This assumes the first entry is for the policy ref
-	initialState, err := loadStateForEntry(repo, firstEntry)
+	requestedState, err := loadStateForEntry(repo, entry)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to load requested policy state: %w", err)
 	}
 
-	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, entry.ID, PolicyRef)
-	if err != nil {
-		return nil, err
+	if currentPolicyState == nil || entry.RefName == PolicyStagingRef {
+		// Either we have just one policy entry or we're loading a staging ref
+		return requestedState, nil
 	}
 
-	if len(allPolicyEntries) == 0 {
-		// this is hit only when we have zero policy entries + staging entries
-		// i.e., right at the start of gittuf use
-		if entry.RefName == PolicyStagingRef {
-			return loadStateForEntry(repo, entry)
-		}
-
-		return nil, ErrPolicyNotFound
+	// Verify root for requested state
+	if err := currentPolicyState.VerifyNewState(ctx, requestedState); err != nil {
+		return nil, fmt.Errorf("unable to verify root of trust for requested state: %w", err)
 	}
 
-	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstEntry.ID))
-	verifiedState := initialState
-	for _, entry := range allPolicyEntries[1:] {
-		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID))
-		currentState, err := loadStateForEntry(repo, entry)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := verifiedState.VerifyNewState(ctx, currentState); err != nil {
-			return nil, err
-		}
-
-		verifiedState = currentState
+	if err := requestedState.Verify(ctx); err != nil {
+		return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 	}
 
-	// If the requested state is for the staging ref, we return it after
-	// verifying the policy ref is in a good state.
-	// This is hit when we have a number of policy entries and staging after.
-	if entry.RefName == PolicyStagingRef {
-		return loadStateForEntry(repo, entry)
-	}
-
-	// We know this is for the policy ref
-	return verifiedState, verifiedState.Verify(ctx)
+	return requestedState, nil
 }
 
 // LoadCurrentState returns the State corresponding to the repository's current
@@ -916,6 +891,81 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 	verifier.threshold = rootMetadata.Roles[TargetsRoleName].Threshold
 
 	return verifier, nil
+}
+
+// verifySuccessiveRootsAndLoadLatestPolicyState loads all policy entries before
+// the requested entry and verifies roots successively. The latest policy state
+// is returned. If the requested policy state is prior to the first policy entry
+// (i.e., it's for one of the initial staging entries), no state is returned.
+// The caller must handle that appropriately.
+func verifySuccessiveRootsAndLoadLatestPolicyState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	firstPolicyEntry, _, err := rsl.GetFirstReferenceEntryForRef(repo, PolicyRef)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// we don't have a policy entry yet
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// check if firstPolicyEntry is **after** requested entry
+	// this can happen when the requested entry is for policy-staging before
+	// Apply() was ever called
+	entryCommit, err := gitinterface.GetCommit(repo, entry.ID)
+	if err != nil {
+		return nil, err
+	}
+	knows, err := gitinterface.KnowsCommit(repo, firstPolicyEntry.ID, entryCommit)
+	if err != nil {
+		return nil, err
+	}
+	if knows {
+		// the first policy entry knows the requested entry, meaning the
+		// requested entry is an ancestor of the first policy entry
+		return nil, nil
+	}
+
+	initialPolicyState, err := loadStateForEntry(repo, firstPolicyEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	latestPolicyEntryBeforeSpecifiedEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// we have a single policy entry
+			return initialPolicyState, nil
+		}
+		return nil, err
+	}
+
+	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstPolicyEntry.ID, latestPolicyEntryBeforeSpecifiedEntry.ID, PolicyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.ID))
+	verifiedState := initialPolicyState
+	for _, entry := range allPolicyEntries[1:] {
+		if entry.RefName != PolicyRef {
+			// refs/gittuf/attestations etc should be skipped
+			continue
+		}
+
+		underTestState, err := loadStateForEntry(repo, entry)
+		if err != nil {
+			return nil, err
+		}
+
+		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID))
+		if err := verifiedState.VerifyNewState(ctx, underTestState); err != nil {
+			return nil, err
+		}
+
+		verifiedState = underTestState
+	}
+
+	return verifiedState, nil
 }
 
 // loadStateForEntry returns the State for a specified RSL reference entry for

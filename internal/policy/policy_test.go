@@ -68,19 +68,196 @@ func TestInitializeNamespace(t *testing.T) {
 }
 
 func TestLoadState(t *testing.T) {
-	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	t.Run("loading while verifying multiple states", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
 
-	entry, err := rsl.GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
-	if err != nil {
-		t.Error(err)
-	}
+		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		if err != nil {
+			t.Error(err)
+		}
 
-	assert.Equal(t, state, loadedState)
+		assert.Equal(t, state, loadedState)
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.ruleNames.Add("test-rule-1")
+
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(repo, "", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := Apply(context.Background(), repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.ruleNames.Add("test-rule-2")
+
+		env, err = dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(repo, "", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := Apply(context.Background(), repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err = rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		loadedState, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		if err != nil {
+			t.Error(err)
+		}
+
+		assert.Equal(t, state, loadedState)
+	})
+
+	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		if err != nil {
+			t.Error(err)
+		}
+
+		assert.Equal(t, state, loadedState)
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.ruleNames.Add("test-rule-1")
+
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(repo, "", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := Apply(context.Background(), repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		state.ruleNames.Add("test-rule-2")
+
+		env, err = dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		badSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, badSigner)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(repo, "", false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyStagingRef, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
+		if err := repo.Storer.SetReference(newPolicyRef); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err = rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
 }
 
 func TestLoadCurrentState(t *testing.T) {
