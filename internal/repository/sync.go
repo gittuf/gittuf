@@ -65,5 +65,5 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 	repository := &Repository{r: r}
 
 	slog.Debug("Verifying HEAD...")
-	return repository, repository.VerifyRef(ctx, head.Target().String(), true)
+	return repository, repository.VerifyRef(ctx, head.Target().String(), false)
 }
