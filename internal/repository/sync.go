@@ -11,8 +11,6 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
@@ -49,7 +47,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	refs := []string{rsl.Ref, policy.PolicyRef}
+	refs := []string{"refs/gittuf/*"}
 
 	slog.Debug("Cloning repository...")
 	r, err := gitinterface.CloneAndFetch(ctx, remoteURL, dir, initialBranch, refs)
