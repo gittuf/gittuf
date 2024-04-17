@@ -79,11 +79,28 @@ func GetAllFilesInTree(tree *object.Tree) (map[string]plumbing.Hash, error) {
 	return files, nil
 }
 
-func GetMergeTree(_ *git.Repository, commitAID, commitBID string) (string, error) {
+// GetMergeTree computes the merge tree for the commits passed in. The tree is
+// not written to the object store. Assuming a typical merge workflow, the first
+// commit is expected to be the tip of the base branch. As such, the second
+// commit is expected to be merged into the first. If the first commit is zero,
+// the second commit's tree is returned.
+func GetMergeTree(repo *git.Repository, commitAID, commitBID string) (string, error) {
 	if !dev.InDevMode() {
 		return "", dev.ErrNotInDevMode
 	}
 
+	// Base branch commit ID is zero
+	if plumbing.NewHash(commitAID).IsZero() {
+		// Return commitB's tree
+		commitB, err := GetCommit(repo, plumbing.NewHash(commitBID))
+		if err != nil {
+			return "", err
+		}
+
+		return commitB.TreeHash.String(), nil
+	}
+
+	// go-git does not support three way merges
 	command := exec.Command("git", "merge-tree", commitAID, commitBID) //nolint:gosec
 	stdOut, err := command.Output()
 	if err != nil {

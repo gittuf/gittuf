@@ -234,6 +234,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 				slog.Debug("Entry has been revoked, searching for fix entry...")
 				invalidEntry = entry
 				verificationErr = err
+
+				if len(entries) == 0 {
+					// Fix entry does not exist after revoking annotation
+					return verificationErr
+				}
 			}
 			continue
 		}

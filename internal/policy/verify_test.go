@@ -688,6 +688,46 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, policyEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
+
+	t.Run("with annotation but no fix entry", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		// It's in an invalid state right now, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]plumbing.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// No fix entry, error out
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, policyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
 }
 
 func TestVerifyCommit(t *testing.T) {
