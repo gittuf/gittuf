@@ -47,7 +47,12 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 	}
 
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	return r.verifyRefTip(target, expectedTip)
+	if err := r.verifyRefTip(target, expectedTip); err != nil {
+		return err
+	}
+
+	slog.Debug("Verification successful!")
+	return nil
 }
 
 func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID string) error {
@@ -70,7 +75,12 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	}
 
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	return r.verifyRefTip(target, expectedTip)
+	if err := r.verifyRefTip(target, expectedTip); err != nil {
+		return err
+	}
+
+	slog.Debug("Verification successful!")
+	return nil
 }
 
 func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
