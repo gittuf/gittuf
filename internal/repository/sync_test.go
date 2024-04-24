@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -44,6 +45,9 @@ func TestClone(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := remoteRepo.AddTopLevelTargetsKey(context.Background(), rootSigner, targetsPubKey, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := remoteRepo.AddRootKey(context.Background(), rootSigner, targetsPubKey, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := remoteRepo.InitializeTargets(context.Background(), targetsSigner, policy.TargetsRoleName, false); err != nil {
@@ -80,15 +84,6 @@ func TestClone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	remoteRSLRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	remotePolicyRef, err := remoteRepo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("successful clone without specifying dir", func(t *testing.T) {
 		localTmpDir := t.TempDir()
 
@@ -97,24 +92,17 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repo, err := Clone(context.Background(), remoteTmpDir, "", "")
+		repo, err := Clone(context.Background(), remoteTmpDir, "", "", nil)
 		assert.Nil(t, err)
+
 		head, err := repo.r.Head()
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Equal(t, commitID, head.Hash())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, policy.PolicyRef)
 	})
 
 	t.Run("successful clone with dir", func(t *testing.T) {
@@ -126,8 +114,9 @@ func TestClone(t *testing.T) {
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		dirName := "myRepo"
-		repo, err := Clone(context.Background(), remoteTmpDir, dirName, "")
+		repo, err := Clone(context.Background(), remoteTmpDir, dirName, "", nil)
 		assert.Nil(t, err)
+
 		head, err := repo.r.Head()
 		if err != nil {
 			t.Fatal(err)
@@ -138,16 +127,8 @@ func TestClone(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, dirInfo.IsDir())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, policy.PolicyRef)
 	})
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch", func(t *testing.T) {
@@ -158,8 +139,9 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repo, err := Clone(context.Background(), remoteTmpDir, "", anotherRefName)
+		repo, err := Clone(context.Background(), remoteTmpDir, "", anotherRefName, nil)
 		assert.Nil(t, err)
+
 		head, err := repo.r.Head()
 		if err != nil {
 			t.Fatal(err)
@@ -167,16 +149,8 @@ func TestClone(t *testing.T) {
 		assert.Equal(t, commitID, head.Hash())
 		assert.Equal(t, plumbing.ReferenceName(anotherRefName), head.Name())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, policy.PolicyRef)
 	})
 
 	t.Run("unsuccessful clone when unspecified dir already exists", func(t *testing.T) {
@@ -187,10 +161,10 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		_, err = Clone(context.Background(), remoteTmpDir, "", "")
+		_, err = Clone(context.Background(), remoteTmpDir, "", "", nil)
 		assert.Nil(t, err)
 
-		_, err = Clone(context.Background(), remoteTmpDir, "", "")
+		_, err = Clone(context.Background(), remoteTmpDir, "", "", nil)
 		assert.ErrorIs(t, err, ErrDirExists)
 	})
 
@@ -203,10 +177,11 @@ func TestClone(t *testing.T) {
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		dirName := "myRepo"
-		if err := os.Mkdir(dirName, 0755); err != nil {
+		if err := os.Mkdir(dirName, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		_, err = Clone(context.Background(), remoteTmpDir, dirName, "")
+
+		_, err = Clone(context.Background(), remoteTmpDir, dirName, "", nil)
 		assert.ErrorIs(t, err, ErrDirExists)
 	})
 
@@ -218,23 +193,69 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repo, err := Clone(context.Background(), remoteTmpDir+"//", "", "")
+		repo, err := Clone(context.Background(), remoteTmpDir+"//", "", "", nil)
 		assert.Nil(t, err)
+
 		head, err := repo.r.Head()
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Equal(t, commitID, head.Hash())
 
-		localRSLRef, err := repo.r.Reference(plumbing.ReferenceName(rsl.Ref), true)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, policy.PolicyRef)
+	})
+
+	t.Run("successful clone without specifying dir, with multiple expected root keys", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+
+		if err := os.Chdir(localTmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		rootPublicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, remoteRSLRef.Hash(), localRSLRef.Hash())
-		localPolicyRef, err := repo.r.Reference(plumbing.ReferenceName(policy.PolicyRef), true)
+
+		targetsPublicKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, remotePolicyRef.Hash(), localPolicyRef.Hash())
+
+		repo, err := Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{targetsPublicKey, rootPublicKey})
+		assert.Nil(t, err)
+
+		head, err := repo.r.Head()
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, commitID, head.Hash())
+
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, repo.r, remoteRepo.r, policy.PolicyRef)
+	})
+
+	t.Run("unsuccessful clone without specifying dir, with expected root keys not equaling root keys", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+
+		if err := os.Chdir(localTmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		badPublicKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootPublicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = Clone(context.Background(), remoteTmpDir, "", "", []*tuf.Key{rootPublicKey, badPublicKey})
+		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
 	})
 }

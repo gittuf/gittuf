@@ -141,6 +141,17 @@ func LoadCurrentState(ctx context.Context, repo *git.Repository, ref string) (*S
 	return LoadState(ctx, repo, entry)
 }
 
+// LoadFirstState returns the State corresponding to the repository's first
+// active policy. It does not verify the root of trust since it is the initial policy.
+func LoadFirstState(ctx context.Context, repo *git.Repository) (*State, error) {
+	firstEntry, _, err := rsl.GetFirstReferenceEntryForRef(repo, PolicyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return LoadState(ctx, repo, firstEntry)
+}
+
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
 // in the repository. The policy preceding that RSL entry is returned as the
 // State to be used for verifying the commit's signature. If the commit hasn't

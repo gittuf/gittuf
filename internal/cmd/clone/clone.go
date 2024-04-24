@@ -3,12 +3,15 @@
 package clone
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	branch string
+	branch           string
+	expectedRootKeys common.PublicKeys
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -19,6 +22,11 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"specify branch to check out",
 	)
+	cmd.Flags().Var(
+		&o.expectedRootKeys,
+		"root-key",
+		"set of initial root of trust keys for the repository (supported values: paths to SSH keys, GPG key fingerprints, Sigstore/Fulcio identities)",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -26,7 +34,19 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	if len(args) > 1 {
 		dir = args[1]
 	}
-	_, err := repository.Clone(cmd.Context(), args[0], dir, o.branch)
+
+	expectedRootKeys := make([]*tuf.Key, len(o.expectedRootKeys))
+
+	for index, keyPath := range o.expectedRootKeys {
+		key, err := common.LoadPublicKey(keyPath)
+		if err != nil {
+			return err
+		}
+
+		expectedRootKeys[index] = key
+	}
+
+	_, err := repository.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys)
 	return err
 }
 

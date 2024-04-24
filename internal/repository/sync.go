@@ -8,22 +8,27 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
 var (
-	ErrCloningRepository = errors.New("unable to clone repository")
-	ErrDirExists         = errors.New("directory exists")
+	ErrCloningRepository          = errors.New("unable to clone repository")
+	ErrDirExists                  = errors.New("directory exists")
+	ErrExpectedRootKeysDoNotMatch = errors.Join(ErrCloningRepository, errors.New("cloned root keys do not match the expected keys"))
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []*tuf.Key) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -63,6 +68,35 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string) (*Reposito
 	}
 
 	repository := &Repository{r: r}
+
+	if len(expectedRootKeys) > 0 {
+		slog.Debug("Verifying if root keys are expected root keys...")
+
+		sort.Slice(expectedRootKeys, func(i, j int) bool {
+			return expectedRootKeys[i].KeyID < expectedRootKeys[j].KeyID
+		})
+
+		state, err := policy.LoadFirstState(ctx, r)
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+		rootKeys, err := state.GetRootKeys()
+		if err != nil {
+			return repository, errors.Join(ErrCloningRepository, err)
+		}
+
+		// We sort the root keys so that we can check if the root keys array match's the expected root key array
+		sort.Slice(rootKeys, func(i, j int) bool {
+			return rootKeys[i].KeyID < rootKeys[j].KeyID
+		})
+
+		if len(rootKeys) != len(expectedRootKeys) {
+			return repository, ErrExpectedRootKeysDoNotMatch
+		}
+		if !reflect.DeepEqual(rootKeys, expectedRootKeys) {
+			return repository, ErrExpectedRootKeysDoNotMatch
+		}
+	}
 
 	slog.Debug("Verifying HEAD...")
 	return repository, repository.VerifyRef(ctx, head.Target().String(), false)
