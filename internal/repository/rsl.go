@@ -90,7 +90,7 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 	return rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit)
 }
 
-// CheckRemoteRSLForUpdates checks if the RSL at the specified remote remote
+// CheckRemoteRSLForUpdates checks if the RSL at the specified remote
 // repository has updated in comparison with the local repository's RSL. This is
 // done by fetching the remote RSL to the local repository's remote RSL tracker.
 // If the remote RSL has been updated, this method also checks if the local and
