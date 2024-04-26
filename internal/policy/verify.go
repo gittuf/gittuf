@@ -199,7 +199,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
 				// TODO: this is repetition if the firstEntry is for policy
-				newPolicy, err := loadStateForEntry(ctx, repo, entry)
+				newPolicy, err := loadStateForEntry(repo, entry)
 				if err != nil {
 					return err
 				}

@@ -51,7 +51,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	commitMessage := "Initialize root of trust"
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, signCommit)
 }
 
 // AddRootKey is the interface for the user to add an authorized key
@@ -271,7 +271,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to root metadata", keyID)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, signCommit)
 }
 
 func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.RootMetadata, error) {
@@ -308,5 +308,5 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	state.RootEnvelope = env
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, signCommit)
 }

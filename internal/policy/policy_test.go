@@ -101,7 +101,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	loadedState, err := loadStateForEntry(context.Background(), repo, entry)
+	loadedState, err := loadStateForEntry(repo, entry)
 	if err != nil {
 		t.Error(err)
 	}
@@ -362,7 +362,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondState.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(context.Background(), repo, "Second state", false); err != nil {
+	if err := secondState.Commit(repo, "Second state", false); err != nil {
 		t.Fatal(err)
 	}
 	if err := Apply(context.Background(), repo, false); err != nil {
@@ -543,7 +543,7 @@ func TestApply(t *testing.T) {
 
 		state.RootEnvelope = rootEnv
 
-		if err := state.Commit(context.Background(), repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
