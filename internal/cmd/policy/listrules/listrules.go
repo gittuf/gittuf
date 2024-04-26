@@ -17,9 +17,9 @@ type options struct {
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&o.targetRef,
-		"targetRef",
+		"target-ref",
 		"policy",
-		"to specify which ref should be inspected",
+		"specify which policy ref should be inspected",
 	)
 }
 

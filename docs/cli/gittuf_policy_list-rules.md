@@ -9,8 +9,8 @@ gittuf policy list-rules [flags]
 ### Options
 
 ```
-  -h, --help               help for list-rules
-      --targetRef string   to specify which ref should be inspected (default "policy")
+  -h, --help                help for list-rules
+      --target-ref string   specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands
