@@ -577,6 +577,68 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 	return nil
 }
 
+// Apply takes valid changes from the policy staging ref, and fast-forward
+// merges it into the policy ref. Apply only takes place if the latest state on
+// the policy staging ref is valid. This prevents invalid changes to the policy
+// taking affect, and allowing new changes, that until signed by multiple users
+// would be invalid to be made, by utilizing the policy staging ref.
+func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
+	// Get the reference for the PolicyRef
+	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
+	if err != nil {
+		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
+	}
+
+	// Get the reference for the PolicyStagingRef
+	policyStagingRef, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+	if err != nil {
+		return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyStagingRef, err)
+	}
+
+	// Check if the PolicyStagingRef is ahead of PolicyRef (fast-forward)
+
+	policyStagingCommit, err := gitinterface.GetCommit(repo, policyStagingRef.Hash())
+	if err != nil {
+		// if there is no tip for the policy staging ref, this means that no change will be made to the policy ref
+		return fmt.Errorf("failed to get policy staging tip commit: %w", err)
+	}
+
+	policyCommit, err := gitinterface.GetCommit(repo, policyRef.Hash())
+	if err == nil {
+		// This check ensures that the policy staging branch is a direct forward progression of the policy branch,
+		// preventing any overwrites of policy history and maintaining a linear policy evolution, since a
+		// fast-forward merge does not work with a non-linear history.
+
+		// This is only being checked if there are no problems finding the tip of the policy ref, since if there
+		// is no tip, then it cannot be an ancestor of the tip of the policy staging ref
+		isAncestor, err := gitinterface.KnowsCommit(repo, policyStagingCommit.Hash, policyCommit)
+		if err != nil {
+			return fmt.Errorf("failed to check if policy commit is ancestor of policy staging commit: %w", err)
+		}
+		if !isAncestor {
+			return ErrNotAncestor
+		}
+	}
+
+	// using LoadCurrentState to verify if the PolicyStagingRef's latest state is valid
+	_, err = LoadCurrentState(ctx, repo, PolicyStagingRef)
+	if err != nil {
+		return fmt.Errorf("failed to load current state: %w", err)
+	}
+
+	// Update the reference for the base to point to the new commit
+	newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
+	if err := repo.Storer.SetReference(newPolicyRef); err != nil {
+		return fmt.Errorf("failed to set new policy reference: %w", err)
+	}
+
+	if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, signRSLEntry); err != nil {
+		return gitinterface.ResetDueToError(err, repo, PolicyRef, policyRef.Hash())
+	}
+
+	return nil
+}
+
 func (s *State) GetRootKeys() ([]*tuf.Key, error) {
 	rootMetadata, err := s.GetRootMetadata()
 	if err != nil {
@@ -815,68 +877,6 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 		keys:      s.RootPublicKeys,
 		threshold: rootMetadata.Roles[RootRoleName].Threshold,
 	}, nil
-}
-
-// Apply takes valid changes from the policy staging ref, and fast-forward
-// merges it into the policy ref. Apply only takes place if the latest state on
-// the policy staging ref is valid. This prevents invalid changes to the policy
-// taking affect, and allowing new changes, that until signed by multiple users
-// would be invalid to be made, by utilizing the policy staging ref.
-func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
-	// Get the reference for the PolicyRef
-	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
-	if err != nil {
-		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
-	}
-
-	// Get the reference for the PolicyStagingRef
-	policyStagingRef, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
-	if err != nil {
-		return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyStagingRef, err)
-	}
-
-	// Check if the PolicyStagingRef is ahead of PolicyRef (fast-forward)
-
-	policyStagingCommit, err := gitinterface.GetCommit(repo, policyStagingRef.Hash())
-	if err != nil {
-		// if there is no tip for the policy staging ref, this means that no change will be made to the policy ref
-		return fmt.Errorf("failed to get policy staging tip commit: %w", err)
-	}
-
-	policyCommit, err := gitinterface.GetCommit(repo, policyRef.Hash())
-	if err == nil {
-		// This check ensures that the policy staging branch is a direct forward progression of the policy branch,
-		// preventing any overwrites of policy history and maintaining a linear policy evolution, since a
-		// fast-forward merge does not work with a non-linear history.
-
-		// This is only being checked if there are no problems finding the tip of the policy ref, since if there
-		// is no tip, then it cannot be an ancestor of the tip of the policy staging ref
-		isAncestor, err := gitinterface.KnowsCommit(repo, policyStagingCommit.Hash, policyCommit)
-		if err != nil {
-			return fmt.Errorf("failed to check if policy commit is ancestor of policy staging commit: %w", err)
-		}
-		if !isAncestor {
-			return ErrNotAncestor
-		}
-	}
-
-	// using LoadCurrentState to verify if the PolicyStagingRef's latest state is valid
-	_, err = LoadCurrentState(ctx, repo, PolicyStagingRef)
-	if err != nil {
-		return fmt.Errorf("failed to load current state: %w", err)
-	}
-
-	// Update the reference for the base to point to the new commit
-	newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
-	if err := repo.Storer.SetReference(newPolicyRef); err != nil {
-		return fmt.Errorf("failed to set new policy reference: %w", err)
-	}
-
-	if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, signRSLEntry); err != nil {
-		return gitinterface.ResetDueToError(err, repo, PolicyRef, policyRef.Hash())
-	}
-
-	return nil
 }
 
 func (s *State) getTargetsVerifier() (*Verifier, error) {
