@@ -728,6 +728,172 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, policyEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
+
+	t.Run("no recovery, with attestations", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commit, err := gitinterface.GetCommit(repo, commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		authorization, err := attestations.NewReferenceAuthorization(refName, plumbing.ZeroHash.String(), commit.TreeHash.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, plumbing.ZeroHash.String(), commit.TreeHash.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		attEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, attestations.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, attEntry, policyEntry, entry, refName)
+		assert.Nil(t, err)
+
+		err = VerifyRelativeForRef(context.Background(), repo, policyEntry, nil, entry, policyEntry, refName)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	})
+
+	t.Run("no recovery, with bad state change", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+
+		repo, _ = createTestRepository(t, createTestStateWithPolicy)
+
+		state := createTestStateWithOnlyBadRoot(t)
+
+		if err := state.Commit(context.Background(), repo, "Create test state", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, initialPolicyEntry, nil, initialPolicyEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+	t.Run("no recovery, with key revocation", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
+			t.Fatal(err)
+		}
+
+		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+
+		repo, _ = createTestRepository(t, createTestStateWithPolicy)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s, err := LoadCurrentState(context.Background(), repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{targetsKey}, []string{"git:refs/heads/main"}, 1)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s.TargetsEnvelope = env
+
+		if err := s.Commit(context.Background(), repo, "revoke key", false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(context.Background(), repo, initialPolicyEntry, nil, initialPolicyEntry, entry, refName)
+		assert.Equal(t, err.Error(), fmt.Sprintf("verifying Git namespace policies failed, %s", ErrUnauthorizedSignature.Error()))
+	})
 }
 
 func TestVerifyCommit(t *testing.T) {
@@ -940,12 +1106,121 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	// FIXME: test for file policy passing for situations where a commit is seen
-	// by the RSL before its signing key is rotated out. This commit should be
-	// trusted for merges under the new policy because it predates the policy
-	// change. This only applies to fast forwards, any other commits that make
-	// the same semantic change will result in a new commit with a new
-	// signature, unseen by the RSL.
+	t.Run("successful verification with key revocation", func(t *testing.T) {
+		targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		s, err := LoadCurrentState(context.Background(), repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{targetsKey}, []string{"git:refs/heads/main"}, 1)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		s.TargetsEnvelope = env
+
+		if err := s.Commit(context.Background(), repo, "revoke key", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = verifyEntry(context.Background(), repo, state, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("unsuccessful verification violating git ref", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		err := verifyEntry(context.Background(), repo, state, nil, entry)
+		assert.Equal(t, err.Error(), fmt.Sprintf("verifying Git namespace policies failed, %s", ErrUnauthorizedSignature.Error()))
+	})
+
+	t.Run("unsuccessful verification violating file ref", func(t *testing.T) {
+		targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsMetadata, err = AddDelegation(targetsMetadata, "protect-1", []*tuf.Key{targetsKey}, []string{"file:1"}, 1)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(context.Background(), repo, "protect-1", false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/unprotected", 1, gpgUnauthorizedKeyBytes)
+		entry := rsl.NewReferenceEntry("refs/heads/unprotected", commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(context.Background(), repo, state, nil, entry)
+		assert.Equal(t, fmt.Sprintf("verifying file namespace policies failed, %s", ErrUnauthorizedSignature.Error()), err.Error())
+	})
 }
 
 func TestVerifyTagEntry(t *testing.T) {

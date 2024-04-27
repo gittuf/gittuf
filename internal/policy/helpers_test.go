@@ -92,6 +92,36 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	}
 }
 
+func createTestStateWithOnlyBadRoot(t *testing.T) *State {
+	t.Helper()
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &State{
+		RootPublicKeys: []*tuf.Key{key},
+		RootEnvelope:   rootEnv,
+	}
+}
+
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
