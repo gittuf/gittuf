@@ -1,0 +1,20 @@
+name: gittuf Verification
+on:
+  workflow_run:
+    workflows: ["Record change to main branch"]
+    branches: [main]
+    types:
+      - completed
+jobs:
+  gittuf-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install gittuf
+        uses: gittuf/gittuf-installer@8ce8fbd070477ec72678151e82b82c3d866d9fcd
+        with:
+          gittuf-version: main
+      - name: Checkout and verify repository
+        run: |
+          gittuf clone https://github.com/${{ github.repository }}
+          cd gittuf
+          gittuf verify-ref main --verbose
