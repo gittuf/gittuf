@@ -1,0 +1,35 @@
+name: Record change to non-main branch
+on:
+  push:
+    branches-ignore:
+      - 'main'
+jobs:
+  create-rsl-entry:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Install gittuf
+        uses: gittuf/gittuf-installer@8ce8fbd070477ec72678151e82b82c3d866d9fcd
+        with:
+          gittuf-version: main
+      - name: Install gitsign
+        uses: actions-go/go-install@0607b3e7a61b8f1b55e1169a884804d084db73af
+        with:
+          module: github.com/sigstore/gitsign@main
+      - name: Checkout repository
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b
+        with:
+          fetch-depth: 0
+      - name: Update RSL
+        run: |
+          git config --global commit.gpgsign true       # Sign all commits
+          git config --global gpg.x509.program gitsign  # Use gitsign for signing
+          git config --global gpg.format x509           # gitsign expects x509 args
+          git config --global user.name "${{ github.workflow }}"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin refs/gittuf/reference-state-log:refs/gittuf/reference-state-log
+          gittuf rsl record ${{ github.ref }}
+          git push origin refs/gittuf/reference-state-log:refs/gittuf/reference-state-log

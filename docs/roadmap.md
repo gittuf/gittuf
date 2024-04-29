@@ -1,34 +1,46 @@
 # gittuf Roadmap
 
-Last Modified: August 21, 2023
+Last Modified: April 24, 2024
 
-This document is a roadmap for the calendar year of 2023. As gittuf is under
-active development, this document is not considered immutable, and some items
-may be added or changed.
+This document details gittuf's ongoing roadmap. As gittuf is under active
+development, this document is not considered immutable, and some items may be
+added or changed. The items are divided between those that are currently being
+worked upon, those that are planned for the future, and those that we have
+already completed.
 
-## Reach Alpha Milestone
+## Partial / Work in Progress
 
-The gittuf implementation is built based on the specification defined in the
-[design document](/docs/design-document.md). Therefore, as features are fleshed
-out and built, the two are updated together.
+### Dogfood gittuf
 
-Currently, gittuf is in a pre-alpha stage. Its core features are still being
-developed, and therefore the primary item on the roadmap is building gittuf to
-reach the alpha milestone. The gittuf alpha version must include support for the
-main design document with features like policies for Git namespaces, file
-namespaces, key distribution, the Reference State Log, and the ability to sync
-gittuf metadata with remote repositories.
+Once gittuf achieves sufficient maturity, the gittuf source must be protected
+using gittuf. This will contribute significantly to the usability and further
+development of the tool, and will demonstrate its features and viability.
 
-## Integrate in-toto Attestations
+### Support Developer Teams
 
-[in-toto](https://in-toto.io/) is a framework for comprehensive software supply
-chain security. Of specific interest to gittuf is in-toto's Attestation
-Framework that provides a standard way to express software supply chain claims.
-By integrating support for source control specific in-toto attestations, gittuf
-can also support verification against requirements specified by projects like
-[SLSA](https://slsa.dev/).
+gittuf currently identifies each developer by their signing key or identity.
+Policies grant permissions to each individual developer. Eventually, gittuf must
+support declaring teams of developers, with policies granting permissions to
+those teams as a whole. Further, thresholds on required authorizations for
+policies must be granular enough to apply across team boundaries. For example, it
+must be possible to require two members of the development team and one member
+of the security team to sign off on a change. This is not the same as a total
+threshold of three across the members of the development and security teams.
 
-## Integrate with Git Ecosystem
+### Support For Different Hats (Roles)
+
+Related to the concept of teams, is the concept that a single developer might be
+on different teams and wish to choose how an action is perceived.  Suppose Alice
+is both a maintainer and also on the security team.  She sometimes may be
+approving something she authored (wearing her maintainer hat) and other times
+doing a security review of a dependency (wearing her security hat).  It is
+reasonable that she may want to control how a statement of trust by her is used.
+These could naturally be linked to the teams for which a statement should be
+trusted.
+
+## Planned
+
+### Integrate with Git Ecosystem
 
 Git forges like GitHub and GitLab allow repository owners to specify policies
 such as the developers authorized to push to a branch, the developers who must
@@ -42,29 +54,7 @@ review system. This integration, in combination with support for
 [in-toto attestations](#integrate-in-toto-attestations) would allow for
 transparent and auditable code review policy enforcement.
 
-## Support Developer Teams
-
-gittuf currently identifies each developer by their signing key or identity.
-Policies grant permissions to each individual developer. Eventually, gittuf must
-support declaring teams of developers, with policies granting permissions to
-those teams as a whole. Further, thresholds on required authorizations for
-policies must be granular enough to apply across team boundaries. For example, it
-must be possible to require two members of the development team and one member
-of the security team to sign off on a change. This is not the same as a total
-threshold of three across the members of the development and security teams.
-
-## Support For Different Hats (Roles)
-
-Related to the concept of teams, is the concept that a single developer might be
-on different teams and wish to choose how an action is perceived.  Suppose Alice
-is both a maintainer and also on the security team.  She sometimes may be
-approving something she authored (wearing her maintainer hat) and other times
-doing a security review of a dependency (wearing her security hat).  It is
-reasonable that she may want to control how a statement of trust by her is used.
-These could naturally be linked to the teams for which a statement should be
-trusted.
-
-## Read Permissions
+### Read Permissions
 
 gittuf's design implements _write_ permission policies such as who can write to
 a Git reference or a file. This must be accompanied by support for _read_
@@ -72,7 +62,7 @@ permissions. This needs to be developed further as the feature can range from
 the ability to store secrets all the way to maintaining encrypted objects for
 certain Git references so only specific users can read that reference.
 
-## Develop Hash Algorithm Agility Extension
+### Develop Hash Algorithm Agility Extension
 
 The
 [hash algorithm agility](/docs/extensions/hash-algorithm-agility.md) extension
@@ -83,8 +73,31 @@ existing repositories and unsupported by major Git hosts and forges. This
 feature needs to be fleshed out as the current document merely records some
 early ideas.
 
-## Dogfood gittuf
+## Reached
 
-Once gittuf achieves sufficient maturity, the gittuf source must be protected
-using gittuf. This will contribute significantly to the usability and further
-development of the tool, and will demonstrate its features and viability.
+### Reach Alpha Milestone
+
+The gittuf implementation is built based on the specification defined in the
+[design document](/docs/design-document.md). Therefore, as features are fleshed
+out and built, the two are updated together.
+
+Currently, gittuf is in a pre-alpha stage. Its core features are still being
+developed, and therefore the primary item on the roadmap is building gittuf to
+reach the alpha milestone. The gittuf alpha version must include support for the
+main design document with features like policies for Git namespaces, file
+namespaces, key distribution, the Reference State Log, and the ability to sync
+gittuf metadata with remote repositories.
+
+### Integrate in-toto Attestations
+
+[in-toto](https://in-toto.io/) is a framework for comprehensive software supply
+chain security. Of specific interest to gittuf is in-toto's Attestation
+Framework that provides a standard way to express software supply chain claims.
+By integrating support for source control specific in-toto attestations, gittuf
+can also support verification against requirements specified by projects like
+[SLSA](https://slsa.dev/).
+
+As of April 2024, in-toto attestations can be used in gittuf for actions such as
+approving a change in the repository. We are actively working upstream with the
+SLSA project to enable using other predicate types that may be defined as part
+of the source track.
