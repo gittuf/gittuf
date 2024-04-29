@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	GittufNamespacePrefix      = "refs/gittuf/"
 	Ref                        = "refs/gittuf/reference-state-log"
 	ReferenceEntryHeader       = "RSL Reference Entry"
 	RefKey                     = "ref"
@@ -27,7 +26,9 @@ const (
 	EntryIDKey                 = "entryID"
 	SkipKey                    = "skip"
 
-	remoteTrackerRef = "refs/remotes/%s/gittuf/reference-state-log"
+	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
+	gittufNamespacePrefix  = "refs/gittuf/"
+	gittufPolicyStagingRef = "refs/gittuf/policy-staging"
 )
 
 var (
@@ -287,7 +288,7 @@ func GetNonGittufParentReferenceEntryForEntry(repo *git.Repository, entry Entry)
 	for {
 		switch iterator := it.(type) {
 		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+			if !strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
 				targetEntry = iterator
 			}
 		case *AnnotationEntry:
@@ -339,7 +340,7 @@ func GetLatestNonGittufReferenceEntry(repo *git.Repository) (*ReferenceEntry, []
 	for {
 		switch iterator := it.(type) {
 		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, GittufNamespacePrefix) {
+			if !strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
 				targetEntry = iterator
 			}
 		case *AnnotationEntry:
@@ -600,7 +601,7 @@ func GetReferenceEntriesInRangeForRef(repo *git.Repository, firstID, lastID plum
 		// found
 		switch it := iterator.(type) {
 		case *ReferenceEntry:
-			if len(refName) == 0 || it.RefName == refName || strings.HasPrefix(it.RefName, GittufNamespacePrefix) {
+			if len(refName) == 0 || it.RefName == refName || isRelevantGittufRef(it.RefName) {
 				// It's a relevant entry if:
 				// a) there's no refName set, or
 				// b) the entry's refName matches the set refName, or
@@ -623,7 +624,7 @@ func GetReferenceEntriesInRangeForRef(repo *git.Repository, firstID, lastID plum
 	// If it's an annotation, ignore it as it refers to something before the
 	// range we care about
 	if entry, isEntry := iterator.(*ReferenceEntry); isEntry {
-		if len(refName) == 0 || entry.RefName == refName || strings.HasPrefix(entry.RefName, GittufNamespacePrefix) {
+		if len(refName) == 0 || entry.RefName == refName || isRelevantGittufRef(entry.RefName) {
 			// It's a relevant entry if:
 			// a) there's no refName set, or
 			// b) the entry's refName matches the set refName, or
@@ -754,4 +755,16 @@ func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, 
 	}
 
 	return annotations
+}
+
+func isRelevantGittufRef(refName string) bool {
+	if !strings.HasPrefix(refName, gittufNamespacePrefix) {
+		return false
+	}
+
+	if refName == gittufPolicyStagingRef {
+		return false
+	}
+
+	return true
 }

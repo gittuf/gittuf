@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -24,7 +25,7 @@ var (
 // update to the RSL.
 func (r *Repository) PushPolicy(ctx context.Context, remoteName string) error {
 	slog.Debug(fmt.Sprintf("Pushing policy and RSL references to %s...", remoteName))
-	if err := gitinterface.Push(ctx, r.r, remoteName, []string{policy.PolicyRef, rsl.Ref}); err != nil {
+	if err := gitinterface.Push(ctx, r.r, remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingPolicy, err)
 	}
 
@@ -36,13 +37,20 @@ func (r *Repository) PushPolicy(ctx context.Context, remoteName string) error {
 // the RSL as the policy must be updated in sync with the RSL.
 func (r *Repository) PullPolicy(ctx context.Context, remoteName string) error {
 	slog.Debug(fmt.Sprintf("Pulling policy and RSL references from %s...", remoteName))
-	if err := gitinterface.Fetch(ctx, r.r, remoteName, []string{policy.PolicyRef, rsl.Ref}, true); err != nil {
+	if err := gitinterface.Fetch(ctx, r.r, remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}, true); err != nil {
 		return errors.Join(ErrPullingPolicy, err)
 	}
 
 	return nil
 }
 
-func (r *Repository) ListRules(ctx context.Context) ([]*policy.DelegationWithDepth, error) {
-	return policy.ListRules(ctx, r.r)
+func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
+	return policy.Apply(ctx, r.r, signRSLEntry)
+}
+
+func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {
+	if strings.HasPrefix(targetRef, "refs/gittuf/") {
+		return policy.ListRules(ctx, r.r, targetRef)
+	}
+	return policy.ListRules(ctx, r.r, "refs/gittuf/"+targetRef)
 }

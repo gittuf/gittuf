@@ -27,7 +27,7 @@ func TestInitializeRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestAddRootKey(t *testing.T) {
 	err = r.AddRootKey(testCtx, sv, newRootKey, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,10 +96,11 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		t.Fatal(err)
@@ -120,7 +121,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestRemoveRootKey(t *testing.T) {
 	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	err = r.AddTopLevelTargetsKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +224,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +244,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,6 +258,53 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
 	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
+}
+
+func TestUpdateRootThreshold(t *testing.T) {
+	r, _ := createTestRepositoryWithRoot(t, "")
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].Threshold)
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddRootKey(testCtx, signer, secondKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateRootThreshold(testCtx, signer, 2, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].Threshold)
 }
 
 func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
@@ -275,7 +323,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +348,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 2, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,4 +360,38 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 
 	assert.Equal(t, 2, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
 	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
+}
+
+func TestSignRoot(t *testing.T) {
+	r, _ := createTestRepositoryWithRoot(t, "")
+
+	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add targets key as a root key
+	secondKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.AddRootKey(testCtx, rootSigner, secondKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	secondSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add signature to root
+	err = r.SignRoot(testCtx, secondSigner, false)
+	assert.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
 }

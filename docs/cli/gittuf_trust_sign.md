@@ -1,16 +1,19 @@
-## gittuf policy list-rules
+## gittuf trust sign
 
-List rules for the current state
+Sign root of trust
+
+### Synopsis
+
+This command allows users to add their signature to the root of trust file.
 
 ```
-gittuf policy list-rules [flags]
+gittuf trust sign [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                help for list-rules
-      --target-ref string   specify which policy ref should be inspected (default "policy")
+  -h, --help   help for sign
 ```
 
 ### Options inherited from parent commands
@@ -19,11 +22,11 @@ gittuf policy list-rules [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign policy file
+  -k, --signing-key string           signing key to use to sign root of trust
       --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO
 
-* [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
+* [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
 

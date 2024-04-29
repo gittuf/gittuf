@@ -52,7 +52,10 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 		t.Fatal(err)
 	}
 
-	if err := state.Commit(context.Background(), repo, "Create test state", false); err != nil {
+	if err := state.Commit(repo, "Create test state", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := Apply(testCtx, repo, false); err != nil {
 		t.Fatal(err)
 	}
 

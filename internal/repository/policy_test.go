@@ -28,6 +28,11 @@ func TestPushPolicy(t *testing.T) {
 		}
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
+
+		if err := policy.Apply(context.Background(), localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},
@@ -39,6 +44,7 @@ func TestPushPolicy(t *testing.T) {
 		assert.Nil(t, err)
 
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
 
 		// No updates, successful push
@@ -63,6 +69,11 @@ func TestPushPolicy(t *testing.T) {
 		}
 
 		localRepo := createTestRepositoryWithPolicy(t, "")
+
+		if err := policy.Apply(context.Background(), localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
 		if _, err := localRepo.r.CreateRemote(&config.RemoteConfig{
 			Name: remoteName,
 			URLs: []string{remoteTmpDir},
@@ -81,6 +92,9 @@ func TestPullPolicy(t *testing.T) {
 	t.Run("successful pull", func(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
+		if err := policy.Apply(context.Background(), remoteRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
 
 		localRepoR, err := git.Init(memory.NewStorage(), memfs.New())
 		if err != nil {
@@ -98,6 +112,7 @@ func TestPullPolicy(t *testing.T) {
 		assert.Nil(t, err)
 
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, rsl.Ref)
 
 		// No updates, successful push

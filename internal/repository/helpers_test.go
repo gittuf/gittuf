@@ -58,6 +58,10 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 		t.Fatal(err)
 	}
 
+	if err := policy.Apply(testCtx, repo, false); err != nil {
+		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+	}
+
 	return r, rootKeyBytes
 }
 
@@ -96,6 +100,10 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 
 	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1, false); err != nil {
 		t.Fatal(err)
+	}
+
+	if err := policy.Apply(testCtx, r.r, false); err != nil {
+		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
 	}
 
 	return r

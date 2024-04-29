@@ -54,7 +54,7 @@ var (
 func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
 	// Get latest policy entry
 	slog.Debug("Loading policy...")
-	policyState, err := LoadCurrentState(ctx, repo)
+	policyState, err := LoadCurrentState(ctx, repo, PolicyRef)
 	if err != nil {
 		return plumbing.ZeroHash, err
 	}
@@ -192,10 +192,14 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 			slog.Debug(fmt.Sprintf("Verifying entry '%s'...", entry.ID.String()))
 
+			slog.Debug("Checking if entry is for policy staging reference...")
+			if entry.RefName == PolicyStagingRef {
+				continue
+			}
 			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
 				// TODO: this is repetition if the firstEntry is for policy
-				newPolicy, err := loadStateForEntry(ctx, repo, entry)
+				newPolicy, err := loadStateForEntry(repo, entry)
 				if err != nil {
 					return err
 				}

@@ -56,12 +56,13 @@ var (
 	ErrPolicyNotFound             = errors.New("cannot find policy")
 	ErrDuplicatedRuleName         = errors.New("two rules with same name found in policy")
 	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
+	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 )
 
 // InitializeNamespace creates a git ref for the policy. Initially, the entry
 // has a zero hash.
 func InitializeNamespace(repo *git.Repository) error {
-	for _, name := range []string{PolicyRef /*, PolicyStagingRef*/} {
+	for _, name := range []string{PolicyRef, PolicyStagingRef} {
 		if ref, err := repo.Reference(plumbing.ReferenceName(name), true); err != nil {
 			if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 				return err
@@ -69,15 +70,13 @@ func InitializeNamespace(repo *git.Repository) error {
 		} else if !ref.Hash().IsZero() {
 			return ErrPolicyExists
 		}
+
+		if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(name), plumbing.ZeroHash)); err != nil {
+			return err
+		}
 	}
 
-	// Disable PolicyStagingRef until it is actually used
-	// https://github.com/gittuf/gittuf/issues/45
-	// if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(PolicyStagingRef), plumbing.ZeroHash)); err != nil {
-	// 	return err
-	// }
-
-	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(PolicyRef), plumbing.ZeroHash))
+	return nil
 }
 
 // State contains the full set of metadata and root keys present in a policy
@@ -99,7 +98,8 @@ type DelegationWithDepth struct {
 
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
-// entry in the RSL.
+// entry in the RSL. If no policy states are found and the entry is for the
+// policy-staging ref, that entry is verified in isolation and returned.
 func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
 	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
@@ -107,7 +107,7 @@ func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEn
 	}
 
 	// This assumes the first entry is for the policy ref
-	initialState, err := loadStateForEntry(ctx, repo, firstEntry)
+	initialState, err := loadStateForEntry(repo, firstEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +118,12 @@ func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEn
 	}
 
 	if len(allPolicyEntries) == 0 {
+		// this is hit only when we have zero policy entries + staging entries
+		// i.e., right at the start of gittuf use
+		if entry.RefName == PolicyStagingRef {
+			return loadStateForEntry(repo, entry)
+		}
+
 		return nil, ErrPolicyNotFound
 	}
 
@@ -125,7 +131,7 @@ func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEn
 	verifiedState := initialState
 	for _, entry := range allPolicyEntries[1:] {
 		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID))
-		currentState, err := loadStateForEntry(ctx, repo, entry)
+		currentState, err := loadStateForEntry(repo, entry)
 		if err != nil {
 			return nil, err
 		}
@@ -137,19 +143,27 @@ func LoadState(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEn
 		verifiedState = currentState
 	}
 
-	return verifiedState, nil
+	// If the requested state is for the staging ref, we return it after
+	// verifying the policy ref is in a good state.
+	// This is hit when we have a number of policy entries and staging after.
+	if entry.RefName == PolicyStagingRef {
+		return loadStateForEntry(repo, entry)
+	}
+
+	// We know this is for the policy ref
+	return verifiedState, verifiedState.Verify(ctx)
 }
 
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
-func LoadCurrentState(ctx context.Context, repo *git.Repository) (*State, error) {
-	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+func LoadCurrentState(ctx context.Context, repo *git.Repository, ref string) (*State, error) {
+	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, ref)
 	if err != nil {
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, latestEntry)
+	return LoadState(ctx, repo, entry)
 }
 
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
@@ -397,6 +411,15 @@ func (s *State) Verify(ctx context.Context) error {
 		return ErrUnableToMatchRootKeys
 	}
 
+	rootVerifier, err := s.getRootVerifier()
+	if err != nil {
+		return err
+	}
+
+	if err := rootVerifier.Verify(ctx, nil, s.RootEnvelope); err != nil {
+		return err
+	}
+
 	if s.TargetsEnvelope == nil {
 		return nil
 	}
@@ -473,13 +496,9 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy namespace. It also creates
-// an RSL entry recording the new tip of the policy namespace.
-func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage string, signCommit bool) error {
-	if err := s.Verify(ctx); err != nil {
-		return err
-	}
-
+// Commit verifies and writes the State to the policy-staging namespace. It also creates
+// an RSL entry recording the new tip of the policy-staging namespace.
+func (s *State) Commit(repo *git.Repository, commitMessage string, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
@@ -558,21 +577,87 @@ func (s *State) Commit(ctx context.Context, repo *git.Repository, commitMessage 
 		return err
 	}
 
-	ref, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
+	ref, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
 	if err != nil {
 		return err
 	}
 	originalCommitID := ref.Hash()
 
-	commitID, err := gitinterface.Commit(repo, policyRootTreeID, PolicyRef, commitMessage, signCommit)
+	commitID, err := gitinterface.Commit(repo, policyRootTreeID, PolicyStagingRef, commitMessage, signCommit)
 	if err != nil {
 		return err
 	}
 
 	// We must reset to original policy commit if err != nil from here onwards.
 
-	if err := rsl.NewReferenceEntry(PolicyRef, commitID).Commit(repo, signCommit); err != nil {
-		return gitinterface.ResetDueToError(err, repo, PolicyRef, originalCommitID)
+	if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
+		return gitinterface.ResetDueToError(err, repo, PolicyStagingRef, originalCommitID)
+	}
+
+	return nil
+}
+
+// Apply takes valid changes from the policy staging ref, and fast-forward
+// merges it into the policy ref. Apply only takes place if the latest state on
+// the policy staging ref is valid. This prevents invalid changes to the policy
+// taking affect, and allowing new changes, that until signed by multiple users
+// would be invalid to be made, by utilizing the policy staging ref.
+func Apply(ctx context.Context, repo *git.Repository, signRSLEntry bool) error {
+	// Get the reference for the PolicyRef
+	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
+	if err != nil {
+		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
+	}
+
+	// Get the reference for the PolicyStagingRef
+	policyStagingRef, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+	if err != nil {
+		return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyStagingRef, err)
+	}
+
+	// Check if the PolicyStagingRef is ahead of PolicyRef (fast-forward)
+
+	policyStagingCommit, err := gitinterface.GetCommit(repo, policyStagingRef.Hash())
+	if err != nil {
+		// if there is no tip for the policy staging ref, this means that no change will be made to the policy ref
+		return fmt.Errorf("failed to get policy staging tip commit: %w", err)
+	}
+
+	policyCommit, err := gitinterface.GetCommit(repo, policyRef.Hash())
+	if err == nil {
+		// This check ensures that the policy staging branch is a direct forward progression of the policy branch,
+		// preventing any overwrites of policy history and maintaining a linear policy evolution, since a
+		// fast-forward merge does not work with a non-linear history.
+
+		// This is only being checked if there are no problems finding the tip of the policy ref, since if there
+		// is no tip, then it cannot be an ancestor of the tip of the policy staging ref
+		isAncestor, err := gitinterface.KnowsCommit(repo, policyStagingCommit.Hash, policyCommit)
+		if err != nil {
+			return fmt.Errorf("failed to check if policy commit is ancestor of policy staging commit: %w", err)
+		}
+		if !isAncestor {
+			return ErrNotAncestor
+		}
+	}
+
+	// using LoadCurrentState to load and verify if the PolicyStagingRef's
+	// latest state is valid
+	state, err := LoadCurrentState(ctx, repo, PolicyStagingRef)
+	if err != nil {
+		return fmt.Errorf("failed to load current state: %w", err)
+	}
+	if err := state.Verify(ctx); err != nil {
+		return fmt.Errorf("staged policy is invalid: %w", err)
+	}
+
+	// Update the reference for the base to point to the new commit
+	newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
+	if err := repo.Storer.SetReference(newPolicyRef); err != nil {
+		return fmt.Errorf("failed to set new policy reference: %w", err)
+	}
+
+	if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, signRSLEntry); err != nil {
+		return gitinterface.ResetDueToError(err, repo, PolicyRef, policyRef.Hash())
 	}
 
 	return nil
@@ -700,8 +785,8 @@ func (s *State) loadRuleNames() error {
 // ListRules returns a list of all the rules as an array of the delegations in a
 // pre order traversal of the delegation tree, with the depth of each
 // delegation.
-func ListRules(ctx context.Context, repo *git.Repository) ([]*DelegationWithDepth, error) {
-	state, err := LoadCurrentState(ctx, repo)
+func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*DelegationWithDepth, error) {
+	state, err := LoadCurrentState(ctx, repo, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -838,8 +923,8 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 // and loading the policy contents. Typically, LoadCurrentState of LoadState
 // must be used. The exception is VerifyRelative... which performs root
 // verification between consecutive policy states.
-func loadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	if entry.RefName != PolicyRef {
+func loadStateForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	if entry.RefName != PolicyRef && entry.RefName != PolicyStagingRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
@@ -929,10 +1014,6 @@ func loadStateForEntry(ctx context.Context, repo *git.Repository, entry *rsl.Ref
 	}
 
 	if err := state.loadRuleNames(); err != nil {
-		return nil, err
-	}
-
-	if err := state.Verify(ctx); err != nil {
 		return nil, err
 	}
 

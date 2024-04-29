@@ -51,7 +51,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	commitMessage := "Initialize root of trust"
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, signCommit)
 }
 
 // AddRootKey is the interface for the user to add an authorized key
@@ -63,7 +63,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -186,6 +186,35 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+// UpdateRootThreshold sets the threshold of valid signatures required for the
+// Root role.
+func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating root threshold...")
+	rootMetadata, err = policy.UpdateRootThreshold(rootMetadata, threshold)
+	if err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Update root threshold to %d", threshold)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
 // required for the top level Targets role.
 func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
@@ -195,7 +224,7 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -213,6 +242,36 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 
 	commitMessage := fmt.Sprintf("Update policy threshold to %d", threshold)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// SignRoot adds a signature to the Root envelope. Note that the metadata itself
+// is not modified, so its version remains the same.
+func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	env := state.RootEnvelope
+
+	slog.Debug(fmt.Sprintf("Signing root metadata using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	state.RootEnvelope = env
+
+	commitMessage := fmt.Sprintf("Add signature from key '%s' to root metadata", keyID)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, signCommit)
 }
 
 func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.RootMetadata, error) {
@@ -249,5 +308,5 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	state.RootEnvelope = env
 
 	slog.Debug("Committing policy...")
-	return state.Commit(ctx, r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, signCommit)
 }
