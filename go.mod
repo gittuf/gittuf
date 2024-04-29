@@ -6,6 +6,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
+	github.com/google/go-github/v61 v61.0.0
 	github.com/hiddeco/sshsig v0.1.0
 	github.com/in-toto/attestation v1.0.2
 	github.com/jonboulle/clockwork v0.4.0
@@ -59,6 +60,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/certificate-transparency-go v1.1.8 // indirect
 	github.com/google/go-containerregistry v0.19.1 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/trillian v1.6.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

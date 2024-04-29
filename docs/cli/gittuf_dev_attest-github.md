@@ -1,0 +1,32 @@
+## gittuf dev attest-github
+
+Record GitHub pull request information as an attestation (developer mode only, set GITTUF_DEV=1)
+
+```
+gittuf dev attest-github [flags]
+```
+
+### Options
+
+```
+      --base-branch string        base branch for pull request, used with --commit
+      --commit string             commit to record pull request attestation for
+  -h, --help                      help for attest-github
+      --pull-request-number int   pull request number to record in attestation (default -1)
+      --repository string         path to base GitHub repository the pull request is opened against, of form {owner}/{repo}
+  -k, --signing-key string        signing key to use for signing attestation
+```
+
+### Options inherited from parent commands
+
+```
+      --profile                      enable CPU and memory profiling
+      --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
+      --profile-memory-file string   file to store memory profile (default "memory.prof")
+      --verbose                      enable verbose logging
+```
+
+### SEE ALSO
+
+* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
+

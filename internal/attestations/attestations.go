@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	Ref                                  = "refs/gittuf/attestations"
-	referenceAuthorizationsTreeEntryName = "reference-authorizations"
-	initialCommitMessage                 = "Initial commit"
-	defaultCommitMessage                 = "Update attestations"
+	Ref                                        = "refs/gittuf/attestations"
+	referenceAuthorizationsTreeEntryName       = "reference-authorizations"
+	githubPullRequestAttestationsTreeEntryName = "github-pull-requests"
+	initialCommitMessage                       = "Initial commit"
+	defaultCommitMessage                       = "Update attestations"
 )
 
 var ErrAttestationsExist = errors.New("cannot initialize attestations namespace as it exists already")
@@ -50,9 +51,16 @@ type Attestations struct {
 	// `<ref-path>/<from-id>-<to-id>`, where `ref-path` is the absolute ref path
 	// such as `refs/heads/main` and `from-id` and `to-id` determine how the ref
 	// in question moved. For example, the key
-	// `refs/heads/main/<commit-A>-<commit-B>` indicates the authorization is
-	// for the action of moving `refs/heads/main` from `commit-A` to `commit-B`.
+	// `refs/heads/main/<commit-A>-<tree-B>` indicates the authorization is
+	// for the action of moving `refs/heads/main` from `commit-A` to a commit
+	// with `tree-B`.
 	referenceAuthorizations map[string]plumbing.Hash
+
+	// githubPullRequestAttestations maps information about the GitHub pull
+	// request for a commit and branch. The key is a path of the form
+	// `<ref-path>/<commit-id>`, where `ref-path` is the absolute ref path, and
+	// `commit-id` is the ID of the merged commit.
+	githubPullRequestAttestations map[string]plumbing.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -94,10 +102,16 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 		return &Attestations{}, nil
 	}
 
-	var authorizationsTreeID plumbing.Hash
+	var (
+		authorizationsTreeID     plumbing.Hash
+		githubPullRequestsTreeID plumbing.Hash
+	)
+
 	for _, e := range attestationsRootTree.Entries {
 		if e.Name == referenceAuthorizationsTreeEntryName {
 			authorizationsTreeID = e.Hash
+		} else if e.Name == githubPullRequestAttestationsTreeEntryName {
+			githubPullRequestsTreeID = e.Hash
 		}
 	}
 
@@ -106,9 +120,22 @@ func LoadAttestationsForEntry(repo *git.Repository, entry *rsl.ReferenceEntry) (
 		return nil, err
 	}
 
-	attestations := &Attestations{referenceAuthorizations: map[string]plumbing.Hash{}}
+	githubPullRequestsTree, err := gitinterface.GetTree(repo, githubPullRequestsTreeID)
+	if err != nil {
+		return nil, err
+	}
+
+	attestations := &Attestations{
+		referenceAuthorizations:       map[string]plumbing.Hash{},
+		githubPullRequestAttestations: map[string]plumbing.Hash{},
+	}
 
 	attestations.referenceAuthorizations, err = gitinterface.GetAllFilesInTree(authorizationsTree)
+	if err != nil {
+		return nil, err
+	}
+
+	attestations.githubPullRequestAttestations, err = gitinterface.GetAllFilesInTree(githubPullRequestsTree)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +163,17 @@ func (a *Attestations) Commit(repo *git.Repository, commitMessage string, signCo
 		Name: referenceAuthorizationsTreeEntryName,
 		Mode: filemode.Dir,
 		Hash: authorizationsTreeID,
+	})
+
+	// Add GitHub pull requests tree
+	githubPullRequestsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(a.githubPullRequestAttestations)
+	if err != nil {
+		return err
+	}
+	attestationsTreeEntries = append(attestationsTreeEntries, object.TreeEntry{
+		Name: githubPullRequestAttestationsTreeEntryName,
+		Mode: filemode.Dir,
+		Hash: githubPullRequestsTreeID,
 	})
 
 	attestationsTreeID, err := gitinterface.WriteTree(repo, attestationsTreeEntries)
