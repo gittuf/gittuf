@@ -5,6 +5,7 @@ on:
       - 'main'
 jobs:
   create-rsl-entry:
+    if: github.repository == 'gittuf/gittuf'
     runs-on: ubuntu-latest
     permissions:
       contents: write
