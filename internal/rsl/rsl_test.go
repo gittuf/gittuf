@@ -402,6 +402,7 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 }
+
 func TestGetEntry(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
@@ -659,6 +660,50 @@ func TestGetFirstEntry(t *testing.T) {
 	}
 
 	testEntry, annotations, err = GetFirstEntry(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, firstEntry, testEntry)
+	assert.Equal(t, 5, len(annotations))
+	assertAnnotationsReferToEntry(t, firstEntry, annotations)
+}
+
+func TestGetFirstReferenceEntryForRef(t *testing.T) {
+	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := InitializeNamespace(repo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewReferenceEntry("first", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	firstEntryT, err := GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstEntry := firstEntryT.(*ReferenceEntry)
+
+	for i := 0; i < 5; i++ {
+		if err := NewReferenceEntry("main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	testEntry, annotations, err := GetFirstReferenceEntryForRef(repo, "first")
+	assert.Nil(t, err)
+	assert.Nil(t, annotations)
+	assert.Equal(t, firstEntry, testEntry)
+
+	for i := 0; i < 5; i++ {
+		if err := NewAnnotationEntry([]plumbing.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	testEntry, annotations, err = GetFirstReferenceEntryForRef(repo, "first")
 	assert.Nil(t, err)
 	assert.Equal(t, firstEntry, testEntry)
 	assert.Equal(t, 5, len(annotations))

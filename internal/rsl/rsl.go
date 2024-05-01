@@ -467,6 +467,13 @@ func GetLatestUnskippedReferenceEntryForRefBefore(repo *git.Repository, refName 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
 // a reference entry as the first entry in the RSL cannot be an annotation.
 func GetFirstEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
+	return GetFirstReferenceEntryForRef(repo, "")
+}
+
+// GetFirstReferenceEntryForRef returns the very first entry in the RSL for the
+// specified ref. It is expected to be a reference entry as the first entry in
+// the RSL for a reference cannot be an annotation.
+func GetFirstReferenceEntryForRef(repo *git.Repository, targetRef string) (*ReferenceEntry, []*AnnotationEntry, error) {
 	iteratorT, err := GetLatestEntry(repo)
 	if err != nil {
 		return nil, nil, err
@@ -475,31 +482,30 @@ func GetFirstEntry(repo *git.Repository) (*ReferenceEntry, []*AnnotationEntry, e
 	allAnnotations := []*AnnotationEntry{}
 	var firstEntry *ReferenceEntry
 
-	if iterator, ok := iteratorT.(*AnnotationEntry); ok {
-		allAnnotations = append(allAnnotations, iterator)
-	}
-
 	for {
+		switch entry := iteratorT.(type) {
+		case *ReferenceEntry:
+			if targetRef == "" || entry.RefName == targetRef {
+				firstEntry = entry
+			}
+		case *AnnotationEntry:
+			allAnnotations = append(allAnnotations, entry)
+		}
+
 		parentT, err := GetParentForEntry(repo, iteratorT)
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
-				entry, ok := iteratorT.(*ReferenceEntry)
-				if !ok {
-					// The first entry cannot be an annotation
-					return nil, nil, ErrInvalidRSLEntry
-				}
-				firstEntry = entry
 				break
 			}
 
 			return nil, nil, err
 		}
 
-		if annotation, ok := parentT.(*AnnotationEntry); ok {
-			allAnnotations = append(allAnnotations, annotation)
-		}
-
 		iteratorT = parentT
+	}
+
+	if firstEntry == nil {
+		return nil, nil, ErrRSLEntryNotFound
 	}
 
 	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
