@@ -710,6 +710,109 @@ func TestGetFirstReferenceEntryForRef(t *testing.T) {
 	assertAnnotationsReferToEntry(t, firstEntry, annotations)
 }
 
+func TestSkipAllInvalidReferenceEntries(t *testing.T) {
+	t.Run("skip latest entry", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		ref := plumbing.NewHashReference("refs/heads/main", plumbing.ZeroHash)
+
+		if err := repo.Storer.SetReference(ref); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewReferenceEntry("refs/heads/main", ref.Hash()).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		referenceEntry, ok := entry.(*ReferenceEntry)
+		if !ok {
+			t.Fatal("invalid entry type")
+		}
+
+		assert.Equal(t, referenceEntry.TargetID, plumbing.ZeroHash)
+
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		nextEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		annotationEntry, ok := nextEntry.(*AnnotationEntry)
+		if !ok {
+			t.Fatal("invalid entry type")
+		}
+
+		assert.Equal(t, annotationEntry.RSLEntryIDs, []plumbing.Hash{entry.GetID()})
+	})
+
+	t.Run("everything is valid, nothing should change", func(t *testing.T) {
+		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := InitializeNamespace(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		commitID, err := gitinterface.Commit(repo, plumbing.ZeroHash, "refs/heads/main", "", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ref := plumbing.NewHashReference("refs/heads/main", commitID)
+
+		if err := repo.Storer.SetReference(ref); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewReferenceEntry("refs/heads/main", ref.Hash()).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entryType, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry, ok := entryType.(*ReferenceEntry)
+		if !ok {
+			t.Fatal(fmt.Errorf("invalid entry type"))
+		}
+
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		entryType, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newEntry, ok := entryType.(*ReferenceEntry)
+		if !ok {
+			t.Fatal(fmt.Errorf("invalid entry type"))
+		}
+
+		assert.Equal(t, newEntry, entry)
+	})
+}
+
 func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	repo, err := git.Init(memory.NewStorage(), memfs.New())
 	if err != nil {
