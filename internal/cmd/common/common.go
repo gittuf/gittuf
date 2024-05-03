@@ -84,6 +84,21 @@ func LoadSigner(keyBytes []byte) (sslibdsse.SignerVerifier, error) {
 	return signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
 }
 
+// CheckIfSigningViableWithFlag checks if a signing key was specified via the
+// "signing-key" flag, and then calls CheckIfSigningViable
+func CheckIfSigningViableWithFlag(cmd *cobra.Command, _ []string) error {
+	signingKeyFlag := cmd.Flags().Lookup("signing-key")
+
+	// Check if a signing key was specified via the "signing-key" flag
+	if signingKeyFlag.Value.String() == "" {
+		return fmt.Errorf("required flag \"signing-key\" not set")
+	}
+
+	return CheckIfSigningViable(cmd, []string{""})
+}
+
+// CheckIfSigningViable checks if we are able to sign RSL entries given the
+// current environment
 func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
 	_, _, err := gitinterface.GetSigningCommand()
 

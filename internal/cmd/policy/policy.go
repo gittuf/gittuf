@@ -28,14 +28,10 @@ func New() *cobra.Command {
 	cmd.AddCommand(addkey.New(o))
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(listrules.New())
+	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removerule.New(o))
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(updaterule.New(o))
-
-	remoteCmd := remote.New()
-	cmd.AddCommand(remoteCmd)
-	// set signing-key as not required for remote command
-	remoteCmd.InheritedFlags().SetAnnotation("signing-key", cobra.BashCompOneRequiredFlag, []string{"false"}) // nolint:errcheck
 
 	return cmd
 }

@@ -50,7 +50,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "sign",
 		Short:             "Sign policy file",
 		Long:              "This command allows users to add their signature to the specified policy file.",
-		PreRunE:           common.CheckIfSigningViable,
+		PreRunE:           common.CheckIfSigningViableWithFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

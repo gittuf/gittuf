@@ -16,5 +16,4 @@ func (o *Options) AddPersistentFlags(cmd *cobra.Command) {
 		"",
 		"signing key to use to sign policy file",
 	)
-	cmd.MarkPersistentFlagRequired("signing-key") //nolint:errcheck
 }
