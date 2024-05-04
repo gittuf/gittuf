@@ -4,13 +4,9 @@ package repository
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 
-	"github.com/gittuf/gittuf/internal/attestations"
-	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/go-git/go-git/v5"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 )
 
 var (
@@ -19,13 +15,13 @@ var (
 )
 
 type Repository struct {
-	r *git.Repository
+	r *gitinterface.Repository
 }
 
 func LoadRepository() (*Repository, error) {
 	slog.Debug("Loading Git repository...")
 
-	repo, err := git.PlainOpenWithOptions(".", &git.PlainOpenOptions{DetectDotGit: true})
+	repo, err := gitinterface.LoadRepository()
 	if err != nil {
 		return nil, err
 	}
@@ -33,21 +29,6 @@ func LoadRepository() (*Repository, error) {
 	return &Repository{
 		r: repo,
 	}, nil
-}
-
-func (r *Repository) InitializeNamespaces() error {
-	slog.Debug(fmt.Sprintf("Initializing RSL reference '%s'...", rsl.Ref))
-	if err := rsl.InitializeNamespace(r.r); err != nil {
-		return err
-	}
-
-	slog.Debug(fmt.Sprintf("Initializing attestations reference '%s'...", attestations.Ref))
-	if err := attestations.InitializeNamespace(r.r); err != nil {
-		return err
-	}
-
-	slog.Debug(fmt.Sprintf("Initializing policy reference '%s'...", policy.PolicyRef))
-	return policy.InitializeNamespace(r.r)
 }
 
 func isKeyAuthorized(authorizedKeyIDs []string, keyID string) bool {

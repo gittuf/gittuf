@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPrepareRSLLogOutput(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
-		branchEntry := rsl.NewReferenceEntry("refs/heads/main", plumbing.ZeroHash)
-		tagEntry := rsl.NewReferenceEntry("refs/tags/v1", plumbing.ZeroHash)
+		branchEntry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
+		branchEntry.ID = gitinterface.ZeroHash
+		tagEntry := rsl.NewReferenceEntry("refs/tags/v1", gitinterface.ZeroHash)
+		tagEntry.ID = gitinterface.ZeroHash
 
 		expectedOutput := `entry 0000000000000000000000000000000000000000
 
@@ -35,15 +34,13 @@ entry 0000000000000000000000000000000000000000
 	})
 
 	t.Run("with annotations", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := rsl.NewReferenceEntry("refs/tags/v1", plumbing.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/tags/v1", gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -56,7 +53,7 @@ entry 0000000000000000000000000000000000000000
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]plumbing.Hash{branchEntry.ID}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{branchEntry.ID}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntry, err := rsl.GetLatestEntry(repo)
@@ -80,7 +77,7 @@ entry %s (skipped)
       msg
 `, tagEntry.ID.String(), branchEntry.ID.String(), annotationEntry.GetID().String())
 
-		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{tagEntry, branchEntry}, map[plumbing.Hash][]*rsl.AnnotationEntry{branchEntry.ID: {annotationEntry.(*rsl.AnnotationEntry)}})
+		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{tagEntry, branchEntry}, map[string][]*rsl.AnnotationEntry{branchEntry.ID.String(): {annotationEntry.(*rsl.AnnotationEntry)}})
 		assert.Equal(t, expectedOutput, logOutput)
 	})
 }

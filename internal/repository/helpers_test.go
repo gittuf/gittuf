@@ -6,14 +6,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/storage/memory"
 )
 
 var (
@@ -34,7 +32,7 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 	t.Helper()
 
 	var (
-		repo *git.Repository
+		repo *gitinterface.Repository
 		err  error
 	)
 
@@ -44,9 +42,10 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 	}
 
 	if location == "" {
-		repo, err = git.Init(memory.NewStorage(), memfs.New())
+		tempDir := t.TempDir()
+		repo = gitinterface.CreateTestGitRepository(t, tempDir, false)
 	} else {
-		repo, err = git.PlainInit(location, true)
+		repo = gitinterface.CreateTestGitRepository(t, location, false)
 	}
 	if err != nil {
 		t.Fatal(err)

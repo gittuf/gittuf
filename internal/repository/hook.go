@@ -32,17 +32,9 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 
 	slog.Debug("Adding gittuf hooks...")
 
-	slog.Debug("Loading repository worktree...")
-	tree, err := r.r.Worktree()
-	if err != nil {
-		return fmt.Errorf("reading worktree: %w", err)
-	}
-	if tree == nil {
-		return fmt.Errorf("worktree is nil, can't update hooks")
-	}
+	gitDir := r.r.GetGitDir()
 
-	repoRoot := tree.Filesystem.Root()
-	hookFolder := filepath.Join(repoRoot, ".git", "hooks")
+	hookFolder := filepath.Join(gitDir, "hooks")
 	if err := os.MkdirAll(hookFolder, 0o750); err != nil {
 		return fmt.Errorf("making sure folder exist: %w", err)
 	}

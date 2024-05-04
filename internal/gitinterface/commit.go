@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -208,6 +209,37 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 	}
 
 	return commitIDHash, r.CheckAndSetReference(targetRef, commitIDHash, refTip)
+}
+
+// commitWithParents creates a new commit in the repo but does not update any
+// references. It is only meant to be used for tests, and therefore accepts
+// specific parent commit IDs.
+func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Hash, message string, sign bool) Hash { //nolint:unparam
+	args := []string{"commit-tree", "-m", message}
+
+	for _, commitID := range parentIDs {
+		args = append(args, "-p", commitID.String())
+	}
+
+	if sign {
+		args = append(args, "-S")
+	}
+
+	args = append(args, treeID.String())
+
+	now := r.clock.Now().Format(time.RFC3339)
+	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
+
+	stdOut, err := r.executor(args...).withEnv(env...).executeString()
+	if err != nil {
+		t.Fatal(fmt.Errorf("unable to create commit: %w", err))
+	}
+	commitID, err := NewHash(stdOut)
+	if err != nil {
+		t.Fatal(fmt.Errorf("received invalid commit ID: %w", err))
+	}
+
+	return commitID
 }
 
 // ApplyCommit writes a commit object in the repository and updates the

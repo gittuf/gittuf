@@ -3,8 +3,6 @@
 package repository
 
 import (
-	"context"
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
@@ -12,7 +10,6 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier"
-	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,46 +17,46 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
 	testDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, testDir, false)
 
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
-
-	r, err := git.PlainInit(testDir, false)
-	if err != nil {
-		t.Fatal(err)
-	}
 	repo := &Repository{r: r}
-	if err := repo.InitializeNamespaces(); err != nil {
+
+	targetRef := "main"
+	absTargetRef := "refs/heads/main"
+	featureRef := "feature"
+	absFeatureRef := "refs/heads/feature"
+
+	// Create common base for main and feature branches
+	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo.r)
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create main branch as the target branch with a Git commit
-	targetRef := "main"
-	absTargetRef := "refs/heads/main"
 	// Add a single commit
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
-	fromCommitID := commitIDs[0].String()
+	fromCommitID := commitIDs[0]
 	if err := repo.RecordRSLEntryForReference(targetRef, false); err != nil {
 		t.Fatal(err)
 	}
 
 	// Create feature branch with two Git commits
-	featureRef := "feature"
-	absFeatureRef := "refs/heads/feature"
 	// Add two commits
 	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
-	featureCommitID := commitIDs[1].String()
+	featureCommitID := commitIDs[1]
 	if err := repo.RecordRSLEntryForReference(featureRef, false); err != nil {
 		t.Fatal(err)
 	}
 
-	targetTreeID, err := gitinterface.GetMergeTree(r, fromCommitID, featureCommitID)
+	targetTreeID, err := r.GetMergeTree(fromCommitID, featureCommitID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +80,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	}
 
 	// First authorization attestation signature
-	err = repo.AddReferenceAuthorization(context.Background(), firstSigner, absTargetRef, absFeatureRef, false)
+	err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false)
 	assert.Nil(t, err)
 
 	allAttestations, err := attestations.LoadCurrentAttestations(r)
@@ -91,7 +88,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID, targetTreeID)
+	env, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +96,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
 
 	// Second authorization attestation signature
-	err = repo.AddReferenceAuthorization(context.Background(), secondSigner, absTargetRef, absFeatureRef, false)
+	err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false)
 	assert.Nil(t, err)
 
 	allAttestations, err = attestations.LoadCurrentAttestations(r)
@@ -107,7 +104,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID, targetTreeID)
+	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +113,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	assert.Equal(t, secondKeyID, env.Signatures[1].KeyID)
 
 	// Remove second authorization attestation signature
-	err = repo.RemoveReferenceAuthorization(context.Background(), secondSigner, absTargetRef, fromCommitID, targetTreeID, false)
+	err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false)
 	assert.Nil(t, err)
 
 	allAttestations, err = attestations.LoadCurrentAttestations(r)
@@ -124,7 +121,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID, targetTreeID)
+	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 	if err != nil {
 		t.Fatal(err)
 	}

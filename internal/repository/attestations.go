@@ -36,31 +36,31 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 
 	var err error
 
-	targetRef, err = gitinterface.AbsoluteReference(r.r, targetRef)
+	targetRef, err = r.r.AbsoluteReference(targetRef)
 	if err != nil {
 		return err
 	}
 
-	featureRef, err = gitinterface.AbsoluteReference(r.r, featureRef)
+	featureRef, err = r.r.AbsoluteReference(featureRef)
 	if err != nil {
 		return err
 	}
 
 	var (
-		fromID          string
-		featureCommitID string
-		toID            string
+		fromID          gitinterface.Hash
+		featureCommitID gitinterface.Hash
+		toID            gitinterface.Hash
 	)
 
 	slog.Debug("Identifying current status of target Git reference...")
 	latestTargetEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, targetRef)
 	if err == nil {
-		fromID = latestTargetEntry.TargetID.String()
+		fromID = latestTargetEntry.TargetID
 	} else {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return err
 		}
-		fromID = plumbing.ZeroHash.String()
+		fromID = gitinterface.ZeroHash
 	}
 
 	slog.Debug("Identifying current status of feature Git reference...")
@@ -70,10 +70,10 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		// merge
 		return err
 	}
-	featureCommitID = latestFeatureEntry.TargetID.String()
+	featureCommitID = latestFeatureEntry.TargetID
 
 	slog.Debug("Computing expected merge tree...")
-	mergeTreeID, err := gitinterface.GetMergeTree(r.r, fromID, featureCommitID)
+	mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 
 	// Does a reference authorization already exist for the parameters?
 	hasAuthorization := false
-	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID, toID)
+	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String())
 	if err == nil {
 		slog.Debug("Found existing reference authorization...")
 		hasAuthorization = true
@@ -98,7 +98,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	if !hasAuthorization {
 		// Create a new reference authorization and embed in env
 		slog.Debug("Creating new reference authorization...")
-		statement, err := attestations.NewReferenceAuthorization(targetRef, fromID, toID)
+		statement, err := attestations.NewReferenceAuthorization(targetRef, fromID.String(), toID.String())
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		return err
 	}
 
-	if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID, toID); err != nil {
+	if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID.String(), toID.String()); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 		return err
 	}
 
-	targetRef, err = gitinterface.AbsoluteReference(r.r, targetRef)
+	targetRef, err = r.r.AbsoluteReference(targetRef)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		return err
 	}
 
-	baseBranch, err = gitinterface.AbsoluteReference(r.r, baseBranch)
+	baseBranch, err = r.r.AbsoluteReference(baseBranch)
 	if err != nil {
 		return err
 	}

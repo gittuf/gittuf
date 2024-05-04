@@ -20,10 +20,6 @@ import (
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
 func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
-	if err := r.InitializeNamespaces(); err != nil {
-		return err
-	}
-
 	var (
 		publicKey *sslibsv.SSLibKey
 		err       error

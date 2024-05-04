@@ -11,7 +11,6 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/go-git/go-git/v5/plumbing"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified
@@ -25,12 +24,12 @@ var ErrRefStateDoesNotMatchRSL = errors.New("Git reference's current state does 
 
 func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bool) error {
 	var (
-		expectedTip plumbing.Hash
+		expectedTip gitinterface.Hash
 		err         error
 	)
 
 	slog.Debug("Identifying absolute reference path...")
-	target, err = gitinterface.AbsoluteReference(r.r, target)
+	target, err = r.r.AbsoluteReference(target)
 	if err != nil {
 		return err
 	}
@@ -63,13 +62,18 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	var err error
 
 	slog.Debug("Identifying absolute reference path...")
-	target, err = gitinterface.AbsoluteReference(r.r, target)
+	target, err = r.r.AbsoluteReference(target)
+	if err != nil {
+		return err
+	}
+
+	entryIDHash, err := gitinterface.NewHash(entryID)
 	if err != nil {
 		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", target, entryID))
-	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, plumbing.NewHash(entryID))
+	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, entryIDHash)
 	if err != nil {
 		return err
 	}
@@ -83,13 +87,13 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	return nil
 }
 
-func (r *Repository) verifyRefTip(target string, expectedTip plumbing.Hash) error {
-	ref, err := r.r.Reference(plumbing.ReferenceName(target), true)
+func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) error {
+	refTip, err := r.r.GetReference(target)
 	if err != nil {
 		return err
 	}
 
-	if ref.Hash() != expectedTip {
+	if !refTip.Equal(expectedTip) {
 		return ErrRefStateDoesNotMatchRSL
 	}
 

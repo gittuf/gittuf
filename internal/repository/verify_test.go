@@ -3,15 +3,14 @@
 package repository
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,9 +18,6 @@ func TestVerifyRef(t *testing.T) {
 	repo := createTestRepositoryWithPolicy(t, "")
 
 	refName := "refs/heads/main"
-	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
@@ -57,7 +53,7 @@ func TestVerifyRef(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		err := repo.VerifyRef(context.Background(), test.target, test.latestOnly)
+		err := repo.VerifyRef(testCtx, test.target, test.latestOnly)
 		if test.err != nil {
 			assert.ErrorIs(t, err, test.err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
@@ -67,9 +63,9 @@ func TestVerifyRef(t *testing.T) {
 
 	// Add another commit
 	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
-	err := repo.VerifyRef(context.Background(), refName, true)
+	err := repo.VerifyRef(testCtx, refName, true)
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
-	err = repo.VerifyRef(context.Background(), refName, false)
+	err = repo.VerifyRef(testCtx, refName, false)
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 }
 
@@ -79,9 +75,6 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	repo := createTestRepositoryWithPolicy(t, "")
 
 	refName := "refs/heads/main"
-	if err := repo.r.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
 
 	// Policy violation
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgUnauthorizedKeyBytes)
@@ -100,7 +93,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 
 	tests := map[string]struct {
 		target      string
-		fromEntryID plumbing.Hash
+		fromEntryID gitinterface.Hash
 		err         error
 	}{
 		"absolute ref, from non-violating": {
@@ -122,8 +115,9 @@ func TestVerifyRefFromEntry(t *testing.T) {
 			err:         policy.ErrUnauthorizedSignature,
 		},
 		"unknown ref": {
-			target: "refs/heads/unknown",
-			err:    rsl.ErrRSLEntryNotFound,
+			target:      "refs/heads/unknown",
+			fromEntryID: gitinterface.ZeroHash,
+			err:         rsl.ErrRSLEntryNotFound,
 		},
 	}
 

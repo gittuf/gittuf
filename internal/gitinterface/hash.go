@@ -27,13 +27,18 @@ type Hash []byte
 
 // String returns the hex encoded hash.
 func (h Hash) String() string {
-	return hex.EncodeToString(h)
+	return hex.EncodeToString(h[:])
 }
 
 // IsZero compares the hash to see if it's the zero hash for either SHA-1 or
 // SHA-256.
 func (h Hash) IsZero() bool {
-	return bytes.Equal(h, zeroSHA1HashBytes[:]) || bytes.Equal(h, zeroSHA256HashBytes[:])
+	return bytes.Equal(h[:], zeroSHA1HashBytes[:]) || bytes.Equal(h[:], zeroSHA256HashBytes[:])
+}
+
+// Equal compares the hash to another provided Hash to see if they're equal.
+func (h Hash) Equal(other Hash) bool {
+	return bytes.Equal(h[:], other[:])
 }
 
 // ZeroHash represents an empty Hash.
@@ -52,5 +57,5 @@ func NewHash(h string) (Hash, error) {
 		return ZeroHash, ErrInvalidHashEncoding
 	}
 
-	return hash, nil
+	return Hash(hash), nil
 }

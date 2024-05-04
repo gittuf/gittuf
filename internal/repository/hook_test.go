@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-git/go-git/v5"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,15 +15,14 @@ import (
 func TestUpdatePrePushHook(t *testing.T) {
 	t.Run("write hook", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		repo, err := git.PlainInit(tmpDir, false)
-		require.NoError(t, err)
 		r := &Repository{r: repo}
 
-		err = r.UpdateHook(HookPrePush, []byte("some content"), false)
+		err := r.UpdateHook(HookPrePush, []byte("some content"), false)
 		require.NoError(t, err)
 
-		hookFile := filepath.Join(tmpDir, ".git", "hooks", "pre-push")
+		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
 		prepushScript, err := os.ReadFile(hookFile)
 		require.NoError(t, err)
 		assert.Equal(t, []byte("some content"), prepushScript)
@@ -31,16 +30,12 @@ func TestUpdatePrePushHook(t *testing.T) {
 
 	t.Run("hook exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		repo, err := git.PlainInit(tmpDir, false)
-		require.NoError(t, err)
 		r := &Repository{r: repo}
 
-		hookDir := filepath.Join(tmpDir, ".git", "hooks")
-		hookFile := filepath.Join(hookDir, "pre-push")
-		err = os.Mkdir(hookDir, 0o750)
-		require.NoError(t, err)
-		err = os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
+		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
+		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
 		require.NoError(t, err)
 
 		err = r.UpdateHook(HookPrePush, []byte("new hook script"), false)
@@ -52,16 +47,12 @@ func TestUpdatePrePushHook(t *testing.T) {
 
 	t.Run("force overwrite hook", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		repo, err := git.PlainInit(tmpDir, false)
-		require.NoError(t, err)
 		r := &Repository{r: repo}
 
-		hookDir := filepath.Join(tmpDir, ".git", "hooks")
-		hookFile := filepath.Join(hookDir, "pre-push")
-		err = os.Mkdir(hookDir, 0o750)
-		require.NoError(t, err)
-		err = os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
+		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
+		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
 		require.NoError(t, err)
 
 		err = r.UpdateHook(HookPrePush, []byte("new hook script"), true)

@@ -3,7 +3,6 @@
 package repository
 
 import (
-	"context"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
@@ -41,7 +40,7 @@ func TestInitializeTargets(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state, err := policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +81,7 @@ func TestAddDelegation(t *testing.T) {
 		authorizedKeyBytes := []*tuf.Key{targetsPubKey}
 		rulePatterns := []string{"git:branch=main"}
 
-		state, err := policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -101,7 +100,7 @@ func TestAddDelegation(t *testing.T) {
 		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
-		state, err = policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,7 +148,7 @@ func TestUpdateDelegation(t *testing.T) {
 	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +187,7 @@ func TestRemoveDelegation(t *testing.T) {
 	err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +207,7 @@ func TestRemoveDelegation(t *testing.T) {
 	err = r.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +239,7 @@ func TestAddKeyToTargets(t *testing.T) {
 
 	authorizedKeysBytes := []*tuf.Key{targetsPubKey, gpgKey}
 
-	state, err := policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +252,7 @@ func TestAddKeyToTargets(t *testing.T) {
 	err = r.AddKeyToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(context.Background(), r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
