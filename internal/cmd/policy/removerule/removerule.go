@@ -58,7 +58,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-rule",
 		Short:             "Remove rule from a policy file",
-		PreRunE:           common.CheckIfSigningViable,
+		PreRunE:           common.CheckIfSigningViableWithFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

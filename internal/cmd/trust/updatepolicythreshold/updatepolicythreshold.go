@@ -59,7 +59,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 
 DO NOT USE until policy-staging is working, so that multiple developers can sequentially sign the policy metadata.
 Until then, this command is available in developer mode only, set %s=1 to use.`, dev.DevModeKey),
-		PreRunE: common.CheckIfSigningViable,
+		PreRunE: common.CheckIfSigningViableWithFlag,
 		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)

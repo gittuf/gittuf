@@ -49,7 +49,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "init",
 		Short:             "Initialize policy file",
-		PreRunE:           common.CheckIfSigningViable,
+		PreRunE:           common.CheckIfSigningViableWithFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
