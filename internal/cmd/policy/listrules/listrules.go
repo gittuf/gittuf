@@ -48,20 +48,22 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	fullDiff.WriteString("\n")
 	for policyPointer < len(policyRules) || policyStagingPointer < len(policyStagingRules) {
-		if policyPointer == len(policyRules) {
+		switch {
+		case policyPointer == len(policyRules):
 			fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 			policyStagingPointer++
-		} else if policyStagingPointer == len(policyStagingRules) {
+		case policyStagingPointer == len(policyStagingRules):
 			fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
 			policyPointer++
-		} else if policyRules[policyPointer] != policyStagingRules[policyStagingPointer] {
-			if policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth {
+		case policyRules[policyPointer] != policyStagingRules[policyStagingPointer]:
+			switch {
+			case policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth:
 				fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 				policyStagingPointer++
-			} else if policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth {
+			case policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth:
 				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
 				policyPointer++
-			} else {
+			default:
 				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 				policyPointer++
 				policyStagingPointer++
@@ -76,10 +78,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 func FindDiffBetweenStrings(initial, withChanges string) string {
 	dmp := diffmatchpatch.New()
-	diffs := dmp.DiffMain(initial, withChanges, false)
-
 	lines1, lines2, lineArray := dmp.DiffLinesToChars(initial, withChanges)
-	diffs = dmp.DiffMain(lines1, lines2, false)
+	diffs := dmp.DiffMain(lines1, lines2, false)
 	diffs = dmp.DiffCharsToLines(diffs, lineArray)
 
 	var diffDisplay strings.Builder
