@@ -14,6 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -32,6 +33,66 @@ var (
 	gpgPublicKey            = artifacts.GPGKey1Public
 	gpgPrivateKey           = artifacts.GPGKey1Private
 )
+
+func TestRepositoryCommit(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second tree
+	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeWithContentsID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"README.md": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit with no tree
+	expectedInitialCommitID := "648c569f3958b899e832f04750de52cf5d0db2fa"
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedInitialCommitID, commitID.String())
+
+	refHead, err := repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedInitialCommitID, refHead.String())
+
+	// Create second commit with tree
+	expectedSecondCommitID := "3d7200c158ccfedf35a68a7d24842d60cac4ec0d"
+	commitID, err = repo.Commit(treeWithContentsID, refName, "Add README\n", false)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedSecondCommitID, commitID.String())
+
+	refHead, err = repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedSecondCommitID, refHead.String())
+
+	// Create third commit with same tree but sign this time
+	expectedThirdCommitID := "821c6322a3637799591e355f92c3334134edc793"
+	commitID, err = repo.Commit(treeWithContentsID, refName, "Signing this commit\n", true)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedThirdCommitID, commitID.String())
+
+	refHead, err = repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedThirdCommitID, refHead.String())
+}
 
 func TestCreateCommitObject(t *testing.T) {
 	t.Run("zero commit and zero parent", func(t *testing.T) {
@@ -183,6 +244,34 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 		err = VerifyCommitSignature(context.Background(), sshCommits[1], rsaKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
+}
+
+func TestRepositoryVerifyCommit(t *testing.T) {
+	// TODO: support multiple signing types
+
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := tuf.LoadKeyFromBytes(artifacts.SSHED25519Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.verifyCommitSignature(context.Background(), commitID, key)
+	assert.Nil(t, err)
 }
 
 func TestKnowsCommit(t *testing.T) {
@@ -346,4 +435,108 @@ func createTestSSHSignedCommits(t *testing.T) []*object.Commit {
 	}
 
 	return testCommits
+}
+
+func TestRepositoryGetCommitMessage(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	message := "Initial commit"
+	commit, err := repo.Commit(emptyTreeID, refName, message, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitMessage, err := repo.GetCommitMessage(commit)
+	assert.Nil(t, err)
+	assert.Equal(t, message, commitMessage)
+}
+
+func TestGetCommitTreeID(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second tree
+	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeWithContentsID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"README.md": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit with no tree
+	initialCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialCommitTreeID, err := repo.GetCommitTreeID(initialCommitID)
+	assert.Nil(t, err)
+	assert.Equal(t, emptyTreeID, initialCommitTreeID)
+
+	// Create second commit with tree
+	secondCommitID, err := repo.Commit(treeWithContentsID, refName, "Add README\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondCommitTreeID, err := repo.GetCommitTreeID(secondCommitID)
+	assert.Nil(t, err)
+	assert.Equal(t, treeWithContentsID, secondCommitTreeID)
+}
+
+func TestGetCommitParentIDs(t *testing.T) {
+	// TODO: test with merge commit
+
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit
+	initialCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialCommitParentIDs, err := repo.GetCommitParentIDs(initialCommitID)
+	assert.Nil(t, err)
+	assert.Empty(t, initialCommitParentIDs)
+
+	// Create second commit
+	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondCommitParentIDs, err := repo.GetCommitParentIDs(secondCommitID)
+	assert.Nil(t, err)
+	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
 }
