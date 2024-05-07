@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addkey.New(o))
+	cmd.AddCommand(apply.New())
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(listrules.New())
 	cmd.AddCommand(remote.New())

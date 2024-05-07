@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
-	"github.com/gittuf/gittuf/internal/cmd/apply"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
@@ -91,7 +90,6 @@ func New() *cobra.Command {
 	o.AddFlags(cmd)
 
 	cmd.AddCommand(addhooks.New())
-	cmd.AddCommand(apply.New())
 	cmd.AddCommand(clone.New())
 	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())

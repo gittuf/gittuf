@@ -1,9 +1,9 @@
-## gittuf apply
+## gittuf trust apply
 
-applies work in progress changes to the policy state to the current policy state
+Validate and apply changes from policy-staging to policy
 
 ```
-gittuf apply [flags]
+gittuf trust apply [flags]
 ```
 
 ### Options
@@ -18,10 +18,11 @@ gittuf apply [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+  -k, --signing-key string           signing key to use to sign root of trust
       --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO
 
-* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
+* [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
 

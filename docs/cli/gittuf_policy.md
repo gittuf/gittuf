@@ -23,6 +23,7 @@ Tools to manage gittuf policies
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 * [gittuf policy add-key](gittuf_policy_add-key.md)	 - Add a trusted key to a policy file
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
+* [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
