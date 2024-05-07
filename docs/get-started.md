@@ -60,7 +60,9 @@ $ make
 
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.  Note that for on-disk
-keys, gittuf does not currently support encrypted private keys (see [#276]). If
+keys, gittuf does not currently support encrypted private keys (see [#276]).
+So for testing purposes, when prompted with `Enter passphrase`, choose no passphrase
+by just hitting enter. If
 the key is created using `ssh-keygen`, convert the public key format.
 
 ```bash
