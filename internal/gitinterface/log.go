@@ -4,7 +4,9 @@ package gitinterface
 
 import (
 	"errors"
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -75,4 +77,41 @@ func GetCommitsBetweenRange(repo *git.Repository, commitNewID, commitOldID plumb
 	}
 
 	return commits, nil
+}
+
+func (r *Repository) GetCommitsBetweenRange(commitNewID, commitOldID Hash) ([]Hash, error) {
+	var args []string
+	if commitOldID.IsZero() {
+		args = []string{"rev-list", commitNewID.String()}
+	} else {
+		args = []string{"rev-list", fmt.Sprintf("%s..%s", commitOldID.String(), commitNewID.String())}
+	}
+
+	stdOut, stdErr, err := r.executeGitCommand(args...)
+	if err != nil {
+		return nil, fmt.Errorf("unable to enumerate commits in range: %s", stdErr)
+	}
+
+	commitRangeString := strings.Split(strings.TrimSpace(stdOut), "\n")
+
+	commitRange := make([]Hash, 0, len(commitRangeString))
+	for _, cID := range commitRangeString {
+		if cID == "" {
+			continue
+		}
+		commitRange = append(commitRange, Hash{hash: cID})
+	}
+
+	// FIXME: we should ideally be sorting this in the order of occurrence
+	// rather than by commit ID. The only reason this is happening is because
+	// the ordering of commitRange by default is not deterministic. Rather than
+	// walking through them and identifying the right order, we're sorting by
+	// commit ID. The intended use case of this function is to get a list of
+	// commits that are then checked for the changes they introduce. At that
+	// point, they must be diffed with their parent directly.
+	sort.Slice(commitRange, func(i, j int) bool {
+		return commitRange[i].String() < commitRange[j].String()
+	})
+
+	return commitRange, nil
 }

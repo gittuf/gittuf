@@ -6,6 +6,7 @@ import (
 	"container/heap"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -102,6 +103,85 @@ func GetFilePathsChangedByCommit(repo *git.Repository, commit *object.Commit) ([
 	}
 
 	return GetDiffFilePaths(commit, parentCommit)
+}
+
+func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error) {
+	if err := r.ensureIsCommit(commitID); err != nil {
+		return nil, err
+	}
+
+	parentCommitIDs, err := r.GetCommitParentIDs(commitID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(parentCommitIDs) == 0 {
+		stdOut, stdErr, err := r.executeGitCommand("ls-tree", "--name-only", "-r", commitID.String())
+		if err != nil {
+			return nil, fmt.Errorf("unable to identify all commit file paths: %s", stdErr)
+		}
+
+		paths := strings.Split(strings.TrimSpace(stdOut), "\n")
+		return paths, nil
+	}
+
+	if len(parentCommitIDs) > 1 {
+		// Check if tree matches last commit
+		stdOut, stdErr, err := r.executeGitCommand("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String())
+		if err != nil {
+			return nil, fmt.Errorf("unable to diff commit against last parent commit: %s", stdErr)
+		}
+
+		stdOut = strings.TrimSpace(stdOut)
+		if stdOut == "" {
+			return nil, nil
+		}
+
+		pathSet := map[string]bool{}
+		for _, parentCommitID := range parentCommitIDs {
+			stdOut, stdErr, err := r.executeGitCommand("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID.String(), commitID.String())
+			if err != nil {
+				return nil, fmt.Errorf("unable to diff commit against parent: %s", stdErr)
+			}
+
+			stdOut = strings.TrimSpace(stdOut)
+			if stdOut == "" {
+				continue
+			}
+
+			paths := strings.Split(stdOut, "\n")
+			for _, path := range paths {
+				if path == "" {
+					continue
+				}
+				pathSet[path] = true
+			}
+		}
+
+		paths := make([]string, 0, len(pathSet))
+		for path := range pathSet {
+			paths = append(paths, path)
+		}
+
+		sort.Slice(paths, func(i, j int) bool {
+			return paths[i] < paths[j]
+		})
+
+		return paths, nil
+	}
+
+	stdOut, stdErr, err := r.executeGitCommand("diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String())
+	if err != nil {
+		return nil, fmt.Errorf("unable to diff commit against parent: %s", stdErr)
+	}
+
+	stdOut = strings.TrimSpace(stdOut)
+	if stdOut == "" {
+		return nil, nil
+	}
+
+	paths := strings.Split(stdOut, "\n")
+	return paths, nil
 }
 
 // GetDiffFilePaths enumerates all the changed file paths between the two
