@@ -6,9 +6,8 @@
 gittuf provides a security layer for Git using some concepts introduced by [The
 Update Framework (TUF)]. Among other features, gittuf handles key management for
 all developers on the repository, allows you to set permissions for repository
-branches, tags, files, etc., lets you use new cryptographic algorithms (SHA256,
-etc.), protects against [other attacks] Git is vulnerable to, and more — all
-while being backwards compatible with GitHub, GitLab, etc.
+branches, tags, files, etc., protects against [other attacks] Git is vulnerable
+to, and more — all while being backwards compatible with GitHub, GitLab, etc.
 
 gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
 as part of the [Supply Chain Integrity Working Group].
