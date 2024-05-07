@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
@@ -48,7 +49,7 @@ func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
 	return policy.Apply(ctx, r.r, signRSLEntry)
 }
 
-func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {
+func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, *tuf.RootMetadata, error) {
 	if strings.HasPrefix(targetRef, "refs/gittuf/") {
 		return policy.ListRules(ctx, r.r, targetRef)
 	}

@@ -23,12 +23,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	policyRules, err := repo.ListRules(cmd.Context(), policy.PolicyRef)
+	policyRules, policyRoot, err := repo.ListRules(cmd.Context(), policy.PolicyRef)
 	if err != nil {
 		return err
 	}
 
-	policyStagingRules, err := repo.ListRules(cmd.Context(), policy.PolicyStagingRef)
+	policyStagingRules, policyStagingRoot, err := repo.ListRules(cmd.Context(), policy.PolicyStagingRef)
 	if err != nil {
 		return err
 	}
@@ -37,25 +37,32 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	var fullDiff strings.Builder
 
-	fullDiff.WriteString("Policy Changes :\n")
-	fullDiff.WriteString("(+'s and -'s correspond to changes in policy staging diffed against the main policy state)\n")
+	fullDiff.WriteString("Policy Changes:\n")
+	fullDiff.WriteString("(+'s and -'s correspond to changes in policy staging diffed against the main policy state)\n\n")
 
+	fullDiff.WriteString("Target role keys:\n")
+	fullDiff.WriteString(FindDiffBetweenStrings(strings.Join(policyRoot.Roles[policy.TargetsRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[policy.TargetsRoleName].KeyIDs, ", ")))
+
+	fullDiff.WriteString("Root role keys:\n")
+	fullDiff.WriteString(FindDiffBetweenStrings(strings.Join(policyRoot.Roles[policy.RootRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[policy.RootRoleName].KeyIDs, ", ")))
+
+	fullDiff.WriteString("\n")
 	for policyPointer < len(policyRules) || policyStagingPointer < len(policyStagingRules) {
 		if policyPointer == len(policyRules) {
-			fullDiff.WriteString(FindDiffBetweenRules("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+			fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 			policyStagingPointer++
 		} else if policyStagingPointer == len(policyStagingRules) {
-			fullDiff.WriteString(FindDiffBetweenRules(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
+			fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
 			policyPointer++
 		} else if policyRules[policyPointer] != policyStagingRules[policyStagingPointer] {
 			if policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth {
-				fullDiff.WriteString(FindDiffBetweenRules("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+				fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 				policyStagingPointer++
 			} else if policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth {
-				fullDiff.WriteString(FindDiffBetweenRules(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
+				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
 				policyPointer++
 			} else {
-				fullDiff.WriteString(FindDiffBetweenRules(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
 				policyPointer++
 				policyStagingPointer++
 			}
@@ -67,7 +74,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func FindDiffBetweenRules(initial, withChanges string) string {
+func FindDiffBetweenStrings(initial, withChanges string) string {
 	dmp := diffmatchpatch.New()
 	diffs := dmp.DiffMain(initial, withChanges, false)
 

@@ -760,15 +760,15 @@ func (s *State) loadRuleNames() error {
 // ListRules returns a list of all the rules as an array of the delegations in a
 // pre order traversal of the delegation tree, with the depth of each
 // delegation.
-func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*DelegationWithDepth, error) {
+func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*DelegationWithDepth, *tuf.RootMetadata, error) {
 	state, err := LoadCurrentState(ctx, repo, targetRef)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	delegationsToSearch := []*DelegationWithDepth{}
@@ -797,7 +797,7 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 		if state.HasTargetsRole(currentDelegation.Delegation.Name) {
 			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.Name)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			seenRoles[currentDelegation.Delegation.Name] = true
@@ -818,7 +818,12 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 		}
 	}
 
-	return allDelegations, nil
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return allDelegations, rootMetadata, nil
 }
 
 // hasFileRule returns true if the policy state has a single rule in any targets

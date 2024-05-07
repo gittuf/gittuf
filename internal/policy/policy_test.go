@@ -571,7 +571,7 @@ func TestListRules(t *testing.T) {
 	t.Run("no delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
+		rules, _, err := ListRules(context.Background(), repo, PolicyRef)
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
 			{
@@ -606,7 +606,7 @@ func TestListRules(t *testing.T) {
 	t.Run("with delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
+		rules, _, err := ListRules(context.Background(), repo, PolicyRef)
 
 		assert.Nil(t, err)
 		expectedRules := []*DelegationWithDepth{
