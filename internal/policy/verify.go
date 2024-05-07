@@ -461,7 +461,7 @@ func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[stri
 				continue
 			}
 		} else {
-			if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			if !errors.Is(err, plumbing.ErrReferenceNotFound) {
 				status[id] = err.Error()
 				continue
 			}
