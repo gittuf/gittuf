@@ -60,8 +60,10 @@ $ make
 
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.  Note that for on-disk
-keys, gittuf does not currently support encrypted private keys (see [#276]). If
-the key is created using `ssh-keygen`, convert the public key format.
+keys, gittuf **does not currently support encrypted private keys** (see [#276]).
+So, for testing purposes, when creating keys using `ssh-keygen`, choose no
+passphrase when prompted to "enter passphrase" by hitting enter.  Additionally,
+convert the public key to be PEM encoded.
 
 ```bash
 $ mkdir gittuf-get-started && cd gittuf-get-started
@@ -116,6 +118,13 @@ Note that `--authorize-key` can also be used to specify a GPG key or a
 throughout in this guide, as gittuf policy metadata currently cannot be signed
 using GPG and Sigstore (see [#229]).
 
+After adding the required policies, _apply_ them from the policy-staging area.
+This means the policy will be applicable henceforth.
+
+```bash
+$ gittuf policy apply
+```
+
 ## Making repository changes
 
 You can make changes in the repository using standard Git workflows. However,
@@ -135,14 +144,7 @@ $ gittuf rsl record main
 gittuf allows for verifying rules for Git references and files.
 
 ```bash
-$ gittuf verify-ref main
-```
-
-You can also verify the signature on the commit is from a key recorded in gittuf
-policy.
-
-```bash
-$ gittuf verify-commit HEAD
+$ gittuf verify-ref --verbose main
 ```
 
 ## Conclusion

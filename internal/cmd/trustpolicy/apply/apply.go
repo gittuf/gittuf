@@ -24,7 +24,7 @@ func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "applies work in progress changes to the policy state to the current policy state",
+		Short: "Validate and apply changes from policy-staging to policy",
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
