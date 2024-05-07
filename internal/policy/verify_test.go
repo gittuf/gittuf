@@ -814,7 +814,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		state := createTestStateWithOnlyBadRoot(t)
 
-		if err := state.Commit(context.Background(), repo, "Create test state", false); err != nil {
+		if err := state.Commit(repo, "Create test state", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := Apply(context.Background(), repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -851,7 +855,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		s, err := LoadCurrentState(context.Background(), repo)
+		s, err := LoadCurrentState(context.Background(), repo, PolicyRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -882,7 +886,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		s.TargetsEnvelope = env
 
-		if err := s.Commit(context.Background(), repo, "revoke key", false); err != nil {
+		if err := s.Commit(repo, "revoke key", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := Apply(context.Background(), repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1120,7 +1128,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		s, err := LoadCurrentState(context.Background(), repo)
+		s, err := LoadCurrentState(context.Background(), repo, PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1151,7 +1159,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		s.TargetsEnvelope = env
 
-		if err := s.Commit(context.Background(), repo, "revoke key", false); err != nil {
+		if err := s.Commit(repo, "revoke key", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1209,7 +1217,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		state.TargetsEnvelope = env
 
-		if err := state.Commit(context.Background(), repo, "protect-1", false); err != nil {
+		if err := state.Commit(repo, "protect-1", false); err != nil {
 			t.Fatal(err)
 		}
 
