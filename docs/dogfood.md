@@ -35,3 +35,32 @@ primarily offline signatures. This can, as before, only be achieved with further
 usability improvements. In this final phase, we hope to essentially have worked
 out the kinks with using gittuf actively so that we can proceed with a stable
 release.
+
+## Verifying `gittuf` using `gittuf`
+
+If you do not have gittuf installed please refer to our [get started guide]
+
+Before verifying using gittuf, we must first clone the repository. Gittuf has a clone command 
+`gittuf clone https://github.com/gittuf/gittuf`
+
+Alternatively you can use `git clone`, or `git pull`, but with this you 
+will have to use `git fetch remote-name refs/gittuf/*:refs/gittuf/*`, to pull
+in gittuf metadata
+
+After this you should be able to perform verification. 
+
+To verify the latest release of gittuf with gittuf, 
+
+`gittuf verify-ref --verbose v0.4.0`
+
+To verify merges into the main branch,
+
+`gittuf verify-ref --verbose main`
+
+If you are working on your own test repo, and want to test out gittuf yourself,
+to push gittuf policies, and other metadata, that makes gittuf work, you will
+have to push these refs explicitly using
+
+`git push remote-name refs/gittuf/*`  
+
+[get started guide]: /docs/get-started.md
