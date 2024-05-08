@@ -704,7 +704,7 @@ func TestGetDiffBetweenPolicyAndStaging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
 	}
