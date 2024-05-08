@@ -33,45 +33,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	policyPointer, policyStagingPointer := 0, 0
-
-	var fullDiff strings.Builder
-
-	fullDiff.WriteString("Policy Changes:\n")
-	fullDiff.WriteString("(+'s and -'s correspond to changes in policy staging diffed against the main policy state)\n\n")
-
-	fullDiff.WriteString("Target role keys:\n")
-	fullDiff.WriteString(FindDiffBetweenStrings(strings.Join(policyRoot.Roles[policy.TargetsRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[policy.TargetsRoleName].KeyIDs, ", ")))
-
-	fullDiff.WriteString("Root role keys:\n")
-	fullDiff.WriteString(FindDiffBetweenStrings(strings.Join(policyRoot.Roles[policy.RootRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[policy.RootRoleName].KeyIDs, ", ")))
-
-	fullDiff.WriteString("\n")
-	for policyPointer < len(policyRules) || policyStagingPointer < len(policyStagingRules) {
-		switch {
-		case policyPointer == len(policyRules):
-			fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
-			policyStagingPointer++
-		case policyStagingPointer == len(policyStagingRules):
-			fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
-			policyPointer++
-		case policyRules[policyPointer] != policyStagingRules[policyStagingPointer]:
-			switch {
-			case policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth:
-				fullDiff.WriteString(FindDiffBetweenStrings("", GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
-				policyStagingPointer++
-			case policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth:
-				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
-				policyPointer++
-			default:
-				fullDiff.WriteString(FindDiffBetweenStrings(GetListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), GetListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
-				policyPointer++
-				policyStagingPointer++
-			}
-		}
-	}
-
-	fmt.Print(fullDiff.String())
+	fmt.Print(policy.GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules, policyRoot, policyStagingRoot))
 
 	return nil
 }

@@ -668,6 +668,74 @@ func TestListRules(t *testing.T) {
 	})
 }
 
+func TestGetDiffBetweenPolicyAndStaging(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+	policyRules, _, err := ListRules(context.Background(), repo, PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := LoadCurrentState(context.Background(), repo, PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	if err := state.Commit(repo, "", false); err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	policyStagingRules, _, err := ListRules(context.Background(), repo, PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	diffStr := GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules, rootMetadata, rootMetadata)
+
+	// Check for specific expected substrings
+	assert.Contains(t, diffStr, "-       Required valid signatures: 1")
+	assert.Contains(t, diffStr, "+           437cdafde81f715cf81e75920d7d4a9ce4cab83aac5a8a5984c3902da6bf2ab7")
+	assert.Contains(t, diffStr, "+       Required valid signatures: 2")
+}
+
 func TestStateHasFileRule(t *testing.T) {
 	t.Run("with file rules", func(t *testing.T) {
 		state := createTestStateWithPolicy(t)
