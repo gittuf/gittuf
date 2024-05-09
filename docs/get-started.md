@@ -66,11 +66,11 @@ the key is created using `ssh-keygen`, convert the public key format.
 ```bash
 $ mkdir gittuf-get-started && cd gittuf-get-started
 $ mkdir keys && cd keys
-$ ssh-keygen -t ecdsa -f root
+$ ssh-keygen -t rsa -N "" -f root
 $ ssh-keygen -f root.pub -e -m pem > root.pem
-$ ssh-keygen -t ecdsa -f policy
+$ ssh-keygen -t rsa -N "" -f policy
 $ ssh-keygen -f policy.pub -e -m pem > policy.pem
-$ ssh-keygen -t ecdsa -f developer
+$ ssh-keygen -t rsa -N "" -f developer
 $ ssh-keygen -f developer.pub -e -m pem > developer.pem
 ```
 
