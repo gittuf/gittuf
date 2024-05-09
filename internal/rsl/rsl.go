@@ -768,9 +768,5 @@ func isRelevantGittufRef(refName string) bool {
 		return false
 	}
 
-	if refName == gittufPolicyStagingRef {
-		return false
-	}
-
 	return true
 }
