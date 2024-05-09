@@ -12,9 +12,7 @@ jobs:
       id-token: write
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@8ce8fbd070477ec72678151e82b82c3d866d9fcd
-        with:
-          gittuf-version: main
+        uses: gittuf/gittuf-installer@bb2e6c13c0825057e48e931b686d61c3b6267ef8
       - name: Install gitsign
         uses: actions-go/go-install@0607b3e7a61b8f1b55e1169a884804d084db73af
         with:
