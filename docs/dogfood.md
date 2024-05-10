@@ -35,3 +35,31 @@ primarily offline signatures. This can, as before, only be achieved with further
 usability improvements. In this final phase, we hope to essentially have worked
 out the kinks with using gittuf actively so that we can proceed with a stable
 release.
+
+## Verifying gittuf using gittuf
+
+To install gittuf, please refer to our [get started guide].
+
+First, clone the repository and fetch the gittuf specific metadata.
+
+```bash
+$ gittuf clone https://github.com/gittuf/gittuf
+```
+
+Alternatively, you can use Git as follows.
+
+```bash
+$ git clone https://github.com/gittuf/gittuf
+$ cd gittuf
+$ git fetch origin refs/gittuf/*:refs/gittuf/*
+```
+
+Next, the latest release of gittuf as well as changes to the `main` branch can
+be verified using gittuf.
+
+```bash
+$ gittuf verify-ref --verbose v0.4.0
+$ gittuf verify-ref --verbose main
+```
+
+[get started guide]: /docs/get-started.md

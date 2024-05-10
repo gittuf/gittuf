@@ -147,6 +147,17 @@ gittuf allows for verifying rules for Git references and files.
 $ gittuf verify-ref --verbose main
 ```
 
+## Communicating with a remote
+
+gittuf includes helpers to push and fetch the policy and RSL references.
+However, there are some known issues (see [#328]) with these commands. In the
+meantime, Git can be used to keep gittuf's references updated.
+
+```bash
+$ git push <remote> refs/gittuf/*
+$ git fetch <remote> refs/gittuf/*:refs/gittuf/*
+```
+
 ## Conclusion
 
 This is a very quick primer to gittuf! Please take a look at gittuf's [CLI docs]
@@ -160,5 +171,6 @@ the gittuf repository.
 [#276]: https://github.com/gittuf/gittuf/issues/276
 [#229]: https://github.com/gittuf/gittuf/issues/229
 [#220]: https://github.com/gittuf/gittuf/issues/220
+[#328]: https://github.com/gittuf/gittuf/issues/328
 [CLI docs]: /docs/cli/gittuf.md
 [open an issue]: https://github.com/gittuf/gittuf/issues/new/choose
