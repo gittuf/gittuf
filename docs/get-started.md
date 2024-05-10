@@ -16,7 +16,7 @@ have [cosign] installed on your system, then you will be able to securely
 download and verify the gittuf release:
 
 > [!NOTE]
-> For `windows` make sure to consider the `.exe` extension, for the binary,
+> For `windows`, make sure to include the `.exe` extension for the binary,
 > signature and certificate file. Similarly, `sudo install` and the destination
 > path must be modified as well.
 
@@ -27,7 +27,7 @@ ARCH=amd64
 # One of: linux, darwin, freebsd
 OS=linux
 # See https://github.com/gittuf/gittuf/releases for the latest version
-VERSION=0.2.0
+VERSION=0.4.0
 cd $(mktemp -d)
 
 curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}
@@ -158,6 +158,12 @@ $ git push <remote> refs/gittuf/*
 $ git fetch <remote> refs/gittuf/*:refs/gittuf/*
 ```
 
+## Verify gittuf itself
+
+You can also verify the state of the gittuf source code repository with gittuf
+itself. For more information on verifying gittuf with gittuf, visit the
+[dogfooding] document.
+
 ## Conclusion
 
 This is a very quick primer to gittuf! Please take a look at gittuf's [CLI docs]
@@ -174,3 +180,4 @@ the gittuf repository.
 [#328]: https://github.com/gittuf/gittuf/issues/328
 [CLI docs]: /docs/cli/gittuf.md
 [open an issue]: https://github.com/gittuf/gittuf/issues/new/choose
+[dogfooding]: /docs/dogfood.md
