@@ -36,31 +36,30 @@ usability improvements. In this final phase, we hope to essentially have worked
 out the kinks with using gittuf actively so that we can proceed with a stable
 release.
 
-## Verifying `gittuf` using `gittuf`
+## Verifying gittuf using gittuf
 
-If you do not have gittuf installed please refer to our [get started guide]
+To install gittuf, please refer to our [get started guide].
 
-Before verifying using gittuf, we must first clone the repository. Gittuf has a clone command 
-`gittuf clone https://github.com/gittuf/gittuf`
+First, clone the repository and fetch the gittuf specific metadata.
 
-Alternatively you can use `git clone`, or `git pull`, but with this you 
-will have to use `git fetch remote-name refs/gittuf/*:refs/gittuf/*`, to pull
-in gittuf metadata
+```bash
+$ gittuf clone https://github.com/gittuf/gittuf
+```
 
-After this you should be able to perform verification. 
+Alternatively, you can use Git as follows.
 
-To verify the latest release of gittuf with gittuf, 
+```bash
+$ git clone https://github.com/gittuf/gittuf
+$ cd gittuf
+$ git fetch origin refs/gittuf/*:refs/gittuf/*
+```
 
-`gittuf verify-ref --verbose v0.4.0`
+Next, the latest release of gittuf as well as changes to the `main` branch can
+be verified using gittuf.
 
-To verify merges into the main branch,
-
-`gittuf verify-ref --verbose main`
-
-If you are working on your own test repo, and want to test out gittuf yourself,
-to push gittuf policies, and other metadata, that makes gittuf work, you will
-have to push these refs explicitly using
-
-`git push remote-name refs/gittuf/*`  
+```bash
+$ gittuf verify-ref --verbose v0.4.0
+$ gittuf verify-ref --verbose main
+```
 
 [get started guide]: /docs/get-started.md
