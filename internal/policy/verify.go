@@ -36,16 +36,16 @@ const (
 	noSignatureMessage                = "no signature found"
 	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
 	unableToFindRSLEntryMessage       = "unable to find tag's RSL entry"
-	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
 var (
-	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
-	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
-	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
+	ErrUnauthorizedSignature             = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped            = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped            = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrUnknownObjectType                 = errors.New("unknown object type passed to verify signature")
+	ErrInvalidVerifier                   = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet           = errors.New("verifier's key and threshold constraints not met")
+	ErrMultipleTagRSLEntriesFoundMessage = errors.New("multiple RSL entries found for tag")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -184,6 +184,19 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	// Verify each entry, looking for a fix when an invalid entry is encountered
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
+
+	targetRefEntiresCount := 0
+
+	for _, entry := range entries {
+		if entry.RefName == target {
+			targetRefEntiresCount++
+		}
+	}
+
+	if strings.HasPrefix(target, gitinterface.TagRefPrefix) && targetRefEntiresCount > 1 {
+		return ErrMultipleTagRSLEntriesFoundMessage
+	}
+
 	for len(entries) != 0 {
 		if invalidEntry == nil {
 			// Pop entry from queue
@@ -260,7 +273,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 }
 
 // findFixEntry is only reached when we have an invalid state.
-// First,findFixEntry determines the last good state for
+// First, findFixEntry determines the last good state for
 // the ref. This is needed to evaluate whether a fix for the invalid
 // state is available. After this is found, the workflow looks through
 // the remaining entries in the queue to find the fix. Until the fix is
@@ -442,70 +455,6 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 
 		if !verified {
 			status[id] = noPublicKeyMessage
-		}
-	}
-
-	return status
-}
-
-// VerifyTag verifies the signature on the RSL entries for the specified tags.
-// In addition, each tag object's signature is also verified using the same set
-// of trusted keys. If the tag is not protected by policy, then all keys in the
-// applicable policy are used to verify the signatures.
-func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[string]string {
-	status := make(map[string]string, len(ids))
-
-	for _, id := range ids {
-		// Check if id is tag name or hash of tag obj
-		absPath, err := gitinterface.AbsoluteReference(repo, id)
-		if err == nil {
-			if !strings.HasPrefix(absPath, gitinterface.TagRefPrefix) {
-				status[id] = nonTagMessage
-				continue
-			}
-		} else {
-			if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-				status[id] = err.Error()
-				continue
-			}
-
-			// Must be a hash
-			// verifyTagEntry also finds the tag object, wasteful?
-			tagObj, err := gitinterface.GetTag(repo, plumbing.NewHash(id))
-			if err != nil {
-				status[id] = nonTagMessage
-				continue
-			}
-			absPath = string(plumbing.NewTagReferenceName(tagObj.Name))
-		}
-
-		entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, absPath)
-		if err != nil {
-			status[id] = unableToFindRSLEntryMessage
-			continue
-		}
-
-		if _, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
-			status[id] = multipleTagRSLEntriesFoundMessage
-			continue
-		}
-
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
-		if err != nil {
-			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
-			continue
-		}
-
-		policy, err := LoadState(ctx, repo, policyEntry)
-		if err != nil {
-			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
-			continue
-		}
-
-		if err := verifyTagEntry(ctx, repo, policy, entry); err == nil {
-			status[id] = goodTagSignatureMessage
-		} else {
-			status[id] = err.Error()
 		}
 	}
 
