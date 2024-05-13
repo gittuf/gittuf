@@ -809,6 +809,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		}
 
 		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		repo, _ = createTestRepository(t, createTestStateWithPolicy)
 
