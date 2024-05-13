@@ -196,7 +196,6 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			switch entry.RefName {
 			case PolicyStagingRef:
 				slog.Debug("Entry is for the policy staging reference...")
-				continue
 			case PolicyRef:
 				slog.Debug("Entry is for the policy reference...")
 				// TODO: this is repetition if the firstEntry is for policy

@@ -812,9 +812,37 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		repo, _ = createTestRepository(t, createTestStateWithPolicy)
 
-		state := createTestStateWithOnlyBadRoot(t)
+		// Create a new bad state which could not be constructed from the last state,
+		// since the signer of the bad state did not have permission to perform these
+		// actions in the initial state
 
-		if err := state.Commit(repo, "Create test state", false); err != nil {
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata := InitializeRootMetadata(key)
+
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newBadState := &State{
+			RootPublicKeys: []*tuf.Key{key},
+			RootEnvelope:   rootEnv,
+		}
+
+		if err := newBadState.Commit(repo, "Create test state", false); err != nil {
 			t.Fatal(err)
 		}
 
