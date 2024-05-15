@@ -827,6 +827,9 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 	return allDelegations, rootMetadata, nil
 }
 
+// GetDiffBetweenPolicyAndStaging is to be used in conjunction with
+// ListRules, to show the difference between the current applicable
+// policy, and the changes to be applied to the policy
 func GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules []*DelegationWithDepth, policyRoot, policyStagingRoot *tuf.RootMetadata) string {
 	policyPointer, policyStagingPointer := 0, 0
 
@@ -843,23 +846,24 @@ func GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules []*Delegatio
 
 	fullDiff.WriteString("\n")
 	for policyPointer < len(policyRules) || policyStagingPointer < len(policyStagingRules) {
+		policyString, policyStagingString := getRuleString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), getRuleString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)
 		switch {
 		case policyPointer == len(policyRules):
-			fullDiff.WriteString(findDiffBetweenStrings("", getListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+			fullDiff.WriteString(findDiffBetweenStrings("", policyStagingString))
 			policyStagingPointer++
 		case policyStagingPointer == len(policyStagingRules):
-			fullDiff.WriteString(findDiffBetweenStrings(getListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
+			fullDiff.WriteString(findDiffBetweenStrings(policyString, ""))
 			policyPointer++
 		case policyRules[policyPointer] != policyStagingRules[policyStagingPointer]:
 			switch {
 			case policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth:
-				fullDiff.WriteString(findDiffBetweenStrings("", getListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+				fullDiff.WriteString(findDiffBetweenStrings("", policyStagingString))
 				policyStagingPointer++
 			case policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth:
-				fullDiff.WriteString(findDiffBetweenStrings(getListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), ""))
+				fullDiff.WriteString(findDiffBetweenStrings(policyString, ""))
 				policyPointer++
 			default:
-				fullDiff.WriteString(findDiffBetweenStrings(getListRulesString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), getListRulesString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)))
+				fullDiff.WriteString(findDiffBetweenStrings(policyString, policyStagingString))
 				policyPointer++
 				policyStagingPointer++
 			}
@@ -868,6 +872,9 @@ func GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules []*Delegatio
 	return fullDiff.String()
 }
 
+// findDiffBetweenStrings takes two strings (currently only used for
+// rule strings) and using the go-diff/diffmatchpatch library, creates a
+// color coded string of the difference between both strings.
 func findDiffBetweenStrings(initial, withChanges string) string {
 	dmp := diffmatchpatch.New()
 	lines1, lines2, lineArray := dmp.DiffLinesToChars(initial, withChanges)
@@ -894,7 +901,9 @@ func findDiffBetweenStrings(initial, withChanges string) string {
 	return diffDisplay.String()
 }
 
-func getListRulesString(rule tuf.Delegation, depth int) string {
+// getRuleString is a helper that takes a rule, and its depth in the
+// tuf delegation tree, and outputs the rule fields in a user-friendly way
+func getRuleString(rule tuf.Delegation, depth int) string {
 	var changes string
 
 	changes += fmt.Sprintf(strings.Repeat("    ", depth)+"Rule %s:\n", rule.Name)
