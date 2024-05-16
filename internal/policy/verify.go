@@ -39,13 +39,13 @@ const (
 )
 
 var (
-	ErrUnauthorizedSignature             = errors.New("unauthorized signature")
-	ErrInvalidEntryNotSkipped            = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped            = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType                 = errors.New("unknown object type passed to verify signature")
-	ErrInvalidVerifier                   = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet           = errors.New("verifier's key and threshold constraints not met")
-	ErrMultipleTagRSLEntriesFoundMessage = errors.New("multiple RSL entries found for tag")
+	ErrUnauthorizedSignature      = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped     = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped     = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrUnknownObjectType          = errors.New("unknown object type passed to verify signature")
+	ErrInvalidVerifier            = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet    = errors.New("verifier's key and threshold constraints not met")
+	ErrMultipleTagRSLEntriesFound = errors.New("multiple RSL entries found for tag")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -194,7 +194,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	}
 
 	if strings.HasPrefix(target, gitinterface.TagRefPrefix) && targetRefEntiresCount > 1 {
-		return ErrMultipleTagRSLEntriesFoundMessage
+		return ErrMultipleTagRSLEntriesFound
 	}
 
 	for len(entries) != 0 {
@@ -208,6 +208,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 			switch entry.RefName {
 			case PolicyStagingRef:
+				// If we encounter a policy-staging entry, we alert the user, but ignore it for gittuf verification
 				slog.Debug("Entry is for the policy staging reference...")
 			case PolicyRef:
 				slog.Debug("Entry is for the policy reference...")
@@ -272,7 +273,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	return nil
 }
 
-// findFixEntry is only reached when we have an invalid state.
+// findFixEntry is only used when we have an invalid state.
 // First, findFixEntry determines the last good state for
 // the ref. This is needed to evaluate whether a fix for the invalid
 // state is available. After this is found, the workflow looks through

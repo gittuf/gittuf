@@ -1019,7 +1019,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		err = VerifyRelativeForRef(context.Background(), repo, initialPolicyEntry, nil, initialPolicyEntry, entry, string(plumbing.NewTagReferenceName(tagName)))
-		assert.ErrorIs(t, err, ErrMultipleTagRSLEntriesFoundMessage)
+		assert.ErrorIs(t, err, ErrMultipleTagRSLEntriesFound)
 	})
 }
 
