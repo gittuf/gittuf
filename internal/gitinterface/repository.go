@@ -71,6 +71,13 @@ func (r *Repository) executeGitCommandString(args ...string) (string, error) {
 	return r.executeGitCommandDirectString(args...)
 }
 
+// executeGitCommand is a helper to execute the specified command in the
+// repository. It automatically adds the explicit `--git-dir` parameter.
+func (r *Repository) executeGitCommand(args ...string) (io.Reader, io.Reader, error) { //nolint:unused
+	args = append([]string{"--git-dir", r.gitDirPath}, args...)
+	return r.executeGitCommandDirect(args...)
+}
+
 // executeGitCommandString is a helper to execute the specified command in the
 // repository. It executes in the current directory without specifying the
 // GIT_DIR explicitly. It returns the stdout for successful execution as a
@@ -104,6 +111,47 @@ func (r *Repository) executeGitCommandDirect(args ...string) (io.Reader, io.Read
 		stdErr bytes.Buffer
 	)
 
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+
+	return &stdOut, &stdErr, cmd.Run()
+}
+
+// executeGitCommandWithStdInString is a helper to execute the specified command
+// in the repository with the specified `stdIn`. It automatically adds the
+// explicit `--git-dir` parameter.  It returns the stdout for successful
+// execution as a string, with leading and trailing spaces removed.
+func (r *Repository) executeGitCommandWithStdInString(stdIn *bytes.Buffer, args ...string) (string, error) {
+	args = append([]string{"--git-dir", r.gitDirPath}, args...)
+	stdOut, stdErr, err := r.executeGitCommandDirectWithStdIn(stdIn, args...)
+	if err != nil {
+		stdErrContents, newErr := io.ReadAll(stdErr)
+		if newErr != nil {
+			return "", fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
+		}
+		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(args, " "), string(stdErrContents))
+	}
+
+	stdOutContents, err := io.ReadAll(stdOut)
+	if err != nil {
+		return "", fmt.Errorf("unable to read stdout contents: %w", err)
+	}
+
+	return strings.TrimSpace(string(stdOutContents)), nil
+}
+
+// executeGitCommandDirectWithStdIn is a helper to execute the specified command
+// in the repository with `stdIn` passed into the process stdin. It executes in
+// the current directory without specifying the GIT_DIR explicitly.
+func (r *Repository) executeGitCommandDirectWithStdIn(stdIn *bytes.Buffer, args ...string) (io.Reader, io.Reader, error) {
+	cmd := exec.Command(binary, args...)
+
+	var (
+		stdOut bytes.Buffer
+		stdErr bytes.Buffer
+	)
+
+	cmd.Stdin = stdIn
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
