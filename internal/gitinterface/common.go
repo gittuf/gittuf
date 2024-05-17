@@ -44,11 +44,7 @@ func CreateTestGitRepository(t *testing.T, dir string) *Repository {
 
 	setupSigningKeys(t, keysDir)
 
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-
-	cmd := exec.Command(binary, "init", "-b", "main")
+	cmd := exec.Command(binary, "init", "-b", "main", dir)
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
