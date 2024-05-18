@@ -74,7 +74,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 	}
 
 	slog.Debug("Verifying entry...")
-	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry)
+	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry, target)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -185,18 +185,6 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
 
-	targetRefEntiresCount := 0
-
-	for _, entry := range entries {
-		if entry.RefName == target {
-			targetRefEntiresCount++
-		}
-	}
-
-	if strings.HasPrefix(target, gitinterface.TagRefPrefix) && targetRefEntiresCount > 1 {
-		return ErrMultipleTagRSLEntriesFound
-	}
-
 	for len(entries) != 0 {
 		if invalidEntry == nil {
 			// Pop entry from queue
@@ -204,12 +192,13 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			entries = entries[1:]
 
 			slog.Debug(fmt.Sprintf("Verifying entry '%s'...", entry.ID.String()))
-			slog.Debug("Checking reference of entry...")
 
+			slog.Debug("Checking reference of entry...")
 			switch entry.RefName {
 			case PolicyStagingRef:
-				// If we encounter a policy-staging entry, we alert the user, but ignore it for gittuf verification
-				slog.Debug("Entry is for the policy staging reference...")
+				// If we encounter a policy-staging entry, we alert the user, but ignore it
+				// for gittuf verification
+				slog.Debug("Entry is for the policy staging reference")
 			case PolicyRef:
 				slog.Debug("Entry is for the policy reference...")
 				// TODO: this is repetition if the firstEntry is for policy
@@ -235,7 +224,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 				currentAttestations = newAttestationsState
 			default:
 				slog.Debug("Verifying changes...")
-				if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
+				if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry, target); err != nil {
 					slog.Debug("Violation found, checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
 					if !entry.SkippedBy(annotations[entry.ID]) {
@@ -479,13 +468,13 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry, target string) error {
 	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
 
 	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
-		return verifyTagEntry(ctx, repo, policy, entry)
+		return verifyTagEntry(ctx, repo, policy, entry, target)
 	}
 
 	pathNamespaceVerified := true // Assume paths are verified until we find out otherwise
@@ -634,7 +623,11 @@ func verifyAttestation(ctx context.Context, verifiers []*Verifier, commitObj *ob
 	return false, "", nil
 }
 
-func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
+func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry, target string) error {
+	if _, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, target, entry.GetID()); err == nil {
+		return ErrMultipleTagRSLEntriesFound
+	}
+
 	// 1. Find authorized public keys for tag's RSL entry
 	trustedKeys, err := policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName))
 	if err != nil {

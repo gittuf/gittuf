@@ -879,9 +879,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		}
 
 		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		repo, _ = createTestRepository(t, createTestStateWithPolicy)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -938,7 +940,6 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
 		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -965,7 +966,6 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
 		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -995,7 +995,6 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
 		initialPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1088,7 +1087,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(context.Background(), repo, state, nil, entry)
+		err := verifyEntry(context.Background(), repo, state, nil, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -1142,7 +1141,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -1195,7 +1194,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = verifyEntry(context.Background(), repo, state, nil, entry)
+		err = verifyEntry(context.Background(), repo, state, nil, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -1207,7 +1206,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(context.Background(), repo, state, nil, entry)
+		err := verifyEntry(context.Background(), repo, state, nil, entry, refName)
 		assert.Equal(t, err.Error(), fmt.Sprintf("verifying Git namespace policies failed, %s", ErrUnauthorizedSignature.Error()))
 	})
 
@@ -1258,7 +1257,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(context.Background(), repo, state, nil, entry)
+		err = verifyEntry(context.Background(), repo, state, nil, entry, refName)
 		assert.Equal(t, fmt.Sprintf("verifying file namespace policies failed, %s", ErrUnauthorizedSignature.Error()), err.Error())
 	})
 }
@@ -1280,7 +1279,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		err := verifyTagEntry(context.Background(), repo, policy, entry, tagName)
 		assert.Nil(t, err)
 	})
 
@@ -1300,7 +1299,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		err := verifyTagEntry(context.Background(), repo, policy, entry, tagName)
 		assert.Nil(t, err)
 	})
 
@@ -1320,7 +1319,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(context.Background(), repo, policy, entry)
+		err := verifyTagEntry(context.Background(), repo, policy, entry, tagName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
 }
