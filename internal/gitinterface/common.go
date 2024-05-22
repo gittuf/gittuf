@@ -60,7 +60,7 @@ func CreateTestGitRepository(t *testing.T, dir string) *Repository {
 	}
 
 	// Set up signing via ED25519 SSH key (deterministic sigs!)
-	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key")); err != nil {
+	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
