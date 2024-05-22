@@ -8,7 +8,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path"
+	"path/filepath"
 )
 
 type ErrHookExists struct {
@@ -42,12 +42,12 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 	}
 
 	repoRoot := tree.Filesystem.Root()
-	hookFolder := path.Join(repoRoot, ".git", "hooks")
+	hookFolder := filepath.Join(repoRoot, ".git", "hooks")
 	if err := os.MkdirAll(hookFolder, 0o750); err != nil {
 		return fmt.Errorf("making sure folder exist: %w", err)
 	}
 
-	hookFile := path.Join(hookFolder, string(hookType))
+	hookFile := filepath.Join(hookFolder, string(hookType))
 	hookExists, err := doesFileExist(hookFile)
 	if err != nil {
 		return fmt.Errorf("checking if hookFile '%s' exists: %w", hookFile, err)
