@@ -151,7 +151,9 @@ func (r *Repository) executeGitCommandDirectWithStdIn(stdIn *bytes.Buffer, args 
 		stdErr bytes.Buffer
 	)
 
-	cmd.Stdin = stdIn
+	if stdIn != nil {
+		cmd.Stdin = stdIn
+	}
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
