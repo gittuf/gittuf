@@ -82,7 +82,7 @@ func TestRepositoryCommit(t *testing.T) {
 	assert.Equal(t, expectedSecondCommitID, refHead.String())
 
 	// Create third commit with same tree but sign this time
-	expectedThirdCommitID := "821c6322a3637799591e355f92c3334134edc793"
+	expectedThirdCommitID := "eed43c23f781ddc10359ce25e0fc486a000a8c9f"
 	commitID, err = repo.Commit(treeWithContentsID, refName, "Signing this commit\n", true)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedThirdCommitID, commitID.String())
@@ -265,7 +265,7 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	key, err := tuf.LoadKeyFromBytes(artifacts.SSHED25519Public)
+	key, err := tuf.LoadKeyFromBytes(artifacts.SSHRSAPublic)
 	if err != nil {
 		t.Fatal(err)
 	}
