@@ -13,6 +13,9 @@ var SSHRSAPublicSSH []byte
 //go:embed testdata/keys/ssh/rsa
 var SSHRSAPrivate []byte
 
+//go:embed testdata/keys/ssh/rsa_enc
+var SSHRSAPrivateEnc []byte
+
 //go:embed testdata/keys/ssh/ecdsa.pem
 var SSHECDSAPublic []byte
 

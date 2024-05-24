@@ -5,18 +5,14 @@ package dsse
 import (
 	"context"
 	"encoding/base64"
+	"path"
+	"path/filepath"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
-	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
-)
-
-var (
-	signingKeyBytes = artifacts.SSLibKey1Private
-	publicKeyBytes  = artifacts.SSLibKey1Public
 )
 
 func TestCreateEnvelope(t *testing.T) {
@@ -28,48 +24,57 @@ func TestCreateEnvelope(t *testing.T) {
 }
 
 func TestSignEnvelope(t *testing.T) {
-	env, err := createSignedEnvelope()
+	signer, err := loadSigner("rsa")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env, err := createSignedEnvelope(signer)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", env.Signatures[0].KeyID)
 
-	// Try signing with the same key to ensure a new signature isn't appended
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
 	env, err = SignEnvelope(context.Background(), env, signer)
 	assert.Nil(t, err)
 	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, "a0xAMWnJ3Hzf8j2zLFmniyUxV58m2lUprgzDPkJIRUORR4aKlX23WB3teaVMjXLuRKrD5GAMN8NSCR1vaetxBA==", env.Signatures[0].Sig)
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", env.Signatures[0].KeyID)
 }
 
 func TestVerifyEnvelope(t *testing.T) {
-	env, err := createSignedEnvelope()
+	signer, err := loadSigner("rsa")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tuf.LoadKeyFromBytes(publicKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
+	env, err := createSignedEnvelope(signer)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{verifier}, 1))
+	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Key}, 1))
 }
 
-func createSignedEnvelope() (*sslibdsse.Envelope, error) {
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(signingKeyBytes) //nolint:staticcheck
+func loadSigner(filename string) (*ssh.Signer, error) {
+	dir, _ := filepath.Abs("../../testartifacts/testdata/keys/ssh")
+	keyPath := path.Join(dir, filename)
+
+	key, err := ssh.Import(keyPath)
 	if err != nil {
 		return nil, err
 	}
+
+	signer := &ssh.Signer{
+		Key:  key,
+		Path: keyPath,
+	}
+
+	return signer, nil
+}
+
+func createSignedEnvelope(signer *ssh.Signer) (*sslibdsse.Envelope, error) {
 
 	message := []byte("test payload")
 	payload := base64.StdEncoding.EncodeToString(message)
@@ -80,7 +85,7 @@ func createSignedEnvelope() (*sslibdsse.Envelope, error) {
 		Signatures:  []sslibdsse.Signature{},
 	}
 
-	env, err = SignEnvelope(context.Background(), env, signer)
+	env, err := SignEnvelope(context.Background(), env, signer)
 	if err != nil {
 		return nil, err
 	}
