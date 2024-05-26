@@ -14,8 +14,8 @@ const AllowRuleName = "gittuf-allow-rule"
 var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
-func InitializeTargetsMetadata() *tuf.TargetsMetadata {
-	targetsMetadata := tuf.NewTargetsMetadata()
+func InitializeTargetsMetadata(name string) *tuf.TargetsMetadata {
+	targetsMetadata := tuf.NewTargetsMetadata(name)
 	targetsMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
 	targetsMetadata.Delegations.AddDelegation(AllowRule())
 	return targetsMetadata

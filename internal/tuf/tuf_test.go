@@ -81,7 +81,7 @@ func TestRootMetadata(t *testing.T) {
 }
 
 func TestTargetsMetadataAndDelegations(t *testing.T) {
-	targetsMetadata := NewTargetsMetadata()
+	targetsMetadata := NewTargetsMetadata("targets")
 
 	t.Run("test SetExpires", func(t *testing.T) {
 		d := time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC)

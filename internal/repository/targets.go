@@ -43,7 +43,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
 	slog.Debug("Creating initial rule file...")
-	targetsMetadata := policy.InitializeTargetsMetadata()
+	targetsMetadata := policy.InitializeTargetsMetadata(targetsRoleName)
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {

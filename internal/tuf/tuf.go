@@ -121,15 +121,17 @@ func (r *RootMetadata) AddRole(roleName string, role Role) {
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
 	Type        string         `json:"type"`
+	Name        string         `json:"name"`
 	Expires     string         `json:"expires"`
 	Targets     map[string]any `json:"targets"`
 	Delegations *Delegations   `json:"delegations"`
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
-func NewTargetsMetadata() *TargetsMetadata {
+func NewTargetsMetadata(name string) *TargetsMetadata {
 	return &TargetsMetadata{
 		Type:        "targets",
+		Name:        name,
 		Delegations: &Delegations{},
 	}
 }

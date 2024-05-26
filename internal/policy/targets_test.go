@@ -13,13 +13,13 @@ import (
 )
 
 func TestInitializeTargetsMetadata(t *testing.T) {
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 }
 
 func TestAddDelegation(t *testing.T) {
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestAddDelegation(t *testing.T) {
 }
 
 func TestUpdateDelegation(t *testing.T) {
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
 	if err != nil {
@@ -87,7 +87,7 @@ func TestUpdateDelegation(t *testing.T) {
 }
 
 func TestRemoveDelegation(t *testing.T) {
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 	key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
 	if err != nil {
@@ -121,7 +121,7 @@ func TestAddKeyToTargets(t *testing.T) {
 	}
 
 	t.Run("add single key", func(t *testing.T) {
-		targetsMetadata := InitializeTargetsMetadata()
+		targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 		assert.Nil(t, targetsMetadata.Delegations.Keys)
 
@@ -132,7 +132,7 @@ func TestAddKeyToTargets(t *testing.T) {
 	})
 
 	t.Run("add multiple keys", func(t *testing.T) {
-		targetsMetadata := InitializeTargetsMetadata()
+		targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 		assert.Nil(t, targetsMetadata.Delegations.Keys)
 

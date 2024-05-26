@@ -126,7 +126,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	}
 
 	// Create the root targets metadata
-	targetsMetadata := InitializeTargetsMetadata()
+	targetsMetadata := InitializeTargetsMetadata(TargetsRoleName)
 
 	targetsMetadata, err = AddDelegation(targetsMetadata, "1", []*tuf.Key{key}, []string{"file:1/*"}, 1)
 	if err != nil {
@@ -217,7 +217,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	}
 
 	// Create the second level of delegations
-	delegation1Metadata := InitializeTargetsMetadata()
+	delegation1Metadata := InitializeTargetsMetadata("1")
 	delegation1Metadata, err = AddDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"}, 1)
 	if err != nil {
 		t.Fatal(err)
