@@ -15,7 +15,6 @@ import (
 func TestInitializeTargetsMetadata(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	assert.Equal(t, 1, targetsMetadata.Version)
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 }
 

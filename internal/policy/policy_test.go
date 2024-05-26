@@ -366,7 +366,6 @@ func TestStateGetRootMetadata(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, 1, rootMetadata.Version)
 	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", rootMetadata.Roles[RootRoleName].KeyIDs[0])
 }
 

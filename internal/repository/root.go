@@ -289,7 +289,6 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.R
 }
 
 func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata *tuf.RootMetadata, commitMessage string, signCommit bool) error {
-	rootMetadata.SetVersion(rootMetadata.Version + 1)
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err
