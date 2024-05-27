@@ -270,6 +270,48 @@ func TestLoadCurrentState(t *testing.T) {
 	assert.Equal(t, state, loadedState)
 }
 
+func TestLoadFirstState(t *testing.T) {
+	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
+
+	// Update policy, record in RSL
+	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := state will modify state as well
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1) // just a dummy rule
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondState.TargetsEnvelope = targetsEnv
+	if err := secondState.Commit(repo, "Second state", false); err != nil {
+		t.Fatal(err)
+	}
+
+	loadedState, err := LoadFirstState(context.Background(), repo)
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.Equal(t, firstState, loadedState)
+}
+
 func TestLoadStateForEntry(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 

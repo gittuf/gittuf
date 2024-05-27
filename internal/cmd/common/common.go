@@ -22,6 +22,25 @@ const (
 	FulcioPrefix = "fulcio:"
 )
 
+// PublicKeys is a custom type to represent a list of paths
+type PublicKeys []string
+
+// String implements part of the pflag.Value interface.
+func (p *PublicKeys) String() string {
+	return strings.Join(*p, ", ")
+}
+
+// Set implements part of the pflag.Value interface.
+func (p *PublicKeys) Set(value string) error {
+	*p = append(*p, value)
+	return nil
+}
+
+// Type implements part of the pflag.Value interface.
+func (p *PublicKeys) Type() string {
+	return "public-keys"
+}
+
 // LoadPublicKey returns a tuf.Key object for a PGP / Sigstore Fulcio / SSH
 // (on-disk) key for use in gittuf metadata.
 func LoadPublicKey(key string) (*tuf.Key, error) {
