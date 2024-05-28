@@ -139,6 +139,8 @@ func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	headerSep := ":"
 	continues := "\\"
 
+	// Normalize and trim newlines
+	data = strings.ReplaceAll(data, "\r\n", lineSep)
 	data = strings.Trim(data, lineSep)
 
 	// Strip begin and end markers
