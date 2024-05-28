@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"path"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -36,6 +37,9 @@ func TestSSH(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
 			if strings.Contains(test.keyName, "_enc") {
+				if runtime.GOOS == "windows" {
+					t.Skip("TODO: test encrypted keys on windows")
+				}
 				script := path.Join(common.TestScripts, "askpass.sh")
 				t.Setenv("SSH_ASKPASS", script)
 				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
