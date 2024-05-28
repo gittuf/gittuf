@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,6 +19,7 @@ func testDataPath(name string) string {
 
 // Basic smoke test for ssh package for all supported keys
 func TestSSH(t *testing.T) {
+	testSSHKeys := common.TestSSHKeys(t)
 
 	rsa_keyid := "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"
 	ecdsa_keyid := "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto"
@@ -45,7 +47,7 @@ func TestSSH(t *testing.T) {
 				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
 			}
 
-			path := testDataPath("keys/ssh/" + test.keyName)
+			path := path.Join(testSSHKeys, test.keyName)
 			key, err := Import(path)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)

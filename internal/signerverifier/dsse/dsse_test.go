@@ -6,9 +6,9 @@ import (
 	"context"
 	"encoding/base64"
 	"path"
-	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -24,7 +24,8 @@ func TestCreateEnvelope(t *testing.T) {
 }
 
 func TestSignEnvelope(t *testing.T) {
-	signer, err := loadSigner("rsa")
+	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
+	signer, err := loadSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +45,8 @@ func TestSignEnvelope(t *testing.T) {
 }
 
 func TestVerifyEnvelope(t *testing.T) {
-	signer, err := loadSigner("rsa")
+	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
+	signer, err := loadSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,9 +59,7 @@ func TestVerifyEnvelope(t *testing.T) {
 	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Key}, 1))
 }
 
-func loadSigner(filename string) (*ssh.Signer, error) {
-	dir, _ := filepath.Abs("../../testartifacts/testdata/keys/ssh")
-	keyPath := path.Join(dir, filename)
+func loadSigner(keyPath string) (*ssh.Signer, error) {
 
 	key, err := ssh.Import(keyPath)
 	if err != nil {
