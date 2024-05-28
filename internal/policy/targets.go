@@ -6,12 +6,16 @@ import (
 	"errors"
 	"time"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const AllowRuleName = "gittuf-allow-rule"
 
-var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+var (
+	ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrInvalidPattern            = errors.New("invalid rule pattern")
+)
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
 func InitializeTargetsMetadata() *tuf.TargetsMetadata {
@@ -26,6 +30,12 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
+	}
+
+	for _, pattern := range rulePatterns {
+		if !doublestar.ValidatePattern(pattern) {
+			return nil, ErrInvalidPattern
+		}
 	}
 
 	authorizedKeyIDs := []string{}
@@ -60,6 +70,12 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 
 	if len(authorizedKeys) < threshold {
 		return nil, ErrCannotMeetThreshold
+	}
+
+	for _, pattern := range rulePatterns {
+		if !doublestar.ValidatePattern(pattern) {
+			return nil, ErrInvalidPattern
+		}
 	}
 
 	authorizedKeyIDs := []string{}

@@ -4,6 +4,7 @@ go 1.22
 
 require (
 	github.com/ProtonMail/go-crypto v1.0.0
+	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/go-git/go-billy/v5 v5.5.0
 	github.com/go-git/go-git/v5 v5.12.0
 	github.com/google/go-github/v61 v61.0.0
@@ -16,7 +17,6 @@ require (
 	github.com/sigstore/sigstore v1.8.3
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
-	github.com/tzvetkoff-go/fnmatch v0.0.0-20220210160758-879480b5e662
 	golang.org/x/crypto v0.23.0
 	google.golang.org/protobuf v1.34.1
 )
