@@ -115,8 +115,6 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		return err
 	}
 
-	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
-
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		return nil
@@ -179,8 +177,6 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
-	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
-
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		return nil
@@ -238,8 +234,6 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	if err != nil {
 		return err
 	}
-
-	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
@@ -302,8 +296,6 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 	if err != nil {
 		return err
 	}
-
-	targetsMetadata.SetVersion(targetsMetadata.Version + 1)
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {

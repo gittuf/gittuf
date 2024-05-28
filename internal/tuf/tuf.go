@@ -17,8 +17,6 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
-const specVersion = "1.0"
-
 var (
 	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 )
@@ -83,27 +81,17 @@ type Role struct {
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type               string          `json:"type"`
-	SpecVersion        string          `json:"spec_version"`
-	ConsistentSnapshot bool            `json:"consistent_snapshot"` // TODO: how do we handle this?
-	Version            int             `json:"version"`
-	Expires            string          `json:"expires"`
-	Keys               map[string]*Key `json:"keys"`
-	Roles              map[string]Role `json:"roles"`
+	Type    string          `json:"type"`
+	Expires string          `json:"expires"`
+	Keys    map[string]*Key `json:"keys"`
+	Roles   map[string]Role `json:"roles"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
 func NewRootMetadata() *RootMetadata {
 	return &RootMetadata{
-		Type:               "root",
-		SpecVersion:        specVersion,
-		ConsistentSnapshot: true,
+		Type: "root",
 	}
-}
-
-// SetVersion sets the version of the RootMetadata to the value passed in.
-func (r *RootMetadata) SetVersion(version int) {
-	r.Version = version
 }
 
 // SetExpires sets the expiry date of the RootMetadata to the value passed in.
@@ -133,8 +121,6 @@ func (r *RootMetadata) AddRole(roleName string, role Role) {
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
 	Type        string         `json:"type"`
-	SpecVersion string         `json:"spec_version"`
-	Version     int            `json:"version"`
 	Expires     string         `json:"expires"`
 	Targets     map[string]any `json:"targets"`
 	Delegations *Delegations   `json:"delegations"`
@@ -144,14 +130,8 @@ type TargetsMetadata struct {
 func NewTargetsMetadata() *TargetsMetadata {
 	return &TargetsMetadata{
 		Type:        "targets",
-		SpecVersion: specVersion,
 		Delegations: &Delegations{},
 	}
-}
-
-// SetVersion sets the version of the TargetsMetadata to the value passed in.
-func (t *TargetsMetadata) SetVersion(version int) {
-	t.Version = version
 }
 
 // SetExpires sets the expiry date of the TargetsMetadata to the value passed

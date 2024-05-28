@@ -16,7 +16,6 @@ func TestInitializeRootMetadata(t *testing.T) {
 	}
 
 	rootMetadata := InitializeRootMetadata(key)
-	assert.Equal(t, 1, rootMetadata.Version)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	assert.Equal(t, 1, rootMetadata.Roles[RootRoleName].Threshold)
 	assert.Equal(t, []string{key.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)

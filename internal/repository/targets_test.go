@@ -48,7 +48,6 @@ func TestInitializeTargets(t *testing.T) {
 
 		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, targetsMetadata.Version)
 		assert.Empty(t, targetsMetadata.Targets)
 		assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 	})
