@@ -40,3 +40,5 @@ func TestSSHKeys(tb testing.TB) string {
 
 	return testDir
 }
+
+var TestScripts = "../../testartifacts/testdata/scripts"
