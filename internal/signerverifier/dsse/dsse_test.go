@@ -60,7 +60,6 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func loadSigner(keyPath string) (*ssh.Signer, error) {
-
 	key, err := ssh.Import(keyPath)
 	if err != nil {
 		return nil, err
@@ -75,7 +74,6 @@ func loadSigner(keyPath string) (*ssh.Signer, error) {
 }
 
 func createSignedEnvelope(signer *ssh.Signer) (*sslibdsse.Envelope, error) {
-
 	message := []byte("test payload")
 	payload := base64.StdEncoding.EncodeToString(message)
 

@@ -27,16 +27,15 @@ type KeyVal struct {
 }
 
 // SSH Key.Verify() implementation of dsse.Verifier interface.
-func (k *Key) Verify(ctx context.Context, data []byte, sig []byte) error {
-
+func (k *Key) Verify(_ context.Context, data []byte, sig []byte) error {
 	pub, err := parseSSH2Body(k.KeyVal.Public)
 	if err != nil {
-		return fmt.Errorf("failed to parse ssh public key material: %v", err)
+		return fmt.Errorf("failed to parse ssh public key material: %w", err)
 	}
 
 	signature, err := sshsig.Unarmor(sig)
 	if err != nil {
-		return fmt.Errorf("failed to parse ssh signature: %v", err)
+		return fmt.Errorf("failed to parse ssh signature: %w", err)
 	}
 
 	message := bytes.NewReader(data)
@@ -44,7 +43,7 @@ func (k *Key) Verify(ctx context.Context, data []byte, sig []byte) error {
 	// ssh-keygen uses sha512 to sign with **any*** key
 	hash := sshsig.HashSHA512
 	if err = sshsig.Verify(message, signature, pub, hash, "gittuf"); err != nil {
-		return fmt.Errorf("failed to verify ssh signature: %v", err)
+		return fmt.Errorf("failed to verify ssh signature: %w", err)
 	}
 
 	return nil
@@ -75,14 +74,14 @@ type Signer struct {
 // ecdsa or ed25519 key file supported by "ssh-keygen". This aligns with the
 // git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
-func (s *Signer) Sign(ctx context.Context, data []byte) ([]byte, error) {
-	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", "gittuf", "-f", s.Path)
+func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
+	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", "gittuf", "-f", s.Path) //nolint:gosec
 
 	cmd.Stdin = bytes.NewBuffer(data)
 
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %v", cmd, err)
+		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
 	}
 
 	return output, nil
@@ -102,12 +101,12 @@ func Import(path string) (*Key, error) {
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %v", cmd, err)
+		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
 	}
 
 	sshPub, err := parseSSH2Key(string(output))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse SSH2 key: %v", err)
+		return nil, fmt.Errorf("failed to parse SSH2 key: %w", err)
 	}
 
 	return &Key{
@@ -134,7 +133,6 @@ func parseSSH2Body(body string) (ssh.PublicKey, error) {
 // - Does not validate line length, or header tag or value format
 // - Discards headers
 func parseSSH2Key(data string) (ssh.PublicKey, error) {
-
 	beginMark := "---- BEGIN SSH2 PUBLIC KEY ----"
 	endMark := "---- END SSH2 PUBLIC KEY ----"
 	lineSep := "\n"

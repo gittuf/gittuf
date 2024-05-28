@@ -14,23 +14,23 @@ import (
 func TestSSH(t *testing.T) {
 	testSSHKeys := common.TestSSHKeys(t)
 
-	rsa_keyid := "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"
-	ecdsa_keyid := "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto"
-	ed25519_keyid := "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E"
+	keyidRSA := "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"
+	keyidECDSA := "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto"
+	keyidEd25519 := "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E"
 
 	tests := []struct {
 		keyName string
 		keyID   string
 	}{
-		{"rsa", rsa_keyid},
-		{"rsa_enc", rsa_keyid},
-		{"rsa.pub", rsa_keyid},
-		{"ecdsa", ecdsa_keyid},
-		{"ecdsa_enc", ecdsa_keyid},
-		{"ecdsa.pub", ecdsa_keyid},
-		{"ed25519", ed25519_keyid},
-		{"ed25519_enc", ed25519_keyid},
-		{"ed25519.pub", ed25519_keyid},
+		{"rsa", keyidRSA},
+		{"rsa_enc", keyidRSA},
+		{"rsa.pub", keyidRSA},
+		{"ecdsa", keyidECDSA},
+		{"ecdsa_enc", keyidECDSA},
+		{"ecdsa.pub", keyidECDSA},
+		{"ed25519", keyidEd25519},
+		{"ed25519_enc", keyidEd25519},
+		{"ed25519.pub", keyidEd25519},
 	}
 
 	for _, test := range tests {
@@ -72,7 +72,6 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 		})
-
 	}
 }
 
