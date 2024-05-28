@@ -144,11 +144,11 @@ func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	// Strip begin and end markers
 	lines := strings.Split(data, lineSep)
 	if lines[0] != beginMark {
-		return nil, fmt.Errorf("no begin marker: %s", beginMark)
+		return nil, fmt.Errorf("expected '%s' in '%s'", beginMark, lines[0])
 	}
 	last := len(lines) - 1
 	if lines[last] != endMark {
-		return nil, fmt.Errorf("no end marker: %s", endMark)
+		return nil, fmt.Errorf("expected '%s' in '%s'", endMark, lines[last])
 	}
 	lines = lines[1:last]
 
