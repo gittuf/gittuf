@@ -2,51 +2,68 @@ package ssh
 
 import (
 	"context"
-	"path"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/common"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
 )
 
 // Basic smoke test for ssh package for all supported keys
 func TestSSH(t *testing.T) {
-	testSSHKeys := common.TestSSHKeys(t)
-
 	keyidRSA := "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"
 	keyidECDSA := "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto"
 	keyidEd25519 := "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E"
 
 	tests := []struct {
-		keyName string
-		keyID   string
+		keyName  string
+		keyBytes []byte
+		keyID    string
 	}{
-		{"rsa", keyidRSA},
-		{"rsa_enc", keyidRSA},
-		{"rsa.pub", keyidRSA},
-		{"ecdsa", keyidECDSA},
-		{"ecdsa_enc", keyidECDSA},
-		{"ecdsa.pub", keyidECDSA},
-		{"ed25519", keyidEd25519},
-		{"ed25519_enc", keyidEd25519},
-		{"ed25519.pub", keyidEd25519},
+		{"rsa", artifacts.SSHRSAPrivate, keyidRSA},
+		{"rsa_enc", artifacts.SSHRSAPrivateEnc, keyidRSA},
+		{"rsa.pub", artifacts.SSHRSAPublicSSH, keyidRSA},
+		{"ecdsa", artifacts.SSHECDSAPrivate, keyidECDSA},
+		{"ecdsa_enc", artifacts.SSHECDSAPrivateEnc, keyidECDSA},
+		{"ecdsa.pub", artifacts.SSHECDSAPublicSSH, keyidECDSA},
+		{"ed25519", artifacts.SSHED25519Private, keyidEd25519},
+		{"ed25519_enc", artifacts.SSHED25519PrivateEnc, keyidEd25519},
+		{"ed25519.pub", artifacts.SSHED25519PublicSSH, keyidEd25519},
+	}
+	// Setup tests
+	tmpDir := t.TempDir()
+	// Write script to mock password prompt
+
+	scriptPath := filepath.Join(tmpDir, "askpass.sh")
+	if err := os.WriteFile(scriptPath, artifacts.AskpassScript, 0o500); err != nil { //nolint:gosec
+		t.Fatal(err)
 	}
 
+	// Write test keys to temp dir with permissions required by ssh-keygen
+	for _, test := range tests {
+		keyPath := filepath.Join(tmpDir, test.keyName)
+		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Run tests
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
 			if strings.Contains(test.keyName, "_enc") {
 				if runtime.GOOS == "windows" {
 					t.Skip("TODO: test encrypted keys on windows")
 				}
-				script := path.Join(common.TestScripts, "askpass.sh")
-				t.Setenv("SSH_ASKPASS", script)
+				t.Setenv("SSH_ASKPASS", scriptPath)
 				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
 			}
 
-			path := path.Join(testSSHKeys, test.keyName)
-			key, err := Import(path)
+			keyPath := filepath.Join(tmpDir, test.keyName)
+
+			key, err := Import(keyPath)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
@@ -57,7 +74,7 @@ func TestSSH(t *testing.T) {
 
 			signer := Signer{
 				Key:  key,
-				Path: path,
+				Path: keyPath,
 			}
 
 			data := []byte("DATA")

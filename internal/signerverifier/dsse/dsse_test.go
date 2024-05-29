@@ -5,11 +5,12 @@ package dsse
 import (
 	"context"
 	"encoding/base64"
-	"path"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,13 @@ func TestCreateEnvelope(t *testing.T) {
 }
 
 func TestSignEnvelope(t *testing.T) {
-	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
+	// Setup test key
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "ecdsa")
+	if err := os.WriteFile(keyPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
 	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
@@ -36,16 +43,22 @@ func TestSignEnvelope(t *testing.T) {
 	}
 
 	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", env.Signatures[0].KeyID)
+	assert.Equal(t, "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto", env.Signatures[0].KeyID)
 
 	env, err = SignEnvelope(context.Background(), env, signer)
 	assert.Nil(t, err)
 	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", env.Signatures[0].KeyID)
+	assert.Equal(t, "SHA256:oNYBImx035m3rl1Sn/+j5DPrlS9+zXn7k3mjNrC5eto", env.Signatures[0].KeyID)
 }
 
 func TestVerifyEnvelope(t *testing.T) {
-	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
+	// Setup test key
+	tmpDir := t.TempDir()
+	keyPath := filepath.Join(tmpDir, "ecdsa")
+	if err := os.WriteFile(keyPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
 	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
