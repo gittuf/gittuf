@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const SSHSigNamespace = "git"
+
 // Key is a container and dsse.Verifier implementation for SSH keys.
 type Key struct {
 	KeyType string
@@ -43,7 +45,7 @@ func (k *Key) Verify(_ context.Context, data []byte, sig []byte) error {
 
 	// ssh-keygen uses sha512 to sign with **any*** key
 	hash := sshsig.HashSHA512
-	if err = sshsig.Verify(message, signature, pub, hash, "gittuf"); err != nil {
+	if err = sshsig.Verify(message, signature, pub, hash, SSHSigNamespace); err != nil {
 		return fmt.Errorf("failed to verify ssh signature: %w", err)
 	}
 
@@ -75,7 +77,7 @@ type Signer struct {
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
-	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", "gittuf", "-f", s.Path) //nolint:gosec
+	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", SSHSigNamespace, "-f", s.Path) //nolint:gosec
 
 	cmd.Stdin = bytes.NewBuffer(data)
 
