@@ -30,7 +30,13 @@ func TestAddDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
+	roles := []tuf.Role{{
+		Name:      "Test Role",
+		KeyIDs:    []string{key1.KeyID, key2.KeyID},
+		Threshold: 1,
+	}}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1, roles)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -41,7 +47,8 @@ func TestAddDelegation(t *testing.T) {
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
+		MinRoles:    1,
+		Roles:       []tuf.Role{{Name: "Test Role", KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1}},
 	}, targetsMetadata.Delegations.Roles[0])
 }
 
@@ -57,7 +64,13 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []string{"test/"}, 1)
+	roles := []tuf.Role{{
+		Name:      "Test Role",
+		KeyIDs:    []string{key1.KeyID},
+		Threshold: 1,
+	}}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []string{"test/"}, 1, roles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +81,17 @@ func TestUpdateDelegation(t *testing.T) {
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID}, Threshold: 1},
+		MinRoles:    1,
+		Roles:       []tuf.Role{{Name: "Test Role", KeyIDs: []string{key1.KeyID}, Threshold: 1}},
 	}, targetsMetadata.Delegations.Roles[0])
 
-	targetsMetadata, err = UpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
+	roles = []tuf.Role{{
+		Name:      "Test Role",
+		KeyIDs:    []string{key1.KeyID, key2.KeyID},
+		Threshold: 1,
+	}}
+
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1, roles)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -82,7 +102,8 @@ func TestUpdateDelegation(t *testing.T) {
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
+		MinRoles:    1,
+		Roles:       []tuf.Role{{Name: "Test Role", KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1}},
 	}, targetsMetadata.Delegations.Roles[0])
 }
 
@@ -94,7 +115,13 @@ func TestRemoveDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []string{"test/"}, 1)
+	roles := []tuf.Role{{
+		Name:      "Test Role",
+		KeyIDs:    []string{key.KeyID},
+		Threshold: 1,
+	}}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []string{"test/"}, 1, roles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,6 +176,6 @@ func TestAllowRule(t *testing.T) {
 	assert.Equal(t, AllowRuleName, allowRule.Name)
 	assert.Equal(t, []string{"*"}, allowRule.Paths)
 	assert.True(t, allowRule.Terminating)
-	assert.Empty(t, allowRule.KeyIDs)
-	assert.Equal(t, 1, allowRule.Threshold)
+	assert.Empty(t, allowRule.Roles[0].KeyIDs)
+	assert.Equal(t, 1, allowRule.Roles[0].Threshold)
 }

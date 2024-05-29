@@ -78,6 +78,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	authorizedKeys := []*tuf.Key{}
+	authorizedKeyStrings := []string{}
 	for _, key := range o.authorizedKeys {
 		key, err := common.LoadPublicKey(key)
 		if err != nil {
@@ -85,9 +86,20 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		}
 
 		authorizedKeys = append(authorizedKeys, key)
+		authorizedKeyStrings = append(authorizedKeyStrings, key.KeyID)
 	}
 
-	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedKeys, o.rulePatterns, o.threshold, true)
+	// TEAMS: To accommodate the existing workflow and the teams metadata
+	// format, this now synthesizes a "placeholder" role that mirrors the
+	// existing functionality. Specifying multiple roles will need a new command
+	// and workflow.
+	roles := []tuf.Role{{
+		Name:      "Single Role",
+		KeyIDs:    authorizedKeyStrings,
+		Threshold: o.threshold,
+	}}
+
+	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedKeys, o.rulePatterns, 1, roles, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

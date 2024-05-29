@@ -22,7 +22,7 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 }
 
 // AddDelegation adds a new delegation to TargetsMetadata.
-func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
+func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, minRoles int, roles []tuf.Role) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
@@ -38,11 +38,9 @@ func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, author
 	newDelegation := tuf.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
+		MinRoles:    minRoles,
 		Terminating: false,
-		Role: tuf.Role{
-			KeyIDs:    authorizedKeyIDs,
-			Threshold: threshold,
-		},
+		Roles:       roles,
 	}
 	allDelegations = append(allDelegations[:len(allDelegations)-1], newDelegation, AllowRule())
 
@@ -52,14 +50,14 @@ func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, author
 }
 
 // UpdateDelegation is used to amend a delegation in TargetsMetadata.
-func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
+func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, minRoles int, roles []tuf.Role) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
 
-	if len(authorizedKeys) < threshold {
-		return nil, ErrCannotMeetThreshold
-	}
+	// if len(authorizedKeys) < threshold {
+	// 	return nil, ErrCannotMeetThreshold
+	// }
 
 	authorizedKeyIDs := []string{}
 	for _, key := range authorizedKeys {
@@ -81,10 +79,8 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
-			delegation.Role = tuf.Role{
-				KeyIDs:    authorizedKeyIDs,
-				Threshold: threshold,
-			}
+			delegation.MinRoles = minRoles
+			delegation.Roles = roles
 		}
 
 		allDelegations = append(allDelegations, delegation)
@@ -130,9 +126,11 @@ func AllowRule() tuf.Delegation {
 		Name:        AllowRuleName,
 		Paths:       []string{"*"},
 		Terminating: true,
-		Role: tuf.Role{
+		MinRoles:    1,
+		Roles: []tuf.Role{{
+			Name:      "Default allow rule",
 			KeyIDs:    []string{},
-			Threshold: 1,
+			Threshold: 1},
 		},
 	}
 }

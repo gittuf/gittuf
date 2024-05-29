@@ -252,9 +252,11 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 		delegationsQueue = delegationsQueue[1:]
 
 		if delegation.Matches(path) {
-			for _, keyID := range delegation.KeyIDs {
-				key := allPublicKeys[keyID]
-				trustedKeys = append(trustedKeys, key)
+			for _, role := range delegation.Roles {
+				for _, keyID := range role.KeyIDs {
+					key := allPublicKeys[keyID]
+					trustedKeys = append(trustedKeys, key)
+				}
 			}
 
 			if _, seen := seenRoles[delegation.Name]; seen {
@@ -290,15 +292,16 @@ func (s *State) FindPublicKeysForPath(ctx context.Context, path string) ([]*tuf.
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
-func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
-	if s.verifiersCache == nil {
-		slog.Debug("Initializing path cache in policy...")
-		s.verifiersCache = map[string][]*Verifier{}
-	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
-		// Cache hit for this path in this policy
-		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
-		return verifiers, nil
-	}
+func (s *State) FindVerifiersForPath(path string) ([]*MultiVerifier, error) {
+	// TEAMS: Caching has been temporarily disabled
+	// if s.verifiersCache == nil {
+	// 	slog.Debug("Initializing path cache in policy...")
+	// 	s.verifiersCache = map[string][]*Verifier{}
+	// } else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
+	// 	// Cache hit for this path in this policy
+	// 	slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
+	// 	return verifiers, nil
+	// }
 
 	if !s.HasTargetsRole(TargetsRoleName) {
 		// No policies exist
@@ -321,11 +324,11 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 	seenRoles := map[string]bool{TargetsRoleName: true}
 
 	var currentDelegationGroup []tuf.Delegation
-	verifiers := []*Verifier{}
+	mVerifiers := []*MultiVerifier{}
 	for {
 		if len(groupedDelegations) == 0 {
-			s.verifiersCache[path] = verifiers
-			return verifiers, nil
+			// s.verifiersCache[path] = mVerifiers
+			return mVerifiers, nil
 		}
 
 		currentDelegationGroup = groupedDelegations[0]
@@ -341,16 +344,30 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 			currentDelegationGroup = currentDelegationGroup[1:]
 
 			if delegation.Matches(path) {
-				verifier := &Verifier{
+				// TEAMS: We now collect all the individual role verifiers into
+				// one big "multi verifier" which requires a threshold of
+				// verifiers to verify before it itself verifies.
+				// 1 verifier : 1 role
+				// 1 multi verifier : 1 delegation
+				mVerifier := &MultiVerifier{
 					name:      delegation.Name,
-					keys:      make([]*tuf.Key, 0, len(delegation.KeyIDs)),
-					threshold: delegation.Threshold,
+					verifiers: make([]*Verifier, 0, len(delegation.Roles)),
+					threshold: delegation.MinRoles,
 				}
-				for _, keyID := range delegation.KeyIDs {
-					key := allPublicKeys[keyID]
-					verifier.keys = append(verifier.keys, key)
+				for _, role := range delegation.Roles {
+					verifier := &Verifier{
+						name:      role.Name,
+						keys:      make([]*tuf.Key, 0, len(role.KeyIDs)),
+						threshold: role.Threshold,
+					}
+					for _, keyID := range role.KeyIDs {
+						key := allPublicKeys[keyID]
+						verifier.keys = append(verifier.keys, key)
+					}
+					mVerifier.verifiers = append(mVerifier.verifiers, verifier)
 				}
-				verifiers = append(verifiers, verifier)
+
+				mVerifiers = append(mVerifiers, mVerifier)
 
 				if _, seen := seenRoles[delegation.Name]; seen {
 					continue
@@ -447,14 +464,16 @@ func (s *State) Verify(ctx context.Context) error {
 			env := s.DelegationEnvelopes[delegation.Name]
 
 			keys := []*tuf.Key{}
-			for _, keyID := range delegation.KeyIDs {
-				keys = append(keys, delegationKeys[keyID])
+			for _, role := range delegation.Roles {
+				for _, keyID := range role.KeyIDs {
+					keys = append(keys, delegationKeys[keyID])
+				}
 			}
 
 			verifier := &Verifier{
 				name:      delegation.Name,
 				keys:      keys,
-				threshold: delegation.Threshold,
+				threshold: delegation.MinRoles,
 			}
 
 			if err := verifier.Verify(ctx, nil, env); err != nil {

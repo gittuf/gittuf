@@ -72,9 +72,18 @@ func calculateKeyID(k *Key) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
+// TEAMS
 // Role records common characteristics recorded in a role entry in Root metadata
 // and in a delegation entry.
 type Role struct {
+	Name      string   `json:"rolename"`
+	KeyIDs    []string `json:"keyids"`
+	Threshold int      `json:"threshold"`
+}
+
+// LegacyRole fulfills the same role (heh) as Role above, but aligns with the
+// old, pre-teams metadata used by gittuf.
+type LegacyRole struct {
 	KeyIDs    []string `json:"keyids"`
 	Threshold int      `json:"threshold"`
 }
@@ -183,10 +192,22 @@ func (d *Delegation) Matches(target string) bool {
 	return false
 }
 
+// TEAMS
 // Delegation defines the schema for a single delegation entry. It differs from
 // the standard TUF schema by allowing a `custom` field to record details
 // pertaining to the delegation.
 type Delegation struct {
+	Name        string           `json:"name"`
+	Paths       []string         `json:"paths"`
+	Terminating bool             `json:"terminating"`
+	MinRoles    int              `json:"min_roles_in_agreement"`
+	Custom      *json.RawMessage `json:"custom,omitempty"`
+	Roles       []Role           `json:"roleinfo"`
+}
+
+// LegacyDelegation is used for compatibility with pre-teams gittuf metadata
+// that follows the old format below.
+type LegacyDelegation struct {
 	Name        string           `json:"name"`
 	Paths       []string         `json:"paths"`
 	Terminating bool             `json:"terminating"`

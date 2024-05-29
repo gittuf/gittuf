@@ -60,12 +60,16 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			}
 		}
 
-		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + "Authorized keys:")
-		for _, key := range curRule.Delegation.Role.KeyIDs {
-			fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
+		fmt.Printf(strings.Repeat("    ", curRule.Depth+1)+"Min Roles Needed to Agree: %d\n", curRule.Delegation.MinRoles)
+		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + "Authorized Roles:")
+		for _, role := range curRule.Delegation.Roles {
+			fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"Role %s:\n", role.Name)
+			fmt.Printf(strings.Repeat("    ", curRule.Depth+3)+"Threshold: %d\n", role.Threshold)
+			fmt.Println(strings.Repeat("    ", curRule.Depth+3) + "Authorized Keys:")
+			for _, key := range role.KeyIDs {
+				fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
+			}
 		}
-
-		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.Role.Threshold))
 	}
 	return nil
 }
