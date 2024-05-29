@@ -173,22 +173,22 @@ func TestDelegationMatches(t *testing.T) {
 			expected: true,
 		},
 		"artifact in subdirectory, matches": {
-			patterns: []string{"foo/**"},
+			patterns: []string{"foo/*"},
 			target:   "foo/bar/foobar",
 			expected: true,
 		},
 		"artifact in arbitrary directory, matches": {
-			patterns: []string{"**/*.txt"},
+			patterns: []string{"*/*.txt"},
 			target:   "foo/bar/foobar.txt",
 			expected: true,
 		},
 		"artifact with specific name in arbitrary directory, matches": {
-			patterns: []string{"**/foobar.txt"},
+			patterns: []string{"*/foobar.txt"},
 			target:   "foo/bar/foobar.txt",
 			expected: true,
 		},
 		"artifact with arbitrary subdirectories, matches": {
-			patterns: []string{"foo/**/foobar.txt"},
+			patterns: []string{"foo/*/foobar.txt"},
 			target:   "foo/bar/baz/foobar.txt",
 			expected: true,
 		},
@@ -223,7 +223,7 @@ func TestDelegationMatches(t *testing.T) {
 			expected: true,
 		},
 		"pattern with gittuf file prefix for all recursive contents, matches": {
-			patterns: []string{"file:src/signatures/**"},
+			patterns: []string{"file:src/signatures/*"},
 			target:   "file:src/signatures/rsa/rsa.go",
 			expected: true,
 		},

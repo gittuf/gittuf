@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -30,12 +29,6 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
-	}
-
-	for _, pattern := range rulePatterns {
-		if !doublestar.ValidatePattern(pattern) {
-			return nil, ErrInvalidPattern
-		}
 	}
 
 	authorizedKeyIDs := []string{}
@@ -70,12 +63,6 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 
 	if len(authorizedKeys) < threshold {
 		return nil, ErrCannotMeetThreshold
-	}
-
-	for _, pattern := range rulePatterns {
-		if !doublestar.ValidatePattern(pattern) {
-			return nil, ErrInvalidPattern
-		}
 	}
 
 	authorizedKeyIDs := []string{}
