@@ -40,12 +40,14 @@ const (
 )
 
 var (
-	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
-	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
-	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
+	ErrUnauthorizedSignature        = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped       = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped       = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrUnknownObjectType            = errors.New("unknown object type passed to verify signature")
+	ErrInvalidVerifier              = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrInvalidMultiVerifier         = errors.New("multi-verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet      = errors.New("verifier's key and threshold constraints not met")
+	ErrMultiVerifierConditionsUnmet = errors.New("multi-verifier's key and threshold constraints not met")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -541,13 +543,13 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	)
 
 	// Find authorized verifiers for entry's ref
-	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
+	mVerifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
 	if err != nil {
 		return err
 	}
 
 	// No verifiers => no restrictions for the git namespace
-	if len(verifiers) == 0 {
+	if len(mVerifiers) == 0 {
 		gitNamespaceVerified = true
 	}
 
@@ -566,13 +568,15 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	}
 
 	// Use each verifier to verify signature
-	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, commitObj, authorizationAttestation)
+	for _, mVerifier := range mVerifiers {
+		slog.Debug("Verifying multi-verifier")
+		slog.Debug(mVerifier.name)
+		err := mVerifier.Verify(ctx, commitObj, authorizationAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			gitNamespaceVerified = true
 			break
-		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+		} else if !errors.Is(err, ErrMultiVerifierConditionsUnmet) {
 			// Unexpected error
 			return err
 		}
@@ -874,6 +878,56 @@ func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string,
 	}
 
 	return gitinterface.GetDiffFilePaths(currentCommit, priorCommit)
+}
+
+// TEAMS
+// A MultiVerifier contains multiple verifiers, each representing one role.
+// If the number of verifiers specified by threshold successfully verify, the
+// MultiVerifier is considered to also successfully verify.
+type MultiVerifier struct {
+	name      string
+	verifiers []*Verifier
+	threshold int
+}
+
+func (m *MultiVerifier) Name() string {
+	return m.name
+}
+
+func (m *MultiVerifier) Verifiers() []*Verifier {
+	return m.verifiers
+}
+
+func (m *MultiVerifier) Threshold() int {
+	return m.threshold
+}
+
+func (m *MultiVerifier) Verify(ctx context.Context, gitObject object.Object, env *sslibdsse.Envelope) error {
+	if m.threshold < 1 || len(m.verifiers) < 1 {
+		return ErrInvalidMultiVerifier
+	}
+
+	numVerified := 0
+
+	for _, verifier := range m.verifiers {
+		err := verifier.Verify(ctx, gitObject, env)
+		if err == nil {
+			// Signature verification succeeded
+			// Let's check if we have met the threshold of verifiers needed to
+			// verify.
+			numVerified++
+			if numVerified >= m.threshold {
+				// Mark as verified and return no error
+				return nil
+			}
+			// Otherwise, we need to continue verifying the verifiers
+		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+			// Unexpected error
+			return err
+		}
+	}
+
+	return ErrMultiVerifierConditionsUnmet
 }
 
 type Verifier struct {

@@ -112,13 +112,14 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Equal(t, key, delegations.Keys[key.KeyID])
 	})
 
+	// TEAMS
 	t.Run("test AddDelegation", func(t *testing.T) {
 		assert.Nil(t, delegations.Roles)
 		d := Delegation{
 			Name: "delegation",
-			Role: Role{
+			Roles: []Role{{
 				KeyIDs:    []string{key.KeyID},
-				Threshold: 1,
+				Threshold: 1},
 			},
 		}
 		delegations.AddDelegation(d)

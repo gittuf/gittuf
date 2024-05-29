@@ -88,7 +88,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -119,7 +119,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,7 +178,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -209,7 +209,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,7 +283,7 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1) // just a dummy rule
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}}) // just a dummy rule
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,39 +421,45 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		}
 
 		tests := map[string]struct {
-			path      string
-			verifiers []*Verifier
+			path       string
+			mVerifiers []*MultiVerifier
 		}{
 			"verifiers for refs/heads/main": {
 				path: "git:refs/heads/main",
-				verifiers: []*Verifier{{
-					name:      "protect-main",
-					keys:      []*tuf.Key{gpgKey},
+				mVerifiers: []*MultiVerifier{{
+					name: "protect-main",
+					verifiers: []*Verifier{{
+						keys:      []*tuf.Key{gpgKey},
+						threshold: 1,
+					}},
 					threshold: 1,
 				}},
 			},
 			"verifiers for files": {
 				path: "file:1",
-				verifiers: []*Verifier{{
-					name:      "protect-files-1-and-2",
-					keys:      []*tuf.Key{gpgKey},
+				mVerifiers: []*MultiVerifier{{
+					name: "protect-files-1-and-2",
+					verifiers: []*Verifier{{
+						keys:      []*tuf.Key{gpgKey},
+						threshold: 1,
+					}},
 					threshold: 1,
 				}},
 			},
 			"verifiers for unprotected branch": {
-				path:      "git:refs/heads/unprotected",
-				verifiers: []*Verifier{},
+				path:       "git:refs/heads/unprotected",
+				mVerifiers: []*MultiVerifier{},
 			},
 			"verifiers for unprotected files": {
-				path:      "file:unprotected",
-				verifiers: []*Verifier{},
+				path:       "file:unprotected",
+				mVerifiers: []*MultiVerifier{},
 			},
 		}
 
 		for name, test := range tests {
 			verifiers, err := state.FindVerifiersForPath(test.path)
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-			assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
+			assert.Equal(t, test.mVerifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
 		}
 	})
 
@@ -563,7 +569,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []string{"*"}, 1) // just a dummy rule
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []string{"*"}, 1, []tuf.Role{{KeyIDs: []string{""}, Threshold: 1}}) // just a dummy rule
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,9 +627,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"git:refs/heads/main"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 0,
@@ -634,9 +641,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"file:1", "file:2"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 0,
@@ -657,9 +665,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"file:1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 0,
@@ -670,9 +679,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"file:1/subpath1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 1,
@@ -683,9 +693,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"file:1/subpath2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 1,
@@ -697,9 +708,10 @@ func TestListRules(t *testing.T) {
 					Paths:       []string{"file:2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					MinRoles:    1,
+					Roles: []tuf.Role{{
 						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
-						Threshold: 1,
+						Threshold: 1},
 					},
 				},
 				Depth: 0,

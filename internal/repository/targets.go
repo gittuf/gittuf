@@ -73,7 +73,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, minRoles int, roles []tuf.Role, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -99,7 +99,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		return policy.ErrMetadataNotFound
 	}
 
-	// TODO: verify is role can be signed using the presented key. This requires
+	// TODO: verify if role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
@@ -110,7 +110,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Adding rule to rule file...")
-	targetsMetadata, err = policy.AddDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, threshold)
+	targetsMetadata, err = policy.AddDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, minRoles, roles)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
 // policy.
-func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, minRoles int, roles []tuf.Role, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -172,7 +172,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Updating rule in rule file...")
-	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, threshold)
+	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, minRoles, roles)
 	if err != nil {
 		return err
 	}
@@ -224,9 +224,16 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
+	// Attempt to decode metadata into new (teams-enabled) format
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
 	if err != nil {
-		return err
+		// If that failed, try to decode it as legacy metadata instead before
+		// giving up
+		// targetsMetadata, err = state.GetLegacyTargetsMetadata(targetsRoleName)
+		if err != nil {
+			// Something went wrong, give up!
+			return err
+		}
 	}
 
 	slog.Debug("Removing rule from rule file...")
