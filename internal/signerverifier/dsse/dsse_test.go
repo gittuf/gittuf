@@ -25,7 +25,7 @@ func TestCreateEnvelope(t *testing.T) {
 
 func TestSignEnvelope(t *testing.T) {
 	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
-	signer, err := loadSigner(keyPath)
+	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSignEnvelope(t *testing.T) {
 
 func TestVerifyEnvelope(t *testing.T) {
 	keyPath := path.Join(common.TestSSHKeys(t), "rsa")
-	signer, err := loadSigner(keyPath)
+	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestVerifyEnvelope(t *testing.T) {
 	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Key}, 1))
 }
 
-func loadSigner(keyPath string) (*ssh.Signer, error) {
+func loadSSHSigner(keyPath string) (*ssh.Signer, error) {
 	key, err := ssh.Import(keyPath)
 	if err != nil {
 		return nil, err
