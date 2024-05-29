@@ -50,6 +50,9 @@ func TestSSH(t *testing.T) {
 		}
 	}
 
+	data := []byte("DATA")
+	notData := []byte("NOT DATA")
+
 	// Run tests
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
@@ -77,7 +80,6 @@ func TestSSH(t *testing.T) {
 				Path: keyPath,
 			}
 
-			data := []byte("DATA")
 			sig, err := signer.Sign(context.TODO(), data)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
@@ -88,7 +90,7 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = key.Verify(context.TODO(), []byte("NOT DATA"), sig)
+			err = key.Verify(context.TODO(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
