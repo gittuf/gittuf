@@ -14,7 +14,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// SSH Key/Verifier
+// Key is a container and dsse.Verifier implementation for SSH keys.
 type Key struct {
 	KeyType string
 	KeyVal  KeyVal
@@ -22,11 +22,12 @@ type Key struct {
 	keyID   string
 }
 
+// KeyVal is a container for public key material for SSH keys.
 type KeyVal struct {
 	Public string
 }
 
-// SSH Key.Verify() implementation of dsse.Verifier interface.
+// Verify implements the dsse.Verifier.Verify interface for SSH keys.
 func (k *Key) Verify(_ context.Context, data []byte, sig []byte) error {
 	pub, err := parseSSH2Body(k.KeyVal.Public)
 	if err != nil {
@@ -49,30 +50,29 @@ func (k *Key) Verify(_ context.Context, data []byte, sig []byte) error {
 	return nil
 }
 
-// SSH Key.KeyID() implementation of dsse.Verifier interface.
-// FIXME: consider removing error in interface; the dsse implementation
-// clearly needs one
+// KeyID implements the dsse.Verifier.KeyID interface for SSH keys.
+// FIXME: consider removing error in interface; a dsse.Verifier needs a keyid
 func (k *Key) KeyID() (string, error) {
 	return k.keyID, nil
 }
 
-// SSH Key.Public() implementation of dsse.Verifier interface.
+// Public implements the dsse.Verifier.Public interface for SSH keys.
 // FIXME: consider removing in interface, "Verify()" is all that's needed
 func (k *Key) Public() crypto.PublicKey {
 	sshKey, _ := parseSSH2Body(k.KeyVal.Public)
 	return sshKey.(ssh.CryptoPublicKey).CryptoPublicKey()
 }
 
-// SSH Signer
+// Signer is a dsse.Signer implementation for SSH keys.
 type Signer struct {
 	Key  *Key
 	Path string
 }
 
-// SSH Signer.Sign() implementation of dsse.Signer interface.
-// Signs using "s.Path" to a public or private, encrypted or plaintext, rsa,
-// ecdsa or ed25519 key file supported by "ssh-keygen". This aligns with the
-// git "user.signingKey" option.
+// Sign implements the dsse.Signer.Sign interface for SSH keys.
+// It signs using "s.Path" to a public or private, encrypted or plaintext, rsa,
+// ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
+// with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", "gittuf", "-f", s.Path) //nolint:gosec
@@ -87,15 +87,15 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	return output, nil
 }
 
-// SSH Signer.KeyID() implementation of dsse.Signer interface.
+// KeyID implements the dsse.Signer.KeyID interface for SSH keys.
 func (s *Signer) KeyID() (string, error) {
 	return s.Key.KeyID()
 }
 
-// Imports Key using the passed path
-// Path can be to a public or private, encrypted or plaintext, rsa, ecdsa or
-// ed25519 key file supported by "ssh-keygen". This aligns with the git
-// "user.signingKey" option.
+// Import imports an SSH public key from the passed path.
+// The path can point to a public or private, encrypted or plaintext, rsa,
+// ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
+// with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func Import(path string) (*Key, error) {
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
@@ -119,7 +119,7 @@ func Import(path string) (*Key, error) {
 	}, nil
 }
 
-// Parses base64-encoded SSH2 wire format key
+// parseSSH2Body parses a base64-encoded SSH2 wire format key.
 func parseSSH2Body(body string) (ssh.PublicKey, error) {
 	bodyBytes, err := base64.StdEncoding.DecodeString(body)
 	if err != nil {
@@ -128,10 +128,11 @@ func parseSSH2Body(body string) (ssh.PublicKey, error) {
 	return ssh.ParsePublicKey(bodyBytes)
 }
 
-// Parses SSH2 public key as defined in RFC4716 (3.  Key File Format)
-// - Only supports "\n" as line termination character
-// - Does not validate line length, or header tag or value format
-// - Discards headers
+// parseSSH2Key parses a SSH2 public key as defined in RFC4716 (section 3.)
+// NOTE:
+// - only supports "\n" as line termination character
+// - does not validate line length, or header tag or value format
+// - discards headers
 func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	beginMark := "---- BEGIN SSH2 PUBLIC KEY ----"
 	endMark := "---- END SSH2 PUBLIC KEY ----"
