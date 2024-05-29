@@ -11,10 +11,7 @@ import (
 
 const AllowRuleName = "gittuf-allow-rule"
 
-var (
-	ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
-	ErrInvalidPattern            = errors.New("invalid rule pattern")
-)
+var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
 func InitializeTargetsMetadata() *tuf.TargetsMetadata {
