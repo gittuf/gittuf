@@ -80,17 +80,17 @@ func TestSSH(t *testing.T) {
 				Path: keyPath,
 			}
 
-			sig, err := signer.Sign(context.TODO(), data)
+			sig, err := signer.Sign(context.Background(), data)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = key.Verify(context.TODO(), data, sig)
+			err = key.Verify(context.Background(), data, sig)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = key.Verify(context.TODO(), notData, sig)
+			err = key.Verify(context.Background(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
