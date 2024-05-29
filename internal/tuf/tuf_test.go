@@ -177,6 +177,36 @@ func TestDelegationMatches(t *testing.T) {
 			target:   "foo/bar/foobar",
 			expected: true,
 		},
+		"artifact in subdirectory with specified extension, matches": {
+			patterns: []string{"foo/*.tgz"},
+			target:   "foo/bar/foobar.tgz",
+			expected: true,
+		},
+		"pattern with single character selector, matches": {
+			patterns: []string{"foo/?.tgz"},
+			target:   "foo/a.tgz",
+			expected: true,
+		},
+		"pattern with character sequence, matches": {
+			patterns: []string{"foo/[abc].tgz"},
+			target:   "foo/a.tgz",
+			expected: true,
+		},
+		"pattern with character sequence, does not match": {
+			patterns: []string{"foo/[abc].tgz"},
+			target:   "foo/x.tgz",
+			expected: false,
+		},
+		"pattern with negative character sequence, matches": {
+			patterns: []string{"foo/[!abc].tgz"},
+			target:   "foo/x.tgz",
+			expected: true,
+		},
+		"pattern with negative character sequence, does not match": {
+			patterns: []string{"foo/[!abc].tgz"},
+			target:   "foo/a.tgz",
+			expected: false,
+		},
 		"artifact in arbitrary directory, matches": {
 			patterns: []string{"*/*.txt"},
 			target:   "foo/bar/foobar.txt",
