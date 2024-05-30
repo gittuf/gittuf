@@ -39,6 +39,9 @@ func TestSSH(t *testing.T) {
 	// Write script to mock password prompt
 
 	scriptPath := filepath.Join(tmpDir, "askpass.sh")
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(tmpDir, "askpass.ps1")
+	}
 	if err := os.WriteFile(scriptPath, artifacts.AskpassScript, 0o500); err != nil { //nolint:gosec
 		t.Fatal(err)
 	}
@@ -58,9 +61,9 @@ func TestSSH(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
 			if strings.Contains(test.keyName, "_enc") {
-				if runtime.GOOS == "windows" {
-					t.Skip("TODO: test encrypted keys on windows")
-				}
+				// if runtime.GOOS == "windows" {
+				// 	t.Skip("TODO: test encrypted keys on windows")
+				// }
 				t.Setenv("SSH_ASKPASS", scriptPath)
 				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
 			}
