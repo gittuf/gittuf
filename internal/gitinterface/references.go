@@ -5,6 +5,8 @@ package gitinterface
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path"
 	"strings"
 )
 
@@ -71,20 +73,27 @@ func (r *Repository) GetSymbolicReferenceTarget(refName string) (string, error) 
 
 // AbsoluteReference returns the fully qualified reference path for the provided
 // Git ref.
+// Source: https://git-scm.com/docs/gitrevisions#Documentation/gitrevisions.txt-emltrefnamegtemegemmasterememheadsmasterememrefsheadsmasterem
 func (r *Repository) AbsoluteReference(target string) (string, error) {
-	if strings.HasPrefix(target, RefPrefix) {
-		return target, nil
-	}
-
-	if target == "HEAD" {
-		return r.GetSymbolicReferenceTarget("HEAD")
-	}
-
-	// Check if branch
-	branchName := BranchReferenceName(target)
-	_, err := r.GetReference(branchName)
+	_, err := os.Stat(path.Join(r.gitDirPath, target))
 	if err == nil {
-		return branchName, nil
+		if strings.HasPrefix(target, RefPrefix) {
+			// not symbolic ref
+			return target, nil
+		}
+		// symbolic ref such as .git/HEAD
+		return r.GetSymbolicReferenceTarget(target)
+	}
+
+	// If target is a full ref already and it's stored in the GIT_DIR/refs
+	// directory, we don't reach this point. Below, we handle cases where the
+	// ref may be packed.
+
+	// Check if custom reference
+	customName := CustomReferenceName(target)
+	_, err = r.GetReference(customName)
+	if err == nil {
+		return customName, nil
 	}
 	if !errors.Is(err, ErrReferenceNotFound) {
 		return "", err
@@ -95,6 +104,35 @@ func (r *Repository) AbsoluteReference(target string) (string, error) {
 	_, err = r.GetReference(tagName)
 	if err == nil {
 		return tagName, nil
+	}
+	if !errors.Is(err, ErrReferenceNotFound) {
+		return "", err
+	}
+
+	// Check if branch
+	branchName := BranchReferenceName(target)
+	_, err = r.GetReference(branchName)
+	if err == nil {
+		return branchName, nil
+	}
+	if !errors.Is(err, ErrReferenceNotFound) {
+		return "", err
+	}
+
+	// Check if remote tracker ref
+	remoteRefName := RemoteReferenceName(target)
+	_, err = r.GetReference(remoteRefName)
+	if err == nil {
+		return branchName, nil
+	}
+	if !errors.Is(err, ErrReferenceNotFound) {
+		return "", err
+	}
+
+	remoteRefHEAD := path.Join(remoteRefName, "HEAD")
+	_, err = r.GetReference(remoteRefHEAD)
+	if err == nil {
+		return branchName, nil
 	}
 	if !errors.Is(err, ErrReferenceNotFound) {
 		return "", err
@@ -143,14 +181,14 @@ func (r *Repository) RefSpec(refName, remoteName string, fastForwardOnly bool) (
 	return refSpecString, nil
 }
 
-// BranchReferenceName returns the full reference name for the specified branch
-// in the form `refs/heads/<branchName>`.
-func BranchReferenceName(branchName string) string {
-	if strings.HasPrefix(branchName, BranchRefPrefix) {
-		return branchName
+// CustomReferenceName returns the full reference name in the form
+// `refs/<customName>`.
+func CustomReferenceName(customName string) string {
+	if strings.HasPrefix(customName, RefPrefix) {
+		return customName
 	}
 
-	return fmt.Sprintf("%s%s", BranchRefPrefix, branchName)
+	return fmt.Sprintf("%s%s", RefPrefix, customName)
 }
 
 // TagReferenceName returns the full reference name for the specified tag in the
@@ -161,4 +199,24 @@ func TagReferenceName(tagName string) string {
 	}
 
 	return fmt.Sprintf("%s%s", TagRefPrefix, tagName)
+}
+
+// BranchReferenceName returns the full reference name for the specified branch
+// in the form `refs/heads/<branchName>`.
+func BranchReferenceName(branchName string) string {
+	if strings.HasPrefix(branchName, BranchRefPrefix) {
+		return branchName
+	}
+
+	return fmt.Sprintf("%s%s", BranchRefPrefix, branchName)
+}
+
+// RemoteReferenceName returns the full reference name in the form
+// `refs/remotes/<name>`.
+func RemoteReferenceName(name string) string {
+	if strings.HasPrefix(name, RemoteRefPrefix) {
+		return name
+	}
+
+	return fmt.Sprintf("%s%s", RemoteRefPrefix, name)
 }
