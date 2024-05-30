@@ -88,9 +88,14 @@ func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string
 	return policy.VerifyCommit(ctx, r.r, ids...)
 }
 
-func (r *Repository) VerifyTag(ctx context.Context, ids []string) map[string]string {
+func (r *Repository) VerifyTag(ctx context.Context, tags []string) map[string]string {
 	slog.Debug("Verifying tag signature...")
-	return policy.VerifyTag(ctx, r.r, ids)
+	result := map[string]string{}
+	for _, tagName := range tags {
+		result[tagName] = r.VerifyRef(ctx, tagName, false).Error()
+	}
+
+	return result
 }
 
 func (r *Repository) verifyRefTip(target string, expectedTip plumbing.Hash) error {

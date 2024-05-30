@@ -36,16 +36,16 @@ const (
 	noSignatureMessage                = "no signature found"
 	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
 	unableToFindRSLEntryMessage       = "unable to find tag's RSL entry"
-	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
 var (
-	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
-	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
-	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
+	ErrUnauthorizedSignature      = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped     = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped     = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrUnknownObjectType          = errors.New("unknown object type passed to verify signature")
+	ErrInvalidVerifier            = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet    = errors.New("verifier's key and threshold constraints not met")
+	ErrMultipleTagRSLEntriesFound = errors.New("multiple RSL entries found for tag")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -74,7 +74,7 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 	}
 
 	slog.Debug("Verifying entry...")
-	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry)
+	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry, target)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -184,6 +184,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 	// Verify each entry, looking for a fix when an invalid entry is encountered
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
+
 	for len(entries) != 0 {
 		if invalidEntry == nil {
 			// Pop entry from queue
@@ -192,12 +193,14 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 			slog.Debug(fmt.Sprintf("Verifying entry '%s'...", entry.ID.String()))
 
-			slog.Debug("Checking if entry is for policy staging reference...")
-			if entry.RefName == PolicyStagingRef {
-				continue
-			}
-			slog.Debug("Checking if entry is for policy reference...")
-			if entry.RefName == PolicyRef {
+			slog.Debug("Checking reference of entry...")
+			switch entry.RefName {
+			case PolicyStagingRef:
+				// If we encounter a policy-staging entry, we alert the user, but ignore it
+				// for gittuf verification
+				slog.Debug("Entry is for the policy staging reference")
+			case PolicyRef:
+				slog.Debug("Entry is for the policy reference...")
 				// TODO: this is repetition if the firstEntry is for policy
 				newPolicy, err := loadStateForEntry(repo, entry)
 				if err != nil {
@@ -211,146 +214,149 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 
 				slog.Debug("Updating current policy...")
 				currentPolicy = newPolicy
-				continue
-			}
-
-			slog.Debug("Checking if entry is for attestations reference...")
-			if entry.RefName == attestations.Ref {
+			case attestations.Ref:
+				slog.Debug("Entry is for the attestations reference...")
 				newAttestationsState, err := attestations.LoadAttestationsForEntry(repo, entry)
 				if err != nil {
 					return err
 				}
 
 				currentAttestations = newAttestationsState
-				continue
-			}
+			default:
+				slog.Debug("Verifying changes...")
+				if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry, target); err != nil {
+					slog.Debug("Violation found, checking if entry has been revoked...")
+					// If the invalid entry is never marked as skipped, we return err
+					if !entry.SkippedBy(annotations[entry.ID]) {
+						return err
+					}
 
-			slog.Debug("Verifying changes...")
-			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
-				slog.Debug("Violation found, checking if entry has been revoked...")
-				// If the invalid entry is never marked as skipped, we return err
-				if !entry.SkippedBy(annotations[entry.ID]) {
-					return err
+					// The invalid entry's been marked as skipped, but we still need
+					// to see if another entry fixed state for non-gittuf users
+					slog.Debug("Entry has been revoked, searching for fix entry...")
+					invalidEntry = entry
+					verificationErr = err
+
+					if len(entries) == 0 {
+						// Fix entry does not exist after revoking annotation
+						return verificationErr
+					}
 				}
-
-				// The invalid entry's been marked as skipped but we still need
-				// to see if another entry fixed state for non-gittuf users
-				slog.Debug("Entry has been revoked, searching for fix entry...")
-				invalidEntry = entry
-				verificationErr = err
-
-				if len(entries) == 0 {
-					// Fix entry does not exist after revoking annotation
-					return verificationErr
-				}
 			}
-			continue
-		}
-
-		// This is only reached when we have an invalid state.
-		// First, the verification workflow determines the last good state for
-		// the ref. This is needed to evaluate whether a fix for the invalid
-		// state is available. After this is found, the workflow looks through
-		// the remaining entries in the queue to find the fix. Until the fix is
-		// found, entries encountered that are for other refs are added to a new
-		// queue. Entries that are for the same ref but not the fix are
-		// considered invalid. The workflow enters a valid state again when a)
-		// the fix entry (which hasn't also been revoked) is found, and b) all
-		// entries for the ref in the invalid range are marked as skipped by an
-		// annotation. If these conditions don't both hold, the workflow returns
-		// an error. After the fix is found, all remaining entries in the
-		// original queue are also added to the new queue. The new queue then
-		// takes the place of the original queue. This ensures that all entries
-		// are processed even when an invalid state is reached.
-
-		// 1. What's the last good state?
-		slog.Debug("Identifying last valid state...")
-		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, invalidEntry.RefName, invalidEntry.ID)
-		if err != nil {
-			return err
-		}
-		slog.Debug("Verifying identified last valid entry has not been revoked...")
-		if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
-			return ErrLastGoodEntryIsSkipped
-		}
-		lastGoodEntryCommit, err := gitinterface.GetCommit(repo, lastGoodEntry.TargetID)
-		if err != nil {
-			return err
-		}
-		// gittuf requires the fix to point to a commit that is tree-same as the
-		// last good state
-		lastGoodTreeID := lastGoodEntryCommit.TreeHash
-
-		// 2. What entries do we have in the current verification set for the
-		// ref? The first one that is tree-same as lastGoodEntry's commit is the
-		// fix. Entries prior to that one in the queue are considered invalid
-		// and must be skipped
-		fixed := false
-		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
-		newEntryQueue := []*rsl.ReferenceEntry{}
-		for len(entries) != 0 {
-			newEntry := entries[0]
-			entries = entries[1:]
-
-			slog.Debug(fmt.Sprintf("Inspecting entry '%s' to see if it's a fix entry...", newEntry.ID.String()))
-
-			slog.Debug("Checking if entry is for the affected reference...")
-			if newEntry.RefName != invalidEntry.RefName {
-				// Unrelated entry that must be processed in the outer loop
-				// Currently this is just policy entries
-				newEntryQueue = append(newEntryQueue, newEntry)
-				continue
-			}
-
-			newEntryCommit, err := gitinterface.GetCommit(repo, newEntry.TargetID)
+		} else {
+			// if we found an invalid entry, check if a fix entry exists
+			newEntryQueue, err := findFixEntry(repo, invalidEntry, entries, annotations, verificationErr)
 			if err != nil {
 				return err
 			}
 
-			slog.Debug("Checking if entry is tree-same with last valid state...")
-			if newEntryCommit.TreeHash == lastGoodTreeID {
-				// Fix found, we append the rest of the current verification set
-				// to the new entry queue
-				// But first, we must check that this fix hasn't been skipped
-				// If it has been skipped, it's not actually a fix and we need
-				// to keep looking
-				slog.Debug("Verifying potential fix entry has not been revoked...")
-				if !newEntry.SkippedBy(annotations[newEntry.ID]) {
-					slog.Debug("Fix entry found, proceeding with regular verification workflow...")
-					fixed = true
-					newEntryQueue = append(newEntryQueue, entries...)
-					break
-				}
-			}
+			// Reset these trackers to continue verification with rest of the queue
+			// We may encounter other issues
+			invalidEntry = nil
+			verificationErr = nil
 
-			// newEntry is not tree-same / commit-same, so it is automatically
-			// invalid, check that it's been marked as revoked
-			slog.Debug("Checking non-fix entry has been revoked as well...")
-			if !newEntry.SkippedBy(annotations[newEntry.ID]) {
-				invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
-			}
+			entries = newEntryQueue
 		}
-
-		if !fixed {
-			// If we haven't found a fix, return the original error
-			return verificationErr
-		}
-
-		if len(invalidIntermediateEntries) != 0 {
-			// We may have found a fix but if an invalid intermediate entry
-			// wasn't skipped, return error
-			return ErrInvalidEntryNotSkipped
-		}
-
-		// Reset these trackers to continue verification with rest of the queue
-		// We may encounter other issues
-		invalidEntry = nil
-		verificationErr = nil
-
-		entries = newEntryQueue
 	}
 
 	return nil
+}
+
+// findFixEntry is only used when we have an invalid state.
+// First, findFixEntry determines the last good state for
+// the ref. This is needed to evaluate whether a fix for the invalid
+// state is available. After this is found, the workflow looks through
+// the remaining entries in the queue to find the fix. Until the fix is
+// found, entries encountered that are for other refs are added to a new
+// queue. Entries that are for the same ref but not the fix are
+// considered invalid. The workflow enters a valid state again when a)
+// the fix entry (which hasn't also been revoked) is found, and b) all
+// entries for the ref in the invalid range are marked as skipped by an
+// annotation. If these conditions don't both hold, the workflow returns
+// an error. After the fix is found, all remaining entries in the
+// original queue are also added to the new queue. The new queue then
+// takes the place of the original queue. This ensures that all entries
+// are processed even when an invalid state is reached.
+func findFixEntry(repo *git.Repository, invalidEntry *rsl.ReferenceEntry, entries []*rsl.ReferenceEntry, annotations map[plumbing.Hash][]*rsl.AnnotationEntry, verificationErr error) ([]*rsl.ReferenceEntry, error) {
+	// 1. What's the last good state?
+	slog.Debug("Identifying last valid state...")
+	lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, invalidEntry.RefName, invalidEntry.ID)
+	if err != nil {
+		return nil, err
+	}
+	slog.Debug("Verifying identified last valid entry has not been revoked...")
+	if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
+		return nil, ErrLastGoodEntryIsSkipped
+	}
+	lastGoodEntryCommit, err := gitinterface.GetCommit(repo, lastGoodEntry.TargetID)
+	if err != nil {
+		return nil, err
+	}
+	// gittuf requires the fix to point to a commit that is tree-same as the
+	// last good state
+	lastGoodTreeID := lastGoodEntryCommit.TreeHash
+
+	// 2. What entries do we have in the current verification set for the
+	// ref? The first one that is tree-same as lastGoodEntry's commit is the
+	// fix. Entries prior to that one in the queue are considered invalid
+	// and must be skipped
+	fixed := false
+	invalidIntermediateEntries := []*rsl.ReferenceEntry{}
+	newEntryQueue := []*rsl.ReferenceEntry{}
+	for len(entries) != 0 {
+		newEntry := entries[0]
+		entries = entries[1:]
+
+		slog.Debug(fmt.Sprintf("Inspecting entry '%s' to see if it's a fix entry...", newEntry.ID.String()))
+
+		slog.Debug("Checking if entry is for the affected reference...")
+		if newEntry.RefName != invalidEntry.RefName {
+			// Unrelated entry that must be processed in the outer loop
+			// Currently this is just policy entries
+			newEntryQueue = append(newEntryQueue, newEntry)
+			continue
+		}
+
+		newEntryCommit, err := gitinterface.GetCommit(repo, newEntry.TargetID)
+		if err != nil {
+			return nil, err
+		}
+
+		slog.Debug("Checking if entry is tree-same with last valid state...")
+		if newEntryCommit.TreeHash == lastGoodTreeID {
+			// Fix found, we append the rest of the current verification set
+			// to the new entry queue
+			// But first, we must check that this fix hasn't been skipped
+			// If it has been skipped, it's not actually a fix and we need
+			// to keep looking
+			slog.Debug("Verifying potential fix entry has not been revoked...")
+			if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+				slog.Debug("Fix entry found, proceeding with regular verification workflow...")
+				fixed = true
+				newEntryQueue = append(newEntryQueue, entries...)
+				break
+			}
+		}
+
+		// newEntry is not tree-same / commit-same, so it is automatically
+		// invalid, check that it's been marked as revoked
+		slog.Debug("Checking non-fix entry has been revoked as well...")
+		if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+			invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
+		}
+	}
+
+	if !fixed {
+		// If we haven't found a fix, return the original error
+		return nil, verificationErr
+	}
+
+	if len(invalidIntermediateEntries) != 0 {
+		// We may have found a fix but if an invalid intermediate entry
+		// wasn't skipped, return error
+		return nil, ErrInvalidEntryNotSkipped
+	}
+	return newEntryQueue, nil
 }
 
 // VerifyCommit verifies the signature on the specified commits (identified by
@@ -445,70 +451,6 @@ func VerifyCommit(ctx context.Context, repo *git.Repository, ids ...string) map[
 	return status
 }
 
-// VerifyTag verifies the signature on the RSL entries for the specified tags.
-// In addition, each tag object's signature is also verified using the same set
-// of trusted keys. If the tag is not protected by policy, then all keys in the
-// applicable policy are used to verify the signatures.
-func VerifyTag(ctx context.Context, repo *git.Repository, ids []string) map[string]string {
-	status := make(map[string]string, len(ids))
-
-	for _, id := range ids {
-		// Check if id is tag name or hash of tag obj
-		absPath, err := gitinterface.AbsoluteReference(repo, id)
-		if err == nil {
-			if !strings.HasPrefix(absPath, gitinterface.TagRefPrefix) {
-				status[id] = nonTagMessage
-				continue
-			}
-		} else {
-			if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-				status[id] = err.Error()
-				continue
-			}
-
-			// Must be a hash
-			// verifyTagEntry also finds the tag object, wasteful?
-			tagObj, err := gitinterface.GetTag(repo, plumbing.NewHash(id))
-			if err != nil {
-				status[id] = nonTagMessage
-				continue
-			}
-			absPath = string(plumbing.NewTagReferenceName(tagObj.Name))
-		}
-
-		entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, absPath)
-		if err != nil {
-			status[id] = unableToFindRSLEntryMessage
-			continue
-		}
-
-		if _, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, absPath, entry.GetID()); err == nil {
-			status[id] = multipleTagRSLEntriesFoundMessage
-			continue
-		}
-
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
-		if err != nil {
-			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
-			continue
-		}
-
-		policy, err := LoadState(ctx, repo, policyEntry)
-		if err != nil {
-			status[id] = fmt.Sprintf(unableToLoadPolicyMessageFmt, err.Error())
-			continue
-		}
-
-		if err := verifyTagEntry(ctx, repo, policy, entry); err == nil {
-			status[id] = goodTagSignatureMessage
-		} else {
-			status[id] = err.Error()
-		}
-	}
-
-	return status
-}
-
 // VerifyNewState ensures that when a new policy is encountered, its root role
 // is signed by keys trusted in the current policy.
 func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
@@ -526,29 +468,21 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry, target string) error {
 	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
 
 	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
-		return verifyTagEntry(ctx, repo, policy, entry)
+		return verifyTagEntry(ctx, repo, policy, entry, target)
 	}
 
-	var (
-		gitNamespaceVerified  = false
-		pathNamespaceVerified = true // Assume paths are verified until we find out otherwise
-	)
+	pathNamespaceVerified := true // Assume paths are verified until we find out otherwise
 
 	// Find authorized verifiers for entry's ref
 	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
 	if err != nil {
 		return err
-	}
-
-	// No verifiers => no restrictions for the git namespace
-	if len(verifiers) == 0 {
-		gitNamespaceVerified = true
 	}
 
 	// Find commit object for the RSL entry
@@ -566,19 +500,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	}
 
 	// Use each verifier to verify signature
-	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, commitObj, authorizationAttestation)
-		if err == nil {
-			// Signature verification succeeded
-			gitNamespaceVerified = true
-			break
-		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-			// Unexpected error
-			return err
-		}
-		// Haven't found a valid verifier, continue with next
+	gitNamespaceVerified, _, err := verifyAttestation(ctx, verifiers, commitObj, authorizationAttestation)
+	if err != nil {
+		return err
 	}
-
 	if !gitNamespaceVerified {
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
 	}
@@ -646,17 +571,10 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 				continue
 			}
 
-			for _, verifier := range verifiers {
-				err := verifier.Verify(ctx, commit, authorizationAttestation)
-				if err == nil {
-					// Signature verification succeeded
-					pathsVerified[j] = true
-					verifiedUsing = verifier.Name()
-					break
-				} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-					// Unexpected error
-					return err
-				}
+			pathsVerified[j], verifiedUsing, err = verifyAttestation(ctx, verifiers, commit, authorizationAttestation)
+
+			if err != nil {
+				return err
 			}
 		}
 
@@ -686,7 +604,30 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	return nil
 }
 
-func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
+func verifyAttestation(ctx context.Context, verifiers []*Verifier, commitObj *object.Commit, authorizationAttestation *sslibdsse.Envelope) (bool, string, error) {
+	// No verifiers => no restrictions for the git namespace
+	if len(verifiers) == 0 {
+		return true, "", nil
+	}
+	for _, verifier := range verifiers {
+		err := verifier.Verify(ctx, commitObj, authorizationAttestation)
+		if err == nil {
+			// Signature verification succeeded
+			return true, verifier.Name(), nil
+		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+			// Unexpected error
+			return false, "", err
+		}
+		// Haven't found a valid verifier, continue with next
+	}
+	return false, "", nil
+}
+
+func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry, target string) error {
+	if _, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, target, entry.GetID()); err == nil {
+		return ErrMultipleTagRSLEntriesFound
+	}
+
 	// 1. Find authorized public keys for tag's RSL entry
 	trustedKeys, err := policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName))
 	if err != nil {
