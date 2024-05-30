@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -71,15 +70,6 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 		}
 	}
 
-	if err := os.Setenv(committerTimeKey, r.clock.Now().Format(time.RFC3339)); err != nil {
-		return ZeroHash, fmt.Errorf("unable to set committer time: %w", err)
-	}
-	defer os.Unsetenv(committerTimeKey) //nolint:errcheck
-	if err := os.Setenv(authorTimeKey, r.clock.Now().Format(time.RFC3339)); err != nil {
-		return ZeroHash, fmt.Errorf("unable to set author time: %w", err)
-	}
-	defer os.Unsetenv(authorTimeKey) //nolint:errcheck
-
 	args := []string{"commit-tree", "-m", message}
 
 	if !currentGitID.IsZero() {
@@ -92,7 +82,10 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 
 	args = append(args, treeID.String())
 
-	stdOut, err := r.executeGitCommandString(args...)
+	now := r.clock.Now().Format(time.RFC3339)
+	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
+
+	stdOut, err := r.executeGitCommandWithEnvString(env, args...)
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
 	}
