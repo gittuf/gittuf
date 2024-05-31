@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package updateruleteams
 
 import (
@@ -49,7 +51,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"path to role definition file",
 	)
-	cmd.MarkFlagRequired("teams") //nolint:errcheck
+	cmd.MarkFlagRequired("roles-json") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.rulePatterns,
@@ -116,7 +118,6 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 		role.KeyIDs = authorizedKeyStrings
 		roles = append(roles, role)
-
 	}
 
 	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedKeys, o.rulePatterns, o.minRoles, roles, true)

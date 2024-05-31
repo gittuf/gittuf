@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package addruleteams
 
 import (
@@ -49,7 +51,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"path to role definition file",
 	)
-	cmd.MarkFlagRequired("teams") //nolint:errcheck
+	cmd.MarkFlagRequired("roles-json") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.rulePatterns,
