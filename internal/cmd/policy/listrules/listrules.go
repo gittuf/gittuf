@@ -67,7 +67,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			fmt.Printf(strings.Repeat("    ", curRule.Depth+3)+"Threshold: %d\n", role.Threshold)
 			fmt.Println(strings.Repeat("    ", curRule.Depth+3) + "Authorized Keys:")
 			for _, key := range role.KeyIDs {
-				fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
+				fmt.Printf(strings.Repeat("    ", curRule.Depth+4)+"%s\n", key)
 			}
 		}
 	}
