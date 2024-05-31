@@ -1,14 +1,19 @@
 # Teams support in gittuf
 gittuf has prototype-level support for teams, as defined in [TUF's
-TAP-3](https://github.com/theupdateframework/taps/blob/master/tap3.md).
+TAP-3](https://github.com/theupdateframework/taps/blob/master/tap3.md). In
+short, each rule in gittuf policy now enumerates the authorized users via
+*roles*. Each role has its own set of authorized keys and its own threshold -
+these roles are combined together by a minimum threshold specified by
+`minRoles`.
 
 ## Existing CLI
 The existing workflow to manage rules via the CLI is through `add-rule`,
 `update-rule`, and `remove-rule`. For backwards compatibility, these commands
 are preserved even with the underlying metadata changed. To be compatible with
 the new underlying metadata format, `add-rule` and `update-rule` now create a
-placeholder "team" whenever they are invoked - the name of this "team" is
-"Single Role".
+placeholder role whenever they are invoked - the name of this role is "Single
+Role", with the supplied keys and threshold stored inside. Naturally, the
+minimum number of roles required for successful verification is 1.
 
 ## New Teams CLI
 In order to support creating teams, two new commands were added to the CLI:
@@ -16,8 +21,9 @@ In order to support creating teams, two new commands were added to the CLI:
 not matter to `remove-rule`, that command remains the same and works for both
 legacy and teams workflows.
 
-At the moment, roles can be specified via a JSON file, whose format is as
-follows:
+For the first two commands, roles are input into gittuf via JSON supplied
+through either standard input (by default) or through a file via an argument.
+The format for both methods is as follows:
 
 ```json
 [

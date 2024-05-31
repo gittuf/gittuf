@@ -4,6 +4,7 @@ package updateruleteams
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -15,15 +16,15 @@ import (
 )
 
 type options struct {
-	p                *persistent.Options
-	policyName       string
-	ruleName         string
-	teamsDefinitions string
-	rulePatterns     []string
-	minRoles         int
+	p            *persistent.Options
+	policyName   string
+	ruleName     string
+	roleJSONFile string
+	rulePatterns []string
+	minRoles     int
 }
 
-type RoleIntermediary struct {
+type RoleJSON struct {
 	Name      string   `json:"name"`
 	Keys      []string `json:"keys"`
 	Threshold int      `json:"threshold"`
@@ -46,12 +47,11 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("rule-name") //nolint:errcheck
 
 	cmd.Flags().StringVar(
-		&o.teamsDefinitions,
-		"roles-json",
+		&o.roleJSONFile,
+		"roles-file",
 		"",
 		"path to role definition file",
 	)
-	cmd.MarkFlagRequired("roles-json") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.rulePatterns,
@@ -85,20 +85,32 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	roleBytes, err := os.ReadFile(o.teamsDefinitions)
-	if err != nil {
-		return err
+	var roleBytes []byte
+
+	// We first see whether the user passed in the path to a JSON file or
+	// piped the definitions into the CLI
+	if o.roleJSONFile != "" {
+		roleBytes, err = os.ReadFile(o.roleJSONFile)
+		if err != nil {
+			return err
+		}
+	} else {
+		roleBytes, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
 	}
 
-	rolesToBeProcessed := []RoleIntermediary{}
+	// As both entry types are of the same syntax, we handle the byte array the
+	// same way
+	rolesToBeProcessed := []RoleJSON{}
+	roles := []tuf.Role{}
+	authorizedKeys := []*tuf.Key{}
 
 	err = json.Unmarshal(roleBytes, &rolesToBeProcessed)
 	if err != nil {
 		return err
 	}
-
-	roles := []tuf.Role{}
-	authorizedKeys := []*tuf.Key{}
 
 	for _, roleDef := range rolesToBeProcessed {
 		role := tuf.Role{
@@ -128,7 +140,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-rule",
 		Short:             "Update an existing rule in a policy file",
-		Long:              `This command allows users to update an existing rule to the specified policy file using the teams functionality. By default, the main policy file is selected. Roles may be specified as a JSON file. See the "teams-format.md" document in the docs directory for more information.`,
+		Long:              `This command allows users to update an existing rule to the specified policy file using the teams functionality. By default, the main policy file is selected. Roles are specified in JSON either supplied via standard input (by default) or by a path to a JSON file. See the "teams-format.md" document in the docs directory for the required format.`,
 		PreRunE:           common.CheckIfSigningViableWithFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
