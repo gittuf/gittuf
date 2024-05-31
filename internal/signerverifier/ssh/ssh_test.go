@@ -25,14 +25,17 @@ func TestSSH(t *testing.T) {
 		keyID    string
 	}{
 		{"rsa", artifacts.SSHRSAPrivate, keyidRSA},
-		{"rsa_enc", artifacts.SSHRSAPrivateEnc, keyidRSA},
 		{"rsa.pub", artifacts.SSHRSAPublicSSH, keyidRSA},
+		{"rsa_enc", artifacts.SSHRSAPrivateEnc, keyidRSA},
+		{"rsa_enc.pub", artifacts.SSHRSAPublicSSH, keyidRSA},
 		{"ecdsa", artifacts.SSHECDSAPrivate, keyidECDSA},
-		{"ecdsa_enc", artifacts.SSHECDSAPrivateEnc, keyidECDSA},
 		{"ecdsa.pub", artifacts.SSHECDSAPublicSSH, keyidECDSA},
+		{"ecdsa_enc", artifacts.SSHECDSAPrivateEnc, keyidECDSA},
+		{"ecdsa_enc.pub", artifacts.SSHECDSAPublicSSH, keyidECDSA},
 		{"ed25519", artifacts.SSHED25519Private, keyidEd25519},
-		{"ed25519_enc", artifacts.SSHED25519PrivateEnc, keyidEd25519},
 		{"ed25519.pub", artifacts.SSHED25519PublicSSH, keyidEd25519},
+		{"ed25519_enc", artifacts.SSHED25519PrivateEnc, keyidEd25519},
+		{"ed25519_enc.pub", artifacts.SSHED25519PublicSSH, keyidEd25519},
 	}
 	// Setup tests
 	tmpDir := t.TempDir()
@@ -43,7 +46,7 @@ func TestSSH(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Write test keys to temp dir with permissions required by ssh-keygen
+	// Write test key pairs to temp dir with permissions required by ssh-keygen
 	for _, test := range tests {
 		keyPath := filepath.Join(tmpDir, test.keyName)
 		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {

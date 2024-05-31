@@ -25,12 +25,7 @@ func TestCreateEnvelope(t *testing.T) {
 }
 
 func TestSignEnvelope(t *testing.T) {
-	// Setup test key
-	tmpDir := t.TempDir()
-	keyPath := filepath.Join(tmpDir, "ecdsa")
-	if err := os.WriteFile(keyPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	keyPath := setupTestECDSAPair(t)
 
 	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
@@ -52,12 +47,7 @@ func TestSignEnvelope(t *testing.T) {
 }
 
 func TestVerifyEnvelope(t *testing.T) {
-	// Setup test key
-	tmpDir := t.TempDir()
-	keyPath := filepath.Join(tmpDir, "ecdsa")
-	if err := os.WriteFile(keyPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	keyPath := setupTestECDSAPair(t)
 
 	signer, err := loadSSHSigner(keyPath)
 	if err != nil {
@@ -102,4 +92,17 @@ func createSignedEnvelope(signer *ssh.Signer) (*sslibdsse.Envelope, error) {
 	}
 
 	return env, nil
+}
+
+func setupTestECDSAPair(t *testing.T) string {
+	tmpDir := t.TempDir()
+	privPath := filepath.Join(tmpDir, "ecdsa")
+
+	if err := os.WriteFile(privPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(privPath+".pub", artifacts.SSHECDSAPublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return privPath
 }
