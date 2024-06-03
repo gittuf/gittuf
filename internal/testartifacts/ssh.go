@@ -13,6 +13,9 @@ var SSHRSAPublicSSH []byte
 //go:embed testdata/keys/ssh/rsa
 var SSHRSAPrivate []byte
 
+//go:embed testdata/keys/ssh/rsa_enc
+var SSHRSAPrivateEnc []byte
+
 //go:embed testdata/keys/ssh/ecdsa.pem
 var SSHECDSAPublic []byte
 
@@ -22,6 +25,9 @@ var SSHECDSAPublicSSH []byte
 //go:embed testdata/keys/ssh/ecdsa
 var SSHECDSAPrivate []byte
 
+//go:embed testdata/keys/ssh/ecdsa_enc
+var SSHECDSAPrivateEnc []byte
+
 //go:embed testdata/keys/ssh/ed25519.pem
 var SSHED25519Public []byte
 
@@ -30,3 +36,6 @@ var SSHED25519PublicSSH []byte
 
 //go:embed testdata/keys/ssh/ed25519
 var SSHED25519Private []byte
+
+//go:embed testdata/keys/ssh/ed25519_enc
+var SSHED25519PrivateEnc []byte
