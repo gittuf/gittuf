@@ -282,7 +282,7 @@ func TestRootMetadataWithSSHKey(t *testing.T) {
 
 	// Create TUF root, convert and add test key
 	rootMetadata := NewRootMetadata()
-	sslibKey := ssh.SSHKeyToSSlibKey(sshKey)
+	sslibKey := ssh.KeyToSSlibKey(sshKey)
 	rootMetadata.AddKey(sslibKey)
 	assert.Contains(t, rootMetadata.Keys, sshKeyid)
 
@@ -309,7 +309,7 @@ func TestRootMetadataWithSSHKey(t *testing.T) {
 	}
 
 	sslibKey2 := rootMetadata2.Keys[sshKeyid]
-	sshKey2, _ := ssh.SSlibKeyToSSHKey(sslibKey2)
+	sshKey2, _ := ssh.KeyFromSSlibKey(sslibKey2)
 
 	err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{sshKey2}, 1)
 	if err != nil {

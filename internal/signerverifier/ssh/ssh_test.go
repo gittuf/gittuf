@@ -131,12 +131,11 @@ func TestConvert(t *testing.T) {
 		KeyVal:  KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
 	}
 
-	sslibKey := SSHKeyToSSlibKey(sshKey)
-	sshKey2, _ := SSlibKeyToSSHKey(sslibKey)
+	sslibKey := KeyToSSlibKey(sshKey)
+	sshKey2, _ := KeyFromSSlibKey(sslibKey)
 	assert.Equal(t, sshKey, sshKey2)
 
 	sslibKey.KeyType = "gpg"
-	_, err := SSlibKeyToSSHKey(sslibKey)
+	_, err := KeyFromSSlibKey(sslibKey)
 	assert.NotNil(t, err)
-
 }

@@ -177,8 +177,8 @@ func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	return parseSSH2Body(body)
 }
 
-// SSHKeyToSSlibKey converts an ssh Key into an SSlibKey.
-func SSHKeyToSSlibKey(key *Key) *sv.SSLibKey {
+// KeyToSSlibKey converts an ssh Key into an SSlibKey.
+func KeyToSSlibKey(key *Key) *sv.SSLibKey {
 	return &sv.SSLibKey{
 		KeyID:   key.keyID,
 		Scheme:  key.Scheme,
@@ -189,8 +189,8 @@ func SSHKeyToSSlibKey(key *Key) *sv.SSLibKey {
 	}
 }
 
-// SSHKeyToSSlibKey converts an SSlibKey into an ssh Key.
-func SSlibKeyToSSHKey(key *sv.SSLibKey) (*Key, error) {
+// KeyFromSSlibKey converts an SSlibKey into an ssh Key.
+func KeyFromSSlibKey(key *sv.SSLibKey) (*Key, error) {
 	if key.KeyType != SSHKeyType {
 		return nil, fmt.Errorf("cannot convert key of type '%s'", key.KeyType)
 	}
