@@ -3,11 +3,18 @@
 package tuf
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -243,5 +250,69 @@ func TestDelegationMatches(t *testing.T) {
 		delegation := Delegation{Paths: test.patterns}
 		got := delegation.Matches(test.target)
 		assert.Equal(t, test.expected, got, fmt.Sprintf("unexpected result in test '%s'", name))
+	}
+}
+
+func TestRootMetadataWithSSHKey(t *testing.T) {
+	// Setup test key pair
+	keys := []struct {
+		name string
+		data []byte
+	}{
+		{"rsa", artifacts.SSHRSAPrivate},
+		{"rsa.pub", artifacts.SSHRSAPublicSSH},
+	}
+	tmpDir := t.TempDir()
+	for _, key := range keys {
+		keyPath := filepath.Join(tmpDir, key.name)
+		if err := os.WriteFile(keyPath, key.data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keyPath := filepath.Join(tmpDir, "rsa")
+	sshKey, err := ssh.Import(keyPath)
+	if err != nil {
+		t.Fatal()
+	}
+	sshKeyid, _ := sshKey.KeyID()
+	signer := &ssh.Signer{
+		Key:  sshKey,
+		Path: keyPath,
+	}
+
+	// Create TUF root, convert and add test key
+	rootMetadata := NewRootMetadata()
+	sslibKey := ssh.SSHKeyToSSlibKey(sshKey)
+	rootMetadata.AddKey(sslibKey)
+	assert.Contains(t, rootMetadata.Keys, sshKeyid)
+
+	// Sign and wrap
+	ctx := context.Background()
+	env, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal()
+	}
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		t.Fatal()
+	}
+	// Unwrap and verify
+	// NOTE: For the sake of testing the contained key, we unwrap before we
+	// verify. Typically, in DSSE it should be the other way around.
+	payload, err := env.DecodeB64Payload()
+	if err != nil {
+		t.Fatal()
+	}
+	rootMetadata2 := &RootMetadata{}
+	if err := json.Unmarshal(payload, rootMetadata2); err != nil {
+		t.Fatal()
+	}
+
+	sslibKey2 := rootMetadata2.Keys[sshKeyid]
+	sshKey2, _ := ssh.SSlibKeyToSSHKey(sslibKey2)
+
+	err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{sshKey2}, 1)
+	if err != nil {
+		t.Fatal()
 	}
 }
