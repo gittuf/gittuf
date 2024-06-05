@@ -11,7 +11,9 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -97,6 +99,66 @@ func TestVerifyTagSignature(t *testing.T) {
 		err = VerifyTagSignature(context.Background(), gpgSignedTag, fulcioKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
+}
+
+func TestGetTagTarget(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetID, err := repo.GetTagTarget(tagID)
+	assert.Nil(t, err)
+	assert.Equal(t, commitID, targetID)
+}
+
+func TestRepositoryVerifyTag(t *testing.T) {
+	// TODO: support multiple signing types
+
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, err := tuf.LoadKeyFromBytes(artifacts.SSHED25519Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.verifyTagSignature(context.Background(), tagID, key)
+	assert.Nil(t, err)
 }
 
 func createTestSignedTag(t *testing.T) *object.Tag {

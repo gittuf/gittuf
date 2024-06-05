@@ -14,16 +14,7 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
-const (
-	RefPrefix       = "refs/"
-	BranchRefPrefix = "refs/heads/"
-	TagRefPrefix    = "refs/tags/"
-	RemoteRefPrefix = "refs/remotes/"
-)
-
 var (
-	ErrReferenceNotFound = plumbing.ErrReferenceNotFound
-
 	clock = clockwork.NewRealClock()
 )
 
@@ -114,7 +105,7 @@ func AbsoluteReference(repo *git.Repository, target string) (string, error) {
 		return "", err
 	}
 
-	return "", ErrReferenceNotFound
+	return "", plumbing.ErrReferenceNotFound
 }
 
 // RefSpec creates a Git refspec for the specified ref.  For more information on

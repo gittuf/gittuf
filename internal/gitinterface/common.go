@@ -5,7 +5,6 @@ package gitinterface
 import (
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -49,7 +48,7 @@ func CreateTestGitRepository(t *testing.T, dir string) *Repository {
 		t.Fatal(err)
 	}
 
-	repo := &Repository{gitDirPath: path.Join(dir, ".git"), clock: testClock}
+	repo := &Repository{gitDirPath: filepath.Join(dir, ".git"), clock: testClock}
 
 	// Set up author / committer identity
 	if err := repo.SetGitConfig("user.name", testName); err != nil {
@@ -59,8 +58,8 @@ func CreateTestGitRepository(t *testing.T, dir string) *Repository {
 		t.Fatal(err)
 	}
 
-	// Set up signing via ED25519 SSH key (deterministic sigs!)
-	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key")); err != nil {
+	// Set up signing via SSH key
+	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
@@ -73,8 +72,8 @@ func CreateTestGitRepository(t *testing.T, dir string) *Repository {
 func setupSigningKeys(t *testing.T, dir string) {
 	t.Helper()
 
-	sshPrivateKey := artifacts.SSHED25519Private
-	sshPublicKey := artifacts.SSHED25519PublicSSH
+	sshPrivateKey := artifacts.SSHRSAPrivate
+	sshPublicKey := artifacts.SSHRSAPublicSSH
 
 	privateKeyPath := filepath.Join(dir, "key")
 	publicKeyPath := filepath.Join(dir, "key.pub")

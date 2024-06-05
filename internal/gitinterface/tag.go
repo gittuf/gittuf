@@ -5,6 +5,7 @@ package gitinterface
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -63,6 +64,84 @@ func Tag(repo *git.Repository, target plumbing.Hash, name, message string, sign 
 	}
 
 	return ApplyTag(repo, tag)
+}
+
+// TagUsingSpecificKey creates a Git tag signed using the specified, PEM encoded
+// SSH or GPG key. It is primarily intended for use with testing. As of now,
+// gittuf is not expected to be used to create tags in developer workflows,
+// though this may change with command compatibility.
+func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, signingKeyPEMBytes []byte) (Hash, error) {
+	gitConfig, err := r.GetGitConfig()
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	goGitRepo, err := r.GetGoGitRepository()
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	targetObj, err := goGitRepo.Object(plumbing.AnyObject, plumbing.NewHash(target.String()))
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	if !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	}
+
+	tag := &object.Tag{
+		Name: name,
+		Tagger: object.Signature{
+			Name:  gitConfig["user.name"],
+			Email: gitConfig["user.email"],
+			When:  r.clock.Now(),
+		},
+		Message:    message,
+		TargetType: targetObj.Type(),
+		Target:     targetObj.ID(),
+	}
+
+	tagContents, err := getTagBytesWithoutSignature(tag)
+	if err != nil {
+		return ZeroHash, err
+	}
+	signature, err := signGitObjectUsingKey(tagContents, signingKeyPEMBytes)
+	if err != nil {
+		return ZeroHash, err
+	}
+	tag.PGPSignature = signature
+
+	obj := goGitRepo.Storer.NewEncodedObject()
+	if err := tag.Encode(obj); err != nil {
+		return ZeroHash, err
+	}
+	tagID, err := goGitRepo.Storer.SetEncodedObject(obj)
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	tagIDHash, err := NewHash(tagID.String())
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	return tagIDHash, r.SetReference(TagReferenceName(name), tagIDHash)
+}
+
+// GetTagTarget returns the ID of the Git object a tag points to.
+func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
+	targetID, err := r.executeGitCommandString("rev-list", "-n", "1", tagID.String())
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
+	}
+
+	hash, err := NewHash(targetID)
+	if err != nil {
+		return ZeroHash, fmt.Errorf("invalid format for target ID: %w", err)
+	}
+
+	return hash, nil
 }
 
 // ApplyTag sets the tag reference after the tag object is written to the
@@ -142,6 +221,55 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 	return ErrUnknownSigningMethod
 }
 
+// verifyTagSignature verifies a signature for the specified tag using the
+// provided public key.
+func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tuf.Key) error {
+	goGitRepo, err := r.GetGoGitRepository()
+	if err != nil {
+		return fmt.Errorf("error opening repository: %w", err)
+	}
+
+	tag, err := goGitRepo.TagObject(plumbing.NewHash(tagID.String()))
+	if err != nil {
+		return fmt.Errorf("unable to load commit object: %w", err)
+	}
+
+	switch key.KeyType {
+	case signerverifier.GPGKeyType:
+		if _, err := tag.Verify(key.KeyVal.Public); err != nil {
+			return ErrIncorrectVerificationKey
+		}
+
+		return nil
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+		tagContents, err := getTagBytesWithoutSignature(tag)
+		if err != nil {
+			return errors.Join(ErrVerifyingSSHSignature, err)
+		}
+		tagSignature := []byte(tag.PGPSignature)
+
+		if err := verifySSHKeySignature(key, tagContents, tagSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
+	case signerverifier.FulcioKeyType:
+		tagContents, err := getTagBytesWithoutSignature(tag)
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
+		tagSignature := []byte(tag.PGPSignature)
+
+		if err := verifyGitsignSignature(ctx, key, tagContents, tagSignature); err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+
+		return nil
+	}
+
+	return ErrUnknownSigningMethod
+}
+
 // GetTag returns the requested tag object.
 func GetTag(repo *git.Repository, tagID plumbing.Hash) (*object.Tag, error) {
 	return repo.TagObject(tagID)
@@ -154,6 +282,17 @@ func signTag(tag *object.Tag) (string, error) {
 	}
 
 	return signGitObject(tagContents)
+}
+
+func (r *Repository) ensureIsTag(tagID Hash) error {
+	objType, err := r.executeGitCommandString("cat-file", "-t", tagID.String())
+	if err != nil {
+		return fmt.Errorf("unable to inspect if object is tag: %w", err)
+	} else if objType != "tag" {
+		return fmt.Errorf("requested Git ID '%s' is not a tag object", tagID.String())
+	}
+
+	return nil
 }
 
 func getTagBytesWithoutSignature(tag *object.Tag) ([]byte, error) {
