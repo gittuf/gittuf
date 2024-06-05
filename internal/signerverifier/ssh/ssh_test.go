@@ -122,3 +122,21 @@ COb1zE7zaJacJ42tNdVq7Z3x+Hik9PRfgBPt1oF41SFSCp0YRPLxLMFdTjNgV3HZXVNlq6
 	}
 	assert.Equal(t, key.Type(), "ssh-rsa")
 }
+
+func TestConvert(t *testing.T) {
+	sshKey := &Key{
+		keyID:   "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E",
+		KeyType: "ssh",
+		Scheme:  "ssh-ed25519",
+		KeyVal:  KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
+	}
+
+	sslibKey := SSHKeyToSSlibKey(sshKey)
+	sshKey2, _ := SSlibKeyToSSHKey(sslibKey)
+	assert.Equal(t, sshKey, sshKey2)
+
+	sslibKey.KeyType = "gpg"
+	_, err := SSlibKeyToSSHKey(sslibKey)
+	assert.NotNil(t, err)
+
+}

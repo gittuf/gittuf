@@ -10,11 +10,13 @@ import (
 	"os/exec"
 	"strings"
 
+	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/hiddeco/sshsig"
 	"golang.org/x/crypto/ssh"
 )
 
 const SSHSigNamespace = "git"
+const SSHKeyType = "ssh"
 
 // Key is a container and dsse.Verifier implementation for SSH keys.
 type Key struct {
@@ -113,7 +115,7 @@ func Import(path string) (*Key, error) {
 
 	return &Key{
 		keyID:   ssh.FingerprintSHA256(sshPub),
-		KeyType: "ssh",
+		KeyType: SSHKeyType,
 		Scheme:  sshPub.Type(),
 		KeyVal: KeyVal{
 			Public: base64.StdEncoding.EncodeToString(sshPub.Marshal()),
@@ -173,4 +175,31 @@ func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	// Parse key material
 	body := strings.Join(lines[i:], "")
 	return parseSSH2Body(body)
+}
+
+// SSHKeyToSSlibKey converts an ssh Key into an SSlibKey.
+func SSHKeyToSSlibKey(key *Key) *sv.SSLibKey {
+	return &sv.SSLibKey{
+		KeyID:   key.keyID,
+		Scheme:  key.Scheme,
+		KeyType: key.KeyType,
+		KeyVal: sv.KeyVal{
+			Public: key.KeyVal.Public,
+		},
+	}
+}
+
+// SSHKeyToSSlibKey converts an SSlibKey into an ssh Key.
+func SSlibKeyToSSHKey(key *sv.SSLibKey) (*Key, error) {
+	if key.KeyType != SSHKeyType {
+		return nil, fmt.Errorf("cannot convert key of type '%s'", key.KeyType)
+	}
+	return &Key{
+		keyID:   key.KeyID,
+		Scheme:  key.Scheme,
+		KeyType: key.KeyType,
+		KeyVal: KeyVal{
+			Public: key.KeyVal.Public,
+		},
+	}, nil
 }
