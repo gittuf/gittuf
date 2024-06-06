@@ -63,7 +63,7 @@ func TestVerifyEnvelope(t *testing.T) {
 }
 
 func loadSSHSigner(keyPath string) (*ssh.Signer, error) {
-	key, err := ssh.Import(keyPath)
+	key, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
 		return nil, err
 	}

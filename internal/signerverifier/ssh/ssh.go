@@ -97,12 +97,12 @@ func (s *Signer) KeyID() (string, error) {
 	return s.Key.KeyID()
 }
 
-// Import imports an SSH public key from the passed path.
+// NewKeyFromFile imports an SSH public key from the passed path.
 // The path can point to a public or private, encrypted or plaintext, rsa,
 // ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
-func Import(path string) (*Key, error) {
+func NewKeyFromFile(path string) (*Key, error) {
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
 	output, err := cmd.Output()
 	if err != nil {

@@ -70,7 +70,7 @@ func TestSSH(t *testing.T) {
 
 			keyPath := filepath.Join(tmpDir, test.keyName)
 
-			key, err := Import(keyPath)
+			key, err := NewKeyFromFile(keyPath)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
