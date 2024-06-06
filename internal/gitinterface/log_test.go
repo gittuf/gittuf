@@ -127,6 +127,97 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 	})
 }
 
+func TestGetCommitsBetweenRangeRepo(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allCommits := []Hash{}
+	for i := 0; i < 5; i++ {
+		commitHash, err := repo.Commit(emptyTreeID, refName, "Test commit\n", false)
+		assert.Nil(t, err)
+		t.Log(commitHash)
+		allCommits = append(allCommits, commitHash)
+	}
+	// Git tree structure with their commit trees and their values:
+	//
+	// Commit1 <- Commit2 <- Commit3 <- Commit4 <- Commit5
+	//   |          |           |           |         |
+	// Tree1      Tree2       Tree3       Tree4     Tree5
+	//   |          |           |           |         |
+	//
+	//
+	//
+	//
+	//
+
+	t.Run("Check range between commits 1 and 5", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[4], allCommits[0])
+		assert.Nil(t, err)
+
+		expectedCommits := []Hash{allCommits[4], allCommits[3], allCommits[2], allCommits[1]}
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+
+		assert.Equal(t, expectedCommits, commits)
+	})
+
+	t.Run("Pass in wrong order", func(t *testing.T) {
+		// Passing in the wrong order and getting a different result is expected behavior. We can show this with a simple example
+
+		//     7
+		//    ↙ ↘
+		//   5   6
+		//   ↓   ↓
+		//   3   4
+		//   ↓   ↓
+		//   1   2
+		//    ↘ ↙
+		//     0
+
+		// If we pass in 7 and 1, we expect to get 7, 6, 5, 4, 3, and 2
+		// If we pass in 1 and 7, we should expect nothing since every node that
+		// is in the subtree of 1 is also in the subtree of 7
+
+		commits, err := repo.GetCommitsBetweenRange(allCommits[0], allCommits[4])
+		assert.Nil(t, err)
+		assert.Empty(t, commits)
+	})
+
+	t.Run("Get all commits", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
+
+		assert.Nil(t, err)
+		expectedCommits := allCommits
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		assert.Equal(t, expectedCommits, commits)
+	})
+
+	t.Run("Get commits from invalid range", func(t *testing.T) {
+		_, err := repo.GetCommitsBetweenRange(ZeroHash, ZeroHash)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("Get commits from non-existent commit", func(t *testing.T) {
+		nonExistentHash, err := repo.WriteBlob([]byte{})
+		assert.Nil(t, err)
+		commits, err := repo.GetCommitsBetweenRange(nonExistentHash, ZeroHash)
+		assert.Nil(t, err)
+		assert.Equal(t, commits, []Hash{})
+	})
+}
+
 func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	// Creating a tree with merge commits
 	commitIDs := make([]plumbing.Hash, 0, 6)
