@@ -14,8 +14,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const SSHSigNamespace = "git"
-
 // Key is a container and dsse.Verifier implementation for SSH keys.
 type Key struct {
 	KeyType string
@@ -23,6 +21,11 @@ type Key struct {
 	Scheme  string
 	keyID   string
 }
+
+const (
+	SSHSigNamespace = "git"
+	SSHKeyType      = "ssh"
+)
 
 // KeyVal is a container for public key material for SSH keys.
 type KeyVal struct {
@@ -113,7 +116,7 @@ func Import(path string) (*Key, error) {
 
 	return &Key{
 		keyID:   ssh.FingerprintSHA256(sshPub),
-		KeyType: "ssh",
+		KeyType: SSHKeyType,
 		Scheme:  sshPub.Type(),
 		KeyVal: KeyVal{
 			Public: base64.StdEncoding.EncodeToString(sshPub.Marshal()),
