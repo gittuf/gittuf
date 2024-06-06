@@ -59,21 +59,22 @@ func TestVerifyEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Key}, 1))
+	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Verifier}, 1))
 }
 
 func loadSSHSigner(keyPath string) (*ssh.Signer, error) {
-	key, err := ssh.Import(keyPath)
+	key, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
 		return nil, err
 	}
-
-	signer := &ssh.Signer{
-		Key:  key,
-		Path: keyPath,
+	verifier, err := ssh.NewVerifierFromKey(key)
+	if err != nil {
+		return nil, err
 	}
-
-	return signer, nil
+	return &ssh.Signer{
+		Verifier: verifier,
+		Path:     keyPath,
+	}, nil
 }
 
 func createSignedEnvelope(signer *ssh.Signer) (*sslibdsse.Envelope, error) {
