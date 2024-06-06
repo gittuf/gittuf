@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,13 +76,17 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 			assert.Equal(t,
-				key.keyID,
+				key.KeyID,
 				test.keyID,
 			)
 
+			verifier, err := NewVerifierFromKey(key)
+			if err != nil {
+				t.Fatalf("%s: %v", test.keyName, err)
+			}
 			signer := Signer{
-				Key:  key,
-				Path: keyPath,
+				Verifier: verifier,
+				Path:     keyPath,
 			}
 
 			sig, err := signer.Sign(context.Background(), data)
@@ -89,12 +94,12 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = key.Verify(context.Background(), data, sig)
+			err = signer.Verifier.Verify(context.Background(), data, sig)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = key.Verify(context.Background(), notData, sig)
+			err = signer.Verifier.Verify(context.Background(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
@@ -121,4 +126,21 @@ COb1zE7zaJacJ42tNdVq7Z3x+Hik9PRfgBPt1oF41SFSCp0YRPLxLMFdTjNgV3HZXVNlq6
 		t.Fatalf("%v", err)
 	}
 	assert.Equal(t, key.Type(), "ssh-rsa")
+}
+
+func TestNewVerifierFromKey(t *testing.T) {
+	sslibKey := &sv.SSLibKey{
+		KeyID:   "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E",
+		KeyType: "ssh",
+		Scheme:  "ssh-ed25519",
+		KeyVal:  sv.KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
+	}
+
+	verifier, err := NewVerifierFromKey(sslibKey)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	keyid, _ := verifier.KeyID()
+	assert.Equal(t, sslibKey.KeyID, keyid)
 }
