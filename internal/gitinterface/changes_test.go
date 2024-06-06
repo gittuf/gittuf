@@ -732,3 +732,220 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 		assert.Equal(t, []string{"a"}, diffs)
 	})
 }
+
+func TestGetFilePathsChangedByCommitRepo(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	blobIDs := []Hash{}
+	for i := 0; i < 3; i++ {
+		blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("%d", i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		blobIDs = append(blobIDs, blobID)
+	}
+
+	t.Run("modify single file", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{{name: "a", isDir: false, gitID: blobIDs[0]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{{name: "a", isDir: false, gitID: blobIDs[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+
+	})
+
+	t.Run("rename single file", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{
+			{name: "b", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("swap two files around", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+			{name: "b", isDir: false, gitID: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[1]},
+			{name: "b", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("create new file", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+			{name: "b", isDir: false, gitID: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("delete file", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+			{name: "b", isDir: false, gitID: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"b"}, diffs)
+	})
+
+	t.Run("modify file and create new file", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[2]},
+			{name: "b", isDir: false, gitID: blobIDs[1]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cB)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("no parent", func(t *testing.T) {
+		treeA, err := treeBuilder.writeTree([]*entry{
+			{name: "a", isDir: false, gitID: blobIDs[0]},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cA, err := repo.Commit(treeA, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cA)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+}

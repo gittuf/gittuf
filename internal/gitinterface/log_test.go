@@ -144,7 +144,6 @@ func TestGetCommitsBetweenRangeRepo(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		commitHash, err := repo.Commit(emptyTreeID, refName, "Test commit\n", false)
 		assert.Nil(t, err)
-		t.Log(commitHash)
 		allCommits = append(allCommits, commitHash)
 	}
 	// Git tree structure with their commit trees and their values:
