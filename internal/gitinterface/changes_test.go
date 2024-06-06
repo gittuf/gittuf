@@ -773,7 +773,6 @@ func TestGetFilePathsChangedByCommitRepo(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
-
 	})
 
 	t.Run("rename single file", func(t *testing.T) {
