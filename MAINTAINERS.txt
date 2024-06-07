@@ -20,3 +20,8 @@ Reza Curtmola
   Email: reza.curtmola@njit.edu
   GitHub username: @reza-curtmola
   Affiliation: NJIT
+
+Patrick Zielinski
+  Email: patrick.z@nyu.edu
+  GitHub username: @patzielinski
+  Affiliation: NYU
