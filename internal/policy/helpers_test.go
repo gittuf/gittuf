@@ -291,6 +291,156 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	return state
 }
 
+func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverKey, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.githubAppApprovalsTrusted = true
+	state.githubAppKey = appKey
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.RootEnvelope = rootEnv
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 2 for existing rule with the added key
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	return state
+}
+
+func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver1Key, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver2Key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.githubAppApprovalsTrusted = true
+	state.githubAppKey = appKey
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.RootEnvelope = rootEnv
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 2 for existing rule with the added key
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approver1Key, approver2Key}, []string{"git:refs/heads/main"}, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	return state
+}
+
 func createTestStateWithTagPolicy(t *testing.T) *State {
 	t.Helper()
 

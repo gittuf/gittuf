@@ -25,6 +25,7 @@ These commands are meant to be used to aid gittuf development, and are not expec
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 * [gittuf dev attest-github](gittuf_dev_attest-github.md)	 - Record GitHub pull request information as an attestation (developer mode only, set GITTUF_DEV=1)
+* [gittuf dev attest-github-approval](gittuf_dev_attest-github-approval.md)	 - Record GitHub pull request approval as an attestation (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev authorize](gittuf_dev_authorize.md)	 - Add or revoke reference authorization (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev rsl-record](gittuf_dev_rsl-record.md)	 - Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
 
