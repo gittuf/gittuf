@@ -68,9 +68,9 @@ func (r *Repository) PushRefSpec(remoteName string, refSpecs []string) error {
 	args := []string{"push", remoteName}
 	args = append(args, refSpecs...)
 
-	_, stdErr, err := r.executeGitCommand(args...)
+	_, err := r.executor(args...).execute()
 	if err != nil {
-		return fmt.Errorf("unable to push: %s", stdErr)
+		return fmt.Errorf("unable to push: %w", err)
 	}
 
 	return nil
@@ -142,9 +142,9 @@ func (r *Repository) FetchRefSpec(remoteName string, refSpecs []string) error {
 	args := []string{"fetch", remoteName}
 	args = append(args, refSpecs...)
 
-	_, stdErr, err := r.executeGitCommand(args...)
+	_, err := r.executor(args...).execute()
 	if err != nil {
-		return fmt.Errorf("unable to fetch: %s", stdErr)
+		return fmt.Errorf("unable to fetch: %w", err)
 	}
 
 	return nil
@@ -177,7 +177,7 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 	}
 	args = append(args, dir)
 
-	_, stdErr, err := repo.executeGitCommandDirect(args...)
+	_, stdErr, err := repo.executor(args...).executeRaw()
 	if err != nil {
 		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
 	}
@@ -210,9 +210,9 @@ func CloneAndFetchToMemory(ctx context.Context, remoteURL, initialBranch string,
 }
 
 func (r *Repository) CreateRemote(remoteName, remoteURL string) error {
-	_, stdErr, err := r.executeGitCommand("remote", "add", remoteName, remoteURL)
+	_, err := r.executor("remote", "add", remoteName, remoteURL).execute()
 	if err != nil {
-		return fmt.Errorf("unable to add remote: %s", stdErr)
+		return fmt.Errorf("unable to add remote: %w", err)
 	}
 
 	return nil

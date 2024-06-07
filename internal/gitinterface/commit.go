@@ -85,7 +85,7 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 	now := r.clock.Now().Format(time.RFC3339)
 	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
 
-	stdOut, err := r.executeGitCommandWithEnvString(env, args...)
+	stdOut, err := r.executor(args...).withEnv(env...).execute()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
 	}
@@ -326,7 +326,7 @@ func (r *Repository) GetCommitMessage(commitID Hash) (string, error) {
 		return "", err
 	}
 
-	commitMessage, err := r.executeGitCommandString("show", "-s", "--format=%B", commitID.String())
+	commitMessage, err := r.executor("show", "-s", "--format=%B", commitID.String()).execute()
 	if err != nil {
 		return "", fmt.Errorf("unable to identify message for commit '%s': %w", commitID.String(), err)
 	}
@@ -340,7 +340,7 @@ func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
 		return ZeroHash, err
 	}
 
-	stdOut, err := r.executeGitCommandString("show", "-s", "--format=%T", commitID.String())
+	stdOut, err := r.executor("show", "-s", "--format=%T", commitID.String()).execute()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
 	}
@@ -358,7 +358,7 @@ func (r *Repository) GetCommitParentIDs(commitID Hash) ([]Hash, error) {
 		return nil, err
 	}
 
-	stdOut, err := r.executeGitCommandString("show", "-s", "--format=%P", commitID.String())
+	stdOut, err := r.executor("show", "-s", "--format=%P", commitID.String()).execute()
 	if err != nil {
 		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
 	}
@@ -443,7 +443,7 @@ func (r *Repository) KnowsCommit(testCommitID, ancestorCommitID Hash) (bool, err
 		return false, err
 	}
 
-	_, _, err := r.executeGitCommand("merge-base", "--is-ancestor", ancestorCommitID.String(), testCommitID.String())
+	_, err := r.executor("merge-base", "--is-ancestor", ancestorCommitID.String(), testCommitID.String()).execute()
 	return err == nil, nil
 }
 
@@ -464,7 +464,7 @@ func signCommit(commit *object.Commit) (string, error) {
 // ensureIsCommit is a helper to check that the ID represents a Git commit
 // object.
 func (r *Repository) ensureIsCommit(commitID Hash) error {
-	objType, err := r.executeGitCommandString("cat-file", "-t", commitID.String())
+	objType, err := r.executor("cat-file", "-t", commitID.String()).execute()
 	if err != nil {
 		return fmt.Errorf("unable to inspect if object is commit: %w", err)
 	} else if objType != "commit" {
