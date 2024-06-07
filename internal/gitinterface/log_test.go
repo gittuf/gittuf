@@ -127,7 +127,7 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 	})
 }
 
-func TestGetCommitsBetweenRangeRepo(t *testing.T) {
+func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir)
 

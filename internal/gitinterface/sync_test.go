@@ -261,6 +261,207 @@ func TestPush(t *testing.T) {
 	})
 }
 
+func TestPushRefSpecRepository(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+	refSpecs := fmt.Sprintf("%s:%s", refName, refName)
+
+	t.Run("assert remote repo does not have object until it is pushed", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the local repository
+		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that the empty tree is not present on the remote repository
+		results, err := remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+		assert.Nil(t, results)
+
+		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+
+		results, err = remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+		assert.NotNil(t, results)
+	})
+
+	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the local repository
+		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+	})
+
+	t.Run("assert no error when there are no updates to push", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		err := localRepo.PushRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+	})
+}
+
+func TestPushRepository(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	t.Run("assert remote repo does not have object until it is pushed", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the local repository
+		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that the empty tree is not present on the remote repository
+		results, err := remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+		assert.Nil(t, results)
+
+		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.Push(remoteName, []string{refName})
+		assert.Nil(t, err)
+
+		results, err = remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+		assert.NotNil(t, results)
+	})
+
+	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the local repository
+		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.Push(remoteName, []string{refName})
+		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+	})
+
+	t.Run("assert no error when there are no updates to push", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		err := localRepo.Push(remoteName, []string{refName})
+		assert.Nil(t, err)
+	})
+}
+
 func TestFetchRefSpec(t *testing.T) {
 	remoteName := "origin"
 	refName := "refs/heads/main"
@@ -526,11 +727,13 @@ func TestFetch(t *testing.T) {
 	})
 }
 
-func TestFetchRepo(t *testing.T) {
+func TestFetchRefSpecRepository(t *testing.T) {
 	remoteName := "origin"
 	refName := "refs/heads/main"
+	refSpecs := fmt.Sprintf("+%s:%s", refName, refName)
 
 	t.Run("assert local repo does not have object until fetched", func(t *testing.T) {
+		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
@@ -539,6 +742,45 @@ func TestFetchRepo(t *testing.T) {
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the remote repository
+		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that the empty tree is not present on the local repository
+		results, err := localRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+		assert.Nil(t, results)
+
+		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+
+		_, err = localRepo.GetAllFilesInTree(emptyTreeHash)
+		assert.Nil(t, err)
+	})
+
+	t.Run("assert after fetch that both refs match", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
+
+		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
@@ -547,7 +789,63 @@ func TestFetchRepo(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
 
+		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+	})
+
+	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		if err := remoteRepo.SetReference(refName, ZeroHash); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		err := localRepo.FetchRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+	})
+}
+
+func TestFetchRepository(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	t.Run("assert local repo does not have object until fetched", func(t *testing.T) {
+		// Create local and remote repositories
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+
+		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
+
+		// Create the remote on the local repository
+		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an empty tree in the remote repository
+		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check that the empty tree is not present on the local repository
 		results, err := localRepo.GetAllFilesInTree(emptyTreeHash)
 		assert.Nil(t, err)
 		assert.Nil(t, results)
@@ -565,6 +863,7 @@ func TestFetchRepo(t *testing.T) {
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
+		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
@@ -573,6 +872,7 @@ func TestFetchRepo(t *testing.T) {
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
+		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
@@ -591,6 +891,7 @@ func TestFetchRepo(t *testing.T) {
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
+		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
@@ -601,6 +902,7 @@ func TestFetchRepo(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}

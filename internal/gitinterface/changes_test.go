@@ -733,7 +733,7 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 	})
 }
 
-func TestGetFilePathsChangedByCommitRepo(t *testing.T) {
+func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir)
 
