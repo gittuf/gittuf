@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -749,6 +750,11 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		blobIDs = append(blobIDs, blobID)
 	}
 
+	emptyTree, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// In each of the tests below, repo.Commit uses the test name as a ref
 	// This allows us to use a single repo in all the tests without interference
 	// For example, if we use a single repo and a single ref (say main), the test that
@@ -926,6 +932,179 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
+
+	t.Run("merge commit with commit matching parent", func(t *testing.T) {
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainBranch := testNameToRefName(t.Name())
+		featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+		// Write common commit for both branches
+		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(featureBranch, cCommon); err != nil {
+			t.Fatal(err)
+		}
+
+		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents
+		cM, err := repo.CommitWithParents(treeB, []Hash{cA, cB}, "Merge commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cM)
+		assert.Nil(t, err)
+		assert.Nil(t, diffs)
+	})
+
+	t.Run("merge commit with no matching parent", func(t *testing.T) {
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobIDs[1]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"c": blobIDs[2]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainBranch := testNameToRefName(t.Name())
+		featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+		// Write common commit for both branches
+		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(featureBranch, cCommon); err != nil {
+			t.Fatal(err)
+		}
+
+		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and a different tree
+		cM, err := repo.CommitWithParents(treeC, []Hash{cA, cB}, "Merge commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cM)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a", "b", "c"}, diffs)
+	})
+
+	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeC, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[2]})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainBranch := testNameToRefName(t.Name())
+		featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+		// Write common commit for both branches
+		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(featureBranch, cCommon); err != nil {
+			t.Fatal(err)
+		}
+
+		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a merge commit with two parents and an overlapping tree
+		cM, err := repo.CommitWithParents(treeC, []Hash{cA, cB}, "Merge commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cM)
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+	})
+}
+
+// CommitWithParents creates a new commit in the repo but does not update any
+// references. It is only meant to be used for tests, and therefore accepts
+// specific parent commit IDs.
+func (r *Repository) CommitWithParents(treeID Hash, parentIDs []Hash, message string, sign bool) (Hash, error) {
+	args := []string{"commit-tree", "-m", message}
+
+	for _, commitID := range parentIDs {
+		args = append(args, "-p", commitID.String())
+	}
+
+	if sign {
+		args = append(args, "-S")
+	}
+
+	args = append(args, treeID.String())
+
+	now := r.clock.Now().Format(time.RFC3339)
+	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
+
+	stdOut, err := r.executor(args...).withEnv(env...).execute()
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
+	}
+	commitID, err := NewHash(stdOut)
+	if err != nil {
+		return ZeroHash, fmt.Errorf("received invalid commit ID: %w", err)
+	}
+
+	return commitID, nil
 }
 
 func testNameToRefName(testName string) string {
