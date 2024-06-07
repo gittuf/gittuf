@@ -21,7 +21,7 @@ func TestCreateEnvelope(t *testing.T) {
 	env, err := CreateEnvelope(rootMetadata)
 	assert.Nil(t, err)
 	assert.Equal(t, PayloadType, env.PayloadType)
-	assert.Equal(t, "eyJ0eXBlIjoicm9vdCIsImV4cGlyZXMiOiIiLCJrZXlzIjpudWxsLCJyb2xlcyI6bnVsbH0=", env.Payload)
+	assert.Equal(t, "eyJ0eXBlIjoicm9vdCIsImV4cGlyZXMiOiIiLCJrZXlzIjpudWxsLCJyb2xlcyI6bnVsbCwiZ2l0aHViQXBwcm92YWxzVHJ1c3RlZCI6ZmFsc2V9", env.Payload)
 }
 
 func TestSignEnvelope(t *testing.T) {
@@ -53,13 +53,19 @@ func TestVerifyEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	keyID, err := signer.KeyID()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	env, err := createSignedEnvelope(signer)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Nil(t, VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Verifier}, 1))
+	acceptedKeys, err := VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Verifier}, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, keyID, acceptedKeys[0].KeyID)
 }
 
 func loadSSHSigner(keyPath string) (*ssh.Signer, error) {

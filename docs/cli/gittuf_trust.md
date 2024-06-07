@@ -21,11 +21,15 @@ Tools for gittuf's root of trust
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
+* [gittuf trust add-github-app-key](gittuf_trust_add-github-app-key.md)	 - Add GitHub app key to gittuf root of trust
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
+* [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
+* [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
+* [gittuf trust remove-github-app-key](gittuf_trust_remove-github-app-key.md)	 - Remove GitHub app key from gittuf root of trust
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust

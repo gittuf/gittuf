@@ -11,7 +11,6 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -48,17 +47,7 @@ func NewReferenceAuthorization(targetRef, fromRevisionID, targetTreeID string) (
 		TargetTreeID:   targetTreeID,
 	}
 
-	predicateBytes, err := json.Marshal(predicate)
-	if err != nil {
-		return nil, err
-	}
-
-	predicateInterface := &map[string]any{}
-	if err := json.Unmarshal(predicateBytes, predicateInterface); err != nil {
-		return nil, err
-	}
-
-	predicateStruct, err := structpb.NewStruct(*predicateInterface)
+	predicateStruct, err := predicateToPBStruct(predicate)
 	if err != nil {
 		return nil, err
 	}

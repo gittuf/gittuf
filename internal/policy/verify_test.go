@@ -701,6 +701,212 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
+	t.Run("successful verification with higher threshold but using GitHub approval", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		approverKey, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
+		if err != nil {
+			t.Fatal(err)
+		}
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("successful verification with higher threshold but using GitHub approval and reference authorization", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		approver1Key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations
+		if err != nil {
+			t.Fatal(err)
+		}
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approver1Key})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add reference authorization
+		signer, err = signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets2KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("unsuccessful verification with higher threshold but using GitHub approval", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes) // WRONG approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
+		if err != nil {
+			t.Fatal(err)
+		}
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
+
 	// FIXME: test for file policy passing for situations where a commit is seen
 	// by the RSL before its signing key is rotated out. This commit should be
 	// trusted for merges under the new policy because it predates the policy
@@ -908,10 +1114,11 @@ func TestVerifier(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		keys          []*tuf.Key
-		threshold     int
-		gitObjectID   gitinterface.Hash
-		attestation   *sslibdsse.Envelope
+		keys        []*tuf.Key
+		threshold   int
+		gitObjectID gitinterface.Hash
+		attestation *sslibdsse.Envelope
+
 		expectedError error
 	}{
 		"commit, no attestation, valid key, threshold 1": {
@@ -989,8 +1196,14 @@ func TestVerifier(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		verifier := Verifier{repository: repo, name: "test-verifier", keys: test.keys, threshold: test.threshold}
-		err := verifier.Verify(testCtx, test.gitObjectID, test.attestation)
+		verifier := Verifier{
+			repository: repo,
+			name:       "test-verifier",
+			keys:       test.keys,
+			threshold:  test.threshold,
+		}
+
+		_, err := verifier.Verify(testCtx, test.gitObjectID, test.attestation)
 		if test.expectedError == nil {
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {

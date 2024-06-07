@@ -82,10 +82,11 @@ type Role struct {
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type    string          `json:"type"`
-	Expires string          `json:"expires"`
-	Keys    map[string]*Key `json:"keys"`
-	Roles   map[string]Role `json:"roles"`
+	Type                   string          `json:"type"`
+	Expires                string          `json:"expires"`
+	Keys                   map[string]*Key `json:"keys"`
+	Roles                  map[string]Role `json:"roles"`
+	GitHubApprovalsTrusted bool            `json:"githubApprovalsTrusted"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
