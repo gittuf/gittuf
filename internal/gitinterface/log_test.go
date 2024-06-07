@@ -129,7 +129,7 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 
 func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
@@ -194,8 +194,8 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 
 	t.Run("Get all commits", func(t *testing.T) {
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
-
 		assert.Nil(t, err)
+
 		expectedCommits := allCommits
 		sort.Slice(expectedCommits, func(i, j int) bool {
 			return expectedCommits[i].String() < expectedCommits[j].String()
@@ -211,9 +211,10 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	t.Run("Get commits from non-existent commit", func(t *testing.T) {
 		nonExistentHash, err := repo.WriteBlob([]byte{})
 		assert.Nil(t, err)
+
 		commits, err := repo.GetCommitsBetweenRange(nonExistentHash, ZeroHash)
 		assert.Nil(t, err)
-		assert.Equal(t, commits, []Hash{})
+		assert.Empty(t, commits)
 	})
 }
 

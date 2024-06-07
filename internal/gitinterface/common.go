@@ -36,19 +36,30 @@ var (
 // This is meant to be used by tests across gittuf packages. This helper also
 // sets up an ED25519 signing key that can be used to create reproducible
 // commits.
-func CreateTestGitRepository(t *testing.T, dir string) *Repository {
+func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 	t.Helper()
 
 	keysDir := t.TempDir()
 
 	setupSigningKeys(t, keysDir)
 
-	cmd := exec.Command(binary, "init", "-b", "main", dir)
+	var gitDirPath string
+	args := []string{"init"}
+	if bare {
+		args = append(args, "--bare")
+		gitDirPath = dir
+	} else {
+		args = append(args, "-b", "main")
+		gitDirPath = filepath.Join(dir, ".git")
+	}
+	args = append(args, dir)
+
+	cmd := exec.Command(binary, args...)
 	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 	}
 
-	repo := &Repository{gitDirPath: filepath.Join(dir, ".git"), clock: testClock}
+	repo := &Repository{gitDirPath: gitDirPath, clock: testClock}
 
 	// Set up author / committer identity
 	if err := repo.SetGitConfig("user.name", testName); err != nil {

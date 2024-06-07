@@ -81,7 +81,7 @@ func TestReadBlob(t *testing.T) {
 
 func TestRepositoryReadBlob(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	contents := []byte("test file read")
 	expectedBlobID, err := NewHash("2ecdd330475d93568ed27f717a84a7fe207d1c58")
@@ -140,7 +140,7 @@ func TestWriteBlob(t *testing.T) {
 
 func TestRepositoryWriteBlob(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	contents := []byte("test file write")
 	expectedBlobID, err := NewHash("999c05e9578e5d244920306842f516789a2498f7")

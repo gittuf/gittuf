@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPushRefSpec(t *testing.T) {
@@ -271,8 +272,8 @@ func TestPushRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
 
 		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
@@ -281,27 +282,30 @@ func TestPushRefSpecRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the local repository
-		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// Check that the empty tree is not present on the remote repository
-		results, err := remoteRepo.GetAllFilesInTree(emptyTreeHash)
-		assert.Nil(t, err)
-		assert.Nil(t, results)
+		// Check that the tree is not present on the remote repository
+		_, err = remoteRepo.GetAllFilesInTree(tree)
+		assert.Contains(t, err.Error(), "fatal: not a tree object") // tree doesn't exist
 
-		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
 			t.Fatal(err)
 		}
 
 		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 
-		results, err = remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		remoteEntries, err := remoteRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.NotNil(t, results)
+		assert.Equal(t, entries, remoteEntries)
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
@@ -309,8 +313,8 @@ func TestPushRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
 
 		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
@@ -319,13 +323,17 @@ func TestPushRefSpecRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the local repository
-		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -350,14 +358,47 @@ func TestPushRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
 		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
 
-		err := localRepo.PushRefSpec(remoteName, []string{refSpecs})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+
+		// Push again; nothing to push
+		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 	})
 }
@@ -371,8 +412,8 @@ func TestPushRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
 
 		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
@@ -381,27 +422,30 @@ func TestPushRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the local repository
-		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// Check that the empty tree is not present on the remote repository
-		results, err := remoteRepo.GetAllFilesInTree(emptyTreeHash)
-		assert.Nil(t, err)
-		assert.Nil(t, results)
+		// Check that the tree is not present on the remote repository
+		_, err = remoteRepo.GetAllFilesInTree(tree)
+		assert.Contains(t, err.Error(), "fatal: not a tree object") // tree doesn't exist
 
-		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
 			t.Fatal(err)
 		}
 
 		err = localRepo.Push(remoteName, []string{refName})
 		assert.Nil(t, err)
 
-		results, err = remoteRepo.GetAllFilesInTree(emptyTreeHash)
+		remoteEntries, err := remoteRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.NotNil(t, results)
+		assert.Equal(t, entries, remoteEntries)
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
@@ -409,8 +453,8 @@ func TestPushRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
 
 		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
@@ -419,13 +463,17 @@ func TestPushRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the local repository
-		emptyTreeHash, err := localTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if _, err := localRepo.Commit(emptyTreeHash, refName, "Test commit\n", false); err != nil {
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -450,14 +498,47 @@ func TestPushRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
+
+		localTreeBuilder := NewReplacementTreeBuilder(localRepo)
 
 		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
 
-		err := localRepo.Push(remoteName, []string{refName})
+		// Create a tree in the local repository
+		emptyBlobHash, err := localRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.Push(remoteName, []string{refName})
+		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+
+		// Push again; nothing to push
+		err = localRepo.Push(remoteName, []string{refName})
 		assert.Nil(t, err)
 	})
 }
@@ -737,8 +818,8 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
@@ -747,18 +828,21 @@ func TestFetchRefSpecRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the remote repository
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// Check that the empty tree is not present on the local repository
-		results, err := localRepo.GetAllFilesInTree(emptyTreeHash)
-		assert.Nil(t, err)
-		assert.Nil(t, results)
+		// Check that the tree is not present on the local repository
+		_, err = localRepo.GetAllFilesInTree(tree)
+		assert.Contains(t, err.Error(), "fatal: not a tree object") // tree doesn't exist
 
-		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -766,8 +850,9 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 
-		_, err = localRepo.GetAllFilesInTree(emptyTreeHash)
+		localEntries, err := localRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
+		assert.Equal(t, entries, localEntries)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -775,8 +860,8 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
@@ -785,17 +870,35 @@ func TestFetchRefSpecRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
@@ -803,20 +906,53 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
-		if err := remoteRepo.SetReference(refName, ZeroHash); err != nil {
-			t.Fatal(err)
-		}
+		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
 		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
 
-		err := localRepo.FetchRefSpec(remoteName, []string{refSpecs})
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+
+		// Fetch again, nothing to fetch
+		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
+		assert.Nil(t, err)
+
+		newLocalRef, err := localRepo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, localRef, newLocalRef)
 	})
 }
 
@@ -829,8 +965,8 @@ func TestFetchRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
@@ -839,18 +975,21 @@ func TestFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Create an empty tree in the remote repository
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// Check that the empty tree is not present on the local repository
-		results, err := localRepo.GetAllFilesInTree(emptyTreeHash)
-		assert.Nil(t, err)
-		assert.Nil(t, results)
+		// Check that the tree is not present on the local repository
+		_, err = localRepo.GetAllFilesInTree(tree)
+		assert.Contains(t, err.Error(), "fatal: not a tree object") // tree doesn't exist
 
-		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -858,8 +997,9 @@ func TestFetchRepository(t *testing.T) {
 		err = localRepo.Fetch(remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
-		_, err = localRepo.GetAllFilesInTree(emptyTreeHash)
+		localEntries, err := localRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
+		assert.Equal(t, entries, localEntries)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -867,8 +1007,8 @@ func TestFetchRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
@@ -877,17 +1017,35 @@ func TestFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = remoteRepo.Commit(emptyTreeHash, refName, "Test commit\n", false)
+
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		err = localRepo.Fetch(remoteName, []string{refName}, true)
 		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
@@ -895,20 +1053,53 @@ func TestFetchRepository(t *testing.T) {
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 
-		localRepo := CreateTestGitRepository(t, localTmpDir)
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
-		if err := remoteRepo.SetReference(refName, ZeroHash); err != nil {
-			t.Fatal(err)
-		}
+		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
 		// Create the remote on the local repository
 		if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
 
-		err := localRepo.Fetch(remoteName, []string{refName}, true)
+		// Create a tree in the remote repository
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = remoteRepo.Commit(tree, refName, "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.Fetch(remoteName, []string{refName}, true)
 		assert.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		remoteRef, err := remoteRepo.GetReference(refName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, localRef, remoteRef)
+
+		// Fetch again, nothing to fetch
+		err = localRepo.Fetch(remoteName, []string{refName}, true)
+		assert.Nil(t, err)
+
+		newLocalRef, err := localRepo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, localRef, newLocalRef)
 	})
 }
 
@@ -920,20 +1111,24 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		mainCommit, err := remoteRepo.Commit(emptyTreeHash, refName, "Commit to main", false)
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		otherCommit, err := remoteRepo.Commit(emptyTreeHash, anotherRefName, "Commit to feature", false)
+		otherCommit, err := remoteRepo.Commit(tree, anotherRefName, "Commit to feature", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -960,20 +1155,24 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		mainCommit, err := remoteRepo.Commit(emptyTreeHash, refName, "Commit to main", false)
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		otherCommit, err := remoteRepo.Commit(emptyTreeHash, anotherRefName, "Commit to feature", false)
+		otherCommit, err := remoteRepo.Commit(tree, anotherRefName, "Commit to feature", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1000,16 +1199,20 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
-		remoteRepo := CreateTestGitRepository(t, remoteTmpDir)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
 
 		remoteTreeBuilder := NewReplacementTreeBuilder(remoteRepo)
 
-		emptyTreeHash, err := remoteTreeBuilder.writeTree([]*entry{})
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := map[string]Hash{"foo": emptyBlobHash}
+
+		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		mainCommit, err := remoteRepo.Commit(emptyTreeHash, refName, "Commit to main", false)
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -4,6 +4,7 @@ package gitinterface
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-billy/v5/memfs"
@@ -735,9 +736,8 @@ func TestGetFilePathsChangedByCommit(t *testing.T) {
 
 func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	tmpDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tmpDir)
+	repo := CreateTestGitRepository(t, tmpDir, false)
 
-	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
 
 	blobIDs := []Hash{}
@@ -749,23 +749,29 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		blobIDs = append(blobIDs, blobID)
 	}
 
+	// In each of the tests below, repo.Commit uses the test name as a ref
+	// This allows us to use a single repo in all the tests without interference
+	// For example, if we use a single repo and a single ref (say main), the test that
+	// expects a commit with no parents will have a parent because of a commit created
+	// in a previous test
+
 	t.Run("modify single file", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{{name: "a", isDir: false, gitID: blobIDs[0]}})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{{name: "a", isDir: false, gitID: blobIDs[1]}})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -776,26 +782,22 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("rename single file", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{
-			{name: "b", isDir: false, gitID: blobIDs[0]},
-		})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -806,28 +808,22 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("swap two files around", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-			{name: "b", isDir: false, gitID: blobIDs[1]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[1]},
-			{name: "b", isDir: false, gitID: blobIDs[0]},
-		})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1], "b": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -838,27 +834,22 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-			{name: "b", isDir: false, gitID: blobIDs[1]},
-		})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -869,27 +860,22 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("delete file", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-			{name: "b", isDir: false, gitID: blobIDs[1]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-		})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -900,27 +886,22 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("modify file and create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[2]},
-			{name: "b", isDir: false, gitID: blobIDs[1]},
-		})
+		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[2], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = repo.Commit(treeA, refName, "Test commit\n", false)
+		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cB, err := repo.Commit(treeB, refName, "Test commit\n", false)
+		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -931,14 +912,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("no parent", func(t *testing.T) {
-		treeA, err := treeBuilder.writeTree([]*entry{
-			{name: "a", isDir: false, gitID: blobIDs[0]},
-		})
+		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		cA, err := repo.Commit(treeA, refName, "Test commit\n", false)
+		cA, err := repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -947,4 +926,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
+}
+
+func testNameToRefName(testName string) string {
+	return BranchReferenceName(strings.ReplaceAll(testName, " ", "__"))
 }

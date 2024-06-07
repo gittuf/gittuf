@@ -69,7 +69,7 @@ func TestEmptyTree(t *testing.T) {
 
 func TestRepositoryEmptyTree(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	hash, err := repo.EmptyTree()
 	assert.Nil(t, err)
@@ -114,7 +114,7 @@ func TestGetAllFilesInTree(t *testing.T) {
 
 func TestGetRepositoryAllFilesInTree(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	emptyBlobID, err := repo.WriteBlob(nil)
 	if err != nil {
@@ -308,7 +308,7 @@ func TestTreeBuilder(t *testing.T) {
 
 func TestReplacementTreeBuilder(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	blobAID, err := repo.WriteBlob([]byte("a"))
 	if err != nil {

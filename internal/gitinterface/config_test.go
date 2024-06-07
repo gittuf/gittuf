@@ -10,7 +10,7 @@ import (
 
 func TestGetGitConfig(t *testing.T) {
 	tmpDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tmpDir)
+	repo := CreateTestGitRepository(t, tmpDir, false)
 
 	// CreateTestGitRepository sets our test config
 	config, err := repo.GetGitConfig()
