@@ -53,6 +53,7 @@ var (
 	ErrDuplicatedRuleName         = errors.New("two rules with same name found in policy")
 	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
 	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrNoGitHubAppRoleDeclared    = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -282,6 +283,19 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 		return nil, ErrMetadataNotFound
 	}
 
+	var (
+		githubAppApprovalTrusted bool
+		githubAppKey             *tuf.Key
+	)
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return nil, err
+	}
+	githubAppApprovalTrusted = rootMetadata.GitHubApprovalsTrusted
+	if role, hasRole := rootMetadata.Roles[GitHubAppRoleName]; hasRole {
+		githubAppKey = rootMetadata.Keys[role.KeyIDs[0]]
+	}
+
 	// This envelope is verified when state is loaded, as this is
 	// the start for all delegation graph searches
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
@@ -319,10 +333,12 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 
 			if delegation.Matches(path) {
 				verifier := &Verifier{
-					repository: s.repository,
-					name:       delegation.Name,
-					keys:       make([]*tuf.Key, 0, len(delegation.KeyIDs)),
-					threshold:  delegation.Threshold,
+					repository:               s.repository,
+					name:                     delegation.Name,
+					keys:                     make([]*tuf.Key, 0, len(delegation.KeyIDs)),
+					githubAppApprovalTrusted: githubAppApprovalTrusted,
+					githubAppKey:             githubAppKey,
+					threshold:                delegation.Threshold,
 				}
 				for _, keyID := range delegation.KeyIDs {
 					key := allPublicKeys[keyID]
@@ -367,6 +383,7 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 // top level Targets role and all reachable delegated Targets roles. Any
 // unreachable role returns an error.
 func (s *State) Verify(ctx context.Context) error {
+	// Check consistency of root keys
 	rootKeys, err := s.GetRootKeys()
 	if err != nil {
 		return err
@@ -380,10 +397,23 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.RootEnvelope); err != nil {
+	if err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.RootEnvelope, nil); err != nil {
 		return err
 	}
 
+	// Check GitHub app approvals
+	rootMetadata, err := s.GetRootMetadata()
+	if err != nil {
+		return err
+	}
+	if rootMetadata.GitHubApprovalsTrusted {
+		// Check that the GitHub app role is declared
+		if _, hasRole := rootMetadata.Roles[GitHubAppRoleName]; !hasRole {
+			return ErrNoGitHubAppRoleDeclared
+		}
+	}
+
+	// Check top-level targets
 	if s.TargetsEnvelope == nil {
 		return nil
 	}
@@ -393,7 +423,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.TargetsEnvelope); err != nil {
+	if err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.TargetsEnvelope, nil); err != nil {
 		return err
 	}
 
@@ -402,6 +432,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
+	// Check reachable delegations
 	reachedDelegations := map[string]bool{}
 	for delegatedRoleName := range s.DelegationEnvelopes {
 		reachedDelegations[delegatedRoleName] = false
@@ -435,7 +466,7 @@ func (s *State) Verify(ctx context.Context) error {
 				threshold: delegation.Threshold,
 			}
 
-			if err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
+			if err := verifier.Verify(ctx, gitinterface.ZeroHash, env, nil); err != nil {
 				return err
 			}
 

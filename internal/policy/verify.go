@@ -4,18 +4,21 @@ package policy
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -339,7 +342,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 		return err
 	}
 
-	return rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.RootEnvelope)
+	return rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.RootEnvelope, nil)
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified
@@ -373,14 +376,14 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 		gitNamespaceVerified = true
 	}
 
-	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
+	authorizationAttestation, githubApprovalAttestation, err := getAttestations(repo, attestationsState, entry)
 	if err != nil {
 		return err
 	}
 
 	// Use each verifier to verify signature
 	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, entry.ID, authorizationAttestation)
+		err := verifier.Verify(ctx, entry.ID, authorizationAttestation, githubApprovalAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			gitNamespaceVerified = true
@@ -460,7 +463,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 			}
 
 			for _, verifier := range verifiers {
-				err := verifier.Verify(ctx, commitID, authorizationAttestation)
+				err := verifier.Verify(ctx, commitID, authorizationAttestation, githubApprovalAttestation)
 				if err == nil {
 					// Signature verification succeeded
 					pathsVerified[j] = true
@@ -524,7 +527,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return nil
 	}
 
-	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
+	authorizationAttestation, githubApprovalAttestation, err := getAttestations(repo, attestationsState, entry)
 	if err != nil {
 		return err
 	}
@@ -532,7 +535,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	// Use each verifier to verify signature
 	rslEntryVerified := false
 	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, entry.ID, authorizationAttestation)
+		err := verifier.Verify(ctx, entry.ID, authorizationAttestation, githubApprovalAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			rslEntryVerified = true
@@ -553,7 +556,10 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	for _, verifier := range verifiers {
 		// explicitly not looking at the attestation
 		// that applies to the _push_
-		err := verifier.Verify(ctx, entry.TargetID, nil)
+		// thus, we also set threshold to 1
+		verifier.threshold = 1
+
+		err := verifier.Verify(ctx, entry.TargetID, nil, nil)
 		if err == nil {
 			// Signature verification succeeded
 			tagObjVerified = true
@@ -572,9 +578,9 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	return nil
 }
 
-func getAuthorizationAttestation(repo *gitinterface.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, error) {
+func getAttestations(repo *gitinterface.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *sslibdsse.Envelope, error) {
 	if attestationsState == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	firstEntry := false
@@ -582,7 +588,7 @@ func getAuthorizationAttestation(repo *gitinterface.Repository, attestationsStat
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return nil, err
+			return nil, nil, err
 		}
 
 		firstEntry = true
@@ -595,19 +601,24 @@ func getAuthorizationAttestation(repo *gitinterface.Repository, attestationsStat
 
 	entryTreeID, err := repo.GetCommitTreeID(entry.TargetID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
 	if err != nil {
-		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
-			return nil, nil
+		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
+			return nil, nil, err
 		}
-
-		return nil, err
 	}
 
-	return attestation, nil
+	githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+	if err != nil {
+		if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+			return nil, nil, err
+		}
+	}
+
+	return authorizationAttestation, githubApprovalAttestation, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the
@@ -633,10 +644,12 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 }
 
 type Verifier struct {
-	repository *gitinterface.Repository
-	name       string
-	keys       []*tuf.Key
-	threshold  int
+	repository               *gitinterface.Repository
+	name                     string
+	keys                     []*tuf.Key
+	githubAppApprovalTrusted bool
+	githubAppKey             *tuf.Key
+	threshold                int
 }
 
 func (v *Verifier) Name() string {
@@ -656,35 +669,18 @@ func (v *Verifier) Threshold() int {
 // signature and signatures embedded in a DSSE envelope. Verify does not inspect
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
-func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, env *sslibdsse.Envelope) error {
+func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, authorizationAttestationEnv, githubApprovalAttestationEnv *sslibdsse.Envelope) error {
 	if v.threshold < 1 || len(v.keys) < 1 {
 		return ErrInvalidVerifier
 	}
 
-	if gitObjectID.IsZero() {
-		if env == nil {
-			// Nothing to verify, but fail closed
-			return ErrVerifierConditionsUnmet
-		} else if len(env.Signatures) < v.threshold {
-			// Envelope doesn't have enough signatures to meet threshold
-			return ErrVerifierConditionsUnmet
-		}
-	} else {
-		if env == nil {
-			if v.threshold > 1 {
-				// Single valid signature at most, so cannot meet threshold
-				return ErrVerifierConditionsUnmet
-			}
-		} else {
-			if (1 + len(env.Signatures)) < v.threshold {
-				// Combining the attestation and the git object we still do not
-				// have sufficient signatures
-				return ErrVerifierConditionsUnmet
-			}
-		}
+	allTrustedKeyIDs := set.NewSet[string]()
+	for _, key := range v.keys {
+		allTrustedKeyIDs.Add(key.KeyID)
 	}
 
-	var keyIDUsed string
+	usedKeyIDs := set.NewSet[string]()
+
 	gitObjectVerified := false
 
 	// First, verify the gitObject's signature if one is presented
@@ -693,7 +689,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 			err := v.repository.VerifySignature(ctx, gitObjectID, key)
 			if err == nil {
 				// Signature verification succeeded
-				keyIDUsed = key.KeyID
+				usedKeyIDs.Add(key.KeyID)
 				gitObjectVerified = true
 				break
 			}
@@ -711,29 +707,81 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 		return nil
 	}
 
-	// Second, verify signatures on the attestation, subtracting the threshold
-	// by 1 to account for a verified Git signature
-	envelopeThreshold := v.threshold
-	if gitObjectVerified {
-		envelopeThreshold--
-	}
+	if authorizationAttestationEnv != nil {
+		// Second, verify signatures on the attestation, subtracting the threshold
+		// by 1 to account for a verified Git signature
+		envelopeThreshold := v.threshold
+		if gitObjectVerified {
+			envelopeThreshold--
+		}
+		verifiers := make([]sslibdsse.Verifier, 0, len(v.keys))
+		for _, key := range v.keys {
+			if usedKeyIDs.Has(key.KeyID) {
+				// Do not create a DSSE verifier for the key used to verify the Git
+				// signature
+				continue
+			}
 
-	verifiers := make([]sslibdsse.Verifier, 0, len(v.keys))
-	for _, key := range v.keys {
-		if key.KeyID == keyIDUsed {
-			// Do not create a DSSE verifier for the key used to verify the Git
-			// signature
-			continue
+			verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
+			if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
+				return err
+			}
+			verifiers = append(verifiers, verifier)
 		}
 
-		verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
-		if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
-			return err
+		acceptedKeys, err := dsse.VerifyEnvelope(ctx, authorizationAttestationEnv, verifiers, envelopeThreshold)
+		if err != nil {
+			if !strings.Contains(err.Error(), "accepted signatures do not match threshold") {
+				// we may yet meet threshold with the approval attestation
+				return ErrVerifierConditionsUnmet
+			}
 		}
-		verifiers = append(verifiers, verifier)
+		for _, ak := range acceptedKeys {
+			usedKeyIDs.Add(ak.KeyID)
+		}
+		if usedKeyIDs.Len() >= v.Threshold() {
+			// We don't need to look at GitHub approvals
+			return nil
+		}
 	}
 
-	if err := dsse.VerifyEnvelope(ctx, env, verifiers, envelopeThreshold); err != nil {
+	if !v.githubAppApprovalTrusted || githubApprovalAttestationEnv == nil {
+		return ErrVerifierConditionsUnmet
+	}
+
+	// Verify approval attestation is signed by right key
+	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(v.githubAppKey) //nolint:staticcheck
+	if err != nil {
+		return err
+	}
+	_, err = dsse.VerifyEnvelope(ctx, githubApprovalAttestationEnv, []sslibdsse.Verifier{verifier}, 1)
+	if err != nil {
+		return ErrVerifierConditionsUnmet
+	}
+
+	payloadBytes, err := githubApprovalAttestationEnv.DecodeB64Payload()
+	if err != nil {
+		return err
+	}
+
+	type tmpStatement struct {
+		Type          string                                             `json:"_type"`
+		Subject       []*ita.ResourceDescriptor                          `json:"subject"`
+		PredicateType string                                             `json:"predicateType"`
+		Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+	}
+	stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}}}
+	if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+		return err
+	}
+
+	for _, key := range stmt.Predicate.Approvers {
+		if allTrustedKeyIDs.Has(key.KeyID) {
+			usedKeyIDs.Add(key.KeyID)
+		}
+	}
+
+	if usedKeyIDs.Len() < v.Threshold() {
 		return ErrVerifierConditionsUnmet
 	}
 
