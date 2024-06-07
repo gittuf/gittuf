@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,8 +16,10 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/go-github/v61/github"
+	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -267,6 +270,87 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 	}
 
 	return r.addGitHubPullRequestAttestation(ctx, signer, owner, repository, pullRequest, signCommit)
+}
+
+// AddGitHubPullRequestApprovalAttestation adds a GitHub pull request approval
+// attestation for the specified parameters. If an attestation already exists,
+// the specified approver is added to the existing attestation's predicate and
+// it is re-signed and stored in the repository. Currently, this is limited to
+// developer mode.
+func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, baseRef, fromID, toID string, approver *tuf.Key, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	hasApprovalAttestation := false
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, baseRef, fromID, toID)
+	if err == nil {
+		slog.Debug("Found existing GitHub pull request approval attestation...")
+		hasApprovalAttestation = true
+	} else if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+		return err
+	}
+
+	approvers := []*tuf.Key{approver}
+	if !hasApprovalAttestation {
+		// Create a new GitHub pull request approval attestation
+		slog.Debug("Creating new GitHub pull request approval attestation...")
+	} else {
+		// Update existing statement's predicate and create new env
+		slog.Debug("Adding approver to existing GitHub pull request approval attestation...")
+		payloadBytes, err := env.DecodeB64Payload()
+		if err != nil {
+			return err
+		}
+
+		type tmpStatement struct {
+			Type          string                                             `json:"_type"`
+			Subject       []*ita.ResourceDescriptor                          `json:"subject"`
+			PredicateType string                                             `json:"predicateType"`
+			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+		}
+		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}}}
+		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+			return err
+		}
+
+		approvers = append(approvers, stmt.Predicate.Approvers...)
+	}
+
+	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers)
+	if err != nil {
+		return err
+	}
+
+	env, err = dsse.CreateEnvelope(statement)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing GitHub pull request approval attestation using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, baseRef, fromID, toID); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add GitHub pull request approval attestation for '%s' from '%s' to '%s' for approval by '%s'", baseRef, fromID, toID, approver.KeyID)
+
+	slog.Debug("Committing attestations...")
+	return currentAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
 func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequest *github.PullRequest, signCommit bool) error {

@@ -318,7 +318,7 @@ func TestRootMetadataWithSSHKey(t *testing.T) {
 	if err != nil {
 		t.Fatal()
 	}
-	err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{verifier2}, 1)
+	_, err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{verifier2}, 1)
 	if err != nil {
 		t.Fatal()
 	}

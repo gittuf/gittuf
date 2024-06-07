@@ -37,7 +37,7 @@ func TestInitializeRoot(t *testing.T) {
 	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.RootRoleName].KeyIDs[0])
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
 	assert.Nil(t, err)
 }
 
@@ -74,7 +74,7 @@ func TestAddRootKey(t *testing.T) {
 	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
 	assert.Equal(t, 2, len(state.RootPublicKeys))
 
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -132,7 +132,7 @@ func TestRemoveRootKey(t *testing.T) {
 	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, newRootKey.KeyID)
 	assert.Equal(t, 2, len(state.RootPublicKeys))
 
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
 	newSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
@@ -158,7 +158,7 @@ func TestRemoveRootKey(t *testing.T) {
 	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
 	assert.Equal(t, 1, len(state.RootPublicKeys))
 
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
 	assert.Nil(t, err)
 }
 
@@ -188,7 +188,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -232,7 +232,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Equal(t, rootKey.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, rootKey.KeyID)
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
@@ -249,7 +249,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	}
 
 	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
-	err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
