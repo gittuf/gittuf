@@ -31,7 +31,7 @@ func ReadBlob(repo *git.Repository, blobID plumbing.Hash) ([]byte, error) {
 	return io.ReadAll(reader)
 }
 
-// ReadBlob returns the contents of a the blob referenced by blobID.
+// ReadBlob returns the contents of the blob referenced by blobID.
 func (r *Repository) ReadBlob(blobID Hash) ([]byte, error) {
 	objType, err := r.executor("cat-file", "-t", blobID.String()).execute()
 	if err != nil {
