@@ -58,8 +58,8 @@ func (v *Verifier) Public() crypto.PublicKey {
 
 // Signer is a dsse.Signer implementation for SSH keys.
 type Signer struct {
-	Verifier *Verifier
-	Path     string
+	Path string
+	*Verifier
 }
 
 // Sign implements the dsse.Signer.Sign interface for SSH keys.
@@ -78,11 +78,6 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	}
 
 	return output, nil
-}
-
-// KeyID implements the dsse.Signer.KeyID interface for SSH keys.
-func (s *Signer) KeyID() (string, error) {
-	return s.Verifier.KeyID()
 }
 
 // NewKeyFromFile imports an ssh SSlibKey from the passed path.
