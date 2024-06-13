@@ -8,6 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
+	"github.com/gittuf/gittuf/internal/cmd/gitCmd"
 	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
 	"github.com/gittuf/gittuf/internal/cmd/profile"
@@ -89,6 +90,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(addhooks.New())
 	cmd.AddCommand(clone.New())
+	cmd.AddCommand(git.New())
 	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
