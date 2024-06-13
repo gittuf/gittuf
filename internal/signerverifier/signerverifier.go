@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -40,7 +41,7 @@ type keyVal struct {
 // keys. While this is called signerverifier, tuf.Key only supports public keys.
 //
 // Deprecated: Switch to upstream key loading APIs.
-func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.SignerVerifier, error) {
+func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.Verifier, error) {
 	switch key.KeyType {
 	case ED25519KeyType:
 		return sslibsv.NewED25519SignerVerifierFromSSLibKey(key)
@@ -48,6 +49,8 @@ func NewSignerVerifierFromTUFKey(key *tuf.Key) (dsse.SignerVerifier, error) {
 		return sslibsv.NewECDSASignerVerifierFromSSLibKey(key)
 	case RSAKeyType:
 		return sslibsv.NewRSAPSSSignerVerifierFromSSLibKey(key)
+	case ssh.SSHKeyType:
+		return ssh.NewVerifierFromKey(key)
 	}
 	return nil, common.ErrUnknownKeyType
 }

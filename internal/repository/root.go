@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -23,10 +24,18 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	rawKey := signer.Public()
-	publicKey, err := sslibsv.NewKey(rawKey)
-	if err != nil {
-		return err
+	var (
+		publicKey *sslibsv.SSLibKey
+		err       error
+	)
+	if signerSSH, isSSHSigner := signer.(*ssh.Signer); isSSHSigner {
+		publicKey = signerSSH.MetadataKey()
+	} else {
+		rawKey := signer.Public()
+		publicKey, err = sslibsv.NewKey(rawKey)
+		if err != nil {
+			return err
+		}
 	}
 
 	slog.Debug("Creating initial root metadata...")

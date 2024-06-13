@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -192,7 +193,7 @@ func VerifyTagSignature(ctx context.Context, tag *object.Tag, key *tuf.Key) erro
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
@@ -241,7 +242,7 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tu
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
