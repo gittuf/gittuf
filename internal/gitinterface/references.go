@@ -85,6 +85,11 @@ func (r *Repository) AbsoluteReference(target string) (string, error) {
 		return r.GetSymbolicReferenceTarget(target)
 	}
 
+	// We may have a ref that isn't available locally but is still ref-prefixed.
+	if strings.HasPrefix(target, RefPrefix) {
+		return target, nil
+	}
+
 	// If target is a full ref already and it's stored in the GIT_DIR/refs
 	// directory, we don't reach this point. Below, we handle cases where the
 	// ref may be packed.
