@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/jonboulle/clockwork"
@@ -54,7 +53,7 @@ func LoadRepository() (*Repository, error) {
 		return repo, nil
 	}
 
-	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").executeRaw()
+	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").execute()
 	if err != nil {
 		errContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
@@ -79,9 +78,7 @@ type executor struct {
 	r     *Repository
 	args  []string
 	env   []string
-	stdIn *bytes.Buffer
-
-	setGitDirOnce sync.Once
+	stdIn io.Reader
 }
 
 // executor initializes a new executor instance to run a Git command with the
@@ -97,30 +94,18 @@ func (e *executor) withEnv(env ...string) *executor {
 	return e
 }
 
-// withGitDir adds the `--git-dir` parameter to the command. It executes only
-// once.
-func (e *executor) withGitDir() *executor {
-	e.setGitDirOnce.Do(func() {
-		e.args = append([]string{"--git-dir", e.r.gitDirPath}, e.args...)
-	})
-	return e
-}
-
 // withStdIn sets the contents of stdin to be passed in to the command.
 func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
 	e.stdIn = stdIn
 	return e
 }
 
-// execute runs the constructed Git command and returns the contents of stdout.
-// Leading and trailing spaces and newlines are removed. This function also sets
-// the Git directory. This function should be used almost every time; the only
-// exception is when the Git directory must not be set and/or the output is
+// executeString runs the constructed Git command and returns the contents of
+// stdout.  Leading and trailing spaces and newlines are removed. This function
+// should be used almost every time; the only exception is when the output is
 // desired without any processing such as the removal of space characters.
-func (e *executor) execute() (string, error) {
-	e.withGitDir()
-
-	stdOut, stdErr, err := e.executeRaw()
+func (e *executor) executeString() (string, error) {
+	stdOut, stdErr, err := e.execute()
 	if err != nil {
 		stdErrContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
@@ -137,8 +122,13 @@ func (e *executor) execute() (string, error) {
 	return strings.TrimSpace(string(stdOutContents)), nil
 }
 
-// executeRaw runs the constructed Git command with no additional processing.
-func (e *executor) executeRaw() (io.Reader, io.Reader, error) {
+// execute runs the constructed Git command and returns the raw stdout and
+// stderr contents. It adds the `--git-dir` argument if the repository has a
+// path set.
+func (e *executor) execute() (io.Reader, io.Reader, error) {
+	if e.r.gitDirPath != "" {
+		e.args = append([]string{"--git-dir", e.r.gitDirPath}, e.args...)
+	}
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
 

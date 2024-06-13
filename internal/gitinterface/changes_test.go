@@ -1095,7 +1095,7 @@ func (r *Repository) CommitWithParents(treeID Hash, parentIDs []Hash, message st
 	now := r.clock.Now().Format(time.RFC3339)
 	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
 
-	stdOut, err := r.executor(args...).withEnv(env...).execute()
+	stdOut, err := r.executor(args...).withEnv(env...).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
 	}

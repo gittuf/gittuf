@@ -89,7 +89,7 @@ func (r *Repository) GetCommitsBetweenRange(commitNewID, commitOldID Hash) ([]Ha
 		args = []string{"rev-list", fmt.Sprintf("%s..%s", commitOldID.String(), commitNewID.String())}
 	}
 
-	commitRangeString, err := r.executor(args...).execute()
+	commitRangeString, err := r.executor(args...).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to enumerate commits in range: %w", err)
 	}

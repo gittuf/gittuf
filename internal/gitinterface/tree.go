@@ -53,7 +53,7 @@ func EmptyTree() plumbing.Hash {
 }
 
 func (r *Repository) EmptyTree() (Hash, error) {
-	treeID, err := r.executor("hash-object", "-t", "tree", "--stdin").execute()
+	treeID, err := r.executor("hash-object", "-t", "tree", "--stdin").executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to hash empty tree: %w", err)
 	}
@@ -98,7 +98,7 @@ func GetAllFilesInTree(tree *object.Tree) (map[string]plumbing.Hash, error) {
 // GetAllFilesInTree returns all filepaths and the corresponding blob hashes in
 // the specified tree.
 func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
-	stdOut, err := r.executor("ls-tree", "-r", "--format=%(path) %(objectname)", treeID.String()).execute()
+	stdOut, err := r.executor("ls-tree", "-r", "--format=%(path) %(objectname)", treeID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to enumerate all files in tree: %w", err)
 	}
@@ -178,7 +178,7 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 		return r.GetCommitTreeID(commitBID)
 	}
 
-	stdOut, err := r.executor("merge-tree", commitAID.String(), commitBID.String()).execute()
+	stdOut, err := r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
 	}
@@ -383,7 +383,7 @@ func (t *ReplacementTreeBuilder) writeTree(entries []*entry) (Hash, error) {
 		input += "\n"
 	}
 
-	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input)).execute()
+	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input)).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
 	}

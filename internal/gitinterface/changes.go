@@ -121,7 +121,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 	}
 
 	if len(parentCommitIDs) == 0 {
-		filePaths, err := r.executor("ls-tree", "--name-only", "-r", commitID.String()).execute()
+		filePaths, err := r.executor("ls-tree", "--name-only", "-r", commitID.String()).executeString()
 		if err != nil {
 			return nil, fmt.Errorf("unable to identify all commit file paths: %w", err)
 		}
@@ -132,7 +132,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 
 	if len(parentCommitIDs) > 1 {
 		// Check if tree matches last commit
-		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).execute()
+		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).executeString()
 		if err != nil {
 			return nil, fmt.Errorf("unable to diff commit against last parent commit: %w", err)
 		}
@@ -142,7 +142,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 
 		pathSet := map[string]bool{}
 		for _, parentCommitID := range parentCommitIDs {
-			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID.String(), commitID.String()).execute()
+			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID.String(), commitID.String()).executeString()
 			if err != nil {
 				return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 			}
@@ -171,7 +171,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 		return paths, nil
 	}
 
-	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).execute()
+	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 	}
