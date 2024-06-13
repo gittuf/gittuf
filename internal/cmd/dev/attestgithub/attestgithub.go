@@ -4,7 +4,6 @@ package attestgithub
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -78,11 +77,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	keyBytes, err := os.ReadFile(o.signingKey)
-	if err != nil {
-		return err
-	}
-	signer, err := common.LoadSigner(keyBytes)
+	signer, err := common.LoadSigner(o.signingKey)
 	if err != nil {
 		return err
 	}

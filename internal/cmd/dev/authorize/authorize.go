@@ -4,7 +4,6 @@ package authorize
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -56,11 +55,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	keyBytes, err := os.ReadFile(o.signingKey)
-	if err != nil {
-		return err
-	}
-	signer, err := common.LoadSigner(keyBytes)
+	signer, err := common.LoadSigner(o.signingKey)
 	if err != nil {
 		return err
 	}

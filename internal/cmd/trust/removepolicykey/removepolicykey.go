@@ -3,7 +3,6 @@
 package removepolicykey
 
 import (
-	"os"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -33,11 +32,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	rootKeyBytes, err := os.ReadFile(o.p.SigningKey)
-	if err != nil {
-		return err
-	}
-	signer, err := common.LoadSigner(rootKeyBytes)
+	signer, err := common.LoadSigner(o.p.SigningKey)
 	if err != nil {
 		return err
 	}

@@ -4,13 +4,13 @@ package common
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -44,7 +44,10 @@ func (p *PublicKeys) Type() string {
 // LoadPublicKey returns a tuf.Key object for a PGP / Sigstore Fulcio / SSH
 // (on-disk) key for use in gittuf metadata.
 func LoadPublicKey(key string) (*tuf.Key, error) {
-	var keyObj *tuf.Key
+	var (
+		keyObj *tuf.Key
+		err    error
+	)
 
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
@@ -77,12 +80,7 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 			},
 		}
 	default:
-		kb, err := os.ReadFile(key)
-		if err != nil {
-			return nil, err
-		}
-
-		keyObj, err = tuf.LoadKeyFromBytes(kb)
+		keyObj, err = ssh.NewKeyFromFile(key)
 		if err != nil {
 			return nil, err
 		}
@@ -94,13 +92,26 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 // LoadSigner loads a signer for the specified key bytes. The key must be
 // encoded either in a standard PEM format. For now, the custom securesystemslib
 // format is also supported.
-func LoadSigner(keyBytes []byte) (sslibdsse.SignerVerifier, error) {
-	signer, err := sslibsv.NewSignerVerifierFromPEM(keyBytes)
-	if err == nil {
-		return signer, nil
+func LoadSigner(key string) (sslibdsse.SignerVerifier, error) {
+	switch {
+	case strings.HasPrefix(key, GPGKeyPrefix):
+		return nil, fmt.Errorf("not implemented")
+	case strings.HasPrefix(key, FulcioPrefix):
+		return nil, fmt.Errorf("not implemented")
+	default:
+		keyObj, err := ssh.NewKeyFromFile(key)
+		if err != nil {
+			return nil, err
+		}
+		verifier, err := ssh.NewVerifierFromKey(keyObj)
+		if err != nil {
+			return nil, err
+		}
+		return &ssh.Signer{
+			Verifier: verifier,
+			Path:     key,
+		}, nil
 	}
-
-	return signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
 }
 
 // CheckIfSigningViableWithFlag checks if a signing key was specified via the
