@@ -11,7 +11,7 @@ import (
 
 // gitCmd represents the base command when called without any subcommands
 var gitCmd = &cobra.Command{
-	Use:               "git", // This sets "git" as the required subcommand
+	Use:               "gittuf-git", // This sets "git" as the required subcommand
 	Short:             "Run git commands with potential gittuf integration",
 	Args:              cobra.ArbitraryArgs, 
 	RunE:              runGitCommand,
@@ -33,7 +33,7 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 		// Custom error handling (same as before)
 		if ee, ok := err.(*exec.ExitError); ok {
 			stderr := string(ee.Stderr)
-			stderr = strings.ReplaceAll(stderr, "git", "gittuf git")
+			stderr = strings.ReplaceAll(stderr, "git", "gittuf-git")
 			return fmt.Errorf("%s", stderr)
 		}
 		return fmt.Errorf("git command failed: %w", err)
