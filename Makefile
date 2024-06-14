@@ -11,7 +11,9 @@ default : install
 build : test
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)"  -o dist/gittuf .
 
-install : test
+install : test just-install
+
+just-install :
 	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/gittuf/gittuf
 
 test :

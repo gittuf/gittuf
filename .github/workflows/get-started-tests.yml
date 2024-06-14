@@ -4,9 +4,13 @@ on:
     branches: ['main']
     paths-ignore:
       - "docs/*"
+      - "!docs/testing/*"
+      - "!docs/get-started.md"
   pull_request:
     paths-ignore:
       - "docs/*"
+      - "!docs/testing/*"
+      - "!docs/get-started.md"
 jobs:
   test:
     strategy:
@@ -26,6 +30,6 @@ jobs:
       with:
         python-version: '3.10'
     - name: Build gittuf
-      run: make
+      run: make just-install
     - name: Test Getting Started
       run: python3 docs/testing/test-get-started-md.py
