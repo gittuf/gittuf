@@ -50,7 +50,7 @@ gittuf version
 `make`. This will also run the test suite prior to installing gittuf. Note that
 Go 1.22 or higher is necessary to build gittuf.
 
-```bash
+```sh
 $ git clone https://github.com/gittuf/gittuf
 $ cd gittuf
 $ make
@@ -65,7 +65,7 @@ So, for testing purposes, when creating keys using `ssh-keygen`, choose no
 passphrase when prompted to "enter passphrase" by hitting enter.  Additionally,
 convert the public key to be PEM encoded.
 
-```bash
+```sh
 $ mkdir gittuf-get-started && cd gittuf-get-started
 $ mkdir keys && cd keys
 $ ssh-keygen -t rsa -N "" -f root
@@ -85,7 +85,7 @@ key.
 
 ```bash
 $ cd .. && mkdir repo && cd repo
-$ git init -b main
+$ git init -q -b main
 $ git config --local gpg.format ssh
 $ git config --local user.signingkey ../keys/developer
 ```
@@ -143,7 +143,7 @@ $ gittuf rsl record main
 
 gittuf allows for verifying rules for Git references and files.
 
-```bash
+```sh
 $ gittuf verify-ref --verbose main
 ```
 
@@ -153,7 +153,7 @@ gittuf includes helpers to push and fetch the policy and RSL references.
 However, there are some known issues (see [#328]) with these commands. In the
 meantime, Git can be used to keep gittuf's references updated.
 
-```bash
+```sh
 $ git push <remote> refs/gittuf/*
 $ git fetch <remote> refs/gittuf/*:refs/gittuf/*
 ```
