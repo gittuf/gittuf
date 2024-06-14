@@ -144,7 +144,7 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	allCommits := []Hash{}
 	for i := 0; i < 5; i++ {
 		commitHash, err := repo.Commit(emptyTreeID, refName, "Test commit\n", false)
-		assert.Nil(t, err)
+		require.Nil(t, err)
 		allCommits = append(allCommits, commitHash)
 	}
 
