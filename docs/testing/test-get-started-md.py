@@ -47,8 +47,9 @@ def test_commands():
     repo_keys_path = os.path.join(tmp_dir, "keys")
     shutil.copytree(keys_path, repo_keys_path)
     os.chdir(repo_keys_path)
+    os.chmod("root", 0o0600)
+    os.chmod("policy", 0o0600)
     os.chmod("developer", 0o0600)
-    
     try:
         with open(expected_output_file) as fp1, open(get_started_file) as fp2:
             expected_output = fp1.read()

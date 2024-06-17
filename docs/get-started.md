@@ -59,21 +59,14 @@ make
 ## Create keys
 
 First, create some keys that are used for the gittuf root of trust, policies, as
-well as for commits created while following this guide.  Note that for on-disk
-keys, gittuf **does not currently support encrypted private keys** (see [#276]).
-So, for testing purposes, when creating keys using `ssh-keygen`, choose no
-passphrase when prompted to "enter passphrase" by hitting enter.  Additionally,
-convert the public key to be PEM encoded.
+well as for commits created while following this guide.
 
 ```sh
 mkdir gittuf-get-started && cd gittuf-get-started
 mkdir keys && cd keys
 ssh-keygen -t rsa -N "" -f root
-ssh-keygen -f root.pub -e -m pem > root.pem
 ssh-keygen -t rsa -N "" -f policy
-ssh-keygen -f policy.pub -e -m pem > policy.pem
 ssh-keygen -t rsa -N "" -f developer
-ssh-keygen -f developer.pub -e -m pem > developer.pem
 ```
 
 ## Create a Git repository
@@ -103,14 +96,14 @@ rules in one or more policy files. The primary policy file (called `targets`,
 from TUF) must be signed by keys specified in the root of trust.
 
 ```bash
-gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pem
+gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
 gittuf policy init -k ../keys/policy --policy-name targets
 ```
 Then, use the policy key to initialize a policy and add a rule protecting the
 `main` branch.
 
 ```bash
-gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pem
+gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
 ```
 
 Note that `--authorize-key` can also be used to specify a GPG key or a
