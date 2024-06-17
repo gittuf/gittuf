@@ -69,6 +69,15 @@ func ResetDueToError(cause error, repo *git.Repository, refName string, commitID
 	return cause
 }
 
+// Does not modify worktree, should be fine, this is used only from refs/gittuf
+// which is not checked out.
+func (r *Repository) ResetDueToError(cause error, refName string, commitID Hash) error {
+	if err := r.SetReference(refName, commitID); err != nil {
+		return fmt.Errorf("unable to reset %s to %s, caused by following error: %w", refName, commitID.String(), cause)
+	}
+	return cause
+}
+
 // AbsoluteReference returns the fully qualified reference path for the provided
 // Git ref.
 func AbsoluteReference(repo *git.Repository, target string) (string, error) {

@@ -64,7 +64,7 @@ func getRealGitConfig(repo *git.Repository) (*config.Config, error) {
 // GetGitConfig reads the applicable Git config for a repository and returns
 // it. The "keys" for each config are normalized to lowercase.
 func (r *Repository) GetGitConfig() (map[string]string, error) {
-	stdOut, err := r.executeGitCommandString("config", "--get-regexp", `.*`)
+	stdOut, err := r.executor("config", "--get-regexp", `.*`).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to read Git config: %w", err)
 	}
@@ -85,7 +85,7 @@ func (r *Repository) GetGitConfig() (map[string]string, error) {
 
 // SetGitConfig sets the specified key to the value locally for a repository.
 func (r *Repository) SetGitConfig(key, value string) error {
-	if _, err := r.executeGitCommandString("config", "--local", key, value); err != nil {
+	if _, err := r.executor("config", "--local", key, value).executeString(); err != nil {
 		return fmt.Errorf("unable to set '%s' to '%s': %w", key, value, err)
 	}
 

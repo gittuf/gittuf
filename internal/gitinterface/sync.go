@@ -5,7 +5,10 @@ package gitinterface
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -13,6 +16,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/jonboulle/clockwork"
 )
 
 const DefaultRemoteName = "origin"
@@ -58,6 +62,31 @@ func Push(ctx context.Context, repo *git.Repository, remoteName string, refs []s
 	}
 
 	return PushRefSpec(ctx, repo, remoteName, refSpecs)
+}
+
+func (r *Repository) PushRefSpec(remoteName string, refSpecs []string) error {
+	args := []string{"push", remoteName}
+	args = append(args, refSpecs...)
+
+	_, err := r.executor(args...).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to push: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) Push(remoteName string, refs []string) error {
+	refSpecs := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		refSpec, err := r.RefSpec(ref, "", true)
+		if err != nil {
+			return err
+		}
+		refSpecs = append(refSpecs, refSpec)
+	}
+
+	return r.PushRefSpec(remoteName, refSpecs)
 }
 
 // FetchRefSpec fetches to the repo from the specified remote using
@@ -109,6 +138,55 @@ func Fetch(ctx context.Context, repo *git.Repository, remoteName string, refs []
 	return FetchRefSpec(ctx, repo, remoteName, refSpecs)
 }
 
+func (r *Repository) FetchRefSpec(remoteName string, refSpecs []string) error {
+	args := []string{"fetch", remoteName}
+	args = append(args, refSpecs...)
+
+	_, err := r.executor(args...).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to fetch: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly bool) error {
+	refSpecs := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		refSpec, err := r.RefSpec(ref, "", fastForwardOnly)
+		if err != nil {
+			return err
+		}
+		refSpecs = append(refSpecs, refSpec)
+	}
+
+	return r.FetchRefSpec(remoteName, refSpecs)
+}
+
+func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string) (*Repository, error) {
+	if dir == "" {
+		return nil, fmt.Errorf("target directory must be specified")
+	}
+
+	repo := &Repository{clock: clockwork.NewRealClock()}
+
+	args := []string{"clone", remoteURL}
+	if initialBranch != "" {
+		initialBranch = strings.TrimPrefix(initialBranch, BranchRefPrefix)
+		args = append(args, "--branch", initialBranch)
+	}
+	args = append(args, dir)
+
+	_, stdErr, err := repo.executor(args...).execute()
+	if err != nil {
+		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
+	}
+
+	repo.gitDirPath = path.Join(dir, ".git")
+
+	return repo, repo.Fetch(DefaultRemoteName, refs, true)
+}
+
 // CloneAndFetch clones a repository using the specified URL and additionally
 // fetches the specified refs.
 func CloneAndFetch(ctx context.Context, remoteURL, dir, initialBranch string, refs []string) (*git.Repository, error) {
@@ -129,6 +207,15 @@ func CloneAndFetchToMemory(ctx context.Context, remoteURL, initialBranch string,
 	}
 
 	return fetchRefs(ctx, repo, refs, true)
+}
+
+func (r *Repository) CreateRemote(remoteName, remoteURL string) error {
+	_, err := r.executor("remote", "add", remoteName, remoteURL).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to add remote: %w", err)
+	}
+
+	return nil
 }
 
 func createCloneOptions(remoteURL, initialBranch string) *git.CloneOptions {

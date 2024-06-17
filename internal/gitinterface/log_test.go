@@ -13,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetCommitsBetweenRange(t *testing.T) {
@@ -124,6 +125,200 @@ func TestGetCommitsBetweenRange(t *testing.T) {
 		commits, err := GetCommitsBetweenRange(repo, nonExistentHash, plumbing.ZeroHash)
 		assert.Nil(t, err)
 		assert.Equal(t, commits, []*object.Commit{})
+	})
+}
+
+func TestGetCommitsBetweenRangeRepository(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewReplacementTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	allCommits := []Hash{}
+	for i := 0; i < 5; i++ {
+		commitHash, err := repo.Commit(emptyTreeID, refName, "Test commit\n", false)
+		require.Nil(t, err)
+		allCommits = append(allCommits, commitHash)
+	}
+
+	// Git tree structure with their commit trees and their values:
+	//
+	// Commit1 <- Commit2 <- Commit3 <- Commit4 <- Commit5
+
+	t.Run("Check range between commits 1 and 5", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[4], allCommits[0])
+		assert.Nil(t, err)
+
+		expectedCommits := []Hash{allCommits[4], allCommits[3], allCommits[2], allCommits[1]}
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+
+		assert.Equal(t, expectedCommits, commits)
+	})
+
+	t.Run("Pass in wrong order", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[0], allCommits[4])
+		assert.Nil(t, err)
+		assert.Empty(t, commits)
+	})
+
+	t.Run("Check range in separate branches", func(t *testing.T) {
+		//     7
+		//    ↙ ↘
+		//   5   6
+		//   ↓   ↓
+		//   3   4
+		//   ↓   ↓
+		//   1   2
+		//    ↘ ↙
+		//     0
+
+		// If we pass in 7 and 1, we expect to get 7, 6, 5, 4, 3, and 2
+		// If we pass in 1 and 7, we should expect nothing since every node that
+		// is in the subtree of 1 is also in the subtree of 7
+
+		// Create two new branches for this
+		mainBranch := testNameToRefName(t.Name())
+		featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+		// Add a common commit for both
+		commonCommit, err := repo.Commit(emptyTreeID, mainBranch, "Initial commit\n", false)
+		require.Nil(t, err)
+		if err := repo.SetReference(featureBranch, commonCommit); err != nil {
+			t.Fatal(err)
+		}
+
+		mainBranchCommits := []Hash{}
+		for i := 0; i < 5; i++ {
+			commitHash, err := repo.Commit(emptyTreeID, mainBranch, fmt.Sprintf("Main commit %d\n", i), false)
+			require.Nil(t, err)
+			mainBranchCommits = append(mainBranchCommits, commitHash)
+		}
+
+		featureBranchCommits := []Hash{}
+		for i := 0; i < 5; i++ {
+			commitHash, err := repo.Commit(emptyTreeID, featureBranch, fmt.Sprintf("Feature commit %d\n", i), false)
+			require.Nil(t, err)
+			featureBranchCommits = append(featureBranchCommits, commitHash)
+		}
+
+		// Add a common merge commit
+		mergeCommit, err := repo.CommitWithParents(
+			emptyTreeID,
+			[]Hash{
+				mainBranchCommits[len(mainBranchCommits)-1],
+				featureBranchCommits[len(featureBranchCommits)-1],
+			},
+			"Merge branches\n",
+			false,
+		)
+		require.Nil(t, err)
+
+		// Check merge to first commit in main branch (not initial common commit)
+		expectedCommits := append([]Hash{mergeCommit}, mainBranchCommits[1:]...)
+		expectedCommits = append(expectedCommits, featureBranchCommits...)
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		commits, err := repo.GetCommitsBetweenRange(mergeCommit, mainBranchCommits[0])
+		assert.Nil(t, err)
+		assert.Equal(t, expectedCommits, commits)
+
+		// Check merge to first commit in feature branch (not initial common commit)
+		expectedCommits = append([]Hash{mergeCommit}, featureBranchCommits[1:]...)
+		expectedCommits = append(expectedCommits, mainBranchCommits...)
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		commits, err = repo.GetCommitsBetweenRange(mergeCommit, featureBranchCommits[0])
+		assert.Nil(t, err)
+		assert.Equal(t, expectedCommits, commits)
+
+		// Check merge to initial common commit
+		expectedCommits = append([]Hash{mergeCommit}, mainBranchCommits...)
+		expectedCommits = append(expectedCommits, featureBranchCommits...)
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		commits, err = repo.GetCommitsBetweenRange(mergeCommit, commonCommit)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedCommits, commits)
+
+		// Set both branches to merge commit, diverge again
+		if err := repo.SetReference(mainBranch, mergeCommit); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(featureBranch, mergeCommit); err != nil {
+			t.Fatal(err)
+		}
+
+		mainBranchCommits = []Hash{}
+		for i := 0; i < 5; i++ {
+			commitHash, err := repo.Commit(emptyTreeID, mainBranch, fmt.Sprintf("Main commit %d\n", i), false)
+			require.Nil(t, err)
+			mainBranchCommits = append(mainBranchCommits, commitHash)
+		}
+
+		featureBranchCommits = []Hash{}
+		for i := 0; i < 5; i++ {
+			commitHash, err := repo.Commit(emptyTreeID, featureBranch, fmt.Sprintf("Feature commit %d\n", i), false)
+			require.Nil(t, err)
+			featureBranchCommits = append(featureBranchCommits, commitHash)
+		}
+
+		newMergeCommit, err := repo.CommitWithParents(
+			emptyTreeID,
+			[]Hash{
+				mainBranchCommits[len(mainBranchCommits)-1],
+				featureBranchCommits[len(featureBranchCommits)-1],
+			},
+			"Merge branches\n",
+			false,
+		)
+		require.Nil(t, err)
+
+		// Check range between two merge commits
+		expectedCommits = append([]Hash{newMergeCommit}, mainBranchCommits...)
+		expectedCommits = append(expectedCommits, featureBranchCommits...)
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		commits, err = repo.GetCommitsBetweenRange(newMergeCommit, mergeCommit)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedCommits, commits)
+	})
+
+	t.Run("Get all commits", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
+		assert.Nil(t, err)
+
+		expectedCommits := allCommits
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		assert.Equal(t, expectedCommits, commits)
+	})
+
+	t.Run("Get commits from invalid range", func(t *testing.T) {
+		_, err := repo.GetCommitsBetweenRange(ZeroHash, ZeroHash)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("Get commits from non-existent commit", func(t *testing.T) {
+		nonExistentHash, err := repo.WriteBlob([]byte{})
+		assert.Nil(t, err)
+
+		commits, err := repo.GetCommitsBetweenRange(nonExistentHash, ZeroHash)
+		assert.Nil(t, err)
+		assert.Empty(t, commits)
 	})
 }
 

@@ -103,7 +103,7 @@ func TestVerifyTagSignature(t *testing.T) {
 
 func TestGetTagTarget(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	treeBuilder := NewReplacementTreeBuilder(repo)
 
@@ -132,7 +132,7 @@ func TestRepositoryVerifyTag(t *testing.T) {
 	// TODO: support multiple signing types
 
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	treeBuilder := NewReplacementTreeBuilder(repo)
 

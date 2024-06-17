@@ -131,7 +131,7 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 
 // GetTagTarget returns the ID of the Git object a tag points to.
 func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
-	targetID, err := r.executeGitCommandString("rev-list", "-n", "1", tagID.String())
+	targetID, err := r.executor("rev-list", "-n", "1", tagID.String()).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
 	}
@@ -285,7 +285,7 @@ func signTag(tag *object.Tag) (string, error) {
 }
 
 func (r *Repository) ensureIsTag(tagID Hash) error {
-	objType, err := r.executeGitCommandString("cat-file", "-t", tagID.String())
+	objType, err := r.executor("cat-file", "-t", tagID.String()).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to inspect if object is tag: %w", err)
 	} else if objType != "tag" {

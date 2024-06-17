@@ -53,43 +53,65 @@ func LoadRepository() (*Repository, error) {
 		return repo, nil
 	}
 
-	gitDirPath, err := repo.executeGitCommandDirectString("rev-parse", "--git-dir")
+	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").execute()
+	if err != nil {
+		errContents, newErr := io.ReadAll(stdErr)
+		if newErr != nil {
+			return nil, fmt.Errorf("unable to read original err '%w' when loading repository: %w", err, newErr)
+		}
+		return nil, fmt.Errorf("unable to identify GIT_DIR: %w: %s", err, strings.TrimSpace(string(errContents)))
+	}
+
+	stdOutContents, err := io.ReadAll(stdOut)
 	if err != nil {
 		return nil, fmt.Errorf("unable to identify GIT_DIR: %w", err)
 	}
-	repo.gitDirPath = gitDirPath
+	repo.gitDirPath = strings.TrimSpace(string(stdOutContents))
 
 	return repo, nil
 }
 
-// executeGitCommandString is a helper to execute the specified command in the
-// repository. It automatically adds the explicit `--git-dir` parameter. It
-// returns the stdout for successful execution as a string, with leading and
-// trailing spaces removed.
-func (r *Repository) executeGitCommandString(args ...string) (string, error) {
-	args = append([]string{"--git-dir", r.gitDirPath}, args...)
-	return r.executeGitCommandDirectString(args...)
+// executor is a lightweight wrapper around exec.Cmd to run Git commands. It
+// accepts the arguments to the `git` binary, but the binary itself must not be
+// specified.
+type executor struct {
+	r     *Repository
+	args  []string
+	env   []string
+	stdIn io.Reader
 }
 
-// executeGitCommand is a helper to execute the specified command in the
-// repository. It automatically adds the explicit `--git-dir` parameter.
-func (r *Repository) executeGitCommand(args ...string) (io.Reader, io.Reader, error) { //nolint:unused
-	args = append([]string{"--git-dir", r.gitDirPath}, args...)
-	return r.executeGitCommandDirect(args...)
+// executor initializes a new executor instance to run a Git command with the
+// specified arguments.
+func (r *Repository) executor(args ...string) *executor {
+	return &executor{r: r, args: args, env: os.Environ()}
 }
 
-// executeGitCommandString is a helper to execute the specified command in the
-// repository. It executes in the current directory without specifying the
-// GIT_DIR explicitly. It returns the stdout for successful execution as a
-// string, with leading and trailing spaces removed.
-func (r *Repository) executeGitCommandDirectString(args ...string) (string, error) {
-	stdOut, stdErr, err := r.executeGitCommandDirect(args...)
+// withEnv adds the specified environment variables. Each environment variable
+// must be specified in the form of `key=value`.
+func (e *executor) withEnv(env ...string) *executor {
+	e.env = append(e.env, env...)
+	return e
+}
+
+// withStdIn sets the contents of stdin to be passed in to the command.
+func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
+	e.stdIn = stdIn
+	return e
+}
+
+// executeString runs the constructed Git command and returns the contents of
+// stdout.  Leading and trailing spaces and newlines are removed. This function
+// should be used almost every time; the only exception is when the output is
+// desired without any processing such as the removal of space characters.
+func (e *executor) executeString() (string, error) {
+	stdOut, stdErr, err := e.execute()
 	if err != nil {
 		stdErrContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
 			return "", fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
 		}
-		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(args, " "), string(stdErrContents))
+		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(e.args, " "), string(stdErrContents))
 	}
 
 	stdOutContents, err := io.ReadAll(stdOut)
@@ -100,51 +122,15 @@ func (r *Repository) executeGitCommandDirectString(args ...string) (string, erro
 	return strings.TrimSpace(string(stdOutContents)), nil
 }
 
-// executeGitCommandDirect is a helper to execute the specified command in the
-// repository. It executes in the current directory without specifying the
-// GIT_DIR explicitly.
-func (r *Repository) executeGitCommandDirect(args ...string) (io.Reader, io.Reader, error) {
-	return r.executeGitCommandDirectWithEnv(nil, args...)
-}
-
-// executeGitCommandWithEnvString is a helper to execute the specified command
-// in the repository after setting the provided environment variables. Note that
-// the command inherits os.Environ() first. This helper explicitly sets the
-// GIT_DIR. It returns the stdout for successful execution as a string, with
-// leading and trailing spaces removed.
-func (r *Repository) executeGitCommandWithEnvString(env []string, args ...string) (string, error) {
-	stdOut, stdErr, err := r.executeGitCommandWithEnv(env, args...)
-	if err != nil {
-		stdErrContents, newErr := io.ReadAll(stdErr)
-		if newErr != nil {
-			return "", fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
-		}
-		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(args, " "), string(stdErrContents))
+// execute runs the constructed Git command and returns the raw stdout and
+// stderr contents. It adds the `--git-dir` argument if the repository has a
+// path set.
+func (e *executor) execute() (io.Reader, io.Reader, error) {
+	if e.r.gitDirPath != "" {
+		e.args = append([]string{"--git-dir", e.r.gitDirPath}, e.args...)
 	}
-
-	stdOutContents, err := io.ReadAll(stdOut)
-	if err != nil {
-		return "", fmt.Errorf("unable to read stdout contents: %w", err)
-	}
-
-	return strings.TrimSpace(string(stdOutContents)), nil
-}
-
-// executeGitCommandWithEnv is a helper to execute the specified command in the
-// repository after setting the provided environment variables. Note that the
-// command inherits os.Environ() first. This helper explicitly sets the GIT_DIR.
-func (r *Repository) executeGitCommandWithEnv(env []string, args ...string) (io.Reader, io.Reader, error) {
-	args = append([]string{"--git-dir", r.gitDirPath}, args...)
-	return r.executeGitCommandDirectWithEnv(env, args...)
-}
-
-// executeGitCommandDirectWithEnv is a helper to execute the specified command
-// in the repository after setting the provided environment variables. Note that
-// the command inherits os.Environ() first. This helper executes in the current
-// directory without specifying the GIT_DIR explicitly.
-func (r *Repository) executeGitCommandDirectWithEnv(env []string, args ...string) (io.Reader, io.Reader, error) {
-	cmd := exec.Command(binary, args...)
-	cmd.Env = append(os.Environ(), env...)
+	cmd := exec.Command(binary, e.args...) //nolint:gosec
+	cmd.Env = e.env
 
 	var (
 		stdOut bytes.Buffer
@@ -154,48 +140,9 @@ func (r *Repository) executeGitCommandDirectWithEnv(env []string, args ...string
 	cmd.Stdout = &stdOut
 	cmd.Stderr = &stdErr
 
-	return &stdOut, &stdErr, cmd.Run()
-}
-
-// executeGitCommandWithStdInString is a helper to execute the specified command
-// in the repository with the specified `stdIn`. It automatically adds the
-// explicit `--git-dir` parameter.  It returns the stdout for successful
-// execution as a string, with leading and trailing spaces removed.
-func (r *Repository) executeGitCommandWithStdInString(stdIn *bytes.Buffer, args ...string) (string, error) {
-	args = append([]string{"--git-dir", r.gitDirPath}, args...)
-	stdOut, stdErr, err := r.executeGitCommandDirectWithStdIn(stdIn, args...)
-	if err != nil {
-		stdErrContents, newErr := io.ReadAll(stdErr)
-		if newErr != nil {
-			return "", fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
-		}
-		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(args, " "), string(stdErrContents))
+	if e.stdIn != nil {
+		cmd.Stdin = e.stdIn
 	}
-
-	stdOutContents, err := io.ReadAll(stdOut)
-	if err != nil {
-		return "", fmt.Errorf("unable to read stdout contents: %w", err)
-	}
-
-	return strings.TrimSpace(string(stdOutContents)), nil
-}
-
-// executeGitCommandDirectWithStdIn is a helper to execute the specified command
-// in the repository with `stdIn` passed into the process stdin. It executes in
-// the current directory without specifying the GIT_DIR explicitly.
-func (r *Repository) executeGitCommandDirectWithStdIn(stdIn *bytes.Buffer, args ...string) (io.Reader, io.Reader, error) {
-	cmd := exec.Command(binary, args...)
-
-	var (
-		stdOut bytes.Buffer
-		stdErr bytes.Buffer
-	)
-
-	if stdIn != nil {
-		cmd.Stdin = stdIn
-	}
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
 
 	return &stdOut, &stdErr, cmd.Run()
 }

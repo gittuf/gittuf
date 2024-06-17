@@ -23,7 +23,7 @@ var (
 
 // GetReference returns the tip of the specified Git reference.
 func (r *Repository) GetReference(refName string) (Hash, error) {
-	refTipID, err := r.executeGitCommandString("rev-parse", refName)
+	refTipID, err := r.executor("rev-parse", refName).executeString()
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown revision or path not in the working tree") {
 			return ZeroHash, ErrReferenceNotFound
@@ -41,9 +41,9 @@ func (r *Repository) GetReference(refName string) (Hash, error) {
 
 // SetReference sets the specified reference to the provided Git ID.
 func (r *Repository) SetReference(refName string, gitID Hash) error {
-	_, stdErr, err := r.executeGitCommand("update-ref", "--create-reflog", refName, gitID.String())
+	_, err := r.executor("update-ref", "--create-reflog", refName, gitID.String()).executeString()
 	if err != nil {
-		return fmt.Errorf("unable to set Git reference '%s' to '%s': %s", refName, gitID.String(), stdErr)
+		return fmt.Errorf("unable to set Git reference '%s' to '%s': %w", refName, gitID.String(), err)
 	}
 
 	return nil
@@ -52,9 +52,9 @@ func (r *Repository) SetReference(refName string, gitID Hash) error {
 // CheckAndSetReference sets the specified reference to the provided Git ID if
 // the reference is currently set to `oldGitID`.
 func (r *Repository) CheckAndSetReference(refName string, newGitID, oldGitID Hash) error {
-	_, stdErr, err := r.executeGitCommand("update-ref", "--create-reflog", refName, newGitID.String(), oldGitID.String())
+	_, err := r.executor("update-ref", "--create-reflog", refName, newGitID.String(), oldGitID.String()).executeString()
 	if err != nil {
-		return fmt.Errorf("unable to set Git reference '%s' to '%s': %s", refName, newGitID.String(), stdErr)
+		return fmt.Errorf("unable to set Git reference '%s' to '%s': %w", refName, newGitID.String(), err)
 	}
 
 	return nil
@@ -63,7 +63,7 @@ func (r *Repository) CheckAndSetReference(refName string, newGitID, oldGitID Has
 // GetSymbolicReferenceTarget returns the name of the Git reference the provided
 // symbolic Git reference is pointing to.
 func (r *Repository) GetSymbolicReferenceTarget(refName string) (string, error) {
-	symTarget, err := r.executeGitCommandString("symbolic-ref", refName)
+	symTarget, err := r.executor("symbolic-ref", refName).executeString()
 	if err != nil {
 		return "", fmt.Errorf("unable to resolve %s: %w", refName, err)
 	}
@@ -83,6 +83,11 @@ func (r *Repository) AbsoluteReference(target string) (string, error) {
 		}
 		// symbolic ref such as .git/HEAD
 		return r.GetSymbolicReferenceTarget(target)
+	}
+
+	// We may have a ref that isn't available locally but is still ref-prefixed.
+	if strings.HasPrefix(target, RefPrefix) {
+		return target, nil
 	}
 
 	// If target is a full ref already and it's stored in the GIT_DIR/refs

@@ -31,16 +31,16 @@ func ReadBlob(repo *git.Repository, blobID plumbing.Hash) ([]byte, error) {
 	return io.ReadAll(reader)
 }
 
-// ReadBlob returns the contents of a the blob referenced by blobID.
+// ReadBlob returns the contents of the blob referenced by blobID.
 func (r *Repository) ReadBlob(blobID Hash) ([]byte, error) {
-	objType, err := r.executeGitCommandString("cat-file", "-t", blobID.String())
+	objType, err := r.executor("cat-file", "-t", blobID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect if object is blob: %w", err)
 	} else if objType != "blob" {
 		return nil, fmt.Errorf("requested Git ID '%s' is not a blob object", blobID.String())
 	}
 
-	stdOut, stdErr, err := r.executeGitCommand("cat-file", "-p", blobID.String())
+	stdOut, stdErr, err := r.executor("cat-file", "-p", blobID.String()).execute()
 	if err != nil {
 		return nil, fmt.Errorf("unable to read blob: %s", stdErr)
 	}
@@ -75,7 +75,7 @@ func WriteBlob(repo *git.Repository, contents []byte) (plumbing.Hash, error) {
 // ID of the resultant blob.
 func (r *Repository) WriteBlob(contents []byte) (Hash, error) {
 	stdInBuf := bytes.NewBuffer(contents)
-	objID, err := r.executeGitCommandWithStdInString(stdInBuf, "hash-object", "-t", "blob", "-w", "--stdin")
+	objID, err := r.executor("hash-object", "-t", "blob", "-w", "--stdin").withStdIn(stdInBuf).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to write blob: %w", err)
 	}

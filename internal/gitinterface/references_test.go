@@ -12,7 +12,7 @@ import (
 
 func TestGetReference(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
@@ -33,7 +33,7 @@ func TestGetReference(t *testing.T) {
 
 func TestSetReference(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
@@ -65,7 +65,7 @@ func TestSetReference(t *testing.T) {
 
 func TestCheckAndSetReference(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
@@ -97,7 +97,7 @@ func TestCheckAndSetReference(t *testing.T) {
 
 func TestGetSymbolicReferenceTarget(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
 	treeBuilder := NewReplacementTreeBuilder(repo)
@@ -119,7 +119,7 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 
 func TestRepositoryRefSpec(t *testing.T) {
 	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir)
+	repo := CreateTestGitRepository(t, tempDir, false)
 
 	shortRefName := "master"
 	qualifiedRefName := "refs/heads/master"
