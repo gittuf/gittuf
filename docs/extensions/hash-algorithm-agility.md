@@ -24,7 +24,7 @@ calculated across the corresponding object prior to compressing it, and it can
 be recalculated as follows:
 
 ```
-$ cat .git/objects/4d/cd174e182cedf597b8a84f24ea5a53dae7e1e7 | zlib-flate -uncompress | sha1sum
+cat .git/objects/4d/cd174e182cedf597b8a84f24ea5a53dae7e1e7 | zlib-flate -uncompress | sha1sum
 4dcd174e182cedf597b8a84f24ea5a53dae7e1e7  -
 ```
 
@@ -40,7 +40,7 @@ Merkle DAG). Each commit also points to the specific tree object that
 represents the root of the repository.
 
 ```
-$ git cat-file -p db1c7b0210513a452b0b971e1912d5eb2e3ffcd0
+git cat-file -p db1c7b0210513a452b0b971e1912d5eb2e3ffcd0
 tree 7b968da28453b323a0d3333e3be4030b870d26e4
 parent 4dcd174e182cedf597b8a84f24ea5a53dae7e1e7
 ...
@@ -52,7 +52,7 @@ Now, there are several ways to calculate SHA-256 identifiers. The simplest way
 is to calculate the SHA-256 hash of the commit object itself.
 
 ```
-$ cat .git/objects/4d/cd174e182cedf597b8a84f24ea5a53dae7e1e7 | zlib-flate -uncompress | sha256sum
+cat .git/objects/4d/cd174e182cedf597b8a84f24ea5a53dae7e1e7 | zlib-flate -uncompress | sha256sum
 c9262d30f2dd6e50088acbfb67fa49bb3e80c30e57779551727bc89fcf02e21b  -
 ```
 

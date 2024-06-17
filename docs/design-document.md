@@ -411,9 +411,9 @@ managed in the root of trust. All other policy files are delegated to directly
 or indirectly by the top level Targets role.
 
 ```bash
-$ gittuf trust init
-$ gittuf trust add-policy-key
-$ gittuf trust remove-policy-key
+gittuf trust init
+gittuf trust add-policy-key
+gittuf trust remove-policy-key
 ```
 
 Note: the commands listed here are examples and not exhaustive. Please refer to
@@ -434,9 +434,9 @@ protection rules can be added to the file. In each instance, the policy file is
 re-signed, and therefore, authorized keys for that policy must be presented.
 
 ```bash
-$ gittuf policy init
-$ gittuf policy add-rule
-$ gittuf policy remove-rule
+gittuf policy init
+gittuf policy add-rule
+gittuf policy remove-rule
 ```
 
 Note: the commands listed here are examples and not exhaustive. Please refer to
@@ -453,8 +453,8 @@ case, the developer must specify the RSL entries the annotation applies to using
 the target entries' Git identifiers.
 
 ```bash
-$ gittuf rsl record
-$ gittuf rsl annotate
+gittuf rsl record
+gittuf rsl annotate
 ```
 
 Note: the commands listed here are examples and not exhaustive. Please refer to
