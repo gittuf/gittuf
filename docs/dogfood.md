@@ -43,23 +43,23 @@ To install gittuf, please refer to our [get started guide].
 First, clone the repository and fetch the gittuf specific metadata.
 
 ```bash
-$ gittuf clone https://github.com/gittuf/gittuf
+gittuf clone https://github.com/gittuf/gittuf
 ```
 
 Alternatively, you can use Git as follows.
 
 ```bash
-$ git clone https://github.com/gittuf/gittuf
-$ cd gittuf
-$ git fetch origin refs/gittuf/*:refs/gittuf/*
+git clone https://github.com/gittuf/gittuf
+cd gittuf
+git fetch origin refs/gittuf/*:refs/gittuf/*
 ```
 
 Next, the latest release of gittuf as well as changes to the `main` branch can
 be verified using gittuf.
 
 ```bash
-$ gittuf verify-ref --verbose v0.4.0
-$ gittuf verify-ref --verbose main
+gittuf verify-ref --verbose v0.4.0
+gittuf verify-ref --verbose main
 ```
 
 [get started guide]: /docs/get-started.md

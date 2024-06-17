@@ -51,9 +51,9 @@ gittuf version
 Go 1.22 or higher is necessary to build gittuf.
 
 ```sh
-$ git clone https://github.com/gittuf/gittuf
-$ cd gittuf
-$ make
+git clone https://github.com/gittuf/gittuf
+cd gittuf
+make
 ```
 
 ## Create keys
@@ -66,14 +66,14 @@ passphrase when prompted to "enter passphrase" by hitting enter.  Additionally,
 convert the public key to be PEM encoded.
 
 ```sh
-$ mkdir gittuf-get-started && cd gittuf-get-started
-$ mkdir keys && cd keys
-$ ssh-keygen -t rsa -N "" -f root
-$ ssh-keygen -f root.pub -e -m pem > root.pem
-$ ssh-keygen -t rsa -N "" -f policy
-$ ssh-keygen -f policy.pub -e -m pem > policy.pem
-$ ssh-keygen -t rsa -N "" -f developer
-$ ssh-keygen -f developer.pub -e -m pem > developer.pem
+mkdir gittuf-get-started && cd gittuf-get-started
+mkdir keys && cd keys
+ssh-keygen -t rsa -N "" -f root
+ssh-keygen -f root.pub -e -m pem > root.pem
+ssh-keygen -t rsa -N "" -f policy
+ssh-keygen -f policy.pub -e -m pem > policy.pem
+ssh-keygen -t rsa -N "" -f developer
+ssh-keygen -f developer.pub -e -m pem > developer.pem
 ```
 
 ## Create a Git repository
@@ -84,10 +84,10 @@ Initialize the repository and gittuf's root of trust metadata using the
 key.
 
 ```bash
-$ cd .. && mkdir repo && cd repo
-$ git init -q -b main
-$ git config --local gpg.format ssh
-$ git config --local user.signingkey ../keys/developer
+cd .. && mkdir repo && cd repo
+git init -q -b main
+git config --local gpg.format ssh
+git config --local user.signingkey ../keys/developer
 ```
 
 ## Initialize gittuf
@@ -95,7 +95,7 @@ $ git config --local user.signingkey ../keys/developer
 Initialize gittuf's root of trust metadata.
 
 ```bash
-$ gittuf trust init -k ../keys/root
+gittuf trust init -k ../keys/root
 ```
 
 After that, add a key for the primary policy. gittuf allows users to specify
@@ -103,14 +103,14 @@ rules in one or more policy files. The primary policy file (called `targets`,
 from TUF) must be signed by keys specified in the root of trust.
 
 ```bash
-$ gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pem
-$ gittuf policy init -k ../keys/policy --policy-name targets
+gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pem
+gittuf policy init -k ../keys/policy --policy-name targets
 ```
 Then, use the policy key to initialize a policy and add a rule protecting the
 `main` branch.
 
 ```bash
-$ gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pem
+gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pem
 ```
 
 Note that `--authorize-key` can also be used to specify a GPG key or a
@@ -122,7 +122,7 @@ After adding the required policies, _apply_ them from the policy-staging area.
 This means the policy will be applicable henceforth.
 
 ```bash
-$ gittuf policy apply
+gittuf policy apply
 ```
 
 ## Making repository changes
@@ -134,9 +134,9 @@ pre-push hook (see `gittuf add-hook -h` for more information about adding the
 hook and [#220] for planned gittuf and Git command compatibility).
 
 ```bash
-$ echo "Hello, world!" > README.md
-$ git add . && git commit -S -m "Initial commit"
-$ gittuf rsl record main
+echo "Hello, world!" > README.md
+git add . && git commit -S -m "Initial commit"
+gittuf rsl record main
 ```
 
 ## Verifying policy
@@ -144,7 +144,7 @@ $ gittuf rsl record main
 gittuf allows for verifying rules for Git references and files.
 
 ```sh
-$ gittuf verify-ref --verbose main
+gittuf verify-ref --verbose main
 ```
 
 ## Communicating with a remote
@@ -154,8 +154,8 @@ However, there are some known issues (see [#328]) with these commands. In the
 meantime, Git can be used to keep gittuf's references updated.
 
 ```sh
-$ git push <remote> refs/gittuf/*
-$ git fetch <remote> refs/gittuf/*:refs/gittuf/*
+git push <remote> refs/gittuf/*
+git fetch <remote> refs/gittuf/*:refs/gittuf/*
 ```
 
 ## Verify gittuf itself
