@@ -83,16 +83,6 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	return nil
 }
 
-func (r *Repository) VerifyCommit(ctx context.Context, ids ...string) map[string]string {
-	slog.Debug("Verifying commit signature...")
-	return policy.VerifyCommit(ctx, r.r, ids...)
-}
-
-func (r *Repository) VerifyTag(ctx context.Context, ids []string) map[string]string {
-	slog.Debug("Verifying tag signature...")
-	return policy.VerifyTag(ctx, r.r, ids)
-}
-
 func (r *Repository) verifyRefTip(target string, expectedTip plumbing.Hash) error {
 	ref, err := r.r.Reference(plumbing.ReferenceName(target), true)
 	if err != nil {
