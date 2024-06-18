@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -242,7 +243,7 @@ func VerifyCommitSignature(ctx context.Context, commit *object.Commit, key *tuf.
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
@@ -291,7 +292,7 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType:
+	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)

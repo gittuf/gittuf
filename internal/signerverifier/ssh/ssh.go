@@ -56,10 +56,14 @@ func (v *Verifier) Public() crypto.PublicKey {
 	return v.sshKey.(ssh.CryptoPublicKey).CryptoPublicKey()
 }
 
+func (v *Verifier) MetadataKey() *sv.SSLibKey {
+	return newSSHKey(v.sshKey, v.keyID)
+}
+
 // Signer is a dsse.Signer implementation for SSH keys.
 type Signer struct {
-	Verifier *Verifier
-	Path     string
+	Path string
+	*Verifier
 }
 
 // Sign implements the dsse.Signer.Sign interface for SSH keys.
@@ -80,11 +84,6 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	return output, nil
 }
 
-// KeyID implements the dsse.Signer.KeyID interface for SSH keys.
-func (s *Signer) KeyID() (string, error) {
-	return s.Verifier.KeyID()
-}
-
 // NewKeyFromFile imports an ssh SSlibKey from the passed path.
 // The path can point to a public or private, encrypted or plaintext, rsa,
 // ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
@@ -101,14 +100,7 @@ func NewKeyFromFile(path string) (*sv.SSLibKey, error) {
 		return nil, fmt.Errorf("failed to parse SSH2 key: %w", err)
 	}
 
-	return &sv.SSLibKey{
-		KeyID:   ssh.FingerprintSHA256(sshPub),
-		KeyType: SSHKeyType,
-		Scheme:  sshPub.Type(),
-		KeyVal: sv.KeyVal{
-			Public: base64.StdEncoding.EncodeToString(sshPub.Marshal()),
-		},
-	}, nil
+	return newSSHKey(sshPub, ""), nil
 }
 
 // NewVerifierFromKey creates a new Verifier from SSlibKey of type ssh.
@@ -178,4 +170,16 @@ func parseSSH2Key(data string) (ssh.PublicKey, error) {
 	// Parse key material
 	body := strings.Join(lines[i:], "")
 	return parseSSH2Body(body)
+}
+
+func newSSHKey(key ssh.PublicKey, keyID string) *sv.SSLibKey {
+	if keyID == "" {
+		keyID = ssh.FingerprintSHA256(key)
+	}
+	return &sv.SSLibKey{
+		KeyID:   keyID,
+		KeyType: SSHKeyType,
+		Scheme:  key.Type(),
+		KeyVal:  sv.KeyVal{Public: base64.StdEncoding.EncodeToString(key.Marshal())},
+	}
 }
