@@ -76,6 +76,10 @@ func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName string, targetID
 	return rsl.NewReferenceEntry(absRefName, plumbing.NewHash(targetID)).CommitUsingSpecificKey(r.r, signingKeyBytes)
 }
 
+func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, signCommit bool) error {
+	return rsl.SkipAllInvalidReferenceEntriesForRef(r.r, targetRef, signCommit)
+}
+
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
 func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, message string, signCommit bool) error {

@@ -7,6 +7,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/rsl/log"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/record"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote"
+	"github.com/gittuf/gittuf/internal/cmd/rsl/skiprewritten"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(log.New())
 	cmd.AddCommand(record.New())
 	cmd.AddCommand(remote.New())
+	cmd.AddCommand(skiprewritten.New())
 
 	return cmd
 }

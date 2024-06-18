@@ -24,4 +24,5 @@ Tools to manage the repository's reference state log
 * [gittuf rsl log](gittuf_rsl_log.md)	 - Display the Reference State Log
 * [gittuf rsl record](gittuf_rsl_record.md)	 - Record latest state of a Git reference in the RSL
 * [gittuf rsl remote](gittuf_rsl_remote.md)	 - Tools for managing remote RSLs
+* [gittuf rsl skip-rewritten](gittuf_rsl_skip-rewritten.md)	 - Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref
 

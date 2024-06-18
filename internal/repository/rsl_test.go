@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -33,7 +34,9 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ref := plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), plumbing.ZeroHash)
+	commits := common.AddNTestCommitsToSpecifiedRef(t, repo.r, "refs/heads/main", 2, gpgKeyBytes)
+
+	ref := plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), commits[0])
 
 	if err := repo.r.Storer.SetReference(ref); err != nil {
 		t.Fatal(err)
@@ -58,11 +61,9 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
-	assert.Equal(t, plumbing.ZeroHash, entry.TargetID)
+	assert.Equal(t, commits[0], entry.TargetID)
 
-	testHash := plumbing.NewHash("abcdef1234567890")
-
-	ref = plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), testHash)
+	ref = plumbing.NewHashReference(plumbing.ReferenceName("refs/heads/main"), commits[1])
 	if err := repo.r.Storer.SetReference(ref); err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(fmt.Errorf("invalid entry type"))
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
-	assert.Equal(t, testHash, entry.TargetID)
+	assert.Equal(t, commits[1], entry.TargetID)
 
 	err = repo.RecordRSLEntryForReference("main", false)
 	assert.Nil(t, err)

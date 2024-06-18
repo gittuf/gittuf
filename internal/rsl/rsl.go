@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -511,6 +512,64 @@ func GetFirstReferenceEntryForRef(repo *git.Repository, targetRef string) (*Refe
 	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
 
 	return firstEntry, annotations, nil
+}
+
+// SkipAllInvalidReferenceEntriesForRef identifies invalid RSL reference entries.
+// Each invalid entry points to a target that is not reachable for the current
+// target of the same reference, indicating that history has been rewritten via a
+// rebase for the reference. After the invalid entries are identified, an annotation
+// entry is created that marks all of these entries as to be skipped.
+func SkipAllInvalidReferenceEntriesForRef(repo *git.Repository, targetRef string, signCommit bool) error {
+	slog.Debug("Checking if RSL entries point to commits not in the target ref...")
+
+	latestEntry, _, err := GetLatestReferenceEntryForRef(repo, targetRef)
+	iterator := Entry(latestEntry)
+	if err != nil {
+		return err
+	}
+
+	entriesToSkip := []plumbing.Hash{}
+
+	for {
+		if entry, ok := iterator.(*ReferenceEntry); ok {
+			var isAncestor bool
+			latestEntryCommit, err := gitinterface.GetCommit(repo, latestEntry.TargetID)
+
+			switch {
+			case err == nil:
+				isAncestor, err = gitinterface.KnowsCommit(repo, entry.TargetID, latestEntryCommit)
+				if err != nil {
+					return err
+				}
+			case errors.Is(err, plumbing.ErrObjectNotFound):
+				// the current commit cannot be reached from the latest entry, since it does not exist
+				isAncestor = false
+			default:
+				return err
+			}
+
+			if !isAncestor {
+				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that does not exist in the target ref.", targetRef, entry.ID, entry.TargetID))
+				entriesToSkip = append(entriesToSkip, entry.ID)
+			} else {
+				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that exists in the target ref. No more commits to skip.", targetRef, entry.ID, entry.TargetID))
+				break
+			}
+		}
+		iterator, err = GetParentForEntry(repo, iterator)
+		if err != nil {
+			if errors.Is(err, ErrRSLEntryNotFound) {
+				break
+			}
+			return err
+		}
+	}
+
+	if len(entriesToSkip) == 0 {
+		return nil
+	}
+
+	return NewAnnotationEntry(entriesToSkip, true, "Automated skip of reference entries pointing to non-existent entries").Commit(repo, signCommit)
 }
 
 // GetFirstReferenceEntryForCommit returns the first reference entry in the RSL
