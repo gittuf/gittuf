@@ -49,7 +49,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	slog.Debug(fmt.Sprintf("Signing initial root metadata using '%s'...", publicKey.KeyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	state := &policy.State{
