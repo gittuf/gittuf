@@ -19,28 +19,10 @@ import (
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
-const (
-	nonCommitMessage                  = "cannot verify non-commit object"
-	nonTagMessage                     = "cannot verify non-tag object"
-	unableToResolveRevisionMessage    = "unable to resolve revision (must be a reference or a commit identifier)"
-	noPublicKeyMessage                = "no public key found for Git object"
-	unableToLoadPolicyMessageFmt      = "unable to load applicable gittuf policy: %s"
-	unableToFindPolicyMessage         = "unable to find applicable gittuf policy"
-	goodSignatureMessageFmt           = "good signature from key '%s:%s'"
-	goodTagSignatureMessage           = "good signature for RSL entry and tag"
-	goodSignatureMessageForRSLEntry   = "good signature for RSL entry"
-	badSignatureMessageForRSLEntry    = "bad signature for RSL entry"
-	noSignatureMessage                = "no signature found"
-	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
-	unableToFindRSLEntryMessage       = "unable to find tag's RSL entry"
-	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
-)
-
 var (
 	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
 	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
 	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
