@@ -3,109 +3,22 @@
 package gitinterface
 
 import (
-	"bytes"
 	"context"
-	"strings"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestTag(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	refName := "refs/heads/main"
-	tagName := "v0.1.0"
-	clock = testClock
-	getGitConfig = func(_ *git.Repository) (*config.Config, error) {
-		return testGitConfig, nil
-	}
-
-	// Try to create tag with an unknown underlying object
-	_, err = Tag(repo, plumbing.ZeroHash, tagName, tagName, false)
-	assert.ErrorIs(t, err, plumbing.ErrObjectNotFound)
-
-	// Create a commit and retry
-	emptyTreeHash, err := WriteTree(repo, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	commitID, err := Commit(repo, emptyTreeHash, refName, "Initial commit", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tagHash, err := Tag(repo, commitID, tagName, tagName, false)
-	assert.Nil(t, err)
-	assert.Equal(t, "8b195348588d8a48060ec8d5436459b825a1b352", tagHash.String())
-
-	tag, err := GetTag(repo, tagHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, tagName, tag.Name)
-	assert.Equal(t, plumbing.CommitObject, tag.TargetType)
-
-	// Check tag reference is set correctly
-	ref, err := repo.Tag(tagName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, tagHash, ref.Hash())
-
-	// Try to create a tag with the same name, expect error
-	_, err = Tag(repo, commitID, tagName, tagName, false)
-	assert.ErrorIs(t, err, ErrTagAlreadyExists)
-}
-
-func TestVerifyTagSignature(t *testing.T) {
-	gpgSignedTag := createTestSignedTag(t)
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fulcioKey := &sslibsv.SSLibKey{
-		KeyType: signerverifier.FulcioKeyType,
-		Scheme:  "fulcio",
-		KeyVal: sslibsv.KeyVal{
-			Identity: testEmail,
-			Issuer:   "https://github.com/login/oauth",
-		},
-	}
-
-	t.Run("gpg signed tag with correct gpg key", func(t *testing.T) {
-		err = VerifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
-		assert.Nil(t, err)
-	})
-
-	t.Run("gpg signed tag with gitsign identity", func(t *testing.T) {
-		err = VerifyTagSignature(context.Background(), gpgSignedTag, fulcioKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-	})
-}
 
 func TestGetTagTarget(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -129,12 +42,10 @@ func TestGetTagTarget(t *testing.T) {
 }
 
 func TestRepositoryVerifyTag(t *testing.T) {
-	// TODO: support multiple signing types
-
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -147,59 +58,37 @@ func TestRepositoryVerifyTag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+	sshSignedTag, err := repo.TagUsingSpecificKey(commitID, "test-tag-ssh", "test-tag-ssh\n", artifacts.SSHED25519Private)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tuf.LoadKeyFromBytes(artifacts.SSHED25519Public)
+	keyDir := t.TempDir()
+	keyPath := filepath.Join(keyDir, "ssh-key.pub")
+	if err := os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sshKey, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = repo.verifyTagSignature(context.Background(), tagID, key)
-	assert.Nil(t, err)
-}
-
-func createTestSignedTag(t *testing.T) *object.Tag {
-	t.Helper()
-
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	gpgSignedTag, err := repo.TagUsingSpecificKey(commitID, "test-tag-gpg", "test-tag-gpg\n", artifacts.GPGKey1Private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	testTag := &object.Tag{
-		Name:    "v1",
-		Message: "v1",
-		Tagger: object.Signature{
-			Name:  testName,
-			Email: testEmail,
-			When:  testClock.Now(),
-		},
-		TargetType: plumbing.CommitObject,
-		Target:     plumbing.ZeroHash,
-	}
+	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
+		err = repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
+		assert.Nil(t, err)
+	})
 
-	tagEncoded := repo.Storer.NewEncodedObject()
-	if err := testTag.EncodeWithoutSignature(tagEncoded); err != nil {
-		t.Fatal(err)
-	}
-	r, err := tagEncoded.Reader()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(gpgPrivateKey))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sig := new(strings.Builder)
-	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
-		t.Fatal(err)
-	}
-	testTag.PGPSignature = sig.String()
-
-	return testTag
+	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
+		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
+		assert.Nil(t, err)
+	})
 }

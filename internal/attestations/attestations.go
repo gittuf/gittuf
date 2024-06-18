@@ -102,7 +102,7 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 		commitMessage = defaultCommitMessage
 	}
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	allAttestations := map[string]gitinterface.Hash{}
 	for name, blobID := range a.referenceAuthorizations {

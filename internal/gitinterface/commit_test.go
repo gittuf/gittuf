@@ -5,33 +5,19 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
-	"github.com/hiddeco/sshsig"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/ssh"
-)
-
-var (
-	rsaSSHPublicKeyBytes    = artifacts.SSHRSAPublic
-	rsaSSHPrivateKeyBytes   = artifacts.SSHRSAPrivate
-	ecdsaSSHPublicKeyBytes  = artifacts.SSHECDSAPublic
-	ecdsaSSHPrivateKeyBytes = artifacts.SSHECDSAPrivate
-	gpgPublicKey            = artifacts.GPGKey1Public
-	gpgPrivateKey           = artifacts.GPGKey1Private
 )
 
 func TestRepositoryCommit(t *testing.T) {
@@ -39,7 +25,7 @@ func TestRepositoryCommit(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -94,53 +80,197 @@ func TestRepositoryCommit(t *testing.T) {
 	assert.Equal(t, expectedThirdCommitID, refHead.String())
 }
 
-func TestCreateCommitObject(t *testing.T) {
-	t.Run("zero commit and zero parent", func(t *testing.T) {
-		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, []plumbing.Hash{plumbing.ZeroHash}, "Test commit", testClock)
+func TestRepositoryVerifyCommit(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
 
-		enc := memory.NewStorage().NewEncodedObject()
-		if err := commit.Encode(enc); err != nil {
-			t.Error(err)
-		}
+	treeBuilder := NewTreeBuilder(repo)
 
-		assert.Equal(t, "22ddfd55fb5fba7b37b50b068d1527a1b0f9f561", enc.Hash().String())
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sshSignedCommitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgSignedCommitID := createTestGPGSignedCommit(t, repo)
+
+	// FIXME: fix gitsign testing
+	gitsignSignedCommitID := createTestSigstoreSignedCommit(t, repo)
+
+	keyDir := t.TempDir()
+	keyPath := filepath.Join(keyDir, "ssh-key")
+	if err := os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sshKey, err := ssh.NewKeyFromFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
+		assert.Nil(t, err)
 	})
 
-	t.Run("zero commit and single non-zero parent", func(t *testing.T) {
-		pHashes := []plumbing.Hash{EmptyTree()}
-		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, pHashes, "Test commit", testClock)
-
-		enc := memory.NewStorage().NewEncodedObject()
-		if err := commit.Encode(enc); err != nil {
-			t.Error(err)
-		}
-
-		for parentHashInd := range commit.ParentHashes {
-			assert.Equal(t, pHashes[parentHashInd], commit.ParentHashes[parentHashInd])
-		}
+	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
-	t.Run("zero commit and multiple parents", func(t *testing.T) {
-		pHashes := []plumbing.Hash{EmptyTree(), EmptyTree()}
+	t.Run("gpg signed commit, verify with gpg key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, gpgKey)
+		assert.Nil(t, err)
+	})
 
-		commit := CreateCommitObject(testGitConfig, plumbing.ZeroHash, pHashes, "Test commit", testClock)
+	t.Run("gpg signed commit, verify with ssh key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, sshKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+	})
 
-		enc := memory.NewStorage().NewEncodedObject()
-		if err := commit.Encode(enc); err != nil {
-			t.Error(err)
-		}
-
-		for parentHashInd := range commit.ParentHashes {
-			assert.Equal(t, pHashes[parentHashInd], commit.ParentHashes[parentHashInd])
-		}
+	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 }
 
-func TestVerifyCommitSignature(t *testing.T) {
-	gpgSignedCommit := createTestSignedCommit(t)
+func TestKnowsCommit(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
 
-	// FIXME: fix gitsign testing
-	gitsignSignedCommit := &object.Commit{
+	refName := "refs/heads/main"
+
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstCommitID, err := repo.Commit(emptyTreeID, refName, "First commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Second commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unknownCommitID, err := repo.Commit(emptyTreeID, "refs/heads/unknown", "Unknown commit", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("check if second commit knows first", func(t *testing.T) {
+		knows, err := repo.KnowsCommit(secondCommitID, firstCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that first commit does not know second", func(t *testing.T) {
+		knows, err := repo.KnowsCommit(firstCommitID, secondCommitID)
+		assert.Nil(t, err)
+		assert.False(t, knows)
+	})
+
+	t.Run("check that both commits know themselves", func(t *testing.T) {
+		knows, err := repo.KnowsCommit(firstCommitID, firstCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+
+		knows, err = repo.KnowsCommit(secondCommitID, secondCommitID)
+		assert.Nil(t, err)
+		assert.True(t, knows)
+	})
+
+	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
+		knows, _ := repo.KnowsCommit(unknownCommitID, firstCommitID)
+		assert.False(t, knows)
+	})
+}
+
+func createTestGPGSignedCommit(t *testing.T, repo *Repository) Hash {
+	t.Helper()
+
+	goGitRepo, err := repo.GetGoGitRepository()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCommit := &object.Commit{
+		Author: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Committer: object.Signature{
+			Name:  testName,
+			Email: testEmail,
+			When:  testClock.Now(),
+		},
+		Message:  "Test commit\n",
+		TreeHash: plumbing.ZeroHash,
+	}
+
+	commitEncoded := goGitRepo.Storer.NewEncodedObject()
+	if err := testCommit.EncodeWithoutSignature(commitEncoded); err != nil {
+		t.Fatal(err)
+	}
+	r, err := commitEncoded.Reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(artifacts.GPGKey1Private))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sig := new(strings.Builder)
+	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
+		t.Fatal(err)
+	}
+	testCommit.PGPSignature = sig.String()
+
+	// Re-encode with the signature
+	commitEncoded = goGitRepo.Storer.NewEncodedObject()
+	if err := testCommit.Encode(commitEncoded); err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := goGitRepo.Storer.SetEncodedObject(commitEncoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitHash, err := NewHash(commitID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return commitHash
+}
+
+func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
+	t.Helper()
+
+	goGitRepo, err := repo.GetGoGitRepository()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCommit := &object.Commit{
 		Hash: plumbing.NewHash("d6b230478965e25477263aa65f1ca6d23d0c0d97"),
 		Author: object.Signature{
 			Name:  "Aditya Sirish",
@@ -182,259 +312,22 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 		TreeHash: plumbing.NewHash("4b825dc642cb6eb9a060e54bf8d69288fbee4904"),
 	}
 
-	sshCommits := createTestSSHSignedCommits(t)
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fulcioKey := &sslibsv.SSLibKey{
-		KeyType: signerverifier.FulcioKeyType,
-		Scheme:  "fulcio",
-		KeyVal: sslibsv.KeyVal{
-			Identity: "aditya@saky.in",
-			Issuer:   "https://github.com/login/oauth",
-		},
-	}
-
-	rsaKey, err := sslibsv.LoadKey(rsaSSHPublicKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ecdsaKey, err := sslibsv.LoadKey(ecdsaSSHPublicKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("gpg signed commit", func(t *testing.T) {
-		err = VerifyCommitSignature(context.Background(), gpgSignedCommit, gpgKey)
-		assert.Nil(t, err)
-	})
-
-	// FIXME: fix gitsign testing
-	// t.Run("gitsign signed commit", func(t *testing.T) {
-	// 	err := VerifyCommitSignature(context.Background(), gitsignSignedCommit, fulcioKey)
-	// 	assert.Nil(t, err)
-	// })
-
-	t.Run("use gpg signed commit with gitsign key", func(t *testing.T) {
-		err := VerifyCommitSignature(context.Background(), gpgSignedCommit, fulcioKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-	})
-
-	t.Run("use gitsign signed commit with gpg key", func(t *testing.T) {
-		err := VerifyCommitSignature(context.Background(), gitsignSignedCommit, gpgKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-	})
-
-	t.Run("use ssh signed commits with corresponding keys", func(t *testing.T) {
-		err := VerifyCommitSignature(context.Background(), sshCommits[0], rsaKey)
-		assert.Nil(t, err)
-
-		err = VerifyCommitSignature(context.Background(), sshCommits[1], ecdsaKey)
-		assert.Nil(t, err)
-	})
-
-	t.Run("use ssh signed commits with wrong keys", func(t *testing.T) {
-		err := VerifyCommitSignature(context.Background(), sshCommits[0], ecdsaKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-
-		err = VerifyCommitSignature(context.Background(), sshCommits[1], rsaKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-	})
-}
-
-func TestRepositoryVerifyCommit(t *testing.T) {
-	// TODO: support multiple signing types
-
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
-	treeBuilder := NewReplacementTreeBuilder(repo)
-
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(artifacts.SSHRSAPublic)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = repo.verifyCommitSignature(context.Background(), commitID, key)
-	assert.Nil(t, err)
-}
-
-func TestKnowsCommit(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	refName := "refs/heads/main"
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), plumbing.ZeroHash)); err != nil {
-		t.Fatal(err)
-	}
-
-	emptyTreeHash, err := WriteTree(repo, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := Commit(repo, emptyTreeHash, refName, "First commit", false); err != nil {
-		t.Fatal(err)
-	}
-	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	firstCommitID := ref.Hash()
-	firstCommit, err := GetCommit(repo, firstCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := Commit(repo, emptyTreeHash, refName, "Second commit", false); err != nil {
-		t.Fatal(err)
-	}
-	ref, err = repo.Reference(plumbing.ReferenceName(refName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondCommitID := ref.Hash()
-	secondCommit, err := GetCommit(repo, secondCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("check if second commit knows first", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, secondCommitID, firstCommit)
-		assert.Nil(t, err)
-		assert.True(t, knows)
-	})
-
-	t.Run("check that first commit does not know second", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, firstCommitID, secondCommit)
-		assert.Nil(t, err)
-		assert.False(t, knows)
-	})
-
-	t.Run("check that both commits know themselves", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, firstCommitID, firstCommit)
-		assert.Nil(t, err)
-		assert.True(t, knows)
-
-		knows, err = KnowsCommit(repo, secondCommitID, secondCommit)
-		assert.Nil(t, err)
-		assert.True(t, knows)
-	})
-
-	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
-		knows, err := KnowsCommit(repo, plumbing.ZeroHash, firstCommit)
-		assert.ErrorIs(t, err, plumbing.ErrObjectNotFound)
-		assert.False(t, knows)
-	})
-}
-
-func createTestSignedCommit(t *testing.T) *object.Commit {
-	t.Helper()
-
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testCommit := &object.Commit{
-		Author: object.Signature{
-			Name:  testName,
-			Email: testEmail,
-			When:  testClock.Now(),
-		},
-		Committer: object.Signature{
-			Name:  testName,
-			Email: testEmail,
-			When:  testClock.Now(),
-		},
-		Message:  "Test commit",
-		TreeHash: plumbing.ZeroHash,
-	}
-
-	commitEncoded := repo.Storer.NewEncodedObject()
+	commitEncoded := goGitRepo.Storer.NewEncodedObject()
 	if err := testCommit.EncodeWithoutSignature(commitEncoded); err != nil {
 		t.Fatal(err)
 	}
-	r, err := commitEncoded.Reader()
+
+	commitID, err := goGitRepo.Storer.SetEncodedObject(commitEncoded)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(gpgPrivateKey))
+	commitHash, err := NewHash(commitID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sig := new(strings.Builder)
-	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
-		t.Fatal(err)
-	}
-	testCommit.PGPSignature = sig.String()
-
-	return testCommit
-}
-
-func createTestSSHSignedCommits(t *testing.T) []*object.Commit {
-	t.Helper()
-
-	testCommits := []*object.Commit{}
-
-	signingKeys := [][]byte{rsaSSHPrivateKeyBytes, ecdsaSSHPrivateKeyBytes}
-
-	for _, keyBytes := range signingKeys {
-		testCommit := &object.Commit{
-			Author: object.Signature{
-				Name:  testName,
-				Email: testEmail,
-				When:  testClock.Now(),
-			},
-			Committer: object.Signature{
-				Name:  testName,
-				Email: testEmail,
-				When:  testClock.Now(),
-			},
-			Message:  "Test commit",
-			TreeHash: EmptyTree(),
-		}
-
-		commitBytes, err := getCommitBytesWithoutSignature(testCommit)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signer, err := ssh.ParsePrivateKey(keyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		sshSig, err := sshsig.Sign(bytes.NewReader(commitBytes), signer, sshsig.HashSHA512, namespaceSSHSignature)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		sigBytes := sshsig.Armor(sshSig)
-		testCommit.PGPSignature = string(sigBytes)
-
-		testCommits = append(testCommits, testCommit)
-	}
-
-	return testCommits
+	return commitHash
 }
 
 func TestRepositoryGetCommitMessage(t *testing.T) {
@@ -442,7 +335,7 @@ func TestRepositoryGetCommitMessage(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -466,7 +359,7 @@ func TestGetCommitTreeID(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -512,7 +405,7 @@ func TestGetCommitParentIDs(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)

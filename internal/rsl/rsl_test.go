@@ -594,7 +594,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		require.Nil(t, err)
 
@@ -638,7 +638,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		require.Nil(t, err)
 
@@ -699,7 +699,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		require.Nil(t, err)
 
@@ -732,7 +732,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		require.Nil(t, err)
 
@@ -773,7 +773,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1232,7 +1232,7 @@ func TestAnnotationEntryRefersTo(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)

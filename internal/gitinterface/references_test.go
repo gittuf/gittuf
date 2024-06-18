@@ -15,7 +15,7 @@ func TestGetReference(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -36,7 +36,7 @@ func TestSetReference(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -68,7 +68,7 @@ func TestCheckAndSetReference(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -100,7 +100,7 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 	repo := CreateTestGitRepository(t, tempDir, false)
 
 	refName := "refs/heads/main"
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
@@ -125,7 +125,7 @@ func TestRepositoryRefSpec(t *testing.T) {
 	qualifiedRefName := "refs/heads/master"
 	qualifiedRemoteRefName := "refs/remotes/origin/master"
 
-	treeBuilder := NewReplacementTreeBuilder(repo)
+	treeBuilder := NewTreeBuilder(repo)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)

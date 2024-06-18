@@ -24,7 +24,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 
 	repo := &Repository{r: r}
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 			r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 			repo := &Repository{r: r}
 
-			treeBuilder := gitinterface.NewReplacementTreeBuilder(repo.r)
+			treeBuilder := gitinterface.NewTreeBuilder(repo.r)
 			emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 			if err != nil {
 				t.Fatal(err)
@@ -202,7 +202,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	err := repo.RecordRSLAnnotation([]string{gitinterface.ZeroHash.String()}, false, "test annotation", false)
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -260,7 +260,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(remoteR)
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -304,7 +304,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(remoteR)
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -340,7 +340,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(remoteR)
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -386,7 +386,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
 
-		treeBuilder := gitinterface.NewReplacementTreeBuilder(remoteR)
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 		if err != nil {
 			t.Fatal(err)

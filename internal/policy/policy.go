@@ -509,7 +509,7 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		allTreeEntries[path.Join(rootPublicKeysTreeEntryName, key.KeyID)] = blobID
 	}
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	policyRootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allTreeEntries)
 	if err != nil {
