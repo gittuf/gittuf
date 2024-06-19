@@ -4,7 +4,6 @@ package main
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +22,7 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 	gitArgs := append([]string{"git"}, args...)
 
 	// Execute the git command
-	gitCmd := exec.Command(gitArgs[0], gitArgs[1:]...) 
+	gitCmd := exec.Command(gitArgs[0], gitArgs[1:]...) //nolint:gosec
 	gitCmd.Stdout = cmd.OutOrStdout()
 	gitCmd.Stderr = cmd.ErrOrStderr()
 
@@ -33,7 +32,6 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 		// Custom error handling (same as before)
 		if ee, ok := err.(*exec.ExitError); ok {
 			stderr := string(ee.Stderr)
-			stderr = strings.ReplaceAll(stderr, "git", "gittuf-git")
 			return fmt.Errorf("%s", stderr)
 		}
 		return fmt.Errorf("git command failed: %w", err)
