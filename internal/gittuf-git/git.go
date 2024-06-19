@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
+
 package main
 
 import (
 	"fmt"
 	"os/exec"
-
+	"errors"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,8 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 
 	if err != nil {
 		// Custom error handling (same as before)
-		if ee, ok := err.(*exec.ExitError); ok {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
 			stderr := string(ee.Stderr)
 			return fmt.Errorf("%s", stderr)
 		}
