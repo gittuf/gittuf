@@ -1,3 +1,10 @@
++ mkdir gittuf-get-started
++ cd gittuf-get-started
++ mkdir keys
++ cd keys
++ ssh-keygen -q -t ecdsa -N '' -f root
++ ssh-keygen -q -t ecdsa -N '' -f policy
++ ssh-keygen -q -t ecdsa -N '' -f developer
 + cd ..
 + mkdir repo
 + cd repo
@@ -20,10 +27,7 @@ Signing data on standard input
 Signing data on standard input
 + echo 'Hello, world!'
 + git add .
-+ git commit -S -m 'Initial commit'
-[main (root-commit) 22949ca] Initial commit
- 1 file changed, 1 insertion(+)
- create mode 100644 README.md
++ git commit -q -S -m 'Initial commit'
 + gittuf rsl record main
 Signing data on standard input
 + gittuf verify-ref main
