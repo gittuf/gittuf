@@ -96,6 +96,27 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 	return targetsMetadata, nil
 }
 
+// ReorderDelegations changes the order of delegations in TargetsMetadata.
+func ReorderDelegations(targetsMetadata *tuf.TargetsMetadata, ruleNames []string) (*tuf.TargetsMetadata, error) {
+	allDelegations := []tuf.Delegation{}
+	for _, ruleName := range ruleNames {
+		if ruleName == AllowRuleName {
+			return nil, ErrCannotManipulateAllowRule
+		}
+
+		for _, delegation := range targetsMetadata.Delegations.Roles {
+			if delegation.Name == ruleName {
+				allDelegations = append(allDelegations, delegation)
+			}
+		}
+	}
+
+	allDelegations = append(allDelegations, AllowRule())
+	targetsMetadata.Delegations.Roles = allDelegations
+
+	return targetsMetadata, nil
+}
+
 // RemoveDelegation deletes a delegation entry from TargetsMetadata.
 func RemoveDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {

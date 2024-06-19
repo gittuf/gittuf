@@ -200,6 +200,59 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	return state.Commit(r.r, commitMessage, signCommit)
 }
 
+// ReorderDelegations is the interface for the user to reorder rules in gittuf
+// policy.
+func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleNames []string, signCommit bool) error {
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current rule file...")
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Reordering rules in rule file...")
+	targetsMetadata, err = policy.ReorderDelegations(targetsMetadata, ruleNames)
+	if err != nil {
+		return nil
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return nil
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return nil
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Reorder rules in policy '%s'", targetsRoleName)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, signCommit)
+}
+
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
 func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
