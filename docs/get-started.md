@@ -61,12 +61,12 @@ make
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
 
-```sh
+```bash
 mkdir gittuf-get-started && cd gittuf-get-started
 mkdir keys && cd keys
-ssh-keygen -t rsa -N "" -f root
-ssh-keygen -t rsa -N "" -f policy
-ssh-keygen -t rsa -N "" -f developer
+ssh-keygen -q -t ecdsa -N "" -f root
+ssh-keygen -q -t ecdsa -N "" -f policy
+ssh-keygen -q -t ecdsa -N "" -f developer
 ```
 
 ## Create a Git repository
@@ -128,7 +128,7 @@ hook and [#220] for planned gittuf and Git command compatibility).
 
 ```bash
 echo "Hello, world!" > README.md
-git add . && git commit -S -m "Initial commit"
+git add . && git commit -q -S -m "Initial commit"
 gittuf rsl record main
 ```
 
