@@ -21,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 const (
@@ -776,10 +777,10 @@ func (s *State) loadRuleNames() error {
 // ListRules returns a list of all the rules as an array of the delegations in a
 // pre order traversal of the delegation tree, with the depth of each
 // delegation.
-func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*DelegationWithDepth, error) {
+func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*DelegationWithDepth, *tuf.RootMetadata, error) {
 	state, err := LoadCurrentState(ctx, repo, targetRef)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !state.HasTargetsRole(TargetsRoleName) {
@@ -788,7 +789,7 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 
 	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	delegationsToSearch := []*DelegationWithDepth{}
@@ -817,7 +818,7 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 		if state.HasTargetsRole(currentDelegation.Delegation.Name) {
 			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.Name)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			seenRoles[currentDelegation.Delegation.Name] = true
@@ -838,7 +839,122 @@ func ListRules(ctx context.Context, repo *git.Repository, targetRef string) ([]*
 		}
 	}
 
-	return allDelegations, nil
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return allDelegations, rootMetadata, nil
+}
+
+// GetDiffBetweenPolicyAndStaging is to be used in conjunction with
+// ListRules, to show the difference between the current applicable
+// policy, and the changes to be applied to the policy
+func GetDiffBetweenPolicyAndStaging(policyRules, policyStagingRules []*DelegationWithDepth, policyRoot, policyStagingRoot *tuf.RootMetadata) string {
+	policyPointer, policyStagingPointer := 0, 0
+
+	var fullDiff strings.Builder
+
+	fullDiff.WriteString("Policy Changes:\n")
+	fullDiff.WriteString("(+'s and -'s correspond to changes in policy staging diffed against the main policy state)\n\n")
+
+	fullDiff.WriteString("Target role keys:\n")
+	fullDiff.WriteString(findDiffBetweenStrings(strings.Join(policyRoot.Roles[TargetsRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[TargetsRoleName].KeyIDs, ", ")))
+
+	fullDiff.WriteString("Root role keys:\n")
+	fullDiff.WriteString(findDiffBetweenStrings(strings.Join(policyRoot.Roles[RootRoleName].KeyIDs, ", "), strings.Join(policyStagingRoot.Roles[RootRoleName].KeyIDs, ", ")))
+
+	fullDiff.WriteString("\n")
+	for policyPointer < len(policyRules) || policyStagingPointer < len(policyStagingRules) {
+		policyString, policyStagingString := getRuleString(policyRules[policyPointer].Delegation, policyRules[policyPointer].Depth), getRuleString(policyStagingRules[policyStagingPointer].Delegation, policyStagingRules[policyStagingPointer].Depth)
+		switch {
+		case policyPointer == len(policyRules):
+			fullDiff.WriteString(findDiffBetweenStrings("", policyStagingString))
+			policyStagingPointer++
+		case policyStagingPointer == len(policyStagingRules):
+			fullDiff.WriteString(findDiffBetweenStrings(policyString, ""))
+			policyPointer++
+		case policyRules[policyPointer] != policyStagingRules[policyStagingPointer]:
+			switch {
+			case policyRules[policyPointer].Depth < policyStagingRules[policyStagingPointer].Depth:
+				fullDiff.WriteString(findDiffBetweenStrings("", policyStagingString))
+				policyStagingPointer++
+			case policyRules[policyPointer].Depth > policyStagingRules[policyStagingPointer].Depth:
+				fullDiff.WriteString(findDiffBetweenStrings(policyString, ""))
+				policyPointer++
+			default:
+				fullDiff.WriteString(findDiffBetweenStrings(policyString, policyStagingString))
+				policyPointer++
+				policyStagingPointer++
+			}
+		}
+	}
+	return fullDiff.String()
+}
+
+// findDiffBetweenStrings takes two strings (currently only used for
+// rule strings) and using the go-diff/diffmatchpatch library, creates a
+// color coded string of the difference between both strings.
+func findDiffBetweenStrings(initial, withChanges string) string {
+	dmp := diffmatchpatch.New()
+	lines1, lines2, lineArray := dmp.DiffLinesToChars(initial, withChanges)
+	diffs := dmp.DiffMain(lines1, lines2, false)
+	diffs = dmp.DiffCharsToLines(diffs, lineArray)
+
+	var diffDisplay strings.Builder
+
+	for _, diff := range diffs {
+		text := strings.TrimSuffix(diff.Text, "\n")
+		lines := strings.Split(text, "\n")
+
+		for _, line := range lines {
+			switch diff.Type {
+			case diffmatchpatch.DiffInsert:
+				diffDisplay.WriteString(fmt.Sprintf("\033[32m+   %s\033[0m\n", line)) // Green for additions
+			case diffmatchpatch.DiffDelete:
+				diffDisplay.WriteString(fmt.Sprintf("\033[31m-   %s\033[0m\n", line)) // Red for deletions
+			case diffmatchpatch.DiffEqual:
+				diffDisplay.WriteString(fmt.Sprintf("    %s\n", line))
+			}
+		}
+	}
+	return diffDisplay.String()
+}
+
+// getRuleString is a helper that takes a rule, and its depth in the
+// tuf delegation tree, and outputs the rule fields in a user-friendly way
+func getRuleString(rule tuf.Delegation, depth int) string {
+	var changes string
+
+	changes += fmt.Sprintf(strings.Repeat("    ", depth)+"Rule %s:\n", rule.Name)
+	gitpaths, filepaths := []string{}, []string{}
+	for _, path := range rule.Paths {
+		if strings.HasPrefix(path, "git:") {
+			gitpaths = append(gitpaths, path)
+		} else {
+			filepaths = append(filepaths, path)
+		}
+	}
+	if len(filepaths) > 0 {
+		changes += fmt.Sprintf(strings.Repeat("    ", depth+1) + "Paths affected:" + "\n")
+		for _, v := range filepaths {
+			changes += fmt.Sprintf(strings.Repeat("    ", depth+2)+"%s\n", v)
+		}
+	}
+	if len(gitpaths) > 0 {
+		changes += fmt.Sprintf(strings.Repeat("    ", depth+1) + "Refs affected:" + "\n")
+		for _, v := range gitpaths {
+			changes += fmt.Sprintf(strings.Repeat("    ", depth+2)+"%s\n", v)
+		}
+	}
+
+	changes += fmt.Sprintf(strings.Repeat("    ", depth+1) + "Authorized keys:" + "\n")
+	for _, key := range rule.Role.KeyIDs {
+		changes += fmt.Sprintf(strings.Repeat("    ", depth+2)+"%s\n", key)
+	}
+
+	changes += fmt.Sprintf(strings.Repeat("    ", depth+1) + fmt.Sprintf("Required valid signatures: %d", rule.Role.Threshold) + "\n")
+	return changes
 }
 
 // hasFileRule returns true if the policy state has a single rule in any targets
