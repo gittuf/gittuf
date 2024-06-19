@@ -3,17 +3,18 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
-	"errors"
+
 	"github.com/spf13/cobra"
 )
 
 // gitCmd represents the base command when called without any subcommands
 var gitCmd = &cobra.Command{
-	Use:               "gittuf-git", // This sets "git" as the required subcommand
+	Use:               "gittuf-git",
 	Short:             "Run git commands with potential gittuf integration",
-	Args:              cobra.ArbitraryArgs, 
+	Args:              cobra.ArbitraryArgs,
 	RunE:              runGitCommand,
 	DisableAutoGenTag: true,
 }
@@ -30,7 +31,6 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 	err := gitCmd.Run()
 
 	if err != nil {
-		// Custom error handling (same as before)
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
 			stderr := string(ee.Stderr)
@@ -43,8 +43,7 @@ func runGitCommand(cmd *cobra.Command, args []string) error {
 }
 
 func New() *cobra.Command {
-	// Disable flag parsing for 'gittuf git' so it doesn't consume --help
-	gitCmd.DisableFlagParsing = true  
+	gitCmd.DisableFlagParsing = true
 
 	return gitCmd
 }
