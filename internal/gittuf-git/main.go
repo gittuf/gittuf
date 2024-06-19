@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func main(){
+func main() {
 	Cmd := New()
 	if err := Cmd.Execute(); err != nil {
 		// We can ignore the linter here (deferred functions are not executed
