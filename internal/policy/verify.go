@@ -373,12 +373,9 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 		gitNamespaceVerified = true
 	}
 
-	var authorizationAttestation *sslibdsse.Envelope
-	if attestationsState != nil {
-		authorizationAttestation, err = getAuthorizationAttestation(repo, attestationsState, entry)
-		if err != nil {
-			return err
-		}
+	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
+	if err != nil {
+		return err
 	}
 
 	// Use each verifier to verify signature
@@ -527,12 +524,9 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return nil
 	}
 
-	var authorizationAttestation *sslibdsse.Envelope
-	if attestationsState != nil {
-		authorizationAttestation, err = getAuthorizationAttestation(repo, attestationsState, entry)
-		if err != nil {
-			return err
-		}
+	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
+	if err != nil {
+		return err
 	}
 
 	// Use each verifier to verify signature
@@ -579,6 +573,10 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 }
 
 func getAuthorizationAttestation(repo *gitinterface.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, error) {
+	if attestationsState == nil {
+		return nil, nil
+	}
+
 	firstEntry := false
 
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
