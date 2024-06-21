@@ -83,6 +83,186 @@ func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target st
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, nil, firstEntry, latestEntry, target)
 }
 
+func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetRef, featureRef string) (bool, error) {
+	slog.Debug("Loading policy...")
+	policyState, err := LoadCurrentState(ctx, repo, PolicyRef)
+	if err != nil {
+		return false, err
+	}
+
+	slog.Debug("Loading current set of attestations...")
+	attestationsState, err := attestations.LoadCurrentAttestations(repo)
+	if err != nil {
+		return false, err
+	}
+
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	targetEntry, _, err := rsl.GetLatestUnskippedReferenceEntryForRef(repo, targetRef)
+	if err != nil {
+		return false, err
+	}
+
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
+	featureEntry, _, err := rsl.GetLatestUnskippedReferenceEntryForRef(repo, featureRef)
+	if err != nil {
+		return false, err
+	}
+
+	mergeTreeID, err := repo.GetMergeTree(targetEntry.TargetID, featureEntry.TargetID)
+	if err != nil {
+		return false, err
+	}
+
+	authorization, githubApproval, err := getAttestationsForIndex(repo, attestationsState, targetRef, targetEntry.TargetID, mergeTreeID)
+	if err != nil {
+		return false, err
+	}
+
+	var (
+		rslEntrySignatureNeededForThreshold = false
+
+		gitNamespaceVerified  = false
+		pathNamespaceVerified = true // Assume paths are verified until we find out otherwise
+	)
+
+	verifiers, err := policyState.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef))
+	if err != nil {
+		return false, err
+	}
+	if len(verifiers) == 0 {
+		gitNamespaceVerified = true
+	}
+
+	for _, verifier := range verifiers {
+		// Try verifying twice
+		// Once with threshold as it is
+		// Once with threshold-- (to account for signature on gitObj)
+		err := verifier.Verify(ctx, gitinterface.ZeroHash, authorization, githubApproval)
+		if err == nil {
+			// we've reached threshold with just the approvals
+			gitNamespaceVerified = true
+			break
+		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+			// Unexpected error
+			return false, err
+		}
+
+		// If threshold == 1 and we have approval without gitObj signature, we'll have exited above
+		// Only try threshold-- if threshold > 1
+		if verifier.Threshold() > 1 {
+			// Make a copy before mutating verifier
+			verifier := verifier
+			verifier.threshold--
+
+			err := verifier.Verify(ctx, gitinterface.ZeroHash, authorization, githubApproval)
+			if err == nil {
+				rslEntrySignatureNeededForThreshold = true
+				gitNamespaceVerified = true
+				break
+			} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+				return false, err
+			}
+		}
+	}
+
+	if !gitNamespaceVerified {
+		return false, fmt.Errorf("not enough approvals to meet Git namespace policies, %w", ErrUnauthorizedSignature)
+	}
+
+	hasFileRule, err := policyState.hasFileRule()
+	if err != nil {
+		return false, err
+	}
+	if !hasFileRule {
+		return rslEntrySignatureNeededForThreshold, nil
+	}
+
+	// Verify modified files
+	commitIDs, err := repo.GetCommitsBetweenRange(featureEntry.TargetID, targetEntry.TargetID)
+	if err != nil {
+		return false, err
+	}
+
+	commitsVerified := make([]bool, len(commitIDs))
+	for i, commitID := range commitIDs {
+		// Assume the commit's paths are verified, if a path is left unverified,
+		// we flip this later.
+		commitsVerified[i] = true
+
+		paths, err := repo.GetFilePathsChangedByCommit(commitID)
+		if err != nil {
+			return false, err
+		}
+
+		pathsVerified := make([]bool, len(paths))
+		verifiedUsing := ""
+		for j, path := range paths {
+			verifiers, err := policyState.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
+			if err != nil {
+				return false, err
+			}
+
+			if len(verifiers) == 0 {
+				pathsVerified[j] = true
+				continue
+			}
+
+			if len(verifiedUsing) > 0 {
+				// We've already verified and identified commit signature, we
+				// can just check if that verifier is trusted for the new path.
+				// If not found, we don't make any assumptions about it being a
+				// failure in case of name mismatches. So, the signature check
+				// proceeds as usual.
+				for _, verifier := range verifiers {
+					if verifier.Name() == verifiedUsing {
+						pathsVerified[j] = true
+						break
+					}
+				}
+			}
+
+			if pathsVerified[j] {
+				continue
+			}
+
+			for _, verifier := range verifiers {
+				err := verifier.Verify(ctx, commitID, authorization, githubApproval)
+				if err == nil {
+					// Signature verification succeeded
+					pathsVerified[j] = true
+					verifiedUsing = verifier.Name()
+					break
+				} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+					// Unexpected error
+					return false, err
+				}
+			}
+		}
+
+		for _, p := range pathsVerified {
+			if !p {
+				// Flip earlier assumption that commit paths are verified as we
+				// find that at least one path wasn't verified successfully
+				commitsVerified[i] = false
+				break
+			}
+		}
+	}
+
+	for _, c := range commitsVerified {
+		if !c {
+			pathNamespaceVerified = false
+			break
+		}
+	}
+
+	if !pathNamespaceVerified {
+		return false, fmt.Errorf("not enough approvals to meet file namespace policies, %w", ErrUnauthorizedSignature)
+	}
+
+	return rslEntrySignatureNeededForThreshold, nil
+}
+
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
@@ -446,10 +626,6 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 				// If not found, we don't make any assumptions about it being a
 				// failure in case of name mismatches. So, the signature check
 				// proceeds as usual.
-				//
-				// FIXME: this is probably a vuln as a rule name may re-occur
-				// without being met by a target delegation in different
-				// policies
 				for _, verifier := range verifiers {
 					if verifier.Name() == verifiedUsing {
 						pathsVerified[j] = true
@@ -584,13 +760,11 @@ func getAttestations(repo *gitinterface.Repository, attestationsState *attestati
 	}
 
 	firstEntry := false
-
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, nil, err
 		}
-
 		firstEntry = true
 	}
 
@@ -604,14 +778,24 @@ func getAttestations(repo *gitinterface.Repository, attestationsState *attestati
 		return nil, nil, err
 	}
 
-	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+	return getAttestationsForIndex(repo, attestationsState, entry.RefName, fromID, entryTreeID)
+}
+
+func getAttestationsForIndex(repo *gitinterface.Repository, attestationsState *attestations.Attestations, refName string, fromID, toID gitinterface.Hash) (*sslibdsse.Envelope, *sslibdsse.Envelope, error) {
+	if attestationsState == nil {
+		return nil, nil, nil
+	}
+
+	slog.Debug(fmt.Sprintf("Loading reference authorization for '%s' from '%s' to '%s'...", refName, fromID.String(), toID.String()))
+	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, refName, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
 			return nil, nil, err
 		}
 	}
 
-	githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+	slog.Debug(fmt.Sprintf("Loading GitHub pull request approval attestation for '%s' from '%s' to '%s'...", refName, fromID.String(), toID.String()))
+	githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, refName, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
 			return nil, nil, err
@@ -707,6 +891,10 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, au
 		return nil
 	}
 
+	// TODO: this isn't always an authorization attestation, so the github
+	// approval is a weird case
+	// Maybe this shouldn't be aware of the special predicate?
+
 	if authorizationAttestationEnv != nil {
 		// Second, verify signatures on the attestation, subtracting the threshold
 		// by 1 to account for a verified Git signature
@@ -733,7 +921,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, au
 		if err != nil {
 			if !strings.Contains(err.Error(), "accepted signatures do not match threshold") {
 				// we may yet meet threshold with the approval attestation
-				return ErrVerifierConditionsUnmet
+				return fmt.Errorf("unexpected error: %w", err)
 			}
 		}
 		for _, ak := range acceptedKeys {
