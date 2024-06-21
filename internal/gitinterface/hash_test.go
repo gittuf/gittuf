@@ -53,6 +53,7 @@ func TestNewHash(t *testing.T) {
 			require.Nil(t, secErr)
 
 			assert.Equal(t, Hash(expectedHash), hash)
+			assert.Equal(t, test.hash, hash.String())
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 		} else {
 			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))

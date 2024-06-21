@@ -4,61 +4,18 @@ package attestations
 
 import (
 	"encoding/json"
+	"path"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInitializeNamespace(t *testing.T) {
-	t.Run("clean repository", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Error(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		initialCommit, err := gitinterface.GetCommit(repo, ref.Hash())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assert.Equal(t, initialCommitMessage, initialCommit.Message)
-		assert.Equal(t, gitinterface.EmptyTree(), initialCommit.TreeHash)
-	})
-
-	t.Run("existing attestations namespace", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		err = InitializeNamespace(repo)
-		assert.ErrorIs(t, err, ErrAttestationsExist)
-	})
-}
-
 func TestLoadCurrentAttestations(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
@@ -73,42 +30,8 @@ func TestLoadCurrentAttestations(t *testing.T) {
 	}
 
 	t.Run("no RSL entry", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		attestations, err := LoadCurrentAttestations(repo)
-		assert.Nil(t, err)
-		assert.Empty(t, attestations.referenceAuthorizations)
-	})
-
-	t.Run("with RSL entry but empty", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.NewReferenceEntry(Ref, ref.Hash()).Commit(repo, false); err != nil {
-			t.Fatal(err)
-		}
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		attestations, err := LoadCurrentAttestations(repo)
 		assert.Nil(t, err)
@@ -116,37 +39,18 @@ func TestLoadCurrentAttestations(t *testing.T) {
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		blobID, err := repo.WriteBlob(testEnvBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := rsl.InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		blobID, err := gitinterface.WriteBlob(repo, testEnvBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", false); err != nil {
-			t.Fatal(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.NewReferenceEntry(Ref, ref.Hash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -158,7 +62,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 
 func TestLoadAttestationsForEntry(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
@@ -172,26 +76,14 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("with RSL entry but empty", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
+	t.Run("with RSL entry and no an attestation", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := rsl.InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
+		authorizations := map[string]gitinterface.Hash{}
 
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.NewReferenceEntry(Ref, ref.Hash()).Commit(repo, false); err != nil {
+		attestations := &Attestations{referenceAuthorizations: authorizations}
+		if err := attestations.Commit(repo, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -200,43 +92,24 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		attestations, err := LoadAttestationsForEntry(repo, entry.(*rsl.ReferenceEntry))
+		attestations, err = LoadAttestationsForEntry(repo, entry.(*rsl.ReferenceEntry))
 		assert.Nil(t, err)
 		assert.Empty(t, attestations.referenceAuthorizations)
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		blobID, err := repo.WriteBlob(testEnvBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if err := rsl.InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		blobID, err := gitinterface.WriteBlob(repo, testEnvBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", false); err != nil {
-			t.Fatal(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := rsl.NewReferenceEntry(Ref, ref.Hash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -253,7 +126,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 
 func TestAttestationsCommit(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorization(testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
@@ -267,57 +140,37 @@ func TestAttestationsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	blobID, err := repo.WriteBlob(testEnvBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	blobID, err := gitinterface.WriteBlob(repo, testEnvBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
-
-	ref, err := repo.Reference(plumbing.ReferenceName(Ref), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit, err := gitinterface.GetCommit(repo, ref.Hash())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, gitinterface.EmptyTree(), commit.TreeHash)
-
-	authorizations := map[string]plumbing.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+	authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 	attestations := &Attestations{referenceAuthorizations: authorizations}
+
+	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	expectedTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]gitinterface.Hash{path.Join(referenceAuthorizationsTreeEntryName, ReferenceAuthorizationPath(testRef, testID, testID)): blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := attestations.Commit(repo, "Test commit", false); err != nil {
 		t.Error(err)
 	}
 
-	ref, err = repo.Reference(plumbing.ReferenceName(Ref), true)
+	currentTip, err := repo.GetReference(Ref)
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, err = gitinterface.GetCommit(repo, ref.Hash())
+	currentTreeID, err := repo.GetCommitTreeID(currentTip)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.NotEqual(t, gitinterface.EmptyTree(), commit.TreeHash)
+	assert.Equal(t, expectedTreeID, currentTreeID)
 
-	rootTree, err := gitinterface.GetTree(repo, commit.TreeHash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, 2, len(rootTree.Entries))
-	assert.Equal(t, githubPullRequestAttestationsTreeEntryName, rootTree.Entries[0].Name)
-	assert.Equal(t, referenceAuthorizationsTreeEntryName, rootTree.Entries[1].Name)
-
-	// We don't need to check every level of the tree because we do it in the
-	// tree builder API
 	attestations, err = LoadCurrentAttestations(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, attestations.referenceAuthorizations, authorizations)

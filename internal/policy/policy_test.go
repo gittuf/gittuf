@@ -14,58 +14,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestInitializeNamespace(t *testing.T) {
-	t.Run("clean repository", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Error(err)
-		}
-
-		ref, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
-		assert.Nil(t, err)
-		assert.Equal(t, plumbing.ZeroHash, ref.Hash())
-
-		// Disable PolicyStagingRef until it is actually used
-		// https://github.com/gittuf/gittuf/issues/45
-		// ref, err = repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
-		// assert.Nil(t, err)
-		// assert.Equal(t, plumbing.ZeroHash, ref.Hash())
-	})
-
-	t.Run("existing Policy namespace", func(t *testing.T) {
-		repo, err := git.Init(memory.NewStorage(), memfs.New())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := InitializeNamespace(repo); err != nil {
-			t.Fatal(err)
-		}
-
-		// Check if policy with zero hash is treated as uninitialized
-		err = InitializeNamespace(repo)
-		assert.Nil(t, err)
-
-		if err := repo.Storer.SetReference(plumbing.NewHashReference(PolicyRef, gitinterface.EmptyBlob())); err != nil {
-			t.Fatal(err)
-		}
-
-		// Now with something added, validate that we cannot initialize the policy again
-		err = InitializeNamespace(repo)
-		assert.ErrorIs(t, err, ErrPolicyExists)
-	})
-}
 
 func TestLoadState(t *testing.T) {
 	t.Run("loading while verifying multiple states", func(t *testing.T) {
@@ -81,7 +31,7 @@ func TestLoadState(t *testing.T) {
 			t.Error(err)
 		}
 
-		assert.Equal(t, state, loadedState)
+		assertStatesEqual(t, state, loadedState)
 
 		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 		if err != nil {
@@ -155,7 +105,7 @@ func TestLoadState(t *testing.T) {
 			t.Error(err)
 		}
 
-		assert.Equal(t, state, loadedState)
+		assertStatesEqual(t, state, loadedState)
 	})
 
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
@@ -171,7 +121,7 @@ func TestLoadState(t *testing.T) {
 			t.Error(err)
 		}
 
-		assert.Equal(t, state, loadedState)
+		assertStatesEqual(t, state, loadedState)
 
 		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 		if err != nil {
@@ -236,17 +186,16 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		policyStagingRef, err := repo.Reference(plumbing.ReferenceName(PolicyStagingRef), true)
+		policyStagingRefTip, err := repo.GetReference(PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		newPolicyRef := plumbing.NewHashReference(PolicyRef, policyStagingRef.Hash())
-		if err := repo.Storer.SetReference(newPolicyRef); err != nil {
+		if err := repo.SetReference(PolicyRef, policyStagingRefTip); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRef.Hash()).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingRefTip).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -267,7 +216,7 @@ func TestLoadCurrentState(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	assert.Equal(t, state, loadedState)
+	assertStatesEqual(t, state, loadedState)
 }
 
 func TestLoadFirstState(t *testing.T) {
@@ -325,7 +274,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		t.Error(err)
 	}
 
-	assert.Equal(t, state, loadedState)
+	assertStatesEqual(t, state, loadedState)
 }
 
 func TestStateKeys(t *testing.T) {
@@ -382,25 +331,20 @@ func TestStateVerify(t *testing.T) {
 
 func TestStateCommit(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+	// Commit and Apply are called by the helper
 
-	policyRef, err := repo.Reference(plumbing.ReferenceName(PolicyRef), true)
+	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	assert.NotEqual(t, plumbing.ZeroHash, policyRef.Hash())
 
-	rslRef, err := repo.Reference(plumbing.ReferenceName(rsl.Ref), true)
+	tmpEntry, err := rsl.GetLatestEntry(repo)
 	if err != nil {
-		t.Error(err)
-	}
-	assert.NotEqual(t, plumbing.ZeroHash, rslRef.Hash())
-
-	tmpEntry, err := rsl.GetEntry(repo, rslRef.Hash())
-	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	entry := tmpEntry.(*rsl.ReferenceEntry)
-	assert.Equal(t, entry.TargetID, policyRef.Hash())
+
+	assert.Equal(t, entry.TargetID, policyTip)
 }
 
 func TestStateGetRootMetadata(t *testing.T) {
@@ -500,21 +444,18 @@ func TestGetStateForCommit(t *testing.T) {
 
 	// Create some commits
 	refName := "refs/heads/main"
-	emptyTreeHash, err := gitinterface.WriteTree(repo, nil)
+	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	commitID, err := gitinterface.Commit(repo, emptyTreeHash, refName, "Initial commit", false)
+	commitID, err := repo.Commit(emptyTreeHash, refName, "Initial commit", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// No RSL entry for commit => no state yet
-	commit, err := gitinterface.GetCommit(repo, commitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	state, err := GetStateForCommit(context.Background(), repo, commit)
+	state, err := GetStateForCommit(context.Background(), repo, commitID)
 	assert.Nil(t, err)
 	assert.Nil(t, state)
 
@@ -523,16 +464,16 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state, err = GetStateForCommit(context.Background(), repo, commit)
+	state, err = GetStateForCommit(context.Background(), repo, commitID)
 	assert.Nil(t, err)
-	assert.Equal(t, firstState, state)
+	assertStatesEqual(t, firstState, state)
 
 	// Create new branch, record new commit there
 	anotherRefName := "refs/heads/feature"
-	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.ReferenceName(anotherRefName), commitID)); err != nil {
+	if err := repo.SetReference(anotherRefName, commitID); err != nil {
 		t.Fatal(err)
 	}
-	newCommitID, err := gitinterface.Commit(repo, emptyTreeHash, anotherRefName, "Second commit", false)
+	newCommitID, err := repo.Commit(emptyTreeHash, anotherRefName, "Second commit", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -541,14 +482,9 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newCommit, err := gitinterface.GetCommit(repo, newCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
 	assert.Nil(t, err)
-	assert.Equal(t, firstState, state)
+	assertStatesEqual(t, firstState, state)
 
 	// Update policy, record in RSL
 	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := firstState will modify firstState as well
@@ -588,11 +524,7 @@ func TestGetStateForCommit(t *testing.T) {
 	}
 
 	// Merge feature branch commit into main
-	curRef, err := repo.Reference(plumbing.ReferenceName(refName), true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.Storer.CheckAndSetReference(plumbing.NewHashReference(plumbing.ReferenceName(refName), newCommitID), curRef); err != nil {
+	if err := repo.CheckAndSetReference(refName, newCommitID, commitID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -603,9 +535,9 @@ func TestGetStateForCommit(t *testing.T) {
 
 	// Check that for this commit ID, the first state is returned and not the
 	// second
-	state, err = GetStateForCommit(context.Background(), repo, newCommit)
+	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
 	assert.Nil(t, err)
-	assert.Equal(t, firstState, state)
+	assertStatesEqual(t, firstState, state)
 }
 
 func TestListRules(t *testing.T) {
@@ -728,74 +660,84 @@ func TestStateHasFileRule(t *testing.T) {
 }
 
 func TestApply(t *testing.T) {
-	t.Run("single addition", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		rootMetadata, err := state.GetRootMetadata()
-		if err != nil {
-			t.Fatal(err)
-		}
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		rootMetadata, err = AddTargetsKey(rootMetadata, key)
-		if err != nil {
-			t.Fatal(err)
-		}
+	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
-		if err != nil {
-			t.Fatal(err)
-		}
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		state.RootEnvelope = rootEnv
+	state.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", false); err != nil {
-			t.Fatal(err)
-		}
+	if err := state.Commit(repo, "Added target key to root", false); err != nil {
+		t.Fatal(err)
+	}
 
-		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+	staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+	policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
-		assert.NotEqual(t, staging, policy)
+	// Currently the policy ref is behind the staging ref, since the staging ref currently has an extra target key
+	assertStatesNotEqual(t, staging, policy)
 
-		err = Apply(testCtx, repo, false)
+	err = Apply(testCtx, repo, false)
+	assert.Nil(t, err)
 
-		assert.Nil(t, err)
+	staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+	policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		if err != nil {
-			t.Fatal(err)
-		}
+	// After Apply, the policy ref was fast-forward merged with the staging ref
+	assertStatesEqual(t, staging, policy)
+}
 
-		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+func assertStatesEqual(t *testing.T, stateA, stateB *State) {
+	t.Helper()
 
-		if err != nil {
-			t.Fatal(err)
-		}
+	assert.Equal(t, stateA.RootEnvelope, stateB.RootEnvelope)
+	assert.Equal(t, stateA.TargetsEnvelope, stateB.TargetsEnvelope)
+	assert.Equal(t, stateA.DelegationEnvelopes, stateB.DelegationEnvelopes)
+	assert.Equal(t, stateA.RootPublicKeys, stateB.RootPublicKeys)
+}
 
-		// After Apply, the policy ref was fast-forward merged with the staging ref
+func assertStatesNotEqual(t *testing.T, stateA, stateB *State) {
+	t.Helper()
 
-		assert.Equal(t, staging, policy)
-	})
+	// at least one of these has to be different
+	assert.True(t, assert.NotEqual(t, stateA.RootEnvelope, stateB.RootEnvelope) || assert.NotEqual(t, stateA.TargetsEnvelope, stateB.TargetsEnvelope) || assert.NotEqual(t, stateA.DelegationEnvelopes, stateB.DelegationEnvelopes) || assert.NotEqual(t, stateA.RootPublicKeys, stateB.RootPublicKeys))
 }

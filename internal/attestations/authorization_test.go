@@ -5,11 +5,9 @@ package attestations
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/storage/memory"
 	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
@@ -43,19 +41,17 @@ func TestNewReferenceAuthorization(t *testing.T) {
 func TestSetReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
 	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	attestations := &Attestations{}
 
 	// Add auth for first branch
-	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+	err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
 	assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
@@ -70,18 +66,16 @@ func TestSetReferenceAuthorization(t *testing.T) {
 func TestRemoveReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
 	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	attestations := &Attestations{}
 
-	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+	err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,18 +103,16 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 func TestGetReferenceAuthorizationFor(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
 	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	attestations := &Attestations{}
 
-	err = attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+	err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +133,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 func TestValidateReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
 	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
 

@@ -16,34 +16,13 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
-)
-
-const (
-	nonCommitMessage                  = "cannot verify non-commit object"
-	nonTagMessage                     = "cannot verify non-tag object"
-	unableToResolveRevisionMessage    = "unable to resolve revision (must be a reference or a commit identifier)"
-	noPublicKeyMessage                = "no public key found for Git object"
-	unableToLoadPolicyMessageFmt      = "unable to load applicable gittuf policy: %s"
-	unableToFindPolicyMessage         = "unable to find applicable gittuf policy"
-	goodSignatureMessageFmt           = "good signature from key '%s:%s'"
-	goodTagSignatureMessage           = "good signature for RSL entry and tag"
-	goodSignatureMessageForRSLEntry   = "good signature for RSL entry"
-	badSignatureMessageForRSLEntry    = "bad signature for RSL entry"
-	noSignatureMessage                = "no signature found"
-	errorVerifyingSignatureMessageFmt = "verifying signature using key '%s:%s' failed: %s"
-	unableToFindRSLEntryMessage       = "unable to find tag's RSL entry"
-	multipleTagRSLEntriesFoundMessage = "multiple RSL entries found for tag"
 )
 
 var (
 	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
 	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrUnknownObjectType       = errors.New("unknown object type passed to verify signature")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
 	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
@@ -51,26 +30,26 @@ var (
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
+func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
 	// Get latest policy entry
 	slog.Debug("Loading policy...")
 	policyState, err := LoadCurrentState(ctx, repo, PolicyRef)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest set of attestations
 	slog.Debug("Loading current set of attestations...")
 	attestationsState, err := attestations.LoadCurrentAttestations(repo)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	slog.Debug("Verifying entry...")
@@ -80,19 +59,19 @@ func VerifyRef(ctx context.Context, repo *git.Repository, target string) (plumbi
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (plumbing.Hash, error) {
+func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug("Identifying first RSL entry...")
 	firstEntry, _, err := rsl.GetFirstEntry(repo)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
@@ -104,33 +83,33 @@ func VerifyRefFull(ctx context.Context, repo *git.Repository, target string) (pl
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string, entryID plumbing.Hash) (plumbing.Hash, error) {
+func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(repo, entryID)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// TODO: we should instead find the latest ref entry before the entryID and
 	// use that
 	fromEntry, isRefEntry := fromEntryT.(*rsl.ReferenceEntry)
 	if !isRefEntry {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find policy entry before the starting point entry
 	slog.Debug("Identifying applicable policy entry...")
 	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
 	if err != nil {
-		return plumbing.ZeroHash, err
+		return gitinterface.ZeroHash, err
 	}
 
 	slog.Debug("Identifying applicable attestations entry...")
@@ -138,7 +117,7 @@ func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string
 	attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, fromEntry.GetID())
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return plumbing.ZeroHash, err
+			return gitinterface.ZeroHash, err
 		}
 	}
 
@@ -151,7 +130,7 @@ func VerifyRefFromEntry(ctx context.Context, repo *git.Repository, target string
 // using the provided policy entry for the first entry.
 //
 // TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
@@ -229,7 +208,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
 				slog.Debug("Violation found, checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
-				if !entry.SkippedBy(annotations[entry.ID]) {
+				if !entry.SkippedBy(annotations[entry.ID.String()]) {
 					return err
 				}
 
@@ -273,13 +252,12 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 		if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
 			return ErrLastGoodEntryIsSkipped
 		}
-		lastGoodEntryCommit, err := gitinterface.GetCommit(repo, lastGoodEntry.TargetID)
+		// gittuf requires the fix to point to a commit that is tree-same as the
+		// last good state
+		lastGoodTreeID, err := repo.GetCommitTreeID(lastGoodEntry.TargetID)
 		if err != nil {
 			return err
 		}
-		// gittuf requires the fix to point to a commit that is tree-same as the
-		// last good state
-		lastGoodTreeID := lastGoodEntryCommit.TreeHash
 
 		// 2. What entries do we have in the current verification set for the
 		// ref? The first one that is tree-same as lastGoodEntry's commit is the
@@ -302,20 +280,20 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 				continue
 			}
 
-			newEntryCommit, err := gitinterface.GetCommit(repo, newEntry.TargetID)
+			newCommitTreeID, err := repo.GetCommitTreeID(newEntry.TargetID)
 			if err != nil {
 				return err
 			}
 
 			slog.Debug("Checking if entry is tree-same with last valid state...")
-			if newEntryCommit.TreeHash == lastGoodTreeID {
+			if newCommitTreeID.Equal(lastGoodTreeID) {
 				// Fix found, we append the rest of the current verification set
 				// to the new entry queue
 				// But first, we must check that this fix hasn't been skipped
 				// If it has been skipped, it's not actually a fix and we need
 				// to keep looking
 				slog.Debug("Verifying potential fix entry has not been revoked...")
-				if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+				if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
 					slog.Debug("Fix entry found, proceeding with regular verification workflow...")
 					fixed = true
 					newEntryQueue = append(newEntryQueue, entries...)
@@ -326,7 +304,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *git.Repository, initialPoli
 			// newEntry is not tree-same / commit-same, so it is automatically
 			// invalid, check that it's been marked as revoked
 			slog.Debug("Checking non-fix entry has been revoked as well...")
-			if !newEntry.SkippedBy(annotations[newEntry.ID]) {
+			if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
 				invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
 			}
 		}
@@ -361,7 +339,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 		return err
 	}
 
-	return rootVerifier.Verify(ctx, nil, newPolicy.RootEnvelope)
+	return rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.RootEnvelope)
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified
@@ -370,13 +348,13 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
 	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
 
 	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
-		return verifyTagEntry(ctx, repo, policy, entry)
+		return verifyTagEntry(ctx, repo, policy, attestationsState, entry)
 	}
 
 	var (
@@ -395,23 +373,14 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 		gitNamespaceVerified = true
 	}
 
-	// Find commit object for the RSL entry
-	commitObj, err := gitinterface.GetCommit(repo, entry.ID)
+	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
 	if err != nil {
 		return err
 	}
 
-	var authorizationAttestation *sslibdsse.Envelope
-	if attestationsState != nil {
-		authorizationAttestation, err = getAuthorizationAttestation(repo, attestationsState, entry)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Use each verifier to verify signature
 	for _, verifier := range verifiers {
-		err := verifier.Verify(ctx, commitObj, authorizationAttestation)
+		err := verifier.Verify(ctx, entry.ID, authorizationAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			gitNamespaceVerified = true
@@ -420,7 +389,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 			// Unexpected error
 			return err
 		}
-		// Haven't found a valid verifier, continue with next
+		// Haven't found a valid verifier, continue with next verifier
 	}
 
 	if !gitNamespaceVerified {
@@ -439,18 +408,18 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	// Verify modified files
 
 	// First, get all commits between the current and last entry for the ref.
-	commits, err := getCommits(repo, entry) // note: this is ordered by commit ID
+	commitIDs, err := getCommits(repo, entry) // note: this is ordered by commit ID
 	if err != nil {
 		return err
 	}
 
-	commitsVerified := make([]bool, len(commits))
-	for i, commit := range commits {
+	commitsVerified := make([]bool, len(commitIDs))
+	for i, commitID := range commitIDs {
 		// Assume the commit's paths are verified, if a path is left unverified,
 		// we flip this later.
 		commitsVerified[i] = true
 
-		paths, err := gitinterface.GetFilePathsChangedByCommit(repo, commit)
+		paths, err := repo.GetFilePathsChangedByCommit(commitID)
 		if err != nil {
 			return err
 		}
@@ -491,7 +460,7 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 			}
 
 			for _, verifier := range verifiers {
-				err := verifier.Verify(ctx, commit, authorizationAttestation)
+				err := verifier.Verify(ctx, commitID, authorizationAttestation)
 				if err == nil {
 					// Signature verification succeeded
 					pathsVerified[j] = true
@@ -530,95 +499,70 @@ func verifyEntry(ctx context.Context, repo *git.Repository, policy *State, attes
 	return nil
 }
 
-func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, entry *rsl.ReferenceEntry) error {
-	// 1. Find authorized public keys for tag's RSL entry
-	trustedKeys, err := policy.FindPublicKeysForPath(ctx, fmt.Sprintf("git:%s", entry.RefName))
+func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+	entryTagRef, err := repo.GetReference(entry.RefName)
 	if err != nil {
 		return err
 	}
 
-	if len(trustedKeys) == 0 {
-		allKeys, err := policy.PublicKeys()
-		if err != nil {
-			return err
-		}
-
-		// FIXME: decide if we want to pass around map or slice for these APIs
-		for _, key := range allKeys {
-			trustedKeys = append(trustedKeys, key)
-		}
-	}
-
-	// 2. Find commit object for the RSL entry
-	commitObj, err := gitinterface.GetCommit(repo, entry.ID)
+	tagTargetID, err := repo.GetTagTarget(entry.TargetID)
 	if err != nil {
 		return err
 	}
 
-	// 3. Use each trusted key to verify signature
+	if !entry.TargetID.Equal(entryTagRef) && !entry.TargetID.Equal(tagTargetID) {
+		return fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
+	}
+
+	// Find authorized public keys for tag's RSL entry
+	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
+	if err != nil {
+		return err
+	}
+
+	if len(verifiers) == 0 {
+		return nil
+	}
+
+	authorizationAttestation, err := getAuthorizationAttestation(repo, attestationsState, entry)
+	if err != nil {
+		return err
+	}
+
+	// Use each verifier to verify signature
 	rslEntryVerified := false
-	for _, key := range trustedKeys {
-		err := gitinterface.VerifyCommitSignature(ctx, commitObj, key)
+	for _, verifier := range verifiers {
+		err := verifier.Verify(ctx, entry.ID, authorizationAttestation)
 		if err == nil {
 			// Signature verification succeeded
 			rslEntryVerified = true
 			break
-		}
-		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-			// We encounter this for key types that can be used for gittuf
-			// policy metadata but not Git objects
-			continue
-		}
-		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
 			// Unexpected error
 			return err
 		}
-		// Haven't found a valid key, continue with next key
+		// Haven't found a valid verifier, continue with next verifier
 	}
 
 	if !rslEntryVerified {
 		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
 	}
 
-	// 4. Verify tag object
+	// Verify tag object
 	tagObjVerified := false
-	tagObj, err := gitinterface.GetTag(repo, entry.TargetID)
-	if err != nil {
-		// Likely indicates the ref is not pointing to a tag object
-		// What about lightweight tags?
-		return err
-	}
-
-	entryTagRef, err := repo.Reference(plumbing.ReferenceName(entry.RefName), true)
-	if err != nil {
-		return err
-	}
-
-	if entry.TargetID != entryTagRef.Hash() && entry.TargetID != tagObj.Target {
-		return fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
-	}
-
-	if len(tagObj.PGPSignature) == 0 {
-		return fmt.Errorf(noSignatureMessage)
-	}
-
-	for _, key := range trustedKeys {
-		err := gitinterface.VerifyTagSignature(ctx, tagObj, key)
+	for _, verifier := range verifiers {
+		// explicitly not looking at the attestation
+		// that applies to the _push_
+		err := verifier.Verify(ctx, entry.TargetID, nil)
 		if err == nil {
 			// Signature verification succeeded
 			tagObjVerified = true
 			break
-		}
-		if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-			// We encounter this for key types that can be used for gittuf
-			// policy metadata but not Git objects
-			continue
-		}
-		if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
 			// Unexpected error
 			return err
 		}
-		// Haven't found a valid key, continue with next key
+		// Haven't found a valid verifier, continue with next verifier
 	}
 
 	if !tagObjVerified {
@@ -628,7 +572,11 @@ func verifyTagEntry(ctx context.Context, repo *git.Repository, policy *State, en
 	return nil
 }
 
-func getAuthorizationAttestation(repo *git.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, error) {
+func getAuthorizationAttestation(repo *gitinterface.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, error) {
+	if attestationsState == nil {
+		return nil, nil
+	}
+
 	firstEntry := false
 
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
@@ -640,17 +588,17 @@ func getAuthorizationAttestation(repo *git.Repository, attestationsState *attest
 		firstEntry = true
 	}
 
-	fromID := plumbing.ZeroHash
+	fromID := gitinterface.ZeroHash
 	if !firstEntry {
 		fromID = priorRefEntry.TargetID
 	}
 
-	currentCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
+	entryTreeID, err := repo.GetCommitTreeID(entry.TargetID)
 	if err != nil {
 		return nil, err
 	}
 
-	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), currentCommit.TreeHash.String())
+	attestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
 	if err != nil {
 		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
 			return nil, nil
@@ -665,7 +613,7 @@ func getAuthorizationAttestation(repo *git.Repository, attestationsState *attest
 // getCommits identifies the commits introduced to the entry's ref since the
 // last RSL entry for the same ref. These commits are then verified for file
 // policies.
-func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]*object.Commit, error) {
+func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]gitinterface.Hash, error) {
 	firstEntry := false
 
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
@@ -678,52 +626,17 @@ func getCommits(repo *git.Repository, entry *rsl.ReferenceEntry) ([]*object.Comm
 	}
 
 	if firstEntry {
-		return gitinterface.GetCommitsBetweenRange(repo, entry.TargetID, plumbing.ZeroHash)
+		return repo.GetCommitsBetweenRange(entry.TargetID, gitinterface.ZeroHash)
 	}
 
-	return gitinterface.GetCommitsBetweenRange(repo, entry.TargetID, priorRefEntry.TargetID)
-}
-
-// getChangedPaths identifies the paths of all the files changed using the
-// specified RSL entry. The entry's commit ID is compared with the commit ID
-// from the previous RSL entry for the same namespace.
-//
-// Deprecated: this was introduced in a previous design. As it turns out, it is
-// flawed as we want changed paths per commit rather than all changed paths
-// between two RSL entries that span multiple commits.
-func getChangedPaths(repo *git.Repository, entry *rsl.ReferenceEntry) ([]string, error) {
-	firstEntry := false
-
-	currentCommit, err := gitinterface.GetCommit(repo, entry.TargetID)
-	if err != nil {
-		return nil, err
-	}
-
-	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return nil, err
-		}
-
-		firstEntry = true
-	}
-
-	if firstEntry {
-		return gitinterface.GetCommitFilePaths(currentCommit)
-	}
-
-	priorCommit, err := gitinterface.GetCommit(repo, priorRefEntry.TargetID)
-	if err != nil {
-		return nil, err
-	}
-
-	return gitinterface.GetDiffFilePaths(currentCommit, priorCommit)
+	return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.TargetID)
 }
 
 type Verifier struct {
-	name      string
-	keys      []*tuf.Key
-	threshold int
+	repository *gitinterface.Repository
+	name       string
+	keys       []*tuf.Key
+	threshold  int
 }
 
 func (v *Verifier) Name() string {
@@ -743,12 +656,12 @@ func (v *Verifier) Threshold() int {
 // signature and signatures embedded in a DSSE envelope. Verify does not inspect
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
-func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *sslibdsse.Envelope) error {
+func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, env *sslibdsse.Envelope) error {
 	if v.threshold < 1 || len(v.keys) < 1 {
 		return ErrInvalidVerifier
 	}
 
-	if gitObject == nil {
+	if gitObjectID.IsZero() {
 		if env == nil {
 			// Nothing to verify, but fail closed
 			return ErrVerifierConditionsUnmet
@@ -775,42 +688,21 @@ func (v *Verifier) Verify(ctx context.Context, gitObject object.Object, env *ssl
 	gitObjectVerified := false
 
 	// First, verify the gitObject's signature if one is presented
-	if gitObject != nil {
-		switch o := gitObject.(type) {
-		case *object.Commit:
-			for _, key := range v.keys {
-				err := gitinterface.VerifyCommitSignature(ctx, o, key)
-				if err == nil {
-					// Signature verification succeeded
-					keyIDUsed = key.KeyID
-					gitObjectVerified = true
-					break
-				}
-				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-					continue
-				}
-				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-					return err
-				}
+	if !gitObjectID.IsZero() {
+		for _, key := range v.keys {
+			err := v.repository.VerifySignature(ctx, gitObjectID, key)
+			if err == nil {
+				// Signature verification succeeded
+				keyIDUsed = key.KeyID
+				gitObjectVerified = true
+				break
 			}
-		case *object.Tag:
-			for _, key := range v.keys {
-				err := gitinterface.VerifyTagSignature(ctx, o, key)
-				if err == nil {
-					// Signature verification succeeded
-					keyIDUsed = key.KeyID
-					gitObjectVerified = true
-					break
-				}
-				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-					continue
-				}
-				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-					return err
-				}
+			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+				continue
 			}
-		default:
-			return ErrUnknownObjectType
+			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+				return err
+			}
 		}
 	}
 

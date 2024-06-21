@@ -49,9 +49,9 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 		args = append(args, "--bare")
 		gitDirPath = dir
 	} else {
-		args = append(args, "-b", "main")
 		gitDirPath = filepath.Join(dir, ".git")
 	}
+	args = append(args, "-b", "main")
 	args = append(args, dir)
 
 	cmd := exec.Command(binary, args...)

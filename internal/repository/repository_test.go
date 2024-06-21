@@ -3,39 +3,36 @@
 package repository
 
 import (
-	"context"
+	"os"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadRepository(t *testing.T) {
+	tmpDir := t.TempDir()
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(currentDir) //nolint:errcheck
+
 	repository, err := LoadRepository()
 	assert.Nil(t, err)
 	assert.NotNil(t, repository.r)
 }
 
-func TestInitializeNamespaces(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	r := &Repository{r: repo}
-	err = r.InitializeNamespaces()
-	assert.Nil(t, err)
-}
-
 func TestUnauthorizedKey(t *testing.T) {
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 	if err != nil {
@@ -48,7 +45,7 @@ func TestUnauthorizedKey(t *testing.T) {
 	}
 
 	r := &Repository{r: repo}
-	if err := r.InitializeRoot(context.Background(), rootSigner, false); err != nil {
+	if err := r.InitializeRoot(testCtx, rootSigner, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,12 +55,12 @@ func TestUnauthorizedKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = r.AddTopLevelTargetsKey(context.Background(), targetsSigner, key, false)
+		err = r.AddTopLevelTargetsKey(testCtx, targetsSigner, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
 	t.Run("test remove targets key", func(t *testing.T) {
-		err := r.RemoveTopLevelTargetsKey(context.Background(), targetsSigner, "some key ID", false)
+		err := r.RemoveTopLevelTargetsKey(testCtx, targetsSigner, "some key ID", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }

@@ -9,8 +9,6 @@ import (
 	"path"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -79,7 +77,7 @@ func NewReferenceAuthorization(targetRef, fromRevisionID, targetTreeID string) (
 
 // SetReferenceAuthorization writes the new reference authorization attestation
 // to the object store and tracks it in the current attestations state.
-func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *sslibdsse.Envelope, refName, fromRevisionID, targetTreeID string) error {
+func (a *Attestations) SetReferenceAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromRevisionID, targetTreeID string) error {
 	if err := validateReferenceAuthorization(env, refName, fromRevisionID, targetTreeID); err != nil {
 		return err
 	}
@@ -89,13 +87,13 @@ func (a *Attestations) SetReferenceAuthorization(repo *git.Repository, env *ssli
 		return err
 	}
 
-	blobID, err := gitinterface.WriteBlob(repo, envBytes)
+	blobID, err := repo.WriteBlob(envBytes)
 	if err != nil {
 		return err
 	}
 
 	if a.referenceAuthorizations == nil {
-		a.referenceAuthorizations = map[string]plumbing.Hash{}
+		a.referenceAuthorizations = map[string]gitinterface.Hash{}
 	}
 
 	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromRevisionID, targetTreeID)] = blobID
@@ -117,13 +115,13 @@ func (a *Attestations) RemoveReferenceAuthorization(refName, fromRevisionID, tar
 
 // GetReferenceAuthorizationFor returns the requested reference authorization
 // attestation (with its signatures).
-func (a *Attestations) GetReferenceAuthorizationFor(repo *git.Repository, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
+func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repository, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
 	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromRevisionID, targetTreeID)]
 	if !has {
 		return nil, ErrAuthorizationNotFound
 	}
 
-	envBytes, err := gitinterface.ReadBlob(repo, blobID)
+	envBytes, err := repo.ReadBlob(blobID)
 	if err != nil {
 		return nil, err
 	}

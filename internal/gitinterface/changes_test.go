@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/go-git/go-billy/v5/memfs"
 	"github.com/go-git/go-git/v5"
@@ -967,10 +966,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents
-		cM, err := repo.CommitWithParents(treeB, []Hash{cA, cB}, "Merge commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		cM := repo.commitWithParents(t, treeB, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
@@ -1016,10 +1012,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents and a different tree
-		cM, err := repo.CommitWithParents(treeC, []Hash{cA, cB}, "Merge commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
@@ -1065,46 +1058,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents and an overlapping tree
-		cM, err := repo.CommitWithParents(treeC, []Hash{cA, cB}, "Merge commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
-}
-
-// CommitWithParents creates a new commit in the repo but does not update any
-// references. It is only meant to be used for tests, and therefore accepts
-// specific parent commit IDs.
-func (r *Repository) CommitWithParents(treeID Hash, parentIDs []Hash, message string, sign bool) (Hash, error) {
-	args := []string{"commit-tree", "-m", message}
-
-	for _, commitID := range parentIDs {
-		args = append(args, "-p", commitID.String())
-	}
-
-	if sign {
-		args = append(args, "-S")
-	}
-
-	args = append(args, treeID.String())
-
-	now := r.clock.Now().Format(time.RFC3339)
-	env := []string{fmt.Sprintf("%s=%s", committerTimeKey, now), fmt.Sprintf("%s=%s", authorTimeKey, now)}
-
-	stdOut, err := r.executor(args...).withEnv(env...).executeString()
-	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
-	}
-	commitID, err := NewHash(stdOut)
-	if err != nil {
-		return ZeroHash, fmt.Errorf("received invalid commit ID: %w", err)
-	}
-
-	return commitID, nil
 }
 
 func testNameToRefName(testName string) string {

@@ -8,8 +8,6 @@ import (
 	"path"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -50,19 +48,19 @@ func NewGitHubPullRequestAttestation(owner, repository string, pullRequestNumber
 	}, nil
 }
 
-func (a *Attestations) SetGitHubPullRequestAuthorization(repo *git.Repository, env *sslibdsse.Envelope, targetRefName, commitID string) error {
+func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, targetRefName, commitID string) error {
 	envBytes, err := json.Marshal(env)
 	if err != nil {
 		return err
 	}
 
-	blobID, err := gitinterface.WriteBlob(repo, envBytes)
+	blobID, err := repo.WriteBlob(envBytes)
 	if err != nil {
 		return err
 	}
 
 	if a.githubPullRequestAttestations == nil {
-		a.githubPullRequestAttestations = map[string]plumbing.Hash{}
+		a.githubPullRequestAttestations = map[string]gitinterface.Hash{}
 	}
 
 	a.githubPullRequestAttestations[GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID

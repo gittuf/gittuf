@@ -12,22 +12,12 @@
 + git config --local gpg.format ssh
 + git config --local user.signingkey ../keys/developer
 + gittuf trust init -k ../keys/root
-Signing data on standard input
-Signing data on standard input
 + gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
-Signing data on standard input
-Signing data on standard input
 + gittuf policy init -k ../keys/policy --policy-name targets
-Signing data on standard input
-Signing data on standard input
 + gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
-Signing data on standard input
-Signing data on standard input
 + gittuf policy apply
-Signing data on standard input
 + echo 'Hello, world!'
 + git add .
 + git commit -q -S -m 'Initial commit'
 + gittuf rsl record main
-Signing data on standard input
 + gittuf verify-ref main

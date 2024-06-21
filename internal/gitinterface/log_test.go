@@ -211,7 +211,8 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		}
 
 		// Add a common merge commit
-		mergeCommit, err := repo.CommitWithParents(
+		mergeCommit := repo.commitWithParents(
+			t,
 			emptyTreeID,
 			[]Hash{
 				mainBranchCommits[len(mainBranchCommits)-1],
@@ -220,7 +221,6 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 			"Merge branches\n",
 			false,
 		)
-		require.Nil(t, err)
 
 		// Check merge to first commit in main branch (not initial common commit)
 		expectedCommits := append([]Hash{mergeCommit}, mainBranchCommits[1:]...)
@@ -274,7 +274,8 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 			featureBranchCommits = append(featureBranchCommits, commitHash)
 		}
 
-		newMergeCommit, err := repo.CommitWithParents(
+		newMergeCommit := repo.commitWithParents(
+			t,
 			emptyTreeID,
 			[]Hash{
 				mainBranchCommits[len(mainBranchCommits)-1],
@@ -283,7 +284,6 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 			"Merge branches\n",
 			false,
 		)
-		require.Nil(t, err)
 
 		// Check range between two merge commits
 		expectedCommits = append([]Hash{newMergeCommit}, mainBranchCommits...)

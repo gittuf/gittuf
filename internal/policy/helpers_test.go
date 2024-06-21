@@ -6,16 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/attestations"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-billy/v5/memfs"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/storage/memory"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -32,25 +28,14 @@ var (
 	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
 )
 
-func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*git.Repository, *State) {
+func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*gitinterface.Repository, *State) {
 	t.Helper()
 
 	state := stateCreator(t)
 
-	repo, err := git.Init(memory.NewStorage(), memfs.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
-	if err := rsl.InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
-	if err := attestations.InitializeNamespace(repo); err != nil {
-		t.Fatal(err)
-	}
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	state.repository = repo
 
 	if err := state.Commit(repo, "Create test state", false); err != nil {
 		t.Fatal(err)
