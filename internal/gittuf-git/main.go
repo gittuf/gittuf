@@ -24,8 +24,16 @@ func main() {
 	}
 
 	gitArgs := os.Args[1:]
+	gitCommand := gitArgs[0]
 
-	// Execute the git command
+	switch gitCommand {
+	case "push":
+		gittufPush(gitArgs)
+	default:
+		// this code runs when a command that doesn't need additional GitTuf features is executed.
+		fmt.Print("Default Section")
+	}
+
 	gitCmd := exec.Command("git", gitArgs...)
 	gitCmd.Stdout = os.Stdout
 	gitCmd.Stderr = os.Stderr
