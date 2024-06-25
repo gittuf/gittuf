@@ -86,6 +86,39 @@ func TestUpdateDelegation(t *testing.T) {
 	}, targetsMetadata.Delegations.Roles[0])
 }
 
+func TestReorderDelegations(t *testing.T) {
+	targetsMetadata := InitializeTargetsMetadata()
+
+	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-1", []*tuf.Key{key1}, []string{"path1/"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-2", []*tuf.Key{key2}, []string{"path2/"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key2.KeyID)
+
+	ruleNames := []string{"rule-2", "rule-1"}
+	targetsMetadata, err = ReorderDelegations(targetsMetadata, ruleNames)
+	assert.Nil(t, err)
+
+	assert.Equal(t, "rule-2", targetsMetadata.Delegations.Roles[0].Name)
+	assert.Equal(t, "rule-1", targetsMetadata.Delegations.Roles[1].Name)
+	assert.Equal(t, AllowRuleName, targetsMetadata.Delegations.Roles[2].Name)
+}
 func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 

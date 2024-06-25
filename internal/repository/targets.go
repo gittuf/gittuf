@@ -224,6 +224,13 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 		return err
 	}
 
+	slog.Debug("Checking if all rules exist...")
+	for _, ruleName := range ruleNames {
+		if !state.HasRuleName(ruleName) {
+			return policy.ErrDelegationNotFound
+		}
+	}
+
 	slog.Debug("Reordering rules in rule file...")
 	targetsMetadata, err = policy.ReorderDelegations(targetsMetadata, ruleNames)
 	if err != nil {

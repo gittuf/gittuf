@@ -167,6 +167,73 @@ func TestUpdateDelegation(t *testing.T) {
 	})
 }
 
+func TestReorderDelegations(t *testing.T) {
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("reorder rules", func(t *testing.T) {
+		r := createTestRepositoryWithPolicy(t, "")
+
+		ruleNames := []string{"rule-1", "rule-2", "rule-3"}
+		for _, ruleName := range ruleNames {
+			err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, nil, nil, 1, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		initialOrder := []string{}
+		for _, role := range targetsMetadata.Delegations.Roles {
+			initialOrder = append(initialOrder, role.Name)
+		}
+		expectedInitialOrder := append([]string{"protect-main"}, ruleNames...)
+		expectedInitialOrder = append(expectedInitialOrder, "gittuf-allow-rule")
+		assert.Equal(t, expectedInitialOrder, initialOrder)
+
+		newOrder := []string{"rule-3", "rule-1", "rule-2"}
+		err = r.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, newOrder, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		finalOrder := []string{}
+		for _, role := range targetsMetadata.Delegations.Roles {
+			finalOrder = append(finalOrder, role.Name)
+		}
+		expectedFinalOrder := append([]string{}, newOrder...)
+		expectedFinalOrder = append(expectedFinalOrder, "gittuf-allow-rule")
+		assert.Equal(t, expectedFinalOrder, finalOrder)
+	})
+
+	t.Run("invalid rule names", func(t *testing.T) {
+		r := createTestRepositoryWithPolicy(t, "")
+
+		invalidOrder := []string{"non-existent-rule"}
+		err := r.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, invalidOrder, false)
+		assert.ErrorIs(t, err, policy.ErrDelegationNotFound)
+	})
+}
+
 func TestRemoveDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
