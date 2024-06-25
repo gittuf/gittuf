@@ -25,3 +25,8 @@ Patrick Zielinski
   Email: patrick.z@nyu.edu
   GitHub username: @patzielinski
   Affiliation: NYU
+
+Neil Naveen
+  Email: naveen.neil@icloud.com
+  GitHub username: @neilnaveen
+  Affiliation: NYU
