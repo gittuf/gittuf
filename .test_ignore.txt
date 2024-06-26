@@ -1,0 +1,16 @@
+github.com/gittuf/gittuf/docs/cli
+github.com/gittuf/gittuf/internal/cmd/addhooks
+github.com/gittuf/gittuf/internal/cmd/clone
+github.com/gittuf/gittuf/internal/cmd/dev
+github.com/gittuf/gittuf/internal/cmd/policy
+github.com/gittuf/gittuf/internal/cmd/profile
+github.com/gittuf/gittuf/internal/cmd/root
+github.com/gittuf/gittuf/internal/cmd/rsl
+github.com/gittuf/gittuf/internal/cmd/trust
+github.com/gittuf/gittuf/internal/cmd/verifycommit
+github.com/gittuf/gittuf/internal/cmd/verifyref
+github.com/gittuf/gittuf/internal/cmd/verifytag
+github.com/gittuf/gittuf/internal/cmd/version
+github.com/gittuf/gittuf/internal/dev
+github.com/gittuf/gittuf/internal/testartifacts
+github.com/gittuf/gittuf/internal/version
