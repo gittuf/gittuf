@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"sort"
 
-	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/google/go-github/v61/github"
@@ -27,6 +25,7 @@ const (
 var (
 	ErrInvalidGitHubPullRequestApprovalAttestation  = errors.New("the GitHub pull request approval attestation does not match expected details")
 	ErrGitHubPullRequestApprovalAttestationNotFound = errors.New("requested GitHub pull request approval attestation not found")
+	ErrGitHubReviewIDNotFound                       = errors.New("requested GitHub review ID does not exist in index")
 )
 
 func NewGitHubPullRequestAttestation(owner, repository string, pullRequestNumber int, commitID string, pullRequest *github.PullRequest) (*ita.Statement, error) {
@@ -87,7 +86,13 @@ func GitHubPullRequestAttestationPath(refName, commitID string) string {
 // `ReferenceAuthorization`, except that it records a pull request's approvers
 // inside the predicate (defined here).
 type GitHubPullRequestApprovalAttestation struct {
+	// Approvers contains the list of currently applicable approvers.
 	Approvers []*tuf.Key `json:"approvers"`
+
+	// DismissedApprovers contains the list of approvers who then dismissed
+	// their approval.
+	DismissedApprovers []*tuf.Key `json:"dismissedApprovers"`
+
 	*ReferenceAuthorization
 }
 
@@ -96,29 +101,15 @@ type GitHubPullRequestApprovalAttestation struct {
 // embedded in an in-toto "statement" and returned with the appropriate
 // "predicate type" set. The `fromTargetID` and `toTargetID` specify the change
 // to `targetRef` that is approved on the corresponding GitHub pull request.
-func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers []*tuf.Key) (*ita.Statement, error) {
-	approversSet := set.NewSet[string]()
-	approversFiltered := make([]*tuf.Key, 0, len(approvers))
-	for _, approver := range approvers {
-		if approversSet.Has(approver.KeyID) {
-			continue
-		}
-		approversSet.Add(approver.KeyID)
-		approversFiltered = append(approversFiltered, approver)
-	}
-
-	approvers = approversFiltered
-	sort.Slice(approvers, func(i, j int) bool {
-		return approvers[i].KeyID < approvers[j].KeyID
-	})
-
+func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers []*tuf.Key, dismissedApprovers []*tuf.Key) (*ita.Statement, error) {
 	predicate := &GitHubPullRequestApprovalAttestation{
 		ReferenceAuthorization: &ReferenceAuthorization{
 			TargetRef:      targetRef,
 			FromRevisionID: fromRevisionID,
 			TargetTreeID:   targetTreeID,
 		},
-		Approvers: approvers,
+		Approvers:          approvers,
+		DismissedApprovers: dismissedApprovers,
 	}
 
 	predicateStruct, err := predicateToPBStruct(predicate)
@@ -141,7 +132,7 @@ func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTr
 // SetGitHubPullRequestApprovalAttestation writes the new GitHub pull request
 // approval attestation to the object store and tracks it in the current
 // attestations state.
-func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromRevisionID, targetTreeID string) error {
+func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterface.Repository, env *sslibdsse.Envelope, reviewID int64, refName, fromRevisionID, targetTreeID string) error {
 	if err := validateGitHubPullRequestApprovalAttestation(env, refName, fromRevisionID, targetTreeID); err != nil {
 		return errors.Join(ErrInvalidGitHubPullRequestApprovalAttestation, err)
 	}
@@ -160,14 +151,47 @@ func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterfac
 		a.githubPullRequestApprovalAttestations = map[string]gitinterface.Hash{}
 	}
 
-	a.githubPullRequestApprovalAttestations[GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID)] = blobID
+	if a.githubPullRequestApprovalIndex == nil {
+		a.githubPullRequestApprovalIndex = map[int64]string{}
+	}
+
+	indexPath := GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID)
+
+	a.githubPullRequestApprovalAttestations[indexPath] = blobID
+
+	if existingIndexPath, has := a.githubPullRequestApprovalIndex[reviewID]; has {
+		if existingIndexPath != indexPath {
+			return ErrInvalidGitHubPullRequestApprovalAttestation
+		}
+	} else {
+		a.githubPullRequestApprovalIndex[reviewID] = indexPath
+	}
+
 	return nil
 }
 
 // GetGitHubPullRequestApprovalAttestationFor returns the requested GitHub pull
 // request approval attestation.
 func (a *Attestations) GetGitHubPullRequestApprovalAttestationFor(repo *gitinterface.Repository, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.githubPullRequestApprovalAttestations[GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID)]
+	return a.GetGitHubPullRequestApprovalAttestationForIndexPath(repo, GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID))
+}
+
+func (a *Attestations) GetGitHubPullRequestApprovalAttestationForReviewID(repo *gitinterface.Repository, reviewID int64) (*sslibdsse.Envelope, error) {
+	indexPath, has := a.GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID)
+	if has {
+		return a.GetGitHubPullRequestApprovalAttestationForIndexPath(repo, indexPath)
+	}
+
+	return nil, ErrGitHubReviewIDNotFound
+}
+
+func (a *Attestations) GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID int64) (string, bool) {
+	indexPath, has := a.githubPullRequestApprovalIndex[reviewID]
+	return indexPath, has
+}
+
+func (a *Attestations) GetGitHubPullRequestApprovalAttestationForIndexPath(repo *gitinterface.Repository, indexPath string) (*sslibdsse.Envelope, error) {
+	blobID, has := a.githubPullRequestApprovalAttestations[indexPath]
 	if !has {
 		return nil, ErrGitHubPullRequestApprovalAttestationNotFound
 	}

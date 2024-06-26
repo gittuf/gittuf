@@ -32,7 +32,7 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 		},
 	}
 
-	approvalAttestation, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, approvers)
+	approvalAttestation, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, approvers, nil)
 	assert.Nil(t, err)
 
 	// Check value of statement type
@@ -81,13 +81,13 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	attestations := &Attestations{}
 
 	// Add auth for first branch
-	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, testRef, testID, testID)
+	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, 1, testRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
 	assert.NotContains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
 
 	// Add auth for the other branch
-	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, testAnotherRef, testID, testID)
+	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, 2, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
 	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
@@ -118,11 +118,11 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 
 	attestations := &Attestations{}
 
-	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, testRef, testID, testID)
+	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, 1, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, testAnotherRef, testID, testID)
+	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, 2, testAnotherRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
 func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []*tuf.Key) *sslibdsse.Envelope {
 	t.Helper()
 
-	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers)
+	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
