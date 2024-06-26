@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package attestgithubapproval
+package addgithubapproval
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -12,11 +13,11 @@ import (
 )
 
 type options struct {
-	signingKey string
-	baseBranch string
-	fromID     string
-	toID       string
-	approver   string
+	signingKey        string
+	repository        string
+	pullRequestNumber int
+	reviewID          int64
+	approver          string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -30,28 +31,28 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
 
 	cmd.Flags().StringVar(
-		&o.baseBranch,
-		"base-branch",
+		&o.repository,
+		"repository",
 		"",
-		"base branch for pull request",
+		"path to base GitHub repository the pull request is opened against, of form {owner}/{repo}",
 	)
-	cmd.MarkFlagRequired("base-branch") //nolint:errcheck
+	cmd.MarkFlagRequired("repository") //nolint:errcheck
 
-	cmd.Flags().StringVar(
-		&o.fromID,
-		"from",
-		"",
-		"`from` revision ID--current tip of the base branch",
+	cmd.Flags().IntVar(
+		&o.pullRequestNumber,
+		"pull-request-number",
+		-1,
+		"pull request number",
 	)
-	cmd.MarkFlagRequired("from") //nolint:errcheck
+	cmd.MarkFlagRequired("pull-request-number") //nolint:errcheck
 
-	cmd.Flags().StringVar(
-		&o.toID,
-		"to",
-		"",
-		"`to` tree ID--the resultant Git tree when this pull request is merged",
+	cmd.Flags().Int64Var(
+		&o.reviewID,
+		"review-ID",
+		-1,
+		"pull request review ID",
 	)
-	cmd.MarkFlagRequired("to") //nolint:errcheck
+	cmd.MarkFlagRequired("review-ID") //nolint:errcheck
 
 	cmd.Flags().StringVar(
 		&o.approver,
@@ -63,6 +64,11 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	repositoryParts := strings.Split(o.repository, "/")
+	if len(repositoryParts) != 2 {
+		return fmt.Errorf("invalid format for repository, must be {owner}/{repo}")
+	}
+
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
@@ -78,13 +84,13 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.AddGitHubPullRequestApprovalAttestation(cmd.Context(), signer, o.baseBranch, o.fromID, o.toID, approverKey, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "attest-github-approval",
+		Use:   "add-github-approval",
 		Short: fmt.Sprintf("Record GitHub pull request approval as an attestation (developer mode only, set %s=1)", dev.DevModeKey),
 		RunE:  o.Run,
 	}

@@ -721,7 +721,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey})
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -741,7 +741,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, 1, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
@@ -781,7 +781,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approver1Key})
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approver1Key}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -801,7 +801,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, 1, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
@@ -867,7 +867,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey})
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -887,7 +887,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, 1, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
