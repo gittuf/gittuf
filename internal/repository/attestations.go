@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -272,12 +274,11 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 	return r.addGitHubPullRequestAttestation(ctx, signer, owner, repository, pullRequest, signCommit)
 }
 
-// AddGitHubPullRequestApprovalAttestation adds a GitHub pull request approval
-// attestation for the specified parameters. If an attestation already exists,
-// the specified approver is added to the existing attestation's predicate and
-// it is re-signed and stored in the repository. Currently, this is limited to
-// developer mode.
-func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, baseRef, fromID, toID string, approver *tuf.Key, signCommit bool) error {
+// AddGitHubPullRequestApprover adds a GitHub pull request approval attestation
+// for the specified parameters. If an attestation already exists, the specified
+// approver is added to the existing attestation's predicate and it is re-signed
+// and stored in the repository. Currently, this is limited to developer mode.
+func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, reviewID int64, approver *tuf.Key, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -287,6 +288,12 @@ func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context
 		return err
 	}
 
+	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, owner, repository, pullRequestNumber, reviewID)
+	if err != nil {
+		return err
+	}
+
+	// TODO: if the helper above has an indexPath, we can directly load that blob, simplifying the logic here
 	hasApprovalAttestation := false
 	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, baseRef, fromID, toID)
 	if err == nil {
@@ -297,6 +304,7 @@ func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context
 	}
 
 	approvers := []*tuf.Key{approver}
+	var dismissedApprovers []*tuf.Key
 	if !hasApprovalAttestation {
 		// Create a new GitHub pull request approval attestation
 		slog.Debug("Creating new GitHub pull request approval attestation...")
@@ -314,15 +322,19 @@ func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context
 			PredicateType string                                             `json:"predicateType"`
 			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
 		}
-		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}}}
+		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}, DismissedApprovers: []*tuf.Key{}}}
 		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
 			return err
 		}
 
 		approvers = append(approvers, stmt.Predicate.Approvers...)
+		dismissedApprovers = stmt.Predicate.DismissedApprovers
 	}
 
-	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers)
+	approvers = getFilteredSetOfApprovers(approvers)
+	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
+
+	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
 		return err
 	}
@@ -343,11 +355,102 @@ func (r *Repository) AddGitHubPullRequestApprovalAttestation(ctx context.Context
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, baseRef, fromID, toID); err != nil {
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, reviewID, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add GitHub pull request approval attestation for '%s' from '%s' to '%s' for approval by '%s'", baseRef, fromID, toID, approver.KeyID)
+	commitMessage := fmt.Sprintf("Add GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, approver.KeyID)
+
+	slog.Debug("Committing attestations...")
+	return currentAttestations.Commit(r.r, commitMessage, signCommit)
+}
+
+func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover *tuf.Key, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+	indexPath, has := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID)
+	if !has {
+		return attestations.ErrGitHubReviewIDNotFound
+	}
+
+	// TODO: if the helper above has an indexPath, we can directly load that blob, simplifying the logic here
+	hasApprovalAttestation := false
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForIndexPath(r.r, indexPath)
+	if err != nil {
+		return err
+	}
+
+	dismissedApprovers := []*tuf.Key{dismissedApprover}
+	var approvers []*tuf.Key
+	if !hasApprovalAttestation {
+		// Create a new GitHub pull request approval attestation
+		slog.Debug("Creating new GitHub pull request approval attestation...")
+	} else {
+		// Update existing statement's predicate and create new env
+		slog.Debug("Adding approver to existing GitHub pull request approval attestation...")
+		payloadBytes, err := env.DecodeB64Payload()
+		if err != nil {
+			return err
+		}
+
+		type tmpStatement struct {
+			Type          string                                             `json:"_type"`
+			Subject       []*ita.ResourceDescriptor                          `json:"subject"`
+			PredicateType string                                             `json:"predicateType"`
+			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+		}
+		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}, DismissedApprovers: []*tuf.Key{}}}
+		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+			return err
+		}
+
+		dismissedApprovers = append(dismissedApprovers, stmt.Predicate.DismissedApprovers...)
+		approvers = []*tuf.Key{}
+		for _, approver := range stmt.Predicate.Approvers {
+			approver := approver
+			if approver.KeyID == dismissedApprover.KeyID {
+				continue
+			}
+			approvers = append(approvers, approver)
+		}
+	}
+
+	approvers = getFilteredSetOfApprovers(approvers)
+	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
+
+	baseRef, fromID, toID := indexPathToComponents(indexPath)
+	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
+	if err != nil {
+		return err
+	}
+
+	env, err = dsse.CreateEnvelope(statement)
+	if err != nil {
+		return err
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing GitHub pull request approval attestation using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, reviewID, baseRef, fromID, toID); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Dismiss GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, dismissedApprover.KeyID)
 
 	slog.Debug("Committing attestations...")
 	return currentAttestations.Commit(r.r, commitMessage, signCommit)
@@ -406,6 +509,65 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
+func indexPathToComponents(indexPath string) (string, string, string) {
+	components := strings.Split(indexPath, "/")
+
+	fromTo := strings.Split(components[len(components)-1], "-")
+	components = components[:len(components)-1] // remove last item which is from-to
+
+	base := strings.Join(components, "/") // reconstruct ref
+	from := fromTo[0]
+	to := fromTo[1]
+
+	return base, from, to
+}
+
+func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, owner, repository string, pullRequestNumber int, reviewID int64) (string, string, string, error) {
+	indexPath, has := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID)
+	if has {
+		base, from, to := indexPathToComponents(indexPath)
+		return base, from, to, nil
+	}
+
+	// Compute details for review, this is when the review is first created as
+	// other times we use the existing indexPath for the reviewID
+	// Note: there's the potential for a TOCTOU issue here, we may query the
+	// repo after things have moved in either branch.
+
+	client, err := getGitHubClient()
+	if err != nil {
+		return "", "", "", err
+	}
+
+	pullRequest, _, err := client.PullRequests.Get(ctx, owner, repository, pullRequestNumber)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	if _, _, err := client.PullRequests.GetReview(ctx, owner, repository, pullRequestNumber, reviewID); err != nil {
+		// testing validity of reviewID for the pull request in question
+		return "", "", "", err
+	}
+
+	baseRef := gitinterface.BranchReferenceName(*pullRequest.Base.Ref)
+
+	referenceDetails, _, err := client.Git.GetRef(ctx, owner, repository, baseRef)
+	if err != nil {
+		return "", "", "", err
+	}
+	fromID := *referenceDetails.Object.SHA // current tip of base ref
+
+	// GitHub has already computed a merge commit, use that tree ID as
+
+	commit, _, err := client.Git.GetCommit(ctx, owner, repository, *pullRequest.MergeCommitSHA)
+	if err != nil {
+		return "", "", "", err
+	}
+	toID := *commit.Tree.SHA
+
+	return baseRef, fromID, toID, nil
+}
+
 // getGitHubClient creates a client to interact with a GitHub instance. If the
 // GITHUB_BASE_URL environment variable is set, the client is configured to
 // interact with the specified instance.
@@ -429,4 +591,25 @@ func getGitHubClient() (*github.Client, error) {
 	}
 
 	return githubClient, nil
+}
+
+func getFilteredSetOfApprovers(approvers []*tuf.Key) []*tuf.Key {
+	if approvers == nil {
+		return nil
+	}
+	approversSet := set.NewSet[string]()
+	approversFiltered := make([]*tuf.Key, 0, len(approvers))
+	for _, approver := range approvers {
+		if approversSet.Has(approver.KeyID) {
+			continue
+		}
+		approversSet.Add(approver.KeyID)
+		approversFiltered = append(approversFiltered, approver)
+	}
+
+	sort.Slice(approversFiltered, func(i, j int) bool {
+		return approversFiltered[i].KeyID < approversFiltered[j].KeyID
+	})
+
+	return approversFiltered
 }

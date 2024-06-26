@@ -3,7 +3,9 @@
 package attestations
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"path"
 	"strings"
 
@@ -17,6 +19,8 @@ const (
 	referenceAuthorizationsTreeEntryName               = "reference-authorizations"
 	githubPullRequestAttestationsTreeEntryName         = "github-pull-requests"
 	githubPullRequestApprovalAttestationsTreeEntryName = "github-pull-request-approvals"
+
+	githubPullRequestApprovalIndexTreeEntryName = "review-index.json"
 
 	initialCommitMessage = "Initial commit"
 	defaultCommitMessage = "Update attestations"
@@ -48,6 +52,15 @@ type Attestations struct {
 	// `refs/heads/main/<commit-A>-<tree-B>` indicates the pull request updated
 	// `refs/heads/main` from `commit-A` to a commit with `tree-B`.
 	githubPullRequestApprovalAttestations map[string]gitinterface.Hash
+
+	// githubPullRequestApprovalIndex is stored in-memory. It maps a GitHub pull
+	// request review ID to the gittuf identifier for a review,
+	// `<ref-path>/<from-id>-<to-id>`. We need this because when a review is
+	// dismissed, we need to unambiguously know what the review applied to when
+	// it was first submitted, which we cannot do with the information at the
+	// time of dismissal. This is serialized to the attestations namespace as a
+	// special blob in the githubPullRequestApprovalAttestations tree.
+	githubPullRequestApprovalIndex map[int64]string
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -93,6 +106,7 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 		referenceAuthorizations:               map[string]gitinterface.Hash{},
 		githubPullRequestAttestations:         map[string]gitinterface.Hash{},
 		githubPullRequestApprovalAttestations: map[string]gitinterface.Hash{},
+		githubPullRequestApprovalIndex:        map[int64]string{},
 	}
 
 	for name, blobID := range treeContents {
@@ -106,6 +120,20 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 		}
 	}
 
+	if blobID, has := attestations.githubPullRequestApprovalAttestations[githubPullRequestApprovalIndexTreeEntryName]; has {
+		// Load the approval index that maps review IDs to the gittuf way of
+		// mapping the review to a change in the repository
+
+		indexContents, err := repo.ReadBlob(blobID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(indexContents, &attestations.githubPullRequestApprovalIndex); err != nil {
+			return nil, fmt.Errorf("unable to read current GitHub approval review index: %w", err)
+		}
+	}
+
 	return attestations, nil
 }
 
@@ -115,6 +143,19 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = defaultCommitMessage
+	}
+
+	if len(a.githubPullRequestApprovalIndex) != 0 {
+		// Create a JSON blob for the approval index
+		indexContents, err := json.Marshal(&a.githubPullRequestApprovalIndex)
+		if err != nil {
+			return err
+		}
+		indexBlobID, err := repo.WriteBlob(indexContents)
+		if err != nil {
+			return err
+		}
+		a.githubPullRequestApprovalAttestations[githubPullRequestApprovalIndexTreeEntryName] = indexBlobID
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
