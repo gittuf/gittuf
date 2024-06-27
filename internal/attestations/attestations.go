@@ -12,11 +12,14 @@ import (
 )
 
 const (
-	Ref                                        = "refs/gittuf/attestations"
-	referenceAuthorizationsTreeEntryName       = "reference-authorizations"
-	githubPullRequestAttestationsTreeEntryName = "github-pull-requests"
-	initialCommitMessage                       = "Initial commit"
-	defaultCommitMessage                       = "Update attestations"
+	Ref = "refs/gittuf/attestations"
+
+	referenceAuthorizationsTreeEntryName               = "reference-authorizations"
+	githubPullRequestAttestationsTreeEntryName         = "github-pull-requests"
+	githubPullRequestApprovalAttestationsTreeEntryName = "github-pull-request-approvals"
+
+	initialCommitMessage = "Initial commit"
+	defaultCommitMessage = "Update attestations"
 )
 
 // Attestations tracks all the attestations in a gittuf repository.
@@ -36,6 +39,8 @@ type Attestations struct {
 	// `<ref-path>/<commit-id>`, where `ref-path` is the absolute ref path, and
 	// `commit-id` is the ID of the merged commit.
 	githubPullRequestAttestations map[string]gitinterface.Hash
+
+	githubPullRequestApprovalAttestations map[string]gitinterface.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -78,8 +83,9 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 	}
 
 	attestations := &Attestations{
-		referenceAuthorizations:       map[string]gitinterface.Hash{},
-		githubPullRequestAttestations: map[string]gitinterface.Hash{},
+		referenceAuthorizations:               map[string]gitinterface.Hash{},
+		githubPullRequestAttestations:         map[string]gitinterface.Hash{},
+		githubPullRequestApprovalAttestations: map[string]gitinterface.Hash{},
 	}
 
 	for name, blobID := range treeContents {
@@ -88,6 +94,8 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 			attestations.referenceAuthorizations[strings.TrimPrefix(name, referenceAuthorizationsTreeEntryName+"/")] = blobID
 		case strings.HasPrefix(name, githubPullRequestAttestationsTreeEntryName+"/"):
 			attestations.githubPullRequestAttestations[strings.TrimPrefix(name, githubPullRequestAttestationsTreeEntryName+"/")] = blobID
+		case strings.HasPrefix(name, githubPullRequestApprovalAttestationsTreeEntryName+"/"):
+			attestations.githubPullRequestApprovalAttestations[strings.TrimPrefix(name, githubPullRequestApprovalAttestationsTreeEntryName+"/")] = blobID
 		}
 	}
 
@@ -110,6 +118,9 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 	}
 	for name, blobID := range a.githubPullRequestAttestations {
 		allAttestations[path.Join(githubPullRequestAttestationsTreeEntryName, name)] = blobID
+	}
+	for name, blobID := range a.githubPullRequestApprovalAttestations {
+		allAttestations[path.Join(githubPullRequestApprovalAttestationsTreeEntryName, name)] = blobID
 	}
 
 	attestationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allAttestations)
