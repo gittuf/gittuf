@@ -12,5 +12,6 @@ github.com/gittuf/gittuf/internal/cmd/verifyref
 github.com/gittuf/gittuf/internal/cmd/verifytag
 github.com/gittuf/gittuf/internal/cmd/version
 github.com/gittuf/gittuf/internal/dev
+github.com/gittuf/gittuf/internal/repository/options
 github.com/gittuf/gittuf/internal/testartifacts
 github.com/gittuf/gittuf/internal/version
