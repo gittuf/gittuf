@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,32 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.Equal(t, "refs/heads/main", entry.RefName)
 	assert.Equal(t, commitID, entry.TargetID)
 
+	newCommitID, err := repo.r.Commit(emptyTreeHash, "refs/heads/main", "Another commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.RecordRSLEntryForReference("main", false); err != nil {
+		t.Fatal(err)
+	}
+
+	rslRef, err := repo.r.GetReference(rsl.Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entryT, err = rsl.GetEntry(repo.r, rslRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entry, ok = entryT.(*rsl.ReferenceEntry)
+	if !ok {
+		t.Fatal(fmt.Errorf("invalid entry type"))
+	}
+	assert.Equal(t, "refs/heads/main", entry.RefName)
+	assert.Equal(t, newCommitID, entry.TargetID)
+
 	err = repo.RecordRSLEntryForReference("main", false)
 	assert.Nil(t, err)
 
@@ -58,6 +85,22 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	}
 	// check that a duplicate entry has not been created
 	assert.Equal(t, entry.GetID(), entryT.GetID())
+
+	// Record entry for a different dst ref
+	err = repo.RecordRSLEntryForReference("refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"))
+	assert.Nil(t, err)
+
+	entryT, err = rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, ok = entryT.(*rsl.ReferenceEntry)
+	if !ok {
+		t.Fatal(fmt.Errorf("invalid entry type"))
+	}
+
+	assert.Equal(t, newCommitID, entry.TargetID)
+	assert.Equal(t, "refs/heads/not-main", entry.RefName)
 }
 
 func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
@@ -113,7 +156,7 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 			err = repo.RecordRSLEntryForReferenceAtTarget(anotherRefName, newCommitID.String(), test.keyBytes)
 			assert.Nil(t, err)
 
-			// Finally, let's record a couple more commits and use the older of the two
+			// Let's record a couple more commits and use the older of the two
 			commitID, err = repo.r.Commit(emptyTreeHash, refName, "Another commit", false)
 			if err != nil {
 				t.Fatal(err)
@@ -125,6 +168,27 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 
 			err = repo.RecordRSLEntryForReferenceAtTarget(refName, commitID.String(), test.keyBytes)
 			assert.Nil(t, err)
+
+			// Let's record a couple more commits and add an entry with a
+			// different dstRefName to the first rather than latest commit
+			commitID, err = repo.r.Commit(emptyTreeHash, refName, "Another commit", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = repo.r.Commit(emptyTreeHash, refName, "Latest commit", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = repo.RecordRSLEntryForReferenceAtTarget(refName, commitID.String(), test.keyBytes, rslopts.WithOverrideRefName(anotherRefName))
+			assert.Nil(t, err)
+
+			latestEntry, err = rsl.GetLatestEntry(repo.r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, anotherRefName, latestEntry.(*rsl.ReferenceEntry).RefName)
+			assert.Equal(t, commitID, latestEntry.(*rsl.ReferenceEntry).TargetID)
 		})
 	}
 }

@@ -9,6 +9,7 @@ gittuf dev rsl-record [flags]
 ### Options
 
 ```
+      --dst-ref string       name of destination reference, if it differs from source reference
   -h, --help                 help for rsl-record
   -k, --signing-key string   path to PEM encoded SSH or GPG signing key
   -t, --target string        target ID

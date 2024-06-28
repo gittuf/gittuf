@@ -8,15 +8,24 @@ import (
 
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/repository"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
 	targetID       string
 	signingKeyPath string
+	dstRef         string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.dstRef,
+		"dst-ref",
+		"",
+		"name of destination reference, if it differs from source reference",
+	)
+
 	cmd.Flags().StringVarP(
 		&o.targetID,
 		"target",
@@ -47,7 +56,7 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RecordRSLEntryForReferenceAtTarget(args[0], o.targetID, signingKeyBytes)
+	return repo.RecordRSLEntryForReferenceAtTarget(args[0], o.targetID, signingKeyBytes, rslopts.WithOverrideRefName(o.dstRef))
 }
 
 func New() *cobra.Command {

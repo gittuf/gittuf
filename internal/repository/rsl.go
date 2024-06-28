@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
@@ -23,21 +24,42 @@ var (
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
-func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool) error {
+func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool, opts ...rslopts.Option) error {
+	options := &rslopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	slog.Debug("Identifying absolute reference path...")
-	absRefName, err := r.r.AbsoluteReference(refName)
+	refName, err := r.r.AbsoluteReference(refName)
 	if err != nil {
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Loading current state of '%s'...", absRefName))
-	refTip, err := r.r.GetReference(absRefName)
+	// Track localRefName to check the expected tip as we may override refName
+	localRefName := refName
+
+	if options.RefNameOverride != "" {
+		// dst differs from src
+		// Eg: git push <remote> <src>:<dst>
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
+		if err != nil {
+			return err
+		}
+
+		refName = refNameOverride
+	}
+
+	// The tip of the ref is always from the localRefName
+	slog.Debug(fmt.Sprintf("Loading current state of '%s'...", localRefName))
+	refTip, err := r.r.GetReference(localRefName)
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Checking for existing entry for reference with same target...")
-	isDuplicate, err := r.isDuplicateEntry(absRefName, refTip)
+	isDuplicate, err := r.isDuplicateEntry(refName, refTip)
 	if err != nil {
 		return err
 	}
@@ -49,20 +71,25 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool)
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	return rsl.NewReferenceEntry(absRefName, refTip).Commit(r.r, signCommit)
+	return rsl.NewReferenceEntry(refName, refTip).Commit(r.r, signCommit)
 }
 
 // RecordRSLEntryForReferenceAtTarget is a special version of
 // RecordRSLEntryForReference used for evaluation. It is only invoked when
 // gittuf is explicitly set in developer mode.
-func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName string, targetID string, signingKeyBytes []byte) error {
+func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string, signingKeyBytes []byte, opts ...rslopts.Option) error {
 	// Double check that gittuf is in developer mode
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
+	options := &rslopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	slog.Debug("Identifying absolute reference path...")
-	absRefName, err := r.r.AbsoluteReference(refName)
+	refName, err := r.r.AbsoluteReference(refName)
 	if err != nil {
 		return err
 	}
@@ -72,11 +99,21 @@ func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName string, targetID
 		return err
 	}
 
+	if options.RefNameOverride != "" {
+		// dst differs from src
+		// Eg: git push <remote> <src>:<dst>
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		refName, err = r.r.AbsoluteReference(options.RefNameOverride)
+		if err != nil {
+			return err
+		}
+	}
+
 	// TODO: once policy verification is in place, the signing key used by
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	return rsl.NewReferenceEntry(absRefName, targetIDHash).CommitUsingSpecificKey(r.r, signingKeyBytes)
+	return rsl.NewReferenceEntry(refName, targetIDHash).CommitUsingSpecificKey(r.r, signingKeyBytes)
 }
 
 func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, signCommit bool) error {

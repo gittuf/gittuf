@@ -9,7 +9,8 @@ gittuf rsl record [flags]
 ### Options
 
 ```
-  -h, --help   help for record
+      --dst-ref string   name of destination reference, if it differs from source reference
+  -h, --help             help for record
 ```
 
 ### Options inherited from parent commands

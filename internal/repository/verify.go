@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	verifyopts "github.com/gittuf/gittuf/internal/repository/options/verify"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified
@@ -22,31 +23,53 @@ import (
 // another is to create a new RSL entry for the current state.
 var ErrRefStateDoesNotMatchRSL = errors.New("Git reference's current state does not match latest RSL entry") //nolint:stylecheck
 
-func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bool) error {
+func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (
 		expectedTip gitinterface.Hash
 		err         error
 	)
 
+	options := &verifyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	slog.Debug("Identifying absolute reference path...")
-	target, err = r.r.AbsoluteReference(target)
+	refName, err = r.r.AbsoluteReference(refName)
 	if err != nil {
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", target))
+	// Track localRefName to check the expected tip as we may override refName
+	localRefName := refName
 
-	if latestOnly {
-		expectedTip, err = policy.VerifyRef(ctx, r.r, target)
+	if options.RefNameOverride != "" {
+		// remote ref name is different
+		// We must consider RSL entries that have refNameOverride rather than
+		// refName
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
+		if err != nil {
+			return err
+		}
+
+		refName = refNameOverride
+	}
+
+	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
+
+	if options.LatestOnly {
+		expectedTip, err = policy.VerifyRef(ctx, r.r, refName)
 	} else {
-		expectedTip, err = policy.VerifyRefFull(ctx, r.r, target)
+		expectedTip, err = policy.VerifyRefFull(ctx, r.r, refName)
 	}
 	if err != nil {
 		return err
 	}
 
+	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(target, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
 		return err
 	}
 
@@ -54,15 +77,20 @@ func (r *Repository) VerifyRef(ctx context.Context, target string, latestOnly bo
 	return nil
 }
 
-func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID string) error {
+func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID string, opts ...verifyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
+	}
+
+	options := &verifyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	var err error
 
 	slog.Debug("Identifying absolute reference path...")
-	target, err = r.r.AbsoluteReference(target)
+	refName, err = r.r.AbsoluteReference(refName)
 	if err != nil {
 		return err
 	}
@@ -72,14 +100,31 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", target, entryID))
-	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, target, entryIDHash)
+	// Track localRefName to check the expected tip as we may override refName
+	localRefName := refName
+
+	if options.RefNameOverride != "" {
+		// remote ref name is different
+		// We must consider RSL entries that have refNameOverride rather than
+		// refName
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
+		if err != nil {
+			return err
+		}
+
+		refName = refNameOverride
+	}
+
+	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
+	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, refName, entryIDHash)
 	if err != nil {
 		return err
 	}
 
+	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(target, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
 		return err
 	}
 
@@ -87,6 +132,8 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, target, entryID str
 	return nil
 }
 
+// verifyRefTip inspects the specified reference in the local repository to
+// check if it points to the expected Git object.
 func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) error {
 	refTip, err := r.r.GetReference(target)
 	if err != nil {
