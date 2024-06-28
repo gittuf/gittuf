@@ -253,6 +253,205 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestAddGitHubAppKey(t *testing.T) {
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	assert.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	assert.Nil(t, err)
+
+	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs[0])
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+}
+
+func TestRemoveGitHubAppKey(t *testing.T) {
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs[0])
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+
+	err = r.RemoveGitHubAppKey(testCtx, sv, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Empty(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+}
+
+func TestTrustGitHubApp(t *testing.T) {
+	t.Run("GitHub app role not defined", func(t *testing.T) {
+		r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+		_, err := tuf.LoadKeyFromBytes(keyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = r.TrustGitHubApp(testCtx, sv, false)
+		assert.Nil(t, err)
+
+		_, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		assert.ErrorIs(t, err, policy.ErrNoGitHubAppRoleDeclared)
+	})
+
+	t.Run("GitHub app role defined", func(t *testing.T) {
+		r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+		key, err := tuf.LoadKeyFromBytes(keyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata()
+		assert.Nil(t, err)
+
+		assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+
+		err = r.AddGitHubAppKey(testCtx, sv, key, false)
+		assert.Nil(t, err)
+
+		err = r.TrustGitHubApp(testCtx, sv, false)
+		assert.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata()
+		assert.Nil(t, err)
+
+		assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+		assert.Nil(t, err)
+
+		// Test if we can trust again if already trusted
+		err = r.TrustGitHubApp(testCtx, sv, false)
+		assert.Nil(t, err)
+	})
+}
+
+func TestUntrustGitHubApp(t *testing.T) {
+	r, keyBytes := createTestRepositoryWithRoot(t, "")
+
+	key, err := tuf.LoadKeyFromBytes(keyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata()
+	assert.Nil(t, err)
+
+	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+
+	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	assert.Nil(t, err)
+
+	err = r.TrustGitHubApp(testCtx, sv, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	assert.Nil(t, err)
+
+	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+
+	err = r.UntrustGitHubApp(testCtx, sv, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata()
+	assert.Nil(t, err)
+
+	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+}
+
 func TestUpdateRootThreshold(t *testing.T) {
 	r, _ := createTestRepositoryWithRoot(t, "")
 

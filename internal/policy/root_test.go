@@ -133,3 +133,87 @@ func TestDeleteTargetsKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
 	assert.Nil(t, rootMetadata)
 }
+
+func TestAddGitHubAppKey(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	appKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = AddGitHubAppKey(nil, appKey)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	_, err = AddGitHubAppKey(rootMetadata, nil)
+	assert.ErrorIs(t, err, ErrGitHubAppKeyNil)
+
+	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
+	assert.Nil(t, err)
+	assert.Equal(t, appKey, rootMetadata.Keys[appKey.KeyID])
+	assert.Equal(t, []string{appKey.KeyID}, rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
+}
+
+func TestDeleteGitHubAppKey(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	appKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
+	assert.Nil(t, err)
+
+	_, err = DeleteGitHubAppKey(nil)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	rootMetadata, err = DeleteGitHubAppKey(rootMetadata)
+	assert.Nil(t, err)
+
+	assert.Empty(t, rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
+}
+
+func TestEnableGitHubAppApprovals(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	_, err = EnableGitHubAppApprovals(nil)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
+	assert.Nil(t, err)
+
+	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+}
+
+func TestDisableGitHubAppApprovals(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	_, err = DisableGitHubAppApprovals(nil)
+	assert.ErrorIs(t, err, ErrRootMetadataNil)
+
+	rootMetadata, err = DisableGitHubAppApprovals(rootMetadata)
+	assert.Nil(t, err)
+
+	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+}
