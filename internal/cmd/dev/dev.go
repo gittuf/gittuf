@@ -5,8 +5,10 @@ package dev
 import (
 	"fmt"
 
+	"github.com/gittuf/gittuf/internal/cmd/dev/addgithubapproval"
 	"github.com/gittuf/gittuf/internal/cmd/dev/attestgithub"
 	"github.com/gittuf/gittuf/internal/cmd/dev/authorize"
+	"github.com/gittuf/gittuf/internal/cmd/dev/dismissgithubapproval"
 	"github.com/gittuf/gittuf/internal/cmd/dev/rslrecordat"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
@@ -20,8 +22,10 @@ func New() *cobra.Command {
 		PreRunE: checkInDevMode,
 	}
 
-	cmd.AddCommand(authorize.New())
 	cmd.AddCommand(attestgithub.New())
+	cmd.AddCommand(addgithubapproval.New())
+	cmd.AddCommand(authorize.New())
+	cmd.AddCommand(dismissgithubapproval.New())
 	cmd.AddCommand(rslrecordat.New())
 
 	return cmd
