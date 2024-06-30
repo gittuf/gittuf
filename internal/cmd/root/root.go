@@ -84,7 +84,6 @@ func New() *cobra.Command {
 		DisableAutoGenTag: true,
 		PersistentPreRunE: o.PreRunE,
 	}
-
 	o.AddFlags(cmd)
 
 	cmd.AddCommand(addhooks.New())
