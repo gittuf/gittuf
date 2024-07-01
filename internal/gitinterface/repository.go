@@ -144,5 +144,7 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 		cmd.Stdin = e.stdIn
 	}
 
-	return &stdOut, &stdErr, cmd.Run()
+	err := cmd.Run()
+
+	return &stdOut, &stdErr, err
 }

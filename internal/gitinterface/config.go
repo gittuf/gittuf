@@ -9,20 +9,19 @@ import (
 	"io"
 	"os/exec"
 	"strings"
-
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/config"
 )
 
 var (
 	getGitConfigFromCommand = execGitConfig // variable used to override in tests
-	getGitConfig            = getRealGitConfig
 )
 
 // GetConfig parses the user's Git config. It shells out to the Git binary
 // because go-git has difficulty combining local, global, and system configs
 // while maintaining all of their fields.
 // See: https://github.com/go-git/go-git/issues/508
+//
+// Deprecated: We only use this to check if signing is viable, we should find an
+// alternative mechanism.
 func getConfig() (map[string]string, error) {
 	configReader, err := getGitConfigFromCommand()
 	if err != nil {
@@ -55,10 +54,6 @@ func execGitConfig() (io.Reader, error) {
 	}
 
 	return stdout, nil
-}
-
-func getRealGitConfig(repo *git.Repository) (*config.Config, error) {
-	return repo.ConfigScoped(config.GlobalScope)
 }
 
 // GetGitConfig reads the applicable Git config for a repository and returns

@@ -51,7 +51,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *gitinterface.Reposito
 
 	commitMessage := strings.Join(lines, "\n")
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *gitinterface.Reposit
 
 	commitMessage := strings.Join(lines, "\n")
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -131,7 +131,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 		t.Fatal(err)
 	}
 
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo)
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Create N trees with 1...N artifacts
 	treeHashes := make([]gitinterface.Hash, 0, n)

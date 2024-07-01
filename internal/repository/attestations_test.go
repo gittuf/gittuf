@@ -27,7 +27,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	absFeatureRef := "refs/heads/feature"
 
 	// Create common base for main and feature branches
-	treeBuilder := gitinterface.NewReplacementTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
 	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
 	if err != nil {
 		t.Fatal(err)

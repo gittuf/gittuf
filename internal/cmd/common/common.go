@@ -124,13 +124,13 @@ func CheckIfSigningViableWithFlag(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("required flag \"signing-key\" not set")
 	}
 
-	return CheckIfSigningViable(cmd, []string{""})
+	return CheckIfSigningViable(cmd, nil)
 }
 
 // CheckIfSigningViable checks if we are able to sign RSL entries given the
 // current environment
 func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
-	_, _, err := gitinterface.GetSigningCommand()
+	_, _, err := gitinterface.GetSigningCommand() //nolint:staticcheck
 
 	return err
 }
