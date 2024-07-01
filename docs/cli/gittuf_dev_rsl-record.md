@@ -1,6 +1,6 @@
 ## gittuf dev rsl-record
 
-Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
+Record explicit state of a Git reference in the RSL, if it passes verification, signed with specified key (developer mode only, set GITTUF_DEV=1)
 
 ```
 gittuf dev rsl-record [flags]
@@ -10,6 +10,7 @@ gittuf dev rsl-record [flags]
 
 ```
       --dst-ref string       name of destination reference, if it differs from source reference
+      --from-entry string    perform verification from specified RSL entry
   -h, --help                 help for rsl-record
   -k, --signing-key string   path to PEM encoded SSH or GPG signing key
   -t, --target string        target ID
