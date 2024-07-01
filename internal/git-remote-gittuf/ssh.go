@@ -428,7 +428,10 @@ func handleSSH(_, url string) (map[string]string, bool, error) {
 					return nil, false, err
 				}
 
-				oldTip := remoteRefTips[rsl.Ref]
+				oldTip, has := remoteRefTips[rsl.Ref]
+				if !has {
+					oldTip = zeroHash
+				}
 				newTip := string(bytes.TrimSpace(output))
 
 				pushCmd := fmt.Sprintf("%s %s %s\n", oldTip, newTip, rsl.Ref)
