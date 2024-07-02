@@ -99,15 +99,19 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 // ReorderDelegations changes the order of delegations in TargetsMetadata.
 func ReorderDelegations(targetsMetadata *tuf.TargetsMetadata, ruleNames []string) (*tuf.TargetsMetadata, error) {
 	allDelegations := []tuf.Delegation{}
+	// Create a map of all delegations for quick validation.
+	rolesMap := make(map[string]tuf.Delegation)
+	for _, delegation := range targetsMetadata.Delegations.Roles {
+		rolesMap[delegation.Name] = delegation
+	}
+
 	for _, ruleName := range ruleNames {
 		if ruleName == AllowRuleName {
 			return nil, ErrCannotManipulateAllowRule
 		}
 
-		for _, delegation := range targetsMetadata.Delegations.Roles {
-			if delegation.Name == ruleName {
-				allDelegations = append(allDelegations, delegation)
-			}
+		if delegation, valid := rolesMap[ruleName]; valid {
+			allDelegations = append(allDelegations, delegation)
 		}
 	}
 

@@ -110,6 +110,9 @@ func TestReorderDelegations(t *testing.T) {
 
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key2.KeyID)
+	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
+	assert.Equal(t, key2, targetsMetadata.Delegations.Keys[key2.KeyID])
+	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 
 	ruleNames := []string{"rule-2", "rule-1"}
 	targetsMetadata, err = ReorderDelegations(targetsMetadata, ruleNames)
@@ -118,6 +121,11 @@ func TestReorderDelegations(t *testing.T) {
 	assert.Equal(t, "rule-2", targetsMetadata.Delegations.Roles[0].Name)
 	assert.Equal(t, "rule-1", targetsMetadata.Delegations.Roles[1].Name)
 	assert.Equal(t, AllowRuleName, targetsMetadata.Delegations.Roles[2].Name)
+
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
+	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key2.KeyID)
+	assert.Equal(t, key2, targetsMetadata.Delegations.Keys[key2.KeyID])
 }
 func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()

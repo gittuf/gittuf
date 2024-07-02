@@ -3,8 +3,6 @@
 package reorderrules
 
 import (
-	"strings"
-
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/repository"
@@ -14,7 +12,7 @@ import (
 type options struct {
 	p          *persistent.Options
 	policyName string
-	ruleNames  string
+	ruleNames  []string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -25,11 +23,11 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"name of policy file to reorder rules in",
 	)
 
-	cmd.Flags().StringVar(
+	cmd.Flags().StringSliceVar(
 		&o.ruleNames,
 		"rule-names",
-		"",
-		"comma-separated list of rule names",
+		[]string{},
+		"a space-separated list of rule names",
 	)
 	cmd.MarkFlagRequired("rule-names") //nolint:errcheck
 }
@@ -45,9 +43,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	ruleNames := strings.Split(o.ruleNames, ",")
-
-	err = repo.ReorderDelegations(cmd.Context(), signer, o.policyName, ruleNames, true)
+	err = repo.ReorderDelegations(cmd.Context(), signer, o.policyName, o.ruleNames, true)
 	if err != nil {
 		return err
 	}
@@ -58,12 +54,15 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:   "reorder-rules",
-		Short: "Reorder rules in a policy file",
+		Use:               "reorder-rules",
+		Short:             "Reorder rules in the specified policy file",
+		Long:              `This command allows users to reorder rules in the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		PreRunE:           common.CheckIfSigningViableWithFlag,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 
 	o.AddFlags(cmd)
-	cmd.RunE = o.Run
 
 	return cmd
 }
