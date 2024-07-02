@@ -7,6 +7,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -73,12 +74,14 @@ type Signer struct {
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", SSHSigNamespace, "-f", s.Path) //nolint:gosec
+	cmd.Env = os.Environ()
+	fmt.Println("TTY:", os.Getenv("TTY"))
 
 	cmd.Stdin = bytes.NewBuffer(data)
 
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
+		return nil, fmt.Errorf("failed to run command %v: %w: %s", cmd, err, string(output))
 	}
 
 	return output, nil
