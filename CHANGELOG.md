@@ -2,6 +2,24 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.5.0
+
+- Added support for `ssh-keygen` based signer and verifier
+- Added support for overriding reference name when local and remote reference
+  names differ
+- Added initial (alpha) implementation of git-remote-gittuf
+- Added command to display RSL
+- Added support for automatically skipping RSL entries that point to rebased
+  commits
+- Updated policy verification pattern matching to use `fnmatch`
+- Updated to use Git binary for various operations on underlying repository
+- Updated various dependencies and CI workflows
+- Updated docs to make command snippets easier to copy
+- Removed extraneous fields from gittuf policy metadata
+- Removed `verify-commit` and `verify-tag` workflows in favor of `verify-ref`
+  (BREAKING CHANGE)
+- Governance: added Patrick Zielinski and Neil Naveen as gittuf maintainers
+
 ## v0.4.0
 
 - Added support for `policy-staging` for sequential signing of metadata to meet
