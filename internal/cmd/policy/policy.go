@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
@@ -34,6 +35,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(removerule.New(o))
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(updaterule.New(o))
+	cmd.AddCommand(reorderrules.New(o))
 
 	return cmd
 }
