@@ -1,3 +1,5 @@
+version: 2
+
 project_name: gittuf
 
 builds:
@@ -30,7 +32,7 @@ gomod:
   proxy: true
 
 changelog:
-  skip: true
+  disable: true
 
 signs:
 - cmd: cosign
