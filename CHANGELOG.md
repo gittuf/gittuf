@@ -2,6 +2,10 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.5.1
+
+- Updated release workflow to support GoReleaser v2
+
 ## v0.5.0
 
 - Added support for `ssh-keygen` based signer and verifier
