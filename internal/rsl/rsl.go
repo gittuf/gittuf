@@ -219,30 +219,47 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 
 // GetEntry returns the entry corresponding to entryID.
 func GetEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (Entry, error) {
+	entry, has := cache.getEntry(entryID)
+	if has {
+		return entry, nil
+	}
 	commitMessage, err := repo.GetCommitMessage(entryID)
 	if err != nil {
 		return nil, errors.Join(ErrRSLEntryNotFound, err)
 	}
 
-	return parseRSLEntryText(entryID, commitMessage)
-}
-
-// GetParentForEntry returns the entry's parent RSL entry.
-func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error) {
-	parentIDs, err := repo.GetCommitParentIDs(entry.GetID())
+	entry, err = parseRSLEntryText(entryID, commitMessage)
 	if err != nil {
 		return nil, err
 	}
 
-	if parentIDs == nil {
-		return nil, ErrRSLEntryNotFound
+	cache.setEntry(entryID, entry)
+	return entry, nil
+}
+
+// GetParentForEntry returns the entry's parent RSL entry.
+func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error) {
+	parentID, has := cache.getParent(entry.GetID())
+	if !has {
+
+		parentIDs, err := repo.GetCommitParentIDs(entry.GetID())
+		if err != nil {
+			return nil, err
+		}
+
+		if parentIDs == nil {
+			return nil, ErrRSLEntryNotFound
+		}
+
+		if len(parentIDs) > 1 {
+			return nil, ErrRSLBranchDetected
+		}
+
+		parentID = parentIDs[0]
+		cache.setParent(entry.GetID(), parentID)
 	}
 
-	if len(parentIDs) > 1 {
-		return nil, ErrRSLBranchDetected
-	}
-
-	return GetEntry(repo, parentIDs[0])
+	return GetEntry(repo, parentID)
 }
 
 // GetNonGittufParentReferenceEntryForEntry returns the first RSL reference
