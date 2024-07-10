@@ -94,6 +94,43 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 	return attestations, nil
 }
 
+// LoadAttestationsForEntry loads the repository's attestations for a particular
+// RSL entry for the attestations namespace.
+func LoadAttestationsForEntryDirect(repo *gitinterface.Repository, entry gitinterface.Hash) (*Attestations, error) {
+	attestationsRootTreeID, err := repo.GetCommitTreeID(entry)
+	if err != nil {
+		return nil, err
+	}
+
+	treeContents, err := repo.GetAllFilesInTree(attestationsRootTreeID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(treeContents) == 0 {
+		// This happens in the initial commit for the attestations namespace,
+		// where there are no entries in the tree yet.
+		// This is expected, and there is nothing more to check so return a zero Attestations state.
+		return &Attestations{}, nil
+	}
+
+	attestations := &Attestations{
+		referenceAuthorizations:       map[string]gitinterface.Hash{},
+		githubPullRequestAttestations: map[string]gitinterface.Hash{},
+	}
+
+	for name, blobID := range treeContents {
+		switch {
+		case strings.HasPrefix(name, referenceAuthorizationsTreeEntryName+"/"):
+			attestations.referenceAuthorizations[strings.TrimPrefix(name, referenceAuthorizationsTreeEntryName+"/")] = blobID
+		case strings.HasPrefix(name, githubPullRequestAttestationsTreeEntryName+"/"):
+			attestations.githubPullRequestAttestations[strings.TrimPrefix(name, githubPullRequestAttestationsTreeEntryName+"/")] = blobID
+		}
+	}
+
+	return attestations, nil
+}
+
 // Commit writes the state of the attestations to the repository, creating a new
 // commit with the changes made. An RSL entry is also recorded for the
 // namespace.

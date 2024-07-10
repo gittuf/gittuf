@@ -77,7 +77,7 @@ func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target st
 	// Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
 	// Also, attestations is initially nil because we haven't seen any yet
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, nil, firstEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry.ID, nil, firstEntry, latestEntry, target)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
@@ -107,30 +107,38 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 
 	// Find policy entry before the starting point entry
 	slog.Debug("Identifying applicable policy entry...")
-	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
-	if err != nil {
-		return gitinterface.ZeroHash, err
-	}
+	// policyEntry := gitinterface.ZeroHash
+	// policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
+	// policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+	// if err != nil {
+	// 	return gitinterface.ZeroHash, err
+	// }
 
-	slog.Debug("Identifying applicable attestations entry...")
-	var attestationsEntry *rsl.ReferenceEntry
-	attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, fromEntry.GetID())
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return gitinterface.ZeroHash, err
-		}
-	}
+	policyRef, err := repo.GetReference(PolicyRef)
+	// policyEntry, err := rsl.GetEntry(repo, policyRef)
+
+	// slog.Debug("Identifying applicable attestations entry...")
+	// var attestationsEntry *rsl.ReferenceEntry
+	// attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, fromEntry.GetID())
+	// if err != nil {
+	// 	if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+	// 		return gitinterface.ZeroHash, err
+	// 	}
+	// }
+
+	attestationsRef, err := repo.GetReference(attestations.Ref)
+	// attestationsEntry, err := rsl.GetEntry(repo, attestationsRef)
 
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyEntry, attestationsEntry, fromEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyRef, attestationsRef, fromEntry, latestEntry, target)
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 //
 // TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, initialPolicyEntry, initialAttestationsEntry gitinterface.Hash, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
@@ -138,7 +146,8 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 
 	// Load policy applicable at firstEntry
 	slog.Debug("Loading initial policy...")
-	state, err := LoadState(ctx, repo, initialPolicyEntry)
+	// state, err := LoadState(ctx, repo, initialPolicyEntry)
+	state, err := loadStateForEntryDirect(repo, initialPolicyEntry)
 	if err != nil {
 		return err
 	}
@@ -146,7 +155,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 
 	if initialAttestationsEntry != nil {
 		slog.Debug("Loading attestations...")
-		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+		attestationsState, err := attestations.LoadAttestationsForEntryDirect(repo, initialAttestationsEntry)
 		if err != nil {
 			return err
 		}
@@ -396,6 +405,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
 	}
 
+	// return nil
 	hasFileRule, err := policy.hasFileRule()
 	if err != nil {
 		return err
@@ -404,7 +414,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	if !hasFileRule {
 		return nil
 	}
-
+	// return nil
 	// Verify modified files
 
 	// First, get all commits between the current and last entry for the ref.

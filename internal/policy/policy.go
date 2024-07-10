@@ -63,9 +63,11 @@ type State struct {
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
 	RootPublicKeys      []*tuf.Key
 
-	repository     *gitinterface.Repository
-	verifiersCache map[string][]*Verifier
-	ruleNames      *set.Set[string]
+	repository           *gitinterface.Repository
+	verifiersCache       map[string][]*Verifier
+	ruleNames            *set.Set[string]
+	fileRulesChecked     bool
+	fileRulesCheckResult bool
 }
 
 type DelegationWithDepth struct {
@@ -803,6 +805,13 @@ func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef str
 // return true even if the role in question is not reachable for some path (or
 // at all).
 func (s *State) hasFileRule() (bool, error) {
+	if s.fileRulesChecked {
+		return s.fileRulesCheckResult, nil
+	}
+
+	s.fileRulesChecked = true
+	s.fileRulesCheckResult = false
+
 	if s.TargetsEnvelope == nil {
 		// No top level targets, we don't need to check for delegated roles
 		return false, nil
@@ -833,6 +842,7 @@ func (s *State) hasFileRule() (bool, error) {
 
 			for _, path := range delegation.Paths {
 				if strings.HasPrefix(path, "file:") {
+					s.fileRulesCheckResult = true
 					return true, nil
 				}
 			}
@@ -946,11 +956,81 @@ func verifySuccessiveRootsAndLoadLatestPolicyState(ctx context.Context, repo *gi
 // must be used. The exception is VerifyRelative... which performs root
 // verification between consecutive policy states.
 func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	slog.Debug(entry.ID.String())
 	if entry.RefName != PolicyRef && entry.RefName != PolicyStagingRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
 	commitTreeID, err := repo.GetCommitTreeID(entry.TargetID)
+	if err != nil {
+		return nil, err
+	}
+
+	allTreeEntries, err := repo.GetAllFilesInTree(commitTreeID)
+	if err != nil {
+		return nil, err
+	}
+
+	state := &State{repository: repo}
+
+	for name, blobID := range allTreeEntries {
+		contents, err := repo.ReadBlob(blobID)
+		if err != nil {
+			return nil, err
+		}
+
+		switch {
+		case strings.HasPrefix(name, metadataTreeEntryName+"/"):
+			env := &sslibdsse.Envelope{}
+			if err := json.Unmarshal(contents, env); err != nil {
+				return nil, err
+			}
+
+			metadataName := strings.TrimPrefix(name, metadataTreeEntryName+"/")
+			switch metadataName {
+			case fmt.Sprintf("%s.json", RootRoleName):
+				state.RootEnvelope = env
+
+			case fmt.Sprintf("%s.json", TargetsRoleName):
+				state.TargetsEnvelope = env
+
+			default:
+				if state.DelegationEnvelopes == nil {
+					state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+				}
+
+				state.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
+			}
+		case strings.HasPrefix(name, rootPublicKeysTreeEntryName+"/"):
+			key, err := tuf.LoadKeyFromBytes(contents)
+			if err != nil {
+				return nil, err
+			}
+
+			if state.RootPublicKeys == nil {
+				state.RootPublicKeys = []*tuf.Key{}
+			}
+
+			state.RootPublicKeys = append(state.RootPublicKeys, key)
+		}
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
+// loadStateForEntry returns the State for a specified RSL reference entry for
+// the policy namespace. This helper is focused on reading the Git object store
+// and loading the policy contents. Typically, LoadCurrentState of LoadState
+// must be used. The exception is VerifyRelative... which performs root
+// verification between consecutive policy states.
+func loadStateForEntryDirect(repo *gitinterface.Repository, entry gitinterface.Hash) (*State, error) {
+	slog.Debug(entry.String())
+
+	commitTreeID, err := repo.GetCommitTreeID(entry)
 	if err != nil {
 		return nil, err
 	}
