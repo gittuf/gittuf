@@ -514,6 +514,7 @@ func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
 }
 
 func TestGetFirstEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -1097,6 +1098,7 @@ func TestGetReferenceEntriesInRangeForRef(t *testing.T) {
 }
 
 func TestGetLatestUnskippedReferenceEntryForRef(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 
 	tempDir := t.TempDir()
