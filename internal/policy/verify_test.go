@@ -24,6 +24,7 @@ import (
 // createTestRepository and the state creation helpers.
 
 func TestVerifyRef(t *testing.T) {
+	t.Parallel()
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
@@ -37,6 +38,7 @@ func TestVerifyRef(t *testing.T) {
 }
 
 func TestVerifyRefFull(t *testing.T) {
+	t.Parallel()
 	// FIXME: currently this test is identical to the one for VerifyRef.
 	// This is because it's not trivial to create a bunch of test policy / RSL
 	// states cleanly. We need something that is easy to maintain and add cases
@@ -54,6 +56,7 @@ func TestVerifyRefFull(t *testing.T) {
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
+	t.Parallel()
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
@@ -79,7 +82,9 @@ func TestVerifyRefFromEntry(t *testing.T) {
 }
 
 func TestVerifyRelativeForRef(t *testing.T) {
+	t.Parallel()
 	t.Run("no recovery", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -101,6 +106,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -146,6 +152,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -191,6 +198,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -243,6 +251,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -295,6 +304,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -353,6 +363,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -409,6 +420,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user, last good state is due to recovery", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -481,6 +493,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -537,6 +550,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery but recovered entry is also skipped, tree-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -596,6 +610,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with annotation but no fix entry", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 

@@ -3,7 +3,6 @@
 package repository
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
@@ -12,19 +11,6 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
-
-var (
-	tempDir string
-	r       *Repository
-	once    sync.Once
-)
-
-func initializeRepo(t *testing.T) {
-	once.Do(func() {
-		tempDir = t.TempDir()
-		r = createTestRepositoryWithPolicy(t, "")
-	})
-}
 
 func TestInitializeTargets(t *testing.T) {
 	targetsKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
@@ -41,10 +27,9 @@ func TestInitializeTargets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	r, _ := createTestRepositoryWithRoot(t, "")
 	t.Run("successful initialization", func(t *testing.T) {
 		// The helper also runs InitializeTargets for this test
-		r, _ := createTestRepositoryWithRoot(t, "")
 
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
@@ -66,7 +51,6 @@ func TestInitializeTargets(t *testing.T) {
 	})
 
 	t.Run("invalid role name", func(t *testing.T) {
-		r, _ := createTestRepositoryWithRoot(t, "")
 
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
@@ -78,7 +62,7 @@ func TestInitializeTargets(t *testing.T) {
 }
 
 func TestAddDelegation(t *testing.T) {
-	r = createTestRepositoryWithPolicy(t, "")
+	r := createTestRepositoryWithPolicy(t, "")
 	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +124,8 @@ func TestAddDelegation(t *testing.T) {
 }
 
 func TestUpdateDelegation(t *testing.T) {
-	r = createTestRepositoryWithPolicy(t, "")
+	t.Parallel()
+	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
 	if err != nil {
@@ -179,7 +164,8 @@ func TestUpdateDelegation(t *testing.T) {
 }
 
 func TestRemoveDelegation(t *testing.T) {
-	initializeRepo(t)
+	t.Parallel()
+	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
 	if err != nil {
@@ -231,7 +217,8 @@ func TestRemoveDelegation(t *testing.T) {
 }
 
 func TestAddKeyToTargets(t *testing.T) {
-	r = createTestRepositoryWithPolicy(t, "")
+	t.Parallel()
+	r := createTestRepositoryWithPolicy(t, "")
 	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
 	if err != nil {
 		t.Fatal(err)
@@ -273,7 +260,8 @@ func TestAddKeyToTargets(t *testing.T) {
 }
 
 func TestSignTargets(t *testing.T) {
-	r = createTestRepositoryWithPolicy(t, "")
+	t.Parallel()
+	r := createTestRepositoryWithPolicy(t, "")
 
 	// Add root key as a targets key
 	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck

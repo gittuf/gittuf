@@ -17,7 +17,6 @@ import (
 
 func TestVerifyRef(t *testing.T) {
 	repo := createTestRepositoryWithPolicy(t, "")
-
 	refName := "refs/heads/main"
 	remoteRefName := "refs/heads/not-main"
 

@@ -5,6 +5,7 @@ package policy
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -17,8 +18,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	tempDir string
+	repo    *gitinterface.Repository
+	state   *State
+	once    sync.Once
+)
+
+func initializeRepo(t *testing.T) {
+	once.Do(func() {
+		tempDir = t.TempDir()
+		repo, state = createTestRepository(t, createTestStateWithPolicy)
+	})
+}
+
 func TestLoadState(t *testing.T) {
+	t.Parallel()
 	t.Run("loading while verifying multiple states", func(t *testing.T) {
+		t.Parallel()
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -109,6 +126,7 @@ func TestLoadState(t *testing.T) {
 	})
 
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
+		t.Parallel()
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -210,7 +228,7 @@ func TestLoadState(t *testing.T) {
 }
 
 func TestLoadCurrentState(t *testing.T) {
-	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	initializeRepo(t)
 
 	loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
 	if err != nil {
@@ -220,6 +238,7 @@ func TestLoadCurrentState(t *testing.T) {
 }
 
 func TestLoadFirstState(t *testing.T) {
+	t.Parallel()
 	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
 
 	// Update policy, record in RSL
@@ -262,6 +281,7 @@ func TestLoadFirstState(t *testing.T) {
 }
 
 func TestLoadStateForEntry(t *testing.T) {
+	t.Parallel()
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
@@ -278,7 +298,7 @@ func TestLoadStateForEntry(t *testing.T) {
 }
 
 func TestStateKeys(t *testing.T) {
-	state := createTestStateWithPolicy(t)
+	initializeRepo(t)
 
 	expectedKeys := map[string]*tuf.Key{}
 	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
@@ -299,7 +319,9 @@ func TestStateKeys(t *testing.T) {
 }
 
 func TestStateVerify(t *testing.T) {
+	t.Parallel()
 	t.Run("only root", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		err := state.Verify(testCtx)
@@ -307,6 +329,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("only root, remove root keys", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		state.RootPublicKeys = nil
@@ -315,6 +338,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("with policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		err := state.Verify(testCtx)
@@ -322,6 +346,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("with delegated policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithDelegatedPolicies(t)
 
 		err := state.Verify(testCtx)
@@ -330,6 +355,7 @@ func TestStateVerify(t *testing.T) {
 }
 
 func TestStateCommit(t *testing.T) {
+	t.Parallel()
 	repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 	// Commit and Apply are called by the helper
 
@@ -348,6 +374,7 @@ func TestStateCommit(t *testing.T) {
 }
 
 func TestStateGetRootMetadata(t *testing.T) {
+	t.Parallel()
 	state := createTestStateWithOnlyRoot(t)
 
 	rootMetadata, err := state.GetRootMetadata()
@@ -356,7 +383,9 @@ func TestStateGetRootMetadata(t *testing.T) {
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
+	t.Parallel()
 	t.Run("with policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
@@ -402,6 +431,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 	})
 
 	t.Run("without policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		verifiers, err := state.FindVerifiersForPath("test-path")
@@ -411,7 +441,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 }
 
 func TestStateFindPublicKeysForPath(t *testing.T) {
-	state := createTestStateWithPolicy(t)
+	initializeRepo(t)
 
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -541,7 +571,9 @@ func TestGetStateForCommit(t *testing.T) {
 }
 
 func TestListRules(t *testing.T) {
+	t.Parallel()
 	t.Run("no delegations", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
 		rules, err := ListRules(context.Background(), repo, PolicyRef)
@@ -577,6 +609,7 @@ func TestListRules(t *testing.T) {
 		assert.Equal(t, expectedRules, rules)
 	})
 	t.Run("with delegations", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
 		rules, err := ListRules(context.Background(), repo, PolicyRef)
@@ -642,7 +675,9 @@ func TestListRules(t *testing.T) {
 }
 
 func TestStateHasFileRule(t *testing.T) {
+	t.Parallel()
 	t.Run("with file rules", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		hasFileRule, err := state.hasFileRule()
@@ -651,6 +686,7 @@ func TestStateHasFileRule(t *testing.T) {
 	})
 
 	t.Run("with no file rules", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		hasFileRule, err := state.hasFileRule()
@@ -660,6 +696,7 @@ func TestStateHasFileRule(t *testing.T) {
 }
 
 func TestApply(t *testing.T) {
+	t.Parallel()
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
