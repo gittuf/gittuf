@@ -360,8 +360,12 @@ func handleSSH(_, url string) (map[string]string, bool, error) {
 				log("adding gittuf RSL entries")
 				for i, refSpec := range pushRefSpecs {
 					refSpecSplit := strings.Split(refSpec, ":")
+
 					srcRef := refSpecSplit[0]
+					srcRef = strings.TrimPrefix(srcRef, "+")
+
 					dstRef := refSpecSplit[1]
+
 					// TODO: check RSL is updated against remote
 					// The best way to fetch the RSL first may be to just
 					// `git fetch <remoteName> refs/gittuf/*:refs/gittuf/*`
