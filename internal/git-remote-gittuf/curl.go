@@ -162,7 +162,10 @@ func handleCurl(remoteName, url string) (map[string]string, bool, error) {
 							if len(gittufRefsTips) != 0 {
 								refSpec := string(bytes.Split(bytes.TrimSpace(pushCommand), []byte{' '})[1])
 								refSpecSplit := strings.Split(refSpec, ":")
+
 								srcRef := refSpecSplit[0]
+								srcRef = strings.TrimPrefix(srcRef, "+")
+
 								dstRef := refSpecSplit[1]
 
 								if !strings.HasPrefix(dstRef, gittufRefPrefix) {
