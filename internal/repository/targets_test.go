@@ -49,7 +49,6 @@ func TestInitializeTargets(t *testing.T) {
 		assert.Empty(t, targetsMetadata.Targets)
 		assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 	})
-
 	t.Run("invalid role name", func(t *testing.T) {
 
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
