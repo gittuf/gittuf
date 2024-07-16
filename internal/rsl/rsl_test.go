@@ -17,6 +17,7 @@ import (
 const annotationMessage = "test annotation"
 
 func TestNewReferenceEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -68,6 +69,7 @@ func TestNewReferenceEntry(t *testing.T) {
 }
 
 func TestGetLatestEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -109,7 +111,9 @@ func TestGetLatestEntry(t *testing.T) {
 }
 
 func TestGetLatestNonGittufReferenceEntry(t *testing.T) {
+	t.Parallel()
 	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -156,6 +160,7 @@ func TestGetLatestNonGittufReferenceEntry(t *testing.T) {
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -178,6 +183,7 @@ func TestGetLatestNonGittufReferenceEntry(t *testing.T) {
 }
 
 func TestGetLatestReferenceEntryForRef(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -219,7 +225,9 @@ func TestGetLatestReferenceEntryForRef(t *testing.T) {
 }
 
 func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
+	t.Parallel()
 	t.Run("no annotations", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -263,6 +271,7 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 	})
 
 	t.Run("with annotations", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -327,6 +336,7 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 }
 
 func TestGetEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -367,6 +377,7 @@ func TestGetEntry(t *testing.T) {
 }
 
 func TestGetParentForEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -416,7 +427,9 @@ func TestGetParentForEntry(t *testing.T) {
 }
 
 func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
+	t.Parallel()
 	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -483,6 +496,7 @@ func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
 	})
 
 	t.Run("only gittuf entries", func(t *testing.T) {
+		t.Parallel()
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -514,6 +528,7 @@ func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
 }
 
 func TestGetFirstEntry(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -552,6 +567,7 @@ func TestGetFirstEntry(t *testing.T) {
 }
 
 func TestGetFirstReferenceEntryForRef(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -590,7 +606,9 @@ func TestGetFirstReferenceEntryForRef(t *testing.T) {
 }
 
 func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
+	t.Parallel()
 	t.Run("skip latest entry", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -635,6 +653,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 	})
 
 	t.Run("skip multiple entries", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -696,6 +715,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 	})
 
 	t.Run("just one entry, nothing should change", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -729,6 +749,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 	})
 
 	t.Run("multiple entries, nothing should change", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -770,6 +791,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 }
 
 func TestGetFirstReferenceEntryForCommit(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -895,6 +917,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 }
 
 func TestGetReferenceEntriesInRange(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
@@ -1097,6 +1120,7 @@ func TestGetReferenceEntriesInRangeForRef(t *testing.T) {
 }
 
 func TestGetLatestUnskippedReferenceEntryForRef(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 
 	tempDir := t.TempDir()
@@ -1162,6 +1186,7 @@ func TestGetLatestUnskippedReferenceEntryForRef(t *testing.T) {
 }
 
 func TestGetLatestUnskippedReferenceEntryForRefBefore(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 
 	tempDir := t.TempDir()
@@ -1228,6 +1253,7 @@ func TestGetLatestUnskippedReferenceEntryForRefBefore(t *testing.T) {
 }
 
 func TestAnnotationEntryRefersTo(t *testing.T) {
+	t.Parallel()
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
@@ -1373,6 +1399,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 }
 
 func TestParseRSLEntryText(t *testing.T) {
+	t.Parallel()
 	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
 	if err != nil {
 		t.Fatal(err)

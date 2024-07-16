@@ -253,11 +253,13 @@ func TestRecordRSLAnnotation(t *testing.T) {
 }
 
 func TestCheckRemoteRSLForUpdates(t *testing.T) {
+	t.Parallel()
 	remoteName := "origin"
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
 	t.Run("remote has updates for local", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
@@ -302,6 +304,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	})
 
 	t.Run("remote has no updates for local", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
@@ -338,6 +341,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	})
 
 	t.Run("local is ahead of remote", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
@@ -384,6 +388,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	})
 
 	t.Run("remote and local have diverged", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		remoteRepo := &Repository{r: remoteR}
@@ -440,9 +445,11 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 }
 
 func TestPushRSL(t *testing.T) {
+	t.Parallel()
 	remoteName := "origin"
 
 	t.Run("successful push", func(t *testing.T) {
+		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		remoteRepoR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
@@ -462,6 +469,7 @@ func TestPushRSL(t *testing.T) {
 	})
 
 	t.Run("divergent RSLs, unsuccessful push", func(t *testing.T) {
+		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		remoteRepoR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
@@ -480,9 +488,11 @@ func TestPushRSL(t *testing.T) {
 }
 
 func TestPullRSL(t *testing.T) {
+	t.Parallel()
 	remoteName := "origin"
 
 	t.Run("successful pull", func(t *testing.T) {
+		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
 
@@ -504,6 +514,7 @@ func TestPullRSL(t *testing.T) {
 	})
 
 	t.Run("divergent RSLs, unsuccessful pull", func(t *testing.T) {
+		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		createTestRepositoryWithPolicy(t, remoteTmpDir)
 
@@ -524,6 +535,7 @@ func TestPullRSL(t *testing.T) {
 }
 
 func TestGetRSLEntryLog(t *testing.T) {
+	t.Parallel()
 	r := createTestRepositoryWithPolicy(t, "")
 
 	entries, annotationMap, err := GetRSLEntryLog(r)
