@@ -30,7 +30,6 @@ func TestInitializeTargets(t *testing.T) {
 	r, _ := createTestRepositoryWithRoot(t, "")
 	t.Run("successful initialization", func(t *testing.T) {
 		// The helper also runs InitializeTargets for this test
-
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +49,6 @@ func TestInitializeTargets(t *testing.T) {
 		assert.Contains(t, targetsMetadata.Delegations.Roles, policy.AllowRule())
 	})
 	t.Run("invalid role name", func(t *testing.T) {
-
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
 		}

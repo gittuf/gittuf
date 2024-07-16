@@ -19,6 +19,7 @@ import (
 )
 
 func TestRecordRSLEntryForReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -194,6 +195,7 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 }
 
 func TestRecordRSLAnnotation(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
 

@@ -5,7 +5,6 @@ package policy
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -17,20 +16,6 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
-
-var (
-	tempDir string
-	repo    *gitinterface.Repository
-	state   *State
-	once    sync.Once
-)
-
-func initializeRepo(t *testing.T) {
-	once.Do(func() {
-		tempDir = t.TempDir()
-		repo, state = createTestRepository(t, createTestStateWithPolicy)
-	})
-}
 
 func TestLoadState(t *testing.T) {
 	t.Parallel()
@@ -228,7 +213,8 @@ func TestLoadState(t *testing.T) {
 }
 
 func TestLoadCurrentState(t *testing.T) {
-	initializeRepo(t)
+	t.Parallel()
+	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 	loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
 	if err != nil {
@@ -298,7 +284,7 @@ func TestLoadStateForEntry(t *testing.T) {
 }
 
 func TestStateKeys(t *testing.T) {
-	initializeRepo(t)
+	state := createTestStateWithPolicy(t)
 
 	expectedKeys := map[string]*tuf.Key{}
 	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
@@ -441,7 +427,8 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 }
 
 func TestStateFindPublicKeysForPath(t *testing.T) {
-	initializeRepo(t)
+	t.Parallel()
+	state := createTestStateWithPolicy(t)
 
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -470,6 +457,7 @@ func TestStateFindPublicKeysForPath(t *testing.T) {
 }
 
 func TestGetStateForCommit(t *testing.T) {
+	t.Parallel()
 	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
 
 	// Create some commits
