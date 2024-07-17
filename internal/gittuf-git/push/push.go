@@ -28,7 +28,7 @@ func splitPushArgs(args []string) (rslRecordArgs []string) {
 }
 
 // GittufPush handles the gittuf push operation.
-func GittufPush(gitArgs []string) {
+func GittufPush(gitArgs []string) error {
 	rslRecordArgs := splitPushArgs(gitArgs[1:])
 	recordCmd := record.New()
 	skiprewrittenCmd := skiprewritten.New()
@@ -57,4 +57,5 @@ func GittufPush(gitArgs []string) {
 		}
 		os.Exit(1)
 	}
+	return err
 }

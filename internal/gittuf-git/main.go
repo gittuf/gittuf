@@ -12,26 +12,11 @@ import (
 )
 
 func main() {
-	// Check if enough arguments are provided
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: gittuf-git <git-command> [<args>]")
-		gitCmd := exec.Command("git", "--help")
-		gitCmd.Stdout = os.Stdout
-		gitCmd.Stderr = os.Stderr
-		err := gitCmd.Run()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error running git help command: %v\n", err)
-		}
-		os.Exit(1)
-	}
-
 	gitArgs := os.Args[1:]
-	gitCommand := gitArgs[0]
 
-	switch gitCommand {
-	case "push":
+	if checkArg("push", gitArgs){
 		push.GittufPush(gitArgs)
-	default:
+	} else {
 		gitCmd := exec.Command("git", gitArgs...)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
@@ -47,4 +32,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func checkArg(arg string, args []string) bool{
+	for _, a := range args {
+		if a == arg {
+			return true
+			}
+	}
+	return false
 }
