@@ -22,13 +22,6 @@ jobs:
       with:
         go-version: '1.22'
         cache: true
-    
-    - name: Setup Git for Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        git config --global user.name "Jane Doe"
-        git config --global user.email "jane.doe@example.com"
-      shell: bash
 
     - name: Test
       run: go test ./...
