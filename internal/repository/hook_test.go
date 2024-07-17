@@ -13,11 +13,15 @@ import (
 )
 
 func TestUpdatePrePushHook(t *testing.T) {
-	t.Run("write hook", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+	r := &Repository{r: repo}
+	t.Run("write hook", func(t *testing.T) {
+		//tmpDir := t.TempDir()
+		//repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		//r := &Repository{r: repo}
 
 		err := r.UpdateHook(HookPrePush, []byte("some content"), false)
 		require.NoError(t, err)
@@ -29,10 +33,10 @@ func TestUpdatePrePushHook(t *testing.T) {
 	})
 
 	t.Run("hook exists", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		//tmpDir := t.TempDir()
+		//repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		//r := &Repository{r: repo}
 
 		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
@@ -46,10 +50,10 @@ func TestUpdatePrePushHook(t *testing.T) {
 	})
 
 	t.Run("force overwrite hook", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		//tmpDir := t.TempDir()
+		//repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		//r := &Repository{r: repo}
 
 		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
