@@ -16,12 +16,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-    
-    - name: Disable Windows Defender (Antivirus Interference)
-      if: matrix.os == 'windows-latest'
-      run: |
-        Set-MpPreference -DisableRealtimeMonitoring $true
-      shell: pwsh
 
     - name: Install Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
@@ -37,14 +31,6 @@ jobs:
         git config --global user.name "Jane Doe"
         git config --global user.email "jane.doe@example.com"
         git config --global gpg.format "ssh"
-      shell: bash
-
-    - name: Create Fast Temp Directory (Temporary Directory Creation)
-      if: matrix.os == 'windows-2019'
-      run: |
-        mkdir C:\fast_temp_storage
-        $env:TEMP = "C:\fast_temp_storage"
-        $env:TMP = "C:\fast_temp_storage"
       shell: bash
 
     - name: Test
