@@ -16,13 +16,56 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+    
+    - name: Disable Windows Defender (Antivirus Interference)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Set-MpPreference -DisableRealtimeMonitoring $true
+      shell: pwsh
+
     - name: Install Go
-      uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
+      uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
         go-version: '1.22'
         cache: true
+    
+    - name: Setup Git for Windows
+      if: matrix.os == 'windows-latest'
+      run: |
+        git config --global core.autocrlf failse
+        git config --global core.longpaths true
+        git config --global user.name "Jane Doe"
+        git config --global user.email "jane.doe@example.com"
+        git config --global gpg.format "ssh"
+      shell: pwsh
+
+    # - name: Create Fast Temp Directory (Temporary Directory Creation)
+    #   if: matrix.os == 'windows-latest'
+    #   run: |
+    #     mkdir C:\\fast_temp_storage
+    #     $env:TEMP = "C:\\fast_temp_storage"
+    #     $env:TMP = "C:\\fast_temp_storage"
+    #   shell: pwsh
+    - name: Create Fast Temp Directory (Temporary Directory Creation)
+      if: matrix.os == 'windows-latest'
+      run: |
+        mkdir C:\fast_temp_storage
+        if ($?) {
+          Write-Output "Successfully created C:\fast_temp_storage"
+          $env:TEMP = "C:\fast_temp_storage"
+          $env:TMP = "C:\fast_temp_storage"
+          Write-Output "TEMP and TMP set to C:\fast_temp_storage"
+        } else {
+          Write-Error "Failed to create C:\fast_temp_storage"
+          exit 1
+        }
+      shell: pwsh
+
+
     - name: Test
       run: go test ./...
+      shell: bash
+
     - name: Test Coverage
       if: matrix.os == 'ubuntu-latest'
       run: go test -covermode=atomic `go list ./... | grep -v -f .test_ignore.txt`

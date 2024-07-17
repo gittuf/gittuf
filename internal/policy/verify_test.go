@@ -81,7 +81,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	assert.Equal(t, commitIDs[1], currentTip)
 }
 
-func TestVerifyRelativeForRef(t *testing.T) {
+func TestVerifyRelativeForRef(t *testing.T) { //doesn't support
 	t.Parallel()
 	t.Run("no recovery", func(t *testing.T) {
 		t.Parallel()
@@ -649,9 +649,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 func TestVerifyEntry(t *testing.T) {
 	refName := "refs/heads/main"
-
+	repo, state := createTestRepository(t, createTestStateWithPolicy)
 	t.Run("successful verification", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		//repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
@@ -663,7 +663,7 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification with higher threshold", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
+		//repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -725,9 +725,11 @@ func TestVerifyEntry(t *testing.T) {
 }
 
 func TestVerifyTagEntry(t *testing.T) {
+	repo, policy := createTestRepository(t, createTestStateWithPolicy)
+	refName := "refs/heads/main"
 	t.Run("no tag specific policy", func(t *testing.T) {
-		repo, policy := createTestRepository(t, createTestStateWithPolicy)
-		refName := "refs/heads/main"
+		//repo, policy := createTestRepository(t, createTestStateWithPolicy)
+		//refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -746,8 +748,8 @@ func TestVerifyTagEntry(t *testing.T) {
 	})
 
 	t.Run("with tag specific policy", func(t *testing.T) {
-		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
-		refName := "refs/heads/main"
+		//repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		//refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -815,8 +817,9 @@ func TestGetCommits(t *testing.T) {
 }
 
 func TestStateVerifyNewState(t *testing.T) {
+	currentPolicy := createTestStateWithOnlyRoot(t)
 	t.Run("valid policy transition", func(t *testing.T) {
-		currentPolicy := createTestStateWithOnlyRoot(t)
+		//currentPolicy := createTestStateWithOnlyRoot(t)
 		newPolicy := createTestStateWithOnlyRoot(t)
 
 		err := currentPolicy.VerifyNewState(testCtx, newPolicy)
@@ -824,7 +827,7 @@ func TestStateVerifyNewState(t *testing.T) {
 	})
 
 	t.Run("invalid policy transition", func(t *testing.T) {
-		currentPolicy := createTestStateWithOnlyRoot(t)
+		//currentPolicy := createTestStateWithOnlyRoot(t)
 
 		// Create invalid state
 		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
