@@ -34,7 +34,7 @@ jobs:
       shell: bash
       
     - name: Generate SSH Key Signature
-       run: |
+      run: |
         ssh-keygen -v -Y sign -n git -f "${{ runner.temp }}/ecdsa"
 
     - name: Test
