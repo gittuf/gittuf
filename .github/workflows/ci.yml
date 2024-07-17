@@ -17,12 +17,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
     
-    - name: Disable Windows Defender (Antivirus Interference)
-      if: matrix.os == 'windows-latest'
-      run: |
-        Set-MpPreference -DisableRealtimeMonitoring $true
-      shell: pwsh
-
     - name: Install Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
@@ -46,21 +40,6 @@ jobs:
     #     $env:TEMP = "C:\\fast_temp_storage"
     #     $env:TMP = "C:\\fast_temp_storage"
     #   shell: pwsh
-    - name: Create Fast Temp Directory (Temporary Directory Creation)
-      if: matrix.os == 'windows-latest'
-      run: |
-        mkdir C:\fast_temp_storage
-        if ($?) {
-          Write-Output "Successfully created C:\fast_temp_storage"
-          $env:TEMP = "C:\fast_temp_storage"
-          $env:TMP = "C:\fast_temp_storage"
-          Write-Output "TEMP and TMP set to C:\fast_temp_storage"
-        } else {
-          Write-Error "Failed to create C:\fast_temp_storage"
-          exit 1
-        }
-      shell: pwsh
-
 
     - name: Test
       run: go test ./...
