@@ -32,10 +32,6 @@ jobs:
         git config --global user.email "jane.doe@example.com"
         git config --global gpg.format "ssh"
       shell: bash
-      
-    - name: Generate SSH Key Signature
-      run: |
-        ssh-keygen -v -Y sign -n git -f "${{ runner.temp }}/ecdsa"
 
     - name: Test
       run: go test ./...

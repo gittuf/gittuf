@@ -56,7 +56,10 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
 		t.Fatal(err)
 	}
-
+	// Set up signing via SSH key
+	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
+		t.Fatal(err)
+	}
 	if runtime.GOOS == "windows" {
 		return repo
 	}
@@ -66,11 +69,6 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 		t.Fatal(err)
 	}
 	if err := repo.SetGitConfig("user.email", testEmail); err != nil {
-		t.Fatal(err)
-	}
-
-	// Set up signing via SSH key
-	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
 		t.Fatal(err)
 	}
 
