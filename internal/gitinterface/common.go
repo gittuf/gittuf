@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -52,6 +51,13 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 
 	repo := &Repository{gitDirPath: gitDirPath, clock: testClock}
 
+	// Set up author / committer identity
+	if err := repo.SetGitConfig("user.name", testName); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetGitConfig("user.email", testEmail); err != nil {
+		t.Fatal(err)
+	}
 	// Set up signing via SSH key
 	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
 		t.Fatal(err)
@@ -60,18 +66,6 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
 		t.Fatal(err)
 	}
-	if runtime.GOOS == "windows" {
-		return repo
-	}
-
-	// Set up author / committer identity
-	if err := repo.SetGitConfig("user.name", testName); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.SetGitConfig("user.email", testEmail); err != nil {
-		t.Fatal(err)
-	}
-
 	return repo
 }
 
