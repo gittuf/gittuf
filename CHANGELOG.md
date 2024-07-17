@@ -2,6 +2,12 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.5.2
+
+- Fixed issue with git-remote-gittuf when force pushing 
+- Fixed issue with git-remote-gittuf not fetching RSL before adding new entries
+- Updated various dependencies
+
 ## v0.5.1
 
 - Updated release workflow to support GoReleaser v2
