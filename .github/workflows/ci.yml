@@ -31,7 +31,6 @@ jobs:
         git config --global user.name "Jane Doe"
         git config --global user.email "jane.doe@example.com"
         git config --global gpg.format "ssh"
-      shell: bash
 
 
     - name: Test
