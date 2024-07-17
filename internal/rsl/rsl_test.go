@@ -1399,7 +1399,6 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 }
 
 func TestParseRSLEntryText(t *testing.T) {
-	t.Parallel()
 	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
 	if err != nil {
 		t.Fatal(err)
