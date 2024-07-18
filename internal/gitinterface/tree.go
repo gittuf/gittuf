@@ -26,7 +26,12 @@ func (r *Repository) EmptyTree() (Hash, error) {
 // GetAllFilesInTree returns all filepaths and the corresponding blob hashes in
 // the specified tree.
 func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
-	stdOut, err := r.executor("ls-tree", "-r", "--format=%(path) %(objectname)", treeID.String()).executeString()
+	// From Git 2.36, we can use --format here. However, it appears a not
+	// insignificant number of developers are still on Git 2.34.1, a side effect
+	// of being on Ubuntu 22.04. 22.04 is still widely used in WSL2 environments.
+	// So, we're removing --format and parsing the output differently to handle
+	// the extra information for each entry we don't need.
+	stdOut, err := r.executor("ls-tree", "-r", treeID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to enumerate all files in tree: %w", err)
 	}
@@ -42,16 +47,23 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 
 	files := map[string]Hash{}
 	for _, entry := range entries {
-		// we control entry's format in --format above, so no need to check
-		// length of split
-		entrySplit := strings.Split(entry, " ")
+		// Without --format, the output is in the following format:
+		// <mode> SP <type> SP <object> TAB <file>
+		// From: https://git-scm.com/docs/git-ls-tree/2.34.1#_output_format
 
-		hash, err := NewHash(entrySplit[1])
+		entrySplit := strings.Split(entry, " ")
+		// entrySplit[0] is <mode> -- discard
+		// entrySplit[1] is <type> -- discard
+		// entrySplit[2] is <object> TAB <file> -- keep
+		entrySplit = strings.Split(entrySplit[2], "\t")
+
+		// <object> is really the object ID
+		hash, err := NewHash(entrySplit[0])
 		if err != nil {
-			return nil, fmt.Errorf("invalid Git ID '%s' for path '%s': %w", entrySplit[1], entrySplit[0], err)
+			return nil, fmt.Errorf("invalid Git ID '%s' for path '%s': %w", entrySplit[0], entrySplit[1], err)
 		}
 
-		files[entrySplit[0]] = hash
+		files[entrySplit[1]] = hash
 	}
 
 	return files, nil
