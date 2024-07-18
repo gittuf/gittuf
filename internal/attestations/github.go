@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/google/go-github/v61/github"
@@ -102,6 +104,9 @@ type GitHubPullRequestApprovalAttestation struct {
 // "predicate type" set. The `fromTargetID` and `toTargetID` specify the change
 // to `targetRef` that is approved on the corresponding GitHub pull request.
 func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers []*tuf.Key, dismissedApprovers []*tuf.Key) (*ita.Statement, error) {
+	approvers = getFilteredSetOfApprovers(approvers)
+	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
+
 	predicate := &GitHubPullRequestApprovalAttestation{
 		ReferenceAuthorization: &ReferenceAuthorization{
 			TargetRef:      targetRef,
@@ -218,4 +223,25 @@ func GitHubPullRequestApprovalAttestationPath(refName, fromID, toID string) stri
 
 func validateGitHubPullRequestApprovalAttestation(env *sslibdsse.Envelope, targetRef, fromRevisionID, targetTreeID string) error {
 	return validateReferenceAuthorization(env, targetRef, fromRevisionID, targetTreeID)
+}
+
+func getFilteredSetOfApprovers(approvers []*tuf.Key) []*tuf.Key {
+	if approvers == nil {
+		return nil
+	}
+	approversSet := set.NewSet[string]()
+	approversFiltered := make([]*tuf.Key, 0, len(approvers))
+	for _, approver := range approvers {
+		if approversSet.Has(approver.KeyID) {
+			continue
+		}
+		approversSet.Add(approver.KeyID)
+		approversFiltered = append(approversFiltered, approver)
+	}
+
+	sort.Slice(approversFiltered, func(i, j int) bool {
+		return approversFiltered[i].KeyID < approversFiltered[j].KeyID
+	})
+
+	return approversFiltered
 }
