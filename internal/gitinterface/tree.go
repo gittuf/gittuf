@@ -86,7 +86,15 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 		return r.GetCommitTreeID(commitBID)
 	}
 
-	stdOut, err := r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
+	// We're using merge-tree with the deprecated --trivial-merge flow to support
+	// Git 2.34.1. With newer versions, we don't need to compute mergeBase.
+	stdOut, err := r.executor("merge-base", commitAID.String(), commitBID.String()).executeString()
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to find merge base: %w", err)
+	}
+	mergeBase := stdOut
+
+	stdOut, err = r.executor("merge-tree", mergeBase, commitAID.String(), commitBID.String()).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
 	}
