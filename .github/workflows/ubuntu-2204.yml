@@ -1,0 +1,24 @@
+name: git 2.34.1 on ubuntu-22.04
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "docs/*"
+  pull_request:
+    paths-ignore:
+      - "docs/*"
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Downgrade Git
+        run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.11 git-man=1:2.34.1-1ubuntu1.11
+      - name: Checkout code
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - name: Install Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: Test
+        run: go test ./...
