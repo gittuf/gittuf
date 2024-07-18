@@ -9,11 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
-	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -311,28 +309,14 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	} else {
 		// Update existing statement's predicate and create new env
 		slog.Debug("Adding approver to existing GitHub pull request approval attestation...")
-		payloadBytes, err := env.DecodeB64Payload()
+		predicate, err := getGitHubPullRequestApprovalPredicateFromEnvelope(env)
 		if err != nil {
 			return err
 		}
 
-		type tmpStatement struct {
-			Type          string                                             `json:"_type"`
-			Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-			PredicateType string                                             `json:"predicateType"`
-			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
-		}
-		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}, DismissedApprovers: []*tuf.Key{}}}
-		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
-			return err
-		}
-
-		approvers = append(approvers, stmt.Predicate.Approvers...)
-		dismissedApprovers = stmt.Predicate.DismissedApprovers
+		approvers = append(approvers, predicate.Approvers...)
+		dismissedApprovers = predicate.DismissedApprovers
 	}
-
-	approvers = getFilteredSetOfApprovers(approvers)
-	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
@@ -365,6 +349,8 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	return currentAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
+// DismissGitHubPullRequestApprover removes an approver from the GitHub pull
+// request approval attestation for the specified parameters.
 func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover *tuf.Key, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
@@ -374,57 +360,37 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 	if err != nil {
 		return err
 	}
-	indexPath, has := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID)
-	if !has {
-		return attestations.ErrGitHubReviewIDNotFound
-	}
 
-	// TODO: if the helper above has an indexPath, we can directly load that blob, simplifying the logic here
-	hasApprovalAttestation := false
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForIndexPath(r.r, indexPath)
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, reviewID)
 	if err != nil {
 		return err
 	}
 
-	dismissedApprovers := []*tuf.Key{dismissedApprover}
-	var approvers []*tuf.Key
-	if !hasApprovalAttestation {
-		// Create a new GitHub pull request approval attestation
-		slog.Debug("Creating new GitHub pull request approval attestation...")
-	} else {
-		// Update existing statement's predicate and create new env
-		slog.Debug("Adding approver to existing GitHub pull request approval attestation...")
-		payloadBytes, err := env.DecodeB64Payload()
-		if err != nil {
-			return err
-		}
+	// Update existing statement's predicate and create new env
+	slog.Debug("Updating existing GitHub pull request approval attestation...")
 
-		type tmpStatement struct {
-			Type          string                                             `json:"_type"`
-			Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-			PredicateType string                                             `json:"predicateType"`
-			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
-		}
-		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}, DismissedApprovers: []*tuf.Key{}}}
-		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
-			return err
-		}
-
-		dismissedApprovers = append(dismissedApprovers, stmt.Predicate.DismissedApprovers...)
-		approvers = []*tuf.Key{}
-		for _, approver := range stmt.Predicate.Approvers {
-			approver := approver
-			if approver.KeyID == dismissedApprover.KeyID {
-				continue
-			}
-			approvers = append(approvers, approver)
-		}
+	predicate, err := getGitHubPullRequestApprovalPredicateFromEnvelope(env)
+	if err != nil {
+		return err
 	}
 
-	approvers = getFilteredSetOfApprovers(approvers)
-	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
+	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.DismissedApprovers)+1)
+	dismissedApprovers = append(dismissedApprovers, predicate.DismissedApprovers...)
+	dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 
-	baseRef, fromID, toID := indexPathToComponents(indexPath)
+	approvers := make([]*tuf.Key, 0, len(predicate.Approvers))
+	for _, approver := range predicate.Approvers {
+		approver := approver
+		if approver.KeyID == dismissedApprover.KeyID {
+			continue
+		}
+		approvers = append(approvers, approver)
+	}
+
+	baseRef := predicate.TargetRef
+	fromID := predicate.FromRevisionID
+	toID := predicate.TargetTreeID
+
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
 		return err
@@ -509,6 +475,30 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
+func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (*attestations.GitHubPullRequestApprovalAttestation, error) {
+	payloadBytes, err := env.DecodeB64Payload()
+	if err != nil {
+		return nil, err
+	}
+
+	// tmpGitHubPullRequestApprovalStatement is essentially a definition of
+	// in-toto's v1 Statement. The difference is that we fix the predicate to be
+	// the GitHub pull request approval type, making unmarshaling easier.
+	type tmpGitHubPullRequestApprovalStatement struct {
+		Type          string                                             `json:"_type"`
+		Subject       []*ita.ResourceDescriptor                          `json:"subject"`
+		PredicateType string                                             `json:"predicateType"`
+		Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+	}
+
+	stmt := new(tmpGitHubPullRequestApprovalStatement)
+	if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+		return nil, err
+	}
+
+	return stmt.Predicate, nil
+}
+
 func indexPathToComponents(indexPath string) (string, string, string) {
 	components := strings.Split(indexPath, "/")
 
@@ -591,25 +581,4 @@ func getGitHubClient() (*github.Client, error) {
 	}
 
 	return githubClient, nil
-}
-
-func getFilteredSetOfApprovers(approvers []*tuf.Key) []*tuf.Key {
-	if approvers == nil {
-		return nil
-	}
-	approversSet := set.NewSet[string]()
-	approversFiltered := make([]*tuf.Key, 0, len(approvers))
-	for _, approver := range approvers {
-		if approversSet.Has(approver.KeyID) {
-			continue
-		}
-		approversSet.Add(approver.KeyID)
-		approversFiltered = append(approversFiltered, approver)
-	}
-
-	sort.Slice(approversFiltered, func(i, j int) bool {
-		return approversFiltered[i].KeyID < approversFiltered[j].KeyID
-	})
-
-	return approversFiltered
 }
