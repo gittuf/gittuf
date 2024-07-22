@@ -27,6 +27,10 @@ func (s *Set[T]) Remove(item T) {
 }
 
 func (s *Set[T]) Extend(set *Set[T]) {
+	if set == nil {
+		return
+	}
+
 	for item := range set.contents {
 		s.Add(item)
 	}

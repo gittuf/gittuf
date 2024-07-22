@@ -361,14 +361,9 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 		return verifyTagEntry(ctx, repo, policy, attestationsState, entry)
 	}
 
-	// Load the applicable reference authorization and GitHub approval
-	// attestations
-	authorizationAttestation, githubApprovalAttestation, err := getAttestations(repo, attestationsState, entry)
-	if err != nil {
-		return err
-	}
-
-	approverKeyIDs, err := getApproverKeyIDs(ctx, policy, githubApprovalAttestation)
+	// Load the applicable reference authorization and approvals from trusted
+	// code review systems
+	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return err
 	}
@@ -454,12 +449,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
 	}
 
-	authorizationAttestation, githubApprovalAttestation, err := getAttestations(repo, attestationsState, entry)
-	if err != nil {
-		return err
-	}
-
-	approverKeyIDs, err := getApproverKeyIDs(ctx, policy, githubApprovalAttestation)
+	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return err
 	}
@@ -506,13 +496,12 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	return nil
 }
 
-func getAttestations(repo *gitinterface.Repository, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *sslibdsse.Envelope, error) {
+func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *set.Set[string], error) {
 	if attestationsState == nil {
 		return nil, nil, nil
 	}
 
 	firstEntry := false
-
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -539,53 +528,55 @@ func getAttestations(repo *gitinterface.Repository, attestationsState *attestati
 		}
 	}
 
-	githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
-	if err != nil {
-		if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
-			return nil, nil, err
-		}
-	}
-
-	return authorizationAttestation, githubApprovalAttestation, nil
-}
-
-func getApproverKeyIDs(ctx context.Context, policy *State, githubApprovalAttestation *sslibdsse.Envelope) (*set.Set[string], error) {
 	approverKeyIDs := set.NewSet[string]()
-	if policy.githubAppApprovalsTrusted && githubApprovalAttestation != nil {
-		// Verify approval is by right key
-		approvalVerifier := &Verifier{
-			repository: policy.repository,
-			name:       GitHubAppRoleName,
-			keys:       []*tuf.Key{policy.githubAppKey},
-			threshold:  1,
-		}
-		_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
+
+	// When we add other code review systems, we can move this into a
+	// generalized helper that inspects the attestations for each system trusted
+	// in policy.
+	if policy.githubAppApprovalsTrusted {
+		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
 		if err != nil {
-			return nil, fmt.Errorf("failed to verify GitHub app approval attestation, signed by untrusted key")
+			if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+				return nil, nil, err
+			}
 		}
 
-		payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
-		if err != nil {
-			return nil, err
-		}
+		// if it exists
+		if githubApprovalAttestation != nil {
+			approvalVerifier := &Verifier{
+				repository: policy.repository,
+				name:       GitHubAppRoleName,
+				keys:       []*tuf.Key{policy.githubAppKey},
+				threshold:  1,
+			}
+			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to verify GitHub app approval attestation, signed by untrusted key")
+			}
 
-		type tmpStatement struct {
-			Type          string                                             `json:"_type"`
-			Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-			PredicateType string                                             `json:"predicateType"`
-			Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
-		}
-		stmt := &tmpStatement{Subject: []*ita.ResourceDescriptor{}, Predicate: &attestations.GitHubPullRequestApprovalAttestation{Approvers: []*tuf.Key{}}}
-		if err := json.Unmarshal(payloadBytes, stmt); err != nil {
-			return nil, err
-		}
+			payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
+			if err != nil {
+				return nil, nil, err
+			}
 
-		for _, approver := range stmt.Predicate.Approvers {
-			approverKeyIDs.Add(approver.KeyID)
+			type tmpStatement struct {
+				Type          string                                             `json:"_type"`
+				Subject       []*ita.ResourceDescriptor                          `json:"subject"`
+				PredicateType string                                             `json:"predicateType"`
+				Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+			}
+			stmt := new(tmpStatement)
+			if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+				return nil, nil, err
+			}
+
+			for _, approver := range stmt.Predicate.Approvers {
+				approverKeyIDs.Add(approver.KeyID)
+			}
 		}
 	}
 
-	return approverKeyIDs, nil
+	return authorizationAttestation, approverKeyIDs, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the

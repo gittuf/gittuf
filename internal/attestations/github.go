@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	ErrInvalidGitHubPullRequestApprovalAttestation  = errors.New("the GitHub pull request approval attestation does not match expected details")
+	ErrInvalidGitHubPullRequestApprovalAttestation  = errors.New("the GitHub pull request approval attestation does not match expected details or has no approvers and dismissed approvers")
 	ErrGitHubPullRequestApprovalAttestationNotFound = errors.New("requested GitHub pull request approval attestation not found")
 	ErrGitHubReviewIDNotFound                       = errors.New("requested GitHub review ID does not exist in index")
 )
@@ -104,6 +104,10 @@ type GitHubPullRequestApprovalAttestation struct {
 // "predicate type" set. The `fromTargetID` and `toTargetID` specify the change
 // to `targetRef` that is approved on the corresponding GitHub pull request.
 func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers []*tuf.Key, dismissedApprovers []*tuf.Key) (*ita.Statement, error) {
+	if len(approvers) == 0 && len(dismissedApprovers) == 0 {
+		return nil, ErrInvalidGitHubPullRequestApprovalAttestation
+	}
+
 	approvers = getFilteredSetOfApprovers(approvers)
 	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
 
@@ -152,24 +156,25 @@ func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterfac
 		return err
 	}
 
-	if a.githubPullRequestApprovalAttestations == nil {
-		a.githubPullRequestApprovalAttestations = map[string]gitinterface.Hash{}
+	if a.codeReviewApprovalAttestations == nil {
+		a.codeReviewApprovalAttestations = map[string]gitinterface.Hash{}
 	}
 
-	if a.githubPullRequestApprovalIndex == nil {
-		a.githubPullRequestApprovalIndex = map[int64]string{}
+	if a.codeReviewApprovalIndex == nil {
+		a.codeReviewApprovalIndex = map[string]string{}
 	}
 
 	indexPath := GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID)
 
-	a.githubPullRequestApprovalAttestations[indexPath] = blobID
+	a.codeReviewApprovalAttestations[indexPath] = blobID
 
-	if existingIndexPath, has := a.githubPullRequestApprovalIndex[reviewID]; has {
+	githubReviewID := GitHubReviewID(reviewID)
+	if existingIndexPath, has := a.codeReviewApprovalIndex[githubReviewID]; has {
 		if existingIndexPath != indexPath {
 			return ErrInvalidGitHubPullRequestApprovalAttestation
 		}
 	} else {
-		a.githubPullRequestApprovalIndex[reviewID] = indexPath
+		a.codeReviewApprovalIndex[githubReviewID] = indexPath
 	}
 
 	return nil
@@ -191,12 +196,13 @@ func (a *Attestations) GetGitHubPullRequestApprovalAttestationForReviewID(repo *
 }
 
 func (a *Attestations) GetGitHubPullRequestApprovalIndexPathForReviewID(reviewID int64) (string, bool) {
-	indexPath, has := a.githubPullRequestApprovalIndex[reviewID]
+	githubReviewID := GitHubReviewID(reviewID)
+	indexPath, has := a.codeReviewApprovalIndex[githubReviewID]
 	return indexPath, has
 }
 
 func (a *Attestations) GetGitHubPullRequestApprovalAttestationForIndexPath(repo *gitinterface.Repository, indexPath string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.githubPullRequestApprovalAttestations[indexPath]
+	blobID, has := a.codeReviewApprovalAttestations[indexPath]
 	if !has {
 		return nil, ErrGitHubPullRequestApprovalAttestationNotFound
 	}
@@ -215,10 +221,18 @@ func (a *Attestations) GetGitHubPullRequestApprovalAttestationForIndexPath(repo 
 }
 
 // GitHubPullRequestApprovalAttestationPath returns the expected path on-disk
-// for the GitHub pull request approval attestation. For now, this attestation
-// type is stored using the same format as a reference authorization.
+// for the GitHub pull request approval attestation. This attestation type is
+// stored using the same format as a reference authorization with the addition
+// of `github` at the end of the path.
 func GitHubPullRequestApprovalAttestationPath(refName, fromID, toID string) string {
-	return ReferenceAuthorizationPath(refName, fromID, toID)
+	return fmt.Sprintf("%s/%s", ReferenceAuthorizationPath(refName, fromID, toID), githubPullRequestApprovalSystemName)
+}
+
+// GitHubReviewID converts a GitHub specific review ID (recorded as an int64
+// number by GitHub) into a code review system agnostic identifier used by
+// gittuf.
+func GitHubReviewID(reviewID int64) string {
+	return fmt.Sprintf("%s-%d", githubPullRequestApprovalSystemName, reviewID)
 }
 
 func validateGitHubPullRequestApprovalAttestation(env *sslibdsse.Envelope, targetRef, fromRevisionID, targetTreeID string) error {

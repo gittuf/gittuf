@@ -192,7 +192,8 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 }
 
 // AddGitHubAppKey is the interface for the user to add the authorized key for
-// the special GitHub app role.
+// the special GitHub app role. This key is used to verify GitHub pull request
+// approval attestation signatures.
 func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey *tuf.Key, signCommit bool) error {
 	rootKeyID, err := signer.KeyID()
 	if err != nil {

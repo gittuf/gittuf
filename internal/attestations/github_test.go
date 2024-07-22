@@ -32,6 +32,9 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 		},
 	}
 
+	_, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, nil, nil)
+	assert.ErrorIs(t, err, ErrInvalidGitHubPullRequestApprovalAttestation)
+
 	approvalAttestation, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, approvers, nil)
 	assert.Nil(t, err)
 
@@ -83,14 +86,14 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	// Add auth for first branch
 	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, 1, testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
+	assert.NotContains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
 
 	// Add auth for the other branch
 	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, 2, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
-	assert.Contains(t, attestations.githubPullRequestApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
 }
 
 func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
