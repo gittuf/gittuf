@@ -150,7 +150,8 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 }
 
 // AddGitHubAppKey adds the 'appKey' as a trusted public key in 'rootMetadata'
-// for the special GitHub app role.
+// for the special GitHub app role. This key is used to verify GitHub pull
+// request approval attestation signatures.
 func AddGitHubAppKey(rootMetadata *tuf.RootMetadata, appKey *tuf.Key) (*tuf.RootMetadata, error) {
 	if rootMetadata == nil {
 		return nil, ErrRootMetadataNil
