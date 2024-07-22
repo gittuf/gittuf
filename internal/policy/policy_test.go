@@ -395,7 +395,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		}
 
 		for name, test := range tests {
-			verifiers, err := state.FindVerifiersForPath(test.path)
+			verifiers, err := state.FindVerifiersForPath([]string{test.path})
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 			assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
 		}
@@ -404,7 +404,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 	t.Run("without policy", func(t *testing.T) {
 		state := createTestStateWithOnlyRoot(t)
 
-		verifiers, err := state.FindVerifiersForPath("test-path")
+		verifiers, err := state.FindVerifiersForPath([]string{"test-path"})
 		assert.Nil(t, verifiers)
 		assert.ErrorIs(t, err, ErrMetadataNotFound)
 	})
