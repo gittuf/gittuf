@@ -14,9 +14,10 @@ import (
 func main() {
 	gitArgs := os.Args[1:]
 
-	if checkArg("push", gitArgs){
+	switch determineGitOp(gitArgs) {
+	case "push":
 		push.GittufPush(gitArgs)
-	} else {
+	case "other":
 		gitCmd := exec.Command("git", gitArgs...)
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
@@ -34,11 +35,13 @@ func main() {
 	}
 }
 
-func checkArg(arg string, args []string) bool{
+func determineGitOp(args []string) string {
 	for _, a := range args {
-		if a == arg {
-			return true
-			}
+		if a == "push" {
+			return "push"
+		} else if a == "pull" {
+			return "pull"
+		}
 	}
-	return false
+	return "other"
 }
