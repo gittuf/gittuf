@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -17,6 +18,11 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/google/go-github/v61/github"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
+)
+
+const (
+	githubTokenEnvKey   = "GITHUB_TOKEN" //nolint:gosec
+	githubBaseURLEnvKey = "GITHUB_BASE_URL"
 )
 
 var ErrNotSigningKey = errors.New("expected signing key")
@@ -203,13 +209,17 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 // AddGitHubPullRequestAttestationForCommit identifies the pull request for a
 // specified commit ID and triggers AddGitHubPullRequestAttestationForNumber for
 // that pull request. Currently, the authentication token for the GitHub API is
-// read from the GITHUB_TOKEN environment variable.
+// read from the GITHUB_TOKEN environment variable. Use GITHUB_BASE_URL to
+// point to an enterprise GitHub instance.
 func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	client := getGitHubClient()
+	client, err := getGitHubClient()
+	if err != nil {
+		return err
+	}
 
 	slog.Debug("Identifying GitHub pull requests for commit...")
 	pullRequests, _, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repository, commitID, nil)
@@ -238,13 +248,17 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 // AddGitHubPullRequestAttestationForNumber wraps the API response for the
 // specified pull request in an in-toto attestation. `pullRequestID` must be the
 // number of the pull request. Currently, the authentication token for the
-// GitHub API is read from the GITHUB_TOKEN environment variable.
+// GitHub API is read from the GITHUB_TOKEN environment variable. Use
+// GITHUB_BASE_URL to point to an enterprise GitHub instance.
 func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	client := getGitHubClient()
+	client, err := getGitHubClient()
+	if err != nil {
+		return err
+	}
 
 	slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequestNumber))
 	pullRequest, _, err := client.PullRequests.Get(ctx, owner, repository, pullRequestNumber)
@@ -308,10 +322,27 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
-func getGitHubClient() *github.Client {
+// getGitHubClient creates a client to interact with a GitHub instance. If the
+// GITHUB_BASE_URL environment variable is set, the client is configured to
+// interact with the specified instance.
+func getGitHubClient() (*github.Client, error) {
 	if githubClient == nil {
-		githubClient = github.NewClient(nil).WithAuthToken(os.Getenv("GITHUB_TOKEN"))
+		githubClient = github.NewClient(nil).WithAuthToken(os.Getenv(githubTokenEnvKey))
 	}
 
-	return githubClient
+	baseURL := os.Getenv(githubBaseURLEnvKey)
+	if baseURL != "" {
+		baseURL = strings.TrimSuffix(baseURL, "/")
+
+		endpointAPI := fmt.Sprintf("%s/%s/%s/", baseURL, "api", "v3")
+		endpointUpload := fmt.Sprintf("%s/%s/%s/", baseURL, "api", "uploads")
+
+		var err error
+		githubClient, err = githubClient.WithEnterpriseURLs(endpointAPI, endpointUpload)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return githubClient, nil
 }
