@@ -11,9 +11,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/danwakefield/fnmatch"
-
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
@@ -185,13 +185,32 @@ type Delegation struct {
 	Role
 }
 
-// Matches checks if any of the delegation's patterns match the target.
-func (d *Delegation) Matches(target string) bool {
+// Matches checks if any of the delegation's patterns match the target. The
+// first element of target specifies the file or branch to match, while the
+// second, optional element of target specifies the branch information, if
+// applicable (i.e. for file policiess)
+func (d *Delegation) Matches(target []string) bool {
 	for _, pattern := range d.Paths {
+		// Attempt to split the pattern with a semicolon to see if there are any
+		// restrictions on the branches that it can apply to
+		pattern := strings.Split(pattern, ";")
+
 		// We validate pattern when it's added to / updated in the metadata
-		if matches := fnmatch.Match(pattern, target, 0); matches {
-			return true
+		if matches := fnmatch.Match(pattern[0], target[0], 0); matches {
+			if len(pattern) == 1 {
+				// No branch restrictions in the pattern, accept
+				return true
+			} else if len(pattern) > 1 && len(target) > 1 {
+				for _, scope := range strings.Split(pattern[1], ",") {
+					// Iterate over every branch specified in the rule and see if there is a match
+					if matches := fnmatch.Match(scope, target[1], 0); matches {
+						return true
+					}
+				}
+
+			}
 		}
 	}
+
 	return false
 }

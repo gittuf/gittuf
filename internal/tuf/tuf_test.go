@@ -136,112 +136,137 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 func TestDelegationMatches(t *testing.T) {
 	tests := map[string]struct {
 		patterns []string
-		target   string
+		target   []string
 		expected bool
 	}{
 		"full path, matches": {
 			patterns: []string{"foo"},
-			target:   "foo",
+			target:   []string{"foo"},
 			expected: true,
+		},
+		"full path, main branch, matches": {
+			patterns: []string{"foo;git:refs/heads/main"},
+			target:   []string{"foo", "git:refs/heads/main"},
+			expected: true,
+		},
+		"full path, feature branch, does not match": {
+			patterns: []string{"foo;git:refs/heads/main"},
+			target:   []string{"foo", "git:refs/heads/feature"},
+			expected: false,
 		},
 		"artifact in directory, matches": {
 			patterns: []string{"foo/*"},
-			target:   "foo/bar",
+			target:   []string{"foo/bar"},
 			expected: true,
+		},
+		"artifact in directory, main branch, matches": {
+			patterns: []string{"foo/*;git:refs/heads/main"},
+			target:   []string{"foo/bar", "git:refs/heads/main"},
+			expected: true,
+		},
+		"artifact in directory, feature branch, does not match": {
+			patterns: []string{"foo/*;git:refs/heads/main"},
+			target:   []string{"foo/bar", "git:refs/heads/feature"},
+			expected: false,
 		},
 		"artifact in directory, does not match": {
 			patterns: []string{"foo/*.txt"},
-			target:   "foo/bar.tgz",
+			target:   []string{"foo/bar.tgz"},
 			expected: false,
 		},
 		"artifact in directory, one pattern matches": {
 			patterns: []string{"foo/*.txt", "foo/*.tgz"},
-			target:   "foo/bar.tgz",
+			target:   []string{"foo/bar.tgz"},
 			expected: true,
 		},
 		"artifact in subdirectory, matches": {
 			patterns: []string{"foo/*"},
-			target:   "foo/bar/foobar",
+			target:   []string{"foo/bar/foobar"},
 			expected: true,
 		},
 		"artifact in subdirectory with specified extension, matches": {
 			patterns: []string{"foo/*.tgz"},
-			target:   "foo/bar/foobar.tgz",
+			target:   []string{"foo/bar/foobar.tgz"},
 			expected: true,
 		},
 		"pattern with single character selector, matches": {
 			patterns: []string{"foo/?.tgz"},
-			target:   "foo/a.tgz",
+			target:   []string{"foo/a.tgz"},
 			expected: true,
 		},
 		"pattern with character sequence, matches": {
 			patterns: []string{"foo/[abc].tgz"},
-			target:   "foo/a.tgz",
+			target:   []string{"foo/a.tgz"},
 			expected: true,
 		},
 		"pattern with character sequence, does not match": {
 			patterns: []string{"foo/[abc].tgz"},
-			target:   "foo/x.tgz",
+			target:   []string{"foo/x.tgz"},
 			expected: false,
 		},
 		"pattern with negative character sequence, matches": {
 			patterns: []string{"foo/[!abc].tgz"},
-			target:   "foo/x.tgz",
+			target:   []string{"foo/x.tgz"},
 			expected: true,
 		},
 		"pattern with negative character sequence, does not match": {
 			patterns: []string{"foo/[!abc].tgz"},
-			target:   "foo/a.tgz",
+			target:   []string{"foo/a.tgz"},
 			expected: false,
 		},
 		"artifact in arbitrary directory, matches": {
 			patterns: []string{"*/*.txt"},
-			target:   "foo/bar/foobar.txt",
+			target:   []string{"foo/bar/foobar.txt"},
 			expected: true,
 		},
 		"artifact with specific name in arbitrary directory, matches": {
 			patterns: []string{"*/foobar.txt"},
-			target:   "foo/bar/foobar.txt",
+			target:   []string{"foo/bar/foobar.txt"},
 			expected: true,
 		},
 		"artifact with arbitrary subdirectories, matches": {
 			patterns: []string{"foo/*/foobar.txt"},
-			target:   "foo/bar/baz/foobar.txt",
+			target:   []string{"foo/bar/baz/foobar.txt"},
 			expected: true,
 		},
 		"artifact in arbitrary directory, does not match": {
 			patterns: []string{"*.txt"},
-			target:   "foo/bar/foobar.txtfile",
+			target:   []string{"foo/bar/foobar.txtfile"},
 			expected: false,
 		},
 		"arbitrary directory, does not match": {
 			patterns: []string{"*_test"},
-			target:   "foo/bar_test/foobar",
+			target:   []string{"foo/bar_test/foobar"},
 			expected: false,
 		},
 		"no patterns": {
 			patterns: nil,
-			target:   "foo",
+			target:   []string{"foo"},
+			expected: false,
+		},
+		"no patterns, but branch somehow specified": {
+			patterns: []string{";git:refs/heads/main"},
+			target:   []string{"foo"},
 			expected: false,
 		},
 		"pattern with multiple consecutive wildcards, matches": {
 			patterns: []string{"foo/*/*/*.txt"},
-			target:   "foo/bar/baz/qux.txt",
+			target:   []string{"foo/bar/baz/qux.txt"},
 			expected: true,
 		},
 		"pattern with multiple non-consecutive wildcards, matches": {
 			patterns: []string{"foo/*/baz/*.txt"},
-			target:   "foo/bar/baz/qux.txt",
+			target:   []string{"foo/bar/baz/qux.txt"},
 			expected: true,
 		},
 		"pattern with gittuf git prefix, matches": {
 			patterns: []string{"git:refs/heads/*"},
-			target:   "git:refs/heads/main",
+			target:   []string{"git:refs/heads/main"},
 			expected: true,
 		},
 		"pattern with gittuf file prefix for all recursive contents, matches": {
 			patterns: []string{"file:src/signatures/*"},
-			target:   "file:src/signatures/rsa/rsa.go",
+			target:   []string{"file:src/signatures/rsa/rsa.go"},
 			expected: true,
 		},
 	}
