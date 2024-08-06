@@ -49,8 +49,7 @@ func TestNewDisplayWriter(t *testing.T) {
 			}
 
 			// Trim the output to remove any extra whitespace or newlines
-			gotOutput := strings.TrimSpace(defaultOutput.String())
-			if gotOutput != tt.wantOutput {
+			if gotOutput := strings.TrimSpace(defaultOutput.String()); gotOutput != tt.wantOutput {
 				t.Errorf("unexpected result with Display(), got stdout = %v, want %v", gotOutput, tt.wantOutput)
 			}
 		})
