@@ -15,6 +15,7 @@ import (
 )
 
 func TestInitializeRoot(t *testing.T) {
+	t.Parallel()
 	// The helper also runs InitializeRoot for this test
 	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
 
@@ -42,6 +43,7 @@ func TestInitializeRoot(t *testing.T) {
 }
 
 func TestAddRootKey(t *testing.T) {
+	t.Parallel()
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
@@ -79,6 +81,7 @@ func TestAddRootKey(t *testing.T) {
 }
 
 func TestRemoveRootKey(t *testing.T) {
+	t.Parallel()
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	rootKey, err := tuf.LoadKeyFromBytes(keyBytes)
@@ -163,6 +166,7 @@ func TestRemoveRootKey(t *testing.T) {
 }
 
 func TestAddTopLevelTargetsKey(t *testing.T) {
+	t.Parallel()
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	key, err := tuf.LoadKeyFromBytes(keyBytes)
@@ -193,6 +197,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 }
 
 func TestRemoveTopLevelTargetsKey(t *testing.T) {
+	t.Parallel()
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	rootKey, err := tuf.LoadKeyFromBytes(keyBytes)
@@ -254,6 +259,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 }
 
 func TestUpdateRootThreshold(t *testing.T) {
+	t.Parallel()
 	r, _ := createTestRepositoryWithRoot(t, "")
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -301,6 +307,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 }
 
 func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
+	t.Parallel()
 	r, keyBytes := createTestRepositoryWithRoot(t, "")
 
 	key, err := tuf.LoadKeyFromBytes(keyBytes)
@@ -356,6 +363,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 }
 
 func TestSignRoot(t *testing.T) {
+	t.Parallel()
 	r, _ := createTestRepositoryWithRoot(t, "")
 
 	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck

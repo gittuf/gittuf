@@ -13,12 +13,13 @@ import (
 
 func TestPushPolicy(t *testing.T) {
 	remoteName := "origin"
-
+	remoteTmpDir := t.TempDir()
+	remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 	t.Run("successful push", func(t *testing.T) {
-		remoteTmpDir := t.TempDir()
-		remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
+		//remoteTmpDir := t.TempDir()
+		//remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
-		localRepo := createTestRepositoryWithPolicy(t, "")
+		localRepo := createTestRepositoryWithPolicy(t, "") //doesn't support
 
 		if err := policy.Apply(testCtx, localRepo.r, false); err != nil {
 			t.Fatal(err)
@@ -41,8 +42,8 @@ func TestPushPolicy(t *testing.T) {
 	})
 
 	t.Run("divergent policies, unsuccessful push", func(t *testing.T) {
-		remoteTmpDir := t.TempDir()
-		remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
+		//remoteTmpDir := t.TempDir()
+		//remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
 		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
@@ -65,10 +66,11 @@ func TestPushPolicy(t *testing.T) {
 
 func TestPullPolicy(t *testing.T) {
 	remoteName := "origin"
-
+	remoteTmpDir := t.TempDir()
+	remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
 	t.Run("successful pull", func(t *testing.T) {
-		remoteTmpDir := t.TempDir()
-		remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
+		//remoteTmpDir := t.TempDir()
+		//remoteRepo := createTestRepositoryWithPolicy(t, remoteTmpDir)
 		if err := policy.Apply(testCtx, remoteRepo.r, false); err != nil {
 			t.Fatal(err)
 		}
@@ -94,8 +96,8 @@ func TestPullPolicy(t *testing.T) {
 	})
 
 	t.Run("divergent policies, unsuccessful pull", func(t *testing.T) {
-		remoteTmpDir := t.TempDir()
-		createTestRepositoryWithPolicy(t, remoteTmpDir)
+		//remoteTmpDir := t.TempDir()
+		//createTestRepositoryWithPolicy(t, remoteTmpDir)
 
 		localTmpDir := t.TempDir()
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)

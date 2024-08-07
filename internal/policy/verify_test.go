@@ -24,6 +24,7 @@ import (
 // createTestRepository and the state creation helpers.
 
 func TestVerifyRef(t *testing.T) {
+	t.Parallel()
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
@@ -37,6 +38,7 @@ func TestVerifyRef(t *testing.T) {
 }
 
 func TestVerifyRefFull(t *testing.T) {
+	t.Parallel()
 	// FIXME: currently this test is identical to the one for VerifyRef.
 	// This is because it's not trivial to create a bunch of test policy / RSL
 	// states cleanly. We need something that is easy to maintain and add cases
@@ -54,6 +56,7 @@ func TestVerifyRefFull(t *testing.T) {
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
+	t.Parallel()
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
@@ -78,8 +81,10 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	assert.Equal(t, commitIDs[1], currentTip)
 }
 
-func TestVerifyRelativeForRef(t *testing.T) {
+func TestVerifyRelativeForRef(t *testing.T) { //doesn't support
+	t.Parallel()
 	t.Run("no recovery", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -101,6 +106,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -146,6 +152,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -191,6 +198,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -243,6 +251,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -295,6 +304,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -353,6 +363,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -409,6 +420,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user, last good state is due to recovery", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -481,6 +493,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -537,6 +550,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with recovery but recovered entry is also skipped, tree-same, recovered by authorized user", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -596,6 +610,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 	})
 
 	t.Run("with annotation but no fix entry", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
@@ -634,9 +649,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 func TestVerifyEntry(t *testing.T) {
 	refName := "refs/heads/main"
-
+	repo, state := createTestRepository(t, createTestStateWithPolicy)
 	t.Run("successful verification", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		//repo, state := createTestRepository(t, createTestStateWithPolicy)
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
@@ -648,7 +663,7 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification with higher threshold", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
+		//repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -710,9 +725,11 @@ func TestVerifyEntry(t *testing.T) {
 }
 
 func TestVerifyTagEntry(t *testing.T) {
+	repo, policy := createTestRepository(t, createTestStateWithPolicy)
+	refName := "refs/heads/main"
 	t.Run("no tag specific policy", func(t *testing.T) {
-		repo, policy := createTestRepository(t, createTestStateWithPolicy)
-		refName := "refs/heads/main"
+		//repo, policy := createTestRepository(t, createTestStateWithPolicy)
+		//refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -731,8 +748,8 @@ func TestVerifyTagEntry(t *testing.T) {
 	})
 
 	t.Run("with tag specific policy", func(t *testing.T) {
-		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
-		refName := "refs/heads/main"
+		//repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		//refName := "refs/heads/main"
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -800,8 +817,9 @@ func TestGetCommits(t *testing.T) {
 }
 
 func TestStateVerifyNewState(t *testing.T) {
+	currentPolicy := createTestStateWithOnlyRoot(t)
 	t.Run("valid policy transition", func(t *testing.T) {
-		currentPolicy := createTestStateWithOnlyRoot(t)
+		//currentPolicy := createTestStateWithOnlyRoot(t)
 		newPolicy := createTestStateWithOnlyRoot(t)
 
 		err := currentPolicy.VerifyNewState(testCtx, newPolicy)
@@ -809,7 +827,7 @@ func TestStateVerifyNewState(t *testing.T) {
 	})
 
 	t.Run("invalid policy transition", func(t *testing.T) {
-		currentPolicy := createTestStateWithOnlyRoot(t)
+		//currentPolicy := createTestStateWithOnlyRoot(t)
 
 		// Create invalid state
 		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck

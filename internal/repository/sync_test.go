@@ -17,6 +17,7 @@ import (
 
 func TestClone(t *testing.T) {
 	remoteTmpDir := t.TempDir()
+	localTmpDir := t.TempDir()
 
 	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
 	if err != nil {
@@ -82,7 +83,7 @@ func TestClone(t *testing.T) {
 	}
 
 	t.Run("successful clone without specifying dir", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		//localTmpDir := t.TempDir() -reused
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -106,7 +107,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone with dir", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		//localTmpDir := t.TempDir() - reused
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -135,7 +136,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //conflicts if reused
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -160,7 +161,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("unsuccessful clone when unspecified dir already exists", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //confilicts
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -175,7 +176,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("unsuccessful clone when specified dir already exists", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //conflicts
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -191,7 +192,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone without specifying dir, with trailing slashes in repository path", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //conflicts
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -215,7 +216,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("successful clone without specifying dir, with multiple expected root keys", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //confilicts
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
@@ -246,7 +247,7 @@ func TestClone(t *testing.T) {
 	})
 
 	t.Run("unsuccessful clone without specifying dir, with expected root keys not equaling root keys", func(t *testing.T) {
-		localTmpDir := t.TempDir()
+		localTmpDir := t.TempDir() //conflicts
 
 		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
