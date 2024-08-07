@@ -158,11 +158,23 @@ func handleCurl(remoteName, url string) (map[string]string, bool, error) {
 
 						// }
 
+						log("fetching remote gittuf refs")
+						cmd := exec.Command("git", "fetch", url, "refs/gittuf/*:refs/gittuf/*")
+						cmd.Stderr = os.Stderr
+						cmd.Stdout = os.Stderr
+						cmd.Stdin = os.Stdin
+						if err := cmd.Run(); err != nil {
+							return nil, false, err
+						}
+
 						for _, pushCommand := range pushCommands {
 							if len(gittufRefsTips) != 0 {
 								refSpec := string(bytes.Split(bytes.TrimSpace(pushCommand), []byte{' '})[1])
 								refSpecSplit := strings.Split(refSpec, ":")
+
 								srcRef := refSpecSplit[0]
+								srcRef = strings.TrimPrefix(srcRef, "+")
+
 								dstRef := refSpecSplit[1]
 
 								if !strings.HasPrefix(dstRef, gittufRefPrefix) {

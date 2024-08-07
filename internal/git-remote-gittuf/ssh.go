@@ -356,12 +356,25 @@ func handleSSH(_, url string) (map[string]string, bool, error) {
 					command = stdInScanner.Bytes()
 				}
 
+				log("fetching remote gittuf refs")
+				cmd := exec.Command("git", "fetch", url, "refs/gittuf/*:refs/gittuf/*")
+				cmd.Stderr = os.Stderr
+				cmd.Stdout = os.Stderr
+				cmd.Stdin = os.Stdin
+				if err := cmd.Run(); err != nil {
+					return nil, false, err
+				}
+
 				pushObjects := set.NewSet[string]()
 				log("adding gittuf RSL entries")
 				for i, refSpec := range pushRefSpecs {
 					refSpecSplit := strings.Split(refSpec, ":")
+
 					srcRef := refSpecSplit[0]
+					srcRef = strings.TrimPrefix(srcRef, "+")
+
 					dstRef := refSpecSplit[1]
+
 					// TODO: check RSL is updated against remote
 					// The best way to fetch the RSL first may be to just
 					// `git fetch <remoteName> refs/gittuf/*:refs/gittuf/*`
@@ -422,7 +435,7 @@ func handleSSH(_, url string) (map[string]string, bool, error) {
 				// TODO: gittuf verify-ref for each dstRef; abort if
 				// verification fails
 
-				cmd := exec.Command("git", "rev-parse", rsl.Ref) //nolint:gosec
+				cmd = exec.Command("git", "rev-parse", rsl.Ref) //nolint:gosec
 				output, err := cmd.Output()
 				if err != nil {
 					return nil, false, err
