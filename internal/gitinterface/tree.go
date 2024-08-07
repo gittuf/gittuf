@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const tempMergeComputationRef = "refs/gittuf/tmp/merge-computation"
+
 func (r *Repository) EmptyTree() (Hash, error) {
 	treeID, err := r.executor("hash-object", "-t", "tree", "--stdin").executeString()
 	if err != nil {
@@ -86,17 +88,63 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 		return r.GetCommitTreeID(commitBID)
 	}
 
-	// We're using merge-tree with the deprecated --trivial-merge flow to support
-	// Git 2.34.1. With newer versions, we don't need to compute mergeBase.
-	stdOut, err := r.executor("merge-base", commitAID.String(), commitBID.String()).executeString()
+	niceGit, err := isNiceGitVersion()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to find merge base: %w", err)
+		return ZeroHash, err
 	}
-	mergeBase := stdOut
 
-	stdOut, err = r.executor("merge-tree", mergeBase, commitAID.String(), commitBID.String()).executeString()
-	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
+	var stdOut string
+
+	if !niceGit {
+		// Older Git versions do not support merge-tree, and, as such, require
+		// quite a long workaround to find what the merge tree is. This
+		// workaround boils down to:
+		// Create new branch > Merge into said branch > Extract tree hash
+		currentBranch, err := r.executor("branch", "--show-current").executeString()
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to determine current branch: %w", err)
+		}
+
+		if currentBranch == "" {
+			return ZeroHash, fmt.Errorf("currently in detached HEAD state, please switch to a branch")
+		}
+
+		err = r.SetReference(tempMergeComputationRef, commitAID)
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to set the merge computation ref: %w", err)
+		}
+
+		_, err = r.executor("checkout", tempMergeComputationRef).executeString()
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to create merge computation branch: %w", err)
+		}
+
+		_, err = r.executor("merge", commitBID.String()).executeString()
+		if err != nil {
+			// Attempt to abort the merge in all cases as a failsafe
+			_, abrtErr := r.executor("merge", "--abort").executeString()
+			if abrtErr != nil {
+				return ZeroHash, fmt.Errorf("unable to perform merge, and unable to abort merge: %w, %w", err, abrtErr)
+			}
+
+			return ZeroHash, fmt.Errorf("unable to perform merge: %w", err)
+		}
+
+		stdOut, err = r.executor("show", "-s", "--format=%T", tempMergeComputationRef).executeString()
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to extract tree hash of merge commit: %w", err)
+		}
+
+		// Switch back to the branch the user was on
+		_, err = r.executor("checkout", currentBranch).executeString()
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to switch back to original branch: %w", err)
+		}
+	} else {
+		stdOut, err = r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
+		if err != nil {
+			return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
+		}
 	}
 
 	treeHash, err := NewHash(stdOut)
