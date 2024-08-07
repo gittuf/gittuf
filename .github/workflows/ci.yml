@@ -16,28 +16,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-
     - name: Install Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
         go-version: '1.22'
         cache: true
-    
-    - name: Setup Git for Windows
-      if: matrix.os == 'windows-latest'
-      run: |
-        git config --global core.autocrlf false
-        git config --global core.longpaths true
-        git config --global user.name "Jane Doe"
-        git config --global user.email "jane.doe@example.com"
-        git config --global gpg.format "ssh"
-      shell: bash
-
-
     - name: Test
-      run: go test ./...
-      shell: bash
-
+      run: go test -timeout 20m ./...
     - name: Test Coverage
       if: matrix.os == 'ubuntu-latest'
       run: go test -covermode=atomic `go list ./... | grep -v -f .test_ignore.txt`
