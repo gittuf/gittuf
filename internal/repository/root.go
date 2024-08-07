@@ -191,6 +191,133 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+// AddGitHubAppKey is the interface for the user to add the authorized key for
+// the special GitHub app role. This key is used to verify GitHub pull request
+// approval attestation signatures.
+func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey *tuf.Key, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding GitHub app key...")
+	rootMetadata, err = policy.AddGitHubAppKey(rootMetadata, appKey)
+	if err != nil {
+		return fmt.Errorf("failed to add GitHub app key: %w", err)
+	}
+
+	commitMessage := fmt.Sprintf("Add GitHub app key '%s' to root", appKey.KeyID)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// RemoveGitHubAppKey is the interface for the user to de-authorize the key for
+// the special GitHub app role.
+func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Removing GitHub app key...")
+	rootMetadata, err = policy.DeleteGitHubAppKey(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	commitMessage := "Remove GitHub app key from root"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// TrustGitHubApp updates the root metadata to mark GitHub app pull request
+// approvals as trusted.
+func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	if rootMetadata.GitHubApprovalsTrusted {
+		slog.Debug("GitHub app approvals are already trusted, exiting...")
+		return nil
+	}
+
+	slog.Debug("Marking GitHub app approvals as trusted in root...")
+	rootMetadata, err = policy.EnableGitHubAppApprovals(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	commitMessage := "Mark GitHub app approvals as trusted"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// UntrustGitHubApp updates the root metadata to mark GitHub app pull request
+// approvals as untrusted.
+func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	if !rootMetadata.GitHubApprovalsTrusted {
+		slog.Debug("GitHub app approvals are already untrusted, exiting...")
+		return nil
+	}
+
+	slog.Debug("Marking GitHub app approvals as untrusted in root...")
+	rootMetadata, err = policy.DisableGitHubAppApprovals(rootMetadata)
+	if err != nil {
+		return err
+	}
+
+	commitMessage := "Mark GitHub app approvals as untrusted"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // UpdateRootThreshold sets the threshold of valid signatures required for the
 // Root role.
 func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
