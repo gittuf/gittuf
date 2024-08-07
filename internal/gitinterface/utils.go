@@ -63,3 +63,7 @@ func isNiceGitVersion() (bool, error) {
 	}
 	return false, nil
 }
+
+func testNameToRefName(testName string) string {
+	return BranchReferenceName(strings.ReplaceAll(testName, " ", "__"))
+}

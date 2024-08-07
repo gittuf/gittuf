@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const tempMergeComputationRef = "refs/gittuf/tmp/merge-computation"
-
 func (r *Repository) EmptyTree() (Hash, error) {
 	treeID, err := r.executor("hash-object", "-t", "tree", "--stdin").executeString()
 	if err != nil {
@@ -94,7 +92,6 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 	}
 
 	var stdOut string
-
 	if !niceGit {
 		// Older Git versions do not support merge-tree, and, as such, require
 		// quite a long workaround to find what the merge tree is. This
@@ -109,17 +106,12 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 			return ZeroHash, fmt.Errorf("currently in detached HEAD state, please switch to a branch")
 		}
 
-		err = r.SetReference(tempMergeComputationRef, commitAID)
+		_, err = r.executor("checkout", commitAID.String()).executeString()
 		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to set the merge computation ref: %w", err)
+			return ZeroHash, fmt.Errorf("unable to enter detached HEAD state: %w", err)
 		}
 
-		_, err = r.executor("checkout", tempMergeComputationRef).executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to create merge computation branch: %w", err)
-		}
-
-		_, err = r.executor("merge", commitBID.String()).executeString()
+		_, err = r.executor("merge", "-m", "Computing merge tree", commitBID.String()).executeString()
 		if err != nil {
 			// Attempt to abort the merge in all cases as a failsafe
 			_, abrtErr := r.executor("merge", "--abort").executeString()
@@ -130,7 +122,7 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 			return ZeroHash, fmt.Errorf("unable to perform merge: %w", err)
 		}
 
-		stdOut, err = r.executor("show", "-s", "--format=%T", tempMergeComputationRef).executeString()
+		stdOut, err = r.executor("show", "-s", "--format=%T").executeString()
 		if err != nil {
 			return ZeroHash, fmt.Errorf("unable to extract tree hash of merge commit: %w", err)
 		}
