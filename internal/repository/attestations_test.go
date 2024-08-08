@@ -3,6 +3,7 @@
 package repository
 
 import (
+	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
@@ -18,6 +19,18 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 	testDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+	// We meed to change the directory for this test because we `checkout`
+	// for older Git versions, modifying the worktree. This chdir ensures
+	// that the temporary directory is used as the worktree.
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(testDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(pwd) //nolint:errcheck
 
 	repo := &Repository{r: r}
 

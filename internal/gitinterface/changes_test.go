@@ -4,7 +4,6 @@ package gitinterface
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -340,8 +339,4 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
 	})
-}
-
-func testNameToRefName(testName string) string {
-	return BranchReferenceName(strings.ReplaceAll(testName, " ", "__"))
 }
