@@ -219,16 +219,32 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 
 // GetEntry returns the entry corresponding to entryID.
 func GetEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (Entry, error) {
+	entry, has := cache.getEntry(entryID)
+	if has {
+		return entry, nil
+	}
+
 	commitMessage, err := repo.GetCommitMessage(entryID)
 	if err != nil {
 		return nil, errors.Join(ErrRSLEntryNotFound, err)
 	}
 
-	return parseRSLEntryText(entryID, commitMessage)
+	entry, err = parseRSLEntryText(entryID, commitMessage)
+	if err != nil {
+		return nil, err
+	}
+
+	cache.setEntry(entryID, entry)
+	return entry, nil
 }
 
 // GetParentForEntry returns the entry's parent RSL entry.
 func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error) {
+	parentID, has, err := cache.getParent(entry.GetID())
+	if err == nil && has {
+		return GetEntry(repo, parentID)
+	}
+
 	parentIDs, err := repo.GetCommitParentIDs(entry.GetID())
 	if err != nil {
 		return nil, err
@@ -242,7 +258,9 @@ func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error
 		return nil, ErrRSLBranchDetected
 	}
 
-	return GetEntry(repo, parentIDs[0])
+	parentID = parentIDs[0]
+	cache.setParent(entry.GetID(), parentID)
+	return GetEntry(repo, parentID)
 }
 
 // GetNonGittufParentReferenceEntryForEntry returns the first RSL reference
@@ -313,12 +331,7 @@ func GetLatestEntry(repo *gitinterface.Repository) (Entry, error) {
 		return nil, err
 	}
 
-	commitMessage, err := repo.GetCommitMessage(commitID)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseRSLEntryText(commitID, commitMessage)
+	return GetEntry(repo, commitID)
 }
 
 // GetLatestNonGittufReferenceEntry returns the first reference entry that is
