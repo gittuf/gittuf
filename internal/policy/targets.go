@@ -4,14 +4,20 @@ package policy
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const AllowRuleName = "gittuf-allow-rule"
 
-var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+var (
+	ErrRuleNotFound              = errors.New("cannot find rule entry")
+	ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrMissingRules              = errors.New("some rules are missing")
+)
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
 func InitializeTargetsMetadata() *tuf.TargetsMetadata {
@@ -91,6 +97,46 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 	}
 	allDelegations = append(allDelegations, AllowRule())
 
+	targetsMetadata.Delegations.Roles = allDelegations
+
+	return targetsMetadata, nil
+}
+
+// ReorderDelegations changes the order of delegations in TargetsMetadata.
+func ReorderDelegations(targetsMetadata *tuf.TargetsMetadata, ruleNames []string) (*tuf.TargetsMetadata, error) {
+	allDelegations := []tuf.Delegation{}
+	// Create a map of all delegations for quick validation.
+	rolesMap := make(map[string]tuf.Delegation)
+	for _, delegation := range targetsMetadata.Delegations.Roles {
+		rolesMap[delegation.Name] = delegation
+	}
+
+	ruleSet := set.NewSet[string]()
+
+	for _, ruleName := range ruleNames {
+		if ruleName == AllowRuleName {
+			return nil, ErrCannotManipulateAllowRule
+		}
+
+		if ruleSet.Has(ruleName) {
+			return nil, fmt.Errorf("%w: %s", ErrDuplicatedRuleName, ruleName)
+		}
+
+		if delegation, valid := rolesMap[ruleName]; valid {
+			allDelegations = append(allDelegations, delegation)
+			ruleSet.Add(ruleName)
+			delete(rolesMap, ruleName)
+		}
+	}
+
+	allDelegations = append(allDelegations, AllowRule())
+
+	// Check for any missing delegations
+	for ruleName := range rolesMap {
+		if ruleName != AllowRuleName {
+			return nil, fmt.Errorf("%w: %s", ErrMissingRules, ruleName)
+		}
+	}
 	targetsMetadata.Delegations.Roles = allDelegations
 
 	return targetsMetadata, nil
