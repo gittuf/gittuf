@@ -26,3 +26,7 @@ jobs:
     - name: Test Coverage
       if: matrix.os == 'ubuntu-latest'
       run: go test -covermode=atomic `go list ./... | grep -v -f .test_ignore.txt`
+    - name: Test on Default Windows Environment
+      if: matrix.os == 'windows-latest'
+      run: go test -covermode=atomic $(go list ./... | findstr /V /G:.test_ignore.txt)
+      shell: powershell
