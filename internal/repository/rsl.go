@@ -139,6 +139,34 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 	return rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit)
 }
 
+// RollbackLatestRSLEntry is used when the latest RSL entry is invalid.
+// This does not skip the RSL entry with an annotation, instead it resets
+// the ref, rolling it back by one commit.
+func (r *Repository) RollbackLatestRSLEntry() error {
+	latestEntry, err := rsl.GetLatestEntry(r.r)
+	if err != nil {
+		return err
+	}
+	_, ok := latestEntry.(*rsl.ReferenceEntry)
+
+	if !ok {
+		return fmt.Errorf("cannot rollback when the latest RSL entry is an annnoation entry")
+	}
+
+	v, err := rsl.GetParentForEntry(r.r, latestEntry)
+	if err != nil {
+		return err
+	}
+
+	errMustRollback := fmt.Errorf("the current RSL entry fails verification, rolling back changes")
+
+	if err := r.r.ResetDueToError(errMustRollback, rsl.Ref, v.GetID()); !errors.Is(err, errMustRollback) {
+		return err
+	}
+
+	return nil
+}
+
 // CheckRemoteRSLForUpdates checks if the RSL at the specified remote
 // repository has updated in comparison with the local repository's RSL. This is
 // done by fetching the remote RSL to the local repository's remote RSL tracker.
