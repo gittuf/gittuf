@@ -6,6 +6,12 @@ updates:
     schedule:
       interval: "daily"
       time: "14:00"
+    # Bundle updates into one PR
+    groups:
+      all:
+        applies-to: version-updates
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -16,6 +22,12 @@ updates:
     schedule:
       interval: "daily"
       time: "14:00"
+    # Bundle updates into one PR
+    groups:
+      all:
+        applies-to: version-updates
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore"
       include: "scope"
