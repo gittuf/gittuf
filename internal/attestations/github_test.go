@@ -3,6 +3,9 @@
 package attestations
 
 import (
+	"encoding/base64"
+	"fmt"
+	"path"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -10,7 +13,6 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-git/v5/plumbing"
 	ita "github.com/in-toto/attestation/go/v1"
 	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +20,7 @@ import (
 
 func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 
 	approvers := []*sslibsv.SSLibKey{
 		{
@@ -61,7 +63,10 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
+	baseURL := "https://github.com"
+	baseHost := "github.com"
+	appName := "github"
 
 	approvers := []*sslibsv.SSLibKey{
 		{
@@ -84,22 +89,27 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	attestations := &Attestations{}
 
 	// Add auth for first branch
-	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, 1, testRef, testID, testID)
+	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, baseURL, 1, appName, testRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
-	assert.NotContains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, path.Join(GitHubPullRequestApprovalAttestationPath(testRef, testID, testID), base64.URLEncoding.EncodeToString([]byte(appName))))
+	assert.NotContains(t, attestations.codeReviewApprovalAttestations, path.Join(GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID), base64.URLEncoding.EncodeToString([]byte(appName))))
+	assert.Equal(t, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID), attestations.codeReviewApprovalIndex[fmt.Sprintf("%s::%d", baseHost, 1)])
 
 	// Add auth for the other branch
-	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, 2, testAnotherRef, testID, testID)
+	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, baseURL, 2, appName, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
-	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID))
-	assert.Contains(t, attestations.codeReviewApprovalAttestations, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, path.Join(GitHubPullRequestApprovalAttestationPath(testRef, testID, testID), base64.URLEncoding.EncodeToString([]byte(appName))))
+	assert.Contains(t, attestations.codeReviewApprovalAttestations, path.Join(GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID), base64.URLEncoding.EncodeToString([]byte(appName))))
+	assert.Equal(t, GitHubPullRequestApprovalAttestationPath(testRef, testID, testID), attestations.codeReviewApprovalIndex[fmt.Sprintf("%s::%d", baseHost, 1)])
+	assert.Equal(t, GitHubPullRequestApprovalAttestationPath(testAnotherRef, testID, testID), attestations.codeReviewApprovalIndex[fmt.Sprintf("%s::%d", baseHost, 2)])
 }
 
 func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
+	baseURL := "https://github.com"
+	appName := "github"
 
 	approvers := []*sslibsv.SSLibKey{
 		{
@@ -121,20 +131,20 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 
 	attestations := &Attestations{}
 
-	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, 1, testRef, testID, testID)
+	err := attestations.SetGitHubPullRequestApprovalAttestation(repo, mainZeroZero, baseURL, 1, appName, testRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, 2, testAnotherRef, testID, testID)
+	err = attestations.SetGitHubPullRequestApprovalAttestation(repo, featureZeroZero, baseURL, 2, appName, testAnotherRef, testID, testID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mainAuth, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, testRef, testID, testID)
+	mainAuth, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, appName, testRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Equal(t, mainZeroZero, mainAuth)
 
-	featureAuth, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, testAnotherRef, testID, testID)
+	featureAuth, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, appName, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Equal(t, featureZeroZero, featureAuth)
 }
@@ -142,7 +152,7 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := plumbing.ZeroHash.String()
+	testID := gitinterface.ZeroHash.String()
 
 	approvers := []*sslibsv.SSLibKey{
 		{

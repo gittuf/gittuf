@@ -10,6 +10,7 @@ gittuf dev add-github-approval [flags]
 
 ```
       --approver string           approver signing key (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)
+      --base-URL string           location of GitHub instance (default "https://github.com")
   -h, --help                      help for add-github-approval
       --pull-request-number int   pull request number (default -1)
       --repository string         path to base GitHub repository the pull request is opened against, of form {owner}/{repo}

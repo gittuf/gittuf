@@ -9,6 +9,7 @@ gittuf dev attest-github [flags]
 ### Options
 
 ```
+      --base-URL string           location of GitHub instance (default "https://github.com")
       --base-branch string        base branch for pull request, used with --commit
       --commit string             commit to record pull request attestation for
   -h, --help                      help for attest-github

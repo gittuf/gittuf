@@ -14,6 +14,7 @@ import (
 
 type options struct {
 	signingKey        string
+	baseURL           string
 	repository        string
 	pullRequestNumber int
 	reviewID          int64
@@ -29,6 +30,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"signing key to use for signing attestation",
 	)
 	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
+
+	cmd.Flags().StringVar(
+		&o.baseURL,
+		"base-URL",
+		"https://github.com",
+		"location of GitHub instance",
+	)
 
 	cmd.Flags().StringVar(
 		&o.repository,
@@ -84,7 +92,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
 }
 
 func New() *cobra.Command {

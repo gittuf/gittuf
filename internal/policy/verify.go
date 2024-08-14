@@ -533,8 +533,11 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	// When we add other code review systems, we can move this into a
 	// generalized helper that inspects the attestations for each system trusted
 	// in policy.
+	// TODO: support multiple apps / threshold per system
 	if policy.githubAppApprovalsTrusted {
-		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+		appName := policy.githubAppKey.KeyID
+
+		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), entryTreeID.String())
 		if err != nil {
 			if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err

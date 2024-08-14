@@ -160,6 +160,7 @@ func AddGitHubAppKey(rootMetadata *tuf.RootMetadata, appKey *tuf.Key) (*tuf.Root
 		return nil, ErrGitHubAppKeyNil
 	}
 
+	// TODO: support multiple keys / threshold for app
 	rootMetadata.Keys[appKey.KeyID] = appKey
 	role := tuf.Role{
 		KeyIDs:    []string{appKey.KeyID},
@@ -176,6 +177,7 @@ func DeleteGitHubAppKey(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata, erro
 		return nil, ErrRootMetadataNil
 	}
 
+	// TODO: support multiple keys / threshold for app
 	delete(rootMetadata.Roles, GitHubAppRoleName)
 	return rootMetadata, nil
 }
