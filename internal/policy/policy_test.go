@@ -12,7 +12,6 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
@@ -408,35 +407,6 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		assert.Nil(t, verifiers)
 		assert.ErrorIs(t, err, ErrMetadataNotFound)
 	})
-}
-
-func TestStateFindPublicKeysForPath(t *testing.T) {
-	state := createTestStateWithPolicy(t)
-
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tests := map[string]struct {
-		path string
-		keys []*sslibsv.SSLibKey
-	}{
-		"public keys for refs/heads/main": {
-			path: "git:refs/heads/main",
-			keys: []*sslibsv.SSLibKey{gpgKey},
-		},
-		"public keys for unprotected branch": {
-			path: "git:refs/heads/unprotected",
-			keys: []*sslibsv.SSLibKey{},
-		},
-	}
-
-	for name, test := range tests {
-		keys, err := state.FindPublicKeysForPath(context.Background(), test.path)
-		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-		assert.Equal(t, test.keys, keys, fmt.Sprintf("policy keys for path '%s' don't match expected keys in test '%s'", test.path, name))
-	}
 }
 
 func TestGetStateForCommit(t *testing.T) {
