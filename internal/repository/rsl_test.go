@@ -250,6 +250,53 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.True(t, annotation.Skip)
 }
 
+func TestRollbackLatestRSLEntry(t *testing.T) {
+	tempDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	repo := &Repository{r: r}
+
+	// Add first RSL entry
+	refName := "refs/heads/main"
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repo.r.Commit(emptyTreeHash, refName, "First commit", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RecordRSLEntryForReference(refName, false); err != nil {
+		t.Fatal(err)
+	}
+
+	latestGoodEntry, err := rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.r.Commit(emptyTreeHash, refName, "Second commit", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.RecordRSLEntryForReference(refName, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Rollback the latest RSL entry
+	if err := repo.RollbackLatestRSLEntry(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the latest RSL entry is now the first one
+	latestEntry, err := rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, latestGoodEntry, latestEntry)
+}
+
 func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	remoteName := "origin"
 	refName := "refs/heads/main"

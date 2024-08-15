@@ -1,6 +1,6 @@
 ## gittuf rsl record
 
-Record latest state of a Git reference in the RSL
+Record latest state of a Git reference in the RSL after verifying against gittuf policy
 
 ```
 gittuf rsl record [flags]
@@ -9,8 +9,9 @@ gittuf rsl record [flags]
 ### Options
 
 ```
-      --dst-ref string   name of destination reference, if it differs from source reference
-  -h, --help             help for record
+      --dst-ref string      name of destination reference, if it differs from source reference
+      --from-entry string   perform verification from specified RSL entry
+  -h, --help                help for record
 ```
 
 ### Options inherited from parent commands
