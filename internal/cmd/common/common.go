@@ -130,7 +130,10 @@ func CheckIfSigningViableWithFlag(cmd *cobra.Command, _ []string) error {
 // CheckIfSigningViable checks if we are able to sign RSL entries given the
 // current environment
 func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
-	_, _, err := gitinterface.GetSigningCommand() //nolint:staticcheck
+	repo, err := gitinterface.LoadRepository()
+	if err != nil {
+		return err
+	}
 
-	return err
+	return repo.CanSign()
 }

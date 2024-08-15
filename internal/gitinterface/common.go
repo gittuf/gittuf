@@ -29,9 +29,32 @@ var (
 func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 	t.Helper()
 
-	keysDir := t.TempDir()
+	repo := setupRepository(t, dir, bare)
 
+	// Set up author / committer identity
+	if err := repo.SetGitConfig("user.name", testName); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetGitConfig("user.email", testEmail); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up signing via SSH key
+	keysDir := t.TempDir()
 	setupSigningKeys(t, keysDir)
+
+	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
+		t.Fatal(err)
+	}
+
+	return repo
+}
+
+func setupRepository(t *testing.T, dir string, bare bool) *Repository {
+	t.Helper()
 
 	var gitDirPath string
 	args := []string{"init"}
@@ -49,25 +72,7 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 		t.Fatal(err)
 	}
 
-	repo := &Repository{gitDirPath: gitDirPath, clock: testClock}
-
-	// Set up author / committer identity
-	if err := repo.SetGitConfig("user.name", testName); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.SetGitConfig("user.email", testEmail); err != nil {
-		t.Fatal(err)
-	}
-
-	// Set up signing via SSH key
-	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.SetGitConfig("gpg.format", "ssh"); err != nil {
-		t.Fatal(err)
-	}
-
-	return repo
+	return &Repository{gitDirPath: gitDirPath, clock: testClock}
 }
 
 func setupSigningKeys(t *testing.T, dir string) {
