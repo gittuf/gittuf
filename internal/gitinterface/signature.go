@@ -26,9 +26,42 @@ const (
 	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
 	rsaPrivateKeyPEMHeader     string = "RSA PRIVATE KEY"
 	genericPrivateKeyPEMHeader string = "PRIVATE KEY"
+	signingFormatGPG           string = "gpg"
+	signingFormatSSH           string = "ssh"
 )
 
-var ErrNotCommitOrTag = errors.New("invalid object type, expected commit or tag for signature verification")
+var (
+	ErrNotCommitOrTag             = errors.New("invalid object type, expected commit or tag for signature verification")
+	ErrSigningKeyNotSpecified     = errors.New("signing key not specified in git config")
+	ErrUnknownSigningMethod       = errors.New("unknown signing method (not one of gpg, ssh, x509)")
+	ErrIncorrectVerificationKey   = errors.New("incorrect key provided to verify signature")
+	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
+	ErrVerifyingSSHSignature      = errors.New("unable to verify SSH signature")
+	ErrInvalidSignature           = errors.New("unable to parse signature / signature has unexpected header")
+)
+
+// CanSign inspects the Git configuration to determine if commit / tag signing
+// is possible.
+func (r *Repository) CanSign() error {
+	config, err := r.GetGitConfig()
+	if err != nil {
+		return err
+	}
+
+	// Format is one of GPG, SSH, X509
+	format := getSigningMethod(config)
+
+	// If format is GPG or X509, the signing key parameter is optional
+	// However, for SSH, the signing key must be set
+	if format == signingFormatSSH {
+		keyInfo := getSigningKeyInfo(config)
+		if keyInfo == "" {
+			return ErrSigningKeyNotSpecified
+		}
+	}
+
+	return nil
+}
 
 // VerifySignature verifies the cryptographic signature associated with the
 // specified object. The `objectID` must point to a Git commit or tag object.
@@ -171,4 +204,20 @@ func verifySSHKeySignature(key *tuf.Key, data, signature []byte) error {
 	}
 
 	return nil
+}
+
+func getSigningMethod(gitConfig map[string]string) string {
+	format, ok := gitConfig["gpg.format"]
+	if !ok {
+		return signingFormatGPG // default to gpg
+	}
+	return format
+}
+
+func getSigningKeyInfo(gitConfig map[string]string) string {
+	keyInfo, ok := gitConfig["user.signingkey"]
+	if !ok {
+		return ""
+	}
+	return keyInfo
 }
