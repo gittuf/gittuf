@@ -74,7 +74,8 @@ gittuf version
 To build from source, clone the repository and run
 `make`. This will also run the test suite prior to installing gittuf. Note that Go 1.22 or higher is necessary to build gittuf.
 
-> [!NOTE] `make` needs to be installed externally on Windows, it is not packaged with the OS. You may install it from [chocolatey] or from the [GNU website].
+> [!NOTE]
+> `make` needs to be installed externally on Windows, it is not packaged with the OS. You may install it from [chocolatey] or from the [GNU website].
 
 ```sh
 git clone https://github.com/gittuf/gittuf
@@ -87,7 +88,8 @@ make
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
 
-> [!NOTE] If running on Windows, do not use the `-N ""` flag for the `ssh-keygen` commands.
+> [!NOTE]
+> If running on Windows, do not use the `-N ""` flag for the `ssh-keygen` commands.
 ```bash
 mkdir gittuf-get-started && cd gittuf-get-started
 mkdir keys && cd keys
