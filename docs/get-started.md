@@ -9,17 +9,18 @@ currently in alpha, and it is not intended for use in a production repository.
 > Please use release v0.1.0 or higher, as prior releases were created to
 > test the release workflow.
 
-**Pre-built binaries.** This repository provides pre-built binaries that are
+**Pre-built binaries:** This repository provides pre-built binaries that are
 signed and published using [GoReleaser]. The signature for these binaries are
 generated using [Sigstore], using the release workflow's identity. Make sure you
 have [cosign] installed on your system, then you will be able to securely
 download and verify the gittuf release:
 
 > [!NOTE]
-> For `windows`, make sure to include the `.exe` extension for the binary,
-> signature and certificate file. Similarly, `sudo install` and the destination
-> path must be modified as well.
+> For `windows`, the `.exe` extension needs to be included for the binary (as `filename.exe`),
+> signature (as `filename.exe.sig`) and certificate (as `filename.exe.sig`) files.
+> Similarly, `sudo install` needs to be changed to `Start-Process` along with the destination path. Explicit instructions are listed below.
 
+### Unix-based operating systems 
 ```sh
 # Modify these values as necessary.
 # One of: amd64, arm64
@@ -46,9 +47,34 @@ cd -
 gittuf version
 ```
 
-**Building from source.** To build from source, clone the repository and run
-`make`. This will also run the test suite prior to installing gittuf. Note that
-Go 1.22 or higher is necessary to build gittuf.
+### Windows
+```sh
+# Modify these values as necessary.
+# One of: amd64, arm64
+ARCH=amd64
+OS=windows
+# See https://github.com/gittuf/gittuf/releases for the latest version
+VERSION=0.5.2
+
+Push-Location # this saves the pwd to the stack
+
+curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}.exe
+curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}.exe.sig
+curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}.exe.pem
+
+cosign verify-blob --certificate gittuf_${VERSION}_${OS}_${ARCH}.exe.pem --signature gittuf_${VERSION}_${OS}_${ARCH}.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v${VERSION} --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_${VERSION}_${OS}_${ARCH}
+
+Start-Process -FilePath ".\gittuf_${VERSION}_windows_${ARCH}.exe" -Verb RunAs
+
+Pop-Location # pushes pwd from the stack to return to the directory you were in before
+gittuf version
+```
+
+### Building from source
+To build from source, clone the repository and run
+`make`. This will also run the test suite prior to installing gittuf. Note that Go 1.22 or higher is necessary to build gittuf.
+
+> [!NOTE] `make` needs to be installed externally on Windows, it is not packaged with the OS. You may install it from [chocolatey] or from the [GNU website].
 
 ```sh
 git clone https://github.com/gittuf/gittuf
@@ -61,6 +87,7 @@ make
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
 
+> [!NOTE] If running on Windows, do not use the `-N ""` flag for the `ssh-keygen` commands.
 ```bash
 mkdir gittuf-get-started && cd gittuf-get-started
 mkdir keys && cd keys
@@ -174,3 +201,5 @@ the gittuf repository.
 [CLI docs]: /docs/cli/gittuf.md
 [open an issue]: https://github.com/gittuf/gittuf/issues/new/choose
 [dogfooding]: /docs/dogfood.md
+[GNU website]: https://gnuwin32.sourceforge.net/packages/make.htm
+[chocolatey]: https://community.chocolatey.org/packages/make
