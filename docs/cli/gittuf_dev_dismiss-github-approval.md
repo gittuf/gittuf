@@ -1,20 +1,18 @@
-## gittuf dev attest-github
+## gittuf dev dismiss-github-approval
 
-Record GitHub pull request information as an attestation (developer mode only, set GITTUF_DEV=1)
+Dismiss GitHub pull request approval as an attestation (developer mode only, set GITTUF_DEV=1)
 
 ```
-gittuf dev attest-github [flags]
+gittuf dev dismiss-github-approval [flags]
 ```
 
 ### Options
 
 ```
       --base-URL string           location of GitHub instance (default "https://github.com")
-      --base-branch string        base branch for pull request, used with --commit
-      --commit string             commit to record pull request attestation for
-  -h, --help                      help for attest-github
-      --pull-request-number int   pull request number to record in attestation (default -1)
-      --repository string         path to base GitHub repository the pull request is opened against, of form {owner}/{repo}
+      --dismiss-approver string   signing key representing approver whose review must be dismissed (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)
+  -h, --help                      help for dismiss-github-approval
+      --review-ID int             pull request review ID (default -1)
   -k, --signing-key string        signing key to use for signing attestation
 ```
 

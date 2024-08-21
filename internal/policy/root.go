@@ -15,8 +15,11 @@ var (
 	ErrRootKeyNil          = errors.New("root key not found")
 	ErrTargetsMetadataNil  = errors.New("targetsMetadata not found")
 	ErrTargetsKeyNil       = errors.New("targetsKey is nil")
+	ErrGitHubAppKeyNil     = errors.New("app key is nil")
 	ErrKeyIDEmpty          = errors.New("keyID is empty")
 )
+
+const GitHubAppRoleName = "github-app"
 
 // InitializeRootMetadata initializes a new instance of tuf.RootMetadata with
 // default values and a given key. The default values are version set to 1,
@@ -143,6 +146,61 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 
 	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
+	return rootMetadata, nil
+}
+
+// AddGitHubAppKey adds the 'appKey' as a trusted public key in 'rootMetadata'
+// for the special GitHub app role. This key is used to verify GitHub pull
+// request approval attestation signatures.
+func AddGitHubAppKey(rootMetadata *tuf.RootMetadata, appKey *tuf.Key) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
+	}
+	if appKey == nil {
+		return nil, ErrGitHubAppKeyNil
+	}
+
+	// TODO: support multiple keys / threshold for app
+	rootMetadata.Keys[appKey.KeyID] = appKey
+	role := tuf.Role{
+		KeyIDs:    []string{appKey.KeyID},
+		Threshold: 1,
+	}
+	rootMetadata.AddRole(GitHubAppRoleName, role) // AddRole replaces the specified role if it already exists
+	return rootMetadata, nil
+}
+
+// DeleteGitHubAppKey removes the special GitHub app role from the root
+// metadata.
+func DeleteGitHubAppKey(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
+	}
+
+	// TODO: support multiple keys / threshold for app
+	delete(rootMetadata.Roles, GitHubAppRoleName)
+	return rootMetadata, nil
+}
+
+// EnableGitHubAppApprovals sets GitHubApprovalsTrusted to true in the
+// root metadata.
+func EnableGitHubAppApprovals(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
+	}
+
+	rootMetadata.GitHubApprovalsTrusted = true
+	return rootMetadata, nil
+}
+
+// DisableGitHubAppApprovals sets GitHubApprovalsTrusted to false in the root
+// metadata.
+func DisableGitHubAppApprovals(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
+	}
+
+	rootMetadata.GitHubApprovalsTrusted = false
 	return rootMetadata, nil
 }
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package attestgithub
+package addgithubapproval
 
 import (
 	"fmt"
@@ -17,8 +17,8 @@ type options struct {
 	baseURL           string
 	repository        string
 	pullRequestNumber int
-	commitID          string
-	baseBranch        string
+	reviewID          int64
+	approver          string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -50,28 +50,25 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.pullRequestNumber,
 		"pull-request-number",
 		-1,
-		"pull request number to record in attestation",
+		"pull request number",
 	)
+	cmd.MarkFlagRequired("pull-request-number") //nolint:errcheck
+
+	cmd.Flags().Int64Var(
+		&o.reviewID,
+		"review-ID",
+		-1,
+		"pull request review ID",
+	)
+	cmd.MarkFlagRequired("review-ID") //nolint:errcheck
 
 	cmd.Flags().StringVar(
-		&o.commitID,
-		"commit",
+		&o.approver,
+		"approver",
 		"",
-		"commit to record pull request attestation for",
+		"approver signing key (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)",
 	)
-
-	cmd.Flags().StringVar(
-		&o.baseBranch,
-		"base-branch",
-		"",
-		"base branch for pull request, used with --commit",
-	)
-
-	// When we're using commit, we need the base branch to filter through nested
-	// pull requests
-	cmd.MarkFlagsRequiredTogether("commit", "base-branch")
-
-	cmd.MarkFlagsOneRequired("pull-request-number", "commit")
+	cmd.MarkFlagRequired("approver") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -90,18 +87,19 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if o.commitID != "" {
-		return repo.AddGitHubPullRequestAttestationForCommit(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.commitID, o.baseBranch, true)
+	approverKey, err := common.LoadPublicKey(o.approver)
+	if err != nil {
+		return err
 	}
 
-	return repo.AddGitHubPullRequestAttestationForNumber(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "attest-github",
-		Short: fmt.Sprintf("Record GitHub pull request information as an attestation (developer mode only, set %s=1)", dev.DevModeKey),
+		Use:   "add-github-approval",
+		Short: fmt.Sprintf("Record GitHub pull request approval as an attestation (developer mode only, set %s=1)", dev.DevModeKey),
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
