@@ -16,10 +16,6 @@ func dropCR(data []byte) []byte {
 }
 
 func splitInput(data []byte, atEOF bool) (int, []byte, error) {
-	if isPacketMode {
-		return splitPacket(data, atEOF)
-	}
-
 	if atEOF {
 		return len(data), data, bufio.ErrFinalToken
 	}
@@ -46,10 +42,6 @@ func splitInput(data []byte, atEOF bool) (int, []byte, error) {
 }
 
 func splitOutput(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if isPacketMode {
-		return splitPacket(data, atEOF)
-	}
-
 	if atEOF {
 		return len(data), data, bufio.ErrFinalToken
 	}

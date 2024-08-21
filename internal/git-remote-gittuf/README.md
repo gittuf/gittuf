@@ -1,8 +1,4 @@
-# gittuf Remote Transfer Protocol
-
-Last Modified: July 2, 2024
-
-## Introduction
+# git-remote-gittuf
 
 Alongside the `gittuf` binary, gittuf ships with a custom remote transfer
 protocol binary, implementing Git's [remote-helper
@@ -26,7 +22,9 @@ The gittuf transport supports both HTTPS and SSH remotes.
 
 Currently, the transport must be built from source. Running `go install` will
 compile the transport and place it in your `GOBIN`, which is the same location
-that the `gittuf` binary is installed into.
+that the `gittuf` binary is installed into. As it matures, we will update our
+release configuration and the packaging of gittuf (e.g., on Homebrew) to include
+this binary.
 
 ## How to Use
 
@@ -54,8 +52,3 @@ git remote set-url origin gittuf::git@github.com:gittuf/gittuf
 # For HTTPS
 git remote set-url origin gittuf::https://github.com/gittuf/gittuf
 ```
-
-# Source Code
-
-If you're interested in seeing how it works or improving it, the transport
-source code lives in [internal/git-remote-gittuf](/internal/git-remote-gittuf).

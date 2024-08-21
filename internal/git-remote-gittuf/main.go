@@ -9,6 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/repository"
 )
 
 /*
@@ -85,28 +88,9 @@ var (
 	// as git-upload-pack and git-receive-pack.
 	gitVersion string
 
-	isPacketMode = false
-
 	flushPkt     = []byte{'0', '0', '0', '0'}
 	delimiterPkt = []byte{'0', '0', '0', '1'}
 	endOfReadPkt = []byte{'0', '0', '0', '2'}
-
-	zeroHash = "0000000000000000000000000000000000000000"
-)
-
-type state int
-
-// TODO: we have a mix of states here, lsRefs onwards are when interacting with
-// upload-pack.
-const (
-	start                   state = iota // top level menu of helper, serves as router too when not within a service
-	serviceRouter                        // router for service
-	lsRefs                               // upload-pack
-	lsRefsResponse                       // upload-pack
-	requestingWants                      // upload-pack
-	requestingWantsResponse              // upload-pack
-	packfileIncoming                     // upload-pack
-	packfileDone
 )
 
 const (
@@ -124,7 +108,7 @@ func run() error {
 	remoteName := os.Args[1]
 	url := os.Args[2]
 
-	var handler func(string, string) (map[string]string, bool, error)
+	var handler func(*repository.Repository, string, string) (map[string]string, bool, error)
 	switch {
 	case strings.HasPrefix(url, "https://"), strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "ftp://"), strings.HasPrefix(url, "ftps://"):
 		log("Prefix indicates curl remote helper must be used")
@@ -137,14 +121,12 @@ func run() error {
 		handler = handleSSH
 	}
 
-	// var rslTip string
-	// cmd := exec.Command("git", "--git-dir", gitDir, "rev-parse", rsl.Ref) //nolint:gosec
-	// rslTipB, err := cmd.Output()
-	// if err == nil {
-	// 	rslTip = string(bytes.TrimSpace(rslTipB))
-	// }
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return err
+	}
 
-	gittufRefsTips, isPush, err := handler(remoteName, url)
+	gittufRefsTips, isPush, err := handler(repo, remoteName, url)
 	if err != nil {
 		return err
 	}
@@ -179,11 +161,12 @@ func run() error {
 		// requested. Use _only_ the latest so as to avoid any unnecessary blob
 		// collissions.
 		for ref, tip := range gittufRefsTips {
-			args := []string{"--git-dir", gitDir, "update-ref", ref, tip}
-			cmd := exec.Command("git", args...)
-
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("unable to set '%s' to '%s'", ref, tip)
+			tipH, err := gitinterface.NewHash(tip)
+			if err != nil {
+				return err
+			}
+			if err := repo.GetGitRepository().SetReference(ref, tipH); err != nil {
+				return err
 			}
 		}
 
