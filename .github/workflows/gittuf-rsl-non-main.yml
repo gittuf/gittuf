@@ -3,6 +3,7 @@ on:
   push:
     branches-ignore:
       - 'main'
+permissions: read-all
 jobs:
   create-rsl-entry:
     if: github.repository == 'gittuf/gittuf'
