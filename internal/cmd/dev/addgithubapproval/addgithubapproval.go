@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	repository "github.com/gittuf/gittuf/gittuf"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
@@ -82,12 +81,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.signingKey)
+	signer, err := repository.LoadSigner(o.signingKey)
 	if err != nil {
 		return err
 	}
 
-	approverKey, err := common.LoadPublicKey(o.approver)
+	approverKey, err := repository.LoadPublicKey(o.approver)
 	if err != nil {
 		return err
 	}

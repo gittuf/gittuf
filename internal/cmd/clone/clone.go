@@ -38,7 +38,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	expectedRootKeys := make([]*tuf.Key, len(o.expectedRootKeys))
 
 	for index, keyPath := range o.expectedRootKeys {
-		key, err := common.LoadPublicKey(keyPath)
+		key, err := repository.LoadPublicKey(keyPath)
 		if err != nil {
 			return err
 		}

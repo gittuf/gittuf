@@ -18,6 +18,10 @@ type Repository struct {
 	r *gitinterface.Repository
 }
 
+func (r *Repository) GetGitRepository() *gitinterface.Repository {
+	return r.r
+}
+
 func LoadRepository() (*Repository, error) {
 	slog.Debug("Loading Git repository...")
 
