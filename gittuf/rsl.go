@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package repository
+package gittuf
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"slices"
 
+	rslopts "github.com/gittuf/gittuf/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )

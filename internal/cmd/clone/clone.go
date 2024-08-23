@@ -3,8 +3,8 @@
 package clone
 
 import (
+	repository "github.com/gittuf/gittuf/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )

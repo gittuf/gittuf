@@ -3,8 +3,8 @@
 package skiprewritten
 
 import (
+	repository "github.com/gittuf/gittuf/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 

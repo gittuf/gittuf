@@ -5,9 +5,9 @@ package verifyref
 import (
 	"fmt"
 
+	repository "github.com/gittuf/gittuf/gittuf"
+	verifyopts "github.com/gittuf/gittuf/gittuf/options/verify"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/repository"
-	verifyopts "github.com/gittuf/gittuf/internal/repository/options/verify"
 	"github.com/spf13/cobra"
 )
 

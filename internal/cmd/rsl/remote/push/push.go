@@ -3,7 +3,7 @@
 package push
 
 import (
-	"github.com/gittuf/gittuf/internal/repository"
+	repository "github.com/gittuf/gittuf/gittuf"
 	"github.com/spf13/cobra"
 )
 

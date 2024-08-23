@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package repository
+package gittuf
 
 import (
 	"fmt"
 	"testing"
 
+	verifyopts "github.com/gittuf/gittuf/gittuf/options/verify"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
-	verifyopts "github.com/gittuf/gittuf/internal/repository/options/verify"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/stretchr/testify/assert"
 )

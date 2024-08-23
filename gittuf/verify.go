@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package repository
+package gittuf
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"log/slog"
 
+	verifyopts "github.com/gittuf/gittuf/gittuf/options/verify"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
-	verifyopts "github.com/gittuf/gittuf/internal/repository/options/verify"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified

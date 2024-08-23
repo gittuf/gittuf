@@ -3,9 +3,9 @@
 package record
 
 import (
+	repository "github.com/gittuf/gittuf/gittuf"
+	rslopts "github.com/gittuf/gittuf/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/repository"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/spf13/cobra"
 )
 
