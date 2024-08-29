@@ -5,6 +5,7 @@ package rsl
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"slices"
 	"testing"
 
@@ -39,7 +40,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Nil(t, parentIDs)
 
@@ -62,7 +63,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Contains(t, parentIDs, currentTip)
 }
@@ -323,6 +324,202 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 
 		_, _, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[1])
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+}
+
+func TestGetLatestReferenceEntryForRefUntilNumber(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	otherRefName := "refs/heads/feature"
+
+	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// RSL: main
+
+	rslRef, err := repo.GetReference(Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entry, annotations, err := GetLatestReferenceEntryForRefUntilNumber(repo, refName, 1)
+	// until is inclusive
+	assert.Nil(t, err)
+	assert.Nil(t, annotations)
+	assert.Equal(t, rslRef, entry.ID)
+
+	if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// RSL: main <- feature
+
+	entry, annotations, err = GetLatestReferenceEntryForRefUntilNumber(repo, refName, 1)
+	assert.Nil(t, err)
+	assert.Nil(t, annotations)
+	assert.Equal(t, rslRef, entry.ID)
+
+	// Add annotation for the target entry
+	if err := NewAnnotationEntry([]gitinterface.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// RSL: main <- feature <- annotation-on-main
+
+	entry, annotations, err = GetLatestReferenceEntryForRefUntilNumber(repo, refName, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, rslRef, entry.ID)
+	assertAnnotationsReferToEntry(t, entry, annotations)
+
+	// Set higher until limit
+	_, _, err = GetLatestReferenceEntryForRefUntilNumber(repo, refName, 2)
+	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+	// Check that until=0 triggers error
+	_, _, err = GetLatestReferenceEntryForRefUntilNumber(repo, refName, 0)
+	assert.ErrorIs(t, err, ErrUntilCannotBeZero)
+}
+
+func TestGetLatestReferenceEntryForRefBeforeUntilNumber(t *testing.T) {
+	t.Run("no annotations", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// RSL structure for the test
+		// 1    <- 2       <- 3    <- 4       <- 5
+		// main <- feature <- main <- feature <- main
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []gitinterface.Hash{}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, annotations, err := GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 1)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[3], 1)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[4], 1)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[3], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[3], 1)
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[1], entry.ID)
+
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[1], 1)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Set higher limits to constrain search
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 5)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 3)
+		// until is inclusive
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[3], 3)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Check that until = 0 triggers an error
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 0)
+		assert.ErrorIs(t, err, ErrUntilCannotBeZero)
+	})
+
+	t.Run("with annotations", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// RSL structure for the test
+		// main <- A <- feature <- A <- main <- A <- feature <- A <- main <- A
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []gitinterface.Hash{}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+
+			if err := NewAnnotationEntry([]gitinterface.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err = GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, annotations, err := GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 1)
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+		// Add an annotation at the end for some entry and see it gets pulled in
+		// even when the anchor is for its ancestor
+		assert.Len(t, annotations, 1) // before adding an annotation, we have just 1
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[4], 1)
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+		assert.Len(t, annotations, 2) // now we have 2
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[3], 1)
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[6], 1)
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[7], 1)
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[6], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[1], 1)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Set higher until limits
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[3], 2)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		entry, annotations, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "feature", entryIDs[6], 3)
+		// until is inclusive
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		// Check that until = 0 triggers an error
+		_, _, err = GetLatestReferenceEntryForRefBeforeUntilNumber(repo, "main", entryIDs[3], 0)
+		assert.ErrorIs(t, err, ErrUntilCannotBeZero)
 	})
 }
 
@@ -1302,6 +1499,22 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
+		"entry, fully resolved ref, small number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 1),
+		},
+		"entry, fully resolved ref, large number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+		},
 	}
 
 	for name, test := range tests {
@@ -1358,6 +1571,24 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Message:     "",
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+		},
+		"annotation, no message, small number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 1),
+		},
+		"annotation, no message, large number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 
