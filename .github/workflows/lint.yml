@@ -7,8 +7,7 @@ on:
   pull_request:
     paths-ignore:
       - "docs/*"
-permissions:
-  contents: read
+permissions: read-all
 jobs:
   golangci:
     name: lint

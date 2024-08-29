@@ -11,6 +11,7 @@ on:
       - "docs/*"
       - "!docs/testing/*"
       - "!docs/get-started.md"
+permissions: read-all
 jobs:
   test:
     strategy:

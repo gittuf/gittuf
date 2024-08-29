@@ -5,6 +5,7 @@ on:
     branches: [main]
     types:
       - completed
+permissions: read-all
 jobs:
   gittuf-verify:
     if: github.repository == 'gittuf/gittuf'

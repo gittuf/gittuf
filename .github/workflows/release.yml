@@ -3,11 +3,12 @@ on:
   push:
     tags:
       - 'v*'
-permissions:
-  contents: write
-  id-token: write
+permissions: read-all
 jobs:
   release:
+    permissions:
+      contents: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
