@@ -14,6 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
+	"github.com/gittuf/gittuf/internal/cmd/verifyrefcache"
 	"github.com/gittuf/gittuf/internal/cmd/version"
 	"github.com/spf13/cobra"
 )
@@ -94,6 +95,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(policy.New())
 	cmd.AddCommand(rsl.New())
 	cmd.AddCommand(verifyref.New())
+	cmd.AddCommand(verifyrefcache.New())
 	cmd.AddCommand(version.New())
 
 	return cmd

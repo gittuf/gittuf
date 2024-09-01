@@ -77,6 +77,51 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	return nil
 }
 
+func (r *Repository) VerifyRefCache(ctx context.Context, refName string, opts ...verifyopts.Option) error {
+	options := &verifyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	slog.Debug("Identifying absolute reference path...")
+	refName, err := r.r.AbsoluteReference(refName)
+	if err != nil {
+		return err
+	}
+
+	// Track localRefName to check the expected tip as we may override refName
+	localRefName := refName
+
+	if options.RefNameOverride != "" {
+		// remote ref name is different
+		// We must consider RSL entries that have refNameOverride rather than
+		// refName
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
+		if err != nil {
+			return err
+		}
+
+		refName = refNameOverride
+	}
+
+	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
+
+	expectedTip, err := policy.VerifyRefUsingCache(ctx, r.r, refName)
+	if err != nil {
+		return err
+	}
+
+	// To verify the tip, we _must_ use the localRefName
+	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
+	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
+		return err
+	}
+
+	slog.Debug("Verification successful!")
+	return nil
+}
+
 func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID string, opts ...verifyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode

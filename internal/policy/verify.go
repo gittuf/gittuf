@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -65,7 +66,7 @@ func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string
 func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug("Identifying first RSL entry...")
-	firstEntry, _, err := rsl.GetFirstEntry(repo)
+	firstEntry, _, err := rsl.GetFirstReferenceEntryForRef(repo, target)
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -77,10 +78,67 @@ func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target st
 		return gitinterface.ZeroHash, err
 	}
 
-	// Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
-	// Also, attestations is initially nil because we haven't seen any yet
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, nil, firstEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, latestEntry, target)
+}
+
+func VerifyRefUsingCache(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
+	// Load persistent cache
+	persistentCache, err := cache.LoadPersistentCache(repo)
+	if err != nil {
+		return gitinterface.ZeroHash, err
+	}
+
+	// Add it to the context to pass persistent cache around
+	ctx = context.WithValue(ctx, cache.PersistentCacheKey, persistentCache)
+
+	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	if err != nil {
+		return gitinterface.ZeroHash, err
+	}
+
+	lastVerifiedEntryInCache, has := persistentCache.LastVerifiedEntryForRef[target]
+	if !has {
+		// This ref has never been verified locally
+		// Verify everything and add it to the persistent cache
+		tip, err := VerifyRefFull(ctx, repo, target)
+		if err != nil {
+			return gitinterface.ZeroHash, err
+		}
+
+		persistentCache.LastVerifiedEntryForRef[target] = cache.EntryNumberToID{Number: latestEntry.GetNumber(), ID: latestEntry.GetID()}
+		return tip, persistentCache.Commit(repo)
+	}
+
+	if latestEntry.GetNumber() == lastVerifiedEntryInCache.Number {
+		// Nothing to verify
+		return latestEntry.TargetID, nil
+	}
+
+	if latestEntry.GetNumber() < lastVerifiedEntryInCache.Number {
+		// Persistent cache has a higher number than the latest entry for the ref
+		// TODO: fix up error handling
+		return nil, fmt.Errorf("persistent cache has invalid entry")
+	}
+
+	lastVerifiedEntryT, err := rsl.GetEntry(repo, lastVerifiedEntryInCache.ID)
+	if err != nil {
+		return nil, err
+	}
+	lastVerifiedEntry, isReferenceEntry := lastVerifiedEntryT.(*rsl.ReferenceEntry)
+	if !isReferenceEntry {
+		return nil, fmt.Errorf("persistent cache has invalid entry")
+	}
+
+	if err := VerifyRelativeForRef(ctx, repo, lastVerifiedEntry, latestEntry, target); err != nil {
+		return nil, err
+	}
+
+	// Add latest entry to verified cache
+	// TODO: Add setter / getter
+	persistentCache.LastVerifiedEntryForRef[target] = cache.EntryNumberToID{Number: latestEntry.GetNumber(), ID: latestEntry.GetID()}
+	persistentCache.AddedAttestationsBeforeNumber = latestEntry.GetNumber()
+	return latestEntry.TargetID, persistentCache.Commit(repo)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
@@ -108,48 +166,118 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 		return gitinterface.ZeroHash, err
 	}
 
-	// Find policy entry before the starting point entry
-	slog.Debug("Identifying applicable policy entry...")
-	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
-	if err != nil {
-		return gitinterface.ZeroHash, err
-	}
-
-	slog.Debug("Identifying applicable attestations entry...")
-	var attestationsEntry *rsl.ReferenceEntry
-	attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, fromEntry.GetID())
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return gitinterface.ZeroHash, err
-		}
-	}
-
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyEntry, attestationsEntry, fromEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, fromEntry, latestEntry, target)
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 //
 // TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+// TODO: lastEntry could be nil to indicate until latest
+func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
+		isReferenceEntry    bool
+		err                 error
 	)
 
-	// Load policy applicable at firstEntry
-	slog.Debug("Loading initial policy...")
-	state, err := LoadState(ctx, repo, initialPolicyEntry)
+	// Load persistent cache from ctx
+	var (
+		persistentCacheExists bool
+		persistentCache       *cache.Persistent
+	)
+	persistentCacheT := ctx.Value(cache.PersistentCacheKey)
+	if persistentCacheT != nil {
+		persistentCacheExists = true
+		persistentCache = persistentCacheT.(*cache.Persistent)
+	}
+
+	slog.Debug(fmt.Sprintf("Loading policy applicable at '%s'...", firstEntry.ID.String()))
+	var policyEntry *rsl.ReferenceEntry
+	if persistentCacheExists {
+		policyEntryInCache := persistentCache.FindPolicyEntryNumberForEntry(firstEntry.Number)
+		if policyEntryInCache.Number == 0 {
+			// We don't have anything from the persistent cache, this may be because
+			// the optimization isn't yet used for the firstEntry or for the
+			// repository as a whole
+			// Identify policy by walking the RSL
+			policyEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstEntry.ID)
+			if err != nil {
+				return err
+			}
+		} else {
+			// We have a policy entry we can use in the persistent cache
+			policyEntryT, err := rsl.GetEntry(repo, policyEntryInCache.ID)
+			if err != nil {
+				return err
+			}
+			policyEntry, isReferenceEntry = policyEntryT.(*rsl.ReferenceEntry)
+			if !isReferenceEntry {
+				// TODO / discuss: do we want to fallthrough into the non cache
+				// way of loading policy?
+				return fmt.Errorf("invalid entry in persistent cache")
+			}
+		}
+	} else {
+		// Identify policy by walking the RSL
+		policyEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstEntry.ID)
+		if err != nil {
+			return err
+		}
+	}
+	state, err := LoadState(ctx, repo, policyEntry)
 	if err != nil {
 		return err
 	}
 	currentPolicy = state
 
-	if initialAttestationsEntry != nil {
-		slog.Debug("Loading attestations...")
-		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+	slog.Debug(fmt.Sprintf("Loading attestations applicable at '%s'...", firstEntry.ID.String()))
+	var attestationsEntry *rsl.ReferenceEntry
+	if persistentCacheExists {
+		attestationsEntryInCache := persistentCache.FindAttestationsEntryNumberForEntry(firstEntry.Number)
+		if attestationsEntryInCache.Number == 0 {
+			if persistentCache.AddedAttestationsBeforeNumber < firstEntry.Number {
+				// We don't have anything from the persistent cache, this may be because
+				// the optimization isn't yet used for the firstEntry or for the
+				// repository as a whole
+				// Identify attestations by walking the RSL
+				slog.Debug(fmt.Sprintf("Looking for attestations before entry '%s' until %d...", firstEntry.ID.String(), persistentCache.AddedAttestationsBeforeNumber))
+				attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBeforeUntilNumber(repo, attestations.Ref, firstEntry.ID, persistentCache.AddedAttestationsBeforeNumber)
+				if err != nil {
+					if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+						return err
+					}
+				}
+				persistentCache.AddedAttestationsBeforeNumber = firstEntry.Number
+			}
+		} else {
+			// We have an attestations we can use in the persistent cache
+			slog.Debug("Found attestations entry in persistent cache")
+			attestationsEntryT, err := rsl.GetEntry(repo, attestationsEntryInCache.ID)
+			if err != nil {
+				return err
+			}
+			attestationsEntry, isReferenceEntry = attestationsEntryT.(*rsl.ReferenceEntry)
+			if !isReferenceEntry {
+				// TODO / discuss: do we want to fallthrough into the non cache
+				// way of loading attestatiins?
+				return fmt.Errorf("invalid entry in persistent cache")
+			}
+		}
+	} else {
+		slog.Debug(fmt.Sprintf("Looking for attestations before entry '%s'...", firstEntry.ID.String()))
+		attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, firstEntry.ID)
+		if err != nil {
+			if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				return err
+			}
+		}
+	}
+	if attestationsEntry != nil {
+		attestationsState, err := attestations.LoadAttestationsForEntry(repo, attestationsEntry)
 		if err != nil {
 			return err
 		}
@@ -193,6 +321,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 
 				slog.Debug("Updating current policy...")
 				currentPolicy = newPolicy
+
+				persistentCache.InsertPolicyEntryNumber(entry.Number, entry.ID)
+
 				continue
 			}
 
@@ -204,6 +335,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 				}
 
 				currentAttestations = newAttestationsState
+
+				persistentCache.InsertAttestationEntryNumber(entry.Number, entry.ID)
+
 				continue
 			}
 
@@ -607,8 +741,12 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
 	verifiers, err := policy.FindVerifiersForPath(target)
 	if err != nil {
+		slog.Debug("Error finding verifiers")
+		slog.Debug(err.Error())
 		return "", err
 	}
+
+	slog.Debug("Found verifiers")
 
 	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, approverKeyIDs)
 }

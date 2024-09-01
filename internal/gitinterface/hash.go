@@ -22,7 +22,6 @@ var (
 
 // Hash represents a Git object hash. It is a lightweight wrapper around the
 // standard hex encoded representation of a SHA-1 or SHA-256 hash used by Git.
-
 type Hash []byte
 
 // String returns the hex encoded hash.

@@ -21,5 +21,6 @@ A security layer for Git repositories, powered by TUF
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log
 * [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
 * [gittuf verify-ref](gittuf_verify-ref.md)	 - Tools for verifying gittuf policies
+* [gittuf verify-ref-cache](gittuf_verify-ref-cache.md)	 - Tools for verifying gittuf policies
 * [gittuf version](gittuf_version.md)	 - Version of gittuf
 
