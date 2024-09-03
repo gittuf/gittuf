@@ -106,30 +106,14 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	)
 
 	// Load policy applicable at firstEntry
-	// If firstEntry is for policy, we don't walk the RSL here
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.ID))
-	var initialPolicyEntry *rsl.ReferenceEntry
-	if firstEntry.RefName == PolicyRef {
-		initialPolicyEntry = firstEntry
-	} else {
-		initialPolicyEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstEntry.ID)
-		if err != nil {
-			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-				// No policy found is only okay if firstEntry is
-				// the very first entry in the RSL
-				firstEntryParentIDs, err := repo.GetCommitParentIDs(firstEntry.ID)
-				if err != nil {
-					return err
-				}
-				if len(firstEntryParentIDs) != 0 {
-					return ErrPolicyNotFound
-				}
-			} else {
-				return err
-			}
-		}
+	policySearcher := NewRegularSearcher(repo)
+	initialPolicyEntry, err := policySearcher.FindPolicyEntryFor(firstEntry)
+	if err != nil {
+		return err
 	}
 	if initialPolicyEntry != nil {
+		// Searcher gives us nil when firstEntry is the very firstEntry
 		state, err := LoadState(ctx, repo, initialPolicyEntry)
 		if err != nil {
 			return err
@@ -138,19 +122,18 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	}
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID))
-	initialAttestationsEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, firstEntry.ID)
-	if err == nil {
+	attestationsSearcher := attestations.NewRegularSearcher(repo)
+	initialAttestationsEntry, err := attestationsSearcher.FindAttestationsEntryFor(firstEntry)
+	if err != nil {
+		return err
+	}
+	if initialAttestationsEntry != nil {
+		// Attestations are not compulsory, this can be nil with no err
 		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
 		if err != nil {
 			return err
 		}
 		currentAttestations = attestationsState
-	} else {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			// Attestations may not be used yet, they're not
-			// compulsory like policies are
-			return err
-		}
 	}
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
