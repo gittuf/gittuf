@@ -34,13 +34,6 @@ var (
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
 func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
-	// Get latest policy entry
-	slog.Debug("Loading policy...")
-	policyState, err := LoadCurrentState(ctx, repo, PolicyRef)
-	if err != nil {
-		return gitinterface.ZeroHash, err
-	}
-
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
@@ -48,15 +41,7 @@ func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string
 		return gitinterface.ZeroHash, err
 	}
 
-	// Find latest set of attestations
-	slog.Debug("Loading current set of attestations...")
-	attestationsState, err := attestations.LoadCurrentAttestations(repo)
-	if err != nil {
-		return gitinterface.ZeroHash, err
-	}
-
-	slog.Debug("Verifying entry...")
-	return latestEntry.TargetID, verifyEntry(ctx, repo, policyState, attestationsState, latestEntry)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, latestEntry, latestEntry, target)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
@@ -77,10 +62,8 @@ func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target st
 		return gitinterface.ZeroHash, err
 	}
 
-	// Do a relative verify from start entry to the latest entry (firstEntry here == policyEntry)
-	// Also, attestations is initially nil because we haven't seen any yet
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, nil, firstEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, latestEntry, target)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
@@ -94,11 +77,11 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 		return gitinterface.ZeroHash, err
 	}
 
-	// TODO: we should instead find the latest ref entry before the entryID and
-	// use that
 	fromEntry, isRefEntry := fromEntryT.(*rsl.ReferenceEntry)
 	if !isRefEntry {
-		return gitinterface.ZeroHash, err
+		// TODO: we should instead find the latest reference entry
+		// before the entryID and use that
+		return gitinterface.ZeroHash, fmt.Errorf("starting entry is not an RSL reference entry")
 	}
 
 	// Find latest entry for target
@@ -108,52 +91,66 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 		return gitinterface.ZeroHash, err
 	}
 
-	// Find policy entry before the starting point entry
-	slog.Debug("Identifying applicable policy entry...")
-	policyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, fromEntry.GetID())
-	if err != nil {
-		return gitinterface.ZeroHash, err
-	}
-
-	slog.Debug("Identifying applicable attestations entry...")
-	var attestationsEntry *rsl.ReferenceEntry
-	attestationsEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, fromEntry.GetID())
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return gitinterface.ZeroHash, err
-		}
-	}
-
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, policyEntry, attestationsEntry, fromEntry, latestEntry, target)
+	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, fromEntry, latestEntry, target)
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-//
-// TODO: should the policy entry be inferred from the specified first entry?
-func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, initialPolicyEntry, initialAttestationsEntry, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
+		err                 error
 	)
 
 	// Load policy applicable at firstEntry
-	slog.Debug("Loading initial policy...")
-	state, err := LoadState(ctx, repo, initialPolicyEntry)
-	if err != nil {
-		return err
+	// If firstEntry is for policy, we don't walk the RSL here
+	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.ID))
+	var initialPolicyEntry *rsl.ReferenceEntry
+	if firstEntry.RefName == PolicyRef {
+		initialPolicyEntry = firstEntry
+	} else {
+		initialPolicyEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstEntry.ID)
+		if err != nil {
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				// No policy found is only okay if firstEntry is
+				// the very first entry in the RSL
+				firstEntryParentIDs, err := repo.GetCommitParentIDs(firstEntry.ID)
+				if err != nil {
+					return err
+				}
+				if len(firstEntryParentIDs) != 0 {
+					return ErrPolicyNotFound
+				}
+			} else {
+				return err
+			}
+		}
 	}
-	currentPolicy = state
+	if initialPolicyEntry != nil {
+		state, err := LoadState(ctx, repo, initialPolicyEntry)
+		if err != nil {
+			return err
+		}
+		currentPolicy = state
+	}
 
-	if initialAttestationsEntry != nil {
-		slog.Debug("Loading attestations...")
+	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID))
+	initialAttestationsEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, firstEntry.ID)
+	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
 		if err != nil {
 			return err
 		}
 		currentAttestations = attestationsState
+	} else {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// Attestations may not be used yet, they're not
+			// compulsory like policies are
+			return err
+		}
 	}
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
@@ -180,18 +177,25 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 			}
 			slog.Debug("Checking if entry is for policy reference...")
 			if entry.RefName == PolicyRef {
-				// TODO: this is repetition if the firstEntry is for policy
 				newPolicy, err := loadStateForEntry(repo, entry)
 				if err != nil {
 					return err
 				}
 
-				slog.Debug("Verifying new policy using current policy...")
-				if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
-					return err
+				if currentPolicy != nil {
+					// currentPolicy can be nil when
+					// verifying from the beginning of the
+					// RSL entry and we only have staging
+					// refs
+					slog.Debug("Verifying new policy using current policy...")
+					if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
+						return err
+					}
+					slog.Debug("Updating current policy...")
+				} else {
+					slog.Debug("Setting current policy...")
 				}
 
-				slog.Debug("Updating current policy...")
 				currentPolicy = newPolicy
 				continue
 			}
@@ -208,6 +212,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, in
 			}
 
 			slog.Debug("Verifying changes...")
+			if currentPolicy == nil {
+				return ErrPolicyNotFound
+			}
 			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
 				slog.Debug("Violation found, checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
