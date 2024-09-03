@@ -5,12 +5,21 @@ package policy
 import (
 	"errors"
 
+	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
 type Searcher interface {
 	FindPolicyEntryFor(*rsl.ReferenceEntry) (*rsl.ReferenceEntry, error)
+}
+
+func NewSearcher(repo *gitinterface.Repository) Searcher {
+	persistentCache, err := cache.LoadPersistentCache(repo)
+	if err == nil {
+		return NewRegularSearcher(repo)
+	}
+	return NewCacheSearcher(repo, persistentCache)
 }
 
 type RegularSearcher struct {
@@ -50,4 +59,35 @@ func (r *RegularSearcher) FindPolicyEntryFor(entry *rsl.ReferenceEntry) (*rsl.Re
 
 func NewRegularSearcher(repo *gitinterface.Repository) *RegularSearcher {
 	return &RegularSearcher{repo: repo}
+}
+
+type CacheSearcher struct {
+	repo            *gitinterface.Repository
+	persistentCache *cache.Persistent
+}
+
+func (c *CacheSearcher) FindPolicyEntryFor(entry *rsl.ReferenceEntry) (*rsl.ReferenceEntry, error) {
+	policyEntryInCache := c.persistentCache.FindPolicyEntryNumberForEntry(entry.Number)
+	if policyEntryInCache.Number == 0 {
+		// We don't have anything from the persistent cache, this may be
+		// because the optimization isn't yet used for the firstEntry or
+		// for the repository as a whole
+
+		return NewRegularSearcher(c.repo).FindPolicyEntryFor(entry)
+	}
+
+	policyEntryT, err := rsl.GetEntry(c.repo, policyEntryInCache.ID)
+	if err != nil {
+		return nil, err
+	}
+	policyEntry, isReferenceEntry := policyEntryT.(*rsl.ReferenceEntry)
+	if !isReferenceEntry {
+		return nil, cache.ErrInvalidEntry
+	}
+
+	return policyEntry, nil
+}
+
+func NewCacheSearcher(repo *gitinterface.Repository, persistentCache *cache.Persistent) *CacheSearcher {
+	return &CacheSearcher{repo: repo, persistentCache: persistentCache}
 }
