@@ -83,7 +83,28 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
+		assert.Nil(t, err)
+
+		err = VerifyRelativeForRef(testCtx, repo, entry, firstEntry, refName)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	})
+
+	t.Run("no recovery, first entry is the very first entry", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,28 +114,59 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, entry, policyEntry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	})
+
+	t.Run("no recovery, first entry is the very first entry but policy is not applied", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		currentRSLTip, err := repo.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentRSLTipParentIDs, err := repo.GetCommitParentIDs(currentRSLTip)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(rsl.Ref, currentRSLTipParentIDs[0]); err != nil {
+			// Set to parent -> this is policy staging
+			t.Fatal(err)
+		}
+
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -124,7 +176,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit
@@ -141,7 +193,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -149,17 +201,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -169,7 +221,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit
@@ -186,7 +238,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -194,17 +246,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -214,7 +266,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit's tree
@@ -238,7 +290,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -246,17 +298,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -266,7 +318,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit's tree
@@ -290,7 +342,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -298,17 +350,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -318,7 +370,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -329,7 +381,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's still in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		invalidEntryIDs = append(invalidEntryIDs, entryID)
@@ -348,7 +400,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -356,17 +408,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -376,7 +428,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -387,7 +439,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's still in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit
@@ -404,7 +456,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// An invalid entry is not marked as skipped
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrInvalidEntryNotSkipped)
 	})
 
@@ -412,17 +464,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -432,7 +484,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit
@@ -449,7 +501,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		// Send it into invalid state again
@@ -459,7 +511,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit
@@ -476,7 +528,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 	})
 
@@ -484,18 +536,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
 
-		// Add some commits
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyBytes)
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
@@ -506,7 +557,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
@@ -515,7 +566,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the invalid last good commit
@@ -532,7 +583,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
 
@@ -540,17 +591,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
@@ -560,7 +611,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Fix using the known-good commit's tree
@@ -584,14 +635,14 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// No error anymore
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		// Skip the recovery entry as well
 		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
 
@@ -599,17 +650,17 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
 
-		policyEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, PolicyRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, firstEntry, gpgKeyBytes)
+		firstEntry.ID = firstEntryID
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err := VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.Nil(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -618,7 +669,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		// It's in an invalid state right now, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 
 		// Create a skip annotation for the invalid entry
@@ -627,7 +678,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		annotation.ID = annotationID
 
 		// No fix entry, error out
-		err = VerifyRelativeForRef(testCtx, repo, policyEntry, nil, policyEntry, entry, refName)
+		err = VerifyRelativeForRef(testCtx, repo, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
 }
@@ -906,13 +957,6 @@ func TestVerifyEntry(t *testing.T) {
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
-
-	// FIXME: test for file policy passing for situations where a commit is seen
-	// by the RSL before its signing key is rotated out. This commit should be
-	// trusted for merges under the new policy because it predates the policy
-	// change. This only applies to fast forwards, any other commits that make
-	// the same semantic change will result in a new commit with a new
-	// signature, unseen by the RSL.
 }
 
 func TestVerifyTagEntry(t *testing.T) {
