@@ -133,3 +133,69 @@ func TestDeleteTargetsKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
 	assert.Nil(t, rootMetadata)
 }
+
+func TestUpdateRootThreshold(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	newRootKey1, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newRootKey2, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata = AddRootKey(rootMetadata, newRootKey1)
+	rootMetadata = AddRootKey(rootMetadata, newRootKey2)
+
+	updatedRootMetadata, err := UpdateRootThreshold(rootMetadata, 4)
+	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
+	assert.Nil(t, updatedRootMetadata)
+
+	updatedRootMetadata, err = UpdateRootThreshold(rootMetadata, 0)
+	assert.Nil(t, err)
+	if assert.NotNil(t, updatedRootMetadata) {
+		assert.Equal(t, 0, updatedRootMetadata.Roles[RootRoleName].Threshold)
+	}
+}
+
+func TestUpdateTargetsThreshold(t *testing.T) {
+	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	targetsKey1, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsKey2, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey1)
+	assert.Nil(t, err)
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey2)
+	assert.Nil(t, err)
+
+	updatedRootMetadata, err := UpdateTargetsThreshold(rootMetadata, 4)
+	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
+	assert.Nil(t, updatedRootMetadata)
+
+	updatedRootMetadata, err = UpdateTargetsThreshold(rootMetadata, 0)
+	assert.Nil(t, err)
+	if assert.NotNil(t, updatedRootMetadata) {
+		assert.Equal(t, 1, updatedRootMetadata.Roles[RootRoleName].Threshold)
+	}
+}
