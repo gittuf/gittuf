@@ -99,6 +99,10 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+	// require firstEntry != nil
+	// require lastEntry != nil
+	// require target != ""
+
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
@@ -120,6 +124,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		}
 		currentPolicy = state
 	}
+	// require currentPolicy != nil || parent(firstEntry) == nil
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID))
 	attestationsSearcher := attestations.NewRegularSearcher(repo)
@@ -135,6 +140,8 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		}
 		currentAttestations = attestationsState
 	}
+	// require currentAttestations != nil || ref(entry) != attestations.Ref
+	//                                         for entry in 0..firstEntry
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
 	slog.Debug("Identifying all entries in range...")
@@ -142,11 +149,115 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	if err != nil {
 		return err
 	}
+	// require len(entries) != 0
 
 	// Verify each entry, looking for a fix when an invalid entry is encountered
+
+	alreadyVerified := set.NewSet[int]()
+	for i, entry := range entries {
+		if alreadyVerified.Has(i) {
+			continue
+		}
+
+		// should we verify an entry if it has been skipped?
+
+		switch entry.RefName {
+		case PolicyStagingRef:
+			// noop
+
+		case PolicyRef:
+			newPolicy, err := loadStateForEntry(repo, entry)
+			if err != nil {
+				return err
+			}
+
+			if currentPolicy != nil {
+				if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
+					return err
+				}
+			}
+			currentPolicy = newPolicy
+
+		case attestations.Ref:
+			newAttestationsState, err := attestations.LoadAttestationsForEntry(repo, entry)
+			if err != nil {
+				return err
+			}
+
+			currentAttestations = newAttestationsState
+
+		default:
+			if currentPolicy == nil {
+				return ErrPolicyNotFound
+			}
+
+			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
+				slog.Debug("Violation found, checking if entry has been revoked...")
+				// If the invalid entry is never marked as skipped, we return err
+				if !entry.SkippedBy(annotations[entry.ID.String()]) {
+					return err
+				}
+
+				// The invalid entry's been marked as skipped but we still need
+				// to see if another entry fixed state for non-gittuf users
+				slog.Debug("Entry has been revoked, searching for fix entry...")
+				if i == len(entries)-1 {
+					// Fix entry does not exist after revoking annotation
+					return err
+				}
+
+				var foundFix bool
+
+				// 1. What's the last good state?
+				slog.Debug("Identifying last valid state...")
+				lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
+				if err != nil {
+					return err
+				}
+				slog.Debug("Verifying identified last valid entry has not been revoked...")
+				if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
+					return ErrLastGoodEntryIsSkipped
+				}
+				// gittuf requires the fix to point to a commit that is tree-same as the
+				// last good state
+				lastGoodTreeID, err := repo.GetCommitTreeID(lastGoodEntry.TargetID)
+				if err != nil {
+					return err
+				}
+
+				for j := i + 1; j < len(entries); j++ {
+					laterEntry := entries[j]
+					if laterEntry.RefName != entry.RefName {
+						continue
+					}
+
+					alreadyVerified.Add(j)
+
+					laterEntryTreeID, newErr := repo.GetCommitTreeID(laterEntry.TargetID)
+					if err != nil {
+						return errors.Join(err, newErr)
+					}
+
+					if laterEntryTreeID.Equal(lastGoodTreeID) {
+						foundFix = true
+						break
+					}
+
+					// must also be revoked
+					if !laterEntry.SkippedBy(annotations[laterEntry.ID.String()]) {
+						return err
+					}
+				}
+			}
+
+		}
+	}
+
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
 	for len(entries) != 0 {
+		// invariant invalidEntry == nil || inRecoveryMode()
+
 		if invalidEntry == nil {
 			// Pop entry from queue
 			entry := entries[0]
@@ -164,6 +275,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 				if err != nil {
 					return err
 				}
+				// require newPolicy != nil
 
 				if currentPolicy != nil {
 					// currentPolicy can be nil when
