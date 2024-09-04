@@ -13,11 +13,9 @@ jobs:
       id-token: write
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@bb2e6c13c0825057e48e931b686d61c3b6267ef8
+        uses: gittuf/gittuf-installer@fe644793aaaa419fef63800d5cf318663aa93105
       - name: Install gitsign
-        uses: actions-go/go-install@0607b3e7a61b8f1b55e1169a884804d084db73af
-        with:
-          module: github.com/sigstore/gitsign@main
+        uses: chainguard-dev/actions/setup-gitsign@main
       - name: Checkout repository
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
@@ -27,13 +25,8 @@ jobs:
           KEY: ${{ secrets.KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global commit.gpgsign true       # Sign all commits
-          git config --global gpg.x509.program gitsign  # Use gitsign for signing
-          git config --global gpg.format x509           # gitsign expects x509 args
-          git config --global user.name "${{ github.workflow }}"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           echo "$KEY" > /tmp/key
+          chmod 600 /tmp/key # ssh-keygen signer requires this
 
           git fetch origin refs/gittuf/reference-state-log:refs/gittuf/reference-state-log refs/gittuf/attestations:refs/gittuf/attestations
           GITTUF_DEV=1 gittuf dev attest-github --signing-key /tmp/key --repository ${{ github.repository }} --commit ${{ github.sha }} --base-branch "main"
