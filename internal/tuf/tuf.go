@@ -12,8 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/danwakefield/fnmatch"
-
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
@@ -180,17 +178,16 @@ func (d *Delegations) AddDelegation(delegation Delegation) {
 // pertaining to the delegation.
 type Delegation struct {
 	Name        string           `json:"name"`
-	Paths       []string         `json:"paths"`
+	Paths       []Path           `json:"paths"`
 	Terminating bool             `json:"terminating"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`
 	Role
 }
 
 // Matches checks if any of the delegation's patterns match the target.
-func (d *Delegation) Matches(target string) bool {
+func (d *Delegation) Matches(target []string) bool {
 	for _, pattern := range d.Paths {
-		// We validate pattern when it's added to / updated in the metadata
-		if matches := fnmatch.Match(pattern, target, 0); matches {
+		if matches := pattern.Matches(target); matches {
 			return true
 		}
 	}

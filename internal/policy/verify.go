@@ -400,7 +400,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for _, path := range paths {
-			verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
+			verifiers, err := policy.FindVerifiersForPath([]string{fmt.Sprintf("%s:%s", fileRuleScheme, path), fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName)})
 			if err != nil {
 				return err
 			}
@@ -455,7 +455,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	}
 
 	// Find authorized verifiers for tag's RSL entry
-	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
+	verifiers, err := policy.FindVerifiersForPath([]string{fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName)})
 	if err != nil {
 		return err
 	}
@@ -605,7 +605,7 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 }
 
 func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
-	verifiers, err := policy.FindVerifiersForPath(target)
+	verifiers, err := policy.FindVerifiersForPath([]string{target})
 	if err != nil {
 		return "", err
 	}

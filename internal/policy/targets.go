@@ -22,7 +22,7 @@ func InitializeTargetsMetadata() *tuf.TargetsMetadata {
 }
 
 // AddDelegation adds a new delegation to TargetsMetadata.
-func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
+func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []tuf.Path, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
@@ -52,7 +52,7 @@ func AddDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, author
 }
 
 // UpdateDelegation is used to amend a delegation in TargetsMetadata.
-func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int) (*tuf.TargetsMetadata, error) {
+func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []tuf.Path, threshold int) (*tuf.TargetsMetadata, error) {
 	if ruleName == AllowRuleName {
 		return nil, ErrCannotManipulateAllowRule
 	}
@@ -128,7 +128,7 @@ func AddKeyToTargets(targetsMetadata *tuf.TargetsMetadata, authorizedKeys []*tuf
 func AllowRule() tuf.Delegation {
 	return tuf.Delegation{
 		Name:        AllowRuleName,
-		Paths:       []string{"*"},
+		Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "*"}},
 		Terminating: true,
 		Role: tuf.Role{
 			KeyIDs:    []string{},

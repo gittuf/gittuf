@@ -208,14 +208,22 @@ func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
-func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
+func (s *State) FindVerifiersForPath(path []string) ([]*Verifier, error) {
 	if s.verifiersCache == nil {
 		slog.Debug("Initializing path cache in policy...")
 		s.verifiersCache = map[string][]*Verifier{}
-	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
-		// Cache hit for this path in this policy
-		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
-		return verifiers, nil
+	} else {
+		var cachePath string
+		if len(path) > 1 {
+			cachePath = path[0] + ";" + path[1]
+		} else {
+			cachePath = path[0]
+		}
+		if verifiers, cacheHit := s.verifiersCache[cachePath]; cacheHit {
+			// Cache hit for this path in this policy
+			slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", cachePath))
+			return verifiers, nil
+		}
 	}
 
 	if !s.HasTargetsRole(TargetsRoleName) {
@@ -242,7 +250,14 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 	verifiers := []*Verifier{}
 	for {
 		if len(groupedDelegations) == 0 {
-			s.verifiersCache[path] = verifiers
+			var cachePath string
+			if len(path) > 1 {
+				cachePath = path[0] + ";" + path[1]
+			} else {
+				cachePath = path[0]
+			}
+
+			s.verifiersCache[cachePath] = verifiers
 			return verifiers, nil
 		}
 
@@ -788,7 +803,7 @@ func (s *State) hasFileRule() (bool, error) {
 			}
 
 			for _, path := range delegation.Paths {
-				if strings.HasPrefix(path, "file:") {
+				if path.PathType() == tuf.FILE_PATH {
 					return true, nil
 				}
 			}

@@ -41,10 +41,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		fmt.Printf(strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.Name)
 		gitpaths, filepaths := []string{}, []string{}
 		for _, path := range curRule.Delegation.Paths {
-			if strings.HasPrefix(path, "git:") {
-				gitpaths = append(gitpaths, path)
+			if path.PathType() == 0 {
+				gitpaths = append(gitpaths, path.GetPath())
 			} else {
-				filepaths = append(filepaths, path)
+				filepaths = append(filepaths, path.GetPath())
 			}
 		}
 		if len(filepaths) > 0 {
