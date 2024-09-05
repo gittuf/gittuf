@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@bb2e6c13c0825057e48e931b686d61c3b6267ef8
+        uses: gittuf/gittuf-installer@fe644793aaaa419fef63800d5cf318663aa93105
       - name: Checkout and verify repository
         run: |
           gittuf clone https://github.com/${{ github.repository }}
