@@ -12,7 +12,7 @@ import (
 )
 
 func TestPrepareRSLLogOutput(t *testing.T) {
-	t.Run("simple", func(t *testing.T) {
+	t.Run("simple without number", func(t *testing.T) {
 		branchEntry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
 		branchEntry.ID = gitinterface.ZeroHash
 		tagEntry := rsl.NewReferenceEntry("refs/tags/v1", gitinterface.ZeroHash)
@@ -27,6 +27,31 @@ entry 0000000000000000000000000000000000000000
 
   Ref:    refs/tags/v1
   Target: 0000000000000000000000000000000000000000
+`
+
+		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{branchEntry, tagEntry}, nil)
+		assert.Equal(t, expectedOutput, logOutput)
+	})
+
+	t.Run("simple with number", func(t *testing.T) {
+		branchEntry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
+		branchEntry.ID = gitinterface.ZeroHash
+		branchEntry.Number = 1
+		tagEntry := rsl.NewReferenceEntry("refs/tags/v1", gitinterface.ZeroHash)
+		tagEntry.ID = gitinterface.ZeroHash
+		tagEntry.Number = 2
+
+		expectedOutput := `entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/tags/v1
+  Target: 0000000000000000000000000000000000000000
+  Number: 2
 `
 
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{branchEntry, tagEntry}, nil)
@@ -65,14 +90,17 @@ entry 0000000000000000000000000000000000000000
 
   Ref:    refs/tags/v1
   Target: 0000000000000000000000000000000000000000
+  Number: 2
 
 entry %s (skipped)
 
   Ref:    refs/heads/main
   Target: 0000000000000000000000000000000000000000
+  Number: 1
 
     Annotation ID: %s
     Skip:          yes
+    Number:        3
     Message:
       msg
 `, tagEntry.ID.String(), branchEntry.ID.String(), annotationEntry.GetID().String())

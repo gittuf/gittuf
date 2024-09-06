@@ -82,6 +82,7 @@ func TestVerifyRef(t *testing.T) {
 			options = append(options, verifyopts.WithLatestOnly())
 		}
 
+		fmt.Println(name)
 		err := repo.VerifyRef(testCtx, test.localRefName, options...)
 		if test.err != nil {
 			assert.ErrorIs(t, err, test.err, fmt.Sprintf("unexpected error in test '%s'", name))

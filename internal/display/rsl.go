@@ -15,14 +15,17 @@ entry <entryID> (skipped)
 
   Ref:    <refName>
   Target: <targetID>
+  Number: <number>
 
     Annotation ID: <annotationID>
     Skip:          <yes/no>
+    Number:        <number>
     Message:
       <message>
 
     Annotation ID: <annotationID>
     Skip:          <yes/no>
+    Number:        <number>
     Message:
       <message>
 */
@@ -49,6 +52,9 @@ func PrepareRSLLogOutput(entries []*rsl.ReferenceEntry, annotationMap map[string
 
 		log += fmt.Sprintf("\n  Ref:    %s", entry.RefName)
 		log += fmt.Sprintf("\n  Target: %s", entry.TargetID.String())
+		if entry.Number != 0 {
+			log += fmt.Sprintf("\n  Number: %d", entry.Number)
+		}
 
 		if annotations, ok := annotationMap[entry.ID.String()]; ok {
 			for _, annotation := range annotations {
@@ -58,6 +64,9 @@ func PrepareRSLLogOutput(entries []*rsl.ReferenceEntry, annotationMap map[string
 					log += "\n    Skip:          yes"
 				} else {
 					log += "\n    Skip:          no"
+				}
+				if annotation.Number != 0 {
+					log += fmt.Sprintf("\n    Number:        %d", annotation.Number)
 				}
 				log += fmt.Sprintf("\n    Message:\n      %s", annotation.Message)
 			}

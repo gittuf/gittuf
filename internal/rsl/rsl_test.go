@@ -5,6 +5,7 @@ package rsl
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"slices"
 	"testing"
 
@@ -39,7 +40,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Nil(t, parentIDs)
 
@@ -62,7 +63,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Contains(t, parentIDs, currentTip)
 }
@@ -1291,14 +1292,30 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 				RefName:  "refs/heads/main",
 				TargetID: gitinterface.ZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 0),
 		},
 		"entry, non-zero commit": {
 			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
 				TargetID: nonZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", NumberKey, 0),
+		},
+		"entry, fully resolved ref, small number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 1),
+		},
+		"entry, fully resolved ref, large number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 
@@ -1323,7 +1340,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Skip:        true,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 0),
 		},
 		"annotation, with message": {
 			entry: &AnnotationEntry{
@@ -1331,7 +1348,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Skip:        true,
 				Message:     "message",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 0, BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, with multi-line message": {
 			entry: &AnnotationEntry{
@@ -1339,7 +1356,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 0, BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
 		},
 		"annotation, no message, skip false": {
 			entry: &AnnotationEntry{
@@ -1347,7 +1364,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false", NumberKey, 0),
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
 			entry: &AnnotationEntry{
@@ -1355,7 +1372,25 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false", NumberKey, 0),
+		},
+		"annotation, no message, small number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 1),
+		},
+		"annotation, no message, large number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 

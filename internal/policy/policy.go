@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -82,7 +83,43 @@ type DelegationWithDepth struct {
 // entry in the RSL. If no policy states are found and the entry is for the
 // policy-staging ref, that entry is returned with no verification.
 func LoadState(ctx context.Context, repo *gitinterface.Repository, entry *rsl.ReferenceEntry) (*State, error) {
+	// Load persistent cache from ctx
+	var (
+		persistentCacheExists bool
+		persistentCache       *cache.Persistent
+	)
+	persistentCacheT := ctx.Value(cache.PersistentCacheKey)
+	if persistentCacheT != nil {
+		persistentCacheExists = true
+		persistentCache = persistentCacheT.(*cache.Persistent)
+	}
+
+	// Is requested state already in the cache? If yes, then assume it was
+	// verified previously and return it.
+	if persistentCacheExists {
+		if expectedEntryID, has := persistentCache.HasPolicyEntryNumber(entry.Number); has {
+			slog.Debug("Found requested policy state in persistent cache, verifying entry ID matches cache...")
+
+			// Ensure the cache's policy entry ID matches the requested entry's ID
+			if !entry.ID.Equal(expectedEntryID) {
+				return nil, fmt.Errorf("requested entry ID '%s' is inconsistent with cached entry ID '%s' for entry '%d'", entry.ID.String(), expectedEntryID.String(), entry.Number)
+			}
+
+			// Return without any additional verification
+			return loadStateForEntry(repo, entry)
+		}
+	}
+
+	// TODO: update verifySuccessiveRootsAndLoadLatestPolicyState to accept
+	// start point
+
 	// Verify prior roots and get the latest applicable policy state
+	// currentPolicyState is the immediately preceding policy state to the
+	// requested one
+	// Thus, it's "current" in the sense that it is used to verify the requested
+	// state
+	// If currentPolicyState is nil, then the requested state is the first
+	// policy state
 	currentPolicyState, err := verifySuccessiveRootsAndLoadLatestPolicyState(ctx, repo, entry)
 	if err != nil {
 		return nil, fmt.Errorf("unable to verify roots of trust for policy states: %w", err)
@@ -95,6 +132,9 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, entry *rsl.Re
 
 	if currentPolicyState == nil || entry.RefName == PolicyStagingRef {
 		// Either we have just one policy entry or we're loading a staging ref
+		if persistentCacheExists && entry.RefName == PolicyRef {
+			persistentCache.InsertPolicyEntryNumber(entry.Number, entry.ID)
+		}
 		return requestedState, nil
 	}
 
@@ -105,6 +145,12 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, entry *rsl.Re
 
 	if err := requestedState.Verify(ctx); err != nil {
 		return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
+	}
+
+	// The requested state passed verification and has been inserted into the
+	// cache
+	if persistentCacheExists {
+		persistentCache.InsertPolicyEntryNumber(entry.Number, entry.ID)
 	}
 
 	return requestedState, nil
@@ -858,6 +904,26 @@ func verifySuccessiveRootsAndLoadLatestPolicyState(ctx context.Context, repo *gi
 		return nil, err
 	}
 
+	// Load persistent cache from ctx
+	var (
+		persistentCacheExists bool
+		persistentCache       *cache.Persistent
+	)
+	persistentCacheT := ctx.Value(cache.PersistentCacheKey)
+	if persistentCacheT != nil {
+		persistentCacheExists = true
+		persistentCache = persistentCacheT.(*cache.Persistent)
+	}
+
+	if persistentCacheExists {
+		// Right now, this is the first policy entry in the history of the
+		// repository, so this is implicitly trusted
+		// If the first entry is made a parameter, we must insert into cache
+		// conditionally as all other policy entries are only inserted when they
+		// can be verified by the prior policy's root
+		persistentCache.InsertPolicyEntryNumber(firstPolicyEntry.Number, firstPolicyEntry.ID)
+	}
+
 	latestPolicyEntryBeforeSpecifiedEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -888,6 +954,11 @@ func verifySuccessiveRootsAndLoadLatestPolicyState(ctx context.Context, repo *gi
 		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID))
 		if err := verifiedState.VerifyNewState(ctx, underTestState); err != nil {
 			return nil, err
+		}
+
+		if persistentCacheExists {
+			// The policy entry was verified, and can be inserted into the cache
+			persistentCache.InsertPolicyEntryNumber(entry.Number, entry.ID)
 		}
 
 		verifiedState = underTestState
