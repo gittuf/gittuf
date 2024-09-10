@@ -3,6 +3,7 @@
 package policy
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
@@ -84,6 +85,83 @@ func TestUpdateDelegation(t *testing.T) {
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
+}
+
+func TestReorderDelegations(t *testing.T) {
+	targetsMetadata := InitializeTargetsMetadata()
+
+	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-1", []*tuf.Key{key1}, []string{"path1/"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-2", []*tuf.Key{key2}, []string{"path2/"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-3", []*tuf.Key{key1, key2}, []string{"path3/"}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string]struct {
+		ruleNames     []string
+		expected      []string
+		expectedError error
+	}{
+		"reverse order (valid input)": {
+			ruleNames:     []string{"rule-3", "rule-2", "rule-1"},
+			expected:      []string{"rule-3", "rule-2", "rule-1", AllowRuleName},
+			expectedError: nil,
+		},
+		"rule not specified in new order": {
+			ruleNames:     []string{"rule-3", "rule-2"},
+			expectedError: ErrMissingRules,
+		},
+		"rule repeated in the new order": {
+			ruleNames:     []string{"rule-3", "rule-2", "rule-1", "rule-3"},
+			expectedError: ErrDuplicatedRuleName,
+		},
+		"unknown rule in the new order": {
+			ruleNames:     []string{"rule-3", "rule-2", "rule-1", "rule-4"},
+			expectedError: ErrRuleNotFound,
+		},
+		"unknown rule in the new order (with correct length)": {
+			ruleNames:     []string{"rule-3", "rule-2", "rule-4"},
+			expectedError: ErrRuleNotFound,
+		},
+		"allow rule appears in the new order": {
+			ruleNames:     []string{"rule-2", "rule-3", "rule-1", AllowRuleName},
+			expectedError: ErrCannotManipulateAllowRule,
+		},
+	}
+
+	for name, test := range tests {
+		_, err = ReorderDelegations(targetsMetadata, test.ruleNames)
+		if test.expectedError != nil {
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
+		} else {
+			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+			assert.Equal(t, len(test.expected), len(targetsMetadata.Delegations.Roles),
+				fmt.Sprintf("expected %d rules in test '%s', but got %d rules",
+					len(test.expected), name, len(targetsMetadata.Delegations.Roles)))
+			for i, ruleName := range test.expected {
+				assert.Equal(t, ruleName, targetsMetadata.Delegations.Roles[i].Name,
+					fmt.Sprintf("expected rule '%s' at index %d in test '%s', but got '%s'",
+						ruleName, i, name, targetsMetadata.Delegations.Roles[i].Name))
+			}
+		}
+	}
 }
 
 func TestRemoveDelegation(t *testing.T) {

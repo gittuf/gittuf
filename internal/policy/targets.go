@@ -4,14 +4,21 @@ package policy
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const AllowRuleName = "gittuf-allow-rule"
 
-var ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+var (
+	ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrRuleNotFound              = errors.New("cannot find rule entry")
+	ErrMissingRules              = errors.New("some rules are missing")
+)
 
 // InitializeTargetsMetadata creates a new instance of TargetsMetadata.
 func InitializeTargetsMetadata() *tuf.TargetsMetadata {
@@ -92,6 +99,58 @@ func UpdateDelegation(targetsMetadata *tuf.TargetsMetadata, ruleName string, aut
 	allDelegations = append(allDelegations, AllowRule())
 
 	targetsMetadata.Delegations.Roles = allDelegations
+
+	return targetsMetadata, nil
+}
+
+// ReorderDelegations changes the order of delegations, and the new order is
+// specified in `ruleNames []string`.
+func ReorderDelegations(targetsMetadata *tuf.TargetsMetadata, ruleNames []string) (*tuf.TargetsMetadata, error) {
+	// Create a map of all existing delegations for quick look up
+	rolesMap := make(map[string]tuf.Delegation)
+	// Create a set of current rules in metadata, skipping the allow rule
+	currentRules := set.NewSet[string]()
+	for _, delegation := range targetsMetadata.Delegations.Roles {
+		if delegation.Name == AllowRuleName {
+			continue
+		}
+		rolesMap[delegation.Name] = delegation
+		currentRules.Add(delegation.Name)
+	}
+
+	specifiedRules := set.NewSet[string]()
+	for _, name := range ruleNames {
+		if specifiedRules.Has(name) {
+			return nil, fmt.Errorf("%w: '%s'", ErrDuplicatedRuleName, name)
+		}
+		specifiedRules.Add(name)
+	}
+
+	if !currentRules.Equal(specifiedRules) {
+		onlyInSpecifiedRules := specifiedRules.Minus(currentRules)
+		if onlyInSpecifiedRules.Len() != 0 {
+			if onlyInSpecifiedRules.Has(AllowRuleName) {
+				return nil, fmt.Errorf("%w: do not specify allow rule", ErrCannotManipulateAllowRule)
+			}
+
+			contents := onlyInSpecifiedRules.Contents()
+			return nil, fmt.Errorf("%w: rules '%s' do not exist in current rule file", ErrRuleNotFound, strings.Join(contents, ", "))
+		}
+
+		onlyInCurrentRules := currentRules.Minus(specifiedRules)
+		if onlyInCurrentRules.Len() != 0 {
+			contents := onlyInCurrentRules.Contents()
+			return nil, fmt.Errorf("%w: rules '%s' not specified", ErrMissingRules, strings.Join(contents, ", "))
+		}
+	}
+
+	// Create newDelegations and set it in the targetsMetadata after adding allow rule
+	newDelegations := make([]tuf.Delegation, 0, len(rolesMap)+1)
+	for _, ruleName := range ruleNames {
+		newDelegations = append(newDelegations, rolesMap[ruleName])
+	}
+	newDelegations = append(newDelegations, AllowRule())
+	targetsMetadata.Delegations.Roles = newDelegations
 
 	return targetsMetadata, nil
 }

@@ -167,6 +167,47 @@ func TestUpdateDelegation(t *testing.T) {
 	})
 }
 
+func TestReorderDelegations(t *testing.T) {
+	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := createTestRepositoryWithPolicy(t, "")
+
+	ruleNames := []string{"rule-1", "rule-2", "rule-3"}
+	for _, ruleName := range ruleNames {
+		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, nil, nil, 1, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Valid Input
+	newOrder := []string{"rule-3", "rule-1", "rule-2", "protect-main"}
+	err = r.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, newOrder, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	finalOrder := []string{}
+	for _, role := range targetsMetadata.Delegations.Roles {
+		finalOrder = append(finalOrder, role.Name)
+	}
+	expectedFinalOrder := append([]string{}, newOrder...)
+	expectedFinalOrder = append(expectedFinalOrder, policy.AllowRuleName)
+	assert.Equal(t, expectedFinalOrder, finalOrder)
+}
+
 func TestRemoveDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 

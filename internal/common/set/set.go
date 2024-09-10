@@ -62,3 +62,29 @@ func (s *Set[T]) Intersection(set *Set[T]) *Set[T] {
 
 	return intersection
 }
+
+func (s *Set[T]) Minus(set *Set[T]) *Set[T] {
+	minus := NewSet[T]()
+
+	for item := range s.contents {
+		if !set.Has(item) {
+			minus.Add(item)
+		}
+	}
+
+	return minus
+}
+
+func (s *Set[T]) Equal(set *Set[T]) bool {
+	if s.Len() != set.Len() {
+		return false
+	}
+
+	for item := range s.contents {
+		if !set.Has(item) {
+			return false
+		}
+	}
+
+	return true
+}
