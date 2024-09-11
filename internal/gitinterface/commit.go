@@ -288,6 +288,28 @@ func (r *Repository) KnowsCommit(testCommitID, ancestorCommitID Hash) (bool, err
 	return err == nil, nil
 }
 
+// GetCommonAncestor finds the common ancestor commit for the two supplied
+// commits.
+func (r *Repository) GetCommonAncestor(commitAID, commitBID Hash) (Hash, error) {
+	if err := r.ensureIsCommit(commitAID); err != nil {
+		return nil, err
+	}
+	if err := r.ensureIsCommit(commitBID); err != nil {
+		return nil, err
+	}
+
+	mergeBase, err := r.executor("merge-base", commitAID.String(), commitBID.String()).executeString()
+	if err != nil {
+		return nil, err
+	}
+
+	mergeBaseID, err := NewHash(mergeBase)
+	if err != nil {
+		return nil, fmt.Errorf("received invalid commit ID: %w", err)
+	}
+	return mergeBaseID, nil
+}
+
 // ensureIsCommit is a helper to check that the ID represents a Git commit
 // object.
 func (r *Repository) ensureIsCommit(commitID Hash) error {

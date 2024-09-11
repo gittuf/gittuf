@@ -18,7 +18,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	hasUpdates, hasDiverged, err := repo.CheckRemoteRSLForUpdates(cmd.Context(), args[0])
+	hasUpdates, hasDiverged, err := repo.CheckRemoteRSLForUpdates(cmd.Context(), args[0]) //nolint:staticcheck
 	if err != nil {
 		return err
 	}
@@ -44,6 +44,7 @@ func New() *cobra.Command {
 		Short:             "Check remote RSL for updates, for development use only",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
+		Deprecated:        "This command will be replaced soon with the new reconciliation workflow",
 		DisableAutoGenTag: true,
 	}
 

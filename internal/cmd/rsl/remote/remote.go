@@ -6,6 +6,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/check"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/pull"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/push"
+	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/reconcile"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(check.New())
 	cmd.AddCommand(pull.New())
 	cmd.AddCommand(push.New())
+	cmd.AddCommand(reconcile.New())
 
 	return cmd
 }
