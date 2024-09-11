@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -15,6 +16,8 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
+
+const gittufTransportPrefix = "gittuf::"
 
 var (
 	ErrCommitNotInRef = errors.New("specified commit is not in ref")
@@ -147,10 +150,23 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 // there is an update and the second return value indicates if the two RSLs have
 // diverged and need to be reconciled.
 func (r *Repository) CheckRemoteRSLForUpdates(_ context.Context, remoteName string) (bool, bool, error) {
+	remoteURL, err := r.r.GetRemoteURL(remoteName)
+	if err != nil {
+		return false, false, err
+	}
+	if strings.HasPrefix(remoteURL, gittufTransportPrefix) {
+		slog.Debug("Creating new remote to avoid using gittuf transport...")
+		remoteName = fmt.Sprintf("check-remote-%s", remoteName)
+		if err := r.r.AddRemote(remoteName, strings.TrimPrefix(remoteURL, gittufTransportPrefix)); err != nil {
+			return false, false, err
+		}
+		defer r.r.RemoveRemote(remoteName) //nolint:errcheck
+	}
+
 	trackerRef := rsl.RemoteTrackerRef(remoteName)
 	rslRemoteRefSpec := []string{fmt.Sprintf("%s:%s", rsl.Ref, trackerRef)}
 
-	slog.Debug("Updating remote RSL tracker...")
+	slog.Debug(fmt.Sprintf("Updating remote RSL tracker (%s)...", rslRemoteRefSpec))
 	if err := r.r.FetchRefSpec(remoteName, rslRemoteRefSpec); err != nil {
 		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
 			// Check if remote is empty and exit appropriately
@@ -163,11 +179,13 @@ func (r *Repository) CheckRemoteRSLForUpdates(_ context.Context, remoteName stri
 	if err != nil {
 		return false, false, err
 	}
+	slog.Debug(fmt.Sprintf("Remote RSL is at '%s'", remoteRefState.String()))
 
 	localRefState, err := r.r.GetReference(rsl.Ref)
 	if err != nil {
 		return false, false, err
 	}
+	slog.Debug(fmt.Sprintf("Local RSL is at '%s'", localRefState.String()))
 
 	// Check if local is nil and exit appropriately
 	if localRefState.IsZero() {
