@@ -80,6 +80,50 @@ func TestRepositoryCommit(t *testing.T) {
 	assert.Equal(t, expectedThirdCommitID, refHead.String())
 }
 
+func TestCommitUsingSpecificKey(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second tree
+	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeWithContentsID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"README.md": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit with no tree
+	expectedInitialCommitID := "648c569f3958b899e832f04750de52cf5d0db2fa"
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedInitialCommitID, commitID.String())
+
+	refHead, err := repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedInitialCommitID, refHead.String())
+
+	key := artifacts.SSHRSAPrivate
+	// Create second commit with tree
+	expectedSecondCommitID := "11020a7c78c4f903d0592ec2e8f73d00a17ec47e"
+	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", key)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedSecondCommitID, commitID.String())
+
+}
+
 func TestRepositoryVerifyCommit(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
@@ -140,7 +184,9 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
 		err = repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		//assert.Nil(t, err)
 	})
+
 }
 
 func TestKnowsCommit(t *testing.T) {
