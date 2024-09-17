@@ -298,7 +298,9 @@ func TestStateKeys(t *testing.T) {
 }
 
 func TestStateVerify(t *testing.T) {
+	t.Parallel()
 	t.Run("only root", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		err := state.Verify(testCtx)
@@ -306,6 +308,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("only root, remove root keys", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		state.RootPublicKeys = nil
@@ -314,6 +317,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("with policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		err := state.Verify(testCtx)
@@ -321,6 +325,7 @@ func TestStateVerify(t *testing.T) {
 	})
 
 	t.Run("with delegated policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithDelegatedPolicies(t)
 
 		err := state.Verify(testCtx)
@@ -347,6 +352,7 @@ func TestStateCommit(t *testing.T) {
 }
 
 func TestStateGetRootMetadata(t *testing.T) {
+	t.Parallel()
 	state := createTestStateWithOnlyRoot(t)
 
 	rootMetadata, err := state.GetRootMetadata()
@@ -355,7 +361,9 @@ func TestStateGetRootMetadata(t *testing.T) {
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
+	t.Parallel()
 	t.Run("with policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
@@ -401,6 +409,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 	})
 
 	t.Run("without policy", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		verifiers, err := state.FindVerifiersForPath("test-path")
@@ -410,6 +419,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 }
 
 func TestGetStateForCommit(t *testing.T) {
+	t.Parallel()
 	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
 
 	// Create some commits
@@ -612,7 +622,9 @@ func TestListRules(t *testing.T) {
 }
 
 func TestStateHasFileRule(t *testing.T) {
+	t.Parallel()
 	t.Run("with file rules", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithPolicy(t)
 
 		hasFileRule, err := state.hasFileRule()
@@ -621,6 +633,7 @@ func TestStateHasFileRule(t *testing.T) {
 	})
 
 	t.Run("with no file rules", func(t *testing.T) {
+		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
 		hasFileRule, err := state.hasFileRule()

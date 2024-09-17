@@ -1006,7 +1006,9 @@ func TestGetCommits(t *testing.T) {
 }
 
 func TestStateVerifyNewState(t *testing.T) {
+	t.Parallel()
 	t.Run("valid policy transition", func(t *testing.T) {
+		t.Parallel()
 		currentPolicy := createTestStateWithOnlyRoot(t)
 		newPolicy := createTestStateWithOnlyRoot(t)
 
@@ -1015,6 +1017,7 @@ func TestStateVerifyNewState(t *testing.T) {
 	})
 
 	t.Run("invalid policy transition", func(t *testing.T) {
+		t.Parallel()
 		currentPolicy := createTestStateWithOnlyRoot(t)
 
 		// Create invalid state
@@ -1050,6 +1053,7 @@ func TestStateVerifyNewState(t *testing.T) {
 }
 
 func TestVerifier(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
