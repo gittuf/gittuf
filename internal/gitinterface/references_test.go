@@ -285,6 +285,27 @@ func TestBranchReferenceName(t *testing.T) {
 	}
 }
 
+func TestRemoteReferenceName(t *testing.T) {
+	tests := map[string]struct {
+		remoteRefName            string
+		expectedReferenceName string
+	}{
+		"short name": {
+			remoteRefName:            "main",
+			expectedReferenceName: "refs/remotes/main",
+		},
+		"reference name": {
+			remoteRefName:            "refs/remotes/main",
+			expectedReferenceName: "refs/remotes/main",
+		},
+	}
+
+	for name, test := range tests {
+		referenceName := RemoteReferenceName(test.remoteRefName)
+		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected branch reference received in test '%s'", name))
+	}
+}
+
 func TestTagReferenceName(t *testing.T) {
 	tests := map[string]struct {
 		tagName               string
