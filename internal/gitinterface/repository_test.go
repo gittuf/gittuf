@@ -17,7 +17,7 @@ import (
 var mockLookPath func(string) (string, error)
 
 // MockCommand simulates the behavior of exec.Command for testing.
-var mockCommand func(name string, args ...string) *exec.Cmd
+var mockCommand func() *exec.Cmd
 
 // TestLoadRepository tests the LoadRepository function.
 func TestLoadRepository(t *testing.T) {
@@ -34,8 +34,8 @@ func TestLoadRepository(t *testing.T) {
 	}
 
 	// Mock exec.Command
-	execCommand = func(name string, args ...string) *exec.Cmd {
-		return mockCommand(name, args...)
+	execCommand = func(_ string, _ ...string) *exec.Cmd { 
+		return mockCommand()
 	}
 
 	t.Run("Git binary found", func(t *testing.T) {
@@ -67,7 +67,7 @@ func TestLoadRepository(t *testing.T) {
 			return "/usr/bin/git", nil
 		}
 
-		mockCommand = func(name string, args ...string) *exec.Cmd {
+		mockCommand = func() *exec.Cmd {
 			cmd := exec.Command("echo", "/mock/path/to/repo/.git")
 			cmd.Stdout = &bytes.Buffer{}
 			return cmd
@@ -83,7 +83,7 @@ func TestLoadRepository(t *testing.T) {
 			return "/usr/bin/git", nil
 		}
 
-		mockCommand = func(name string, args ...string) *exec.Cmd {
+		mockCommand = func() *exec.Cmd {
 			cmd := exec.Command("echo", "some error")
 			cmd.Stderr = &bytes.Buffer{}
 			return cmd
