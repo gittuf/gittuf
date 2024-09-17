@@ -277,24 +277,38 @@ func TestLoadStateForEntry(t *testing.T) {
 }
 
 func TestStateKeys(t *testing.T) {
-	state := createTestStateWithPolicy(t)
+	t.Run("state with delegated policies", func(t *testing.T) {
+		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
+		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
-	expectedKeys := map[string]*tuf.Key{}
-	rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedKeys[rootKey.KeyID] = rootKey
+		expectedKeys := map[string]*tuf.Key{}
+		rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedKeys[rootKey.KeyID] = rootKey
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedKeys[gpgKey.KeyID] = gpgKey
+		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedKeys[gpgKey.KeyID] = gpgKey
 
-	keys, err := state.PublicKeys()
-	assert.Nil(t, err, keys)
-	assert.Equal(t, expectedKeys, keys)
+		keys, err := state.PublicKeys()
+		assert.Nil(t, err, keys)
+		assert.Equal(t, expectedKeys, keys)
+	})
+
+	t.Run("state with only root", func(t *testing.T) {
+		state := createTestStateWithOnlyRoot(t)
+
+		expectedKeys := map[string]*tuf.Key(nil)
+
+		keys, err := state.PublicKeys()
+		assert.Nil(t, err, keys)
+		assert.Equal(t, expectedKeys, keys)
+	})
+
 }
 
 func TestStateVerify(t *testing.T) {
@@ -362,11 +376,12 @@ func TestStateGetRootMetadata(t *testing.T) {
 
 func TestStateFindVerifiersForPath(t *testing.T) {
 	t.Parallel()
-	t.Run("with policy", func(t *testing.T) {
+	t.Run("with delegated policy", func(t *testing.T) {
 		t.Parallel()
-		state := createTestStateWithPolicy(t)
+		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
+		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
-		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -375,19 +390,19 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 			path      string
 			verifiers []*Verifier
 		}{
-			"verifiers for refs/heads/main": {
-				path: "git:refs/heads/main",
+			"verifiers for files 1": {
+				path: "file:1/*",
 				verifiers: []*Verifier{{
-					name:      "protect-main",
-					keys:      []*tuf.Key{gpgKey},
+					name:      "1",
+					keys:      []*tuf.Key{key},
 					threshold: 1,
 				}},
 			},
 			"verifiers for files": {
-				path: "file:1",
+				path: "file:2/*",
 				verifiers: []*Verifier{{
-					name:      "protect-files-1-and-2",
-					keys:      []*tuf.Key{gpgKey},
+					name:      "2",
+					keys:      []*tuf.Key{key},
 					threshold: 1,
 				}},
 			},
@@ -625,7 +640,7 @@ func TestStateHasFileRule(t *testing.T) {
 	t.Parallel()
 	t.Run("with file rules", func(t *testing.T) {
 		t.Parallel()
-		state := createTestStateWithPolicy(t)
+		state := createTestStateWithDelegatedPolicies(t) // policy = has a rule in some targets role with the file namespace scheme
 
 		hasFileRule, err := state.hasFileRule()
 		assert.Nil(t, err)
