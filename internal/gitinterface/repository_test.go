@@ -34,7 +34,7 @@ func TestLoadRepository(t *testing.T) {
 	}
 
 	// Mock exec.Command
-	execCommand = func(_ string, _ ...string) *exec.Cmd { 
+	execCommand = func(_ string, _ ...string) *exec.Cmd {
 		return mockCommand()
 	}
 
