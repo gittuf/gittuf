@@ -2,6 +2,19 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.6.0
+
+- Added command to reorder policy rules
+- Added support for older Git versions
+- Added support for GitHub pull request approval attestations
+- Added support for using enterprise GitHub instances
+- Added caching for the RSL APIs `GetEntry` and `GetParentForEntry`
+- Added parallelization for some unit tests
+- Removed some deprecated flows such as `FindPublicKeysForPath` and refactored
+  verification APIs
+- Added CodeQL scanning for the repository
+- Updated various dependencies and CI workflows
+
 ## v0.5.2
 
 - Fixed issue with git-remote-gittuf when force pushing 
