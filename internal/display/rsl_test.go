@@ -69,11 +69,11 @@ entry 0000000000000000000000000000000000000000
 			t.Fatal(err)
 		}
 
-		branchEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, "refs/heads/main")
+		branchEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference("refs/heads/main"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		tagEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, "refs/tags/v1")
+		tagEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference("refs/tags/v1"))
 		if err != nil {
 			t.Fatal(err)
 		}

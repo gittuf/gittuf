@@ -36,7 +36,7 @@ var (
 func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -57,7 +57,7 @@ func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target st
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -86,7 +86,7 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntryForRef(repo, target)
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -113,7 +113,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		slog.Debug(fmt.Sprintf("First entry '%s' is for gittuf policy, setting that as current policy...", firstEntry.ID.String()))
 		initialPolicyEntry = firstEntry
 	} else {
-		initialPolicyEntry, _, err = rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstEntry.ID)
+		initialPolicyEntry, _, err = rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstEntry.ID))
 		if err != nil {
 			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 				slog.Debug(fmt.Sprintf("No policy found before first entry '%s'", firstEntry.ID.String()))
@@ -131,7 +131,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	}
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID.String()))
-	initialAttestationsEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, attestations.Ref, firstEntry.ID)
+	initialAttestationsEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(attestations.Ref), rsl.BeforeEntryID(firstEntry.ID))
 	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
 		if err != nil {
@@ -250,7 +250,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 		// 1. What's the last good state?
 		slog.Debug("Identifying last valid state...")
-		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestUnskippedReferenceEntryForRefBefore(repo, invalidEntry.RefName, invalidEntry.ID)
+		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(invalidEntry.RefName), rsl.BeforeEntryID(invalidEntry.ID), rsl.IsUnskipped())
 		if err != nil {
 			return err
 		}
@@ -505,7 +505,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	}
 
 	firstEntry := false
-	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, nil, err
@@ -591,7 +591,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]gitinterface.Hash, error) {
 	firstEntry := false
 
-	priorRefEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, entry.RefName, entry.ID)
+	priorRefEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err

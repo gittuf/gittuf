@@ -235,7 +235,7 @@ func (r *Repository) PullRSL(remoteName string) error {
 // same target ID Note that it's legal for the RSL to have target A, then B,
 // then A again, this is not considered a duplicate entry
 func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash) (bool, error) {
-	latestUnskippedEntry, _, err := rsl.GetLatestUnskippedReferenceEntryForRef(r.r, refName)
+	latestUnskippedEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(refName), rsl.IsUnskipped())
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return false, nil
