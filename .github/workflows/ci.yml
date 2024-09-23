@@ -13,6 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.22', '1.23']
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
@@ -20,7 +21,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
-        go-version: '1.22'
+        go-version: ${{ matrix.go-version }}
         cache: true
     - name: Test
       run: go test -timeout 20m ./...
