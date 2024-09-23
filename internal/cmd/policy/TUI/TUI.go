@@ -15,14 +15,14 @@ import (
 
 var (
 	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#000000")).
+			Foreground(lipgloss.Color("#FFFFFF")).
 			Padding(0, 2).
 			MarginTop(1).
 			Bold(true)
 
 	itemStyle = lipgloss.NewStyle().
 			PaddingLeft(4).
-			Foreground(lipgloss.Color("#000000"))
+			Foreground(lipgloss.Color("#FFFFFF"))
 
 	selectedItemStyle = lipgloss.NewStyle().
 				PaddingLeft(4).
@@ -36,7 +36,7 @@ var (
 			Foreground(lipgloss.Color("#A0A0A0"))
 
 	cursorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#000000"))
+			Foreground(lipgloss.Color("#FFFFFF"))
 )
 
 type screen int
