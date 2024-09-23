@@ -25,6 +25,10 @@ jobs:
         cache: true
     - name: Test
       run: go test -timeout 20m ./...
-    - name: Test Coverage
-      if: matrix.os == 'ubuntu-latest'
+    - name: Test Coverage (UNIX)
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
       run: go test -covermode=atomic `go list ./... | grep -v -f .test_ignore.txt`
+    - name: Test Coverage (Windows)
+      if: matrix.os == 'windows-latest'
+      run: go test -covermode=atomic $(go list ./... | findstr /V /G:.test_ignore.txt)
+
