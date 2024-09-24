@@ -308,7 +308,6 @@ func TestStateKeys(t *testing.T) {
 		assert.Nil(t, err, keys)
 		assert.Equal(t, expectedKeys, keys)
 	})
-
 }
 func TestStateVerify(t *testing.T) {
 	t.Parallel()
