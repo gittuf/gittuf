@@ -1,4 +1,4 @@
-name: tests
+name: coverage
 on:
   push:
     branches: ['main']
@@ -10,18 +10,18 @@ on:
 permissions: read-all
 jobs:
   test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.22', '1.23']
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
     - name: Install Go
       uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32
       with:
-        go-version: ${{ matrix.go-version }}
+        go-version: 1.23
         cache: true
-    - name: Test
-      run: go test -timeout 20m ./...
+    - name: Check Coverage
+      run: go test -covermode=atomic -coverprofile='coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
+    - name: Coveralls Parallel
+      uses: coverallsapp/github-action@643bc377ffa44ace6394b2b5d0d3950076de9f63
+      with:
+        file: 'coverage.cov'
