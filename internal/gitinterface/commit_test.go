@@ -129,11 +129,11 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	// Create second commit with tree
 	expectedSecondCommitID := "11020a7c78c4f903d0592ec2e8f73d00a17ec47e"
 	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", privateKey)
+	assert.Nil(t, err)
 
 	// Verify commit signature using publicKey
-	verificationErr := repo.verifyCommitSignature(context.Background(), commitID, publicKey)
+	err = repo.verifyCommitSignature(context.Background(), commitID, publicKey)
 	assert.Nil(t, err)
-	assert.Nil(t, verificationErr)
 	assert.Equal(t, expectedSecondCommitID, commitID.String())
 }
 
