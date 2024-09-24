@@ -115,13 +115,28 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	}
 	assert.Equal(t, expectedInitialCommitID, refHead.String())
 
-	key := artifacts.SSHRSAPrivate
+	privateKey := artifacts.SSHRSAPrivate
+
+	// Create publicKey
+	keyPath := filepath.Join(tempDir, "ssh-key")
+	if err := os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := ssh.NewKeyFromFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Create second commit with tree
 	expectedSecondCommitID := "11020a7c78c4f903d0592ec2e8f73d00a17ec47e"
-	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", key)
+	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", privateKey)
+
+	// Verify commit signature using publicKey
+	verificationErr := repo.verifyCommitSignature(context.Background(), commitID, publicKey)
 	assert.Nil(t, err)
+	assert.Nil(t, verificationErr)
 	assert.Equal(t, expectedSecondCommitID, commitID.String())
 }
+
 func TestRepositoryVerifyCommit(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
