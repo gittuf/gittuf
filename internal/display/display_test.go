@@ -48,11 +48,9 @@ func TestNewDisplayWriter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			gotOutput := ""
+			gotOutput := defaultOutput.String()
 			if runtime.GOOS == "windows" {
 				gotOutput = strings.TrimSpace(defaultOutput.String())
-			} else {
-				gotOutput = defaultOutput.String()
 			}
 
 			if gotOutput != tt.wantOutput {
