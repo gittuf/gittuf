@@ -121,9 +121,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", key)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedSecondCommitID, commitID.String())
-
 }
-
 func TestRepositoryVerifyCommit(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
@@ -184,11 +182,8 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
 		err = repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
-		//assert.Nil(t, err)
 	})
-
 }
-
 func TestKnowsCommit(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
@@ -307,7 +302,6 @@ func createTestGPGSignedCommit(t *testing.T, repo *Repository) Hash {
 
 	return commitHash
 }
-
 func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
 	t.Helper()
 
@@ -315,7 +309,6 @@ func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	testCommit := &object.Commit{
 		Hash: plumbing.NewHash("d6b230478965e25477263aa65f1ca6d23d0c0d97"),
 		Author: object.Signature{
