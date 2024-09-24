@@ -5,6 +5,7 @@ package display
 import (
 	"bytes"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -47,9 +48,14 @@ func TestNewDisplayWriter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			gotOutput := ""
+			if runtime.GOOS == "windows" {
+				gotOutput = strings.TrimSpace(defaultOutput.String())
+			} else {
+				gotOutput = defaultOutput.String()
+			}
 
-			// Trim the output to remove any extra whitespace or newlines
-			if gotOutput := strings.TrimSpace(defaultOutput.String()); gotOutput != tt.wantOutput {
+			if gotOutput != tt.wantOutput {
 				t.Errorf("unexpected result with Display(), got stdout = %v, want %v", gotOutput, tt.wantOutput)
 			}
 		})
