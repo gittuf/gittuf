@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	"github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -150,7 +153,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 	tests := map[string]struct {
 		envelope          *dsse.Envelope
-		expectedPredicate *attestations.GitHubPullRequestApprovalAttestation
+		expectedPredicate github.PullRequestApprovalAttestation
 	}{
 		"one approver, no dismissals": {
 			envelope: &dsse.Envelope{
@@ -163,7 +166,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
 						KeyType: signerverifier.FulcioKeyType,
@@ -175,7 +178,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: signerverifier.FulcioKeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -193,7 +196,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
 						KeyType: signerverifier.FulcioKeyType,
@@ -216,7 +219,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: signerverifier.FulcioKeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -234,7 +237,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.GitHubPullRequestApprovalAttestation{
 				DismissedApprovers: []*tuf.Key{
 					{
 						KeyType: signerverifier.FulcioKeyType,
@@ -246,7 +249,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: signerverifier.FulcioKeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -264,7 +267,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
 						KeyType: signerverifier.FulcioKeyType,
@@ -305,7 +308,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: signerverifier.FulcioKeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",

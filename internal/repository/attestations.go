@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	githubattn "github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -320,8 +322,8 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 			return err
 		}
 
-		approvers = append(approvers, predicate.Approvers...)
-		dismissedApprovers = predicate.DismissedApprovers
+		approvers = append(approvers, predicate.GetApprovers()...)
+		dismissedApprovers = predicate.GetDismissedApprovers()
 	}
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
@@ -380,12 +382,12 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.DismissedApprovers)+1)
-	dismissedApprovers = append(dismissedApprovers, predicate.DismissedApprovers...)
+	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.GetDismissedApprovers())+1)
+	dismissedApprovers = append(dismissedApprovers, predicate.GetDismissedApprovers()...)
 	dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 
-	approvers := make([]*tuf.Key, 0, len(predicate.Approvers))
-	for _, approver := range predicate.Approvers {
+	approvers := make([]*tuf.Key, 0, len(predicate.GetApprovers()))
+	for _, approver := range predicate.GetApprovers() {
 		approver := approver
 		if approver.KeyID == dismissedApprover.KeyID {
 			continue
@@ -393,9 +395,9 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		approvers = append(approvers, approver)
 	}
 
-	baseRef := predicate.TargetRef
-	fromID := predicate.FromRevisionID
-	toID := predicate.TargetTreeID
+	baseRef := predicate.GetRef()
+	fromID := predicate.GetFromID()
+	toID := predicate.GetTargetID()
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
@@ -476,7 +478,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
-func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (*attestations.GitHubPullRequestApprovalAttestation, error) {
+func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (githubattn.PullRequestApprovalAttestation, error) {
 	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, err
@@ -486,10 +488,10 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 	// in-toto's v1 Statement. The difference is that we fix the predicate to be
 	// the GitHub pull request approval type, making unmarshaling easier.
 	type tmpGitHubPullRequestApprovalStatement struct {
-		Type          string                                             `json:"_type"`
-		Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-		PredicateType string                                             `json:"predicateType"`
-		Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+		Type          string                    `json:"_type"`
+		Subject       []*ita.ResourceDescriptor `json:"subject"`
+		PredicateType string                    `json:"predicate_type"`
+		Predicate     json.RawMessage           `json:"predicate"`
 	}
 
 	stmt := new(tmpGitHubPullRequestApprovalStatement)
@@ -497,7 +499,17 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 		return nil, err
 	}
 
-	return stmt.Predicate, nil
+	switch stmt.PredicateType { //nolint:gocritic
+	case githubv01.GitHubPullRequestApprovalPredicateType:
+		predicate := new(githubv01.GitHubPullRequestApprovalAttestation)
+		if err := json.Unmarshal(stmt.Predicate, predicate); err != nil {
+			return nil, err
+		}
+
+		return predicate, nil
+	}
+
+	return nil, fmt.Errorf("unknown version of GitHub Pull Request Approval Attestation")
 }
 
 func indexPathToComponents(indexPath string) (string, string, string) {
