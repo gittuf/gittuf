@@ -54,7 +54,7 @@ type Entry interface {
 	GetID() gitinterface.Hash
 	Commit(*gitinterface.Repository, bool) error
 	GetNumber() uint64
-	createCommitMessage() (string, error)
+	createCommitMessage(bool) (string, error)
 }
 
 // ReferenceEntry represents a record of a reference state in the RSL. It
@@ -92,7 +92,7 @@ func (e *ReferenceEntry) Commit(repo *gitinterface.Repository, sign bool) error 
 		return err
 	}
 
-	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
 	emptyTreeID, err := repo.EmptyTree()
 	if err != nil {
@@ -115,7 +115,7 @@ func (e *ReferenceEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, s
 		return err
 	}
 
-	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
 	emptyTreeID, err := repo.EmptyTree()
 	if err != nil {
@@ -158,17 +158,32 @@ func (e *ReferenceEntry) setEntryNumber(repo *gitinterface.Repository) error {
 	return nil
 }
 
-func (e *ReferenceEntry) createCommitMessage() (string, error) {
+func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error) {
 	lines := []string{
 		ReferenceEntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", RefKey, e.RefName),
 		fmt.Sprintf("%s: %s", TargetIDKey, e.TargetID.String()),
 	}
-	if e.Number > 0 {
+	if includeNumber && e.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+// commitWithoutNumber is used to test the RSL's support for entry numbers in
+// repositories that switch from not having numbered entries to having numbered
+// entries.
+func (e *ReferenceEntry) commitWithoutNumber(repo *gitinterface.Repository) error {
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	return err
 }
 
 // AnnotationEntry is a type of RSL record that references prior items in the
@@ -219,7 +234,7 @@ func (a *AnnotationEntry) Commit(repo *gitinterface.Repository, sign bool) error
 		return err
 	}
 
-	message, err := a.createCommitMessage()
+	message, err := a.createCommitMessage(true)
 	if err != nil {
 		return err
 	}
@@ -252,7 +267,7 @@ func (a *AnnotationEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, 
 		return err
 	}
 
-	message, err := a.createCommitMessage()
+	message, err := a.createCommitMessage(true)
 	if err != nil {
 		return err
 	}
@@ -298,7 +313,7 @@ func (a *AnnotationEntry) setEntryNumber(repo *gitinterface.Repository) error {
 	return err
 }
 
-func (a *AnnotationEntry) createCommitMessage() (string, error) {
+func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error) {
 	lines := []string{
 		AnnotationEntryHeader,
 		"",
@@ -314,7 +329,7 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 		lines = append(lines, fmt.Sprintf("%s: false", SkipKey))
 	}
 
-	if a.Number > 0 {
+	if includeNumber && a.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, a.Number))
 	}
 
@@ -331,6 +346,31 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 	}
 
 	return strings.Join(lines, "\n"), nil
+}
+
+// commitWithoutNumber is used to test the RSL's support for entry numbers in
+// repositories that switch from not having numbered entries to having numbered
+// entries.
+func (a *AnnotationEntry) commitWithoutNumber(repo *gitinterface.Repository) error {
+	// Check if referred entries exist in the RSL namespace.
+	for _, id := range a.RSLEntryIDs {
+		if _, err := GetEntry(repo, id); err != nil {
+			return err
+		}
+	}
+
+	message, err := a.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	return err
 }
 
 // GetEntry returns the entry corresponding to entryID.

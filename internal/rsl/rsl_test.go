@@ -658,6 +658,46 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		_, _, err = GetLatestReferenceEntry(repo, ForNonGittufReference())
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
+
+	t.Run("transitioning from no numbers to numbers", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// Add non-numbered entries, including an annotation
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "annotation").commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), BeforeEntryNumber(1))
+		assert.ErrorIs(t, err, ErrCannotUseEntryNumberFilter)
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), UntilEntryNumber(1))
+		assert.ErrorIs(t, err, ErrCannotUseEntryNumberFilter)
+
+		// Add numbered entries
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, expectedEntry.GetID(), entry.GetID())
+		assert.Nil(t, annotations)
+	})
 }
 
 func TestGetEntry(t *testing.T) {
@@ -701,52 +741,84 @@ func TestGetEntry(t *testing.T) {
 }
 
 func TestGetParentForEntry(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	t.Run("regular test", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	// Assert no parent for first entry
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Assert no parent for first entry
+		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err := GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryID := entry.GetID()
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryID := entry.GetID()
 
-	_, err = GetParentForEntry(repo, entry)
-	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		_, err = GetParentForEntry(repo, entry)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
-	// Find parent for an entry
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Find parent for an entry
+		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	parentEntry, err := GetParentForEntry(repo, entry)
-	assert.Nil(t, err)
-	assert.Equal(t, entryID, parentEntry.GetID())
+		parentEntry, err := GetParentForEntry(repo, entry)
+		assert.Nil(t, err)
+		assert.Equal(t, entryID, parentEntry.GetID())
 
-	entryID = entry.GetID()
+		entryID = entry.GetID()
 
-	// Find parent for an annotation
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Find parent for an annotation
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	parentEntry, err = GetParentForEntry(repo, entry)
-	assert.Nil(t, err)
-	assert.Equal(t, entryID, parentEntry.GetID())
+		parentEntry, err = GetParentForEntry(repo, entry)
+		assert.Nil(t, err)
+		assert.Equal(t, entryID, parentEntry.GetID())
+	})
+
+	t.Run("transition from no number to with number", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		nonNumberedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		numberedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, uint64(1), numberedEntry.GetNumber())
+
+		parentEntry, err := GetParentForEntry(repo, numberedEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(0), parentEntry.GetNumber())
+		assert.Equal(t, nonNumberedEntry.GetID(), parentEntry.GetID())
+	})
 }
 
 func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
@@ -1524,7 +1596,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			message, _ := test.entry.createCommitMessage()
+			message, _ := test.entry.createCommitMessage(true)
 			if !assert.Equal(t, test.expectedMessage, message) {
 				t.Errorf("expected\n%s\n\ngot\n%s", test.expectedMessage, message)
 			}
@@ -1599,7 +1671,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			message, err := test.entry.createCommitMessage()
+			message, err := test.entry.createCommitMessage(true)
 			if err != nil {
 				t.Fatal(err)
 			}
