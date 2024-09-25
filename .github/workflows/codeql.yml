@@ -14,8 +14,12 @@ name: "CodeQL"
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - "docs/**"
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - "docs/**"
   schedule:
     - cron: '28 17 * * 6'
 permissions: read-all
