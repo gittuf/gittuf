@@ -250,6 +250,345 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.True(t, annotation.Skip)
 }
 
+func TestReconcileLocalRSLWithRemote(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+	anotherRefName := "refs/heads/feature"
+
+	t.Run("remote has updates for local", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		if err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Local RSL must now be updated to match remote
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("remote has no updates for local", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		if err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("local is ahead of remote", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		// Simulate local actions
+		if _, err := localR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		originalRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// No change to local AND no change to remote
+		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
+		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
+	})
+
+	t.Run("remote and local have diverged", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		// Simulate remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(anotherRefName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		originalRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Remote must not have changed
+		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
+
+		// The current remote tip must be the parent of the current
+		// local tip
+		parents, err := localRepo.r.GetCommitParentIDs(currentLocalRSLTip)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, currentRemoteRSLTip, parents[0])
+
+		// The current local tip and original local tip must have same
+		// entry ref and target ID
+		originalEntry, err := rsl.GetEntry(localRepo.r, originalLocalRSLTip)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentEntry, err := rsl.GetEntry(localRepo.r, currentLocalRSLTip)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, originalEntry.(*rsl.ReferenceEntry).RefName, currentEntry.(*rsl.ReferenceEntry).RefName)
+		assert.Equal(t, originalEntry.(*rsl.ReferenceEntry).TargetID, currentEntry.(*rsl.ReferenceEntry).TargetID)
+	})
+
+	t.Run("remote and local have diverged but modify same ref", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		// Simulate remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions -- NOT anotherRefname here
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		originalRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.ErrorContains(t, err, "changes to the same ref")
+
+		currentLocalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		currentRemoteRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Neither RSL should have changed
+		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
+		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
+	})
+}
 func TestCheckRemoteRSLForUpdates(t *testing.T) {
 	remoteName := "origin"
 	refName := "refs/heads/main"

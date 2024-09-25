@@ -433,3 +433,43 @@ func TestGetCommitParentIDs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
 }
+
+func TestGetCommonAncestor(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	refName := "refs/heads/main"
+
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add child commit A
+	commitA, err := repo.Commit(emptyTreeID, refName, "Second commit A\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add child commit B
+	commitB := repo.commitWithParents(t, emptyTreeID, []Hash{initialCommitID}, "Second commit B\n", false)
+
+	// Test commits, ensure we get back initial commit
+	commonAncestor, err := repo.GetCommonAncestor(commitA, commitB)
+	assert.Nil(t, err)
+	assert.Equal(t, initialCommitID, commonAncestor)
+
+	// Test with disjoint commit histories
+	commitDisconnected := repo.commitWithParents(t, emptyTreeID, nil, "Disconnected initial commit\n", false)
+
+	_, err = repo.GetCommonAncestor(commitDisconnected, commitA)
+	assert.NotNil(t, err)
+}
