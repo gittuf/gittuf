@@ -14,7 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/stretchr/testify/assert"
 )
 

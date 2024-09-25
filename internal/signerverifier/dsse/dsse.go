@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 )
 
 const PayloadType = "application/vnd.gittuf+json"

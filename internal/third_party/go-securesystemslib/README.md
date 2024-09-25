@@ -1,5 +1,9 @@
 # Vendored secure-systems-lab/go-securesystemslib
 
+Issue: https://github.com/gittuf/gittuf/issues/266
+
+## signerverifier
+
 We have temporarily vendored go-securesystemslib's signerverifier package, a
 dependency we use for signature creation / verification workflows. The reason
 for this is to update go-securesystemslib with support for standard encoding
@@ -18,4 +22,9 @@ Note that @adityasaky, maintainer of gittuf, is also a maintainer of
 go-securesystemslib, and is part of the improvement effort. After it is
 complete, this copy will be taken out.
 
-Issue: https://github.com/gittuf/gittuf/issues/266
+## dsse
+
+The dsse package has also been vendored to experimentally add support for DSSE
+signature extensions. We're starting with support for Sigstore, and once we land
+on a reusable interface for extensions, we can upstream this to
+go-securesystemslib.

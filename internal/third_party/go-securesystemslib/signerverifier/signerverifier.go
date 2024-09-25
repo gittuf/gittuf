@@ -9,7 +9,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 )
 
 var KeyIDHashAlgorithms = []string{"sha256", "sha512"}
