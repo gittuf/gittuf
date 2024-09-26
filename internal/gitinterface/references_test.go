@@ -287,15 +287,15 @@ func TestBranchReferenceName(t *testing.T) {
 
 func TestRemoteReferenceName(t *testing.T) {
 	tests := map[string]struct {
-		remoteRefName            string
+		remoteRefName         string
 		expectedReferenceName string
 	}{
 		"short name": {
-			remoteRefName:            "main",
+			remoteRefName:         "main",
 			expectedReferenceName: "refs/remotes/main",
 		},
 		"reference name": {
-			remoteRefName:            "refs/remotes/main",
+			remoteRefName:         "refs/remotes/main",
 			expectedReferenceName: "refs/remotes/main",
 		},
 	}
