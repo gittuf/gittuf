@@ -28,6 +28,8 @@ const (
 	defaultCommitMessage = "Update attestations"
 )
 
+var ErrAttestationsNotFound = errors.New("attestations not found")
+
 // Attestations tracks all the attestations in a gittuf repository.
 type Attestations struct {
 	// referenceAuthorizations maps each authorized action to the blob ID of the
