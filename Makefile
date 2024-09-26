@@ -17,6 +17,7 @@ ifeq ($(OS),Windows_NT)
 else
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/gittuf .
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/git-remote-gittuf ./internal/git-remote-gittuf
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o dist/gittuf-git ./internal/gittuf-git
 endif
 
 install : test just-install
@@ -30,6 +31,7 @@ ifeq ($(OS),Windows_NT)
 else
 	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/gittuf/gittuf
 	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/gittuf/gittuf/internal/git-remote-gittuf
+	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/gittuf/gittuf/internal/gittuf-git
 endif
 
 test :
