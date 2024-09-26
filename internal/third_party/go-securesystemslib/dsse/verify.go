@@ -71,6 +71,13 @@ func (ev *EnvelopeVerifier) Verify(ctx context.Context, e *Envelope) ([]Accepted
 				continue
 			}
 
+			if v, supportsSignatureExtension := v.(SupportsSignatureExtension); supportsSignatureExtension {
+				if s.Extension == nil || s.Extension.Kind != v.ExpectedExtensionKind() {
+					continue
+				}
+				v.SetExtension(s.Extension.Ext)
+			}
+
 			err = v.Verify(ctx, paeEnc, sig)
 			if err != nil {
 				continue

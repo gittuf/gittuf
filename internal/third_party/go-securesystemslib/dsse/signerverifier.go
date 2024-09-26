@@ -3,6 +3,8 @@ package dsse
 import (
 	"context"
 	"crypto"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 /*
@@ -30,6 +32,11 @@ type Verifier interface {
 	Verify(ctx context.Context, data, sig []byte) error
 	KeyID() (string, error)
 	Public() crypto.PublicKey
+}
+
+type SupportsSignatureExtension interface {
+	SetExtension(*structpb.Struct)
+	ExpectedExtensionKind() string
 }
 
 // SignerVerifier provides both the signing and verification interface.

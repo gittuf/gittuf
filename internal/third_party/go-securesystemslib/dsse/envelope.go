@@ -3,6 +3,8 @@ package dsse
 import (
 	"encoding/base64"
 	"fmt"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 /*
@@ -33,8 +35,14 @@ The signature is a base64 encoding of the raw bytes from the signature
 algorithm.
 */
 type Signature struct {
-	KeyID string `json:"keyid"`
-	Sig   string `json:"sig"`
+	KeyID     string     `json:"keyid"`
+	Sig       string     `json:"sig"`
+	Extension *Extension `json:"extension,omitempty"`
+}
+
+type Extension struct {
+	Kind string           `json:"kind"`
+	Ext  *structpb.Struct `json:"ext"`
 }
 
 /*
