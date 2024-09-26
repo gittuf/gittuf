@@ -78,6 +78,66 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Nil(t, policyEntry)
 	})
 
+	t.Run("first policy", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newRegularSearcher(repo)
+		policyEntry, err := searcher.FindFirstPolicyEntry()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
+	})
+
+	t.Run("policies in range", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		latestEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		firstEntry := latestEntry
+
+		expectedPolicyEntries := []*rsl.ReferenceEntry{latestEntry.(*rsl.ReferenceEntry)}
+
+		searcher := newRegularSearcher(repo)
+
+		policyEntries, err := searcher.FindPolicyEntriesInRange(firstEntry, latestEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntries, policyEntries)
+
+		if err := rsl.NewReferenceEntry(PolicyRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err = rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedPolicyEntries = append(expectedPolicyEntries, latestEntry.(*rsl.ReferenceEntry))
+
+		policyEntries, err = searcher.FindPolicyEntriesInRange(firstEntry, latestEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntries, policyEntries)
+
+		if err := rsl.NewReferenceEntry(PolicyStagingRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err = rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// expectedPolicyEntries does not change in this instance
+		policyEntries, err = searcher.FindPolicyEntriesInRange(firstEntry, latestEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntries, policyEntries)
+	})
+
 	t.Run("attestations exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)

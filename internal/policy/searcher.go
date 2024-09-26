@@ -15,7 +15,9 @@ import (
 // searcher defines the interface for identifying the applicable policy and
 // attestation entries in the RSL for some entry.
 type searcher interface {
+	FindFirstPolicyEntry() (*rsl.ReferenceEntry, error)
 	FindPolicyEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
+	FindPolicyEntriesInRange(rsl.Entry, rsl.Entry) ([]*rsl.ReferenceEntry, error)
 	FindAttestationsEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
 }
 
@@ -27,6 +29,19 @@ func newSearcher(repo *gitinterface.Repository) searcher {
 // the specified entry to find the latest policy or attestations entry.
 type regularSearcher struct {
 	repo *gitinterface.Repository
+}
+
+func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
+	entry, _, err := rsl.GetFirstReferenceEntryForRef(r.repo, PolicyRef)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// we don't have a policy entry yet
+			return nil, ErrPolicyNotFound
+		}
+		return nil, err
+	}
+
+	return entry, nil
 }
 
 func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
@@ -48,6 +63,15 @@ func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEnt
 	}
 
 	return policyEntry, nil
+}
+
+func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
+	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return allPolicyEntries, nil
 }
 
 func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
