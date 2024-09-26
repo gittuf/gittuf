@@ -106,41 +106,33 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	)
 
 	// Load policy applicable at firstEntry
-	// If firstEntry is for policy, we don't walk the RSL here
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.ID.String()))
-	var initialPolicyEntry *rsl.ReferenceEntry
-	if firstEntry.RefName == PolicyRef {
-		slog.Debug(fmt.Sprintf("First entry '%s' is for gittuf policy, setting that as current policy...", firstEntry.ID.String()))
-		initialPolicyEntry = firstEntry
-	} else {
-		initialPolicyEntry, _, err = rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstEntry.ID))
-		if err != nil {
-			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-				slog.Debug(fmt.Sprintf("No policy found before first entry '%s'", firstEntry.ID.String()))
-			} else {
-				return err
-			}
-		}
-	}
-	if initialPolicyEntry != nil {
+	policySearcher := NewRegularSearcher(repo)
+	initialPolicyEntry, err := policySearcher.FindPolicyEntryFor(firstEntry)
+	if err == nil {
 		state, err := LoadState(ctx, repo, initialPolicyEntry)
 		if err != nil {
 			return err
 		}
 		currentPolicy = state
+	} else if !errors.Is(err, ErrPolicyNotFound) {
+		// Searcher gives us nil when firstEntry is the very first entry or
+		// close to it (i.e., before a policy was applied)
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID.String()))
-	initialAttestationsEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(attestations.Ref), rsl.BeforeEntryID(firstEntry.ID))
+	attestationsSearcher := attestations.NewRegularSearcher(repo)
+	initialAttestationsEntry, err := attestationsSearcher.FindAttestationsEntryFor(firstEntry)
 	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
 		if err != nil {
 			return err
 		}
 		currentAttestations = attestationsState
-	} else if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-		// Attestations may not be used yet, they're not
-		// compulsory like policies are
+	} else if !errors.Is(err, attestations.ErrAttestationsNotFound) {
+		// Attestations are not compulsory, so return err only
+		// if it's some other error
 		return err
 	}
 
