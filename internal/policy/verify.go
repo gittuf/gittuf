@@ -105,10 +105,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		err                 error
 	)
 
+	searcher := newSearcher(repo)
+
 	// Load policy applicable at firstEntry
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.ID.String()))
-	policySearcher := NewRegularSearcher(repo)
-	initialPolicyEntry, err := policySearcher.FindPolicyEntryFor(firstEntry)
+	initialPolicyEntry, err := searcher.FindPolicyEntryFor(firstEntry)
 	if err == nil {
 		state, err := LoadState(ctx, repo, initialPolicyEntry)
 		if err != nil {
@@ -122,8 +123,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	}
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID.String()))
-	attestationsSearcher := attestations.NewRegularSearcher(repo)
-	initialAttestationsEntry, err := attestationsSearcher.FindAttestationsEntryFor(firstEntry)
+	initialAttestationsEntry, err := searcher.FindAttestationsEntryFor(firstEntry)
 	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
 		if err != nil {
