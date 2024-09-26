@@ -18,6 +18,8 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
+const currentMetadataVersion = 0
+
 var (
 	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 )
@@ -83,6 +85,7 @@ type Role struct {
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
 	Type                   string          `json:"type"`
+	MetadataVersion        int             `json:"metadata_version"`
 	Expires                string          `json:"expires"`
 	Keys                   map[string]*Key `json:"keys"`
 	Roles                  map[string]Role `json:"roles"`
@@ -92,7 +95,8 @@ type RootMetadata struct {
 // NewRootMetadata returns a new instance of RootMetadata.
 func NewRootMetadata() *RootMetadata {
 	return &RootMetadata{
-		Type: "root",
+		Type:            "root",
+		MetadataVersion: currentMetadataVersion,
 	}
 }
 
@@ -122,17 +126,19 @@ func (r *RootMetadata) AddRole(roleName string, role Role) {
 
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
+	Type            string         `json:"type"`
+	MedadataVersion int            `json:"metadata_version"`
+	Expires         string         `json:"expires"`
+	Targets         map[string]any `json:"targets"`
+	Delegations     *Delegations   `json:"delegations"`
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
 func NewTargetsMetadata() *TargetsMetadata {
 	return &TargetsMetadata{
-		Type:        "targets",
-		Delegations: &Delegations{},
+		Type:            "targets",
+		MedadataVersion: currentMetadataVersion,
+		Delegations:     &Delegations{},
 	}
 }
 

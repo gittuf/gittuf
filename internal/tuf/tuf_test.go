@@ -62,6 +62,10 @@ Y3eV5jJqu4dWvCMmwbCLSfCJJOF9dryMwkqjpcpWUuPlAgMBAAE=
 func TestRootMetadata(t *testing.T) {
 	rootMetadata := NewRootMetadata()
 
+	t.Run("test NewRootMetadata", func(t *testing.T) {
+		assert.Equal(t, currentMetadataVersion, rootMetadata.MetadataVersion)
+	})
+
 	t.Run("test SetExpires", func(t *testing.T) {
 		d := time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC)
 		rootMetadata.SetExpires(d.Format(time.RFC3339))
@@ -89,6 +93,10 @@ func TestRootMetadata(t *testing.T) {
 
 func TestTargetsMetadataAndDelegations(t *testing.T) {
 	targetsMetadata := NewTargetsMetadata()
+
+	t.Run("test NewTargetsMetadata", func(t *testing.T) {
+		assert.Equal(t, currentMetadataVersion, targetsMetadata.MedadataVersion)
+	})
 
 	t.Run("test SetExpires", func(t *testing.T) {
 		d := time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC)
