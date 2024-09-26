@@ -13,6 +13,8 @@ on:
     - cron: '15 10 * * 3'
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - "docs/**"
 
 # Declare default permissions as read only.
 permissions: read-all
