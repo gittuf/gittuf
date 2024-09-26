@@ -13,6 +13,8 @@ github.com/gittuf/gittuf/internal/cmd/verifytag
 github.com/gittuf/gittuf/internal/cmd/version
 github.com/gittuf/gittuf/internal/dev
 github.com/gittuf/gittuf/internal/git-remote-gittuf
+github.com/gittuf/gittuf/internal/gittuf-git/clone
+github.com/gittuf/gittuf/internal/gittuf-git/main.go
 github.com/gittuf/gittuf/internal/repository/options
 github.com/gittuf/gittuf/internal/testartifacts
 github.com/gittuf/gittuf/internal/third_party
