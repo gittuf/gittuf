@@ -62,7 +62,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	)
 
 	slog.Debug("Identifying current status of target Git reference...")
-	latestTargetEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, targetRef)
+	latestTargetEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(targetRef))
 	if err == nil {
 		fromID = latestTargetEntry.TargetID
 	} else {
@@ -73,7 +73,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Identifying current status of feature Git reference...")
-	latestFeatureEntry, _, err := rsl.GetLatestReferenceEntryForRef(r.r, featureRef)
+	latestFeatureEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(featureRef))
 	if err != nil {
 		// We don't have an RSL entry for the feature ref to use to approve the
 		// merge

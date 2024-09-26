@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -23,6 +24,7 @@ const (
 	EndMessage                 = "-----END MESSAGE-----"
 	EntryIDKey                 = "entryID"
 	SkipKey                    = "skip"
+	NumberKey                  = "number"
 
 	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
 	gittufNamespacePrefix  = "refs/gittuf/"
@@ -30,11 +32,14 @@ const (
 )
 
 var (
-	ErrRSLEntryNotFound        = errors.New("unable to find RSL entry")
-	ErrRSLBranchDetected       = errors.New("potential RSL branch detected, entry has more than one parent")
-	ErrInvalidRSLEntry         = errors.New("RSL entry has invalid format or is of unexpected type")
-	ErrRSLEntryDoesNotMatchRef = errors.New("RSL entry does not match requested ref")
-	ErrNoRecordOfCommit        = errors.New("commit has not been encountered before")
+	ErrRSLEntryNotFound                      = errors.New("unable to find RSL entry")
+	ErrRSLBranchDetected                     = errors.New("potential RSL branch detected, entry has more than one parent")
+	ErrInvalidRSLEntry                       = errors.New("RSL entry has invalid format or is of unexpected type")
+	ErrRSLEntryDoesNotMatchRef               = errors.New("RSL entry does not match requested ref")
+	ErrNoRecordOfCommit                      = errors.New("commit has not been encountered before")
+	ErrInvalidGetLatestReferenceEntryOptions = errors.New("invalid options presented for getting latest reference entry (are both before or until conditions set or is the before number less than the until number?)")
+	ErrCannotUseEntryNumberFilter            = errors.New("current RSL entries are not numbered, cannot use number range options")
+	ErrInvalidUntilEntryNumberCondition      = errors.New("cannot meet until entry number condition")
 )
 
 // RemoteTrackerRef returns the remote tracking ref for the specified remote
@@ -48,7 +53,8 @@ func RemoteTrackerRef(remote string) string {
 type Entry interface {
 	GetID() gitinterface.Hash
 	Commit(*gitinterface.Repository, bool) error
-	createCommitMessage() (string, error)
+	GetNumber() uint64
+	createCommitMessage(bool) (string, error)
 }
 
 // ReferenceEntry represents a record of a reference state in the RSL. It
@@ -62,6 +68,9 @@ type ReferenceEntry struct {
 
 	// TargetID contains the Git hash for the object expected at RefName.
 	TargetID gitinterface.Hash
+
+	// Number contains a strictly increasing number that hints at entry ordering.
+	Number uint64
 }
 
 // NewReferenceEntry returns a ReferenceEntry object for a normal RSL entry.
@@ -73,9 +82,17 @@ func (e *ReferenceEntry) GetID() gitinterface.Hash {
 	return e.ID
 }
 
-// Commit creates a commit object in the RSL for the ReferenceEntry.
+// Commit creates a commit object in the RSL for the ReferenceEntry. The
+// function looks up the latest committed entry in the RSL and increments the
+// number in the new entry. If a parent entry does not exist or the parent
+// entry's number is 0 (unset), the current entry's number is set to 1. The
+// numbering starts from 1 as 0 is used to signal the lack of numbering.
 func (e *ReferenceEntry) Commit(repo *gitinterface.Repository, sign bool) error {
-	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
+	if err := e.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
 	emptyTreeID, err := repo.EmptyTree()
 	if err != nil {
@@ -87,10 +104,18 @@ func (e *ReferenceEntry) Commit(repo *gitinterface.Repository, sign bool) error 
 }
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
-// ReferenceEmpty. The commit is signed using the provided PEM encoded SSH or
-// GPG private key. This is only intended for use in gittuf's developer mode.
+// ReferenceEntry. The commit is signed using the provided PEM encoded SSH or
+// GPG private key. This is only intended for use in gittuf's developer mode or
+// in tests. The function looks up the latest committed entry in the RSL and
+// increments the number in the new entry. If a parent entry does not exist or
+// the parent entry's number is 0 (unset), the current entry's number is set to
+// 1. The numbering starts from 1 as 0 is used to signal the lack of numbering.
 func (e *ReferenceEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, signingKeyBytes []byte) error {
-	message, _ := e.createCommitMessage() // we have an error return for annotations, always nil here
+	if err := e.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
 	emptyTreeID, err := repo.EmptyTree()
 	if err != nil {
@@ -99,6 +124,10 @@ func (e *ReferenceEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, s
 
 	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
 	return err
+}
+
+func (e *ReferenceEntry) GetNumber() uint64 {
+	return e.Number
 }
 
 // Skipped returns true if any of the annotations mark the entry as
@@ -113,14 +142,48 @@ func (e *ReferenceEntry) SkippedBy(annotations []*AnnotationEntry) bool {
 	return false
 }
 
-func (e *ReferenceEntry) createCommitMessage() (string, error) {
+func (e *ReferenceEntry) setEntryNumber(repo *gitinterface.Repository) error {
+	latestEntry, err := GetLatestEntry(repo)
+	if err == nil {
+		e.Number = latestEntry.GetNumber() + 1
+	} else {
+		if errors.Is(err, ErrRSLEntryNotFound) {
+			// First entry
+			e.Number = 1
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error) {
 	lines := []string{
 		ReferenceEntryHeader,
 		"",
 		fmt.Sprintf("%s: %s", RefKey, e.RefName),
 		fmt.Sprintf("%s: %s", TargetIDKey, e.TargetID.String()),
 	}
+	if includeNumber && e.Number > 0 {
+		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
+	}
 	return strings.Join(lines, "\n"), nil
+}
+
+// commitWithoutNumber is used to test the RSL's support for entry numbers in
+// repositories that switch from not having numbered entries to having numbered
+// entries.
+func (e *ReferenceEntry) commitWithoutNumber(repo *gitinterface.Repository) error {
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	return err
 }
 
 // AnnotationEntry is a type of RSL record that references prior items in the
@@ -139,6 +202,9 @@ type AnnotationEntry struct {
 
 	// Message contains any messages or notes added by a user for the annotation.
 	Message string
+
+	// Number contains a strictly increasing number that hints at entry ordering.
+	Number uint64
 }
 
 // NewAnnotationEntry returns an Annotation object that applies to one or more
@@ -151,7 +217,11 @@ func (a *AnnotationEntry) GetID() gitinterface.Hash {
 	return a.ID
 }
 
-// Commit creates a commit object in the RSL for the Annotation.
+// Commit creates a commit object in the RSL for the Annotation. The function
+// looks up the latest committed entry in the RSL and increments the number in
+// the new entry. If a parent entry does not exist or the parent entry's number
+// is 0 (unset), the current entry's number is set to 1. The numbering starts
+// from 1 as 0 is used to signal the lack of numbering.
 func (a *AnnotationEntry) Commit(repo *gitinterface.Repository, sign bool) error {
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
@@ -160,7 +230,11 @@ func (a *AnnotationEntry) Commit(repo *gitinterface.Repository, sign bool) error
 		}
 	}
 
-	message, err := a.createCommitMessage()
+	if err := a.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, err := a.createCommitMessage(true)
 	if err != nil {
 		return err
 	}
@@ -172,6 +246,43 @@ func (a *AnnotationEntry) Commit(repo *gitinterface.Repository, sign bool) error
 
 	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
 	return err
+}
+
+// CommitUsingSpecificKey creates a commit object in the RSL for the
+// AnnotationEntry. The commit is signed using the provided PEM encoded SSH or
+// GPG private key. This is only intended for use in gittuf's developer mode or
+// in tests. The function looks up the latest committed entry in the RSL and
+// increments the number in the new entry. If a parent entry does not exist or
+// the parent entry's number is 0 (unset), the current entry's number is set to
+// 1. The numbering starts from 1 as 0 is used to signal the lack of numbering.
+func (a *AnnotationEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, signingKeyBytes []byte) error {
+	// Check if referred entries exist in the RSL namespace.
+	for _, id := range a.RSLEntryIDs {
+		if _, err := GetEntry(repo, id); err != nil {
+			return err
+		}
+	}
+
+	if err := a.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, err := a.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
+	return err
+}
+
+func (a *AnnotationEntry) GetNumber() uint64 {
+	return a.Number
 }
 
 // RefersTo returns true if the specified entryID is referred to by the
@@ -186,7 +297,23 @@ func (a *AnnotationEntry) RefersTo(entryID gitinterface.Hash) bool {
 	return false
 }
 
-func (a *AnnotationEntry) createCommitMessage() (string, error) {
+func (a *AnnotationEntry) setEntryNumber(repo *gitinterface.Repository) error {
+	latestEntry, err := GetLatestEntry(repo)
+	if err == nil {
+		a.Number = latestEntry.GetNumber() + 1
+	} else {
+		if errors.Is(err, ErrRSLEntryNotFound) {
+			// First entry -> can an annotation actually be first? TODO
+			a.Number = 1
+		} else {
+			return err
+		}
+	}
+
+	return err
+}
+
+func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error) {
 	lines := []string{
 		AnnotationEntryHeader,
 		"",
@@ -202,6 +329,10 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 		lines = append(lines, fmt.Sprintf("%s: false", SkipKey))
 	}
 
+	if includeNumber && a.Number > 0 {
+		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, a.Number))
+	}
+
 	if len(a.Message) != 0 {
 		var message strings.Builder
 		messageBlock := pem.Block{
@@ -215,6 +346,31 @@ func (a *AnnotationEntry) createCommitMessage() (string, error) {
 	}
 
 	return strings.Join(lines, "\n"), nil
+}
+
+// commitWithoutNumber is used to test the RSL's support for entry numbers in
+// repositories that switch from not having numbered entries to having numbered
+// entries.
+func (a *AnnotationEntry) commitWithoutNumber(repo *gitinterface.Repository) error {
+	// Check if referred entries exist in the RSL namespace.
+	for _, id := range a.RSLEntryIDs {
+		if _, err := GetEntry(repo, id); err != nil {
+			return err
+		}
+	}
+
+	message, err := a.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	return err
 }
 
 // GetEntry returns the entry corresponding to entryID.
@@ -242,6 +398,8 @@ func GetEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (Entry, 
 func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error) {
 	parentID, has, err := cache.getParent(entry.GetID())
 	if err == nil && has {
+		// We don't need to check the parent's Number here because it was
+		// checked when this was set in the cache
 		return GetEntry(repo, parentID)
 	}
 
@@ -259,8 +417,26 @@ func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error
 	}
 
 	parentID = parentIDs[0]
+	parentEntry, err := GetEntry(repo, parentID)
+	if err != nil {
+		return nil, err
+	}
+
+	switch entry.GetNumber() {
+	case 0, 1:
+		// parent entry has to be 0
+		if parentEntry.GetNumber() != 0 {
+			return nil, ErrInvalidRSLEntry
+		}
+	default:
+		// parent entry has to be 1 less than entry
+		if parentEntry.GetNumber() != entry.GetNumber()-1 {
+			return nil, ErrInvalidRSLEntry
+		}
+	}
+
 	cache.setParent(entry.GetID(), parentID)
-	return GetEntry(repo, parentID)
+	return parentEntry, nil
 }
 
 // GetNonGittufParentReferenceEntryForEntry returns the first RSL reference
@@ -334,53 +510,29 @@ func GetLatestEntry(repo *gitinterface.Repository) (Entry, error) {
 	return GetEntry(repo, commitID)
 }
 
-// GetLatestNonGittufReferenceEntry returns the first reference entry that is
-// not for the gittuf namespace.
-func GetLatestNonGittufReferenceEntry(repo *gitinterface.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
-	it, err := GetLatestEntry(repo)
-	if err != nil {
-		return nil, nil, err
+// GetLatestReferenceEntry returns the latest reference entry in the local RSL
+// that matches the specified conditions.
+func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestReferenceEntryOption) (*ReferenceEntry, []*AnnotationEntry, error) {
+	options := GetLatestReferenceEntryOptions{
+		BeforeEntryID: gitinterface.ZeroHash,
+		UntilEntryID:  gitinterface.ZeroHash,
+	}
+	for _, fn := range opts {
+		fn(&options)
 	}
 
-	allAnnotations := []*AnnotationEntry{}
-	var targetEntry *ReferenceEntry
-
-	for {
-		switch iterator := it.(type) {
-		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
-				targetEntry = iterator
-			}
-		case *AnnotationEntry:
-			allAnnotations = append(allAnnotations, iterator)
-		}
-
-		if targetEntry != nil {
-			// we've found the target entry, stop walking the RSL
-			break
-		}
-
-		it, err = GetParentForEntry(repo, it)
-		if err != nil {
-			return nil, nil, err
-		}
+	if !options.BeforeEntryID.IsZero() && options.BeforeEntryNumber != 0 {
+		// Only one of the Before options can be set
+		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+	}
+	if !options.UntilEntryID.IsZero() && options.UntilEntryNumber != 0 {
+		// Only one of the Until options can be set
+		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+	}
+	if options.BeforeEntryNumber != 0 && options.UntilEntryNumber != 0 && options.BeforeEntryNumber < options.UntilEntryNumber {
+		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
 	}
 
-	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
-
-	return targetEntry, annotations, nil
-}
-
-// GetLatestReferenceEntryForRef returns the latest reference entry available
-// locally in the RSL for the specified refName.
-func GetLatestReferenceEntryForRef(repo *gitinterface.Repository, refName string) (*ReferenceEntry, []*AnnotationEntry, error) {
-	return GetLatestReferenceEntryForRefBefore(repo, refName, gitinterface.ZeroHash)
-}
-
-// GetLatestReferenceEntryForRefBefore returns the latest reference entry
-// available locally in the RSL for the specified refName before the specified
-// anchor.
-func GetLatestReferenceEntryForRefBefore(repo *gitinterface.Repository, refName string, anchor gitinterface.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
 	allAnnotations := []*AnnotationEntry{}
 
 	iteratorT, err := GetLatestEntry(repo)
@@ -388,8 +540,19 @@ func GetLatestReferenceEntryForRefBefore(repo *gitinterface.Repository, refName 
 		return nil, nil, err
 	}
 
-	if !anchor.IsZero() {
-		for !iteratorT.GetID().Equal(anchor) {
+	// Sanity check before / until number conditions
+	if iteratorT.GetNumber() == 0 {
+		// The repository doesn't use numbers yet
+		if options.BeforeEntryNumber != 0 || options.UntilEntryNumber != 0 {
+			return nil, nil, ErrCannotUseEntryNumberFilter
+		}
+	} else if options.UntilEntryNumber != 0 && iteratorT.GetNumber() < options.UntilEntryNumber {
+		return nil, nil, ErrInvalidUntilEntryNumberCondition
+	}
+
+	// Do initial walk if either before condition is set
+	if !options.BeforeEntryID.IsZero() || options.BeforeEntryNumber != 0 {
+		for !iteratorT.GetID().Equal(options.BeforeEntryID) && iteratorT.GetNumber() != options.BeforeEntryNumber {
 			if annotation, isAnnotation := iteratorT.(*AnnotationEntry); isAnnotation {
 				allAnnotations = append(allAnnotations, annotation)
 			}
@@ -398,17 +561,21 @@ func GetLatestReferenceEntryForRefBefore(repo *gitinterface.Repository, refName 
 			if err != nil {
 				return nil, nil, err
 			}
+
+			if iteratorT.GetNumber() < options.UntilEntryNumber {
+				return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+			}
 		}
 
-		// If the anchor is an annotation, track that
+		// we've found the before anchor entry, track it if it's an
+		// annotation
 		if annotation, isAnnotation := iteratorT.(*AnnotationEntry); isAnnotation {
 			allAnnotations = append(allAnnotations, annotation)
 		}
 
-		// We have to set the iterator to the parent. The other option is to
-		// swap the refName check and parent in the loop below but that breaks
-		// GetLatestReferenceEntryForRef's behavior. By adding this one extra
-		// GetParent here, we avoid repetition.
+		// Set it to parent as this is the first entry considered below
+		// While this entry may match equal until condition, that's fine
+		// as the until condition is inclusive
 		iteratorT, err = GetParentForEntry(repo, iteratorT)
 		if err != nil {
 			return nil, nil, err
@@ -419,15 +586,33 @@ func GetLatestReferenceEntryForRefBefore(repo *gitinterface.Repository, refName 
 	for {
 		switch iterator := iteratorT.(type) {
 		case *ReferenceEntry:
-			if iterator.RefName == refName {
+			matchesConditions := true
+
+			if options.Reference != "" && iterator.RefName != options.Reference {
+				matchesConditions = false
+			}
+
+			if matchesConditions && options.Unskipped && iterator.SkippedBy(allAnnotations) {
+				// SkippedBy ensures only the applicable
+				// annotations that refer to the entry
+				// are used
+				matchesConditions = false
+			}
+
+			if matchesConditions && options.NonGittuf && strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
+				matchesConditions = false
+			}
+
+			if matchesConditions {
 				targetEntry = iterator
 			}
+
 		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, iterator)
 		}
 
 		if targetEntry != nil {
-			// we've found the target entry, stop walking the RSL
+			// We've found the target entry, stop walking the RSL
 			break
 		}
 
@@ -435,41 +620,19 @@ func GetLatestReferenceEntryForRefBefore(repo *gitinterface.Repository, refName 
 		if err != nil {
 			return nil, nil, err
 		}
+
+		if options.UntilEntryNumber != 0 && iteratorT.GetNumber() < options.UntilEntryNumber {
+			return nil, nil, ErrRSLEntryNotFound
+		}
+
+		if !options.UntilEntryID.IsZero() && iteratorT.GetID().Equal(options.UntilEntryID) {
+			return nil, nil, ErrRSLEntryNotFound
+		}
 	}
 
-	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.GetID())
 
 	return targetEntry, annotations, nil
-}
-
-// GetLatestUnskippedReferenceEntryForRef returns the latest reference entry for
-// the ref that does not have an annotation marking it as to-be-skipped. Entries
-// are searched from the latest entry in the RSL to include new annotations for
-// each reference entry tested for the ref.
-func GetLatestUnskippedReferenceEntryForRef(repo *gitinterface.Repository, refName string) (*ReferenceEntry, []*AnnotationEntry, error) {
-	return GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, gitinterface.ZeroHash)
-}
-
-// GetLatestUnskippedReferenceEntryForRefBefore returns the first reference
-// entry for the ref before the anchor that does not have an annotation marking
-// it as to-be-skipped. Entries are searched from the latest entry in the RSL to
-// include new annotations for each reference entry tested for the ref. The only
-// reference entries for the ref considered are those that occur strictly before
-// the anchor entry in the RSL. Of these, the latest reference entry that is not
-// skipped by an annotation (before or after the anchor) is returned.
-func GetLatestUnskippedReferenceEntryForRefBefore(repo *gitinterface.Repository, refName string, anchor gitinterface.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
-	for {
-		latestEntry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, refName, anchor)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if !latestEntry.SkippedBy(annotations) {
-			return latestEntry, annotations, nil
-		}
-
-		anchor = latestEntry.ID
-	}
 }
 
 // GetFirstEntry returns the very first entry in the RSL. It is expected to be
@@ -529,12 +692,12 @@ func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef strin
 func SkipAllInvalidReferenceEntriesForRef(repo *gitinterface.Repository, targetRef string, signCommit bool) error {
 	slog.Debug("Checking if RSL entries point to commits not in the target ref...")
 
-	latestEntry, _, err := GetLatestReferenceEntryForRef(repo, targetRef)
+	latestEntry, _, err := GetLatestReferenceEntry(repo, ForReference(targetRef))
 	if err != nil {
 		return err
 	}
 
-	iteratorEntry, _, err := GetLatestReferenceEntryForRefBefore(repo, targetRef, latestEntry.ID)
+	iteratorEntry, _, err := GetLatestReferenceEntry(repo, ForReference(targetRef), BeforeEntryID(latestEntry.ID))
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			// We don't have a parent to check if invalid
@@ -592,7 +755,7 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 	// checking the parent. The first pair where the parent entry is not
 	// descended from the target commit, we return the other entry in the pair.
 
-	firstEntry, firstAnnotations, err := GetLatestNonGittufReferenceEntry(repo)
+	firstEntry, firstAnnotations, err := GetLatestReferenceEntry(repo, ForNonGittufReference())
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			return nil, nil, ErrNoRecordOfCommit
@@ -770,6 +933,14 @@ func parseReferenceEntryText(id gitinterface.Hash, text string) (*ReferenceEntry
 			}
 
 			entry.TargetID = targetHash
+
+		case NumberKey:
+			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			entry.Number = number
 		}
 	}
 
@@ -812,12 +983,21 @@ func parseAnnotationEntryText(id gitinterface.Hash, text string) (*AnnotationEnt
 			}
 
 			annotation.RSLEntryIDs = append(annotation.RSLEntryIDs, hash)
+
 		case SkipKey:
 			if strings.TrimSpace(ls[1]) == "true" {
 				annotation.Skip = true
 			} else {
 				annotation.Skip = false
 			}
+
+		case NumberKey:
+			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			annotation.Number = number
 		}
 	}
 

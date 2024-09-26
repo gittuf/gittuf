@@ -72,7 +72,7 @@ type Attestations struct {
 // LoadCurrentAttestations inspects the repository's attestations namespace and
 // loads the current attestations.
 func LoadCurrentAttestations(repo *gitinterface.Repository) (*Attestations, error) {
-	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, Ref)
+	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(Ref))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err

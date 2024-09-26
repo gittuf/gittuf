@@ -5,6 +5,7 @@ package rsl
 import (
 	"encoding/base64"
 	"fmt"
+	"math"
 	"slices"
 	"testing"
 
@@ -39,7 +40,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Nil(t, parentIDs)
 
@@ -62,7 +63,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Contains(t, parentIDs, currentTip)
 }
@@ -108,118 +109,129 @@ func TestGetLatestEntry(t *testing.T) {
 	assert.Equal(t, "This was a mistaken push!", a.Message)
 }
 
-func TestGetLatestNonGittufReferenceEntry(t *testing.T) {
-	t.Run("mix of gittuf and non gittuf entries", func(t *testing.T) {
+func TestGetLatestReferenceEntry(t *testing.T) {
+	t.Run("with ref name", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		refName := "refs/heads/main"
+		otherRefName := "refs/heads/feature"
+
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		// Add non gittuf entries
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-			t.Fatal(err)
-		}
-
-		// At this point, latest entry should be returned
-		expectedLatestEntry, err := GetLatestEntry(repo)
+		rslRef, err := repo.GetReference(Ref)
 		if err != nil {
 			t.Fatal(err)
 		}
-		latestEntry, annotations, err := GetLatestNonGittufReferenceEntry(repo)
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference(refName))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
-		assert.Equal(t, expectedLatestEntry, latestEntry)
+		assert.Equal(t, rslRef, entry.ID)
 
-		// Add another gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		// At this point, the expected entry is the same as before
-		latestEntry, annotations, err = GetLatestNonGittufReferenceEntry(repo)
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
-		assert.Equal(t, expectedLatestEntry, latestEntry)
+		assert.Equal(t, rslRef, entry.ID)
 
-		// Add an annotation for latest entry, check that it's returned
-		if err := NewAnnotationEntry([]gitinterface.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		// Add annotation for the target entry
+		if err := NewAnnotationEntry([]gitinterface.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		latestEntry, annotations, err = GetLatestNonGittufReferenceEntry(repo)
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName))
 		assert.Nil(t, err)
-		assert.Equal(t, expectedLatestEntry, latestEntry)
-		assertAnnotationsReferToEntry(t, latestEntry, annotations)
+		assert.Equal(t, rslRef, entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
 	})
 
-	t.Run("only gittuf entries", func(t *testing.T) {
+	t.Run("with invalid conditions", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		emptyTreeID, err := repo.EmptyTree()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Both Before
+		_, _, err = GetLatestReferenceEntry(repo, BeforeEntryID(emptyTreeID), BeforeEntryNumber(3))
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
+
+		// Both Until
+		_, _, err = GetLatestReferenceEntry(repo, UntilEntryID(emptyTreeID), UntilEntryNumber(3))
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
+
+		// Before number is less than until number
+		_, _, err = GetLatestReferenceEntry(repo, BeforeEntryNumber(2), UntilEntryNumber(29))
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
+
+		// Until number is greater than latest entry in the RSL
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		_, _, err = GetLatestReferenceEntry(repo, UntilEntryNumber(10))
+		assert.ErrorIs(t, err, ErrInvalidUntilEntryNumberCondition)
+	})
+
+	t.Run("with ref name and until entry number", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		refName := "refs/heads/main"
+		otherRefName := "refs/heads/feature"
+
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		_, _, err := GetLatestNonGittufReferenceEntry(repo)
-		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		// RSL: main
 
-		// Add another gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		rslRef, err := repo.GetReference(Ref)
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, _, err = GetLatestNonGittufReferenceEntry(repo)
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference(refName), UntilEntryNumber(1))
+		// until is inclusive
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, rslRef, entry.ID)
+
+		if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// RSL: main <- feature
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, rslRef, entry.ID)
+
+		// Add annotation for the target entry
+		if err := NewAnnotationEntry([]gitinterface.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// RSL: main <- feature <- annotation-on-main
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, rslRef, entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		// Set higher until limit
+		_, _, err = GetLatestReferenceEntry(repo, ForReference(refName), UntilEntryNumber(2))
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
-}
 
-func TestGetLatestReferenceEntryForRef(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-
-	refName := "refs/heads/main"
-	otherRefName := "refs/heads/feature"
-
-	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	rslRef, err := repo.GetReference(Ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	entry, annotations, err := GetLatestReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Nil(t, annotations)
-	assert.Equal(t, rslRef, entry.ID)
-
-	if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	entry, annotations, err = GetLatestReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Nil(t, annotations)
-	assert.Equal(t, rslRef, entry.ID)
-
-	// Add annotation for the target entry
-	if err := NewAnnotationEntry([]gitinterface.Hash{entry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	entry, annotations, err = GetLatestReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Equal(t, rslRef, entry.ID)
-	assertAnnotationsReferToEntry(t, entry, annotations)
-}
-
-func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
-	t.Run("no annotations", func(t *testing.T) {
+	t.Run("with ref name and before entry ID", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -238,31 +250,31 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[3]))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[2], entry.ID)
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[4])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[4]))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[3], entry.ID)
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[3]))
 		assert.Nil(t, err)
 		assert.Nil(t, annotations)
 		assert.Equal(t, entryIDs[1], entry.ID)
 
-		_, _, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[1]))
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
-	t.Run("with annotations", func(t *testing.T) {
+	t.Run("with ref name, before entry ID, and annotations", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -290,7 +302,7 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 			entryIDs = append(entryIDs, latest.GetID())
 		}
 
-		entry, annotations, err := GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]))
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
 		assertAnnotationsReferToEntry(t, entry, annotations)
@@ -300,29 +312,391 @@ func TestGetLatestReferenceEntryForRefBefore(t *testing.T) {
 		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[4])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]))
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
 		assertAnnotationsReferToEntry(t, entry, annotations)
 		assert.Len(t, annotations, 2) // now we have 2
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "main", entryIDs[3])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[3]))
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[0], entry.ID)
 		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[6])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[6]))
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[2], entry.ID)
 		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		entry, annotations, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[7])
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[7]))
 		assert.Nil(t, err)
 		assert.Equal(t, entryIDs[6], entry.ID)
 		assertAnnotationsReferToEntry(t, entry, annotations)
 
-		_, _, err = GetLatestReferenceEntryForRefBefore(repo, "feature", entryIDs[1])
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[1]))
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with ref name, before entry ID and until entry number", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// RSL structure for the test
+		// 1    <- 2       <- 3    <- 4       <- 5
+		// main <- feature <- main <- feature <- main
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []gitinterface.Hash{}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[3], entry.ID)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[1], entry.ID)
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[1]), UntilEntryNumber(1))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Set higher limits to constrain search
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(5))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(3))
+		// until is inclusive
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, entryIDs[2], entry.ID)
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(3))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with ref name, before entry ID, until entry number and with annotations", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// RSL structure for the test
+		// main <- A <- feature <- A <- main <- A <- feature <- A <- main <- A
+		testRefs := []string{"main", "feature", "main", "feature", "main"}
+		entryIDs := []gitinterface.Hash{}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+
+			if err := NewAnnotationEntry([]gitinterface.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err = GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+		// Add an annotation at the end for some entry and see it gets pulled in
+		// even when the anchor is for its ancestor
+		assert.Len(t, annotations, 1) // before adding an annotation, we have just 1
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+		assert.Len(t, annotations, 2) // now we have 2
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[0], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[6]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[7]), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[6], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[1]), UntilEntryNumber(1))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Set higher until limits
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(2))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[6]), UntilEntryNumber(3))
+		// until is inclusive
+		assert.Nil(t, err)
+		assert.Equal(t, entryIDs[2], entry.ID)
+		assertAnnotationsReferToEntry(t, entry, annotations)
+	})
+
+	t.Run("with ref name and unskipped", func(t *testing.T) {
+		refName := "refs/heads/main"
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		entryIDs := []gitinterface.Hash{}
+
+		// Add an entry
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Latest unskipped entry is the one we just added
+		e, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryIDs = append(entryIDs, e.GetID())
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference(refName), IsUnskipped())
+		assert.Nil(t, err)
+		assert.Empty(t, annotations)
+		assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
+
+		// Add another entry
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Record latest entry's ID
+		e, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryIDs = append(entryIDs, e.GetID())
+
+		// Latest unskipped entry is the newest one
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), IsUnskipped())
+		assert.Nil(t, err)
+		assert.Empty(t, annotations)
+		assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
+
+		// Skip the second one
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now the latest unskipped entry should be the first one
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), IsUnskipped())
+		assert.Nil(t, err)
+		assert.Empty(t, annotations)
+		assert.Equal(t, entryIDs[0], entry.GetID())
+
+		// Skip the first one too to trigger error
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), IsUnskipped())
+		assert.Nil(t, entry)
+		assert.Empty(t, annotations)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with ref name, unskipped, and before entry ID", func(t *testing.T) {
+		refName := "refs/heads/main"
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		entryIDs := []gitinterface.Hash{}
+
+		// Add an entry
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Latest unskipped entry is the one we just added
+		e, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryIDs = append(entryIDs, e.GetID())
+
+		// Add another entry
+		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Record latest entry's ID
+		e, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryIDs = append(entryIDs, e.GetID())
+
+		// Latest unskipped before the current entry is the first entry
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference(refName), BeforeEntryID(entryIDs[1]), IsUnskipped())
+		assert.Nil(t, err)
+		assert.Empty(t, annotations)
+		assert.Equal(t, entryIDs[0], entry.GetID())
+
+		// Skip the second one
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now even the latest unskipped entry with zero hash should return the first one
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), BeforeEntryID(gitinterface.ZeroHash), IsUnskipped())
+		assert.Nil(t, err)
+		assert.Empty(t, annotations)
+		assert.Equal(t, entryIDs[0], entry.GetID())
+
+		// Skip the first one too to trigger error
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, annotations, err = GetLatestReferenceEntry(repo, ForReference(refName), BeforeEntryID(gitinterface.ZeroHash), IsUnskipped())
+		assert.Nil(t, entry)
+		assert.Empty(t, annotations)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with non gittuf option, mix of gittuf and non gittuf entries", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// Add the first gittuf entry
+		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add non gittuf entries
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// At this point, latest entry should be returned
+		expectedLatestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		latestEntry, annotations, err := GetLatestReferenceEntry(repo, ForNonGittufReference())
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+
+		// Add another gittuf entry
+		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// At this point, the expected entry is the same as before
+		latestEntry, annotations, err = GetLatestReferenceEntry(repo, ForNonGittufReference())
+		assert.Nil(t, err)
+		assert.Nil(t, annotations)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+
+		// Add an annotation for latest entry, check that it's returned
+		if err := NewAnnotationEntry([]gitinterface.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, annotations, err = GetLatestReferenceEntry(repo, ForNonGittufReference())
+		assert.Nil(t, err)
+		assert.Equal(t, expectedLatestEntry, latestEntry)
+		assertAnnotationsReferToEntry(t, latestEntry, annotations)
+	})
+
+	t.Run("with non gittuf option, only gittuf entries", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// Add the first gittuf entry
+		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err := GetLatestReferenceEntry(repo, ForNonGittufReference())
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		// Add another gittuf entry
+		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err = GetLatestReferenceEntry(repo, ForNonGittufReference())
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("transitioning from no numbers to numbers", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		// Add non-numbered entries, including an annotation
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "annotation").commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), BeforeEntryNumber(1))
+		assert.ErrorIs(t, err, ErrCannotUseEntryNumberFilter)
+
+		_, _, err = GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), UntilEntryNumber(1))
+		assert.ErrorIs(t, err, ErrCannotUseEntryNumberFilter)
+
+		// Add numbered entries
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("refs/heads/main"), UntilEntryNumber(1))
+		assert.Nil(t, err)
+		assert.Equal(t, expectedEntry.GetID(), entry.GetID())
+		assert.Nil(t, annotations)
 	})
 }
 
@@ -367,52 +741,84 @@ func TestGetEntry(t *testing.T) {
 }
 
 func TestGetParentForEntry(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	t.Run("regular test", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	// Assert no parent for first entry
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Assert no parent for first entry
+		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err := GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryID := entry.GetID()
+		entry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entryID := entry.GetID()
 
-	_, err = GetParentForEntry(repo, entry)
-	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		_, err = GetParentForEntry(repo, entry)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
-	// Find parent for an entry
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Find parent for an entry
+		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	parentEntry, err := GetParentForEntry(repo, entry)
-	assert.Nil(t, err)
-	assert.Equal(t, entryID, parentEntry.GetID())
+		parentEntry, err := GetParentForEntry(repo, entry)
+		assert.Nil(t, err)
+		assert.Equal(t, entryID, parentEntry.GetID())
 
-	entryID = entry.GetID()
+		entryID = entry.GetID()
 
-	// Find parent for an annotation
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// Find parent for an annotation
+		if err := NewAnnotationEntry([]gitinterface.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, err = GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	parentEntry, err = GetParentForEntry(repo, entry)
-	assert.Nil(t, err)
-	assert.Equal(t, entryID, parentEntry.GetID())
+		parentEntry, err = GetParentForEntry(repo, entry)
+		assert.Nil(t, err)
+		assert.Equal(t, entryID, parentEntry.GetID())
+	})
+
+	t.Run("transition from no number to with number", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+			t.Fatal(err)
+		}
+
+		nonNumberedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		numberedEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, uint64(1), numberedEntry.GetNumber())
+
+		parentEntry, err := GetParentForEntry(repo, numberedEntry)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(0), parentEntry.GetNumber())
+		assert.Equal(t, nonNumberedEntry.GetID(), parentEntry.GetID())
+	})
 }
 
 func TestGetNonGittufParentReferenceEntryForEntry(t *testing.T) {
@@ -1097,138 +1503,6 @@ func TestGetReferenceEntriesInRangeForRef(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 }
 
-func TestGetLatestUnskippedReferenceEntryForRef(t *testing.T) {
-	t.Parallel()
-	refName := "refs/heads/main"
-
-	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-
-	entryIDs := []gitinterface.Hash{}
-
-	// Add an entry
-	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Latest unskipped entry is the one we just added
-	e, err := GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryIDs = append(entryIDs, e.GetID())
-
-	entry, annotations, err := GetLatestUnskippedReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
-
-	// Add another entry
-	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Record latest entry's ID
-	e, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryIDs = append(entryIDs, e.GetID())
-
-	// Latest unskipped entry is the newest one
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
-
-	// Skip the second one
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Now the latest unskipped entry should be the first one
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[0], entry.GetID())
-
-	// Skip the first one too to trigger error
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRef(repo, refName)
-	assert.Nil(t, entry)
-	assert.Empty(t, annotations)
-	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
-}
-
-func TestGetLatestUnskippedReferenceEntryForRefBefore(t *testing.T) {
-	refName := "refs/heads/main"
-
-	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-
-	entryIDs := []gitinterface.Hash{}
-
-	// Add an entry
-	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Latest unskipped entry is the one we just added
-	e, err := GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryIDs = append(entryIDs, e.GetID())
-
-	// We use zero hash because we have just the one entry
-	entry, annotations, err := GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, gitinterface.ZeroHash)
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[0], entry.GetID())
-
-	// Add another entry
-	if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Record latest entry's ID
-	e, err = GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entryIDs = append(entryIDs, e.GetID())
-
-	// Latest unskipped before the current entry is the first entry
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, entryIDs[1])
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[0], entry.GetID())
-
-	// Skip the second one
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Now even the latest unskipped entry with zero hash should return the first one
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, gitinterface.ZeroHash)
-	assert.Nil(t, err)
-	assert.Empty(t, annotations)
-	assert.Equal(t, entryIDs[0], entry.GetID())
-
-	// Skip the first one too to trigger error
-	if err := NewAnnotationEntry([]gitinterface.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	entry, annotations, err = GetLatestUnskippedReferenceEntryForRefBefore(repo, refName, gitinterface.ZeroHash)
-	assert.Nil(t, entry)
-	assert.Empty(t, annotations)
-	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
-}
-
 func TestAnnotationEntryRefersTo(t *testing.T) {
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	tempDir := t.TempDir()
@@ -1302,11 +1576,27 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
 		},
+		"entry, fully resolved ref, small number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 1),
+		},
+		"entry, fully resolved ref, large number": {
+			entry: &ReferenceEntry{
+				RefName:  "refs/heads/main",
+				TargetID: gitinterface.ZeroHash,
+				Number:   math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			message, _ := test.entry.createCommitMessage()
+			message, _ := test.entry.createCommitMessage(true)
 			if !assert.Equal(t, test.expectedMessage, message) {
 				t.Errorf("expected\n%s\n\ngot\n%s", test.expectedMessage, message)
 			}
@@ -1359,11 +1649,29 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
 		},
+		"annotation, no message, small number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 1),
+		},
+		"annotation, no message, large number": {
+			entry: &AnnotationEntry{
+				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				Skip:        true,
+				Message:     "",
+				Number:      math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, uint64(math.MaxUint64)),
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			message, err := test.entry.createCommitMessage()
+			message, err := test.entry.createCommitMessage(true)
 			if err != nil {
 				t.Fatal(err)
 			}

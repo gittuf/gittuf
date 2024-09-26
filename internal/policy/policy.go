@@ -114,7 +114,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, entry *rsl.Re
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
 func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string) (*State, error) {
-	entry, _, err := rsl.GetLatestReferenceEntryForRef(repo, ref)
+	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(ref))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 		return nil, err
 	}
 
-	commitPolicyEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, firstSeenEntry.ID)
+	commitPolicyEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstSeenEntry.ID))
 	if err != nil {
 		return nil, err
 	}
@@ -858,7 +858,7 @@ func verifySuccessiveRootsAndLoadLatestPolicyState(ctx context.Context, repo *gi
 		return nil, err
 	}
 
-	latestPolicyEntryBeforeSpecifiedEntry, _, err := rsl.GetLatestReferenceEntryForRefBefore(repo, PolicyRef, entry.ID)
+	latestPolicyEntryBeforeSpecifiedEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// we have a single policy entry
