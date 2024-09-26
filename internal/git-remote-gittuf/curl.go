@@ -5,17 +5,27 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/repository"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-func handleCurl(remoteName, url string) (map[string]string, bool, error) {
-	helper := exec.Command("git-remote-http", remoteName, url)
+// handleCurl implements the helper for remotes configured to use the curl
+// backend. For this transport, we invoke git-remote-http, only interjecting at
+// specific points to make gittuf specific additions.
+func handleCurl(repo *repository.Repository, remoteName, url string) (map[string]string, bool, error) {
+	// Scan git-remote-gittuf stdin for commands from the parent process
+	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
+	stdInScanner.Split(splitInput)
 
+	// We invoke git-remote-http, itself a Git remote helper
+	helper := exec.Command("git-remote-http", remoteName, url)
 	helper.Stderr = os.Stderr
 
 	// We want to inspect the helper's stdout for the gittuf ref statuses
@@ -25,8 +35,8 @@ func handleCurl(remoteName, url string) (map[string]string, bool, error) {
 	}
 	helperStdOut := &logReadCloser{name: "git-remote-http stdout", readCloser: helperStdOutPipe}
 
-	// We want to interpose with the helper's stdin by passing in extra refs
-	// etc
+	// We want to interpose with the helper's stdin to push and fetch gittuf
+	// specific objects and refs
 	helperStdInPipe, err := helper.StdinPipe()
 	if err != nil {
 		return nil, false, err
@@ -37,392 +47,384 @@ func handleCurl(remoteName, url string) (map[string]string, bool, error) {
 		return nil, false, err
 	}
 
-	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
-	stdInScanner.Split(splitInput)
-
 	var (
 		gittufRefsTips = map[string]string{}
-		pushCommands   = [][]byte{}
-		service        string
 		isPush         bool
 	)
 
-	currentState := start // top level "menu" for the helper
 	for stdInScanner.Scan() {
-		command := stdInScanner.Bytes()
+		input := stdInScanner.Bytes()
 
-	alreadyScanned:
+		switch {
+		case bytes.HasPrefix(input, []byte("stateless-connect")):
+			/*
+				stateless-connect is the new experimental way of
+				communicating with the remote. It implements Git Protocol
+				v2. Here, we don't do much other than recognizing that we're
+				in a fetch, as this protocol doesn't support pushes yet.
+			*/
 
-		switch currentState {
-		case start:
-			log("state: start")
-			// Handle "top level" commands here
-			switch {
-			case bytes.HasPrefix(command, []byte("stateless-connect")):
-				/*
-					stateless-connect is the new experimental way of
-					communicating with the remote. It implements Git Protocol
-					v2. Here, we don't do much other than recognizing that we're
-					in a fetch, as this protocol doesn't support pushes yet.
-				*/
-				log("cmd: stateless-connect")
-				commandSplit := bytes.Split(bytes.TrimSpace(command), []byte(" "))
-				service = string(commandSplit[1])
-				log("found service", service)
-				currentState = serviceRouter // head to the service router next
+			log("cmd: stateless-connect")
 
-				if _, err := helperStdIn.Write(command); err != nil {
+			// Write to git-remote-http
+			if _, err := helperStdIn.Write(input); err != nil {
+				return nil, false, err
+			}
+
+			// Receive the initial info sent by the service via
+			// git-remote-http
+			helperStdOutScanner := bufio.NewScanner(helperStdOut)
+			helperStdOutScanner.Split(splitOutput)
+
+			for helperStdOutScanner.Scan() {
+				output := helperStdOutScanner.Bytes()
+
+				if _, err := os.Stdout.Write(output); err != nil {
 					return nil, false, err
 				}
 
-				// Receive the initial info sent by the service
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+				// flushPkt is used to indicate the end of
+				// output
+				if bytes.Equal(output, flushPkt) {
+					break
+				}
+			}
 
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
+			// Read in command from parent process -> this should be
+			// command=ls-refs with protocol v2
+			// ls-refs is a command to upload-pack. Like list and list
+			// for-push, it enumerates the refs and their states on the remote.
+			// Unlike those commands, this must be passed to upload-pack.
+			// Further, ls-refs must be parametrized with ref-prefixes. We add
+			// refs/gittuf/ as a prefix to learn about the gittuf refs on the
+			// remote during fetches.
+			for stdInScanner.Scan() {
+				input = stdInScanner.Bytes()
 
-					if _, err := os.Stdout.Write(output); err != nil {
+				// Add ref-prefix refs/gittuf/ to the ls-refs command before
+				// flush
+				if bytes.Equal(input, flushPkt) {
+					log("adding ref-prefix for refs/gittuf/")
+					gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
+					if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {
 						return nil, false, err
-					}
-
-					if bytes.Equal(output, flushPkt) {
-						break
 					}
 				}
 
-			case bytes.HasPrefix(command, []byte("list for-push")):
-				/*
-					The helper has two commands, in reality: list, list
-					for-push. Both of these are used to list the states of refs
-					on the remote. The for-push variation just formats it in a
-					way that can be used for the push comamnd later.
-
-					We inspect this to learn we're in a push. We also use the
-					output of this command, implemented by git-remote-https, to
-					learn what the states of the gittuf refs are on the remote.
-				*/
-				log("cmd: list for-push")
-				if _, err := helperStdIn.Write(command); err != nil {
+				if _, err := helperStdIn.Write(input); err != nil {
 					return nil, false, err
 				}
 
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+				// flushPkt is used to indicate the end of input
+				if bytes.Equal(input, flushPkt) {
+					break
+				}
+			}
 
-				log("list for-push returned:")
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
+			// Read advertised refs from the remote
+			helperStdOutScanner = bufio.NewScanner(helperStdOut)
+			helperStdOutScanner.Split(splitPacket)
 
-					refAdSplit := strings.Split(strings.TrimSpace(string(output)), " ")
-					if len(refAdSplit) >= 2 {
-						if strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
-							gittufRefsTips[refAdSplit[1]] = refAdSplit[0]
-						}
+			for helperStdOutScanner.Scan() {
+				output := helperStdOutScanner.Bytes()
+
+				if !bytes.Equal(output, flushPkt) && !bytes.Equal(output, endOfReadPkt) {
+					refAd := string(output)
+					refAd = refAd[4:] // remove pkt length prefix
+					refAd = strings.TrimSpace(refAd)
+
+					// If the gittuf ref is the very first, then there will be
+					// additional information in the output after a null byte.
+					// However, this is unlikely as HEAD is typically the first.
+					if i := strings.IndexByte(refAd, '\x00'); i > 0 {
+						refAd = refAd[:i] // drop everything from null byte onwards
 					}
 
-					if _, err := os.Stdout.Write(output); err != nil {
-						return nil, false, err
-					}
-
-					if bytes.Equal(output, flushPkt) {
-						break
+					refAdSplit := strings.Split(refAd, " ")
+					if strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
+						gittufRefsTips[refAdSplit[1]] = refAdSplit[0]
 					}
 				}
 
-			case bytes.HasPrefix(command, []byte("push")): // multiline input
-				log("cmd: push")
-				isPush = true
-
-				for {
-					if bytes.Equal(command, []byte("\n")) {
-						log("adding gittuf RSL entries if remote is gittuf-enabled")
-						// Fetch remote RSL if needed
-						// TODO
-						// cmd := exec.Command("git", "rev-parse", rsl.Ref)
-						// output, err := cmd.Output()
-						// if err != nil {
-						// 	return nil, false, err
-						// }
-						// localRSLTip := string(bytes.TrimSpace(output))
-						// remoteRSLTip := gittufRefsTips[rsl.Ref]
-						// if localRSLTip != remoteRSLTip {
-						// 	// TODO: This just assumes the local RSL is behind
-						// 	// the remote RSL. With the transport in use, the
-						// 	// local should never be ahead of remote, but we
-						// 	// should verify.
-
-						// 	var fetchStdOut bytes.Buffer
-						// 	cmd := exec.Command("git", "fetch", remoteName, fmt.Sprintf("%s:%s", rsl.Ref, rsl.Ref))
-						// 	cmd.Stdout = &fetchStdOut
-
-						// }
-
-						log("fetching remote gittuf refs")
-						cmd := exec.Command("git", "fetch", url, "refs/gittuf/*:refs/gittuf/*")
-						cmd.Stderr = os.Stderr
-						cmd.Stdout = os.Stderr
-						cmd.Stdin = os.Stdin
-						if err := cmd.Run(); err != nil {
-							return nil, false, err
-						}
-
-						for _, pushCommand := range pushCommands {
-							if len(gittufRefsTips) != 0 {
-								refSpec := string(bytes.Split(bytes.TrimSpace(pushCommand), []byte{' '})[1])
-								refSpecSplit := strings.Split(refSpec, ":")
-
-								srcRef := refSpecSplit[0]
-								srcRef = strings.TrimPrefix(srcRef, "+")
-
-								dstRef := refSpecSplit[1]
-
-								if !strings.HasPrefix(dstRef, gittufRefPrefix) {
-									// For all pushed refs that aren't gittuf
-									// refs, we create an RSL entry
-									cmd := exec.Command("gittuf", "rsl", "record", "--dst-ref", dstRef, srcRef)
-									cmd.Stderr = os.Stderr
-									cmd.Stdout = os.Stderr
-									if err := cmd.Run(); err != nil {
-										return nil, false, err
-									}
-								}
-							}
-
-							if _, err := helperStdIn.Write(pushCommand); err != nil {
-								return nil, false, err
-							}
-						}
-
-						// If remote is gittuf-enabled, also push the RSL
-						if len(gittufRefsTips) != 0 {
-							if _, err := helperStdIn.Write([]byte(fmt.Sprintf("push %s:%s\n", rsl.Ref, rsl.Ref))); err != nil {
-								return nil, false, err
-							}
-						}
-
-						// Add newline to indicate end of push batch
-						if _, err := helperStdIn.Write([]byte("\n")); err != nil {
-							return nil, false, err
-						}
-
-						break
-					}
-
-					pushCommands = append(pushCommands, command)
-
-					// Read in the next statement in the push batch
-					if !stdInScanner.Scan() {
-						// This should really not be reachable as we ought to
-						// get the newline and break first from our invoker.
-						break
-					}
-					command = stdInScanner.Bytes()
+				// Write output to parent process
+				if _, err := os.Stdout.Write(output); err != nil {
+					return nil, false, err
 				}
 
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+				// endOfReadPkt indicates end of response
+				// in stateless connections
+				if bytes.Equal(output, endOfReadPkt) {
+					break
+				}
+			}
 
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
+			// At this point, we enter the haves / wants negotiation, which is
+			// followed usually by the remote sending a packfile with the
+			// requested Git objects.
 
-					if !bytes.Contains(output, []byte(gittufRefPrefix)) {
-						// we do this because git (at the very top level)
-						// inspects all the refs it's been asked to push and
-						// tracks their current status it never does this for
-						// the rsl ref, because only the transport is pushing
-						// that ref if we don't filter this out, it knows
-						// refs/gittuf/rsl got pushed, it knows _what_ the
-						// previous rsl tip was (by talking to the remote in
-						// list for-push) but it doesn't actually know the new
-						// tip of the rsl that was pushed because this is loaded
-						// before the transport is ever invoked.
+			// We add the gittuf specific objects as wants. We don't have to
+			// specify haves as Git automatically specifies all the objects it
+			// has regardless of what refs they're reachable via.
+
+			// Read in command from parent process -> this should be
+			// command=fetch with protocol v2
+			var (
+				wroteGittufWants = false // track this in case there are multiple rounds of negotiation
+				wroteWants       = false
+			)
+			for stdInScanner.Scan() {
+				input = stdInScanner.Bytes()
+
+				if bytes.Equal(input, flushPkt) {
+					if !wroteGittufWants {
+						log("adding gittuf wants")
+						tips, err := getGittufWants(repo, gittufRefsTips)
+						if err != nil {
+							tips = gittufRefsTips
+						}
+
+						for _, tip := range tips {
+							wantCmd := fmt.Sprintf("want %s\n", tip)
+							if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
+								return nil, false, err
+							}
+						}
+						wroteGittufWants = true
+					}
+					wroteWants = true
+				}
+
+				if _, err := helperStdIn.Write(input); err != nil {
+					return nil, false, err
+				}
+
+				// Read from remote if wants are done
+				// We may need to scan multiple times for inputs, which is
+				// why this flag is used
+				if wroteWants {
+					helperStdOutScanner := bufio.NewScanner(helperStdOut)
+					helperStdOutScanner.Split(splitPacket)
+
+					// TODO: check multiplexed output
+					for helperStdOutScanner.Scan() {
+						output := helperStdOutScanner.Bytes()
+
+						// Send along to parent process
 						if _, err := os.Stdout.Write(output); err != nil {
 							return nil, false, err
 						}
-					}
 
-					if bytes.Equal(output, flushPkt) {
-						break
-					}
-				}
-			default:
-				log("state: other-helper-command")
-				// Pass through other commands we don't want to interpose to the
-				// curl helper
-				if _, err := helperStdIn.Write(command); err != nil {
-					return nil, false, err
-				}
+						if bytes.Equal(output, endOfReadPkt) {
+							// Two things are possible
+							// a) The communication is done
+							// b) The remote indicates another round of
+							// negotiation is required
+							// Instead of parsing the output to find out,
+							// we let the parent process tell us
+							// If the parent process has further input, more
+							// negotiation is needed
+							if !stdInScanner.Scan() {
+								break
+							}
 
-				// Receive the initial info sent by the service
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+							input = stdInScanner.Bytes()
+							if len(input) == 0 {
+								break
+							}
 
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
-
-					if _, err := os.Stdout.Write(output); err != nil {
-						return nil, false, err
-					}
-
-					if bytes.Equal(output, flushPkt) {
-						break
+							// Having scanned already, we must write prior
+							// to letting the scan continue in the outer
+							// loop
+							// This assumes the very first input isn't just
+							// flush again...
+							if _, err := helperStdIn.Write(input); err != nil {
+								return nil, false, err
+							}
+							wroteWants = false
+							break
+						}
 					}
 				}
 			}
 
-		case serviceRouter:
+		case bytes.HasPrefix(input, []byte("list for-push")):
 			/*
-				The serviceRouter state is used when git-upload-pack is invoked
-				on the remote via stateless-connect. We've got nested states
-				here: git-upload-pack has commands you can pass to it, so
-				commands from this point onwards are not for the remote helper.
-			*/
-			log("state: service-router")
-			isPacketMode = true
-			switch service { //nolint:gocritic
-			case gitUploadPack: // fetching from remote
-				if bytes.Contains(command, []byte("command=ls-refs")) {
-					currentState = lsRefs
-				} else if bytes.Contains(command, []byte("command=fetch")) {
-					currentState = requestingWants
-				}
-				// Right now, only upload-pack can be handled this way
-			}
+				The helper has two commands, in reality: list, list
+				for-push. Both of these are used to list the states of refs
+				on the remote. The for-push variation just formats it in a
+				way that can be used for the push comamnd later.
 
-			if _, err := helperStdIn.Write(command); err != nil {
+				We inspect this to learn we're in a push. We also use the
+				output of this command, implemented by git-remote-https, to
+				learn what the states of the gittuf refs are on the remote.
+			*/
+
+			log("cmd: list for-push")
+
+			// Write it to git-remote-http
+			if _, err := helperStdIn.Write(input); err != nil {
 				return nil, false, err
 			}
 
-			// Right now, we don't need to wait for a response here, we check
-			// what command of the git service we're invoking and go to that
-			// state, this is almost a "routing" state. THIS MAY CHANGE!
+			// Read remote refs
+			helperStdOutScanner := bufio.NewScanner(helperStdOut)
+			helperStdOutScanner.Split(splitOutput)
 
-		case lsRefs:
-			/*
-				ls-refs is a command to upload-pack. Like list and list
-				for-push, it enumerates the refs and their states on the remote.
-				Unlike those commands, this must be passed to upload-pack.
-				Further, ls-refs must be parametrized with ref-prefixes. We add
-				refs/gittuf/ as a prefix to learn about the gittuf refs on the
-				remote during fetches.
-			*/
-			log("state: ls-refs")
-			if bytes.Equal(command, flushPkt) {
-				// add the gittuf ref-prefix right before the flushPkt
-				log("adding ref-prefix for refs/gittuf/")
-				gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
-				if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {
+			for helperStdOutScanner.Scan() {
+				output := helperStdOutScanner.Bytes()
+
+				refAdSplit := strings.Split(strings.TrimSpace(string(output)), " ")
+				if len(refAdSplit) >= 2 {
+					// Inspect each one to see if it's a gittuf ref
+					if strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
+						gittufRefsTips[refAdSplit[1]] = refAdSplit[0]
+					}
+				}
+
+				// Pass remote ref status to parent process
+				if _, err := os.Stdout.Write(output); err != nil {
 					return nil, false, err
 				}
 
-				currentState = lsRefsResponse
+				// flushPkt indicates end of message
+				if bytes.Equal(output, flushPkt) {
+					break
+				}
 			}
 
-			if _, err := helperStdIn.Write(command); err != nil {
-				return nil, false, err
-			}
+		case bytes.HasPrefix(input, []byte("push")): // multiline input
+			log("cmd: push")
 
-			// after writing flush to stdin, we can get the advertised refs
-			if currentState == lsRefsResponse {
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+			isPush = true
 
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
-
-					if !bytes.Equal(output, flushPkt) && !bytes.Equal(output, endOfReadPkt) {
-						refAd := strings.TrimSpace(string(output)[4:]) // remove the length prefix
-						if i := strings.IndexByte(refAd, '\x00'); i > 0 {
-							// this checks if the gittuf entry is the very first
-							// returned (unlikely because of HEAD)
-							refAd = refAd[:i] // drop everything from null byte onwards
-						}
-						refAdSplit := strings.Split(refAd, " ")
-
-						if strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
-							gittufRefsTips[refAdSplit[1]] = refAdSplit[0]
-						}
-					}
-
-					if _, err := os.Stdout.Write(output); err != nil {
-						return nil, false, err
-					}
-
-					if bytes.Equal(output, endOfReadPkt) {
-						break
-					}
+			pushCommands := [][]byte{}
+			for {
+				if bytes.Equal(input, []byte("\n")) {
+					break
 				}
 
-				currentState = serviceRouter // go back to service's "router"
+				pushCommands = append(pushCommands, input)
+
+				if !stdInScanner.Scan() {
+					break
+				}
+				input = stdInScanner.Bytes()
 			}
 
-		case requestingWants:
-			/*
-				At this point, we enter the haves / wants negotiation, which is
-				followed usually by the remote sending a packfile with the
-				requested Git objects.
+			if len(gittufRefsTips) != 0 {
+				if err := repo.ReconcileLocalRSLWithRemote(context.TODO(), remoteName, true); err != nil {
+					return nil, false, err
+				}
+			}
 
-				We add the gittuf specific objects as wants. We don't have to
-				specify haves as Git automatically specifies all the objects it
-				has regardless of what refs they're reachable via.
-			*/
-			log("state: requesting-wants")
-			wantsDone := false
-			if bytes.Equal(command, flushPkt) {
-				if !wantsDone {
-					// Write gittuf wants
-					log("adding gittuf wants")
-					for _, tip := range gittufRefsTips {
-						wantCmd := fmt.Sprintf("want %s\n", tip)
-						if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
+			rslPushed := false
+			for _, pushCommand := range pushCommands {
+				// TODO: maybe find another way to determine
+				// whether repo is gittuf enabled
+				// The remote may not have gittuf refs but the
+				// local may, meaning this won't get synced
+				if len(gittufRefsTips) != 0 {
+					pushCommandString := string(pushCommand)
+					pushCommandString = strings.TrimSpace(pushCommandString)
+
+					refSpec := strings.TrimPrefix(pushCommandString, "push ")
+					refSpecSplit := strings.Split(refSpec, ":")
+
+					srcRef := refSpecSplit[0]
+					srcRef = strings.TrimPrefix(srcRef, "+") // force push
+					// TODO: during a force push, we want to also revoke prior
+					// pushes
+
+					dstRef := refSpecSplit[1]
+					if dstRef == rsl.Ref {
+						rslPushed = true
+					}
+
+					if !strings.HasPrefix(dstRef, gittufRefPrefix) {
+						// Create RSL entries for the ref as long as it's not a
+						// gittuf ref
+						// A gittuf ref can pop up here when it's explicitly
+						// pushed by the user
+
+						if err := repo.RecordRSLEntryForReference(srcRef, true, rslopts.WithOverrideRefName(dstRef)); err != nil {
 							return nil, false, err
 						}
 					}
-					wantsDone = true
+				}
 
-					// FIXME: does this work for incremental fetches?
-					currentState = packfileIncoming
+				// Write push command to helper
+				if _, err := helperStdIn.Write(pushCommand); err != nil {
+					return nil, false, err
 				}
 			}
 
-			if _, err := helperStdIn.Write(command); err != nil {
+			if len(gittufRefsTips) != 0 && !rslPushed {
+				// Push RSL
+				pushCommand := fmt.Sprintf("push %s:%s\n", rsl.Ref, rsl.Ref)
+				if _, err := helperStdIn.Write([]byte(pushCommand)); err != nil {
+					return nil, false, err
+				}
+			}
+
+			// Indicate end of push statements
+			if _, err := helperStdIn.Write([]byte("\n")); err != nil {
 				return nil, false, err
 			}
 
-			if currentState == packfileIncoming {
-				log("awaiting packfile(s)")
-				helperStdOutScanner := bufio.NewScanner(helperStdOut)
-				helperStdOutScanner.Split(splitOutput)
+			helperStdOutScanner := bufio.NewScanner(helperStdOut)
+			helperStdOutScanner.Split(splitOutput)
 
-				// TODO: fix issues with multiplexing
-				for helperStdOutScanner.Scan() {
-					output := helperStdOutScanner.Bytes()
+			for helperStdOutScanner.Scan() {
+				output := helperStdOutScanner.Bytes()
 
+				if !bytes.Contains(output, []byte(gittufRefPrefix)) {
+					// we do this because git (at the very
+					// top level) inspects all the refs it's
+					// been asked to push and tracks their
+					// current status. it never does this
+					// for the rsl ref, because only the
+					// transport is pushing that ref. if we
+					// don't filter this out, it knows
+					// refs/gittuf/rsl got pushed, it knows
+					// _what_ the previous rsl tip was (by
+					// talking to the remote in list
+					// for-push) but it doesn't actually
+					// know the new tip of the rsl that was
+					// pushed because this is loaded before
+					// the transport is ever invoked.
 					if _, err := os.Stdout.Write(output); err != nil {
 						return nil, false, err
 					}
-
-					if bytes.Equal(output, endOfReadPkt) {
-						if !stdInScanner.Scan() {
-							break
-						}
-						command = stdInScanner.Bytes()
-						if len(command) == 0 {
-							break
-						}
-						// we have a second want batch
-						currentState = requestingWants
-						goto alreadyScanned
-					}
 				}
-				if currentState == packfileIncoming {
-					currentState = packfileDone
+
+				// flushPkt indicates end of message
+				if bytes.Equal(output, flushPkt) {
+					break
 				}
 			}
-		}
-		if currentState == packfileDone {
-			break
+		default:
+			// Pass through other commands we don't want to interpose to the
+			// curl helper
+			if _, err := helperStdIn.Write(input); err != nil {
+				return nil, false, err
+			}
+
+			// Receive the initial info sent by the service
+			helperStdOutScanner := bufio.NewScanner(helperStdOut)
+			helperStdOutScanner.Split(splitOutput)
+
+			for helperStdOutScanner.Scan() {
+				output := helperStdOutScanner.Bytes()
+
+				if _, err := os.Stdout.Write(output); err != nil {
+					return nil, false, err
+				}
+
+				// Check for end of message
+				if bytes.Equal(output, flushPkt) {
+					break
+				}
+			}
 		}
 	}
 

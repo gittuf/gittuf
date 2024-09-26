@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/gittuf/gittuf/internal/repository"
 )
 
 type logWriteCloser struct {
@@ -131,24 +133,23 @@ func packetEncode(str string) []byte {
 	return []byte(fmt.Sprintf("%04x%s", 4+len(str), str))
 }
 
-func getGittufWants(remoteTips map[string]string) ([]string, error) {
-	wants := []string{}
+func getGittufWants(repo *repository.Repository, remoteTips map[string]string) (map[string]string, error) {
+	wants := map[string]string{}
 	for remoteRef, tip := range remoteTips {
-		cmd := exec.Command("git", "--git-dir", os.Getenv("GIT_DIR"), "rev-parse", remoteRef) //nolint:gosec
-		output, err := cmd.Output()
+		currentTip, err := repo.GetGitRepository().GetReference(remoteRef)
 		if err != nil {
 			return nil, err
 		}
 
-		if string(bytes.TrimSpace(output)) != tip {
-			wants = append(wants, tip)
+		if currentTip.String() != tip {
+			wants[remoteRef] = tip
 		}
 	}
 
 	return wants, nil
 }
 
-func getSSHCommand() ([]string, error) {
+func getSSHCommand(repo *repository.Repository) ([]string, error) {
 	sshCmd := os.Getenv("GIT_SSH_COMMAND")
 	if len(sshCmd) != 0 {
 		return strings.Split(sshCmd, " "), nil
@@ -159,21 +160,9 @@ func getSSHCommand() ([]string, error) {
 		return []string{sshCmd}, nil
 	}
 
-	cmd := exec.Command("git", "config", "--get-regexp", `.*`)
-	stdOut, err := cmd.Output()
+	config, err := repo.GetGitRepository().GetGitConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read Git config: %w", err)
-	}
-
-	config := map[string]string{}
-
-	lines := strings.Split(strings.TrimSpace(string(stdOut)), "\n")
-	for _, line := range lines {
-		split := strings.Split(line, " ")
-		if len(split) < 2 {
-			continue
-		}
-		config[strings.ToLower(split[0])] = strings.Join(split[1:], " ")
+		return nil, err
 	}
 
 	sshCmd, defined := config["core.sshcommand"]
@@ -182,4 +171,17 @@ func getSSHCommand() ([]string, error) {
 	}
 
 	return []string{"ssh"}, nil
+}
+
+func testSSH(sshCmd []string, host string) error {
+	command := append(sshCmd, "-T", host)           //nolint:gocritic
+	cmd := exec.Command(command[0], command[1:]...) //nolint:gosec
+	if output, err := cmd.CombinedOutput(); err != nil {
+		if cmd.ProcessState.ExitCode() == 255 {
+			// with GitHub, we see exit code 1 while with GitLab and BitBucket,
+			// we see exit code 0
+			return fmt.Errorf("%s: %s", err.Error(), bytes.TrimSpace(output))
+		}
+	}
+	return nil
 }
