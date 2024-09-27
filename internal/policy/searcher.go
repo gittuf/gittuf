@@ -12,8 +12,8 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-// searcher defines the interface for identifying the applicable policy and
-// attestation entries in the RSL for some entry.
+// searcher defines the interface for finding policy and attestation entries in
+// the RSL.
 type searcher interface {
 	FindFirstPolicyEntry() (*rsl.ReferenceEntry, error)
 	FindPolicyEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
@@ -31,6 +31,7 @@ type regularSearcher struct {
 	repo *gitinterface.Repository
 }
 
+// FindFirstPolicyEntry identifies the very first policy entry in the RSL.
 func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 	entry, _, err := rsl.GetFirstReferenceEntryForRef(r.repo, PolicyRef)
 	if err != nil {
@@ -44,6 +45,8 @@ func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 	return entry, nil
 }
 
+// FindPolicyEntryFor identifies the latest policy entry for the specified
+// entry.
 func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
 	// If the requested entry itself is for the policy ref, return as is
 	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == PolicyRef {
@@ -65,6 +68,8 @@ func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEnt
 	return policyEntry, nil
 }
 
+// FindPolicyEntriesInRange returns all policy RSL entries in the specified
+// range. firstEntry and lastEntry are included if they are for the policy ref.
 func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
 	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef)
 	if err != nil {
@@ -74,6 +79,8 @@ func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Ent
 	return allPolicyEntries, nil
 }
 
+// FindAttestationsEntryFor identifies the latest attestations entry for the
+// specified entry.
 func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
 	// If the requested entry itself is for the attestations ref, return as is
 	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == attestations.Ref {
