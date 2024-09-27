@@ -120,14 +120,14 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tu
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
+	case ssh.SSHKeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
 		tagSignature := []byte(tag.PGPSignature)
 
-		if err := verifySSHKeySignature(key, tagContents, tagSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

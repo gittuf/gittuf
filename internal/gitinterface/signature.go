@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	sslibsvssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/hiddeco/sshsig"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
@@ -22,6 +22,7 @@ import (
 )
 
 const (
+	rekorServer                       = "https://rekor.sigstore.dev"
 	namespaceSSHSignature      string = "git"
 	gpgPrivateKeyPEMHeader     string = "PGP PRIVATE KEY"
 	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
@@ -154,7 +155,8 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 		return ErrIncorrectVerificationKey
 	}
 
-	rekor, err := gitsignRekor.NewWithOptions(ctx, signerverifier.RekorServer)
+	// TODO: support private sigstore
+	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorServer)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
 	}
@@ -184,24 +186,14 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 }
 
 // verifySSHKeySignature verifies Git signatures issued by SSH keys.
-func verifySSHKeySignature(key *tuf.Key, data, signature []byte) error {
-	verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
+func verifySSHKeySignature(ctx context.Context, key *tuf.Key, data, signature []byte) error {
+	verifier, err := sslibsvssh.NewVerifierFromKey(key)
 	if err != nil {
 		return errors.Join(ErrVerifyingSSHSignature, err)
 	}
 
-	publicKey, err := ssh.NewPublicKey(verifier.Public())
-	if err != nil {
+	if err := verifier.Verify(ctx, data, signature); err != nil {
 		return errors.Join(ErrVerifyingSSHSignature, err)
-	}
-
-	sshSignature, err := sshsig.Unarmor(signature)
-	if err != nil {
-		return errors.Join(ErrVerifyingSSHSignature, err)
-	}
-
-	if err := sshsig.Verify(bytes.NewReader(data), sshSignature, publicKey, sshSignature.HashAlgorithm, namespaceSSHSignature); err != nil {
-		return errors.Join(ErrIncorrectVerificationKey, err)
 	}
 
 	return nil
