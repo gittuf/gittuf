@@ -56,7 +56,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.signingKey)
+	signer, err := common.LoadSigner(repo, o.signingKey)
 	if err != nil {
 		return err
 	}

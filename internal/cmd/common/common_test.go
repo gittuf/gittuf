@@ -34,7 +34,7 @@ func TestLoadSigner(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signer, err := LoadSigner(keyPath)
+		signer, err := LoadSigner(nil, keyPath)
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 
 		_, err = signer.Sign(context.Background(), nil)

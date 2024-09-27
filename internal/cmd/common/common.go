@@ -8,9 +8,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	sigstoresigneropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
@@ -90,15 +93,46 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 	return keyObj, nil
 }
 
-// LoadSigner loads a signer for the specified key bytes. The key must be
-// encoded either in a standard PEM format. For now, the custom securesystemslib
-// format is also supported.
-func LoadSigner(key string) (sslibdsse.SignerVerifier, error) {
+// LoadSigner loads a metadata signer for the specified key bytes. Currently,
+// the signer must be either for an SSH key (in which case the `key` is a path
+// to the private key) or for signing with Sigstore (where `key` has a prefix
+// `fulcio:`). For Sigstore, developer mode must be enabled by setting
+// GITTUF_DEV=1 in the environment.
+func LoadSigner(repo *repository.Repository, key string) (sslibdsse.SignerVerifier, error) {
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		return nil, fmt.Errorf("not implemented")
 	case strings.HasPrefix(key, FulcioPrefix):
-		return nil, fmt.Errorf("not implemented")
+		if !dev.InDevMode() {
+			return nil, dev.ErrNotInDevMode
+		}
+
+		opts := []sigstoresigneropts.Option{}
+
+		gitRepo := repo.GetGitRepository()
+		config, err := gitRepo.GetGitConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse relevant gitsign.<> config values
+		if value, has := config[sigstore.GitConfigIssuer]; has {
+			opts = append(opts, sigstoresigneropts.WithIssuerURL(value))
+		}
+		if value, has := config[sigstore.GitConfigClientID]; has {
+			opts = append(opts, sigstoresigneropts.WithClientID(value))
+		}
+		if value, has := config[sigstore.GitConfigFulcio]; has {
+			opts = append(opts, sigstoresigneropts.WithFulcioURL(value))
+		}
+		if value, has := config[sigstore.GitConfigRekor]; has {
+			opts = append(opts, sigstoresigneropts.WithRekorURL(value))
+		}
+		if value, has := config[sigstore.GitConfigRedirectURL]; has {
+			opts = append(opts, sigstoresigneropts.WithRedirectURL(value))
+		}
+
+		return sigstore.NewSigner(opts...), nil
 	default:
 		return ssh.NewSignerFromFile(key)
 	}

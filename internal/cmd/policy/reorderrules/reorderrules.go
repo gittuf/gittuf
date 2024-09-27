@@ -33,7 +33,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.p.SigningKey)
+	signer, err := common.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
