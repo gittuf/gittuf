@@ -1,0 +1,59 @@
+DEBUG:    3+   >>>> mkdir gittuf-get-started > $null ; cd gittuf-get-started
+DEBUG:   36+ begin  >>>> {
+DEBUG:   39+          >>>> $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('New-Item', [System.Management.Automation.CommandTypes]::Cmdlet)
+DEBUG:   40+          >>>> $scriptCmd = {& $wrappedCmd -Type Directory @PSBoundParameters }
+DEBUG:   41+          >>>> $steppablePipeline = $scriptCmd.GetSteppablePipeline()
+DEBUG:   42+          >>>> $steppablePipeline.Begin($PSCmdlet)
+DEBUG:   47+  >>>> }
+DEBUG:   49+ process  >>>> {
+DEBUG:   52+          >>>> $steppablePipeline.Process($_)
+DEBUG:   57+  >>>> }
+DEBUG:   59+ end  >>>> {
+DEBUG:   62+          >>>> $steppablePipeline.End()
+DEBUG:   67+  >>>> }
+DEBUG:    3+  mkdir gittuf-get-started > $null ;  >>>> cd gittuf-get-started
+DEBUG:    4+  >>>> mkdir keys > $null ; cd keys
+DEBUG:   36+ begin  >>>> {
+DEBUG:   39+          >>>> $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('New-Item', [System.Management.Automation.CommandTypes]::Cmdlet)
+DEBUG:   40+          >>>> $scriptCmd = {& $wrappedCmd -Type Directory @PSBoundParameters }
+DEBUG:   41+          >>>> $steppablePipeline = $scriptCmd.GetSteppablePipeline()
+DEBUG:   42+          >>>> $steppablePipeline.Begin($PSCmdlet)
+DEBUG:   47+  >>>> }
+DEBUG:   49+ process  >>>> {
+DEBUG:   52+          >>>> $steppablePipeline.Process($_)
+DEBUG:   57+  >>>> }
+DEBUG:   59+ end  >>>> {
+DEBUG:   62+          >>>> $steppablePipeline.End()
+DEBUG:   67+  >>>> }
+DEBUG:    4+ mkdir keys > $null ;  >>>> cd keys
+DEBUG:    5+  >>>> ssh-keygen -q -t ecdsa -N '""' -f root
+DEBUG:    6+  >>>> ssh-keygen -q -t ecdsa -N '""' -f policy
+DEBUG:    7+  >>>> ssh-keygen -q -t ecdsa -N '""' -f developer
+DEBUG:    8+  >>>> cd .. ; mkdir repo > $null ; cd repo
+DEBUG:    8+ cd .. ;  >>>> mkdir repo > $null ; cd repo
+DEBUG:   36+ begin  >>>> {
+DEBUG:   39+          >>>> $wrappedCmd = $ExecutionContext.InvokeCommand.GetCommand('New-Item', [System.Management.Automation.CommandTypes]::Cmdlet)
+DEBUG:   40+          >>>> $scriptCmd = {& $wrappedCmd -Type Directory @PSBoundParameters }
+DEBUG:   41+          >>>> $steppablePipeline = $scriptCmd.GetSteppablePipeline()
+DEBUG:   42+          >>>> $steppablePipeline.Begin($PSCmdlet)
+DEBUG:   47+  >>>> }
+DEBUG:   49+ process  >>>> {
+DEBUG:   52+          >>>> $steppablePipeline.Process($_)
+DEBUG:   57+  >>>> }
+DEBUG:   59+ end  >>>> {
+DEBUG:   62+          >>>> $steppablePipeline.End()
+DEBUG:   67+  >>>> }
+DEBUG:    8+ cd .. ; mkdir repo > $null ;  >>>> cd repo
+DEBUG:    9+  >>>> git init -q -b main
+DEBUG:   10+  >>>> git config --local gpg.format ssh
+DEBUG:   11+  >>>> git config --local user.signingkey ../keys/developer
+DEBUG:   12+  >>>> gittuf trust init -k ../keys/root
+DEBUG:   13+  >>>> gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
+DEBUG:   14+  >>>> gittuf policy init -k ../keys/policy --policy-name targets
+DEBUG:   15+  >>>> gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
+DEBUG:   16+  >>>> gittuf policy apply
+DEBUG:   17+  >>>> echo "Hello, world!" > README.md
+DEBUG:   18+  >>>> git add . ; git commit -q -S -m "Initial commit"
+DEBUG:   18+ git add . ;  >>>> git commit -q -S -m "Initial commit"
+DEBUG:   19+  >>>> gittuf rsl record main
+DEBUG:   20+  >>>> gittuf verify-ref main
