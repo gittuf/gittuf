@@ -9,8 +9,8 @@ import (
 	"path"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	ita "github.com/in-toto/attestation/go/v1"
-	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
 const (

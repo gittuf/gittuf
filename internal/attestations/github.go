@@ -13,10 +13,10 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
-	sslibdsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
