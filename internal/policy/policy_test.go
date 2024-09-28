@@ -309,6 +309,7 @@ func TestStateKeys(t *testing.T) {
 		assert.Equal(t, expectedKeys, keys)
 	})
 }
+
 func TestStateVerify(t *testing.T) {
 	t.Parallel()
 	t.Run("only root", func(t *testing.T) {

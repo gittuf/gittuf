@@ -199,6 +199,7 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 }
+
 func TestKnowsCommit(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
@@ -317,6 +318,7 @@ func createTestGPGSignedCommit(t *testing.T, repo *Repository) Hash {
 
 	return commitHash
 }
+
 func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
 	t.Helper()
 
