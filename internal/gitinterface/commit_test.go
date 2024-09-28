@@ -81,6 +81,63 @@ func TestRepositoryCommit(t *testing.T) {
 	assert.Equal(t, expectedThirdCommitID, refHead.String())
 }
 
+func TestCommitUsingSpecificKey(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second tree
+	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeWithContentsID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"README.md": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit with no tree
+	expectedInitialCommitID := "648c569f3958b899e832f04750de52cf5d0db2fa"
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedInitialCommitID, commitID.String())
+
+	refHead, err := repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedInitialCommitID, refHead.String())
+
+	privateKey := artifacts.SSHRSAPrivate
+
+	// Create publicKey
+	keyPath := filepath.Join(tempDir, "ssh-key")
+	if err := os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := ssh.NewKeyFromFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Create second commit with tree
+	expectedSecondCommitID := "11020a7c78c4f903d0592ec2e8f73d00a17ec47e"
+	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", privateKey)
+	assert.Nil(t, err)
+
+	// Verify commit signature using publicKey
+	err = repo.verifyCommitSignature(context.Background(), commitID, publicKey)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedSecondCommitID, commitID.String())
+}
+
 func TestRepositoryVerifyCommit(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
@@ -270,7 +327,6 @@ func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	testCommit := &object.Commit{
 		Hash: plumbing.NewHash("d6b230478965e25477263aa65f1ca6d23d0c0d97"),
 		Author: object.Signature{
