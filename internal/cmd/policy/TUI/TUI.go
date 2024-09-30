@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/spf13/cobra"
 )
 
@@ -63,13 +67,30 @@ type model struct {
 	inputs     []textinput.Model
 	focusIndex int
 	cursorMode textinput.CursorMode
+	repo       *repository.Repository
+	signer     dsse.SignerVerifier
+	policyName string
+	options    *options
 }
 
-func initialModel() model {
+func initialModel(o *options) model {
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return model{}
+	}
+
+	signer, err := common.LoadSigner(o.p.SigningKey)
+	if err != nil {
+		return model{}
+	}
 	m := model{
 		screen:     screenMain,
-		rules:      getCurrRules(),
 		cursorMode: textinput.CursorBlink,
+		repo:       repo,
+		signer:     signer,
+		policyName: o.policyName,
+		rules:      getCurrRules(o),
+		options:    o,
 	}
 
 	mainItems := []list.Item{
@@ -186,6 +207,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						pattern: m.inputs[1].Value(),
 						key:     m.inputs[2].Value(),
 					})
+					authorizedKeys := []string{m.inputs[2].Value()}
+					repoAddRule(m.options, m.rules[len(m.rules)-1], authorizedKeys)
 					m.updateRuleList()
 					m.screen = screenMain
 				}
@@ -197,6 +220,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							break
 						}
 					}
+					repoRemoveRule(m.options, rule{name: i.title})
 					m.updateRuleList()
 					m.screen = screenMain
 				}
@@ -205,6 +229,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.screen == screenReorderRules {
 				if i := m.ruleList.Index(); i > 0 {
 					m.rules[i], m.rules[i-1] = m.rules[i-1], m.rules[i]
+					repoReorderRules(m.options, m.rules)
 					m.updateRuleList()
 					m.ruleList.Select(i - 1)
 				}
@@ -213,6 +238,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.screen == screenReorderRules {
 				if i := m.ruleList.Index(); i < len(m.rules)-1 {
 					m.rules[i], m.rules[i+1] = m.rules[i+1], m.rules[i]
+					repoReorderRules(m.options, m.rules)
 					m.updateRuleList()
 					m.ruleList.Select(i + 1)
 				}
@@ -291,7 +317,7 @@ func (m model) View() string {
 		sb.WriteString(titleStyle.Render("Current Rules") + "\n\n")
 		for _, rule := range m.rules {
 			sb.WriteString(fmt.Sprintf("- %s\n  Pattern: %s\n  Key: %s\n\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#000000")).Bold(true).Render(rule.name),
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true).Render(rule.name),
 				lipgloss.NewStyle().Foreground(lipgloss.Color("#555555")).Render(rule.pattern),
 				lipgloss.NewStyle().Foreground(lipgloss.Color("#555555")).Render(rule.key)))
 		}
@@ -306,29 +332,107 @@ func (m model) View() string {
 	}
 }
 
-func getCurrRules() []rule {
-	return []rule{
-		{name: "Rule 1", pattern: "pattern1", key: "key1"},
-		{name: "Rule 2", pattern: "pattern2", key: "key2"},
-		{name: "Rule 3", pattern: "pattern3", key: "key3"},
+func getCurrRules(o *options) []rule {
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return nil
 	}
+
+	rules, err := repo.ListRules(context.Background(), o.policyName)
+	if err != nil {
+		return nil
+	}
+
+	var currRules []rule
+	for _, r := range rules {
+		currRules = append(currRules, rule{
+			name:    r.Delegation.Name,
+			pattern: strings.Join(r.Delegation.Paths, ", "),
+			key:     strings.Join(r.Delegation.Role.KeyIDs, ", "),
+		})
+	}
+	return currRules
 }
 
-func startTUI() error {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+func repoAddRule(o *options, rule rule, keyPath []string) error {
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return err
+	}
+
+	signer, err := common.LoadSigner(o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	authorizedKeys := []*tuf.Key{}
+	for _, key := range keyPath {
+		key, err := common.LoadPublicKey(key)
+		if err != nil {
+			return err
+		}
+
+		authorizedKeys = append(authorizedKeys, key)
+	}
+
+	return repo.AddDelegation(context.Background(), signer, o.policyName, rule.name, authorizedKeys, []string{rule.pattern}, 1, true)
+}
+
+func repoRemoveRule(o *options, rule rule) error {
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return err
+	}
+
+	signer, err := common.LoadSigner(o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	return repo.RemoveDelegation(context.Background(), signer, o.policyName, rule.name, true)
+}
+
+func repoReorderRules(o *options, rules []rule) error {
+	repo, err := repository.LoadRepository()
+	if err != nil {
+		return err
+	}
+
+	signer, err := common.LoadSigner(o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	ruleNames := make([]string, len(rules))
+	for i, r := range rules {
+		ruleNames[i] = r.
+			name
+	}
+
+	return repo.ReorderDelegations(context.Background(), signer, o.policyName, ruleNames, true)
+}
+
+func startTUI(o *options) error {
+	p := tea.NewProgram(initialModel(o), tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }
 
 type options struct {
-	p *persistent.Options
+	p          *persistent.Options
+	policyName string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.policyName,
+		"target-ref",
+		"policy",
+		"specify which policy ref should be inspected",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	return startTUI()
+	return startTUI(o)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
