@@ -387,34 +387,48 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 				return nil, false, err
 			}
 
-			helperStdOutScanner := bufio.NewScanner(helperStdOut)
-			helperStdOutScanner.Split(splitOutput)
+			seenTrailingNewLine := false
+			for {
+				// We wrap this in an extra loop because for
+				// some reason, on Windows, the trailing newline
+				// indicating end of output is sent in a
+				// separate buffer that's otherwise missed. If
+				// we miss that newline, we hang as though the
+				// push isn't complete.
 
-			for helperStdOutScanner.Scan() {
-				output := helperStdOutScanner.Bytes()
+				helperStdOutScanner := bufio.NewScanner(helperStdOut)
+				helperStdOutScanner.Split(splitOutput)
 
-				if !bytes.Contains(output, []byte(gittufRefPrefix)) {
-					// we do this because git (at the very
-					// top level) inspects all the refs it's
-					// been asked to push and tracks their
-					// current status. it never does this
-					// for the rsl ref, because only the
-					// transport is pushing that ref. if we
-					// don't filter this out, it knows
-					// refs/gittuf/rsl got pushed, it knows
-					// _what_ the previous rsl tip was (by
-					// talking to the remote in list
-					// for-push) but it doesn't actually
-					// know the new tip of the rsl that was
-					// pushed because this is loaded before
-					// the transport is ever invoked.
-					if _, err := os.Stdout.Write(output); err != nil {
-						return nil, false, err
+				for helperStdOutScanner.Scan() {
+					output := helperStdOutScanner.Bytes()
+
+					if !bytes.Contains(output, []byte(gittufRefPrefix)) {
+						// we do this because git (at the very
+						// top level) inspects all the refs it's
+						// been asked to push and tracks their
+						// current status. it never does this
+						// for the rsl ref, because only the
+						// transport is pushing that ref. if we
+						// don't filter this out, it knows
+						// refs/gittuf/rsl got pushed, it knows
+						// _what_ the previous rsl tip was (by
+						// talking to the remote in list
+						// for-push) but it doesn't actually
+						// know the new tip of the rsl that was
+						// pushed because this is loaded before
+						// the transport is ever invoked.
+						if _, err := os.Stdout.Write(output); err != nil {
+							return nil, false, err
+						}
+					}
+
+					if bytes.Equal(output, []byte("\n")) {
+						seenTrailingNewLine = true
+						break
 					}
 				}
 
-				// flushPkt indicates end of message
-				if bytes.Equal(output, flushPkt) {
+				if seenTrailingNewLine {
 					break
 				}
 			}
