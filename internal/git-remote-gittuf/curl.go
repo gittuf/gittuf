@@ -74,19 +74,34 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 
 			// Receive the initial info sent by the service via
 			// git-remote-http
-			helperStdOutScanner := bufio.NewScanner(helperStdOut)
-			helperStdOutScanner.Split(splitOutput)
+			seenFlush := false
+			for {
+				// We wrap this in an extra loop because for
+				// some reason, on Windows, git-remote-http
+				// responds with a buffer that just contains
+				// `\n` followed by the actual response.
+				// However, the initial buffer is taken to be
+				// the end of output, meaning we miss the actual
+				// end of output.
+				helperStdOutScanner := bufio.NewScanner(helperStdOut)
+				helperStdOutScanner.Split(splitOutput)
 
-			for helperStdOutScanner.Scan() {
-				output := helperStdOutScanner.Bytes()
+				for helperStdOutScanner.Scan() {
+					output := helperStdOutScanner.Bytes()
 
-				if _, err := os.Stdout.Write(output); err != nil {
-					return nil, false, err
+					if _, err := os.Stdout.Write(output); err != nil {
+						return nil, false, err
+					}
+
+					// flushPkt is used to indicate the end of
+					// output
+					if bytes.Equal(output, flushPkt) {
+						seenFlush = true
+						break
+					}
 				}
 
-				// flushPkt is used to indicate the end of
-				// output
-				if bytes.Equal(output, flushPkt) {
+				if seenFlush {
 					break
 				}
 			}
@@ -123,7 +138,7 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 			}
 
 			// Read advertised refs from the remote
-			helperStdOutScanner = bufio.NewScanner(helperStdOut)
+			helperStdOutScanner := bufio.NewScanner(helperStdOut)
 			helperStdOutScanner.Split(splitPacket)
 
 			for helperStdOutScanner.Scan() {
