@@ -205,7 +205,8 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 				return ErrPolicyNotFound
 			}
 			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
-				slog.Debug("Violation found, checking if entry has been revoked...")
+				slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
+				slog.Debug("Checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
 				if !entry.SkippedBy(annotations[entry.ID.String()]) {
 					return err
@@ -354,6 +355,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	}
 
 	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
+		slog.Debug("Entry is for a Git tag, using tag verification workflow...")
 		return verifyTagEntry(ctx, repo, policy, attestationsState, entry)
 	}
 
@@ -512,12 +514,25 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		fromID = priorRefEntry.TargetID
 	}
 
-	entryTreeID, err := repo.GetCommitTreeID(entry.TargetID)
+	// We need to handle the case where we're approving a tag
+	// For a tag, the expected toID in the approval is the commit the tag points to
+	// Otherwise, the expected toID is the tree the commit points to
+	var (
+		toID  gitinterface.Hash
+		isTag bool
+	)
+	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
+		isTag = true
+
+		toID, err = repo.GetTagTarget(entry.TargetID)
+	} else {
+		toID, err = repo.GetCommitTreeID(entry.TargetID)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
 
-	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), entryTreeID.String())
+	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
 			return nil, nil, err
@@ -529,11 +544,13 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	// When we add other code review systems, we can move this into a
 	// generalized helper that inspects the attestations for each system trusted
 	// in policy.
+	// We only use this flow right now for non-tags as tags cannot be approved
+	// on currently supported systems
 	// TODO: support multiple apps / threshold per system
-	if policy.githubAppApprovalsTrusted {
+	if !isTag && policy.githubAppApprovalsTrusted {
 		appName := policy.githubAppKey.KeyID
 
-		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), entryTreeID.String())
+		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
 		if err != nil {
 			if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err
