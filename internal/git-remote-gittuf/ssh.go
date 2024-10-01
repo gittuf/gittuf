@@ -316,6 +316,17 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 						wroteGittufWants = true
 					}
 					wroteWants = true
+				} else {
+					for ref, tip := range gittufRefsTips {
+						wantCmd := fmt.Sprintf("want %s", tip)
+						if bytes.Contains(input, []byte(wantCmd)) {
+							// Take out this ref as
+							// something for us to
+							// update or add wants
+							// for
+							delete(gittufRefsTips, ref)
+						}
+					}
 				}
 
 				if _, err := helperStdIn.Write(input); err != nil {

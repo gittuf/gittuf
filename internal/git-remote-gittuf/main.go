@@ -167,7 +167,9 @@ func run() error {
 				return err
 			}
 			if err := repo.GetGitRepository().SetReference(ref, tipH); err != nil {
-				return err
+				msg := fmt.Sprintf("Unable to set reference '%s': '%s'", ref, err.Error())
+				log(msg)
+				os.Stderr.Write([]byte(fmt.Sprintf("git-remote-gittuf: %s\n", msg))) //nolint:errcheck
 			}
 		}
 
