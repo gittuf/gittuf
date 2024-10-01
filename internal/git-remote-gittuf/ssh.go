@@ -492,6 +492,15 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 
 				dstRef := refSpecSplit[1]
 				dstRefs.Add(dstRef)
+
+				if dstRef == rsl.Ref {
+					// We explicitly push the RSL ref below
+					// because we need to know what its tip
+					// will be after all other refs are
+					// pushed.
+					continue
+				}
+
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
 					if err := repo.RecordRSLEntryForReference(srcRef, true, rslopts.WithOverrideRefName(dstRef)); err != nil {
 						return nil, false, err
@@ -538,7 +547,9 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 			// TODO: gittuf verify-ref for each dstRef; abort if
 			// verification fails
 
-			if !dstRefs.Has(rsl.Ref) {
+			// TODO: find better way to evaluate if gittuf refs must
+			// be pushed
+			if len(gittufRefsTips) != 0 {
 				oldTip, has := remoteRefTips[rsl.Ref]
 				if !has {
 					oldTip = gitinterface.ZeroHash.String()
