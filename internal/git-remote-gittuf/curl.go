@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/repository"
 	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -333,7 +334,10 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 				}
 			}
 
-			rslPushed := false
+			// dstRefs tracks the explicitly pushed refs so we know
+			// to pass the response from the server for those refs
+			// back to Git
+			dstRefs := set.NewSet[string]()
 			for _, pushCommand := range pushCommands {
 				// TODO: maybe find another way to determine
 				// whether repo is gittuf enabled
@@ -352,9 +356,7 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 					// pushes
 
 					dstRef := refSpecSplit[1]
-					if dstRef == rsl.Ref {
-						rslPushed = true
-					}
+					dstRefs.Add(dstRef)
 
 					if !strings.HasPrefix(dstRef, gittufRefPrefix) {
 						// Create RSL entries for the ref as long as it's not a
@@ -374,8 +376,8 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 				}
 			}
 
-			if len(gittufRefsTips) != 0 && !rslPushed {
-				// Push RSL
+			if len(gittufRefsTips) != 0 && !dstRefs.Has(rsl.Ref) {
+				// Push RSL if it hasn't been explicitly pushed
 				pushCommand := fmt.Sprintf("push %s:%s\n", rsl.Ref, rsl.Ref)
 				if _, err := helperStdIn.Write([]byte(pushCommand)); err != nil {
 					return nil, false, err
@@ -402,23 +404,28 @@ func handleCurl(repo *repository.Repository, remoteName, url string) (map[string
 				for helperStdOutScanner.Scan() {
 					output := helperStdOutScanner.Bytes()
 
-					if !bytes.Contains(output, []byte(gittufRefPrefix)) {
-						// we do this because git (at the very
-						// top level) inspects all the refs it's
-						// been asked to push and tracks their
-						// current status. it never does this
-						// for the rsl ref, because only the
-						// transport is pushing that ref. if we
-						// don't filter this out, it knows
-						// refs/gittuf/rsl got pushed, it knows
-						// _what_ the previous rsl tip was (by
-						// talking to the remote in list
-						// for-push) but it doesn't actually
-						// know the new tip of the rsl that was
-						// pushed because this is loaded before
-						// the transport is ever invoked.
+					outputSplit := bytes.Split(output, []byte(" "))
+					// outputSplit has either two items or
+					// three items. It has two when the
+					// response is `ok` and potentially
+					// three when the response is `error`.
+					// Either way, the second item is the
+					// ref in question that we want to
+					// bubble back to our caller.
+					if len(outputSplit) < 2 {
+						// This should never happen but
+						// if it does, just send it back
+						// to the caller
 						if _, err := os.Stdout.Write(output); err != nil {
 							return nil, false, err
+						}
+					} else {
+						if dstRefs.Has(string(outputSplit[1])) {
+							// this was explicitly
+							// pushed by the user
+							if _, err := os.Stdout.Write(output); err != nil {
+								return nil, false, err
+							}
 						}
 					}
 
