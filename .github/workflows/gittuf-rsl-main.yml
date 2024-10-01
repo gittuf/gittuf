@@ -13,7 +13,7 @@ jobs:
       id-token: write
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@26235450ee63a0bb9d834ecd62b910783af72006
+        uses: gittuf/gittuf-installer@a7644594c7def5a72ec719c2424825a5a8831548
       - name: Install gitsign
         uses: chainguard-dev/actions/setup-gitsign@main
       - name: Checkout repository
