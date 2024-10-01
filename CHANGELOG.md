@@ -2,6 +2,24 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.6.1
+
+- Added a counter to RSL entries to support persistent caching
+- Added experimental support for signature extensions to vendored DSSE library
+- Refactored `GetLatestReferenceEntry` RSL API
+- Fixed Makefile build on Windows
+- Moved `update-root-threshold` and `update-policy-threshold` out of developer
+  mode
+- Fixed issue with git-remote-gittuf using the wrong transport when fetching the
+  RSL
+- Fixed issue with git-remote-gittuf when explicitly pushing the RSL
+- Fixed issue with git-remote-gittuf and `curl` fetches and pushes on Windows
+- Increased testing coverage of `policy` and `gitinterface`
+- Improved documentation for getting started with gittuf, especially on Windows
+  platforms
+- Added copyright notices to code files
+- Updated various dependencies and CI workflows
+
 ## v0.6.0
 
 - Added command to reorder policy rules
