@@ -481,9 +481,9 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 				}
 			}
 
-			pushObjects := set.NewSet[string]()
 			log("adding gittuf RSL entries")
-			rslPushed := false
+			pushObjects := set.NewSet[string]()
+			dstRefs := set.NewSet[string]()
 			for i, refSpec := range pushRefSpecs {
 				refSpecSplit := strings.Split(refSpec, ":")
 
@@ -491,14 +491,11 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 				srcRef = strings.TrimPrefix(srcRef, "+")
 
 				dstRef := refSpecSplit[1]
+				dstRefs.Add(dstRef)
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
 					if err := repo.RecordRSLEntryForReference(srcRef, true, rslopts.WithOverrideRefName(dstRef)); err != nil {
 						return nil, false, err
 					}
-				}
-
-				if dstRef == rsl.Ref {
-					rslPushed = true
 				}
 
 				oldTip := remoteRefTips[dstRef]
@@ -541,7 +538,7 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 			// TODO: gittuf verify-ref for each dstRef; abort if
 			// verification fails
 
-			if !rslPushed {
+			if !dstRefs.Has(rsl.Ref) {
 				oldTip, has := remoteRefTips[rsl.Ref]
 				if !has {
 					oldTip = gitinterface.ZeroHash.String()
@@ -607,10 +604,9 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 				}
 
 				output = output[4:] // remove length prefix
+				outputSplit := bytes.Split(output, []byte(" "))
 				if bytes.HasPrefix(output, []byte("ok")) {
-					if !bytes.Contains(output, []byte(gittufRefPrefix)) {
-						// TODO: this can hang when gittuf ref is explicitly
-						// pushed
+					if dstRefs.Has(string(outputSplit[1])) {
 						if _, err := os.Stdout.Write(output); err != nil {
 							return nil, false, err
 						}
@@ -619,18 +615,17 @@ func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]
 					output = bytes.TrimPrefix(output, []byte("ng"))
 					output = append([]byte("error"), output...) // replace ng with error
 
-					if bytes.Contains(output, []byte(gittufRefPrefix)) {
-						// error is in updating gittuf, send it to stderr
-						if _, err := os.Stderr.Write(output); err != nil {
-							return nil, false, err
-						}
-					} else {
-						output = append(output, '\n') // TODO: is this needed?
+					if dstRefs.Has(string(outputSplit[1])) {
 						if _, err := os.Stdout.Write(output); err != nil {
 							return nil, false, err
 						}
 					}
 				}
+			}
+
+			// Trailing newline for end of output
+			if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+				return nil, false, err
 			}
 		default:
 			c := string(bytes.TrimSpace(input))
