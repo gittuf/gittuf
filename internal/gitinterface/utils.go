@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"testing"
 )
 
 // ResetDueToError reverses a change applied to a ref to the specified target
@@ -19,6 +20,21 @@ func (r *Repository) ResetDueToError(cause error, refName string, commitID Hash)
 		return fmt.Errorf("unable to reset %s to %s, caused by following error: %w", refName, commitID.String(), cause)
 	}
 	return cause
+}
+
+// RestoreWorktree is a test helper to fix the worktree in tests where we need
+// to operate in a checked out copy of the repository. This is primarily needed
+// for support with older Git versions.
+func (r *Repository) RestoreWorktree(t *testing.T) {
+	t.Helper()
+
+	if _, err := r.executor("restore", "--staged", ".").executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := r.executor("checkout", "--", ".").executeString(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func RemoteRef(refName, remoteName string) string {

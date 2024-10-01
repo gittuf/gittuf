@@ -133,6 +133,33 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 	return nil
 }
 
+func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef string) error {
+	var err error
+
+	slog.Debug("Identifying absolute reference paths...")
+	targetRef, err = r.r.AbsoluteReference(targetRef)
+	if err != nil {
+		return err
+	}
+	featureRef, err = r.r.AbsoluteReference(featureRef)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Inspecting gittuf policies to identify if '%s' can be merged into '%s' with current approvals...", featureRef, targetRef))
+	needRSLSignature, err := policy.VerifyMergeable(ctx, r.r, targetRef, featureRef)
+	if err != nil {
+		return err
+	}
+
+	if needRSLSignature {
+		slog.Debug("Merge is allowed but must be performed by authorized user who has not already issued an approval!")
+	} else {
+		slog.Debug("Merge is allowed and can be performed by any user!")
+	}
+	return nil
+}
+
 // verifyRefTip inspects the specified reference in the local repository to
 // check if it points to the expected Git object.
 func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) error {
