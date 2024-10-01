@@ -1,13 +1,10 @@
 ## gittuf trust update-root-threshold
 
-Update Root threshold in the gittuf root of trust (developer mode only, set GITTUF_DEV=1)
+Update Root threshold in the gittuf root of trust
 
 ### Synopsis
 
 This command allows users to update the threshold of valid signatures required for the root of trust.
-
-DO NOT USE until policy-staging is working, so that multiple developers can sequentially sign the policy metadata.
-Until then, this command is available in developer mode only, set GITTUF_DEV=1 to use.
 
 ```
 gittuf trust update-root-threshold [flags]
