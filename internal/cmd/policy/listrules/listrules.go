@@ -32,7 +32,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	rules, err := repo.ListRules(cmd.Context(), o.targetRef)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to list rules: %v", err)
 	}
 
 	// Iterate through the rules, they are already in order, and the depth tells us how to indent.
