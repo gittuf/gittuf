@@ -38,7 +38,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []tuf.Path{&tuf.BranchPath{BranchName: ""}}, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,7 +69,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []tuf.Path{&tuf.BranchPath{BranchName: ""}}, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []tuf.Path{&tuf.BranchPath{BranchName: ""}}, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,7 +159,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
+		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []tuf.Path{&tuf.BranchPath{BranchName: ""}}, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,7 +232,7 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1) // just a dummy rule
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []tuf.Path{&tuf.BranchPath{BranchName: "*"}}, 1) // just a dummy rule
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +417,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		}
 
 		for name, test := range tests {
-			verifiers, err := state.FindVerifiersForPath(test.path)
+			verifiers, err := state.FindVerifiersForPath([]string{test.path})
 			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
 			assert.Equal(t, test.verifiers, verifiers, fmt.Sprintf("policy verifiers for path '%s' don't match expected verifiers in test '%s'", test.path, name))
 		}
@@ -427,7 +427,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
-		verifiers, err := state.FindVerifiersForPath("test-path")
+		verifiers, err := state.FindVerifiersForPath([]string{"test-path"})
 		assert.Nil(t, verifiers)
 		assert.ErrorIs(t, err, ErrMetadataNotFound)
 	})
@@ -494,7 +494,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []string{"*"}, 1) // just a dummy rule
+	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []tuf.Path{&tuf.BranchPath{BranchName: "*"}}, 1) // just a dummy rule
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +545,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "protect-main",
-					Paths:       []string{"git:refs/heads/main"},
+					Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "refs/heads/main"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
@@ -558,7 +558,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "protect-files-1-and-2",
-					Paths:       []string{"file:1", "file:2"},
+					Paths:       []tuf.Path{&tuf.FilePath{FilePath: "file:1"}, &tuf.FilePath{FilePath: "file:2"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
@@ -581,7 +581,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "1",
-					Paths:       []string{"file:1/*"},
+					Paths:       []tuf.Path{&tuf.FilePath{FilePath: "file:1/*"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
@@ -594,7 +594,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "3",
-					Paths:       []string{"file:1/subpath1/*"},
+					Paths:       []tuf.Path{&tuf.FilePath{FilePath: "file:1/subpath1/*"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
@@ -607,7 +607,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "4",
-					Paths:       []string{"file:1/subpath2/*"},
+					Paths:       []tuf.Path{&tuf.FilePath{FilePath: "file:1/subpath2/*"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
@@ -621,7 +621,7 @@ func TestListRules(t *testing.T) {
 			{
 				Delegation: tuf.Delegation{
 					Name:        "2",
-					Paths:       []string{"file:2/*"},
+					Paths:       []tuf.Path{&tuf.FilePath{FilePath: "file:2/*"}},
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{

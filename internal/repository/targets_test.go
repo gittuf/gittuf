@@ -80,7 +80,7 @@ func TestAddDelegation(t *testing.T) {
 
 		ruleName := "test-rule"
 		authorizedKeyBytes := []*tuf.Key{targetsPubKey}
-		rulePatterns := []string{"git:branch=main"}
+		rulePatterns := []tuf.Path{&tuf.BranchPath{BranchName: "git:branch=main"}}
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -146,7 +146,7 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, 1, false)
+	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []tuf.Path{&tuf.BranchPath{BranchName: "git:refs/heads/main"}}, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -162,7 +162,7 @@ func TestUpdateDelegation(t *testing.T) {
 	assert.Equal(t, 2, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.Delegation{
 		Name:        "protect-main",
-		Paths:       []string{"git:refs/heads/main"},
+		Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "git:refs/heads/main"}},
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{gpgKey.KeyID, targetsKey.KeyID}, Threshold: 1},
 	})
@@ -224,7 +224,7 @@ func TestRemoveDelegation(t *testing.T) {
 
 	ruleName := "test-rule"
 	authorizedKeyBytes := []*tuf.Key{targetsPubKey}
-	rulePatterns := []string{"git:branch=main"}
+	rulePatterns := []tuf.Path{&tuf.BranchPath{BranchName: "git:branch=main"}}
 
 	err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 	assert.Nil(t, err)

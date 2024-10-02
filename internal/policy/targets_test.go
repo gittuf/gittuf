@@ -32,7 +32,7 @@ func TestAddDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []tuf.Path{&tuf.BranchPath{BranchName: "test/"}}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -41,7 +41,7 @@ func TestAddDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
-		Paths:       []string{"test/"},
+		Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "test/"}},
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
@@ -59,7 +59,7 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []string{"test/"}, 1)
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []tuf.Path{&tuf.BranchPath{BranchName: "test/"}}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,12 +68,12 @@ func TestUpdateDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
-		Paths:       []string{"test/"},
+		Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "test/"}},
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{key1.KeyID}, Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
 
-	targetsMetadata, err = UpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
+	targetsMetadata, err = UpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []tuf.Path{&tuf.BranchPath{BranchName: "test/"}}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -82,7 +82,7 @@ func TestUpdateDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
-		Paths:       []string{"test/"},
+		Paths:       []tuf.Path{&tuf.BranchPath{BranchName: "test/"}},
 		Terminating: false,
 		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
@@ -173,7 +173,7 @@ func TestRemoveDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []string{"test/"}, 1)
+	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []tuf.Path{&tuf.BranchPath{BranchName: "test/"}}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
