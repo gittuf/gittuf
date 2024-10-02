@@ -2,6 +2,11 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.6.2
+
+- Added `git-remote-gittuf` to the release workflow's pre-built artifacts
+- Updated CI workflow dependency
+
 ## v0.6.1
 
 - Added a counter to RSL entries to support persistent caching
