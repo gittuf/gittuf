@@ -18,13 +18,16 @@ takes care of the following common operations for you:
 
 The gittuf transport supports both HTTPS and SSH remotes.
 
-## How to Obtain
+## How to Install
 
-Currently, the transport must be built from source. Running `go install` will
-compile the transport and place it in your `GOBIN`, which is the same location
-that the `gittuf` binary is installed into. As it matures, we will update our
-release configuration and the packaging of gittuf (e.g., on Homebrew) to include
-this binary.
+This repository provides pre-built binaries for the transport that are signed
+and published using [GoReleaser]. The signature for these binaries are generated
+using [Sigstore], using the release workflow's identity. Refer to the
+instructions in the [get started guide] to verify the signature for the
+transport binary.
+
+Alternatively, the transport can be built from source. Running `go install` will
+compile the transport and place it in your `GOBIN`.
 
 ## How to Use
 
@@ -52,3 +55,7 @@ git remote set-url origin gittuf::git@github.com:gittuf/gittuf
 # For HTTPS
 git remote set-url origin gittuf::https://github.com/gittuf/gittuf
 ```
+
+[Sigstore]: https://www.sigstore.dev/
+[GoReleaser]: https://goreleaser.com/
+[get started guide]: /docs/get-started.md
