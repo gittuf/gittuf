@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -699,7 +701,7 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("successful verification with higher threshold", func(t *testing.T) {
+	t.Run("successful verification with higher threshold using v0.1 authorization", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
@@ -715,7 +717,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := authorizationsv01.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -733,9 +735,61 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		currentAttestations.SetReferenceAuthorizationWithoutValidating(t, repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
 			t.Fatal(err)
 		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("successful verification with higher threshold using v0.2 authorization", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		authorization, err := authorizationsv02.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations.SetReferenceAuthorizationWithoutValidating(t, repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+
 		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
 			t.Fatal(err)
 		}
@@ -865,7 +919,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}

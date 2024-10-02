@@ -6,35 +6,54 @@ package attestations
 import (
 	"testing"
 
-	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	authorizations "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewReferenceAuthorization(t *testing.T) {
-	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	t.Run("for commit", func(t *testing.T) {
+		testRef := "refs/heads/main"
+		testID := gitinterface.ZeroHash.String()
 
-	authorization, err := NewReferenceAuthorization(testRef, testID, testID)
-	assert.Nil(t, err)
+		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+		assert.Nil(t, err)
 
-	// Check value of statement type
-	assert.Equal(t, ita.StatementTypeUri, authorization.Type)
+		// Check value of statement type
+		assert.Equal(t, ita.StatementTypeUri, authorization.Type)
 
-	// Check subject contents
-	assert.Equal(t, 1, len(authorization.Subject))
+		// Check subject contents
+		assert.Equal(t, 1, len(authorization.Subject))
 
-	// Check predicate type
-	assert.Equal(t, authorizationsv01.ReferenceAuthorizationPredicateType, authorization.PredicateType)
+		// Check predicate type
+		assert.Equal(t, authorizations.ReferenceAuthorizationPredicateType, authorization.PredicateType)
+	})
+
+	t.Run("for tag", func(t *testing.T) {
+		testRef := "refs/heads/main"
+		testID := gitinterface.ZeroHash.String()
+
+		authorization, err := NewReferenceAuthorizationForTag(testRef, testID, testID)
+		assert.Nil(t, err)
+
+		// Check value of statement type
+		assert.Equal(t, ita.StatementTypeUri, authorization.Type)
+
+		// Check subject contents
+		assert.Equal(t, 1, len(authorization.Subject))
+
+		// Check predicate type
+		assert.Equal(t, authorizations.ReferenceAuthorizationPredicateType, authorization.PredicateType)
+	})
 }
 
 func TestSetReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
-	mainZeroZero := authorizationsv01.CreateTestEnvelope(t, testRef, testID, testID)
-	featureZeroZero := authorizationsv01.CreateTestEnvelope(t, testAnotherRef, testID, testID)
+	mainZeroZero := authorizations.CreateTestEnvelope(t, testRef, testID, testID, false)
+	featureZeroZero := authorizations.CreateTestEnvelope(t, testAnotherRef, testID, testID, false)
 
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
@@ -58,8 +77,8 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
-	mainZeroZero := authorizationsv01.CreateTestEnvelope(t, testRef, testID, testID)
-	featureZeroZero := authorizationsv01.CreateTestEnvelope(t, testAnotherRef, testID, testID)
+	mainZeroZero := authorizations.CreateTestEnvelope(t, testRef, testID, testID, false)
+	featureZeroZero := authorizations.CreateTestEnvelope(t, testAnotherRef, testID, testID, false)
 
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
@@ -95,8 +114,8 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
-	mainZeroZero := authorizationsv01.CreateTestEnvelope(t, testRef, testID, testID)
-	featureZeroZero := authorizationsv01.CreateTestEnvelope(t, testAnotherRef, testID, testID)
+	mainZeroZero := authorizations.CreateTestEnvelope(t, testRef, testID, testID, false)
+	featureZeroZero := authorizations.CreateTestEnvelope(t, testAnotherRef, testID, testID, false)
 
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
