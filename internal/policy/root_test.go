@@ -6,15 +6,12 @@ package policy
 import (
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitializeRootMetadata(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
@@ -23,17 +20,11 @@ func TestInitializeRootMetadata(t *testing.T) {
 }
 
 func TestAddRootKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	newRootKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newRootKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
 	rootMetadata = AddRootKey(rootMetadata, newRootKey)
 
@@ -42,21 +33,15 @@ func TestAddRootKey(t *testing.T) {
 }
 
 func TestRemoveRootKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	newRootKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newRootKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
 	rootMetadata = AddRootKey(rootMetadata, newRootKey)
 
-	rootMetadata, err = DeleteRootKey(rootMetadata, newRootKey.KeyID)
+	rootMetadata, err := DeleteRootKey(rootMetadata, newRootKey.KeyID)
 
 	assert.Nil(t, err)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
@@ -70,19 +55,13 @@ func TestRemoveRootKey(t *testing.T) {
 }
 
 func TestAddTargetsKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	_, err = AddTargetsKey(nil, targetsKey)
+	_, err := AddTargetsKey(nil, targetsKey)
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	_, err = AddTargetsKey(rootMetadata, nil)
@@ -95,24 +74,15 @@ func TestAddTargetsKey(t *testing.T) {
 }
 
 func TestDeleteTargetsKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	targetsKey1, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey1 := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	targetsKey2, err := tuf.LoadKeyFromBytes(targets2KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey2 := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
-	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey1)
+	rootMetadata, err := AddTargetsKey(rootMetadata, targetsKey1)
 	assert.Nil(t, err)
 	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey2)
 	assert.Nil(t, err)
@@ -136,19 +106,13 @@ func TestDeleteTargetsKey(t *testing.T) {
 }
 
 func TestAddGitHubAppKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	appKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	appKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	_, err = AddGitHubAppKey(nil, appKey)
+	_, err := AddGitHubAppKey(nil, appKey)
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	_, err = AddGitHubAppKey(rootMetadata, nil)
@@ -161,19 +125,13 @@ func TestAddGitHubAppKey(t *testing.T) {
 }
 
 func TestDeleteGitHubAppKey(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	appKey, err := tuf.LoadKeyFromBytes(targets1KeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	appKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
+	rootMetadata, err := AddGitHubAppKey(rootMetadata, appKey)
 	assert.Nil(t, err)
 
 	_, err = DeleteGitHubAppKey(nil)
@@ -186,14 +144,11 @@ func TestDeleteGitHubAppKey(t *testing.T) {
 }
 
 func TestEnableGitHubAppApprovals(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	_, err = EnableGitHubAppApprovals(nil)
+	_, err := EnableGitHubAppApprovals(nil)
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
@@ -203,14 +158,11 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 }
 
 func TestDisableGitHubAppApprovals(t *testing.T) {
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	_, err = DisableGitHubAppApprovals(nil)
+	_, err := DisableGitHubAppApprovals(nil)
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	rootMetadata, err = DisableGitHubAppApprovals(rootMetadata)

@@ -100,18 +100,7 @@ func LoadSigner(key string) (sslibdsse.SignerVerifier, error) {
 	case strings.HasPrefix(key, FulcioPrefix):
 		return nil, fmt.Errorf("not implemented")
 	default:
-		keyObj, err := ssh.NewKeyFromFile(key)
-		if err != nil {
-			return nil, err
-		}
-		verifier, err := ssh.NewVerifierFromKey(keyObj)
-		if err != nil {
-			return nil, err
-		}
-		return &ssh.Signer{
-			Verifier: verifier,
-			Path:     key,
-		}, nil
+		return ssh.NewSignerFromFile(key)
 	}
 }
 

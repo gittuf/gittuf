@@ -12,9 +12,9 @@ import (
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
@@ -720,10 +720,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
 		env, err := dsse.CreateEnvelope(authorization)
 		if err != nil {
 			t.Fatal(err)
@@ -769,10 +767,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		approverKey, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
-		if err != nil {
-			t.Fatal(err)
-		}
+		approverKey := ssh.NewKeyFromBytes(t, targets2PubKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -780,10 +775,8 @@ func TestVerifyEntry(t *testing.T) {
 
 		// This signer for the GitHub app is trusted in the root setup by the
 		// policy state creator helper
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
 		env, err := dsse.CreateEnvelope(githubAppApproval)
 		if err != nil {
 			t.Fatal(err)
@@ -840,10 +833,8 @@ func TestVerifyEntry(t *testing.T) {
 
 		// This signer for the GitHub app is trusted in the root setup by the
 		// policy state creator helper
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
 		env, err := dsse.CreateEnvelope(githubAppApproval)
 		if err != nil {
 			t.Fatal(err)
@@ -861,10 +852,8 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Add reference authorization
-		signer, err = signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets2KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
 		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
@@ -915,10 +904,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes) // WRONG approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
-		if err != nil {
-			t.Fatal(err)
-		}
+		approverKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes) // WRONG approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -926,10 +912,8 @@ func TestVerifyEntry(t *testing.T) {
 
 		// This signer for the GitHub app is trusted in the root setup by the
 		// policy state creator helper
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
 		env, err := dsse.CreateEnvelope(githubAppApproval)
 		if err != nil {
 			t.Fatal(err)
@@ -1066,15 +1050,9 @@ func TestStateVerifyNewState(t *testing.T) {
 		currentPolicy := createTestStateWithOnlyRoot(t)
 
 		// Create invalid state
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
 
-		key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		key := signer.MetadataKey()
 
 		rootMetadata := InitializeRootMetadata(key)
 
@@ -1107,25 +1085,11 @@ func TestVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootPubKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootPubKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+	targetsPubKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	targetsPubKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	targetsSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
 	commitID := commitIDs[0]

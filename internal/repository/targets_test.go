@@ -7,31 +7,20 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitializeTargets(t *testing.T) {
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey := targetsSigner.MetadataKey()
 
 	t.Run("successful initialization", func(t *testing.T) {
 		// The helper also runs InitializeTargets for this test
-		r, _ := createTestRepositoryWithRoot(t, "")
+		r := createTestRepositoryWithRoot(t, "")
 
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
@@ -53,7 +42,7 @@ func TestInitializeTargets(t *testing.T) {
 	})
 
 	t.Run("invalid role name", func(t *testing.T) {
-		r, _ := createTestRepositoryWithRoot(t, "")
+		r := createTestRepositoryWithRoot(t, "")
 
 		if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false); err != nil {
 			t.Fatal(err)
@@ -65,18 +54,12 @@ func TestInitializeTargets(t *testing.T) {
 }
 
 func TestAddDelegation(t *testing.T) {
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	t.Run("valid rule / delegation name", func(t *testing.T) {
 		r := createTestRepositoryWithPolicy(t, "")
 
-		targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		targetsPubKey := targetsSigner.MetadataKey()
 
 		ruleName := "test-rule"
 		authorizedKeyBytes := []*tuf.Key{targetsPubKey}
@@ -132,19 +115,13 @@ func TestAddDelegation(t *testing.T) {
 func TestUpdateDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey := targetsSigner.MetadataKey()
 
 	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
@@ -169,10 +146,7 @@ func TestUpdateDelegation(t *testing.T) {
 }
 
 func TestReorderDelegations(t *testing.T) {
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	r := createTestRepositoryWithPolicy(t, "")
 
@@ -186,7 +160,7 @@ func TestReorderDelegations(t *testing.T) {
 
 	// Valid Input
 	newOrder := []string{"rule-3", "rule-1", "rule-2", "protect-main"}
-	err = r.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, newOrder, false)
+	err := r.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, newOrder, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,21 +186,14 @@ func TestReorderDelegations(t *testing.T) {
 func TestRemoveDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := targetsSigner.MetadataKey()
 
 	ruleName := "test-rule"
 	authorizedKeyBytes := []*tuf.Key{targetsPubKey}
 	rulePatterns := []string{"git:branch=main"}
 
-	err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
+	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeyBytes, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -264,15 +231,8 @@ func TestRemoveDelegation(t *testing.T) {
 func TestAddKeyToTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := targetsSigner.MetadataKey()
 
 	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -308,20 +268,15 @@ func TestSignTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
 	// Add root key as a targets key
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootPubKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootPubKey := rootSigner.MetadataKey()
+
 	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, rootPubKey, false); err != nil {
 		t.Fatal(err)
 	}
 
 	// Add signature to targets
-	err = r.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, false)
+	err := r.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)

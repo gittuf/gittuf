@@ -5,12 +5,14 @@ package repository
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
@@ -19,37 +21,27 @@ var (
 	gpgKeyBytes             = artifacts.GPGKey1Private
 	gpgPubKeyBytes          = artifacts.GPGKey1Public
 	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
-	rootKeyBytes            = artifacts.SSLibKey1Private
-	rootPubKeyBytes         = artifacts.SSLibKey1Public
-	targetsKeyBytes         = artifacts.SSLibKey2Private
-	targetsPubKeyBytes      = artifacts.SSLibKey2Public
+	rootKeyBytes            = artifacts.SSHRSAPrivate
+	rootPubKeyBytes         = artifacts.SSHRSAPublicSSH
+	targetsKeyBytes         = artifacts.SSHECDSAPrivate
+	targetsPubKeyBytes      = artifacts.SSHECDSAPublicSSH
 	rsaKeyBytes             = artifacts.SSHRSAPrivate
 	ecdsaKeyBytes           = artifacts.SSHECDSAPrivate
 
 	testCtx = context.Background()
 )
 
-func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, []byte) {
+func createTestRepositoryWithRoot(t *testing.T, location string) *Repository {
 	t.Helper()
 
-	var (
-		repo *gitinterface.Repository
-		err  error
-	)
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	var repo *gitinterface.Repository
 	if location == "" {
 		tempDir := t.TempDir()
 		repo = gitinterface.CreateTestGitRepository(t, tempDir, false)
 	} else {
 		repo = gitinterface.CreateTestGitRepository(t, location, false)
-	}
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	r := &Repository{r: repo}
@@ -62,28 +54,18 @@ func createTestRepositoryWithRoot(t *testing.T, location string) (*Repository, [
 		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
 	}
 
-	return r, rootKeyBytes
+	return r
 }
 
 func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	t.Helper()
 
-	r, keyBytes := createTestRepositoryWithRoot(t, location)
+	r := createTestRepositoryWithRoot(t, location)
 
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := targetsSigner.MetadataKey()
 
 	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false); err != nil {
 		t.Fatal(err)
@@ -107,4 +89,26 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	}
 
 	return r
+}
+
+func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh.Signer {
+	t.Helper()
+
+	keysDir := t.TempDir()
+	privKeyPath := filepath.Join(keysDir, "key")
+	pubKeyPath := filepath.Join(keysDir, "key.pub")
+
+	if err := os.WriteFile(privKeyPath, privateBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pubKeyPath, publicBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := ssh.NewSignerFromFile(privKeyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return signer
 }

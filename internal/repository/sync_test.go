@@ -10,8 +10,8 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,20 +19,9 @@ import (
 func TestClone(t *testing.T) {
 	remoteTmpDir := t.TempDir()
 
-	targetsPubKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := targetsSigner.MetadataKey()
 
 	remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
 	remoteRepo := &Repository{r: remoteR}
@@ -223,15 +212,8 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		rootPublicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		targetsPublicKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		rootPublicKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		targetsPublicKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", "", []*tuf.Key{targetsPublicKey, rootPublicKey})
 		assert.Nil(t, err)
@@ -259,10 +241,7 @@ func TestClone(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rootPublicKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		rootPublicKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 		_, err = Clone(testCtx, remoteTmpDir, "", "", []*tuf.Key{rootPublicKey, badPublicKey})
 		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)

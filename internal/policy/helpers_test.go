@@ -5,12 +5,14 @@ package policy
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -18,12 +20,12 @@ import (
 
 var (
 	testCtx                 = context.Background()
-	rootKeyBytes            = artifacts.SSLibKey1Private
-	rootPubKeyBytes         = artifacts.SSLibKey1Public
-	targets1KeyBytes        = artifacts.SSLibKey2Private
-	targets1PubKeyBytes     = artifacts.SSLibKey2Public
-	targets2KeyBytes        = artifacts.SSLibKey3Private
-	targets2PubKeyBytes     = artifacts.SSLibKey3Public
+	rootKeyBytes            = artifacts.SSHRSAPrivate
+	rootPubKeyBytes         = artifacts.SSHRSAPublicSSH
+	targets1KeyBytes        = artifacts.SSHECDSAPrivate
+	targets1PubKeyBytes     = artifacts.SSHECDSAPublicSSH
+	targets2KeyBytes        = artifacts.SSHED25519Private
+	targets2PubKeyBytes     = artifacts.SSHED25519PublicSSH
 	gpgKeyBytes             = artifacts.GPGKey1Private
 	gpgPubKeyBytes          = artifacts.GPGKey1Public
 	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
@@ -51,15 +53,8 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+	key := signer.MetadataKey()
 
 	rootMetadata := InitializeRootMetadata(key)
 
@@ -81,19 +76,12 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := signer.MetadataKey()
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	rootMetadata, err := AddTargetsKey(rootMetadata, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,19 +136,12 @@ func createTestStateWithPolicy(t *testing.T) *State {
 func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := signer.MetadataKey()
 
 	rootMetadata := InitializeRootMetadata(key)
 
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
+	rootMetadata, err := AddTargetsKey(rootMetadata, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,10 +240,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	approverKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
@@ -279,10 +257,9 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -301,19 +278,10 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approverKey, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	appKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	approverKey := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -374,23 +342,16 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approver1Key, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	appKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	approver1Key := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
+
 	approver2Key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
@@ -463,10 +424,9 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -485,10 +445,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 
 	state := createTestStateWithPolicy(t)
 
-	rootKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
 	if err != nil {
 		t.Fatal(err)
@@ -501,10 +458,9 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -516,4 +472,26 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	}
 
 	return state
+}
+
+func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh.Signer {
+	t.Helper()
+
+	keysDir := t.TempDir()
+	privKeyPath := filepath.Join(keysDir, "key")
+	pubKeyPath := filepath.Join(keysDir, "key.pub")
+
+	if err := os.WriteFile(privKeyPath, privateBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pubKeyPath, publicBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := ssh.NewSignerFromFile(privKeyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return signer
 }
