@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -576,18 +577,25 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 			}
 
 			type tmpStatement struct {
-				Type          string                                             `json:"_type"`
-				Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-				PredicateType string                                             `json:"predicateType"`
-				Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+				Type          string                    `json:"_type"`
+				Subject       []*ita.ResourceDescriptor `json:"subject"`
+				PredicateType string                    `json:"predicate_type"`
+				Predicate     json.RawMessage           `json:"predicate"`
 			}
 			stmt := new(tmpStatement)
 			if err := json.Unmarshal(payloadBytes, stmt); err != nil {
 				return nil, nil, err
 			}
 
-			for _, approver := range stmt.Predicate.Approvers {
-				approverKeyIDs.Add(approver.KeyID)
+			switch stmt.PredicateType { //nolint:gocritic
+			case githubv01.GitHubPullRequestApprovalPredicateType:
+				predicate := new(githubv01.GitHubPullRequestApprovalAttestation)
+				if err := json.Unmarshal(stmt.Predicate, predicate); err != nil {
+					return nil, nil, err
+				}
+				for _, approver := range predicate.GetApprovers() {
+					approverKeyIDs.Add(approver.KeyID)
+				}
 			}
 		}
 	}

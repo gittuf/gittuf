@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	githubattn "github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -62,9 +64,18 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		toID            gitinterface.Hash
 	)
 
+	isTag := false
+	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
+		isTag = true
+	}
+
 	slog.Debug("Identifying current status of target Git reference...")
 	latestTargetEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(targetRef))
 	if err == nil {
+		if isTag {
+			return fmt.Errorf("cannot approve a tag that already exists: %w", gitinterface.ErrTagAlreadyExists)
+		}
+
 		fromID = latestTargetEntry.TargetID
 	} else {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -82,12 +93,17 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 	featureCommitID = latestFeatureEntry.TargetID
 
-	slog.Debug("Computing expected merge tree...")
-	mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
-	if err != nil {
-		return err
+	if isTag {
+		// for tags, the toID is the commitID the tag will point to
+		toID = featureCommitID
+	} else {
+		slog.Debug("Computing expected merge tree...")
+		mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
+		if err != nil {
+			return err
+		}
+		toID = mergeTreeID
 	}
-	toID = mergeTreeID
 
 	slog.Debug("Loading current set of attestations...")
 	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
@@ -108,7 +124,12 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	if !hasAuthorization {
 		// Create a new reference authorization and embed in env
 		slog.Debug("Creating new reference authorization...")
-		statement, err := attestations.NewReferenceAuthorization(targetRef, fromID.String(), toID.String())
+		var statement *ita.Statement
+		if isTag {
+			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String())
+		} else {
+			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String())
+		}
 		if err != nil {
 			return err
 		}
@@ -134,7 +155,10 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add reference authorization for '%s' from '%s' to '%s'", targetRef, fromID, toID)
+	commitMessage := fmt.Sprintf("Add reference authorization for '%s' from '%s' to '%s'", targetRef, fromID.String(), toID.String())
+	if isTag {
+		commitMessage = fmt.Sprintf("Add reference authorization for '%s' at '%s'", targetRef, toID.String())
+	}
 
 	slog.Debug("Committing attestations...")
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
@@ -320,8 +344,8 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 			return err
 		}
 
-		approvers = append(approvers, predicate.Approvers...)
-		dismissedApprovers = predicate.DismissedApprovers
+		approvers = append(approvers, predicate.GetApprovers()...)
+		dismissedApprovers = predicate.GetDismissedApprovers()
 	}
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
@@ -380,12 +404,12 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.DismissedApprovers)+1)
-	dismissedApprovers = append(dismissedApprovers, predicate.DismissedApprovers...)
+	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.GetDismissedApprovers())+1)
+	dismissedApprovers = append(dismissedApprovers, predicate.GetDismissedApprovers()...)
 	dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 
-	approvers := make([]*tuf.Key, 0, len(predicate.Approvers))
-	for _, approver := range predicate.Approvers {
+	approvers := make([]*tuf.Key, 0, len(predicate.GetApprovers()))
+	for _, approver := range predicate.GetApprovers() {
 		approver := approver
 		if approver.KeyID == dismissedApprover.KeyID {
 			continue
@@ -393,9 +417,9 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		approvers = append(approvers, approver)
 	}
 
-	baseRef := predicate.TargetRef
-	fromID := predicate.FromRevisionID
-	toID := predicate.TargetTreeID
+	baseRef := predicate.GetRef()
+	fromID := predicate.GetFromID()
+	toID := predicate.GetTargetID()
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
@@ -476,7 +500,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
-func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (*attestations.GitHubPullRequestApprovalAttestation, error) {
+func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (githubattn.PullRequestApprovalAttestation, error) {
 	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, err
@@ -486,10 +510,10 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 	// in-toto's v1 Statement. The difference is that we fix the predicate to be
 	// the GitHub pull request approval type, making unmarshaling easier.
 	type tmpGitHubPullRequestApprovalStatement struct {
-		Type          string                                             `json:"_type"`
-		Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-		PredicateType string                                             `json:"predicateType"`
-		Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+		Type          string                    `json:"_type"`
+		Subject       []*ita.ResourceDescriptor `json:"subject"`
+		PredicateType string                    `json:"predicate_type"`
+		Predicate     json.RawMessage           `json:"predicate"`
 	}
 
 	stmt := new(tmpGitHubPullRequestApprovalStatement)
@@ -497,7 +521,17 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 		return nil, err
 	}
 
-	return stmt.Predicate, nil
+	switch stmt.PredicateType { //nolint:gocritic
+	case githubv01.GitHubPullRequestApprovalPredicateType:
+		predicate := new(githubv01.GitHubPullRequestApprovalAttestation)
+		if err := json.Unmarshal(stmt.Predicate, predicate); err != nil {
+			return nil, err
+		}
+
+		return predicate, nil
+	}
+
+	return nil, fmt.Errorf("unknown version of GitHub Pull Request Approval Attestation")
 }
 
 func indexPathToComponents(indexPath string) (string, string, string) {

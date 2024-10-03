@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package attestations
+package common
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func predicateToPBStruct(predicate any) (*structpb.Struct, error) {
+func PredicateToPBStruct(predicate any) (*structpb.Struct, error) {
 	predicateBytes, err := json.Marshal(predicate)
 	if err != nil {
 		return nil, err
