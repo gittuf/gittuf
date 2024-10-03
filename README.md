@@ -4,23 +4,28 @@
 ![Build and Tests (CI)](https://github.com/gittuf/gittuf/actions/workflows/ci.yml/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/gittuf/gittuf/badge.svg)](https://coveralls.io/github/gittuf/gittuf)
 
-gittuf provides a security layer for Git using some concepts introduced by [The
-Update Framework (TUF)]. Among other features, gittuf handles key management for
-all developers on the repository, allows you to set permissions for repository
-branches, tags, files, etc., protects against [other attacks] Git is vulnerable
-to, and more — all while being backwards compatible with GitHub, GitLab, etc.
+gittuf is a security layer for Git repositories. With gittuf, any developer who
+can pull from a Git repository can independently verify that the repository's
+security policies were followed. gittuf's policy, inspired by [The Update
+Framework (TUF)], handles key management for all trusted developers in a
+repository, allows for setting permissions for repository branches, tags, files,
+etc., protects against [other attacks] Git is vulnerable to, and more — all
+while being backwards compatible with GitHub, GitLab, etc.
 
 gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
 as part of the [Supply Chain Integrity Working Group].
 
 ## Current Status
 
-gittuf is currently in alpha. It is not yet intended for use in a production
-system or repository. We're now actively working on making gittuf more usable so
-it has lesser impact on developer workflows. Contributions are welcome, please
-refer to the [contributing guide]. Some of the features listed above are being
-actively developed, please refer to the [roadmap] and the issue tracker for more
-details.
+gittuf is currently in alpha. gittuf's metadata may have breaking changes,
+meaning a repository's gittuf policy may have to be reinitialized from time to
+time. As such, gittuf is currently not intended to be the primary mechanism for
+enforcing a repository's security.
+
+That said, we're actively seeking feedback from users. Take a look at the [get
+started guide] to learn how to install and try gittuf out! Additionally,
+contributions are welcome, please refer to the [contributing guide], our
+[roadmap], and the issue tracker for ways to get involved.
 
 ## Installation & Get Started
 
