@@ -6,10 +6,15 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"testing"
 
 	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/hiddeco/sshsig"
@@ -92,9 +97,9 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func NewKeyFromFile(path string) (*sv.SSLibKey, error) {
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
+		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
 	}
 	sshPub, err := parseSSH2Key(string(output))
 	if err != nil {
@@ -102,6 +107,31 @@ func NewKeyFromFile(path string) (*sv.SSLibKey, error) {
 	}
 
 	return newSSHKey(sshPub, ""), nil
+}
+
+// NewKeyFromBytes returns an ssh SSLibKey from the passed bytes. It's meant to
+// be used for tests as that's when we directly deal with key bytes.
+func NewKeyFromBytes(t *testing.T, keyB []byte) *sv.SSLibKey {
+	t.Helper()
+
+	testName := strings.ReplaceAll(t.Name(), " ", "__")
+	testName = strings.ReplaceAll(testName, "/", "__")
+	testName = strings.ReplaceAll(testName, "\\", "__")
+	hash := sha256.Sum256(keyB)
+	keyName := fmt.Sprintf("%s-%s", testName, hex.EncodeToString(hash[:]))
+	keyPath := filepath.Join(os.TempDir(), keyName)
+
+	if err := os.WriteFile(keyPath, keyB, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(keyPath) //nolint:errcheck
+
+	key, err := NewKeyFromFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return key
 }
 
 // NewVerifierFromKey creates a new Verifier from SSlibKey of type ssh.
@@ -116,6 +146,23 @@ func NewVerifierFromKey(key *sv.SSLibKey) (*Verifier, error) {
 	return &Verifier{
 		keyID:  key.KeyID,
 		sshKey: sshKey,
+	}, nil
+}
+
+// NewSignerFromFile creates an SSH signer from the passed path.
+func NewSignerFromFile(path string) (*Signer, error) {
+	keyObj, err := NewKeyFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	verifier, err := NewVerifierFromKey(keyObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Signer{
+		Verifier: verifier,
+		Path:     path,
 	}, nil
 }
 

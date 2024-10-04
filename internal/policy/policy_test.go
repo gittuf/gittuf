@@ -10,9 +10,9 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
@@ -49,10 +49,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, signer)
 		if err != nil {
@@ -139,10 +136,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, signer)
 		if err != nil {
@@ -170,10 +164,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		badSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		badSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, badSigner)
 		if err != nil {
@@ -236,10 +227,9 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
@@ -283,10 +273,7 @@ func TestStateKeys(t *testing.T) {
 		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
 		expectedKeys := map[string]*tuf.Key{}
-		rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		rootKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 		expectedKeys[rootKey.KeyID] = rootKey
 
 		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
@@ -371,7 +358,7 @@ func TestStateGetRootMetadata(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", rootMetadata.Roles[RootRoleName].KeyIDs[0])
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootMetadata.Roles[RootRoleName].KeyIDs[0])
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
@@ -381,10 +368,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
 		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
-		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
 
 		tests := map[string]struct {
 			path      string
@@ -498,10 +482,9 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
@@ -571,6 +554,7 @@ func TestListRules(t *testing.T) {
 		}
 		assert.Equal(t, expectedRules, rules)
 	})
+
 	t.Run("with delegations", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
@@ -585,7 +569,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
+						KeyIDs:    []string{"SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"},
 						Threshold: 1,
 					},
 				},
@@ -625,7 +609,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
+						KeyIDs:    []string{"SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"},
 						Threshold: 1,
 					},
 				},
@@ -659,14 +643,9 @@ func TestStateHasFileRule(t *testing.T) {
 func TestApply(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {

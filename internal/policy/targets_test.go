@@ -9,6 +9,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
@@ -23,16 +24,10 @@ func TestInitializeTargetsMetadata(t *testing.T) {
 func TestAddDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key1 := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	key2 := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
+	targetsMetadata, err := AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -50,16 +45,10 @@ func TestAddDelegation(t *testing.T) {
 func TestUpdateDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key1 := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	key2 := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []string{"test/"}, 1)
+	targetsMetadata, err := AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1}, []string{"test/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,16 +80,10 @@ func TestUpdateDelegation(t *testing.T) {
 func TestReorderDelegations(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	key1, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key2, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key1 := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	key2 := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "rule-1", []*tuf.Key{key1}, []string{"path1/"}, 1)
+	targetsMetadata, err := AddDelegation(targetsMetadata, "rule-1", []*tuf.Key{key1}, []string{"path1/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,12 +151,9 @@ func TestReorderDelegations(t *testing.T) {
 func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	key, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []string{"test/"}, 1)
+	targetsMetadata, err := AddDelegation(targetsMetadata, "test-rule", []*tuf.Key{key}, []string{"test/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

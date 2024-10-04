@@ -19,46 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	customEncodedPublicKeyBytes = artifacts.SSLibKey1Public
-	pemEncodedPublicKeyBytes    = artifacts.SSHRSAPublic
-)
-
-func TestLoadKeyFromBytes(t *testing.T) {
-	tests := map[string]struct {
-		keyBytes          []byte
-		expectedPublicKey string
-		expectedKeyID     string
-	}{
-		"legacy serialization format key": {
-			keyBytes:          customEncodedPublicKeyBytes,
-			expectedKeyID:     "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997",
-			expectedPublicKey: "3f586ce67329419fb0081bd995914e866a7205da463d593b3b490eab2b27fd3f",
-		},
-		"PEM encoded key": {
-			keyBytes:      pemEncodedPublicKeyBytes,
-			expectedKeyID: "be1d8bc05c5d287d72ecc5d96e7a32858c377d940bd09ff86f228b09b90ff6cf",
-			expectedPublicKey: `-----BEGIN PUBLIC KEY-----
-MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxCOK3QmP8wN6DjHrdSWC
-flboFGqTX4+4XAGXptQkbrHeRU4llZjYeMssIAPtSVg7AZ8i32zmQYs+H4kEPvm0
-Rf5g10MdkK9sYAktu7Tcsr/LXxERroJQLuvU+2i7Hzxp+FgmlV9/jrgC2VWkJfxe
-TM6A5ImmZArAa1WZHy99/d2ZYbHm/22PO3+1DsAK6t1jDCvUKdHDvP/K7GZ87t5x
-QpWEiCylMe1a3+7kmlLZd/Q4f0DF9ZugMdDIeN4DJ5PhW64WovgVqN2OfAOfiwVC
-946g5Jl8xb4WCYBiiElOZ3yghww6pboPpecCZhrrNRvI2ebmO7NmR0ucrpj0DaAi
-Gc7Zi5tA4EKjTeCfmLm+fi+sgoANUOpiqv+t9fw8h7xfHuRpZwjm9cxO82iWnCeN
-rTXVau2d8fh4pPT0X4AT7daBeNUhUgqdGETy8SzBXU4zYFdx2V1TZauuiIcqA2do
-Y3eV5jJqu4dWvCMmwbCLSfCJJOF9dryMwkqjpcpWUuPlAgMBAAE=
------END PUBLIC KEY-----`,
-		},
-	}
-
-	for name, test := range tests {
-		key, err := LoadKeyFromBytes(test.keyBytes)
-		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-		assert.Equal(t, test.expectedPublicKey, key.KeyVal.Public)
-		assert.Equal(t, test.expectedKeyID, key.KeyID)
-	}
-}
+var testKey = artifacts.SSHRSAPublicSSH
 
 func TestRootMetadata(t *testing.T) {
 	rootMetadata := NewRootMetadata()
@@ -69,10 +30,7 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, "1995-10-26T09:00:00Z", rootMetadata.Expires)
 	})
 
-	key, err := LoadKeyFromBytes(customEncodedPublicKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, testKey)
 
 	t.Run("test AddKey", func(t *testing.T) {
 		rootMetadata.AddKey(key)
@@ -107,10 +65,7 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		targetsMetadata.Targets = nil
 	})
 
-	key, err := LoadKeyFromBytes(customEncodedPublicKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	key := ssh.NewKeyFromBytes(t, testKey)
 
 	delegations := &Delegations{}
 

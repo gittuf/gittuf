@@ -85,9 +85,10 @@ func TestSSH(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
-			signer := Signer{
-				Verifier: verifier,
-				Path:     keyPath,
+
+			signer, err := NewSignerFromFile(keyPath)
+			if err != nil {
+				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
 			sig, err := signer.Sign(context.Background(), data)
@@ -95,12 +96,12 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = signer.Verifier.Verify(context.Background(), data, sig)
+			err = verifier.Verify(context.Background(), data, sig)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = signer.Verifier.Verify(context.Background(), notData, sig)
+			err = verifier.Verify(context.Background(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}

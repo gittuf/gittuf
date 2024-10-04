@@ -80,18 +80,13 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	}
 
 	// Create signers
-	firstSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	firstKeyID, err := firstSigner.KeyID()
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 	secondKeyID, err := secondSigner.KeyID()
 	if err != nil {
 		t.Fatal(err)

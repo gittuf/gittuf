@@ -37,8 +37,7 @@ const (
 	// DefaultCommitMessage defines the fallback message to use when updating the policy ref if an action specific message is unavailable.
 	DefaultCommitMessage = "Update policy state"
 
-	rootPublicKeysTreeEntryName = "keys"
-	metadataTreeEntryName       = "metadata"
+	metadataTreeEntryName = "metadata"
 
 	gitReferenceRuleScheme = "git"
 	fileRuleScheme         = "file"
@@ -510,20 +509,6 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		allTreeEntries[path.Join(metadataTreeEntryName, name+".json")] = blobID
 	}
 
-	for _, key := range s.RootPublicKeys {
-		keyContents, err := json.Marshal(key)
-		if err != nil {
-			return err
-		}
-
-		blobID, err := repo.WriteBlob(keyContents)
-		if err != nil {
-			return err
-		}
-
-		allTreeEntries[path.Join(rootPublicKeysTreeEntryName, key.KeyID)] = blobID
-	}
-
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	policyRootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allTreeEntries)
@@ -912,8 +897,10 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 			return nil, err
 		}
 
-		switch {
-		case strings.HasPrefix(name, metadataTreeEntryName+"/"):
+		// We have this conditional because once upon a time we used to store
+		// the root keys on disk as well; now we just get them from the root
+		// metadata file. We ignore the keys on disk in the old policy states.
+		if strings.HasPrefix(name, metadataTreeEntryName+"/") {
 			env := &sslibdsse.Envelope{}
 			if err := json.Unmarshal(contents, env); err != nil {
 				return nil, err
@@ -934,17 +921,6 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 
 				state.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
 			}
-		case strings.HasPrefix(name, rootPublicKeysTreeEntryName+"/"):
-			key, err := tuf.LoadKeyFromBytes(contents)
-			if err != nil {
-				return nil, err
-			}
-
-			if state.RootPublicKeys == nil {
-				state.RootPublicKeys = []*tuf.Key{}
-			}
-
-			state.RootPublicKeys = append(state.RootPublicKeys, key)
 		}
 	}
 
@@ -956,6 +932,12 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 	if err != nil {
 		return nil, err
 	}
+
+	state.RootPublicKeys = make([]*tuf.Key, 0, len(rootMetadata.Roles[RootRoleName].KeyIDs))
+	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs {
+		state.RootPublicKeys = append(state.RootPublicKeys, rootMetadata.Keys[keyID])
+	}
+
 	state.githubAppApprovalsTrusted = rootMetadata.GitHubApprovalsTrusted
 
 	role, hasRole := rootMetadata.Roles[GitHubAppRoleName]

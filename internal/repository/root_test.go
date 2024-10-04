@@ -7,23 +7,18 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitializeRoot(t *testing.T) {
 	// The helper also runs InitializeRoot for this test
-	r, rootKeyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	verifier, err := sslibsv.NewVerifierFromSSLibKey(key)
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+	verifier, err := ssh.NewVerifierFromKey(key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,23 +38,15 @@ func TestInitializeRoot(t *testing.T) {
 }
 
 func TestAddRootKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	originalKeyID, err := sv.KeyID()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var newRootKey *sslibsv.SSLibKey
-
-	newRootKey, err = tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newRootKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 	err = r.AddRootKey(testCtx, sv, newRootKey, false)
 	assert.Nil(t, err)
@@ -80,18 +67,12 @@ func TestAddRootKey(t *testing.T) {
 }
 
 func TestRemoveRootKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	rootKey, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	originalSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	originalSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootKey := originalSigner.MetadataKey()
 
-	err = r.AddRootKey(testCtx, originalSigner, rootKey, false)
+	err := r.AddRootKey(testCtx, originalSigner, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,10 +91,7 @@ func TestRemoveRootKey(t *testing.T) {
 	assert.Equal(t, 1, len(state.RootPublicKeys))
 	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
 
-	newRootKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newRootKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 	err = r.AddRootKey(testCtx, originalSigner, newRootKey, false)
 	if err != nil {
@@ -136,10 +114,7 @@ func TestRemoveRootKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
-	newSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	newSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	// We can use the newly added root key to revoke the old one
 	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
@@ -164,18 +139,12 @@ func TestRemoveRootKey(t *testing.T) {
 }
 
 func TestAddTopLevelTargetsKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := sv.MetadataKey()
 
-	err = r.AddTopLevelTargetsKey(testCtx, sv, key, false)
+	err := r.AddTopLevelTargetsKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -194,26 +163,17 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 }
 
 func TestRemoveTopLevelTargetsKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	rootKey, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootKey := sv.MetadataKey()
 
-	err = r.AddTopLevelTargetsKey(testCtx, sv, rootKey, false)
+	err := r.AddTopLevelTargetsKey(testCtx, sv, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 	err = r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false)
 	if err != nil {
@@ -255,18 +215,12 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 }
 
 func TestAddGitHubAppKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := sv.MetadataKey()
 
-	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	err := r.AddGitHubAppKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -283,18 +237,12 @@ func TestAddGitHubAppKey(t *testing.T) {
 }
 
 func TestRemoveGitHubAppKey(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := sv.MetadataKey()
 
-	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	err := r.AddGitHubAppKey(testCtx, sv, key, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,18 +281,11 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 
 func TestTrustGitHubApp(t *testing.T) {
 	t.Run("GitHub app role not defined", func(t *testing.T) {
-		r, keyBytes := createTestRepositoryWithRoot(t, "")
+		r := createTestRepositoryWithRoot(t, "")
 
-		_, err := tuf.LoadKeyFromBytes(keyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = r.TrustGitHubApp(testCtx, sv, false)
+		err := r.TrustGitHubApp(testCtx, sv, false)
 		assert.Nil(t, err)
 
 		_, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -352,16 +293,10 @@ func TestTrustGitHubApp(t *testing.T) {
 	})
 
 	t.Run("GitHub app role defined", func(t *testing.T) {
-		r, keyBytes := createTestRepositoryWithRoot(t, "")
+		r := createTestRepositoryWithRoot(t, "")
 
-		key, err := tuf.LoadKeyFromBytes(keyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := sv.MetadataKey()
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -398,16 +333,10 @@ func TestTrustGitHubApp(t *testing.T) {
 }
 
 func TestUntrustGitHubApp(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := sv.MetadataKey()
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -454,7 +383,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 }
 
 func TestUpdateRootThreshold(t *testing.T) {
-	r, _ := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -469,15 +398,9 @@ func TestUpdateRootThreshold(t *testing.T) {
 	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
 	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].Threshold)
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	secondKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	secondKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 	if err := r.AddRootKey(testCtx, signer, secondKey, false); err != nil {
 		t.Fatal(err)
@@ -501,16 +424,10 @@ func TestUpdateRootThreshold(t *testing.T) {
 }
 
 func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
-	r, keyBytes := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	key, err := tuf.LoadKeyFromBytes(keyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sv, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(keyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := sv.MetadataKey()
 
 	if err := r.AddTopLevelTargetsKey(testCtx, sv, key, false); err != nil {
 		t.Fatal(err)
@@ -529,10 +446,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	assert.Equal(t, 1, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
 	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
 
-	targetsKey, err := tuf.LoadKeyFromBytes(targetsKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	targetsKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
 	if err := r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false); err != nil {
 		t.Fatal(err)
@@ -556,29 +470,20 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 }
 
 func TestSignRoot(t *testing.T) {
-	r, _ := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	// Add targets key as a root key
-	secondKey, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	secondKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 	if err := r.AddRootKey(testCtx, rootSigner, secondKey, false); err != nil {
 		t.Fatal(err)
 	}
 
-	secondSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	// Add signature to root
-	err = r.SignRoot(testCtx, secondSigner, false)
+	err := r.SignRoot(testCtx, secondSigner, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)

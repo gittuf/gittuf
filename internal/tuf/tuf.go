@@ -8,15 +8,12 @@ package tuf
 // however, is inspired by or cloned from the go-tuf implementation.
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 
 	"github.com/danwakefield/fnmatch"
 
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/secure-systems-lab/go-securesystemslib/cjson"
 )
 
 var (
@@ -25,54 +22,6 @@ var (
 
 // Key defines the structure for how public keys are stored in TUF metadata.
 type Key = signerverifier.SSLibKey
-
-// LoadKeyFromBytes returns a pointer to a Key instance created from the
-// contents of the bytes. The key contents are expected to be in the custom
-// securesystemslib format.
-func LoadKeyFromBytes(contents []byte) (*Key, error) {
-	var (
-		key *Key
-		err error
-	)
-
-	// Try to load PEM encoded key
-	key, err = signerverifier.LoadKey(contents)
-	if err == nil {
-		return key, nil
-	}
-
-	// Compatibility with old, custom serialization format if err != nil above
-	if err := json.Unmarshal(contents, &key); err != nil {
-		return nil, err
-	}
-
-	if len(key.KeyID) == 0 {
-		keyID, err := calculateKeyID(key)
-		if err != nil {
-			return nil, err
-		}
-		key.KeyID = keyID
-	}
-
-	return key, nil
-}
-
-func calculateKeyID(k *Key) (string, error) {
-	key := map[string]any{
-		"keytype":               k.KeyType,
-		"scheme":                k.Scheme,
-		"keyid_hash_algorithms": k.KeyIDHashAlgorithms,
-		"keyval": map[string]string{
-			"public": k.KeyVal.Public,
-		},
-	}
-	canonical, err := cjson.EncodeCanonical(key)
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(canonical)
-	return hex.EncodeToString(digest[:]), nil
-}
 
 // Role records common characteristics recorded in a role entry in Root metadata
 // and in a delegation entry.

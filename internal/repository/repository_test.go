@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,15 +33,8 @@ func TestUnauthorizedKey(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	rootSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	targetsSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targetsKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 	r := &Repository{r: repo}
 	if err := r.InitializeRoot(testCtx, rootSigner, false); err != nil {
@@ -51,12 +42,9 @@ func TestUnauthorizedKey(t *testing.T) {
 	}
 
 	t.Run("test add targets key", func(t *testing.T) {
-		key, err := tuf.LoadKeyFromBytes(targetsPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		key := targetsSigner.MetadataKey()
 
-		err = r.AddTopLevelTargetsKey(testCtx, targetsSigner, key, false)
+		err := r.AddTopLevelTargetsKey(testCtx, targetsSigner, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
