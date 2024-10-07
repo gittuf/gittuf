@@ -395,6 +395,14 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
+	t.Run("with ref name, before entry ID, until entry number is zero", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		entryIDs := []gitinterface.Hash{}
+		_, _, err := GetLatestReferenceEntry(repo, BeforeEntryID(entryIDs[1]), UntilEntryNumber(0))
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
+	})
+
 	t.Run("with ref name, before entry ID, until entry number and with annotations", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
