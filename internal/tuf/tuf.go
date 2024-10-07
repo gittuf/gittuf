@@ -8,16 +8,33 @@ package tuf
 // however, is inspired by or cloned from the go-tuf implementation.
 
 import (
-	"encoding/json"
 	"errors"
 
-	"github.com/danwakefield/fnmatch"
-
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 )
 
+const (
+	// RootRoleName defines the expected name for the gittuf root of trust.
+	RootRoleName = "root"
+
+	// TargetsRoleName defines the expected name for the top level gittuf policy file.
+	TargetsRoleName = "targets"
+)
+
 var (
-	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
+	ErrCannotMeetThreshold       = errors.New("insufficient keys to meet threshold")
+	ErrTargetsNotEmpty           = errors.New("`targets` field in gittuf Targets metadata must be empty")
+	ErrDuplicatedRuleName        = errors.New("two rules with same name found in policy")
+	ErrRootKeyNil                = errors.New("root key not found")
+	ErrRootMetadataNil           = errors.New("rootMetadata is nil")
+	ErrTargetsMetadataNil        = errors.New("targetsMetadata not found")
+	ErrTargetsKeyNil             = errors.New("targetsKey is nil")
+	ErrGitHubAppKeyNil           = errors.New("app key is nil")
+	ErrKeyIDEmpty                = errors.New("keyID is empty")
+	ErrCannotManipulateAllowRule = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrRuleNotFound              = errors.New("cannot find rule entry")
+	ErrMissingRules              = errors.New("some rules are missing")
 )
 
 // Key defines the structure for how public keys are stored in TUF metadata.
@@ -26,123 +43,6 @@ type Key = signerverifier.SSLibKey
 // Role records common characteristics recorded in a role entry in Root metadata
 // and in a delegation entry.
 type Role struct {
-	KeyIDs    []string `json:"keyids"`
-	Threshold int      `json:"threshold"`
-}
-
-// RootMetadata defines the schema of TUF's Root role.
-type RootMetadata struct {
-	Type                   string          `json:"type"`
-	Expires                string          `json:"expires"`
-	Keys                   map[string]*Key `json:"keys"`
-	Roles                  map[string]Role `json:"roles"`
-	GitHubApprovalsTrusted bool            `json:"githubApprovalsTrusted"`
-}
-
-// NewRootMetadata returns a new instance of RootMetadata.
-func NewRootMetadata() *RootMetadata {
-	return &RootMetadata{
-		Type: "root",
-	}
-}
-
-// SetExpires sets the expiry date of the RootMetadata to the value passed in.
-func (r *RootMetadata) SetExpires(expires string) {
-	r.Expires = expires
-}
-
-// AddKey adds a key to the RootMetadata instance.
-func (r *RootMetadata) AddKey(key *Key) {
-	if r.Keys == nil {
-		r.Keys = map[string]*Key{}
-	}
-
-	r.Keys[key.KeyID] = key
-}
-
-// AddRole adds a role object and associates it with roleName in the
-// RootMetadata instance.
-func (r *RootMetadata) AddRole(roleName string, role Role) {
-	if r.Roles == nil {
-		r.Roles = map[string]Role{}
-	}
-
-	r.Roles[roleName] = role
-}
-
-// TargetsMetadata defines the schema of TUF's Targets role.
-type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
-}
-
-// NewTargetsMetadata returns a new instance of TargetsMetadata.
-func NewTargetsMetadata() *TargetsMetadata {
-	return &TargetsMetadata{
-		Type:        "targets",
-		Delegations: &Delegations{},
-	}
-}
-
-// SetExpires sets the expiry date of the TargetsMetadata to the value passed
-// in.
-func (t *TargetsMetadata) SetExpires(expires string) {
-	t.Expires = expires
-}
-
-// Validate ensures the instance of TargetsMetadata matches gittuf expectations.
-func (t *TargetsMetadata) Validate() error {
-	if len(t.Targets) != 0 {
-		return ErrTargetsNotEmpty
-	}
-	return nil
-}
-
-// Delegations defines the schema for specifying delegations in TUF's Targets
-// metadata.
-type Delegations struct {
-	Keys  map[string]*Key `json:"keys"`
-	Roles []Delegation    `json:"roles"`
-}
-
-// AddKey adds a delegations key.
-func (d *Delegations) AddKey(key *Key) {
-	if d.Keys == nil {
-		d.Keys = map[string]*Key{}
-	}
-
-	d.Keys[key.KeyID] = key
-}
-
-// AddDelegation adds a new delegation.
-func (d *Delegations) AddDelegation(delegation Delegation) {
-	if d.Roles == nil {
-		d.Roles = []Delegation{}
-	}
-
-	d.Roles = append(d.Roles, delegation)
-}
-
-// Delegation defines the schema for a single delegation entry. It differs from
-// the standard TUF schema by allowing a `custom` field to record details
-// pertaining to the delegation.
-type Delegation struct {
-	Name        string           `json:"name"`
-	Paths       []string         `json:"paths"`
-	Terminating bool             `json:"terminating"`
-	Custom      *json.RawMessage `json:"custom,omitempty"`
-	Role
-}
-
-// Matches checks if any of the delegation's patterns match the target.
-func (d *Delegation) Matches(target string) bool {
-	for _, pattern := range d.Paths {
-		// We validate pattern when it's added to / updated in the metadata
-		if matches := fnmatch.Match(pattern, target, 0); matches {
-			return true
-		}
-	}
-	return false
+	KeyIDs    *set.Set[string] `json:"keyids"`
+	Threshold int              `json:"threshold"`
 }

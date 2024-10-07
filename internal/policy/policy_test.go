@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -358,7 +359,7 @@ func TestStateGetRootMetadata(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootMetadata.Roles[RootRoleName].KeyIDs[0])
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootMetadata.Roles[RootRoleName].KeyIDs.Contents()[0])
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
@@ -524,6 +525,7 @@ func TestListRules(t *testing.T) {
 
 		rules, err := ListRules(context.Background(), repo, PolicyRef)
 		assert.Nil(t, err)
+
 		expectedRules := []*DelegationWithDepth{
 			{
 				Delegation: tuf.Delegation{
@@ -532,7 +534,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
 				},
@@ -545,7 +547,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
 				},
@@ -559,8 +561,8 @@ func TestListRules(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
 
 		rules, err := ListRules(context.Background(), repo, PolicyRef)
-
 		assert.Nil(t, err)
+
 		expectedRules := []*DelegationWithDepth{
 			{
 				Delegation: tuf.Delegation{
@@ -569,7 +571,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"},
+						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
 						Threshold: 1,
 					},
 				},
@@ -582,7 +584,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
 				},
@@ -595,7 +597,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
+						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
 				},
@@ -609,7 +611,7 @@ func TestListRules(t *testing.T) {
 					Terminating: false,
 					Custom:      nil,
 					Role: tuf.Role{
-						KeyIDs:    []string{"SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"},
+						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
 						Threshold: 1,
 					},
 				},

@@ -7,17 +7,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
-	ErrCannotMeetThreshold = errors.New("insufficient keys to meet threshold")
-	ErrRootMetadataNil     = errors.New("rootMetadata is nil")
-	ErrRootKeyNil          = errors.New("root key not found")
-	ErrTargetsMetadataNil  = errors.New("targetsMetadata not found")
-	ErrTargetsKeyNil       = errors.New("targetsKey is nil")
-	ErrGitHubAppKeyNil     = errors.New("app key is nil")
-	ErrKeyIDEmpty          = errors.New("keyID is empty")
+	ErrRootMetadataNil    = errors.New("rootMetadata is nil")
+	ErrTargetsMetadataNil = errors.New("targetsMetadata not found")
 )
 
 const GitHubAppRoleName = "github-app"
@@ -31,7 +27,7 @@ func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
 	rootMetadata.AddKey(key)
 
 	rootMetadata.AddRole(RootRoleName, tuf.Role{
-		KeyIDs:    []string{key.KeyID},
+		KeyIDs:    set.NewSetFromItems(key.KeyID),
 		Threshold: 1,
 	})
 
@@ -40,46 +36,30 @@ func InitializeRootMetadata(key *tuf.Key) *tuf.RootMetadata {
 
 // AddRootKey adds rootKey as a trusted public key in rootMetadata for the
 // Root role.
-func AddRootKey(rootMetadata *tuf.RootMetadata, rootKey *tuf.Key) *tuf.RootMetadata {
-	if _, ok := rootMetadata.Roles[RootRoleName]; !ok {
-		return rootMetadata
+func AddRootKey(rootMetadata *tuf.RootMetadata, rootKey *tuf.Key) (*tuf.RootMetadata, error) {
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
 	}
 
-	rootMetadata.AddKey(rootKey)
-
-	rootRole := rootMetadata.Roles[RootRoleName]
-
-	for _, keyID := range rootRole.KeyIDs {
-		if keyID == rootKey.KeyID {
-			return rootMetadata
-		}
+	err := rootMetadata.AddRootKey(rootKey)
+	if err != nil {
+		return nil, err
 	}
 
-	rootRole.KeyIDs = append(rootRole.KeyIDs, rootKey.KeyID)
-	rootMetadata.Roles[RootRoleName] = rootRole
-
-	return rootMetadata
+	return rootMetadata, nil
 }
 
 // DeleteRootKey removes keyID from the list of trusted Root
 // public keys in rootMetadata. It does not remove the key entry itself as it
 // does not check if other roles can be verified using the same key.
 func DeleteRootKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMetadata, error) {
-	if _, ok := rootMetadata.Roles[RootRoleName]; !ok {
-		return rootMetadata, nil
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
 	}
 
-	rootRole := rootMetadata.Roles[RootRoleName]
-	if len(rootRole.KeyIDs) <= rootRole.Threshold {
-		return nil, ErrCannotMeetThreshold
+	if err := rootMetadata.DeleteRootKey(keyID); err != nil {
+		return nil, err
 	}
-	for i, k := range rootRole.KeyIDs {
-		if k == keyID {
-			rootRole.KeyIDs = append(rootRole.KeyIDs[:i], rootRole.KeyIDs[i+1:]...)
-			break
-		}
-	}
-	rootMetadata.Roles[RootRoleName] = rootRole
 
 	return rootMetadata, nil
 }
@@ -90,29 +70,10 @@ func AddTargetsKey(rootMetadata *tuf.RootMetadata, targetsKey *tuf.Key) (*tuf.Ro
 	if rootMetadata == nil {
 		return nil, ErrRootMetadataNil
 	}
-	if targetsKey == nil {
-		return nil, ErrTargetsKeyNil
+
+	if err := rootMetadata.AddTargetsKey(targetsKey); err != nil {
+		return nil, err
 	}
-
-	rootMetadata.Keys[targetsKey.KeyID] = targetsKey
-
-	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
-		rootMetadata.AddRole(TargetsRoleName, tuf.Role{
-			KeyIDs:    []string{targetsKey.KeyID},
-			Threshold: 1,
-		})
-		return rootMetadata, nil
-	}
-
-	targetsRole := rootMetadata.Roles[TargetsRoleName]
-	for _, keyID := range targetsRole.KeyIDs {
-		if keyID == targetsKey.KeyID {
-			return rootMetadata, nil
-		}
-	}
-
-	targetsRole.KeyIDs = append(targetsRole.KeyIDs, targetsKey.KeyID)
-	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
 	return rootMetadata, nil
 }
@@ -124,28 +85,10 @@ func DeleteTargetsKey(rootMetadata *tuf.RootMetadata, keyID string) (*tuf.RootMe
 	if rootMetadata == nil {
 		return nil, ErrRootMetadataNil
 	}
-	if keyID == "" {
-		return nil, ErrKeyIDEmpty
-	}
-	if _, ok := rootMetadata.Roles[TargetsRoleName]; !ok {
-		return rootMetadata, nil
-	}
 
-	targetsRole := rootMetadata.Roles[TargetsRoleName]
-
-	if len(targetsRole.KeyIDs) <= targetsRole.Threshold {
-		return nil, ErrCannotMeetThreshold
+	if err := rootMetadata.DeleteTargetsKey(keyID); err != nil {
+		return nil, err
 	}
-
-	newKeyIDs := []string{}
-	for _, k := range targetsRole.KeyIDs {
-		if k != keyID {
-			newKeyIDs = append(newKeyIDs, k)
-		}
-	}
-	targetsRole.KeyIDs = newKeyIDs
-
-	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
 	return rootMetadata, nil
 }
@@ -157,17 +100,11 @@ func AddGitHubAppKey(rootMetadata *tuf.RootMetadata, appKey *tuf.Key) (*tuf.Root
 	if rootMetadata == nil {
 		return nil, ErrRootMetadataNil
 	}
-	if appKey == nil {
-		return nil, ErrGitHubAppKeyNil
+
+	if err := rootMetadata.AddGitHubAppKey(appKey); err != nil {
+		return nil, err
 	}
 
-	// TODO: support multiple keys / threshold for app
-	rootMetadata.Keys[appKey.KeyID] = appKey
-	role := tuf.Role{
-		KeyIDs:    []string{appKey.KeyID},
-		Threshold: 1,
-	}
-	rootMetadata.AddRole(GitHubAppRoleName, role) // AddRole replaces the specified role if it already exists
 	return rootMetadata, nil
 }
 
@@ -178,8 +115,7 @@ func DeleteGitHubAppKey(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata, erro
 		return nil, ErrRootMetadataNil
 	}
 
-	// TODO: support multiple keys / threshold for app
-	delete(rootMetadata.Roles, GitHubAppRoleName)
+	rootMetadata.DeleteGitHubAppKey()
 	return rootMetadata, nil
 }
 
@@ -190,7 +126,7 @@ func EnableGitHubAppApprovals(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadata
 		return nil, ErrRootMetadataNil
 	}
 
-	rootMetadata.GitHubApprovalsTrusted = true
+	rootMetadata.EnableGitHubAppApprovals()
 	return rootMetadata, nil
 }
 
@@ -201,40 +137,32 @@ func DisableGitHubAppApprovals(rootMetadata *tuf.RootMetadata) (*tuf.RootMetadat
 		return nil, ErrRootMetadataNil
 	}
 
-	rootMetadata.GitHubApprovalsTrusted = false
+	rootMetadata.DisableGitHubAppApprovals()
 	return rootMetadata, nil
 }
 
 // UpdateRootThreshold sets the threshold for the Root role.
 func UpdateRootThreshold(rootMetadata *tuf.RootMetadata, threshold int) (*tuf.RootMetadata, error) {
-	rootRole, ok := rootMetadata.Roles[RootRoleName]
-	if !ok {
-		return nil, ErrTargetsMetadataNil
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
 	}
 
-	if len(rootRole.KeyIDs) < threshold {
-		return nil, ErrCannotMeetThreshold
+	if err := rootMetadata.UpdateRootThreshold(threshold); err != nil {
+		return nil, err
 	}
-
-	rootRole.Threshold = threshold
-	rootMetadata.Roles[RootRoleName] = rootRole
 
 	return rootMetadata, nil
 }
 
 // UpdateTargetsThreshold sets the threshold for the top level Targets role.
 func UpdateTargetsThreshold(rootMetadata *tuf.RootMetadata, threshold int) (*tuf.RootMetadata, error) {
-	targetsRole, ok := rootMetadata.Roles[TargetsRoleName]
-	if !ok {
-		return nil, ErrTargetsMetadataNil
+	if rootMetadata == nil {
+		return nil, ErrRootMetadataNil
 	}
 
-	if len(targetsRole.KeyIDs) < threshold {
-		return nil, ErrCannotMeetThreshold
+	if err := rootMetadata.UpdateTargetsThreshold(threshold); err != nil {
+		return nil, err
 	}
-
-	targetsRole.Threshold = threshold
-	rootMetadata.Roles[TargetsRoleName] = targetsRole
 
 	return rootMetadata, nil
 }

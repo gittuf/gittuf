@@ -22,7 +22,7 @@ import (
 // creating an RSL entry for some new changes. Depending on the context, one
 // resolution is to update the reference state to match the RSL entry, while
 // another is to create a new RSL entry for the current state.
-var ErrRefStateDoesNotMatchRSL = errors.New("Git reference's current state does not match latest RSL entry") //nolint:stylecheck
+var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does not match latest RSL entry")
 
 func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (

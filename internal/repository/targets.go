@@ -92,7 +92,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 	slog.Debug("Checking if rule with same name exists...")
 	if state.HasRuleName(ruleName) {
-		return policy.ErrDuplicatedRuleName
+		return tuf.ErrDuplicatedRuleName
 	}
 
 	slog.Debug("Loading current rule file...")

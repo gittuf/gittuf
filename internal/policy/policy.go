@@ -45,12 +45,8 @@ const (
 
 var (
 	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
-	ErrInvalidPolicyTree          = errors.New("invalid policy tree structure")
 	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
-	ErrNotRSLEntry                = errors.New("RSL entry expected, annotation found instead")
-	ErrDelegationNotFound         = errors.New("required delegation entry not found")
 	ErrPolicyNotFound             = errors.New("cannot find policy")
-	ErrDuplicatedRuleName         = errors.New("two rules with same name found in policy")
 	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
 	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 	ErrNoGitHubAppRoleDeclared    = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
@@ -320,10 +316,10 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 				verifier := &Verifier{
 					repository: s.repository,
 					name:       delegation.Name,
-					keys:       make([]*tuf.Key, 0, len(delegation.KeyIDs)),
+					keys:       make([]*tuf.Key, 0, delegation.KeyIDs.Len()),
 					threshold:  delegation.Threshold,
 				}
-				for _, keyID := range delegation.KeyIDs {
+				for _, keyID := range delegation.KeyIDs.Contents() {
 					key := allPublicKeys[keyID]
 					verifier.keys = append(verifier.keys, key)
 				}
@@ -439,7 +435,7 @@ func (s *State) Verify(ctx context.Context) error {
 			env := s.DelegationEnvelopes[delegation.Name]
 
 			keys := []*tuf.Key{}
-			for _, keyID := range delegation.KeyIDs {
+			for _, keyID := range delegation.KeyIDs.Contents() {
 				keys = append(keys, delegationKeys[keyID])
 			}
 
@@ -611,11 +607,11 @@ func (s *State) GetRootKeys() ([]*tuf.Key, error) {
 		return nil, err
 	}
 
-	rootKeys := make([]*tuf.Key, 0, len(rootMetadata.Roles[RootRoleName].KeyIDs))
-	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs {
+	rootKeys := make([]*tuf.Key, 0, rootMetadata.Roles[RootRoleName].KeyIDs.Len())
+	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs.Contents() {
 		key, has := rootMetadata.Keys[keyID]
 		if !has {
-			return nil, ErrRootKeyNil
+			return nil, tuf.ErrRootKeyNil
 		}
 
 		rootKeys = append(rootKeys, key)
@@ -697,7 +693,7 @@ func (s *State) loadRuleNames() error {
 		}
 
 		if s.ruleNames.Has(rule.Name) {
-			return ErrDuplicatedRuleName
+			return tuf.ErrDuplicatedRuleName
 		}
 
 		s.ruleNames.Add(rule.Name)
@@ -719,7 +715,7 @@ func (s *State) loadRuleNames() error {
 			}
 
 			if s.ruleNames.Has(rule.Name) {
-				return ErrDuplicatedRuleName
+				return tuf.ErrDuplicatedRuleName
 			}
 
 			s.ruleNames.Add(rule.Name)
@@ -860,8 +856,8 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	verifier := &Verifier{keys: make([]*tuf.Key, 0, len(rootMetadata.Roles[TargetsRoleName].KeyIDs))}
-	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs {
+	verifier := &Verifier{keys: make([]*tuf.Key, 0, rootMetadata.Roles[TargetsRoleName].KeyIDs.Len())}
+	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs.Contents() {
 		verifier.keys = append(verifier.keys, rootMetadata.Keys[keyID])
 	}
 	verifier.threshold = rootMetadata.Roles[TargetsRoleName].Threshold
@@ -933,8 +929,8 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 		return nil, err
 	}
 
-	state.RootPublicKeys = make([]*tuf.Key, 0, len(rootMetadata.Roles[RootRoleName].KeyIDs))
-	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs {
+	state.RootPublicKeys = make([]*tuf.Key, 0, rootMetadata.Roles[RootRoleName].KeyIDs.Len())
+	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs.Contents() {
 		state.RootPublicKeys = append(state.RootPublicKeys, rootMetadata.Keys[keyID])
 	}
 
@@ -942,7 +938,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 
 	role, hasRole := rootMetadata.Roles[GitHubAppRoleName]
 	if hasRole {
-		state.githubAppKey = rootMetadata.Keys[role.KeyIDs[0]]
+		state.githubAppKey = rootMetadata.Keys[role.KeyIDs.Contents()[0]] // FIXME: support thresholds
 	} else if state.githubAppApprovalsTrusted {
 		return nil, ErrNoGitHubAppRoleDeclared
 	}

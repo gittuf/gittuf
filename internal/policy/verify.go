@@ -27,6 +27,7 @@ var (
 	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
 	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrNoVerifiers             = errors.New("no verifiers present for verification")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
 	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
@@ -404,7 +405,10 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 			}
 
 			verified := false
-			if len(verifiedUsing) > 0 {
+			if len(verifiers) == 0 {
+				// Path is not protected
+				verified = true
+			} else if len(verifiedUsing) > 0 {
 				// We've already verified and identified commit signature, we
 				// can just check if that verifier is trusted for the new path.
 				// If not found, we don't make any assumptions about it being a
@@ -623,13 +627,17 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", err
 	}
 
+	if len(verifiers) == 0 {
+		// This target is not protected by gittuf policy
+		return "", nil
+	}
+
 	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, approverKeyIDs)
 }
 
 func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
 	if len(verifiers) == 0 {
-		// This target is not protected by gittuf policy
-		return "", nil
+		return "", ErrNoVerifiers
 	}
 
 	verifiedUsing := ""
@@ -748,10 +756,15 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 			}
 
 			verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
-			if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
+			if err == nil {
+				envVerifiers = append(envVerifiers, verifier)
+			} else {
+				if errors.Is(err, common.ErrUnknownKeyType) {
+					// Cannot create a verifier for this type yet
+					continue
+				}
 				return nil, err
 			}
-			envVerifiers = append(envVerifiers, verifier)
 		}
 
 		acceptedKeys, err := dsse.VerifyEnvelope(ctx, env, envVerifiers, envelopeThreshold)
