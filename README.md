@@ -10,7 +10,7 @@ security policies were followed. gittuf's policy, inspired by [The Update
 Framework (TUF)], handles key management for all trusted developers in a
 repository, allows for setting permissions for repository branches, tags, files,
 etc., protects against [other attacks] Git is vulnerable to, and more — all
-while being backwards compatible with GitHub, GitLab, etc.
+while being backwards compatible with forges such as GitHub and GitLab.
 
 gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
 as part of the [Supply Chain Integrity Working Group].
