@@ -140,7 +140,7 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *si
 		}
 		tagSignature := []byte(tag.PGPSignature)
 
-		if err := verifyGitsignSignature(ctx, key, tagContents, tagSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

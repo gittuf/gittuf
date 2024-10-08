@@ -196,7 +196,7 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		}
 		commitSignature := []byte(commit.PGPSignature)
 
-		if err := verifyGitsignSignature(ctx, key, commitContents, commitSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
