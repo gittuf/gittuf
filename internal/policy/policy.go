@@ -440,9 +440,10 @@ func (s *State) Verify(ctx context.Context) error {
 			}
 
 			verifier := &Verifier{
-				name:      delegation.Name,
-				keys:      keys,
-				threshold: delegation.Threshold,
+				repository: s.repository,
+				name:       delegation.Name,
+				keys:       keys,
+				threshold:  delegation.Threshold,
 			}
 
 			if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
@@ -845,8 +846,9 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 	}
 
 	return &Verifier{
-		keys:      s.RootPublicKeys,
-		threshold: rootMetadata.Roles[RootRoleName].Threshold,
+		repository: s.repository,
+		keys:       s.RootPublicKeys,
+		threshold:  rootMetadata.Roles[RootRoleName].Threshold,
 	}, nil
 }
 
@@ -856,7 +858,10 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	verifier := &Verifier{keys: make([]*tuf.Key, 0, rootMetadata.Roles[TargetsRoleName].KeyIDs.Len())}
+	verifier := &Verifier{
+		repository: s.repository,
+		keys:       make([]*tuf.Key, 0, rootMetadata.Roles[TargetsRoleName].KeyIDs.Len()),
+	}
 	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs.Contents() {
 		verifier.keys = append(verifier.keys, rootMetadata.Keys[keyID])
 	}
