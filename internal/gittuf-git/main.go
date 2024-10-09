@@ -48,36 +48,41 @@ func main() {
 	}
 
 	// Categorize the Git operation.
-	switch {
-	case gitArgs.Command == "clone":
-		err := cmd.Clone(gitArgs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
-		}
-	case gitArgs.Command == "push":
-		err := cmd.Push(gitArgs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
-		}
-	case (gitArgs.Command == "pull") || (gitArgs.Command == "fetch"):
-		err := cmd.PullOrFetch(gitArgs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
-		}
+	switch gitArgs.Command {
+	case "clone":
+		handleCommand(cmd.Clone, gitArgs)
+	case "push":
+		handleCommand(cmd.Push, gitArgs)
+	case "pull", "fetch":
+		handleCommand(cmd.PullOrFetch, gitArgs)
 	default:
 		// If the git operation isn't one of the above ones, just send the args
 		// over to git without any gittuf invocation
-		gitCmd := exec.Command("git", rawArgs...)
-		gitCmd.Stdout = os.Stdout
-		gitCmd.Stderr = os.Stderr
+		executeGit(rawArgs)
+	}
+}
 
-		err := gitCmd.Run()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
-		}
+func handleCommand(cmdFunc func(args.Args) error, gitArgs args.Args) {
+	if err := cmdFunc(gitArgs); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
+}
+
+func executeGit(rawArgs []string) {
+	// Resolve symlink to the git binary
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to find git executable: %s\n", err)
+		os.Exit(1)
+	}
+
+	gitCmd := exec.Command(gitPath, rawArgs...)
+	gitCmd.Stdout = os.Stdout
+	gitCmd.Stderr = os.Stderr
+
+	if err := gitCmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
 	}
 }
