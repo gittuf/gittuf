@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestProcessArgs(t *testing.T) {
-	// TODO: Test this more
 	tests := map[string]struct {
 		args     []string
 		expected Args
@@ -29,6 +29,7 @@ func TestProcessArgs(t *testing.T) {
 				GlobalFlags: []string{},
 				Command:     "pull",
 				Parameters:  []string{},
+				GitDir:      ".git",
 			},
 		},
 		"push": {
@@ -37,6 +38,7 @@ func TestProcessArgs(t *testing.T) {
 				GlobalFlags: []string{},
 				Command:     "push",
 				Parameters:  []string{},
+				GitDir:      ".git",
 			},
 		},
 		"fetch origin": {
@@ -45,6 +47,7 @@ func TestProcessArgs(t *testing.T) {
 				GlobalFlags: []string{},
 				Command:     "fetch",
 				Parameters:  []string{"origin"},
+				GitDir:      ".git",
 			},
 		},
 		"-C ../somedir fetch origin": {
@@ -54,6 +57,73 @@ func TestProcessArgs(t *testing.T) {
 				Command:     "fetch",
 				Parameters:  []string{"origin"},
 				ChdirIdx:    1,
+				GitDir:      "../somedir/.git",
+			},
+		},
+		"-c core.editor=vim commit": {
+			args: []string{"-c", "core.editor=vim", "commit"},
+			expected: Args{
+				GlobalFlags: []string{"-c", "core.editor=vim"},
+				Command:     "commit",
+				Parameters:  []string{},
+				ChdirIdx:    0,
+				ConfigIdx:   1,
+				GitDir:      ".git",
+			},
+		},
+		"-c user.name=Test -C ../somedir --version": {
+			args: []string{"-c", "user.name=Test", "-C", "../somedir", "--version"},
+			expected: Args{
+				GlobalFlags: []string{"-c", "user.name=Test", "-C", "../somedir"},
+				Command:     "--version",
+				Parameters:  []string{},
+				ChdirIdx:    3,
+				ConfigIdx:   1,
+				GitDir:      "../somedir/.git",
+			},
+		},
+		"-c user.name=Test -C /tmp/git-repo push origin main": {
+			args: []string{"-c", "user.name=Test", "-C", "/tmp/git-repo", "push", "origin", "main"},
+			expected: Args{
+				GlobalFlags: []string{"-c", "user.name=Test", "-C", "/tmp/git-repo"},
+				Command:     "push",
+				Parameters:  []string{"origin", "main"},
+				ChdirIdx:    3,
+				ConfigIdx:   1,
+				GitDir:      "/tmp/git-repo/.git",
+			},
+		},
+		"--help": {
+			args: []string{"--help"},
+			expected: Args{
+				GlobalFlags: []string{},
+				Command:     "--help",
+				Parameters:  []string{},
+				ChdirIdx:    0,
+				ConfigIdx:   0,
+				GitDir:      ".git",
+			},
+		},
+		"--noop status": {
+			args: []string{"--noop", "status"},
+			expected: Args{
+				GlobalFlags: []string{"--noop"},
+				Command:     "status",
+				Parameters:  []string{},
+				ChdirIdx:    0,
+				ConfigIdx:   0,
+				GitDir:      ".git",
+			},
+		},
+		"--list-cmds=main": {
+			args: []string{"--list-cmds=main"},
+			expected: Args{
+				GlobalFlags: []string{},
+				Command:     "--list-cmds=main",
+				Parameters:  []string{},
+				ChdirIdx:    0,
+				ConfigIdx:   0,
+				GitDir:      ".git",
 			},
 		},
 	}
@@ -65,68 +135,146 @@ func TestProcessArgs(t *testing.T) {
 }
 
 func TestLocateCommand(t *testing.T) {
-	// TODO: Test this more
 	tests := map[string]struct {
-		args             []string
-		expectedCmdIdx   int
-		expectedCfgIdx   int
-		expectedChdirIdx int
+		args              []string
+		expectedCmdIdx    int
+		expectedCfgIdx    int
+		expectedChdirIdx  int
+		expectedgitDirIdx int
 	}{
 		"no arguments": {
-			args:             []string{},
-			expectedCmdIdx:   0,
-			expectedCfgIdx:   0,
-			expectedChdirIdx: 0,
+			args:              []string{},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
 		},
 		"pull": {
-			args:             []string{"pull"},
-			expectedCmdIdx:   0,
-			expectedCfgIdx:   0,
-			expectedChdirIdx: 0,
+			args:              []string{"pull"},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
 		},
 		"push": {
-			args:             []string{"push"},
-			expectedCmdIdx:   0,
-			expectedCfgIdx:   0,
-			expectedChdirIdx: 0,
+			args:              []string{"push"},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
 		},
 		"fetch origin": {
-			args:             []string{"fetch", "origin"},
-			expectedCmdIdx:   0,
-			expectedCfgIdx:   0,
-			expectedChdirIdx: 0,
+			args:              []string{"fetch", "origin"},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
 		},
 		"-C ../somedir fetch origin": {
-			args:             []string{"-C", "../somedir", "fetch", "origin"},
-			expectedCmdIdx:   2,
-			expectedCfgIdx:   0,
-			expectedChdirIdx: 1,
+			args:              []string{"-C", "../somedir", "fetch", "origin"},
+			expectedCmdIdx:    2,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  1,
+			expectedgitDirIdx: 0,
+		},
+		"-c core.editor=vim commit": {
+			args:              []string{"-c", "core.editor=vim", "commit"},
+			expectedCmdIdx:    2,
+			expectedCfgIdx:    1,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
+		},
+		"-c user.name=Test -C ../somedir --version": {
+			args:              []string{"-c", "user.name=Test", "-C", "../somedir", "--version"},
+			expectedCmdIdx:    4,
+			expectedCfgIdx:    1,
+			expectedChdirIdx:  3,
+			expectedgitDirIdx: 0,
+		},
+		"--help": {
+			args:              []string{"--help"},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
+		},
+		"--noop status": {
+			args:              []string{"--noop", "status"},
+			expectedCmdIdx:    1,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
+		},
+		"--list-cmds=main": {
+			args:              []string{"--list-cmds=main"},
+			expectedCmdIdx:    0,
+			expectedCfgIdx:    0,
+			expectedChdirIdx:  0,
+			expectedgitDirIdx: 0,
+		},
+		"-c user.name=Test -C /tmp/git-repo push origin main": {
+			args:              []string{"-c", "user.name=Test", "-C", "/tmp/git-repo", "push", "origin", "main"},
+			expectedCmdIdx:    4,
+			expectedCfgIdx:    1,
+			expectedChdirIdx:  3,
+			expectedgitDirIdx: 0,
 		},
 	}
 
 	for name, test := range tests {
-		cmdIdx, cfgIdx, chdirIdx := locateCommand(test.args)
+		cmdIdx, cfgIdx, chdirIdx, girDirIndex := locateCommand(test.args)
 
 		assert.Equal(t, test.expectedCmdIdx, cmdIdx, fmt.Sprintf("unexpected result in test '%s'", name))
 		assert.Equal(t, test.expectedCfgIdx, cfgIdx, fmt.Sprintf("unexpected result in test '%s'", name))
 		assert.Equal(t, test.expectedChdirIdx, chdirIdx, fmt.Sprintf("unexpected result in test '%s'", name))
+		assert.Equal(t, test.expectedgitDirIdx, girDirIndex, fmt.Sprintf("unexpected result in test '%s'", name))
 	}
 }
 
 func TestDetermineRemote(t *testing.T) {
-	// TODO: Test this more
+	gitDir := t.TempDir()
+	// TODO: Possibly implement a independent helper here?
+	repo := gitinterface.CreateTestGitRepository(t, gitDir, true)
+	err := repo.SetGitConfig("remote.notorigin.url", "https://github.com/test/test.git")
+	if err != nil {
+		t.Fatalf("failed to set git config: %s", err)
+	}
+
 	tests := map[string]struct {
 		args     []string
 		expected string
 	}{
 		"simple case": {
-			args:     []string{"origin"},
-			expected: "origin",
+			args:     []string{"notorigin"},
+			expected: "notorigin",
+		},
+		"remote with colon": {
+			args:     []string{"notorigin:main"},
+			expected: "notorigin",
+		},
+		"remote with branch": {
+			args:     []string{"notorigin", "main"},
+			expected: "notorigin",
+		},
+		"remote with multiple args": {
+			args:     []string{"-f", "notorigin", "main"},
+			expected: "notorigin",
+		},
+		"no args": {
+			args:     []string{},
+			expected: "notorigin",
+		},
+		"args without remote": {
+			args:     []string{"main"},
+			expected: "notorigin",
 		},
 	}
 
 	for name, test := range tests {
-		remote := DetermineRemote(test.args)
+		remote, err := DetermineRemote(test.args, gitDir)
+		if err != nil {
+			t.Fatalf("unexpected error in test '%s': %s", name, err)
+		}
 
 		assert.Equal(t, test.expected, remote, fmt.Sprintf("unexpected result in test '%s'", name))
 	}
