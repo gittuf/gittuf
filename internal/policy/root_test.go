@@ -6,7 +6,9 @@ package policy
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +18,7 @@ func TestInitializeRootMetadata(t *testing.T) {
 	rootMetadata := InitializeRootMetadata(key)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	assert.Equal(t, 1, rootMetadata.Roles[RootRoleName].Threshold)
-	assert.Equal(t, []string{key.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID), rootMetadata.Roles[RootRoleName].KeyIDs)
 }
 
 func TestAddRootKey(t *testing.T) {
@@ -26,10 +28,10 @@ func TestAddRootKey(t *testing.T) {
 
 	newRootKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	rootMetadata = AddRootKey(rootMetadata, newRootKey)
-
+	rootMetadata, err := AddRootKey(rootMetadata, newRootKey)
+	assert.Nil(t, err)
 	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
-	assert.Equal(t, []string{key.KeyID, newRootKey.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID, newRootKey.KeyID), rootMetadata.Roles[RootRoleName].KeyIDs)
 }
 
 func TestRemoveRootKey(t *testing.T) {
@@ -39,18 +41,17 @@ func TestRemoveRootKey(t *testing.T) {
 
 	newRootKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
 
-	rootMetadata = AddRootKey(rootMetadata, newRootKey)
+	rootMetadata, err := AddRootKey(rootMetadata, newRootKey)
+	assert.Nil(t, err)
 
-	rootMetadata, err := DeleteRootKey(rootMetadata, newRootKey.KeyID)
-
+	rootMetadata, err = DeleteRootKey(rootMetadata, newRootKey.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
-	assert.Equal(t, []string{key.KeyID}, rootMetadata.Roles[RootRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID), rootMetadata.Roles[RootRoleName].KeyIDs)
 
 	rootMetadata, err = DeleteRootKey(rootMetadata, key.KeyID)
-
-	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
+	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	assert.Nil(t, rootMetadata)
 }
 
@@ -65,12 +66,12 @@ func TestAddTargetsKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	_, err = AddTargetsKey(rootMetadata, nil)
-	assert.ErrorIs(t, err, ErrTargetsKeyNil)
+	assert.ErrorIs(t, err, tuf.ErrTargetsKeyNil)
 
 	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey, rootMetadata.Keys[targetsKey.KeyID])
-	assert.Equal(t, []string{targetsKey.KeyID}, rootMetadata.Roles[TargetsRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(targetsKey.KeyID), rootMetadata.Roles[TargetsRoleName].KeyIDs)
 }
 
 func TestDeleteTargetsKey(t *testing.T) {
@@ -79,7 +80,6 @@ func TestDeleteTargetsKey(t *testing.T) {
 	rootMetadata := InitializeRootMetadata(key)
 
 	targetsKey1 := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
-
 	targetsKey2 := ssh.NewKeyFromBytes(t, targets2PubKeyBytes)
 
 	rootMetadata, err := AddTargetsKey(rootMetadata, targetsKey1)
@@ -91,17 +91,17 @@ func TestDeleteTargetsKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	_, err = DeleteTargetsKey(rootMetadata, "")
-	assert.ErrorIs(t, err, ErrKeyIDEmpty)
+	assert.ErrorIs(t, err, tuf.ErrKeyIDEmpty)
 
 	rootMetadata, err = DeleteTargetsKey(rootMetadata, targetsKey1.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey1, rootMetadata.Keys[targetsKey1.KeyID])
 	assert.Equal(t, targetsKey2, rootMetadata.Keys[targetsKey2.KeyID])
 	targetsRole := rootMetadata.Roles[TargetsRoleName]
-	assert.Contains(t, targetsRole.KeyIDs, targetsKey2.KeyID)
+	assert.True(t, targetsRole.KeyIDs.Has(targetsKey2.KeyID))
 
 	rootMetadata, err = DeleteTargetsKey(rootMetadata, targetsKey2.KeyID)
-	assert.ErrorIs(t, err, ErrCannotMeetThreshold)
+	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	assert.Nil(t, rootMetadata)
 }
 
@@ -116,12 +116,12 @@ func TestAddGitHubAppKey(t *testing.T) {
 	assert.ErrorIs(t, err, ErrRootMetadataNil)
 
 	_, err = AddGitHubAppKey(rootMetadata, nil)
-	assert.ErrorIs(t, err, ErrGitHubAppKeyNil)
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppKeyNil)
 
 	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
 	assert.Nil(t, err)
 	assert.Equal(t, appKey, rootMetadata.Keys[appKey.KeyID])
-	assert.Equal(t, []string{appKey.KeyID}, rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(appKey.KeyID), rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
 }
 
 func TestDeleteGitHubAppKey(t *testing.T) {
@@ -140,7 +140,7 @@ func TestDeleteGitHubAppKey(t *testing.T) {
 	rootMetadata, err = DeleteGitHubAppKey(rootMetadata)
 	assert.Nil(t, err)
 
-	assert.Empty(t, rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
+	assert.Nil(t, rootMetadata.Roles[GitHubAppRoleName].KeyIDs)
 }
 
 func TestEnableGitHubAppApprovals(t *testing.T) {
@@ -153,7 +153,6 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 
 	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
 	assert.Nil(t, err)
-
 	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
 }
 
@@ -167,6 +166,5 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 
 	rootMetadata, err = DisableGitHubAppApprovals(rootMetadata)
 	assert.Nil(t, err)
-
 	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
 }

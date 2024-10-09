@@ -10,7 +10,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -114,13 +115,13 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tu
 	}
 
 	switch key.KeyType {
-	case signerverifier.GPGKeyType:
+	case gpg.KeyType:
 		if _, err := tag.Verify(key.KeyVal.Public); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
-	case ssh.SSHKeyType:
+	case ssh.KeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
@@ -132,7 +133,7 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tu
 		}
 
 		return nil
-	case signerverifier.FulcioKeyType:
+	case sigstore.KeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)

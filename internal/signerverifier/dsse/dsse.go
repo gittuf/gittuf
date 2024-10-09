@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -77,14 +78,24 @@ func SignEnvelope(ctx context.Context, envelope *dsse.Envelope, signer dsse.Sign
 // a slice of verifiers passed into it. Threshold indicates the number of
 // providers that must validate the envelope.
 func VerifyEnvelope(ctx context.Context, envelope *dsse.Envelope, verifiers []dsse.Verifier, threshold int) ([]dsse.AcceptedKey, error) {
-	if threshold < 1 || threshold > len(verifiers) {
+	if threshold < 1 {
 		return nil, common.ErrInvalidThreshold
 	}
 
-	ev, err := dsse.NewMultiEnvelopeVerifier(threshold, verifiers...)
+	ev, err := dsse.NewEnvelopeVerifier(verifiers...)
 	if err != nil {
 		return nil, err
 	}
 
-	return ev.Verify(ctx, envelope)
+	// We verify with threshold == 1 because we want control over the threshold
+	// checks: we get all the verified keys back
+	acceptedKeys, err := ev.Verify(ctx, envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(acceptedKeys) < threshold {
+		return acceptedKeys, fmt.Errorf("accepted signatures do not match threshold, Found: %d, Expected %d", len(acceptedKeys), threshold)
+	}
+	return acceptedKeys, nil
 }

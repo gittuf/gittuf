@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -26,8 +26,8 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	approvers := []*sslibsv.SSLibKey{
 		{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
+			KeyType: sigstore.KeyType,
+			Scheme:  sigstore.KeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
@@ -72,8 +72,8 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	approvers := []*sslibsv.SSLibKey{
 		{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
+			KeyType: sigstore.KeyType,
+			Scheme:  sigstore.KeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
@@ -115,8 +115,8 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	approvers := []*sslibsv.SSLibKey{
 		{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
+			KeyType: sigstore.KeyType,
+			Scheme:  sigstore.KeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
@@ -158,8 +158,8 @@ func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
 	approvers := []*sslibsv.SSLibKey{
 		{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
+			KeyType: sigstore.KeyType,
+			Scheme:  sigstore.KeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",

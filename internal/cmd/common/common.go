@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
@@ -73,8 +73,8 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 
 		keyObj = &sslibsv.SSLibKey{
 			KeyID:   keyID,
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
+			KeyType: sigstore.KeyType,
+			Scheme:  sigstore.KeyScheme,
 			KeyVal: sslibsv.KeyVal{
 				Identity: ks[0],
 				Issuer:   ks[1],

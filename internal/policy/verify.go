@@ -15,9 +15,11 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	ita "github.com/in-toto/attestation/go/v1"
@@ -27,6 +29,7 @@ var (
 	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
 	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrNoVerifiers             = errors.New("no verifiers present for verification")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
 	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
@@ -404,7 +407,10 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 			}
 
 			verified := false
-			if len(verifiedUsing) > 0 {
+			if len(verifiers) == 0 {
+				// Path is not protected
+				verified = true
+			} else if len(verifiedUsing) > 0 {
 				// We've already verified and identified commit signature, we
 				// can just check if that verifier is trusted for the new path.
 				// If not found, we don't make any assumptions about it being a
@@ -623,13 +629,17 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", err
 	}
 
+	if len(verifiers) == 0 {
+		// This target is not protected by gittuf policy
+		return "", nil
+	}
+
 	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, approverKeyIDs)
 }
 
 func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
 	if len(verifiers) == 0 {
-		// This target is not protected by gittuf policy
-		return "", nil
+		return "", ErrNoVerifiers
 	}
 
 	verifiedUsing := ""
@@ -747,11 +757,27 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 				continue
 			}
 
-			verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
-			if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
-				return nil, err
+			var (
+				envVerifier sslibdsse.Verifier
+				err         error
+			)
+			switch key.KeyType {
+			case ssh.KeyType:
+				envVerifier, err = ssh.NewVerifierFromKey(key)
+				if err != nil {
+					return nil, err
+				}
+
+				envVerifiers = append(envVerifiers, envVerifier)
+			case gpg.KeyType:
+				slog.Debug(fmt.Sprintf("Found GPG key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
+				continue
+			case sigstore.KeyType:
+				slog.Debug(fmt.Sprintf("Found Sigstore key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
+				continue
+			default:
+				return nil, common.ErrUnknownKeyType
 			}
-			envVerifiers = append(envVerifiers, verifier)
 		}
 
 		acceptedKeys, err := dsse.VerifyEnvelope(ctx, env, envVerifiers, envelopeThreshold)

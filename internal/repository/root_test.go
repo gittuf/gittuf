@@ -6,6 +6,7 @@ package repository
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -30,7 +31,7 @@ func TestInitializeRoot(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.RootRoleName].KeyIDs[0])
+	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(key.KeyID))
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
@@ -58,7 +59,7 @@ func TestAddRootKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, []string{originalKeyID, newRootKey.KeyID}, rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(originalKeyID, newRootKey.KeyID), rootMetadata.Roles[policy.RootRoleName].KeyIDs)
 	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
 	assert.Equal(t, 2, len(state.RootPublicKeys))
 
@@ -89,7 +90,7 @@ func TestRemoveRootKey(t *testing.T) {
 
 	// We should have no additions as we tried to add the same key
 	assert.Equal(t, 1, len(state.RootPublicKeys))
-	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
 
 	newRootKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
 
@@ -107,8 +108,8 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, rootKey.KeyID)
-	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, newRootKey.KeyID)
+	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(rootKey.KeyID))
+	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(newRootKey.KeyID))
 	assert.Equal(t, 2, len(state.RootPublicKeys))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
@@ -130,8 +131,8 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Contains(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs, newRootKey.KeyID)
-	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(newRootKey.KeyID))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
 	assert.Equal(t, 1, len(state.RootPublicKeys))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
@@ -154,8 +155,8 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.RootRoleName].KeyIDs[0])
-	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
+	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(key.KeyID))
+	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(key.KeyID))
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
@@ -190,9 +191,8 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, rootKey.KeyID, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs[0])
-	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, rootKey.KeyID)
-	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
+	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(rootKey.KeyID))
+	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(targetsKey.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
@@ -209,7 +209,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Contains(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs, targetsKey.KeyID)
+	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(targetsKey.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -231,7 +231,7 @@ func TestAddGitHubAppKey(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
 
-	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs[0])
+	assert.True(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs.Has(key.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -257,7 +257,7 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, key.KeyID, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs[0])
+	assert.True(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs.Has(key.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
@@ -395,7 +395,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 1, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
 	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].Threshold)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
@@ -419,7 +419,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, len(rootMetadata.Roles[policy.RootRoleName].KeyIDs))
+	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
 	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].Threshold)
 }
 
@@ -443,7 +443,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 1, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
+	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Len())
 	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
 
 	targetsKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
@@ -465,7 +465,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, len(rootMetadata.Roles[policy.TargetsRoleName].KeyIDs))
+	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Len())
 	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
 }
 

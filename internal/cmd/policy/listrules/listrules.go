@@ -62,7 +62,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		}
 
 		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + "Authorized keys:")
-		for _, key := range curRule.Delegation.Role.KeyIDs {
+		for _, key := range curRule.Delegation.Role.KeyIDs.Contents() {
 			fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
 		}
 

@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -18,7 +19,7 @@ import (
 func TestInitializeTargetsMetadata(t *testing.T) {
 	targetsMetadata := InitializeTargetsMetadata()
 
-	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.AllowRule())
 }
 
 func TestAddDelegation(t *testing.T) {
@@ -33,12 +34,12 @@ func TestAddDelegation(t *testing.T) {
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key2.KeyID)
 	assert.Equal(t, key2, targetsMetadata.Delegations.Keys[key2.KeyID])
-	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: set.NewSetFromItems(key1.KeyID, key2.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
 }
 
@@ -54,12 +55,12 @@ func TestUpdateDelegation(t *testing.T) {
 	}
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
-	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: set.NewSetFromItems(key1.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
 
 	targetsMetadata, err = UpdateDelegation(targetsMetadata, "test-rule", []*tuf.Key{key1, key2}, []string{"test/"}, 1)
@@ -68,12 +69,12 @@ func TestUpdateDelegation(t *testing.T) {
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key2.KeyID)
 	assert.Equal(t, key2, targetsMetadata.Delegations.Keys[key2.KeyID])
-	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.AllowRule())
 	assert.Equal(t, tuf.Delegation{
 		Name:        "test-rule",
 		Paths:       []string{"test/"},
 		Terminating: false,
-		Role:        tuf.Role{KeyIDs: []string{key1.KeyID, key2.KeyID}, Threshold: 1},
+		Role:        tuf.Role{KeyIDs: set.NewSetFromItems(key1.KeyID, key2.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
 }
 
@@ -110,23 +111,23 @@ func TestReorderDelegations(t *testing.T) {
 		},
 		"rule not specified in new order": {
 			ruleNames:     []string{"rule-3", "rule-2"},
-			expectedError: ErrMissingRules,
+			expectedError: tuf.ErrMissingRules,
 		},
 		"rule repeated in the new order": {
 			ruleNames:     []string{"rule-3", "rule-2", "rule-1", "rule-3"},
-			expectedError: ErrDuplicatedRuleName,
+			expectedError: tuf.ErrDuplicatedRuleName,
 		},
 		"unknown rule in the new order": {
 			ruleNames:     []string{"rule-3", "rule-2", "rule-1", "rule-4"},
-			expectedError: ErrRuleNotFound,
+			expectedError: tuf.ErrRuleNotFound,
 		},
 		"unknown rule in the new order (with correct length)": {
 			ruleNames:     []string{"rule-3", "rule-2", "rule-4"},
-			expectedError: ErrRuleNotFound,
+			expectedError: tuf.ErrRuleNotFound,
 		},
 		"allow rule appears in the new order": {
 			ruleNames:     []string{"rule-2", "rule-3", "rule-1", AllowRuleName},
-			expectedError: ErrCannotManipulateAllowRule,
+			expectedError: tuf.ErrCannotManipulateAllowRule,
 		},
 	}
 
@@ -162,7 +163,7 @@ func TestRemoveDelegation(t *testing.T) {
 	targetsMetadata, err = RemoveDelegation(targetsMetadata, "test-rule")
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
-	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
+	assert.Contains(t, targetsMetadata.Delegations.Roles, tuf.AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
 }
 
@@ -173,8 +174,8 @@ func TestAddKeyToTargets(t *testing.T) {
 	}
 
 	fulcioKey := &tuf.Key{
-		KeyType: signerverifier.FulcioKeyType,
-		Scheme:  signerverifier.FulcioKeyScheme,
+		KeyType: sigstore.KeyType,
+		Scheme:  sigstore.KeyScheme,
 		KeyVal:  sslibsv.KeyVal{Identity: "jane.doe@example.com", Issuer: "https://github.com/login/oauth"},
 		KeyID:   "jane.doe@example.com::https://github.com/login/oauth",
 	}
@@ -201,13 +202,4 @@ func TestAddKeyToTargets(t *testing.T) {
 		assert.Equal(t, gpgKey, targetsMetadata.Delegations.Keys[gpgKey.KeyID])
 		assert.Equal(t, fulcioKey, targetsMetadata.Delegations.Keys[fulcioKey.KeyID])
 	})
-}
-
-func TestAllowRule(t *testing.T) {
-	allowRule := AllowRule()
-	assert.Equal(t, AllowRuleName, allowRule.Name)
-	assert.Equal(t, []string{"*"}, allowRule.Paths)
-	assert.True(t, allowRule.Terminating)
-	assert.Empty(t, allowRule.KeyIDs)
-	assert.Equal(t, 1, allowRule.Threshold)
 }

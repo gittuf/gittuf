@@ -80,7 +80,10 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Adding root key...")
-	rootMetadata = policy.AddRootKey(rootMetadata, newRootKey)
+	rootMetadata, err = policy.AddRootKey(rootMetadata, newRootKey)
+	if err != nil {
+		return err
+	}
 
 	found := false
 	for _, key := range state.RootPublicKeys {
@@ -414,7 +417,7 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.R
 		return nil, err
 	}
 
-	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs, keyID) {
+	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs.Contents(), keyID) {
 		return nil, ErrUnauthorizedKey
 	}
 
