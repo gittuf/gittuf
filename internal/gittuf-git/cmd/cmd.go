@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -60,22 +61,73 @@ func PullOrFetch(gitArgs args.Args) error {
 		return err
 	}
 
-	// Pull RSL changes
-	remote, err := args.DetermineRemote(gitArgs.Parameters, gitArgs.GitDir)
-	if err != nil {
+	RSLcmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
+	RSLcmdArgs = append(RSLcmdArgs, "refs/gittuf/reference-state-log")
+	gitPullRSLCmd := exec.Command("git", RSLcmdArgs...)
+	gitPullRSLCmd.Stdout = os.Stdout
+	gitPullRSLCmd.Stderr = os.Stderr
+
+	if err := gitPullRSLCmd.Run(); err != nil {
 		return err
 	}
+
+	policyCmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
+	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy")
+	gitPullPolicyCmd := exec.Command("git", policyCmdArgs...)
+	gitPullPolicyCmd.Stdout = os.Stdout
+	gitPullPolicyCmd.Stderr = os.Stderr
+
+	// Pull policy changes
+	return gitPullRSLCmd.Run()
+}
+
+// Commit handles the commit operation for gittuf + git
+func Commit(gitArgs args.Args) error {
+	if gitArgs.ChdirIdx > 0 {
+		if err := os.Chdir(gitArgs.GlobalFlags[gitArgs.ChdirIdx]); err != nil {
+			return err
+		}
+	}
+
+	// verify policy
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	if err := repo.PullRSL(remote); err != nil {
+	var refName string
+	if len(gitArgs.Parameters) > 1 {
+		refParts := strings.Split(gitArgs.Parameters[1], ":")
+		if len(refParts) > 0 {
+			refName = refParts[0]
+		} else {
+			refName = gitArgs.Parameters[1]
+		}
+	} else {
+		refName = "HEAD"
+	}
+
+	if err = repo.VerifyRef(context.Background(), refName); err != nil {
+		fmt.Println("Verification unsuccessful with error: ", err)
+	} else {
+		fmt.Println("Verification success")
+	}
+
+	// Commit irrespective of failed verification. However, verification is
+	// important for debugging purposes. The user should be able to keep
+	// track of whether and why verification is failing.
+	cmdArgs := []string{gitArgs.Command}
+	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
+	// TODO: Make this more robust in case of symlinks to git
+	gitPushCmd := exec.Command("git", cmdArgs...)
+	gitPushCmd.Stdout = os.Stdout
+	gitPushCmd.Stderr = os.Stderr
+
+	if err := gitPushCmd.Run(); err != nil {
 		return err
 	}
 
-	// Pull policy changes
-	return repo.PullPolicy(remote)
+	return nil
 }
 
 // Push handles the push operation for gittuf + git

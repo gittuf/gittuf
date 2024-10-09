@@ -51,7 +51,13 @@ func main() {
 	switch gitArgs.Command {
 	case "clone":
 		handleCommand(cmd.Clone, gitArgs)
-	case "push":
+	case "commit":
+		err := cmd.Commit(gitArgs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+			os.Exit(1)
+		}
+	case gitArgs.Command == "push":
 		handleCommand(cmd.Push, gitArgs)
 	case "pull", "fetch":
 		handleCommand(cmd.PullOrFetch, gitArgs)
