@@ -176,14 +176,14 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
+	case ssh.SSHKeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
 		commitSignature := []byte(commit.PGPSignature)
 
-		if err := verifySSHKeySignature(key, commitContents, commitSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
