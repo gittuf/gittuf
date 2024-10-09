@@ -15,9 +15,11 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	ita "github.com/in-toto/attestation/go/v1"
@@ -755,15 +757,26 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 				continue
 			}
 
-			verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
-			if err == nil {
-				envVerifiers = append(envVerifiers, verifier)
-			} else {
-				if errors.Is(err, common.ErrUnknownKeyType) {
-					// Cannot create a verifier for this type yet
-					continue
+			var (
+				envVerifier sslibdsse.Verifier
+				err         error
+			)
+			switch key.KeyType {
+			case ssh.KeyType:
+				envVerifier, err = ssh.NewVerifierFromKey(key)
+				if err != nil {
+					return nil, err
 				}
-				return nil, err
+
+				envVerifiers = append(envVerifiers, envVerifier)
+			case gpg.KeyType:
+				slog.Debug(fmt.Sprintf("Found GPG key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
+				continue
+			case sigstore.KeyType:
+				slog.Debug(fmt.Sprintf("Found Sigstore key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
+				continue
+			default:
+				return nil, common.ErrUnknownKeyType
 			}
 		}
 

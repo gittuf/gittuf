@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -170,13 +171,13 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 	}
 
 	switch key.KeyType {
-	case signerverifier.GPGKeyType:
+	case gpg.KeyType:
 		if _, err := commit.Verify(key.KeyVal.Public); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
-	case ssh.SSHKeyType:
+	case ssh.KeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
@@ -188,7 +189,7 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		}
 
 		return nil
-	case signerverifier.FulcioKeyType:
+	case sigstore.KeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)

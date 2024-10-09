@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	SSHSigNamespace = "git"
-	SSHKeyType      = "ssh"
+	SigNamespace = "git"
+	KeyType      = "ssh"
 )
 
 // Verifier is a dsse.Verifier implementation for SSH keys.
@@ -43,7 +43,7 @@ func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 
 	// ssh-keygen uses sha512 to sign with **any*** key
 	hash := sshsig.HashSHA512
-	if err := sshsig.Verify(message, signature, v.sshKey, hash, SSHSigNamespace); err != nil {
+	if err := sshsig.Verify(message, signature, v.sshKey, hash, SigNamespace); err != nil {
 		return fmt.Errorf("failed to verify ssh signature: %w", err)
 	}
 
@@ -78,7 +78,7 @@ type Signer struct {
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
-	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", SSHSigNamespace, "-f", s.Path) //nolint:gosec
+	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", SigNamespace, "-f", s.Path) //nolint:gosec
 
 	cmd.Stdin = bytes.NewBuffer(data)
 
@@ -136,7 +136,7 @@ func NewKeyFromBytes(t *testing.T, keyB []byte) *sv.SSLibKey {
 
 // NewVerifierFromKey creates a new Verifier from SSlibKey of type ssh.
 func NewVerifierFromKey(key *sv.SSLibKey) (*Verifier, error) {
-	if key.KeyType != SSHKeyType {
+	if key.KeyType != KeyType {
 		return nil, fmt.Errorf("wrong keyType: %s", key.KeyType)
 	}
 	sshKey, err := parseSSH2Body(key.KeyVal.Public)
@@ -226,7 +226,7 @@ func newSSHKey(key ssh.PublicKey, keyID string) *sv.SSLibKey {
 	}
 	return &sv.SSLibKey{
 		KeyID:   keyID,
-		KeyType: SSHKeyType,
+		KeyType: KeyType,
 		Scheme:  key.Type(),
 		KeyVal:  sv.KeyVal{Public: base64.StdEncoding.EncodeToString(key.Marshal())},
 	}

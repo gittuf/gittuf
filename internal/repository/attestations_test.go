@@ -12,7 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -161,13 +161,13 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				ReferenceAuthorization: &attestations.ReferenceAuthorization{
@@ -191,24 +191,24 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				DismissedApprovers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				ReferenceAuthorization: &attestations.ReferenceAuthorization{
@@ -232,13 +232,13 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
 				DismissedApprovers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				ReferenceAuthorization: &attestations.ReferenceAuthorization{
@@ -262,42 +262,42 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
 				Approvers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				DismissedApprovers: []*tuf.Key{
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 					{
-						KeyType: signerverifier.FulcioKeyType,
+						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
 						KeyVal: sslibsv.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
-						Scheme: signerverifier.FulcioKeyScheme,
+						Scheme: sigstore.KeyScheme,
 					},
 				},
 				ReferenceAuthorization: &attestations.ReferenceAuthorization{
