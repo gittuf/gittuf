@@ -47,8 +47,12 @@ func PullOrFetch(gitArgs args.Args) error {
 	// Pull non-RSL changes
 	cmdArgs := []string{gitArgs.Command}
 	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
-	// TODO: Make this more robust in case of symlinks to git
-	gitPullCmd := exec.Command("git", cmdArgs...)
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		return err
+	}
+
+	gitPullCmd := exec.Command(gitPath, cmdArgs...)
 	gitPullCmd.Stdout = os.Stdout
 	gitPullCmd.Stderr = os.Stderr
 
@@ -57,7 +61,10 @@ func PullOrFetch(gitArgs args.Args) error {
 	}
 
 	// Pull RSL changes
-	remote := args.DetermineRemote(gitArgs.Parameters)
+	remote, err := args.DetermineRemote(gitArgs.Parameters, gitArgs.GitDir)
+	if err != nil {
+		return err
+	}
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
@@ -106,8 +113,13 @@ func Push(gitArgs args.Args) error {
 	// Push non-RSL changes to the remote
 	cmdArgs := []string{gitArgs.Command}
 	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
-	// TODO: Make this more robust in case of symlinks to git
-	gitPushCmd := exec.Command("git", cmdArgs...)
+
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		return err
+	}
+
+	gitPushCmd := exec.Command(gitPath, cmdArgs...)
 	gitPushCmd.Stdout = os.Stdout
 	gitPushCmd.Stderr = os.Stderr
 
@@ -116,7 +128,10 @@ func Push(gitArgs args.Args) error {
 	}
 
 	// Push RSL changes to the remote
-	remote := args.DetermineRemote(gitArgs.Parameters)
+	remote, err := args.DetermineRemote(gitArgs.Parameters, gitArgs.GitDir)
+	if err != nil {
+		return err
+	}
 
 	if err := repo.PushRSL(remote); err != nil {
 		return err
