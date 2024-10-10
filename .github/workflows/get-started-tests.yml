@@ -6,11 +6,13 @@ on:
       - "docs/**"
       - "!docs/testing/**"
       - "!docs/get-started.md"
+      - "*.md"
   pull_request:
     paths-ignore:
       - "docs/**"
       - "!docs/testing/**"
       - "!docs/get-started.md"
+      - "*.md"
 permissions: read-all
 jobs:
   test:
