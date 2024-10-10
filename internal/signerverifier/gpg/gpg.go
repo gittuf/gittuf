@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const KeyType = "gpg"

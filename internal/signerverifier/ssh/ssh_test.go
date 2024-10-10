@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	sv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 

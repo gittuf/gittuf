@@ -11,7 +11,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const (

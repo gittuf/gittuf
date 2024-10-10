@@ -17,8 +17,8 @@ import (
 	"strings"
 	"testing"
 
-	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/hiddeco/sshsig"
+	sv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"golang.org/x/crypto/ssh"
 )
 
