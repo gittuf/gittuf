@@ -763,21 +763,22 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 			)
 			switch key.KeyType {
 			case ssh.KeyType:
+				slog.Debug(fmt.Sprintf("Found SSH key '%s'...", key.KeyID))
 				envVerifier, err = ssh.NewVerifierFromKey(key)
 				if err != nil {
 					return nil, err
 				}
-
-				envVerifiers = append(envVerifiers, envVerifier)
 			case gpg.KeyType:
 				slog.Debug(fmt.Sprintf("Found GPG key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
 				continue
 			case sigstore.KeyType:
-				slog.Debug(fmt.Sprintf("Found Sigstore key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
-				continue
+				slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
+				envVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer)
 			default:
 				return nil, common.ErrUnknownKeyType
 			}
+
+			envVerifiers = append(envVerifiers, envVerifier)
 		}
 
 		acceptedKeys, err := dsse.VerifyEnvelope(ctx, env, envVerifiers, envelopeThreshold)

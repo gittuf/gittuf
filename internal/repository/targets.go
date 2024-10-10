@@ -26,7 +26,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug("Loading current policy...")
@@ -48,13 +48,13 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing initial rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -81,7 +81,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug("Loading current policy...")
@@ -118,13 +118,13 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -148,7 +148,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug("Loading current policy...")
@@ -180,13 +180,13 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -233,13 +233,13 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -259,7 +259,7 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug("Loading current policy...")
@@ -291,13 +291,13 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
@@ -317,7 +317,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug("Loading current policy...")
@@ -377,6 +377,11 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
 func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
 	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -384,11 +389,6 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 	}
 	if !state.HasTargetsRole(targetsRoleName) {
 		return policy.ErrMetadataNotFound
-	}
-
-	keyID, err := signer.KeyID()
-	if err != nil {
-		return err
 	}
 
 	var env *sslibdsse.Envelope
