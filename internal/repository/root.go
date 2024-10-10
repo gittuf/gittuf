@@ -7,11 +7,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -20,27 +20,23 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
-var ErrCannotUseSigstoreForRootMetadata = errors.New("cannot use Sigstore to sign root metadata")
-
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
 func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	var (
 		publicKey *sslibsv.SSLibKey
 		err       error
 	)
-	if signerSSH, isSSHSigner := signer.(*ssh.Signer); isSSHSigner {
-		publicKey = signerSSH.MetadataKey()
-	} else {
-		rawKey := signer.Public()
-		publicKey, err = sslibsv.NewKey(rawKey)
+	switch signer := signer.(type) {
+	case *ssh.Signer:
+		publicKey = signer.MetadataKey()
+	case *sigstore.Signer:
+		publicKey, err = signer.MetadataKey()
 		if err != nil {
 			return err
 		}
+	default:
+		return common.ErrUnknownKeyType
 	}
 
 	slog.Debug("Creating initial root metadata...")
@@ -71,10 +67,6 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
 func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey *tuf.Key, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -115,10 +107,6 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 // RemoveRootKey is the interface for the user to de-authorize a key
 // trusted to sign the Root role.
 func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -156,10 +144,6 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
 func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey *tuf.Key, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -189,10 +173,6 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 // RemoveTopLevelTargetsKey is the interface for the user to de-authorize a key
 // trusted to sign the top level Targets role / policy file.
 func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKeyID string, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -349,10 +329,6 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 // UpdateRootThreshold sets the threshold of valid signatures required for the
 // Root role.
 func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -382,10 +358,6 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 // UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
 // required for the top level Targets role.
 func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -415,10 +387,6 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
-	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
-		return ErrCannotUseSigstoreForRootMetadata
-	}
-
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err

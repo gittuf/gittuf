@@ -14,6 +14,7 @@ import (
 
 	signeropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
 	verifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
+	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
@@ -255,6 +256,25 @@ func (s *Signer) KeyID() (string, error) {
 	}
 
 	return s.Verifier.KeyID()
+}
+
+// MetadataKey returns the securesystemslib representation of the key, used for
+// its representation in gittuf metadata.
+func (s *Signer) MetadataKey() (*signerverifier.SSLibKey, error) {
+	keyID, err := s.KeyID()
+	if err != nil {
+		return nil, err
+	}
+
+	return &signerverifier.SSLibKey{
+		KeyID:   keyID,
+		KeyType: KeyType,
+		Scheme:  KeyScheme,
+		KeyVal: signerverifier.KeyVal{
+			Identity: s.Verifier.identity,
+			Issuer:   s.Verifier.issuer,
+		},
+	}, nil
 }
 
 func (s *Signer) getIDToken() (string, error) {
