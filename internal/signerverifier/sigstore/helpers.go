@@ -4,6 +4,7 @@
 package sigstore
 
 import (
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+
+	"github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore/pkg/cryptoutils"
 )
 
 const fulcioConfigurationEndpoint = "/api/v2/configuration"
@@ -137,4 +142,38 @@ func subjectFromToken(tok *idToken) string {
 	}
 
 	return tok.Subject
+}
+
+func parsePEMFile(path string) (*root.CertificateAuthority, error) {
+	certs, err := parseCerts(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var ca root.CertificateAuthority
+	ca.Root = certs[len(certs)-1]
+	if len(certs) > 1 {
+		ca.Intermediates = certs[:len(certs)-1]
+	}
+
+	return &ca, nil
+}
+
+func parseCerts(path string) ([]*x509.Certificate, error) {
+	slog.Debug(fmt.Sprintf("Loading %s...", path))
+	pemBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	certs, err := cryptoutils.UnmarshalCertificatesFromPEM(pemBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates in file %s", path)
+	}
+
+	return certs, nil
 }
