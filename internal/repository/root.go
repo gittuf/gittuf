@@ -16,8 +16,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
 	"github.com/gittuf/gittuf/internal/tuf"
+	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 // InitializeRoot is the interface for the user to create the repository's root

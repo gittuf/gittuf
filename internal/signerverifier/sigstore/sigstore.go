@@ -14,7 +14,7 @@ import (
 
 	signeropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
 	verifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
-	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
