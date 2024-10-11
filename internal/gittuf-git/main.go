@@ -57,7 +57,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 			os.Exit(1)
 		}
-	case gitArgs.Command == "push":
+	case "push":
 		handleCommand(cmd.Push, gitArgs)
 	case "pull", "fetch":
 		handleCommand(cmd.PullOrFetch, gitArgs)

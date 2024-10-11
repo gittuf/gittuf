@@ -15,6 +15,21 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
+func determineRef(gitArgs args.Args) string {
+	var refName string
+	if len(gitArgs.Parameters) > 1 {
+		refParts := strings.Split(gitArgs.Parameters[1], ":")
+		if len(refParts) > 0 {
+			refName = refParts[0]
+		} else {
+			refName = gitArgs.Parameters[1]
+		}
+	} else {
+		refName = "HEAD"
+	}
+	return refName
+}
+
 // Clone handles the clone operation for gittuf + git
 func Clone(gitArgs args.Args) error {
 	// Set working directory as needed
@@ -61,9 +76,9 @@ func PullOrFetch(gitArgs args.Args) error {
 		return err
 	}
 
-	RSLcmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
-	RSLcmdArgs = append(RSLcmdArgs, "refs/gittuf/reference-state-log")
-	gitPullRSLCmd := exec.Command("git", RSLcmdArgs...)
+	rslcmdargs := []string{gitArgs.Command, gitArgs.Parameters[0]}
+	rslcmdargs = append(rslcmdargs, "refs/gittuf/reference-state-log:refs/gittuf/reference-state-log")
+	gitPullRSLCmd := exec.Command("git", rslcmdargs...)
 	gitPullRSLCmd.Stdout = os.Stdout
 	gitPullRSLCmd.Stderr = os.Stderr
 
@@ -72,7 +87,7 @@ func PullOrFetch(gitArgs args.Args) error {
 	}
 
 	policyCmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
-	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy")
+	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy:refs/gittuf/policy")
 	gitPullPolicyCmd := exec.Command("git", policyCmdArgs...)
 	gitPullPolicyCmd.Stdout = os.Stdout
 	gitPullPolicyCmd.Stderr = os.Stderr
@@ -94,19 +109,7 @@ func Commit(gitArgs args.Args) error {
 	if err != nil {
 		return err
 	}
-
-	var refName string
-	if len(gitArgs.Parameters) > 1 {
-		refParts := strings.Split(gitArgs.Parameters[1], ":")
-		if len(refParts) > 0 {
-			refName = refParts[0]
-		} else {
-			refName = gitArgs.Parameters[1]
-		}
-	} else {
-		refName = "HEAD"
-	}
-
+	refName := determineRef(gitArgs)
 	if err = repo.VerifyRef(context.Background(), refName); err != nil {
 		fmt.Println("Verification unsuccessful with error: ", err)
 	} else {
@@ -145,17 +148,7 @@ func Push(gitArgs args.Args) error {
 		return err
 	}
 
-	var refName string
-	if len(gitArgs.Parameters) > 1 {
-		refParts := strings.Split(gitArgs.Parameters[1], ":")
-		if len(refParts) > 0 {
-			refName = refParts[0]
-		} else {
-			refName = gitArgs.Parameters[1]
-		}
-	} else {
-		refName = "HEAD"
-	}
+	refName := determineRef(gitArgs)
 
 	// TODO: This needs to record the appropriate reference being pushed.
 	if err := repo.RecordRSLEntryForReference(refName, true, rslopts.WithOverrideRefName(refName)); err != nil {
