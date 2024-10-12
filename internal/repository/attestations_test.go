@@ -14,8 +14,8 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -159,11 +159,11 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 				},
 			},
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
-				Approvers: []*tuf.Key{
+				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
@@ -189,22 +189,22 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 				},
 			},
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
-				Approvers: []*tuf.Key{
+				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				DismissedApprovers: []*tuf.Key{
+				DismissedApprovers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
@@ -230,11 +230,11 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 				},
 			},
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
-				DismissedApprovers: []*tuf.Key{
+				DismissedApprovers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
@@ -260,11 +260,11 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 				},
 			},
 			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
-				Approvers: []*tuf.Key{
+				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
@@ -273,18 +273,18 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				DismissedApprovers: []*tuf.Key{
+				DismissedApprovers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "alice::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "alice",
 							Issuer:   "https://github.com/login/oauth",
 						},
@@ -293,7 +293,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					{
 						KeyType: sigstore.KeyType,
 						KeyID:   "bob::https://github.com/login/oauth",
-						KeyVal: sslibsv.KeyVal{
+						KeyVal: signerverifier.KeyVal{
 							Identity: "bob",
 							Issuer:   "https://github.com/login/oauth",
 						},

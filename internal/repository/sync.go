@@ -28,7 +28,7 @@ var (
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []*tuf.Key) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []tuf.Principal) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -73,7 +73,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		slog.Debug("Verifying if root keys are expected root keys...")
 
 		sort.Slice(expectedRootKeys, func(i, j int) bool {
-			return expectedRootKeys[i].KeyID < expectedRootKeys[j].KeyID
+			return expectedRootKeys[i].ID() < expectedRootKeys[j].ID()
 		})
 
 		state, err := policy.LoadFirstState(ctx, r)
@@ -87,7 +87,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 		// We sort the root keys so that we can check if the root keys array match's the expected root key array
 		sort.Slice(rootKeys, func(i, j int) bool {
-			return rootKeys[i].KeyID < rootKeys[j].KeyID
+			return rootKeys[i].ID() < rootKeys[j].ID()
 		})
 
 		if len(rootKeys) != len(expectedRootKeys) {

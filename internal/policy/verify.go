@@ -23,6 +23,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	ita "github.com/in-toto/attestation/go/v1"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 var (
@@ -554,7 +555,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	// on currently supported systems
 	// TODO: support multiple apps / threshold per system
 	if !isTag && policy.githubAppApprovalsTrusted {
-		appName := policy.githubAppKey.KeyID
+		appName := policy.githubAppKeys[0].ID()
 
 		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
 		if err != nil {
@@ -567,8 +568,8 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		if githubApprovalAttestation != nil {
 			approvalVerifier := &Verifier{
 				repository: policy.repository,
-				name:       GitHubAppRoleName,
-				keys:       []*tuf.Key{policy.githubAppKey},
+				name:       tuf.GitHubAppRoleName,
+				keys:       []*signerverifier.SSLibKey{policy.githubAppKeys[0].Keys()[0]}, // FIXME: this is set to accept a single key
 				threshold:  1,
 			}
 			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
@@ -593,7 +594,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 			}
 
 			for _, approver := range stmt.Predicate.Approvers {
-				approverKeyIDs.Add(approver.KeyID)
+				approverKeyIDs.Add(approver.ID())
 			}
 		}
 	}
@@ -679,7 +680,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 type Verifier struct {
 	repository *gitinterface.Repository
 	name       string
-	keys       []*tuf.Key
+	keys       []*signerverifier.SSLibKey
 	threshold  int
 }
 
@@ -687,7 +688,7 @@ func (v *Verifier) Name() string {
 	return v.name
 }
 
-func (v *Verifier) Keys() []*tuf.Key {
+func (v *Verifier) Keys() []*signerverifier.SSLibKey {
 	return v.keys
 }
 

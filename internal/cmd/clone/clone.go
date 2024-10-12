@@ -36,7 +36,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		dir = args[1]
 	}
 
-	expectedRootKeys := make([]*tuf.Key, len(o.expectedRootKeys))
+	expectedRootKeys := make([]tuf.Principal, len(o.expectedRootKeys))
 
 	for index, keyPath := range o.expectedRootKeys {
 		key, err := common.LoadPublicKey(keyPath)

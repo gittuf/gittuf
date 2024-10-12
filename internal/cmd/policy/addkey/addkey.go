@@ -46,7 +46,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	authorizedKeys := []*tuf.Key{}
+	authorizedKeys := []tuf.Principal{}
 	for _, key := range o.authorizedKeys {
 		key, err := common.LoadPublicKey(key)
 		if err != nil {

@@ -12,8 +12,8 @@ import (
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	sslibsvssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/hiddeco/sshsig"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
@@ -67,7 +67,7 @@ func (r *Repository) CanSign() error {
 
 // VerifySignature verifies the cryptographic signature associated with the
 // specified object. The `objectID` must point to a Git commit or tag object.
-func (r *Repository) VerifySignature(ctx context.Context, objectID Hash, key *tuf.Key) error {
+func (r *Repository) VerifySignature(ctx context.Context, objectID Hash, key *signerverifier.SSLibKey) error {
 	if err := r.ensureIsCommit(objectID); err == nil {
 		return r.verifyCommitSignature(ctx, objectID, key)
 	}
@@ -132,7 +132,7 @@ func signGitObjectUsingSSHKey(contents, pemKeyBytes []byte) (string, error) {
 
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
 // verifying commit or tag signatures issued by gitsign.
-func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature []byte) error {
+func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte) error {
 	root, err := fulcioroots.Get()
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
@@ -186,7 +186,7 @@ func verifyGitsignSignature(ctx context.Context, key *tuf.Key, data, signature [
 }
 
 // verifySSHKeySignature verifies Git signatures issued by SSH keys.
-func verifySSHKeySignature(ctx context.Context, key *tuf.Key, data, signature []byte) error {
+func verifySSHKeySignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte) error {
 	verifier, err := sslibsvssh.NewVerifierFromKey(key)
 	if err != nil {
 		return errors.Join(ErrVerifyingSSHSignature, err)

@@ -11,6 +11,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,8 +33,9 @@ func TestInitializeRoot(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(key.KeyID))
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+
+	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
 	assert.Nil(t, err)
@@ -47,7 +50,7 @@ func TestAddRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newRootKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
 	err = r.AddRootKey(testCtx, sv, newRootKey, false)
 	assert.Nil(t, err)
@@ -59,9 +62,11 @@ func TestAddRootKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, set.NewSetFromItems(originalKeyID, newRootKey.KeyID), rootMetadata.Roles[policy.RootRoleName].KeyIDs)
+
 	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
 	assert.Equal(t, 2, len(state.RootPublicKeys))
+
+	assert.Equal(t, set.NewSetFromItems(originalKeyID, newRootKey.KeyID), getRootPrincipalIDs(t, rootMetadata))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
@@ -71,7 +76,7 @@ func TestRemoveRootKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	originalSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	rootKey := originalSigner.MetadataKey()
+	rootKey := tufv01.NewKeyFromSSLibKey(originalSigner.MetadataKey())
 
 	err := r.AddRootKey(testCtx, originalSigner, rootKey, false)
 	if err != nil {
@@ -90,9 +95,11 @@ func TestRemoveRootKey(t *testing.T) {
 
 	// We should have no additions as we tried to add the same key
 	assert.Equal(t, 1, len(state.RootPublicKeys))
-	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(rootPrincipals))
 
-	newRootKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
 	err = r.AddRootKey(testCtx, originalSigner, newRootKey, false)
 	if err != nil {
@@ -108,8 +115,9 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(rootKey.KeyID))
-	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(newRootKey.KeyID))
+	rootPrincipalIDs := getRootPrincipalIDs(t, rootMetadata)
+	assert.True(t, rootPrincipalIDs.Has(rootKey.KeyID))
+	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
 	assert.Equal(t, 2, len(state.RootPublicKeys))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
@@ -131,8 +139,9 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(newRootKey.KeyID))
-	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
+	rootPrincipalIDs = getRootPrincipalIDs(t, rootMetadata)
+	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
+	assert.Equal(t, 1, rootPrincipalIDs.Len())
 	assert.Equal(t, 1, len(state.RootPublicKeys))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
@@ -143,7 +152,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	key := sv.MetadataKey()
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	err := r.AddTopLevelTargetsKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
@@ -155,9 +164,9 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.True(t, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Has(key.KeyID))
-	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(key.KeyID))
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
+	assert.True(t, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
@@ -167,14 +176,14 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	rootKey := sv.MetadataKey()
+	rootKey := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	err := r.AddTopLevelTargetsKey(testCtx, sv, rootKey, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	targetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
 	err = r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false)
 	if err != nil {
@@ -191,8 +200,10 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(rootKey.KeyID))
-	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(targetsKey.KeyID))
+	targetsPrincipalIDs := getPrimaryRuleFilePrincipalIDs(t, rootMetadata)
+	assert.True(t, targetsPrincipalIDs.Has(rootKey.KeyID))
+	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
+
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
@@ -209,7 +220,8 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Has(targetsKey.KeyID))
+	targetsPrincipalIDs = getPrimaryRuleFilePrincipalIDs(t, rootMetadata)
+	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -218,7 +230,7 @@ func TestAddGitHubAppKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	key := sv.MetadataKey()
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	err := r.AddGitHubAppKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
@@ -231,7 +243,12 @@ func TestAddGitHubAppKey(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
 
-	assert.True(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs.Has(key.KeyID))
+	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, key, appPrincipals[0])
+
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -240,7 +257,7 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	key := sv.MetadataKey()
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	err := r.AddGitHubAppKey(testCtx, sv, key, false)
 	if err != nil {
@@ -257,7 +274,12 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.True(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs.Has(key.KeyID))
+	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, key, appPrincipals[0])
+
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
@@ -274,7 +296,11 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Empty(t, rootMetadata.Roles[policy.GitHubAppRoleName].KeyIDs)
+	appPrincipals, err = rootMetadata.GetGitHubAppPrincipals()
+	// We see an error (correctly that the app is trusted but no key is present)
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
+	assert.Empty(t, appPrincipals)
+
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -289,14 +315,14 @@ func TestTrustGitHubApp(t *testing.T) {
 		assert.Nil(t, err)
 
 		_, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		assert.ErrorIs(t, err, policy.ErrNoGitHubAppRoleDeclared)
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 	})
 
 	t.Run("GitHub app role defined", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
 		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := sv.MetadataKey()
+		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -306,7 +332,7 @@ func TestTrustGitHubApp(t *testing.T) {
 		rootMetadata, err := state.GetRootMetadata()
 		assert.Nil(t, err)
 
-		assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
 
 		err = r.AddGitHubAppKey(testCtx, sv, key, false)
 		assert.Nil(t, err)
@@ -322,7 +348,7 @@ func TestTrustGitHubApp(t *testing.T) {
 		rootMetadata, err = state.GetRootMetadata()
 		assert.Nil(t, err)
 
-		assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
 		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 		assert.Nil(t, err)
 
@@ -336,7 +362,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	key := sv.MetadataKey()
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -346,7 +372,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
 
-	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
 
 	err = r.AddGitHubAppKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
@@ -362,7 +388,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err = state.GetRootMetadata()
 	assert.Nil(t, err)
 
-	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
@@ -377,7 +403,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err = state.GetRootMetadata()
 	assert.Nil(t, err)
 
-	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
@@ -395,12 +421,17 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
-	assert.Equal(t, 1, rootMetadata.Roles[policy.RootRoleName].Threshold)
+	assert.Equal(t, 1, getRootPrincipalIDs(t, rootMetadata).Len())
+
+	rootThreshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, rootThreshold)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	secondKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	secondKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
 	if err := r.AddRootKey(testCtx, signer, secondKey, false); err != nil {
 		t.Fatal(err)
@@ -419,15 +450,20 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].KeyIDs.Len())
-	assert.Equal(t, 2, rootMetadata.Roles[policy.RootRoleName].Threshold)
+	assert.Equal(t, 2, getRootPrincipalIDs(t, rootMetadata).Len())
+
+	rootThreshold, err = rootMetadata.GetRootThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, rootThreshold)
 }
 
 func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	key := sv.MetadataKey()
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
 	if err := r.AddTopLevelTargetsKey(testCtx, sv, key, false); err != nil {
 		t.Fatal(err)
@@ -443,10 +479,15 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Len())
-	assert.Equal(t, 1, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
+	assert.Equal(t, 1, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Len())
 
-	targetsKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	targetsThreshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, targetsThreshold)
+
+	targetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
 	if err := r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false); err != nil {
 		t.Fatal(err)
@@ -465,8 +506,13 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].KeyIDs.Len())
-	assert.Equal(t, 2, rootMetadata.Roles[policy.TargetsRoleName].Threshold)
+	assert.Equal(t, 2, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Len())
+
+	targetsThreshold, err = rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, targetsThreshold)
 }
 
 func TestSignRoot(t *testing.T) {
@@ -475,7 +521,7 @@ func TestSignRoot(t *testing.T) {
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	// Add targets key as a root key
-	secondKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+	secondKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 	if err := r.AddRootKey(testCtx, rootSigner, secondKey, false); err != nil {
 		t.Fatal(err)
 	}
@@ -492,4 +538,36 @@ func TestSignRoot(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
+}
+
+func getRootPrincipalIDs(t *testing.T, rootMetadata tuf.RootMetadata) *set.Set[string] {
+	t.Helper()
+
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	principalIDs := set.NewSet[string]()
+	for _, principal := range principals {
+		principalIDs.Add(principal.ID())
+	}
+
+	return principalIDs
+}
+
+func getPrimaryRuleFilePrincipalIDs(t *testing.T, rootMetadata tuf.RootMetadata) *set.Set[string] {
+	t.Helper()
+
+	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	principalIDs := set.NewSet[string]()
+	for _, principal := range principals {
+		principalIDs.Add(principal.ID())
+	}
+
+	return principalIDs
 }

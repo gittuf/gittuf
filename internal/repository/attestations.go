@@ -277,7 +277,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 // for the specified parameters. If an attestation already exists, the specified
 // approver is added to the existing attestation's predicate and it is re-signed
 // and stored in the repository. Currently, this is limited to developer mode.
-func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequestNumber int, reviewID int64, approver *tuf.Key, signCommit bool) error {
+func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequestNumber int, reviewID int64, approver tuf.Principal, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -307,8 +307,8 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	approvers := []*tuf.Key{approver}
-	var dismissedApprovers []*tuf.Key
+	approvers := []tuf.Principal{approver}
+	var dismissedApprovers []tuf.Principal
 	if !hasApprovalAttestation {
 		// Create a new GitHub pull request approval attestation
 		slog.Debug("Creating new GitHub pull request approval attestation...")
@@ -320,8 +320,13 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 			return err
 		}
 
-		approvers = append(approvers, predicate.Approvers...)
-		dismissedApprovers = predicate.DismissedApprovers
+		for _, approver := range predicate.Approvers {
+			approvers = append(approvers, approver)
+		}
+
+		for _, dismissedApprover := range predicate.DismissedApprovers {
+			dismissedApprovers = append(dismissedApprovers, dismissedApprover)
+		}
 	}
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
@@ -344,7 +349,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, approver.KeyID)
+	commitMessage := fmt.Sprintf("Add GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, approver.ID())
 
 	slog.Debug("Committing attestations...")
 	return currentAttestations.Commit(r.r, commitMessage, signCommit)
@@ -352,7 +357,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 
 // DismissGitHubPullRequestApprover removes an approver from the GitHub pull
 // request approval attestation for the specified parameters.
-func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL string, reviewID int64, dismissedApprover *tuf.Key, signCommit bool) error {
+func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL string, reviewID int64, dismissedApprover tuf.Principal, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -380,14 +385,16 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	dismissedApprovers := make([]*tuf.Key, 0, len(predicate.DismissedApprovers)+1)
-	dismissedApprovers = append(dismissedApprovers, predicate.DismissedApprovers...)
+	dismissedApprovers := make([]tuf.Principal, 0, len(predicate.DismissedApprovers)+1)
+	for _, existingDismissedApprover := range predicate.DismissedApprovers {
+		dismissedApprovers = append(dismissedApprovers, existingDismissedApprover)
+	}
 	dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 
-	approvers := make([]*tuf.Key, 0, len(predicate.Approvers))
+	approvers := make([]tuf.Principal, 0, len(predicate.Approvers))
 	for _, approver := range predicate.Approvers {
 		approver := approver
-		if approver.KeyID == dismissedApprover.KeyID {
+		if approver.ID() == dismissedApprover.ID() {
 			continue
 		}
 		approvers = append(approvers, approver)
@@ -417,7 +424,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Dismiss GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, dismissedApprover.KeyID)
+	commitMessage := fmt.Sprintf("Dismiss GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, dismissedApprover.ID())
 
 	slog.Debug("Committing attestations...")
 	return currentAttestations.Commit(r.r, commitMessage, signCommit)

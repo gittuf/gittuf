@@ -17,34 +17,39 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
 func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
 	var (
-		publicKey *sslibsv.SSLibKey
-		err       error
+		publicKeyRaw *signerverifier.SSLibKey
+		err          error
 	)
 	switch signer := signer.(type) {
 	case *ssh.Signer:
-		publicKey = signer.MetadataKey()
+		publicKeyRaw = signer.MetadataKey()
 	case *sigstore.Signer:
-		publicKey, err = signer.MetadataKey()
+		publicKeyRaw, err = signer.MetadataKey()
 		if err != nil {
 			return err
 		}
 	default:
 		return common.ErrUnknownKeyType
 	}
+	publicKey := tufv01.NewKeyFromSSLibKey(publicKeyRaw)
 
 	slog.Debug("Creating initial root metadata...")
-	rootMetadata := policy.InitializeRootMetadata(publicKey)
+	rootMetadata, err := policy.InitializeRootMetadata(publicKey)
+	if err != nil {
+		return err
+	}
 
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	slog.Debug(fmt.Sprintf("Signing initial root metadata using '%s'...", publicKey.KeyID))
@@ -54,7 +59,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	state := &policy.State{
-		RootPublicKeys: []*tuf.Key{publicKey},
+		RootPublicKeys: []tuf.Principal{publicKey},
 		RootEnvelope:   env,
 	}
 
@@ -66,7 +71,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
-func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey *tuf.Key, signCommit bool) error {
+func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool) error {
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -84,14 +89,13 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Adding root key...")
-	rootMetadata, err = policy.AddRootKey(rootMetadata, newRootKey)
-	if err != nil {
+	if err := rootMetadata.AddRootPrincipal(newRootKey); err != nil {
 		return err
 	}
 
 	found := false
 	for _, key := range state.RootPublicKeys {
-		if key.KeyID == newRootKey.KeyID {
+		if key.ID() == newRootKey.ID() {
 			found = true
 			break
 		}
@@ -100,7 +104,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		state.RootPublicKeys = append(state.RootPublicKeys, newRootKey)
 	}
 
-	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.KeyID)
+	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.ID())
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
@@ -124,14 +128,13 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Removing root key...")
-	rootMetadata, err = policy.DeleteRootKey(rootMetadata, keyID)
-	if err != nil {
+	if err := rootMetadata.DeleteRootPrincipal(keyID); err != nil {
 		return err
 	}
 
-	newRootPublicKeys := []*tuf.Key{}
+	newRootPublicKeys := []tuf.Principal{}
 	for _, key := range state.RootPublicKeys {
-		if key.KeyID != keyID {
+		if key.ID() != keyID {
 			newRootPublicKeys = append(newRootPublicKeys, key)
 		}
 	}
@@ -143,7 +146,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
-func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey *tuf.Key, signCommit bool) error {
+func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool) error {
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -161,12 +164,11 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Adding policy key...")
-	rootMetadata, err = policy.AddTargetsKey(rootMetadata, targetsKey)
-	if err != nil {
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(targetsKey); err != nil {
 		return fmt.Errorf("failed to add policy key: %w", err)
 	}
 
-	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.KeyID)
+	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.ID())
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
@@ -190,8 +192,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Removing policy key...")
-	rootMetadata, err = policy.DeleteTargetsKey(rootMetadata, targetsKeyID)
-	if err != nil {
+	if err := rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKeyID); err != nil {
 		return err
 	}
 
@@ -202,7 +203,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 // AddGitHubAppKey is the interface for the user to add the authorized key for
 // the special GitHub app role. This key is used to verify GitHub pull request
 // approval attestation signatures.
-func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey *tuf.Key, signCommit bool) error {
+func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool) error {
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -220,12 +221,11 @@ func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	slog.Debug("Adding GitHub app key...")
-	rootMetadata, err = policy.AddGitHubAppKey(rootMetadata, appKey)
-	if err != nil {
+	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
 		return fmt.Errorf("failed to add GitHub app key: %w", err)
 	}
 
-	commitMessage := fmt.Sprintf("Add GitHub app key '%s' to root", appKey.KeyID)
+	commitMessage := fmt.Sprintf("Add GitHub app key '%s' to root", appKey.ID())
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
@@ -249,10 +249,7 @@ func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.Si
 	}
 
 	slog.Debug("Removing GitHub app key...")
-	rootMetadata, err = policy.DeleteGitHubAppKey(rootMetadata)
-	if err != nil {
-		return err
-	}
+	rootMetadata.DeleteGitHubAppPrincipal()
 
 	commitMessage := "Remove GitHub app key from root"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
@@ -277,16 +274,13 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	if rootMetadata.GitHubApprovalsTrusted {
+	if rootMetadata.IsGitHubAppApprovalTrusted() {
 		slog.Debug("GitHub app approvals are already trusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as trusted in root...")
-	rootMetadata, err = policy.EnableGitHubAppApprovals(rootMetadata)
-	if err != nil {
-		return err
-	}
+	rootMetadata.EnableGitHubAppApprovals()
 
 	commitMessage := "Mark GitHub app approvals as trusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
@@ -311,16 +305,13 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
-	if !rootMetadata.GitHubApprovalsTrusted {
+	if !rootMetadata.IsGitHubAppApprovalTrusted() {
 		slog.Debug("GitHub app approvals are already untrusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as untrusted in root...")
-	rootMetadata, err = policy.DisableGitHubAppApprovals(rootMetadata)
-	if err != nil {
-		return err
-	}
+	rootMetadata.DisableGitHubAppApprovals()
 
 	commitMessage := "Mark GitHub app approvals as untrusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
@@ -346,8 +337,7 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 	}
 
 	slog.Debug("Updating root threshold...")
-	rootMetadata, err = policy.UpdateRootThreshold(rootMetadata, threshold)
-	if err != nil {
+	if err := rootMetadata.UpdateRootThreshold(threshold); err != nil {
 		return err
 	}
 
@@ -375,8 +365,7 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	slog.Debug("Updating policy threshold...")
-	rootMetadata, err = policy.UpdateTargetsThreshold(rootMetadata, threshold)
-	if err != nil {
+	if err := rootMetadata.UpdatePrimaryRuleFileThreshold(threshold); err != nil {
 		return err
 	}
 
@@ -414,21 +403,26 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 	return state.Commit(r.r, commitMessage, signCommit)
 }
 
-func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (*tuf.RootMetadata, error) {
+func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.RootMetadata, error) {
 	slog.Debug("Loading current root metadata...")
 	rootMetadata, err := state.GetRootMetadata()
 	if err != nil {
 		return nil, err
 	}
 
-	if !isKeyAuthorized(rootMetadata.Roles[policy.RootRoleName].KeyIDs.Contents(), keyID) {
+	authorizedPrincipals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	if !isKeyAuthorized(authorizedPrincipals, keyID) {
 		return nil, ErrUnauthorizedKey
 	}
 
 	return rootMetadata, nil
 }
 
-func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata *tuf.RootMetadata, commitMessage string, signCommit bool) error {
+func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, signCommit bool) error {
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err

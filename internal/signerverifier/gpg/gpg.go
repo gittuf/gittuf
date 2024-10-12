@@ -9,16 +9,15 @@ import (
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const KeyType = "gpg"
 
-// LoadGPGKeyFromBytes returns a tuf.Key for a GPG / PGP key passed in as
-// armored bytes. The returned tuf.Key uses the primary key's fingerprint as the
+// LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
+// armored bytes. The returned signerverifier.SSLibKey uses the primary key's fingerprint as the
 // key ID.
-func LoadGPGKeyFromBytes(contents []byte) (*tuf.Key, error) {
+func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(contents))
 	if err != nil {
 		return nil, err
@@ -28,11 +27,11 @@ func LoadGPGKeyFromBytes(contents []byte) (*tuf.Key, error) {
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
 	publicKey := strings.TrimSpace(string(contents))
 
-	gpgKey := &tuf.Key{
+	gpgKey := &signerverifier.SSLibKey{
 		KeyID:   fingerprint,
 		KeyType: KeyType,
 		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
-		KeyVal: sslibsv.KeyVal{
+		KeyVal: signerverifier.KeyVal{
 			Public: publicKey,
 		},
 	}

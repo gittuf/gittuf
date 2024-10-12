@@ -19,6 +19,8 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const (
@@ -49,7 +51,6 @@ var (
 	ErrPolicyNotFound             = errors.New("cannot find policy")
 	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
 	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
-	ErrNoGitHubAppRoleDeclared    = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -58,10 +59,10 @@ type State struct {
 	RootEnvelope        *sslibdsse.Envelope
 	TargetsEnvelope     *sslibdsse.Envelope
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
-	RootPublicKeys      []*tuf.Key
+	RootPublicKeys      []tuf.Principal
 
 	githubAppApprovalsTrusted bool
-	githubAppKey              *tuf.Key
+	githubAppKeys             []tuf.Principal
 
 	repository     *gitinterface.Repository
 	verifiersCache map[string][]*Verifier
@@ -69,7 +70,7 @@ type State struct {
 }
 
 type DelegationWithDepth struct {
-	Delegation tuf.Delegation
+	Delegation tuf.Rule
 	Depth      int
 }
 
@@ -210,55 +211,6 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 	return LoadState(ctx, repo, commitPolicyEntry)
 }
 
-// PublicKeys returns all the public keys associated with a state.
-func (s *State) PublicKeys() (map[string]*tuf.Key, error) {
-	allKeys := map[string]*tuf.Key{}
-
-	// Add root keys
-	for _, key := range s.RootPublicKeys {
-		key := key
-		allKeys[key.KeyID] = key
-	}
-
-	// Add keys from the root metadata
-	rootMetadata, err := s.GetRootMetadata()
-	if err != nil {
-		return nil, err
-	}
-	for keyID, key := range rootMetadata.Keys {
-		key := key
-		allKeys[keyID] = key
-	}
-
-	// Add keys from top level targets metadata
-	if s.TargetsEnvelope == nil {
-		// Early states where this hasn't been initialized yet
-		return nil, err
-	}
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
-	if err != nil {
-		return nil, err
-	}
-	for keyID, key := range targetsMetadata.Delegations.Keys {
-		key := key
-		allKeys[keyID] = key
-	}
-
-	// Add keys from delegated targets metadata
-	for roleName := range s.DelegationEnvelopes {
-		delegatedMetadata, err := s.GetTargetsMetadata(roleName)
-		if err != nil {
-			return nil, err
-		}
-		for keyID, key := range delegatedMetadata.Delegations.Keys {
-			key := key
-			allKeys[keyID] = key
-		}
-	}
-
-	return allKeys, nil
-}
-
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
@@ -284,15 +236,15 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 		return nil, err
 	}
 
-	allPublicKeys := targetsMetadata.Delegations.Keys
+	allPublicKeys := targetsMetadata.GetPrincipals()
 	// each entry is a list of delegations from a particular metadata file
-	groupedDelegations := [][]tuf.Delegation{
-		targetsMetadata.Delegations.Roles,
+	groupedDelegations := [][]tuf.Rule{
+		targetsMetadata.GetRules(),
 	}
 
 	seenRoles := map[string]bool{TargetsRoleName: true}
 
-	var currentDelegationGroup []tuf.Delegation
+	var currentDelegationGroup []tuf.Rule
 	verifiers := []*Verifier{}
 	for {
 		if len(groupedDelegations) == 0 {
@@ -315,37 +267,40 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 			if delegation.Matches(path) {
 				verifier := &Verifier{
 					repository: s.repository,
-					name:       delegation.Name,
-					keys:       make([]*tuf.Key, 0, delegation.KeyIDs.Len()),
-					threshold:  delegation.Threshold,
+					name:       delegation.ID(),
+					keys:       make([]*signerverifier.SSLibKey, 0, delegation.GetPrincipalIDs().Len()),
+					threshold:  delegation.GetThreshold(),
 				}
-				for _, keyID := range delegation.KeyIDs.Contents() {
+				for _, keyID := range delegation.GetPrincipalIDs().Contents() {
 					key := allPublicKeys[keyID]
-					verifier.keys = append(verifier.keys, key)
+					// This is temporary: verifier will need to be separately
+					// updated with notions of multi-key principals where only
+					// one must be trusted
+					verifier.keys = append(verifier.keys, key.Keys()...)
 				}
 				verifiers = append(verifiers, verifier)
 
-				if _, seen := seenRoles[delegation.Name]; seen {
+				if _, seen := seenRoles[delegation.ID()]; seen {
 					continue
 				}
 
-				if s.HasTargetsRole(delegation.Name) {
-					delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+				if s.HasTargetsRole(delegation.ID()) {
+					delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID())
 					if err != nil {
 						return nil, err
 					}
 
-					seenRoles[delegation.Name] = true
+					seenRoles[delegation.ID()] = true
 
-					for keyID, key := range delegatedMetadata.Delegations.Keys {
+					for keyID, key := range delegatedMetadata.GetPrincipals() {
 						allPublicKeys[keyID] = key
 					}
 
 					// Add the current metadata's further delegations upfront to
 					// be depth-first
-					groupedDelegations = append([][]tuf.Delegation{delegatedMetadata.Delegations.Roles}, groupedDelegations...)
+					groupedDelegations = append([][]tuf.Rule{delegatedMetadata.GetRules()}, groupedDelegations...)
 
-					if delegation.Terminating {
+					if delegation.IsLastTrustedInRuleFile() {
 						// Stop processing current delegation group, but proceed
 						// with other groups
 						break
@@ -367,6 +322,7 @@ func (s *State) Verify(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// TODO: do we need this?
 	if !verifyRootKeysMatch(rootKeys, s.RootPublicKeys) {
 		return ErrUnableToMatchRootKeys
 	}
@@ -385,10 +341,11 @@ func (s *State) Verify(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if rootMetadata.GitHubApprovalsTrusted {
+	if rootMetadata.IsGitHubAppApprovalTrusted() {
 		// Check that the GitHub app role is declared
-		if _, hasRole := rootMetadata.Roles[GitHubAppRoleName]; !hasRole {
-			return ErrNoGitHubAppRoleDeclared
+		_, err := rootMetadata.GetGitHubAppPrincipals()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -417,8 +374,8 @@ func (s *State) Verify(ctx context.Context) error {
 		reachedDelegations[delegatedRoleName] = false
 	}
 
-	delegationsQueue := targetsMetadata.Delegations.Roles
-	delegationKeys := targetsMetadata.Delegations.Keys
+	delegationsQueue := targetsMetadata.GetRules()
+	delegationKeys := targetsMetadata.GetPrincipals()
 	for {
 		// The last entry in the queue is always the allow rule, which we don't
 		// process during DFS
@@ -429,33 +386,34 @@ func (s *State) Verify(ctx context.Context) error {
 		delegation := delegationsQueue[0]
 		delegationsQueue = delegationsQueue[1:]
 
-		if s.HasTargetsRole(delegation.Name) {
-			reachedDelegations[delegation.Name] = true
+		if s.HasTargetsRole(delegation.ID()) {
+			reachedDelegations[delegation.ID()] = true
 
-			env := s.DelegationEnvelopes[delegation.Name]
+			env := s.DelegationEnvelopes[delegation.ID()]
 
-			keys := []*tuf.Key{}
-			for _, keyID := range delegation.KeyIDs.Contents() {
-				keys = append(keys, delegationKeys[keyID])
+			keys := []*signerverifier.SSLibKey{}
+			for _, keyID := range delegation.GetPrincipalIDs().Contents() {
+				// This is temporary until verifiers support multi-key principals
+				keys = append(keys, delegationKeys[keyID].Keys()...)
 			}
 
 			verifier := &Verifier{
-				name:      delegation.Name,
+				name:      delegation.ID(),
 				keys:      keys,
-				threshold: delegation.Threshold,
+				threshold: delegation.GetThreshold(),
 			}
 
 			if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
 				return err
 			}
 
-			delegatedMetadata, err := s.GetTargetsMetadata(delegation.Name)
+			delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID())
 			if err != nil {
 				return err
 			}
 
-			delegationsQueue = append(delegatedMetadata.Delegations.Roles, delegationsQueue...)
-			for keyID, key := range delegatedMetadata.Delegations.Keys {
+			delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
+			for keyID, key := range delegatedMetadata.GetPrincipals() {
 				delegationKeys[keyID] = key
 			}
 		}
@@ -601,33 +559,23 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 	return nil
 }
 
-func (s *State) GetRootKeys() ([]*tuf.Key, error) {
+func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 	rootMetadata, err := s.GetRootMetadata()
 	if err != nil {
 		return nil, err
 	}
 
-	rootKeys := make([]*tuf.Key, 0, rootMetadata.Roles[RootRoleName].KeyIDs.Len())
-	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs.Contents() {
-		key, has := rootMetadata.Keys[keyID]
-		if !has {
-			return nil, tuf.ErrRootKeyNil
-		}
-
-		rootKeys = append(rootKeys, key)
-	}
-
-	return rootKeys, nil
+	return rootMetadata.GetRootPrincipals()
 }
 
 // GetRootMetadata returns the deserialized payload of the State's RootEnvelope.
-func (s *State) GetRootMetadata() (*tuf.RootMetadata, error) {
+func (s *State) GetRootMetadata() (tuf.RootMetadata, error) {
 	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
 
-	rootMetadata := &tuf.RootMetadata{}
+	rootMetadata := &tufv01.RootMetadata{}
 	if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
 		return nil, err
 	}
@@ -635,7 +583,7 @@ func (s *State) GetRootMetadata() (*tuf.RootMetadata, error) {
 	return rootMetadata, nil
 }
 
-func (s *State) GetTargetsMetadata(roleName string) (*tuf.TargetsMetadata, error) {
+func (s *State) GetTargetsMetadata(roleName string) (tuf.TargetsMetadata, error) {
 	e := s.TargetsEnvelope
 	if roleName != TargetsRoleName {
 		env, ok := s.DelegationEnvelopes[roleName]
@@ -654,7 +602,7 @@ func (s *State) GetTargetsMetadata(roleName string) (*tuf.TargetsMetadata, error
 		return nil, err
 	}
 
-	targetsMetadata := &tuf.TargetsMetadata{}
+	targetsMetadata := &tufv01.TargetsMetadata{}
 	if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
 		return nil, err
 	}
@@ -687,16 +635,16 @@ func (s *State) loadRuleNames() error {
 		return err
 	}
 
-	for _, rule := range targetsMetadata.Delegations.Roles {
-		if rule.Name == AllowRuleName {
+	for _, rule := range targetsMetadata.GetRules() {
+		if rule.ID() == tuf.AllowRuleName {
 			continue
 		}
 
-		if s.ruleNames.Has(rule.Name) {
+		if s.ruleNames.Has(rule.ID()) {
 			return tuf.ErrDuplicatedRuleName
 		}
 
-		s.ruleNames.Add(rule.Name)
+		s.ruleNames.Add(rule.ID())
 	}
 
 	if len(s.DelegationEnvelopes) == 0 {
@@ -709,16 +657,16 @@ func (s *State) loadRuleNames() error {
 			return err
 		}
 
-		for _, rule := range delegatedMetadata.Delegations.Roles {
-			if rule.Name == AllowRuleName {
+		for _, rule := range delegatedMetadata.GetRules() {
+			if rule.ID() == tuf.AllowRuleName {
 				continue
 			}
 
-			if s.ruleNames.Has(rule.Name) {
+			if s.ruleNames.Has(rule.ID()) {
 				return tuf.ErrDuplicatedRuleName
 			}
 
-			s.ruleNames.Add(rule.Name)
+			s.ruleNames.Add(rule.ID())
 		}
 	}
 
@@ -746,8 +694,8 @@ func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef str
 	delegationsToSearch := []*DelegationWithDepth{}
 	allDelegations := []*DelegationWithDepth{}
 
-	for _, topLevelDelegation := range topLevelTargetsMetadata.Delegations.Roles {
-		if topLevelDelegation.Name == AllowRuleName {
+	for _, topLevelDelegation := range topLevelTargetsMetadata.GetRules() {
+		if topLevelDelegation.ID() == tuf.AllowRuleName {
 			continue
 		}
 		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
@@ -762,23 +710,23 @@ func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef str
 		// allDelegations will be the returned list of all the delegations in pre-order traversal, no delegations will be popped off
 		allDelegations = append(allDelegations, currentDelegation)
 
-		if _, seen := seenRoles[currentDelegation.Delegation.Name]; seen {
+		if _, seen := seenRoles[currentDelegation.Delegation.ID()]; seen {
 			continue
 		}
 
-		if state.HasTargetsRole(currentDelegation.Delegation.Name) {
-			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.Name)
+		if state.HasTargetsRole(currentDelegation.Delegation.ID()) {
+			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.ID())
 			if err != nil {
 				return nil, err
 			}
 
-			seenRoles[currentDelegation.Delegation.Name] = true
+			seenRoles[currentDelegation.Delegation.ID()] = true
 
 			// We construct localDelegations first so that we preserve the order
 			// of delegations in currentMetadata in delegationsToSearch
 			localDelegations := []*DelegationWithDepth{}
-			for _, delegation := range currentMetadata.Delegations.Roles {
-				if delegation.Name == AllowRuleName {
+			for _, delegation := range currentMetadata.GetRules() {
+				if delegation.ID() == tuf.AllowRuleName {
 					continue
 				}
 				localDelegations = append(localDelegations, &DelegationWithDepth{Delegation: delegation, Depth: currentDelegation.Depth + 1})
@@ -809,7 +757,7 @@ func (s *State) hasFileRule() (bool, error) {
 		return false, err
 	}
 
-	rolesToCheck := []*tuf.TargetsMetadata{targetsRole}
+	rolesToCheck := []tuf.TargetsMetadata{targetsRole}
 
 	// This doesn't consider whether a delegated role is reachable because we
 	// don't know what artifact path this is for
@@ -822,12 +770,12 @@ func (s *State) hasFileRule() (bool, error) {
 	}
 
 	for _, role := range rolesToCheck {
-		for _, delegation := range role.Delegations.Roles {
-			if delegation.Name == AllowRuleName {
+		for _, delegation := range role.GetRules() {
+			if delegation.ID() == tuf.AllowRuleName {
 				continue
 			}
 
-			for _, path := range delegation.Paths {
+			for _, path := range delegation.GetProtectedNamespaces() {
 				if strings.HasPrefix(path, "file:") {
 					return true, nil
 				}
@@ -844,9 +792,25 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
+	keys := []*signerverifier.SSLibKey{}
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, err
+	}
+	for _, principal := range principals {
+		// TODO: this is temporary, we need to update verifier's implementation
+		// Right now, each principal has a single key
+		keys = append(keys, principal.Keys()...)
+	}
+
+	threshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Verifier{
-		keys:      s.RootPublicKeys,
-		threshold: rootMetadata.Roles[RootRoleName].Threshold,
+		keys:      keys,
+		threshold: threshold,
 	}, nil
 }
 
@@ -856,13 +820,26 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	verifier := &Verifier{keys: make([]*tuf.Key, 0, rootMetadata.Roles[TargetsRoleName].KeyIDs.Len())}
-	for _, keyID := range rootMetadata.Roles[TargetsRoleName].KeyIDs.Contents() {
-		verifier.keys = append(verifier.keys, rootMetadata.Keys[keyID])
+	keys := []*signerverifier.SSLibKey{}
+	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		return nil, err
 	}
-	verifier.threshold = rootMetadata.Roles[TargetsRoleName].Threshold
+	for _, principal := range principals {
+		// TODO: this is temporary, we need to update verifier's implementation
+		// Right now, each principal has a single key
+		keys = append(keys, principal.Keys()...)
+	}
 
-	return verifier, nil
+	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Verifier{
+		keys:      keys,
+		threshold: threshold,
+	}, nil
 }
 
 // loadStateForEntry returns the State for a specified RSL reference entry for
@@ -929,34 +906,35 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 		return nil, err
 	}
 
-	state.RootPublicKeys = make([]*tuf.Key, 0, rootMetadata.Roles[RootRoleName].KeyIDs.Len())
-	for _, keyID := range rootMetadata.Roles[RootRoleName].KeyIDs.Contents() {
-		state.RootPublicKeys = append(state.RootPublicKeys, rootMetadata.Keys[keyID])
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, err
 	}
+	state.RootPublicKeys = rootPrincipals
 
-	state.githubAppApprovalsTrusted = rootMetadata.GitHubApprovalsTrusted
+	state.githubAppApprovalsTrusted = rootMetadata.IsGitHubAppApprovalTrusted()
 
-	role, hasRole := rootMetadata.Roles[GitHubAppRoleName]
-	if hasRole {
-		state.githubAppKey = rootMetadata.Keys[role.KeyIDs.Contents()[0]] // FIXME: support thresholds
+	githubAppPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+	if err == nil {
+		state.githubAppKeys = githubAppPrincipals
 	} else if state.githubAppApprovalsTrusted {
-		return nil, ErrNoGitHubAppRoleDeclared
+		return nil, tuf.ErrGitHubAppInformationNotFoundInRoot
 	}
 
 	return state, nil
 }
 
-func verifyRootKeysMatch(keys1, keys2 []*tuf.Key) bool {
+func verifyRootKeysMatch(keys1, keys2 []tuf.Principal) bool {
 	if len(keys1) != len(keys2) {
 		return false
 	}
 
 	sort.Slice(keys1, func(i, j int) bool {
-		return keys1[i].KeyID < keys1[j].KeyID
+		return keys1[i].ID() < keys1[j].ID()
 	})
 
 	sort.Slice(keys2, func(i, j int) bool {
-		return keys2[i].KeyID < keys2[j].KeyID
+		return keys2[i].ID() < keys2[j].ID()
 	})
 
 	return reflect.DeepEqual(keys1, keys2)
