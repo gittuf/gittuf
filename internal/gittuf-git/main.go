@@ -52,15 +52,9 @@ func main() {
 	case "clone":
 		handleCommand(cmd.Clone, gitArgs)
 	case "commit":
-		err := cmd.Commit(gitArgs)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-			os.Exit(1)
-		}
-	case "push":
-		handleCommand(cmd.Push, gitArgs)
-	case "pull", "fetch":
-		handleCommand(cmd.PullOrFetch, gitArgs)
+		handleCommand(cmd.Commit, gitArgs)
+	case "pull", "fetch", "push":
+		handleCommand(cmd.SyncWithRemote, gitArgs)
 	default:
 		// If the git operation isn't one of the above ones, just send the args
 		// over to git without any gittuf invocation
