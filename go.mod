@@ -15,10 +15,10 @@ require (
 	github.com/sigstore/gitsign v0.10.2
 	github.com/sigstore/protobuf-specs v0.3.2
 	github.com/sigstore/sigstore v1.8.9
-	github.com/sigstore/sigstore-go v0.6.1
+	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
-	github.com/theupdateframework/go-tuf/v2 v2.0.1
+	github.com/theupdateframework/go-tuf/v2 v2.0.2
 	golang.org/x/crypto v0.28.0
 	google.golang.org/protobuf v1.35.1
 )
