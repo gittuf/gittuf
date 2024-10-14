@@ -8,7 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/gittuf/gittuf/internal/tuf"
+	tuf "github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -167,4 +167,52 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	rootMetadata, err = DisableGitHubAppApprovals(rootMetadata)
 	assert.Nil(t, err)
 	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+}
+
+func TestUpdateRootThreshold(t *testing.T) {
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	newRootKey1 := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	newRootKey2 := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	rootMetadata, _ = AddRootKey(rootMetadata, newRootKey1)
+	rootMetadata, _ = AddRootKey(rootMetadata, newRootKey2)
+
+	updatedRootMetadata, err := UpdateRootThreshold(rootMetadata, 4)
+	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	assert.Nil(t, updatedRootMetadata)
+
+	updatedRootMetadata, err = UpdateRootThreshold(rootMetadata, 0)
+	assert.Nil(t, err)
+	if assert.NotNil(t, updatedRootMetadata) {
+		assert.Equal(t, 0, updatedRootMetadata.Roles[RootRoleName].Threshold)
+	}
+}
+
+func TestUpdateTargetsThreshold(t *testing.T) {
+	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	rootMetadata := InitializeRootMetadata(key)
+
+	targetsKey1 := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	targetsKey2 := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+
+	rootMetadata, err := AddTargetsKey(rootMetadata, targetsKey1)
+	assert.Nil(t, err)
+	rootMetadata, err = AddTargetsKey(rootMetadata, targetsKey2)
+	assert.Nil(t, err)
+
+	updatedRootMetadata, err := UpdateTargetsThreshold(rootMetadata, 4)
+	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	assert.Nil(t, updatedRootMetadata)
+
+	updatedRootMetadata, err = UpdateTargetsThreshold(rootMetadata, 0)
+	assert.Nil(t, err)
+	if assert.NotNil(t, updatedRootMetadata) {
+		assert.Equal(t, 1, updatedRootMetadata.Roles[RootRoleName].Threshold)
+	}
 }

@@ -81,6 +81,66 @@ func TestRepositoryCommit(t *testing.T) {
 	assert.Equal(t, expectedThirdCommitID, refHead.String())
 }
 
+func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write second tree
+	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	treeWithContentsID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"README.md": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create initial commit with no tree
+	expectedInitialCommitID := "b218890d607cdcea53ebf6c640748b4b1c8015ca"
+	commitID, err := repo.CommitUsingSpecificKey(emptyTreeID, refName, "Initial commit\n", artifacts.SSHED25519Private)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedInitialCommitID, commitID.String())
+
+	refHead, err := repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedInitialCommitID, refHead.String())
+
+	// Create second commit with tree
+	expectedSecondCommitID := "2b3f8b1f6af0d0d3c37130ba4d054ff4c2e95a3a"
+	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Add README\n", artifacts.SSHED25519Private)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedSecondCommitID, commitID.String())
+
+	refHead, err = repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedSecondCommitID, refHead.String())
+
+	// Create third commit with same tree but sign this time
+	expectedThirdCommitID := "2182d7e834188d4eae222944772a6addaf099853"
+	commitID, err = repo.CommitUsingSpecificKey(treeWithContentsID, refName, "Signing this commit\n", artifacts.SSHED25519Private)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedThirdCommitID, commitID.String())
+
+	refHead, err = repo.GetReference(refName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedThirdCommitID, refHead.String())
+}
+
 func TestCommitUsingSpecificKey(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
