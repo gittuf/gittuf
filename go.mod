@@ -1,7 +1,6 @@
 module github.com/gittuf/gittuf
 
 go 1.22.7
-
 require (
 	github.com/ProtonMail/go-crypto v1.0.0
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
@@ -14,7 +13,7 @@ require (
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/sigstore/gitsign v0.10.2
 	github.com/sigstore/protobuf-specs v0.3.2
-	github.com/sigstore/sigstore v1.8.9
+	github.com/sigstore/sigstore v1.8.10
 	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
