@@ -5,13 +5,13 @@ package cmd
 import (
 	"context"
 	"fmt"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
 	"github.com/gittuf/gittuf/internal/repository"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -28,7 +28,12 @@ func determineRef(gitArgs args.Args) string {
 	if len(gitArgs.Parameters) > 1 {
 		refParts := strings.Split(gitArgs.Parameters[1], ":")
 		if len(refParts) > 0 {
-			refName = refParts[0]
+			for i := range refParts {
+				if !strings.HasPrefix(refParts[i], "-") {
+					refName = refParts[0]
+					break
+				}
+			}
 		} else {
 			refName = gitArgs.Parameters[1]
 		}
@@ -68,26 +73,27 @@ func SyncWithRemote(gitArgs args.Args) error {
 		}
 	}
 
-	// Record changes to RSL
-	repo, err := repository.LoadRepository()
-	if err != nil {
-		return err
+	if gitArgs.Command == "push" {
+		// Record changes to RSL
+		repo, err := repository.LoadRepository()
+		if err != nil {
+			return err
+		}
+
+		refName := determineRef(gitArgs)
+
+		if err := repo.RecordRSLEntryForReference(refName, true, rslopts.WithOverrideRefName(refName)); err != nil {
+			return err
+		}
 	}
 
-	refName := determineRef(gitArgs)
-
-	if err := repo.RecordRSLEntryForReference(refName, true, rslopts.WithOverrideRefName(refName)); err != nil {
-		return err
-	}
-
-	// Sync non-RSL changes
+	// Sync non-RSL changes (user specified command)
 	cmdArgs := []string{gitArgs.Command}
 	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		return err
 	}
-
 	gitSyncCmd := exec.Command(gitPath, cmdArgs...)
 	gitSyncCmd.Stdout = os.Stdout
 	gitSyncCmd.Stderr = os.Stderr
@@ -96,24 +102,51 @@ func SyncWithRemote(gitArgs args.Args) error {
 		return err
 	}
 
-	rslCmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
+	rslCmdArgs := []string{}
+	policyCmdArgs := []string{}
+	if gitArgs.Command == "pull" || gitArgs.Command == "fetch" {
+		// use git fetch to get the updates to the RSL.
+		rslCmdArgs = append(rslCmdArgs, "fetch")
+		policyCmdArgs = append(policyCmdArgs, "fetch")
+
+		// in case of a pull, the remote needs to be specified for the git
+		// fetch command in case of a simple `git pull`.
+		if gitArgs.Command == "pull" && len(gitArgs.Parameters) == 0 {
+			gitConfig, err := args.GetGitConfig(".git")
+			if err != nil {
+				fmt.Println("Error while retrieving git config")
+				return err
+			}
+			remote := gitConfig["branch.main.remote"]
+			rslCmdArgs = append(rslCmdArgs, remote)
+			policyCmdArgs = append(policyCmdArgs, remote)
+		}
+	}
+
+	if len(gitArgs.Parameters) > 0 {
+		rslCmdArgs = append(rslCmdArgs, gitArgs.Parameters...)
+	}
 	rslCmdArgs = append(rslCmdArgs, "refs/gittuf/reference-state-log:refs/gittuf/reference-state-log")
+
+	if len(gitArgs.Parameters) > 0 {
+		policyCmdArgs = append(policyCmdArgs, gitArgs.Parameters...)
+	}
+	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy:refs/gittuf/policy")
+
 	gitSyncRSLCmd := exec.Command(gitPath, rslCmdArgs...)
 	gitSyncRSLCmd.Stdout = os.Stdout
 	gitSyncRSLCmd.Stderr = os.Stderr
+
+	gitSyncPolicyCmd := exec.Command(gitPath, policyCmdArgs...)
+	gitSyncPolicyCmd.Stdout = os.Stdout
+	gitSyncPolicyCmd.Stderr = os.Stderr
 
 	if err := gitSyncRSLCmd.Run(); err != nil {
 		return err
 	}
 
-	policyCmdArgs := []string{gitArgs.Command, gitArgs.Parameters[0]}
-	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy:refs/gittuf/policy")
-	gitSyncPolicyCmd := exec.Command(gitPath, policyCmdArgs...)
-	gitSyncPolicyCmd.Stdout = os.Stdout
-	gitSyncPolicyCmd.Stderr = os.Stderr
-
 	// Sync policy changes
-	return gitSyncRSLCmd.Run()
+	return gitSyncPolicyCmd.Run()
 }
 
 // Commit handles the commit operation for gittuf + git
