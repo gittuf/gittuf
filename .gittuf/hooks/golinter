@@ -1,0 +1,4 @@
+local rootDir = getRootDir()
+print(rootDir)
+goExecute("golangci-lint run " .. rootDir)
+
