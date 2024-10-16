@@ -14,16 +14,17 @@ import (
 )
 
 const (
-	noopFlag      = "--noop"
-	versionFlag   = "--version"
-	listCmds      = "--list-cmds="
-	helpFlag      = "--help"
-	configFlag    = "-c"
-	chdirFlag     = "-C"
-	flagPrefix    = "-"
-	defaultRemote = "origin"
-	defaultGitDir = ".git"
-	gitDirFlag    = "--git-dir"
+	noopFlag       = "--noop"
+	versionFlag    = "--version"
+	listCmds       = "--list-cmds="
+	helpFlag       = "--help"
+	configFlag     = "-c"
+	chdirFlag      = "-C"
+	gitDirFlag     = "--git-dir"
+	flagPrefix     = "-"
+	defaultRemote  = "origin"
+	defaultGitDir  = ".git"
+	defaultRootDir = "."
 )
 
 // Args stores any global flags for the invocation of Git (i.e. those before the
@@ -36,6 +37,7 @@ type Args struct {
 	ConfigIdx   int
 	ChdirIdx    int
 	GitDir      string
+	RootDir     string
 }
 
 // ProcessArgs takes in the arguments from the commandline, and then nicely
@@ -54,8 +56,10 @@ func ProcessArgs(args []string) Args {
 	cmdIndex, configIndex, chdirIndex, girDirIndex := locateCommand(args)
 
 	gitDir := defaultGitDir
+	RootDir := defaultRootDir
 	if chdirIndex > 0 {
 		gitDir = args[chdirIndex] + "/" + defaultGitDir
+		RootDir = args[chdirIndex]
 	}
 
 	if girDirIndex > 0 {
@@ -69,6 +73,7 @@ func ProcessArgs(args []string) Args {
 		ConfigIdx:   configIndex,
 		ChdirIdx:    chdirIndex,
 		GitDir:      gitDir,
+		RootDir:     RootDir,
 	}
 }
 
