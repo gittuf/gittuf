@@ -19,6 +19,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.9.0
 	github.com/theupdateframework/go-tuf/v2 v2.0.1
+	github.com/yuin/gopher-lua v1.1.1
 	golang.org/x/crypto v0.28.0
 	google.golang.org/protobuf v1.35.1
 )
