@@ -247,7 +247,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,7 +310,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	}
 	state.RootEnvelope = rootEnv
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +354,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	}
 	state.RootEnvelope = rootEnv
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +481,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	state := createTestStateWithPolicy(t)
 
 	rootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}

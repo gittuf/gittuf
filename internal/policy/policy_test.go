@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +37,7 @@ func TestLoadState(t *testing.T) {
 
 		assertStatesEqual(t, state, loadedState)
 
-		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +122,7 @@ func TestLoadState(t *testing.T) {
 
 		assertStatesEqual(t, state, loadedState)
 
-		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +219,7 @@ func TestLoadFirstState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +324,7 @@ func TestStateGetRootMetadata(t *testing.T) {
 	t.Parallel()
 	state := createTestStateWithOnlyRoot(t)
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(true)
 	assert.Nil(t, err)
 
 	rootPrincipals, err := rootMetadata.GetRootPrincipals()
@@ -440,7 +441,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,27 +498,27 @@ func TestListRules(t *testing.T) {
 
 		expectedRules := []*DelegationWithDepth{
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "protect-main",
 					Paths:       []string{"git:refs/heads/main"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
 					},
 				},
 				Depth: 0,
 			},
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "protect-files-1-and-2",
 					Paths:       []string{"file:1", "file:2"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
 					},
 				},
 				Depth: 0,
@@ -534,54 +535,54 @@ func TestListRules(t *testing.T) {
 
 		expectedRules := []*DelegationWithDepth{
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "1",
 					Paths:       []string{"file:1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
+						Threshold:    1,
 					},
 				},
 				Depth: 0,
 			},
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "3",
 					Paths:       []string{"file:1/subpath1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
 					},
 				},
 				Depth: 1,
 			},
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "4",
 					Paths:       []string{"file:1/subpath2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
 					},
 				},
 				Depth: 1,
 			},
 
 			{
-				Delegation: &tufv01.Delegation{
+				Delegation: &tufv02.Delegation{
 					Name:        "2",
 					Paths:       []string{"file:2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tufv01.Role{
-						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
-						Threshold: 1,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
+						Threshold:    1,
 					},
 				},
 				Depth: 0,
@@ -618,7 +619,7 @@ func TestApply(t *testing.T) {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -37,7 +37,7 @@ func TestInitializeTargets(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
 		assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
 	})
@@ -76,7 +76,7 @@ func TestAddDelegation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
 		assert.Equal(t, 2, len(targetsMetadata.GetRules()))
@@ -90,7 +90,7 @@ func TestAddDelegation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+		targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
 		assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 		assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
@@ -133,7 +133,7 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestReorderDelegations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestRemoveDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 3, len(targetsMetadata.GetRules()))
@@ -223,7 +223,7 @@ func TestRemoveDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
@@ -249,7 +249,7 @@ func TestAddKeyToTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
 	assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
@@ -262,7 +262,7 @@ func TestAddKeyToTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName)
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
 }

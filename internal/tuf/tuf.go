@@ -25,6 +25,8 @@ const (
 
 var (
 	ErrInvalidRootMetadata                      = errors.New("invalid root metadata")
+	ErrUnknownRootMetadataVersion               = errors.New("unknown schema version for root metadata")
+	ErrUnknownTargetsMetadataVersion            = errors.New("unknown schema version for rule file metadata")
 	ErrPrimaryRuleFileInformationNotFoundInRoot = errors.New("root metadata does not contain primary rule file information")
 	ErrGitHubAppInformationNotFoundInRoot       = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
 	ErrDuplicatedRuleName                       = errors.New("two rules with same name found in policy")
