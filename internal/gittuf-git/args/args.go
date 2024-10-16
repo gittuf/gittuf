@@ -181,7 +181,7 @@ func locateCommand(args []string) (int, int, int, int) {
 			skip = false
 		case arg == versionFlag || arg == helpFlag || arg == gitDirFlag ||
 			strings.HasPrefix(arg, listCmds) || !strings.HasPrefix(arg, flagPrefix):
-			// If the arg is the verion flag, a help / list cmd flag, or does
+			// If the arg is the version flag, a help / list cmd flag, or does
 			// not have the "-" prefix, we've reached the location of the
 			// operation.
 			return idx, config, chdir, gitDirInd

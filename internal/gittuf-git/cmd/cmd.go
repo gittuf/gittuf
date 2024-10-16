@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,8 +36,8 @@ func Clone(gitArgs args.Args) error {
 	return err
 }
 
-// PullOrFetch handles the pull or fetch operation for gittuf + git
-func PullOrFetch(gitArgs args.Args) error {
+// SyncWithRemote handles the pull, fetch and push operations for gittuf + git
+func SyncWithRemote(gitArgs args.Args) error {
 	// Set working directory as needed
 	if gitArgs.ChdirIdx > 0 {
 		if err := os.Chdir(gitArgs.GlobalFlags[gitArgs.ChdirIdx]); err != nil {
@@ -44,76 +45,107 @@ func PullOrFetch(gitArgs args.Args) error {
 		}
 	}
 
-	// Pull non-RSL changes
+	if gitArgs.Command == "push" {
+		// Record changes to RSL
+		repo, err := repository.LoadRepository()
+		if err != nil {
+			return err
+		}
+
+		refName := determineRef(gitArgs)
+
+		if err := repo.RecordRSLEntryForReference(refName, true, rslopts.WithOverrideRefName(refName)); err != nil {
+			return err
+		}
+	}
+
+	// Sync non-RSL changes (user specified command)
 	cmdArgs := []string{gitArgs.Command}
 	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		return err
 	}
+	gitSyncCmd := exec.Command(gitPath, cmdArgs...)
+	gitSyncCmd.Stdout = os.Stdout
+	gitSyncCmd.Stderr = os.Stderr
 
-	gitPullCmd := exec.Command(gitPath, cmdArgs...)
-	gitPullCmd.Stdout = os.Stdout
-	gitPullCmd.Stderr = os.Stderr
-
-	if err := gitPullCmd.Run(); err != nil {
+	if err := gitSyncCmd.Run(); err != nil {
 		return err
 	}
 
-	// Pull RSL changes
-	remote, err := args.DetermineRemote(gitArgs.Parameters, gitArgs.GitDir)
-	if err != nil {
-		return err
+	rslCmdArgs := []string{}
+	policyCmdArgs := []string{}
+	if gitArgs.Command == "pull" || gitArgs.Command == "fetch" {
+		// use git fetch to get the updates to the RSL.
+		rslCmdArgs = append(rslCmdArgs, "fetch")
+		policyCmdArgs = append(policyCmdArgs, "fetch")
+
+		// in case of a pull, the remote needs to be specified for the git
+		// fetch command in case of a simple `git pull`.
+		if gitArgs.Command == "pull" && len(gitArgs.Parameters) == 0 {
+			gitConfig, err := args.GetGitConfig(".git")
+			if err != nil {
+				fmt.Println("Error while retrieving git config")
+				return err
+			}
+			remote := gitConfig["branch.main.remote"]
+			rslCmdArgs = append(rslCmdArgs, remote)
+			policyCmdArgs = append(policyCmdArgs, remote)
+		}
 	}
-	repo, err := repository.LoadRepository()
-	if err != nil {
+
+	if len(gitArgs.Parameters) > 0 {
+		rslCmdArgs = append(rslCmdArgs, gitArgs.Parameters...)
+	}
+	rslCmdArgs = append(rslCmdArgs, "refs/gittuf/reference-state-log:refs/gittuf/reference-state-log")
+
+	if len(gitArgs.Parameters) > 0 {
+		policyCmdArgs = append(policyCmdArgs, gitArgs.Parameters...)
+	}
+	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy:refs/gittuf/policy")
+
+	gitSyncRSLCmd := exec.Command(gitPath, rslCmdArgs...)
+	gitSyncRSLCmd.Stdout = os.Stdout
+	gitSyncRSLCmd.Stderr = os.Stderr
+
+	gitSyncPolicyCmd := exec.Command(gitPath, policyCmdArgs...)
+	gitSyncPolicyCmd.Stdout = os.Stdout
+	gitSyncPolicyCmd.Stderr = os.Stderr
+
+	if err := gitSyncRSLCmd.Run(); err != nil {
 		return err
 	}
 
-	if err := repo.PullRSL(remote); err != nil {
-		return err
-	}
-
-	// Pull policy changes
-	return repo.PullPolicy(remote)
+	// Sync policy changes
+	return gitSyncPolicyCmd.Run()
 }
 
-// Push handles the push operation for gittuf + git
-func Push(gitArgs args.Args) error {
-	// Set working directory as needed
+// Commit handles the commit operation for gittuf + git
+func Commit(gitArgs args.Args) error {
 	if gitArgs.ChdirIdx > 0 {
 		if err := os.Chdir(gitArgs.GlobalFlags[gitArgs.ChdirIdx]); err != nil {
 			return err
 		}
 	}
 
-	// Record changes to the RSL
+	// verify policy
 	repo, err := repository.LoadRepository()
 	if err != nil {
 		return err
 	}
-
-	var refName string
-	if len(gitArgs.Parameters) > 1 {
-		refParts := strings.Split(gitArgs.Parameters[1], ":")
-		if len(refParts) > 0 {
-			refName = refParts[0]
-		} else {
-			refName = gitArgs.Parameters[1]
-		}
+	refName := determineRef(gitArgs)
+	if err = repo.VerifyRef(context.Background(), refName); err != nil {
+		fmt.Println("Verification unsuccessful with error: ", err)
 	} else {
-		refName = "HEAD"
+		fmt.Println("Verification success")
 	}
 
-	// TODO: This needs to record the appropriate reference being pushed.
-	if err := repo.RecordRSLEntryForReference(refName, true, rslopts.WithOverrideRefName(refName)); err != nil {
-		return err
-	}
-
-	// Push non-RSL changes to the remote
+	// Commit irrespective of failed verification. However, verification is
+	// important for debugging purposes. The user should be able to keep
+	// track of whether and why verification is failing.
 	cmdArgs := []string{gitArgs.Command}
 	cmdArgs = append(cmdArgs, gitArgs.Parameters...)
-
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		return err
@@ -127,19 +159,33 @@ func Push(gitArgs args.Args) error {
 		return err
 	}
 
-	// Push RSL changes to the remote
-	remote, err := args.DetermineRemote(gitArgs.Parameters, gitArgs.GitDir)
-	if err != nil {
-		return err
-	}
-
-	if err := repo.PushRSL(remote); err != nil {
-		return err
-	}
-
-	if err := repo.PushPolicy(remote); err != nil {
-		return err
-	}
-
 	return nil
+}
+
+// determineRef parses the git reference from the given command-line arguments.
+//
+// Parameters:
+//   gitArgs (args.Args): Struct containing the command-line arguments passed to the Git command.
+//
+// Returns:
+//   string: The Git reference name or "HEAD" if no reference is provided.
+
+func determineRef(gitArgs args.Args) string {
+	var refName string
+	if len(gitArgs.Parameters) > 1 {
+		refParts := strings.Split(gitArgs.Parameters[1], ":")
+		if len(refParts) > 0 {
+			for i := range refParts {
+				if !strings.HasPrefix(refParts[i], "-") {
+					refName = refParts[0]
+					break
+				}
+			}
+		} else {
+			refName = gitArgs.Parameters[1]
+		}
+	} else {
+		refName = "HEAD"
+	}
+	return refName
 }
