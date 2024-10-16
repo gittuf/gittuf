@@ -10,10 +10,13 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
+	lua "github.com/gittuf/gittuf/internal/lua-sandbox"
 	"github.com/gittuf/gittuf/internal/repository"
 	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
+
+const gittufHooksDir = ".gittuf/hooks"
 
 // Clone handles the clone operation for gittuf + git
 func Clone(gitArgs args.Args) error {
@@ -129,6 +132,19 @@ func Commit(gitArgs args.Args) error {
 		}
 	}
 
+	// Lua test
+	L, err := lua.NewLuaEnvironment()
+	if err != nil {
+		return err
+	}
+
+	defer L.Close()
+
+	if _, err := os.Stat(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err == nil {
+		if err := L.DoFile(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err != nil {
+			return fmt.Errorf("failed to load Lua script: %w", err)
+		}
+	}
 	// verify policy
 	repo, err := repository.LoadRepository()
 	if err != nil {
