@@ -74,7 +74,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -111,8 +111,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Adding rule to rule file...")
-	targetsMetadata, err = policy.AddDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, threshold)
-	if err != nil {
+	if err := targetsMetadata.AddRule(ruleName, authorizedKeys, rulePatterns, threshold); err != nil {
 		return err
 	}
 
@@ -141,7 +140,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
 // policy.
-func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []*tuf.Key, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -173,8 +172,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Updating rule in rule file...")
-	targetsMetadata, err = policy.UpdateDelegation(targetsMetadata, ruleName, authorizedKeys, rulePatterns, threshold)
-	if err != nil {
+	if err := targetsMetadata.UpdateRule(ruleName, authorizedKeys, rulePatterns, threshold); err != nil {
 		return err
 	}
 
@@ -226,8 +224,7 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 	}
 
 	slog.Debug("Reordering rules in rule file...")
-	targetsMetadata, err = policy.ReorderDelegations(targetsMetadata, ruleNames)
-	if err != nil {
+	if err := targetsMetadata.ReorderRules(ruleNames); err != nil {
 		return err
 	}
 
@@ -284,8 +281,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Removing rule from rule file...")
-	targetsMetadata, err = policy.RemoveDelegation(targetsMetadata, ruleName)
-	if err != nil {
+	if err := targetsMetadata.RemoveRule(ruleName); err != nil {
 		return err
 	}
 
@@ -314,7 +310,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 
 // AddKeyToTargets is the interface for a user to add a trusted key to the
 // gittuf policy.
-func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []*tuf.Key, signCommit bool) error {
+func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []tuf.Principal, signCommit bool) error {
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -336,7 +332,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 
 	keyIDs := ""
 	for _, key := range authorizedKeys {
-		keyIDs += fmt.Sprintf("\n%s:%s", key.KeyType, key.KeyID)
+		keyIDs += fmt.Sprintf("\n%s", key.ID())
 	}
 
 	slog.Debug("Loading current rule file...")
@@ -345,10 +341,11 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 		return err
 	}
 
-	slog.Debug("Adding rule to rule file...")
-	targetsMetadata, err = policy.AddKeyToTargets(targetsMetadata, authorizedKeys)
-	if err != nil {
-		return err
+	slog.Debug("Adding key to rule file...")
+	for _, authorizedKey := range authorizedKeys {
+		if err := targetsMetadata.AddPrincipal(authorizedKey); err != nil {
+			return err
+		}
 	}
 
 	env, err := dsse.CreateEnvelope(targetsMetadata)

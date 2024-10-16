@@ -17,6 +17,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -767,8 +769,8 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		approverKey := ssh.NewKeyFromBytes(t, targets2PubKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
+		approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes)) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []tuf.Principal{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -786,7 +788,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKey.KeyID, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKeys[0].ID(), refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
@@ -822,11 +824,12 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		approver1Key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations
+		approver1KeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes) // expected approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations
 		if err != nil {
 			t.Fatal(err)
 		}
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approver1Key}, nil)
+		approver1Key := tufv01.NewKeyFromSSLibKey(approver1KeyR)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []tuf.Principal{approver1Key}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -844,7 +847,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKey.KeyID, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKeys[0].ID(), refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
@@ -904,8 +907,8 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		approverKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes) // WRONG approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []*tuf.Key{approverKey}, nil)
+		approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes)) // WRONG approver key in policy per createTestStateWithThresholdPolicyAndGitHubAppTrust
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []tuf.Principal{approverKey}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -923,7 +926,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKey.KeyID, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppKeys[0].ID(), refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
@@ -1052,9 +1055,12 @@ func TestStateVerifyNewState(t *testing.T) {
 		// Create invalid state
 		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
 
-		key := signer.MetadataKey()
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
-		rootMetadata := InitializeRootMetadata(key)
+		rootMetadata, err := InitializeRootMetadata(key)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 		if err != nil {
@@ -1065,7 +1071,7 @@ func TestStateVerifyNewState(t *testing.T) {
 			t.Fatal(err)
 		}
 		newPolicy := &State{
-			RootPublicKeys:      []*tuf.Key{key},
+			RootPublicKeys:      []tuf.Principal{key},
 			RootEnvelope:        rootEnv,
 			DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
 		}
@@ -1127,7 +1133,7 @@ func TestVerifier(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		keys        []*tuf.Key
+		keys        []*signerverifier.SSLibKey
 		threshold   int
 		gitObjectID gitinterface.Hash
 		attestation *sslibdsse.Envelope
@@ -1135,73 +1141,73 @@ func TestVerifier(t *testing.T) {
 		expectedError error
 	}{
 		"commit, no attestation, valid key, threshold 1": {
-			keys:        []*tuf.Key{gpgKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey},
 			threshold:   1,
 			gitObjectID: commitID,
 		},
 		"commit, no attestation, valid key, threshold 2": {
-			keys:          []*tuf.Key{gpgKey},
+			keys:          []*signerverifier.SSLibKey{gpgKey},
 			threshold:     2,
 			gitObjectID:   commitID,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"commit, attestation, valid key, threshold 1": {
-			keys:        []*tuf.Key{gpgKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey},
 			threshold:   1,
 			gitObjectID: commitID,
 			attestation: attestation,
 		},
 		"commit, attestation, valid keys, threshold 2": {
-			keys:        []*tuf.Key{gpgKey, rootPubKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey},
 			threshold:   2,
 			gitObjectID: commitID,
 			attestation: attestation,
 		},
 		"commit, invalid signed attestation, threshold 2": {
-			keys:          []*tuf.Key{gpgKey, rootPubKey},
+			keys:          []*signerverifier.SSLibKey{gpgKey, rootPubKey},
 			threshold:     2,
 			gitObjectID:   commitID,
 			attestation:   invalidAttestation,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"commit, attestation, valid keys, threshold 3": {
-			keys:        []*tuf.Key{gpgKey, rootPubKey, targetsPubKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey, targetsPubKey},
 			threshold:   3,
 			gitObjectID: commitID,
 			attestation: attestationWithTwoSigs,
 		},
 		"tag, no attestation, valid key, threshold 1": {
-			keys:        []*tuf.Key{gpgKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey},
 			threshold:   1,
 			gitObjectID: tagID,
 		},
 		"tag, no attestation, valid key, threshold 2": {
-			keys:          []*tuf.Key{gpgKey},
+			keys:          []*signerverifier.SSLibKey{gpgKey},
 			threshold:     2,
 			gitObjectID:   tagID,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"tag, attestation, valid key, threshold 1": {
-			keys:        []*tuf.Key{gpgKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey},
 			threshold:   1,
 			gitObjectID: tagID,
 			attestation: attestation,
 		},
 		"tag, attestation, valid keys, threshold 2": {
-			keys:        []*tuf.Key{gpgKey, rootPubKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey},
 			threshold:   2,
 			gitObjectID: tagID,
 			attestation: attestation,
 		},
 		"tag, invalid signed attestation, threshold 2": {
-			keys:          []*tuf.Key{gpgKey, rootPubKey},
+			keys:          []*signerverifier.SSLibKey{gpgKey, rootPubKey},
 			threshold:     2,
 			gitObjectID:   tagID,
 			attestation:   invalidAttestation,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"tag, attestation, valid keys, threshold 3": {
-			keys:        []*tuf.Key{gpgKey, rootPubKey, targetsPubKey},
+			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey, targetsPubKey},
 			threshold:   3,
 			gitObjectID: tagID,
 			attestation: attestationWithTwoSigs,

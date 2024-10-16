@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
@@ -36,9 +37,9 @@ func LoadRepository() (*Repository, error) {
 	}, nil
 }
 
-func isKeyAuthorized(authorizedKeyIDs []string, keyID string) bool {
+func isKeyAuthorized(authorizedKeyIDs []tuf.Principal, keyID string) bool {
 	for _, k := range authorizedKeyIDs {
-		if k == keyID {
+		if k.ID() == keyID {
 			return true
 		}
 	}

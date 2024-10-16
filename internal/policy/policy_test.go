@@ -15,6 +15,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,8 +41,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-1", []tuf.Principal{}, []string{""}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -67,8 +68,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []tuf.Principal{}, []string{""}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -126,8 +126,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-1", []tuf.Principal{}, []string{""}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -154,8 +153,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []tuf.Principal{}, []string{""}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -224,8 +222,7 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1) // just a dummy rule
-	if err != nil {
+	if err := targetsMetadata.AddRule("new-rule", []tuf.Principal{}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
 
@@ -266,37 +263,6 @@ func TestLoadStateForEntry(t *testing.T) {
 	}
 
 	assertStatesEqual(t, state, loadedState)
-}
-
-func TestStateKeys(t *testing.T) {
-	t.Run("state with delegated policies", func(t *testing.T) {
-		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
-		// coverage to cover s.DelegationEnvelopes in PublicKeys()
-
-		expectedKeys := map[string]*tuf.Key{}
-		rootKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
-		expectedKeys[rootKey.KeyID] = rootKey
-
-		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expectedKeys[gpgKey.KeyID] = gpgKey
-
-		keys, err := state.PublicKeys()
-		assert.Nil(t, err, keys)
-		assert.Equal(t, expectedKeys, keys)
-	})
-
-	t.Run("state with only root", func(t *testing.T) {
-		state := createTestStateWithOnlyRoot(t)
-
-		expectedKeys := map[string]*tuf.Key(nil)
-
-		keys, err := state.PublicKeys()
-		assert.Nil(t, err, keys)
-		assert.Equal(t, expectedKeys, keys)
-	})
 }
 
 func TestStateVerify(t *testing.T) {
@@ -359,7 +325,10 @@ func TestStateGetRootMetadata(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata()
 	assert.Nil(t, err)
-	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootMetadata.Roles[RootRoleName].KeyIDs.Contents()[0])
+
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	assert.Nil(t, err)
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootPrincipals[0].ID())
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
@@ -379,7 +348,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 				path: "file:1/*",
 				verifiers: []*Verifier{{
 					name:      "1",
-					keys:      []*tuf.Key{key},
+					keys:      []*signerverifier.SSLibKey{key},
 					threshold: 1,
 				}},
 			},
@@ -387,7 +356,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 				path: "file:2/*",
 				verifiers: []*Verifier{{
 					name:      "2",
-					keys:      []*tuf.Key{key},
+					keys:      []*signerverifier.SSLibKey{key},
 					threshold: 1,
 				}},
 			},
@@ -475,12 +444,12 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	keyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []string{"*"}, 1) // just a dummy rule
-	if err != nil {
+	key := tufv01.NewKeyFromSSLibKey(keyR)
+	if err := targetsMetadata.AddRule("new-rule", []tuf.Principal{key}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
 
@@ -528,12 +497,12 @@ func TestListRules(t *testing.T) {
 
 		expectedRules := []*DelegationWithDepth{
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "protect-main",
 					Paths:       []string{"git:refs/heads/main"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
@@ -541,12 +510,12 @@ func TestListRules(t *testing.T) {
 				Depth: 0,
 			},
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "protect-files-1-and-2",
 					Paths:       []string{"file:1", "file:2"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
@@ -565,12 +534,12 @@ func TestListRules(t *testing.T) {
 
 		expectedRules := []*DelegationWithDepth{
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "1",
 					Paths:       []string{"file:1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
 						Threshold: 1,
 					},
@@ -578,12 +547,12 @@ func TestListRules(t *testing.T) {
 				Depth: 0,
 			},
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "3",
 					Paths:       []string{"file:1/subpath1/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
@@ -591,12 +560,12 @@ func TestListRules(t *testing.T) {
 				Depth: 1,
 			},
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "4",
 					Paths:       []string{"file:1/subpath2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
 						Threshold: 1,
 					},
@@ -605,12 +574,12 @@ func TestListRules(t *testing.T) {
 			},
 
 			{
-				Delegation: tuf.Delegation{
+				Delegation: &tufv01.Delegation{
 					Name:        "2",
 					Paths:       []string{"file:2/*"},
 					Terminating: false,
 					Custom:      nil,
-					Role: tuf.Role{
+					Role: tufv01.Role{
 						KeyIDs:    set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
 						Threshold: 1,
 					},
@@ -645,7 +614,7 @@ func TestStateHasFileRule(t *testing.T) {
 func TestApply(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -654,8 +623,7 @@ func TestApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
-	if err != nil {
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
 		t.Fatal(err)
 	}
 

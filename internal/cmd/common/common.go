@@ -17,7 +17,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/spf13/cobra"
 )
 
@@ -45,17 +46,17 @@ func (p *PublicKeys) Type() string {
 	return "public-keys"
 }
 
-// LoadPublicKey returns a tuf.Key object for a PGP / Sigstore Fulcio / SSH
-// (on-disk) key for use in gittuf metadata.
-func LoadPublicKey(key string) (*tuf.Key, error) {
+// LoadPublicKey returns a signerverifier.SSLibKey object for a PGP / Sigstore
+// Fulcio / SSH (on-disk) key for use in gittuf metadata.
+func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	var (
-		keyObj *tuf.Key
+		keyObj *signerverifier.SSLibKey
 		err    error
 	)
 
 	switch {
-	case strings.HasPrefix(key, GPGKeyPrefix):
-		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(key, GPGKeyPrefix)))
+	case strings.HasPrefix(keyRef, GPGKeyPrefix):
+		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(keyRef, GPGKeyPrefix)))
 
 		command := exec.Command("gpg", "--export", "--armor", fingerprint)
 		stdOut, err := command.Output()
@@ -67,30 +68,30 @@ func LoadPublicKey(key string) (*tuf.Key, error) {
 		if err != nil {
 			return nil, err
 		}
-	case strings.HasPrefix(key, FulcioPrefix):
-		keyID := strings.TrimPrefix(key, FulcioPrefix)
+	case strings.HasPrefix(keyRef, FulcioPrefix):
+		keyID := strings.TrimPrefix(keyRef, FulcioPrefix)
 		ks := strings.Split(keyID, "::")
 		if len(ks) != 2 {
 			return nil, fmt.Errorf("incorrect format for fulcio identity")
 		}
 
-		keyObj = &sslibsv.SSLibKey{
+		keyObj = &signerverifier.SSLibKey{
 			KeyID:   keyID,
 			KeyType: sigstore.KeyType,
 			Scheme:  sigstore.KeyScheme,
-			KeyVal: sslibsv.KeyVal{
+			KeyVal: signerverifier.KeyVal{
 				Identity: ks[0],
 				Issuer:   ks[1],
 			},
 		}
 	default:
-		keyObj, err = ssh.NewKeyFromFile(key)
+		keyObj, err = ssh.NewKeyFromFile(keyRef)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return keyObj, nil
+	return tufv01.NewKeyFromSSLibKey(keyObj), nil
 }
 
 // LoadSigner loads a metadata signer for the specified key bytes. Currently,

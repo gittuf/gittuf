@@ -14,8 +14,9 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	ita "github.com/in-toto/attestation/go/v1"
-	sslibsv "github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,12 +24,12 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 
-	approvers := []*sslibsv.SSLibKey{
-		{
+	approvers := []tuf.Principal{
+		&tufv01.Key{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
 			KeyType: sigstore.KeyType,
 			Scheme:  sigstore.KeyScheme,
-			KeyVal: sslibsv.KeyVal{
+			KeyVal: signerverifier.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
 			},
@@ -58,7 +59,7 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.Equal(t, predicate[targetTreeIDKey], testID)
 	assert.Equal(t, predicate[fromRevisionIDKey], testID)
 	// FIXME: this is a really messy assertion
-	assert.Equal(t, approvers[0].KeyID, predicate["approvers"].([]any)[0].(map[string]any)["keyid"])
+	assert.Equal(t, approvers[0].ID(), predicate["approvers"].([]any)[0].(map[string]any)["keyid"])
 }
 
 func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
@@ -69,12 +70,12 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseHost := "github.com"
 	appName := "github"
 
-	approvers := []*sslibsv.SSLibKey{
-		{
+	approvers := []tuf.Principal{
+		&tufv01.Key{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
 			KeyType: sigstore.KeyType,
 			Scheme:  sigstore.KeyScheme,
-			KeyVal: sslibsv.KeyVal{
+			KeyVal: signerverifier.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
 			},
@@ -112,12 +113,12 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseURL := "https://github.com"
 	appName := "github"
 
-	approvers := []*sslibsv.SSLibKey{
-		{
+	approvers := []tuf.Principal{
+		&tufv01.Key{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
 			KeyType: sigstore.KeyType,
 			Scheme:  sigstore.KeyScheme,
-			KeyVal: sslibsv.KeyVal{
+			KeyVal: signerverifier.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
 			},
@@ -155,12 +156,12 @@ func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
 
-	approvers := []*sslibsv.SSLibKey{
-		{
+	approvers := []tuf.Principal{
+		&tufv01.Key{
 			KeyID:   "jane.doe@example.com::https://oidc.example.com",
 			KeyType: sigstore.KeyType,
 			Scheme:  sigstore.KeyScheme,
-			KeyVal: sslibsv.KeyVal{
+			KeyVal: signerverifier.KeyVal{
 				Identity: "jane.doe@example.com",
 				Issuer:   "https://oidc.example.com",
 			},
@@ -180,7 +181,7 @@ func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.ErrorIs(t, err, ErrInvalidAuthorization)
 }
 
-func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []*tuf.Key) *sslibdsse.Envelope {
+func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []tuf.Principal) *sslibdsse.Envelope {
 	t.Helper()
 
 	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, nil)

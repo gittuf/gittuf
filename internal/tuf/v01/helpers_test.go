@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package tuf
+package v01
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
@@ -21,12 +22,14 @@ var (
 func initialTestRootMetadata(t *testing.T) *RootMetadata {
 	t.Helper()
 
-	rootKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+	rootKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 	rootMetadata := NewRootMetadata()
 	rootMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
-	rootMetadata.AddKey(rootKey)
+	if err := rootMetadata.addKey(rootKey); err != nil {
+		t.Fatal(err)
+	}
 
-	rootMetadata.AddRole(RootRoleName, Role{
+	rootMetadata.addRole(tuf.RootRoleName, Role{
 		KeyIDs:    set.NewSetFromItems(rootKey.KeyID),
 		Threshold: 1,
 	})
@@ -39,6 +42,6 @@ func initialTestTargetsMetadata(t *testing.T) *TargetsMetadata {
 
 	targetsMetadata := NewTargetsMetadata()
 	targetsMetadata.SetExpires(time.Now().AddDate(1, 0, 0).Format(time.RFC3339))
-	targetsMetadata.Delegations.AddDelegation(AllowRule())
+	targetsMetadata.Delegations = &Delegations{Roles: []*Delegation{AllowRule()}}
 	return targetsMetadata
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 )
 
 var (
@@ -65,7 +66,7 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-	targetsPubKey := targetsSigner.MetadataKey()
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false); err != nil {
 		t.Fatal(err)
@@ -75,12 +76,13 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 		t.Fatal(err)
 	}
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []tuf.Principal{gpgKey}, []string{"git:refs/heads/main"}, 1, false); err != nil {
 		t.Fatal(err)
 	}
 

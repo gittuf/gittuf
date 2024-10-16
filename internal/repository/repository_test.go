@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +43,7 @@ func TestUnauthorizedKey(t *testing.T) {
 	}
 
 	t.Run("test add targets key", func(t *testing.T) {
-		key := targetsSigner.MetadataKey()
+		key := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 		err := r.AddTopLevelTargetsKey(testCtx, targetsSigner, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)

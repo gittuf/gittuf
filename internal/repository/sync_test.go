@@ -13,6 +13,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,7 @@ func TestClone(t *testing.T) {
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-	targetsPubKey := targetsSigner.MetadataKey()
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 	remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
 	remoteRepo := &Repository{r: remoteR}
@@ -212,10 +213,10 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		rootPublicKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
-		targetsPublicKey := ssh.NewKeyFromBytes(t, targetsPubKeyBytes)
+		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+		targetsPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
-		repo, err := Clone(testCtx, remoteTmpDir, "", "", []*tuf.Key{targetsPublicKey, rootPublicKey})
+		repo, err := Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{targetsPublicKey, rootPublicKey})
 		assert.Nil(t, err)
 
 		head, err := repo.r.GetReference("HEAD")
@@ -236,14 +237,15 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		badPublicKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		badPublicKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 		if err != nil {
 			t.Fatal(err)
 		}
+		badPublicKey := tufv01.NewKeyFromSSLibKey(badPublicKeyR)
 
-		rootPublicKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
-		_, err = Clone(testCtx, remoteTmpDir, "", "", []*tuf.Key{rootPublicKey, badPublicKey})
+		_, err = Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{rootPublicKey, badPublicKey})
 		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
 	})
 }

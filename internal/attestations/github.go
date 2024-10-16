@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -92,11 +93,11 @@ func GitHubPullRequestAttestationPath(refName, commitID string) string {
 // inside the predicate (defined here).
 type GitHubPullRequestApprovalAttestation struct {
 	// Approvers contains the list of currently applicable approvers.
-	Approvers []*tuf.Key `json:"approvers"`
+	Approvers []*tufv01.Key `json:"approvers"`
 
 	// DismissedApprovers contains the list of approvers who then dismissed
 	// their approval.
-	DismissedApprovers []*tuf.Key `json:"dismissedApprovers"`
+	DismissedApprovers []*tufv01.Key `json:"dismissedApprovers"`
 
 	*ReferenceAuthorization
 }
@@ -106,7 +107,7 @@ type GitHubPullRequestApprovalAttestation struct {
 // embedded in an in-toto "statement" and returned with the appropriate
 // "predicate type" set. The `fromTargetID` and `toTargetID` specify the change
 // to `targetRef` that is approved on the corresponding GitHub pull request.
-func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers []*tuf.Key, dismissedApprovers []*tuf.Key) (*ita.Statement, error) {
+func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers, dismissedApprovers []tuf.Principal) (*ita.Statement, error) {
 	if len(approvers) == 0 && len(dismissedApprovers) == 0 {
 		return nil, ErrInvalidGitHubPullRequestApprovalAttestation
 	}
@@ -114,14 +115,32 @@ func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTr
 	approvers = getFilteredSetOfApprovers(approvers)
 	dismissedApprovers = getFilteredSetOfApprovers(dismissedApprovers)
 
+	approversTyped := make([]*tufv01.Key, 0, len(approvers))
+	for _, approver := range approvers {
+		approverTyped, isKnownType := approver.(*tufv01.Key)
+		if !isKnownType {
+			return nil, tuf.ErrInvalidPrincipalType
+		}
+		approversTyped = append(approversTyped, approverTyped)
+	}
+
+	dismissedApproversTyped := make([]*tufv01.Key, 0, len(dismissedApprovers))
+	for _, dismissedApprover := range dismissedApprovers {
+		dismissedApproverTyped, isKnownType := dismissedApprover.(*tufv01.Key)
+		if !isKnownType {
+			return nil, tuf.ErrInvalidPrincipalType
+		}
+		dismissedApproversTyped = append(dismissedApproversTyped, dismissedApproverTyped)
+	}
+
 	predicate := &GitHubPullRequestApprovalAttestation{
 		ReferenceAuthorization: &ReferenceAuthorization{
 			TargetRef:      targetRef,
 			FromRevisionID: fromRevisionID,
 			TargetTreeID:   targetTreeID,
 		},
-		Approvers:          approvers,
-		DismissedApprovers: dismissedApprovers,
+		Approvers:          approversTyped,
+		DismissedApprovers: dismissedApproversTyped,
 	}
 
 	predicateStruct, err := predicateToPBStruct(predicate)
@@ -283,22 +302,22 @@ func validateGitHubPullRequestApprovalAttestation(env *sslibdsse.Envelope, targe
 	return validateReferenceAuthorization(env, targetRef, fromRevisionID, targetTreeID)
 }
 
-func getFilteredSetOfApprovers(approvers []*tuf.Key) []*tuf.Key {
+func getFilteredSetOfApprovers(approvers []tuf.Principal) []tuf.Principal {
 	if approvers == nil {
 		return nil
 	}
 	approversSet := set.NewSet[string]()
-	approversFiltered := make([]*tuf.Key, 0, len(approvers))
+	approversFiltered := make([]tuf.Principal, 0, len(approvers))
 	for _, approver := range approvers {
-		if approversSet.Has(approver.KeyID) {
+		if approversSet.Has(approver.ID()) {
 			continue
 		}
-		approversSet.Add(approver.KeyID)
+		approversSet.Add(approver.ID())
 		approversFiltered = append(approversFiltered, approver)
 	}
 
 	sort.Slice(approversFiltered, func(i, j int) bool {
-		return approversFiltered[i].KeyID < approversFiltered[j].KeyID
+		return approversFiltered[i].ID() < approversFiltered[j].ID()
 	})
 
 	return approversFiltered
