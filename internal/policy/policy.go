@@ -398,9 +398,10 @@ func (s *State) Verify(ctx context.Context) error {
 			}
 
 			verifier := &Verifier{
-				name:      delegation.ID(),
-				keys:      keys,
-				threshold: delegation.GetThreshold(),
+				repository: s.repository,
+				name:       delegation.ID(),
+				keys:       keys,
+				threshold:  delegation.GetThreshold(),
 			}
 
 			if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
@@ -809,8 +810,9 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 	}
 
 	return &Verifier{
-		keys:      keys,
-		threshold: threshold,
+		repository: s.repository,
+		keys:       keys,
+		threshold:  threshold,
 	}, nil
 }
 
@@ -837,8 +839,9 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 	}
 
 	return &Verifier{
-		keys:      keys,
-		threshold: threshold,
+		repository: s.repository,
+		keys:       keys,
+		threshold:  threshold,
 	}, nil
 }
 

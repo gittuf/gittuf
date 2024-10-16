@@ -6,11 +6,17 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sslibsvssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/hiddeco/sshsig"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
@@ -22,7 +28,7 @@ import (
 )
 
 const (
-	rekorServer                       = "https://rekor.sigstore.dev"
+	rekorPublicGoodInstance           = "https://rekor.sigstore.dev"
 	namespaceSSHSignature      string = "git"
 	gpgPrivateKeyPEMHeader     string = "PGP PRIVATE KEY"
 	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
@@ -132,22 +138,55 @@ func signGitObjectUsingSSHKey(contents, pemKeyBytes []byte) (string, error) {
 
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
 // verifying commit or tag signatures issued by gitsign.
-func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte) error {
-	root, err := fulcioroots.Get()
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-	intermediate, err := fulcioroots.GetIntermediates()
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
+func verifyGitsignSignature(ctx context.Context, repo *Repository, key *signerverifier.SSLibKey, data, signature []byte) error {
+	checkOpts := &cosign.CheckOpts{
+		Identities: []cosign.Identity{{
+			Issuer:  key.KeyVal.Issuer,
+			Subject: key.KeyVal.Identity,
+		}},
 	}
 
-	verifier, err := gitsignVerifier.NewCertVerifier(
-		gitsignVerifier.WithRootPool(root),
-		gitsignVerifier.WithIntermediatePool(intermediate),
-	)
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
+	var verifier *gitsignVerifier.CertVerifier
+	sigstoreRootFilePath := os.Getenv(sigstore.EnvSigstoreRootFile)
+	if sigstoreRootFilePath == "" {
+		root, err := fulcioroots.Get()
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
+		intermediate, err := fulcioroots.GetIntermediates()
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
+
+		checkOpts.RootCerts = root
+		checkOpts.IntermediateCerts = intermediate
+
+		verifier, err = gitsignVerifier.NewCertVerifier(
+			gitsignVerifier.WithRootPool(root),
+			gitsignVerifier.WithIntermediatePool(intermediate),
+		)
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
+	} else {
+		slog.Debug("Using environment variables to establish trust for Sigstore instance...")
+		rootCerts, err := common.LoadCertsFromPath(sigstoreRootFilePath)
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
+		root := x509.NewCertPool()
+		for _, cert := range rootCerts {
+			root.AddCert(cert)
+		}
+
+		checkOpts.RootCerts = root
+
+		verifier, err = gitsignVerifier.NewCertVerifier(
+			gitsignVerifier.WithRootPool(root),
+		)
+		if err != nil {
+			return errors.Join(ErrVerifyingSigstoreSignature, err)
+		}
 	}
 
 	verifiedCert, err := verifier.Verify(ctx, data, signature, true)
@@ -155,28 +194,35 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 		return ErrIncorrectVerificationKey
 	}
 
-	// TODO: support private sigstore
-	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorServer)
+	rekorURL := rekorPublicGoodInstance
+	// Check git config to see if rekor server must be overridden
+	config, err := repo.GetGitConfig()
+	if err != nil {
+		return errors.Join(ErrVerifyingSigstoreSignature, err)
+	}
+	if configValue, has := config[sigstore.GitConfigRekor]; has {
+		slog.Debug(fmt.Sprintf("Using '%s' as Rekor instance...", configValue))
+		rekorURL = configValue
+	}
+
+	// gitsignRekor.NewWithOptions invokes cosign.GetRekorPubs which looks at
+	// the env var, so we don't have to do anything here
+	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorURL)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
 	}
 
+	checkOpts.RekorClient = rekor.Rekor
+	checkOpts.RekorPubKeys = rekor.PublicKeys()
+
+	// cosign.GetCTLogPubs already looks at the env var, so we don't have to do
+	// anything here
 	ctPub, err := cosign.GetCTLogPubs(ctx)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
 	}
 
-	checkOpts := &cosign.CheckOpts{
-		RekorClient:       rekor.Rekor,
-		RootCerts:         root,
-		IntermediateCerts: intermediate,
-		CTLogPubKeys:      ctPub,
-		RekorPubKeys:      rekor.PublicKeys(),
-		Identities: []cosign.Identity{{
-			Issuer:  key.KeyVal.Issuer,
-			Subject: key.KeyVal.Identity,
-		}},
-	}
+	checkOpts.CTLogPubKeys = ctPub
 
 	if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
 		return errors.Join(ErrIncorrectVerificationKey, err)

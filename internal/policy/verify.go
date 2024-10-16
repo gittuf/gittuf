@@ -19,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	sigstoreverifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -774,7 +775,17 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 				continue
 			case sigstore.KeyType:
 				slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
-				envVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer)
+				opts := []sigstoreverifieropts.Option{}
+				config, err := v.repository.GetGitConfig()
+				if err != nil {
+					return nil, err
+				}
+				if rekorURL, has := config[sigstore.GitConfigRekor]; has {
+					slog.Debug(fmt.Sprintf("Using '%s' as Rekor server...", rekorURL))
+					opts = append(opts, sigstoreverifieropts.WithRekorURL(rekorURL))
+				}
+
+				envVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer, opts...)
 			case signerverifier.ED25519KeyType:
 				// These are only used to verify old policy metadata signed before the ssh-signer was added
 				slog.Debug(fmt.Sprintf("Found legacy ED25519 key '%s' in custom securesystemslib format...", key.KeyID))
