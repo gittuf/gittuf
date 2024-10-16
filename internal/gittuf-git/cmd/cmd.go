@@ -5,43 +5,15 @@ package cmd
 import (
 	"context"
 	"fmt"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
 	"github.com/gittuf/gittuf/internal/repository"
+	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
-
-// determineRef parses the git reference from the given command-line arguments.
-//
-// Parameters:
-//   gitArgs (args.Args): Struct containing the command-line arguments passed to the Git command.
-//
-// Returns:
-//   string: The Git reference name or "HEAD" if no reference is provided.
-
-func determineRef(gitArgs args.Args) string {
-	var refName string
-	if len(gitArgs.Parameters) > 1 {
-		refParts := strings.Split(gitArgs.Parameters[1], ":")
-		if len(refParts) > 0 {
-			for i := range refParts {
-				if !strings.HasPrefix(refParts[i], "-") {
-					refName = refParts[0]
-					break
-				}
-			}
-		} else {
-			refName = gitArgs.Parameters[1]
-		}
-	} else {
-		refName = "HEAD"
-	}
-	return refName
-}
 
 // Clone handles the clone operation for gittuf + git
 func Clone(gitArgs args.Args) error {
@@ -188,4 +160,32 @@ func Commit(gitArgs args.Args) error {
 	}
 
 	return nil
+}
+
+// determineRef parses the git reference from the given command-line arguments.
+//
+// Parameters:
+//   gitArgs (args.Args): Struct containing the command-line arguments passed to the Git command.
+//
+// Returns:
+//   string: The Git reference name or "HEAD" if no reference is provided.
+
+func determineRef(gitArgs args.Args) string {
+	var refName string
+	if len(gitArgs.Parameters) > 1 {
+		refParts := strings.Split(gitArgs.Parameters[1], ":")
+		if len(refParts) > 0 {
+			for i := range refParts {
+				if !strings.HasPrefix(refParts[i], "-") {
+					refName = refParts[0]
+					break
+				}
+			}
+		} else {
+			refName = gitArgs.Parameters[1]
+		}
+	} else {
+		refName = "HEAD"
+	}
+	return refName
 }
