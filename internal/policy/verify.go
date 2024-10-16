@@ -775,6 +775,27 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 			case sigstore.KeyType:
 				slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
 				envVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer)
+			case signerverifier.ED25519KeyType:
+				// These are only used to verify old policy metadata signed before the ssh-signer was added
+				slog.Debug(fmt.Sprintf("Found legacy ED25519 key '%s' in custom securesystemslib format...", key.KeyID))
+				envVerifier, err = signerverifier.NewED25519SignerVerifierFromSSLibKey(key)
+				if err != nil {
+					return nil, err
+				}
+			case signerverifier.RSAKeyType:
+				// These are only used to verify old policy metadata signed before the ssh-signer was added
+				slog.Debug(fmt.Sprintf("Found legacy RSA key '%s' in custom securesystemslib format...", key.KeyID))
+				envVerifier, err = signerverifier.NewRSAPSSSignerVerifierFromSSLibKey(key)
+				if err != nil {
+					return nil, err
+				}
+			case signerverifier.ECDSAKeyScheme:
+				// These are only used to verify old policy metadata signed before the ssh-signer was added
+				slog.Debug(fmt.Sprintf("Found legacy ECDSA key '%s' in custom securesystemslib format...", key.KeyID))
+				envVerifier, err = signerverifier.NewECDSASignerVerifierFromSSLibKey(key)
+				if err != nil {
+					return nil, err
+				}
 			default:
 				return nil, common.ErrUnknownKeyType
 			}
