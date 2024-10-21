@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: September 23, 2024
+Last Modified: October 21, 2024
 
 ## Introduction
 
@@ -136,9 +136,13 @@ description of gittuf's implementation of RSL. A full read of the paper is
 recommended.
 
 The Reference State Log contains a series of entries that each describe some
-change to a Git ref. Each entry contains the ref being updated, the new location
-it points to, and a hash of the parent RSL entry. The entry is signed by the
-actor making the change to the ref.
+change to a Git ref. Such entries are known as RSL reference entries. Each entry
+contains the ref being updated, the new location it points to, and a hash of the
+parent RSL entry. The entry is signed by the actor making the change to the ref.
+
+Additionally, the RSL supports annotation entries that refer to prior reference
+entries. An annotation entry can be used to attach additional user-readable
+messages to prior RSL entries or to mark those entries as revoked.
 
 Given that each entry in effect points to its parent entry using its hash, an
 RSL is a hash chain. gittuf's implementation of the RSL uses Git's underlying
@@ -174,6 +178,7 @@ RSL Entry
 
 ref: <ref name>
 targetID: <target ID>
+number: <number>
 ```
 
 The `targetID` is typically the ID of a commit for references that are branches.
@@ -197,6 +202,7 @@ entryID: <RSL entry ID 1>
 entryID: <RSL entry ID 2>
 ...
 skip: <true/false>
+number: <number>
 -----BEGIN MESSAGE-----
 <message>
 ------END MESSAGE------
@@ -204,9 +210,96 @@ skip: <true/false>
 
 #### Example Entries
 
-TODO: Add example entries with all commit information. Create a couple of
-regular entries and annotations, paste the outputs of `git cat-file -p <ID>`
-here.
+Here's a sample RSL, with the output taken from `gittuf rsl log`:
+
+```
+entry a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa (skipped)
+
+  Ref:    refs/heads/main
+  Target: 6cb8e5c546eab3d0e1d245014de8003febb8e9b3
+  Number: 5
+
+    Annotation ID: cccfb6f27b2a71c33e9a55bc82f084e2445aa398
+    Skip:          yes
+    Number:        6
+    Message:
+      Skipping RSL entry
+
+entry 40c82851f78c7018f4c360030a83923b0925c28d
+
+  Ref:    refs/gittuf/policy
+  Target: b7cf91ec9b5b6b17334ab1378dc85375236524f5
+  Number: 4
+
+entry 94c153bff6d684a956ed27f0abd70624e875657c
+
+  Ref:    refs/gittuf/policy-staging
+  Target: b7cf91ec9b5b6b17334ab1378dc85375236524f5
+  Number: 3
+
+entry fed977a5ca07e566af3a37808284dc7c5a67d6dc
+
+  Ref:    refs/gittuf/policy-staging
+  Target: dcbb536bd86a69e555692aec7b65c20de8257ee2
+  Number: 2
+
+entry e026a62f1c63c6db58bb357f9a85cafe05c64fb6
+
+  Ref:    refs/gittuf/policy-staging
+  Target: 603fc733218a0a1e54ccde47d1d9864f67e0bb75
+  Number: 1
+```
+
+Specifically, the latest reference entry
+`a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa` has been skipped by an annotation
+entry `cccfb6f27b2a71c33e9a55bc82f084e2445aa398`.
+
+The commit object for the reference entry is as follows:
+
+```bash
+~/tmp/repo $ git cat-file -p a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa
+tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+parent 40c82851f78c7018f4c360030a83923b0925c28d
+author Aditya Sirish A Yelgundhalli <ayelgundhall@bloomberg.net> 1729514863 -0400
+committer Aditya Sirish A Yelgundhalli <ayelgundhall@bloomberg.net> 1729514863 -0400
+gpgsig -----BEGIN SSH SIGNATURE-----
+ U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg8g2CmHSb7guzi6MUNgwHUQnxPN
+ X1x8urScZyJrUB6MMAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5
+ AAAAQGQMSviwqF+cE/wgEo0U73vu86YHi4f5crzzFIctjyMGOOy2isYfHgGvSzs5bv6V2Q
+ EtMumBSVbCxvnRqJpiFAs=
+ -----END SSH SIGNATURE-----
+
+RSL Reference Entry
+
+ref: refs/heads/main
+targetID: 6cb8e5c546eab3d0e1d245014de8003febb8e9b3
+number: 5
+```
+
+Similarly, the commit object for the annotation entry is as follows:
+
+```bash
+~/tmp/repo $ git cat-file -p cccfb6f27b2a71c33e9a55bc82f084e2445aa398
+tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+parent a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa
+author Aditya Sirish A Yelgundhalli <ayelgundhall@bloomberg.net> 1729514924 -0400
+committer Aditya Sirish A Yelgundhalli <ayelgundhall@bloomberg.net> 1729514924 -0400
+gpgsig -----BEGIN SSH SIGNATURE-----
+ U1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAg8g2CmHSb7guzi6MUNgwHUQnxPN
+ X1x8urScZyJrUB6MMAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5
+ AAAAQNf32yJvhGfLIIeeStHgkSB7iuRGJl6LhbRTpX/q49lUu4TrEiCeGa3H8LMJ/5D1EE
+ in3QAhlzdowYnmCKglTAw=
+ -----END SSH SIGNATURE-----
+
+RSL Annotation Entry
+
+entryID: a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa
+skip: true
+number: 6
+-----BEGIN MESSAGE-----
+U2tpcHBpbmcgUlNMIGVudHJ5
+-----END MESSAGE-----
+```
 
 ### Actor Access Control Policies
 
@@ -274,16 +367,16 @@ after all explicit policies (expressed as delegations) are processed, and none
 apply to the namespace being verified, an implicit `allow-rule` is applied,
 allowing verification to succeed.
 
-In summary, a repository secured by gittuf stores the Root role and one or more
-Targets roles. Further, it embeds the public keys used to verify the Root role's
-signatures, the veracity of which are established out of band. The metadata and
-the public keys are stored as Git blobs and updates to them are tracked through
-a standalone Git commit graph. This is tracked at `refs/gittuf/policy`. The RSL
-MUST track the state of this reference so that the policy namespace is protected
-from reference state attacks. Further, RSL entries are used to identify
-historical policy states that may apply to older changes.
+In summary, a repository secured by gittuf stores metadata for the Root role and
+one or more Targets roles. Further, it embeds the public keys used to verify the
+Root role's signatures, the veracity of which are established out of band. The
+metadata and the public keys are stored as Git blobs and updates to them are
+tracked through a standalone Git commit graph. This is tracked at
+`refs/gittuf/policy`. The RSL MUST track the state of this reference so that the
+policy namespace is protected from reference state attacks. Further, RSL entries
+are used to identify historical policy states that may apply to older changes.
 
-### Attestations
+### Attestations for Authorization Records
 
 gittuf makes use of the signing capability provided by Git for commits and tags
 significantly. However, it is sometimes necessary to attach more than a single
@@ -312,10 +405,15 @@ The `TargetRef` is the Git reference the authorization is for, while
 `FromTargetID` and `ToTargetID` record the change in the state of the reference
 authorized by the attestation (as Git hashes). The information pertaining to the
 prior state of the Git reference is explicitly recorded in the attestation
-unlike a standard RSL reference entry. This is because this information can be
-implicitly identified using the RSL by examining the previous entry for the
-reference in question. If the authorization is for a brand new reference (say a
-new branch or tag), `FromTargetID` must be set to zero.
+unlike a standard RSL reference entry. This is because, for a reference entry,
+this information can be implicitly identified using the RSL by examining the
+previous entry for the reference in question. If the authorization is for a
+brand new reference (say a new branch or any tag), `FromTargetID` must be set to
+zero. For a change to a branch, `ToTargetID` pre-computes the Git merge tree
+resulting from the change being approved. Thus, when verifying the change to the
+branch, it must be followed by an RSL reference entry that points to a commit
+which has the same Git tree ID. For a tag, `ToTargetID` records the Git object
+the tag object is expected to point to.
 
 Reference authorizations are stored in a directory called
 `reference-authorizations` in the attestations namespace. Each authorization
@@ -324,51 +422,10 @@ must have the in-toto predicate type:
 
 #### Authentication Evidence Attestations
 
-In certain workflows, it is necessary to authenticate an actor outside of the
-context of gittuf. For example, later in this document is a description of a
-recovery mechanism where a gittuf user must create an RSL entry on behalf of
-another non-gittuf user after authenticating them. gittuf requires evidence of
-this authentication to be recorded in the repository using an attestation.
+See the corresponding [WIP
+extension](/docs/extensions/authentication-evidence-attestations.md).
 
-Primarily, this attestation is recorded for pushes that are not accompanied by
-RSL reference entries. As such, this attestation workflow focuses on that
-scenario. It has the following format:
-
-```
-TargetRef    string
-FromTargetID string
-ToTargetID   string
-PushActor    string
-EvidenceType string
-Evidence     object
-```
-
-Note that this attestation's schema is a superset of the reference
-authorization attestation. While that one allows for detached authorizations
-for a reference update, this one is focused on providing evidence for a push.
-As such, to identify the push in question, the schema consists of many of the
-same fields.
-
-The `PushActor` field identifies the actor performing the push, but did not
-create an RSL entry. `EvidenceType` is a string that identifies the type of
-evidence gathered. It dictates how `Evidence` must be parsed, as this field is
-an opaque object that differs from one evidence type to another.
-
-TODO: `PushActor` has this notion of tracking actors in the policy even if
-they're not gittuf users. This is somewhat reasonable as this could just be a
-key ID, which is used just with Git. However, we're fast approaching a
-separation of actor identifier from their key ID. There's also a TAP for this
-that we should look at, and think about how OIDC bits can also connect here.
-
-TODO: Add some example evidence types for common scenarios. Push certificate
-and GitHub API result (subset) ought to do the trick.
-
-Authentication evidence attestations are stored in a directory called
-`authentication-evidence` in the attestations namespace. Each attestation must
-have the in-toto predicate type:
-`https://gittuf.dev/authentication-evidence/v<VERSION>`.
-
-## Example
+## Example of Using gittuf
 
 Consider project `foo`'s Git repository maintained by Alice and Bob. Alice and
 Bob are the only actors authorized to update the state of the main branch. This
@@ -825,79 +882,3 @@ key must be skipped. This ensures that gittuf clients do not consider attacker
 created RSL entries as valid states for the corresponding Git references.
 Clients that have an older RSL from before the attack can skip past the
 malicious entries altogether.
-
-## gittuf on the Forge [WIP]
-
-gittuf can be deployed at the forge that all developers push changes to. This
-instance of gittuf must behave differently from regular gittuf clients because
-multiple developers may be pushing and fetching from the forge at any given
-point in time.
-
-### What are the responsibilities of gittuf at the forge?
-
-The forge uses gittuf to:
-* receive an update from a developer
-* perform gittuf verification on the update
-* make update available to all developers if gittuf verification succeeds
-* serialize update handling so that the linearity of the RSL is maintained
-
-### How can gittuf perform verification at the forge?
-
-gittuf can perform verification in several ways at the server. The first option
-is a simple pre-receive hook that is invoked every time an update is pushed to
-the server. The hook is provided a summary of the changes to the RSL and the
-updated Git reference, i.e., all the information necessary for gittuf
-verification. If the verification is successful, the push is allowed to succeed.
-
-The other option is to use a CI system or have gittuf verification implemented
-in the server software itself.
-
-### Where must gittuf clients send an update to?
-
-A gittuf client pushing an update changes _two_ Git references: the reference
-updated by the developer and changes to the RSL. The client must push both
-changes
-[atomically](https://git-scm.com/docs/git-push#Documentation/git-push.txt---no-atomic)
-so that either both references are updated or neither at the forge.
-
-The client, broadly speaking, has two options: either it pushes directly to the
-forge's RSL and the updated reference, or it does not, instead pushing to
-another namespace at the forge. Let us consider each.
-
-#### Pushing directly to the RSL and updated reference
-
-As the push is atomic, the repository does not enter an invalid state where only
-the RSL or the updated reference is updated. This option works well in low
-traffic scenarios, where pushes are few and far between. This is because in the
-case of multiple parallel pushes, verification may be invoked for each in
-parallel.  This is the case for pre-receive hooks. The first one to succeed
-"wins", updating the repository state and leading to the other pushes failing.
-This is not ideal as gittuf verification scales by the number of RSL entries and
-files modified in an update. Larger changes will, therefore, fail more due to
-concurrent smaller changes. Note that Git implements a lock on its internal
-store, but this does not block pushes prior to the hook invocation (TODO: test,
-this is based off existing documentation).
-
-If the invocation of verification is not via a pre-receive hook, the repository
-can reject other new pushes when verifying one. This mechanism must also ensure
-the RSL state and the updated reference are not exposed to clients until after
-verification succeeds, as clients must not receive an unverified RSL entry.
-
-#### Pushing to staging namespaces in the repository
-
-In this case, the gittuf client pushes to staging namespaces, such as
-`refs/gittuf/staging/reference-state-log` and
-`refs/gittuf/staging/<git-reference>`. The repository verification can be
-triggered using any mechanism. As the staging area namespaces are consistently
-generated by all gittuf clients, they act as an implicit lock to new pushes. A
-gittuf client cannot push to the staging area when a prior push is being
-verified.
-
-If the verification succeeds, the verifying mechanism must update the actual RSL
-and the updated reference. In addition, regardless of the status of
-verification, the staging namespaces must be removed to allow other gittuf
-clients to push to.
-
-The staging namespace cannot be used with a pre-receive hook as it must reflect
-a push in progress. The post-receive hook is a better fit if a Git server-side
-hook is to be used.
