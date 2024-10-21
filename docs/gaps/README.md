@@ -28,6 +28,8 @@ the gittuf/community repository.
 | 2 | [gittuf on the Forge](/docs/gaps/2/README.md) | No | No |
 | 3 | [Authentication Evidence Attestations](/docs/gaps/3/README.md) | No | No |
 | 4 | [Supporting Global Constraints in gittuf](/docs/gaps/4/README.md) | No | No |
+| 5 | [Principals, not Keys](/docs/gaps/5/README.md) | No | No |
+| 6 | [Code Review Tool Attestations](/docs/gaps/6/README.md) | No | No |
 
 ## GAP Format
 
