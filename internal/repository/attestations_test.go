@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -145,7 +147,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 	tests := map[string]struct {
 		envelope          *dsse.Envelope
-		expectedPredicate *attestations.GitHubPullRequestApprovalAttestation
+		expectedPredicate *githubv01.PullRequestApprovalAttestation
 	}{
 		"one approver, no dismissals": {
 			envelope: &dsse.Envelope{
@@ -158,7 +160,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.PullRequestApprovalAttestation{
 				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
@@ -170,7 +172,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -188,7 +190,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.PullRequestApprovalAttestation{
 				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
@@ -211,7 +213,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -229,7 +231,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.PullRequestApprovalAttestation{
 				DismissedApprovers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
@@ -241,7 +243,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",
@@ -259,7 +261,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 					},
 				},
 			},
-			expectedPredicate: &attestations.GitHubPullRequestApprovalAttestation{
+			expectedPredicate: &githubv01.PullRequestApprovalAttestation{
 				Approvers: []*tufv01.Key{
 					{
 						KeyType: sigstore.KeyType,
@@ -300,7 +302,7 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 						Scheme: sigstore.KeyScheme,
 					},
 				},
-				ReferenceAuthorization: &attestations.ReferenceAuthorization{
+				ReferenceAuthorization: &authorizationsv01.ReferenceAuthorization{
 					FromRevisionID: "2f593e3195a59983423f45fe6d4335f148ffeecf",
 					TargetRef:      "refs/heads/main",
 					TargetTreeID:   "ee25b1b6c27862ea1cc419c144127123fd6f47d3",

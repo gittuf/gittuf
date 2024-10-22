@@ -9,35 +9,8 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/go-git/go-git/v5/plumbing"
-	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestNewReferenceAuthorization(t *testing.T) {
-	testRef := "refs/heads/main"
-	testID := plumbing.ZeroHash.String()
-
-	authorization, err := NewReferenceAuthorization(testRef, testID, testID)
-	assert.Nil(t, err)
-
-	// Check value of statement type
-	assert.Equal(t, ita.StatementTypeUri, authorization.Type)
-
-	// Check subject contents
-	assert.Equal(t, 1, len(authorization.Subject))
-	assert.Contains(t, authorization.Subject[0].Digest, digestGitTreeKey)
-	assert.Equal(t, authorization.Subject[0].Digest[digestGitTreeKey], testID)
-
-	// Check predicate type
-	assert.Equal(t, ReferenceAuthorizationPredicateType, authorization.PredicateType)
-
-	// Check predicate
-	predicate := authorization.Predicate.AsMap()
-	assert.Equal(t, predicate[targetRefKey], testRef)
-	assert.Equal(t, predicate[targetTreeIDKey], testID)
-	assert.Equal(t, predicate[fromRevisionIDKey], testID)
-}
 
 func TestSetReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
@@ -129,23 +102,6 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 	featureAuth, err := attestations.GetReferenceAuthorizationFor(repo, testAnotherRef, testID, testID)
 	assert.Nil(t, err)
 	assert.Equal(t, featureZeroZero, featureAuth)
-}
-
-func TestValidateReferenceAuthorization(t *testing.T) {
-	testRef := "refs/heads/main"
-	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
-	mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID)
-	featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID)
-
-	err := validateReferenceAuthorization(mainZeroZero, testRef, testID, testID)
-	assert.Nil(t, err)
-
-	err = validateReferenceAuthorization(featureZeroZero, testAnotherRef, testID, testID)
-	assert.Nil(t, err)
-
-	err = validateReferenceAuthorization(mainZeroZero, testAnotherRef, testID, testID)
-	assert.ErrorIs(t, err, ErrInvalidAuthorization)
 }
 
 func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fromID, toID string) *sslibdsse.Envelope {
