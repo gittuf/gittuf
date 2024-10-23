@@ -12,6 +12,9 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/attestations/authorizations"
+	"github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -542,7 +545,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 
 	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), toID.String())
 	if err != nil {
-		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
+		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 			return nil, nil, err
 		}
 	}
@@ -560,7 +563,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 
 		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
 		if err != nil {
-			if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+			if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err
 			}
 		}
@@ -583,11 +586,12 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 				return nil, nil, err
 			}
 
+			// TODO: support multiple versions
 			type tmpStatement struct {
-				Type          string                                             `json:"_type"`
-				Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-				PredicateType string                                             `json:"predicateType"`
-				Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+				Type          string                                    `json:"_type"`
+				Subject       []*ita.ResourceDescriptor                 `json:"subject"`
+				PredicateType string                                    `json:"predicateType"`
+				Predicate     *githubv01.PullRequestApprovalAttestation `json:"predicate"`
 			}
 			stmt := new(tmpStatement)
 			if err := json.Unmarshal(payloadBytes, stmt); err != nil {

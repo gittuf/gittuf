@@ -13,6 +13,9 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/attestations/authorizations"
+	"github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -20,7 +23,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/google/go-github/v61/github"
+	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
@@ -31,7 +34,7 @@ const (
 
 var ErrNotSigningKey = errors.New("expected signing key")
 
-var githubClient *github.Client
+var githubClient *gogithub.Client
 
 // AddReferenceAuthorization adds a reference authorization attestation to the
 // repository for the specified target ref. The from ID is identified using the
@@ -101,7 +104,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	if err == nil {
 		slog.Debug("Found existing reference authorization...")
 		hasAuthorization = true
-	} else if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
+	} else if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 		return err
 	}
 
@@ -173,7 +176,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 	slog.Debug("Loading reference authorization...")
 	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID, toID)
 	if err != nil {
-		if errors.Is(err, attestations.ErrAuthorizationNotFound) {
+		if errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 			// No reference authorization at all
 			return nil
 		}
@@ -303,7 +306,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	if err == nil {
 		slog.Debug("Found existing GitHub pull request approval attestation...")
 		hasApprovalAttestation = true
-	} else if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+	} else if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
 		return err
 	}
 
@@ -320,11 +323,11 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 			return err
 		}
 
-		for _, approver := range predicate.Approvers {
+		for _, approver := range predicate.GetApprovers() {
 			approvers = append(approvers, approver)
 		}
 
-		for _, dismissedApprover := range predicate.DismissedApprovers {
+		for _, dismissedApprover := range predicate.GetDismissedApprovers() {
 			dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 		}
 	}
@@ -385,14 +388,14 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	dismissedApprovers := make([]tuf.Principal, 0, len(predicate.DismissedApprovers)+1)
-	for _, existingDismissedApprover := range predicate.DismissedApprovers {
+	dismissedApprovers := make([]tuf.Principal, 0, len(predicate.GetDismissedApprovers())+1)
+	for _, existingDismissedApprover := range predicate.GetDismissedApprovers() {
 		dismissedApprovers = append(dismissedApprovers, existingDismissedApprover)
 	}
 	dismissedApprovers = append(dismissedApprovers, dismissedApprover)
 
-	approvers := make([]tuf.Principal, 0, len(predicate.Approvers))
-	for _, approver := range predicate.Approvers {
+	approvers := make([]tuf.Principal, 0, len(predicate.GetApprovers()))
+	for _, approver := range predicate.GetApprovers() {
 		approver := approver
 		if approver.ID() == dismissedApprover.ID() {
 			continue
@@ -400,9 +403,9 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		approvers = append(approvers, approver)
 	}
 
-	baseRef := predicate.TargetRef
-	fromID := predicate.FromRevisionID
-	toID := predicate.TargetTreeID
+	baseRef := predicate.GetRef()
+	fromID := predicate.GetFromID()
+	toID := predicate.GetTargetID()
 
 	statement, err := attestations.NewGitHubPullRequestApprovalAttestation(baseRef, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
@@ -430,7 +433,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 	return currentAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
-func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *github.PullRequest, signCommit bool) error {
+func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *gogithub.PullRequest, signCommit bool) error {
 	var (
 		targetRef      string
 		targetCommitID string
@@ -483,20 +486,22 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
 }
 
-func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (*attestations.GitHubPullRequestApprovalAttestation, error) {
+func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (github.PullRequestApprovalAttestation, error) {
 	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
 
+	// TODO: support multiple versions here
+
 	// tmpGitHubPullRequestApprovalStatement is essentially a definition of
 	// in-toto's v1 Statement. The difference is that we fix the predicate to be
 	// the GitHub pull request approval type, making unmarshaling easier.
 	type tmpGitHubPullRequestApprovalStatement struct {
-		Type          string                                             `json:"_type"`
-		Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-		PredicateType string                                             `json:"predicateType"`
-		Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+		Type          string                                    `json:"_type"`
+		Subject       []*ita.ResourceDescriptor                 `json:"subject"`
+		PredicateType string                                    `json:"predicateType"`
+		Predicate     *githubv01.PullRequestApprovalAttestation `json:"predicate"`
 	}
 
 	stmt := new(tmpGitHubPullRequestApprovalStatement)
@@ -572,9 +577,9 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 // getGitHubClient creates a client to interact with a GitHub instance. If a
 // base URL other than https://github.com is supplied, the client is configured
 // to interact with the specified enterprise instance.
-func getGitHubClient(baseURL string) (*github.Client, error) {
+func getGitHubClient(baseURL string) (*gogithub.Client, error) {
 	if githubClient == nil {
-		githubClient = github.NewClient(nil).WithAuthToken(os.Getenv(githubTokenEnvKey))
+		githubClient = gogithub.NewClient(nil).WithAuthToken(os.Getenv(githubTokenEnvKey))
 	}
 
 	if baseURL != defaultGitHubBaseURL {
