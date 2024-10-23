@@ -31,12 +31,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(repo, o.p.SigningKey)
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
 
-	targetsKey, err := common.LoadPublicKey(o.targetsKey)
+	targetsKey, err := gittuf.LoadPublicKey(o.targetsKey)
 	if err != nil {
 		return err
 	}

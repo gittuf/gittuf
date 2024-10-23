@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
@@ -59,12 +58,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(repo, o.signingKey)
+	signer, err := gittuf.LoadSigner(repo, o.signingKey)
 	if err != nil {
 		return err
 	}
 
-	dismissedApproverKey, err := common.LoadPublicKey(o.dismissedApprover)
+	dismissedApproverKey, err := gittuf.LoadPublicKey(o.dismissedApprover)
 	if err != nil {
 		return err
 	}

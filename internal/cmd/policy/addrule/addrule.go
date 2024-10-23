@@ -67,14 +67,14 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	signer, err := common.LoadSigner(repo, o.p.SigningKey)
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
 
 	authorizedKeys := []tuf.Principal{}
 	for _, key := range o.authorizedKeys {
-		key, err := common.LoadPublicKey(key)
+		key, err := gittuf.LoadPublicKey(key)
 		if err != nil {
 			return err
 		}
