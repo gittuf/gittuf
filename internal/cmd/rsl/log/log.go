@@ -6,8 +6,8 @@ package log
 import (
 	"os"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/display"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -33,12 +33,12 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(_ *cobra.Command, _ []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	entries, annotationMap, err := repository.GetRSLEntryLog(repo)
+	entries, annotationMap, err := gittuf.GetRSLEntryLog(repo)
 	if err != nil {
 		return err
 	}

@@ -4,9 +4,9 @@
 package reorderrules
 
 import (
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +28,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 func (o *options) Run(cmd *cobra.Command, args []string) error {
 	o.ruleNames = append(o.ruleNames, args...)
 
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}

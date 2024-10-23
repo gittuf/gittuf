@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/repository"
 )
 
 /*
@@ -109,7 +109,7 @@ func run() error {
 	remoteName := os.Args[1]
 	url := os.Args[2]
 
-	var handler func(*repository.Repository, string, string) (map[string]string, bool, error)
+	var handler func(*gittuf.Repository, string, string) (map[string]string, bool, error)
 	switch {
 	case strings.HasPrefix(url, "https://"), strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "ftp://"), strings.HasPrefix(url, "ftps://"):
 		log("Prefix indicates curl remote helper must be used")
@@ -122,7 +122,7 @@ func run() error {
 		handler = handleSSH
 	}
 
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
