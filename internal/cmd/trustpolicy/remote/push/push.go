@@ -4,7 +4,7 @@
 package push
 
 import (
-	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +12,7 @@ type options struct {
 }
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}

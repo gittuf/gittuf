@@ -12,7 +12,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 )
 
 type logWriteCloser struct {
@@ -134,7 +134,7 @@ func packetEncode(str string) []byte {
 	return []byte(fmt.Sprintf("%04x%s", 4+len(str), str))
 }
 
-func getGittufWants(repo *repository.Repository, remoteTips map[string]string) (map[string]string, error) {
+func getGittufWants(repo *gittuf.Repository, remoteTips map[string]string) (map[string]string, error) {
 	wants := map[string]string{}
 	for remoteRef, tip := range remoteTips {
 		currentTip, err := repo.GetGitRepository().GetReference(remoteRef)
@@ -150,7 +150,7 @@ func getGittufWants(repo *repository.Repository, remoteTips map[string]string) (
 	return wants, nil
 }
 
-func getSSHCommand(repo *repository.Repository) ([]string, error) {
+func getSSHCommand(repo *gittuf.Repository) ([]string, error) {
 	sshCmd := os.Getenv("GIT_SSH_COMMAND")
 	if len(sshCmd) != 0 {
 		return strings.Split(sshCmd, " "), nil

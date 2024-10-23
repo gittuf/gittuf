@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sigstoresigneropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
@@ -99,7 +99,7 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 // to the private key) or for signing with Sigstore (where `key` has a prefix
 // `fulcio:`). For Sigstore, developer mode must be enabled by setting
 // GITTUF_DEV=1 in the environment.
-func LoadSigner(repo *repository.Repository, key string) (sslibdsse.SignerVerifier, error) {
+func LoadSigner(repo *gittuf.Repository, key string) (sslibdsse.SignerVerifier, error) {
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		return nil, fmt.Errorf("not implemented")

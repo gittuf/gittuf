@@ -4,8 +4,8 @@
 package clone
 
 import (
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +47,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		expectedRootKeys[index] = key
 	}
 
-	_, err := repository.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys)
+	_, err := gittuf.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys)
 	return err
 }
 

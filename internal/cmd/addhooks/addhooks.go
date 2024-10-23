@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/spf13/cobra"
 )
 
@@ -26,13 +26,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	err = repo.UpdateHook(repository.HookPrePush, prePushScript, o.force)
-	var hookErr *repository.ErrHookExists
+	err = repo.UpdateHook(gittuf.HookPrePush, prePushScript, o.force)
+	var hookErr *gittuf.ErrHookExists
 	if errors.As(err, &hookErr) {
 		fmt.Fprintf(
 			cmd.ErrOrStderr(),

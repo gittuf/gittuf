@@ -6,9 +6,9 @@ package authorize
 import (
 	"fmt"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +51,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return dev.ErrNotInDevMode
 	}
 
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}

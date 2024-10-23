@@ -13,16 +13,16 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/repository"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
 // handleSSH implements the helper for remotes configured to use SSH. For this
 // transport, we invoke the installed ssh binary to interact with the remote.
-func handleSSH(repo *repository.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
 	url = strings.TrimPrefix(url, "ssh://")
 	url = strings.TrimPrefix(url, "git+ssh://")
 	url = strings.TrimPrefix(url, "ssh+git://")

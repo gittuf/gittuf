@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package repository
+package gittuf
 
 import (
 	"fmt"
@@ -10,10 +10,10 @@ import (
 	"slices"
 	"testing"
 
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
