@@ -10,10 +10,13 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
+	lua "github.com/gittuf/gittuf/internal/lua-sandbox"
 	"github.com/gittuf/gittuf/internal/repository"
 	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
+
+const gittufHooksDir = ".gittuf/hooks"
 
 // Clone handles the clone operation for gittuf + git
 func Clone(gitArgs args.Args) error {
@@ -139,6 +142,25 @@ func Commit(gitArgs args.Args) error {
 		fmt.Println("Verification unsuccessful with error: ", err)
 	} else {
 		fmt.Println("Verification success")
+	}
+
+	// TODO: parse correct hook file from refs
+
+	// TODO: parse mode from refs
+	luaMode := "default"
+
+	// Lua hook point for pre-commit hooks
+	L, err := lua.NewLuaEnvironment(luaMode)
+	if err != nil {
+		return err
+	}
+
+	defer L.Close()
+
+	if _, err := os.Stat(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err == nil {
+		if err := L.DoFile(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err != nil {
+			return fmt.Errorf("hook file: %s", strings.Split(err.Error(), "\n")[0])
+		}
 	}
 
 	// Commit irrespective of failed verification. However, verification is
