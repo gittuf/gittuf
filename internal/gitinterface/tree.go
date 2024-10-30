@@ -76,15 +76,19 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 // commit is expected to be merged into the first. If the first commit is zero,
 // the second commit's tree is returned.
 func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
-	if err := r.ensureIsCommit(commitAID); err != nil {
-		return ZeroHash, err
-	}
 	if err := r.ensureIsCommit(commitBID); err != nil {
 		return ZeroHash, err
 	}
 
 	if commitAID.IsZero() {
+		// fast-forward merge -> use tree ID from commitB
 		return r.GetCommitTreeID(commitBID)
+	}
+
+	// Only commitB needs to be non-zero, we can allow fast-forward merges when
+	// the base commit is zero. So, check this only after above
+	if err := r.ensureIsCommit(commitAID); err != nil {
+		return ZeroHash, err
 	}
 
 	niceGit, err := isNiceGitVersion()
