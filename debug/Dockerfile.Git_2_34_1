@@ -1,0 +1,18 @@
+# This Dockerfile can be used to build a container image with Git 2.34.1 but the
+# latest Go and delve release. This is useful when debugging gittuf errors with
+# Git 2.34.1, a version of Git we support due to it being the latest on Ubuntu
+# 22.04 LTS. After building the container image, run it with the local
+# repository as a mounted volume. That way, changes can be made outside the
+# container but iteratively debugged within the container.
+
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install git software-properties-common -y
+
+RUN add-apt-repository ppa:longsleep/golang-backports -y
+
+RUN apt-get update && apt-get install golang -y
+
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+ENV PATH=/root/go/bin:$PATH
