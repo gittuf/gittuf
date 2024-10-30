@@ -6,15 +6,18 @@ package gittuf
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
@@ -24,124 +27,207 @@ import (
 func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
-	testDir := t.TempDir()
-	r := gitinterface.CreateTestGitRepository(t, testDir, false)
+	t.Run("for commit", func(t *testing.T) {
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
 
-	// We meed to change the directory for this test because we `checkout`
-	// for older Git versions, modifying the worktree. This chdir ensures
-	// that the temporary directory is used as the worktree.
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(testDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(pwd) //nolint:errcheck
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
 
-	repo := &Repository{r: r}
+		repo := &Repository{r: r}
 
-	targetRef := "main"
-	absTargetRef := "refs/heads/main"
-	featureRef := "feature"
-	absFeatureRef := "refs/heads/feature"
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
 
-	// Create common base for main and feature branches
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
-		t.Fatal(err)
-	}
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
 
-	// Create main branch as the target branch with a Git commit
-	// Add a single commit
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
-	fromCommitID := commitIDs[0]
-	if err := repo.RecordRSLEntryForReference(targetRef, false); err != nil {
-		t.Fatal(err)
-	}
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
+		fromCommitID := commitIDs[0]
+		if err := repo.RecordRSLEntryForReference(targetRef, false); err != nil {
+			t.Fatal(err)
+		}
 
-	// Create feature branch with two Git commits
-	// Add two commits
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
-	featureCommitID := commitIDs[1]
-	if err := repo.RecordRSLEntryForReference(featureRef, false); err != nil {
-		t.Fatal(err)
-	}
+		// Create feature branch with two Git commits
+		// Add two commits
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
+		featureCommitID := commitIDs[1]
+		if err := repo.RecordRSLEntryForReference(featureRef, false); err != nil {
+			t.Fatal(err)
+		}
 
-	targetTreeID, err := r.GetMergeTree(fromCommitID, featureCommitID)
-	if err != nil {
-		t.Fatal(err)
-	}
+		targetTreeID, err := r.GetMergeTree(fromCommitID, featureCommitID)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// Create signers
-	firstSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-	firstKeyID, err := firstSigner.KeyID()
-	if err != nil {
-		t.Fatal(err)
-	}
+		// Create signers
+		firstSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		firstKeyID, err := firstSigner.KeyID()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-	secondKeyID, err := secondSigner.KeyID()
-	if err != nil {
-		t.Fatal(err)
-	}
+		secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		secondKeyID, err := secondSigner.KeyID()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// First authorization attestation signature
-	err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false)
-	assert.Nil(t, err)
+		// First authorization attestation signature
+		err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false)
+		assert.Nil(t, err)
 
-	allAttestations, err := attestations.LoadCurrentAttestations(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+		allAttestations, err := attestations.LoadCurrentAttestations(r)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	env, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
+		env, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Len(t, env.Signatures, 1)
+		assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
 
-	// Second authorization attestation signature
-	err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false)
-	assert.Nil(t, err)
+		// Second authorization attestation signature
+		err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false)
+		assert.Nil(t, err)
 
-	allAttestations, err = attestations.LoadCurrentAttestations(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+		allAttestations, err = attestations.LoadCurrentAttestations(r)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Len(t, env.Signatures, 2)
-	assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
-	assert.Equal(t, secondKeyID, env.Signatures[1].KeyID)
+		env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Len(t, env.Signatures, 2)
+		assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
+		assert.Equal(t, secondKeyID, env.Signatures[1].KeyID)
 
-	// Remove second authorization attestation signature
-	err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false)
-	assert.Nil(t, err)
+		// Remove second authorization attestation signature
+		err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false)
+		assert.Nil(t, err)
 
-	allAttestations, err = attestations.LoadCurrentAttestations(r)
-	if err != nil {
-		t.Fatal(err)
-	}
+		allAttestations, err = attestations.LoadCurrentAttestations(r)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Len(t, env.Signatures, 1)
-	assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
+		env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Len(t, env.Signatures, 1)
+		assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
+	})
+
+	t.Run("for tag", func(t *testing.T) {
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		repo := &Repository{r: r}
+
+		fromRef := "refs/heads/main"
+		targetTagRef := "refs/tags/v1"
+
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, fromRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.RecordRSLEntryForReference(fromRef, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create signer
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		keyID, err := signer.KeyID()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false)
+		assert.Nil(t, err)
+
+		allAttestations, err := attestations.LoadCurrentAttestations(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		assert.Nil(t, err)
+		assert.Len(t, env.Signatures, 1)
+		assert.Equal(t, keyID, env.Signatures[0].KeyID)
+
+		// Create tag
+		_, err = repo.r.TagUsingSpecificKey(initialCommitID, strings.TrimPrefix(targetTagRef, gitinterface.TagRefPrefix), "v1", artifacts.SSHRSAPrivate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Add it to RSL
+		if err := repo.RecordRSLEntryForReference(targetTagRef, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Trying to approve it now fails as we're approving a tag already seen in the RSL
+		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false)
+		assert.ErrorIs(t, err, gitinterface.ErrTagAlreadyExists)
+
+		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String(), false)
+		assert.Nil(t, err)
+
+		allAttestations, err = attestations.LoadCurrentAttestations(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
+	})
 }
 
 func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {

@@ -436,6 +436,45 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	return state
 }
 
+func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-tags", []tuf.Principal{gpgKey, approverKey}, []string{"git:refs/tags/*"}, 2); err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.TargetsEnvelope = targetsEnv
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
 func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	t.Helper()
 

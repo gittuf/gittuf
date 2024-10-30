@@ -65,9 +65,18 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		toID            gitinterface.Hash
 	)
 
+	isTag := false
+	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
+		isTag = true
+	}
+
 	slog.Debug("Identifying current status of target Git reference...")
 	latestTargetEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(targetRef))
 	if err == nil {
+		if isTag {
+			return fmt.Errorf("cannot approve a tag that already exists: %w", gitinterface.ErrTagAlreadyExists)
+		}
+
 		fromID = latestTargetEntry.TargetID
 	} else {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -85,12 +94,17 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 	featureCommitID = latestFeatureEntry.TargetID
 
-	slog.Debug("Computing expected merge tree...")
-	mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
-	if err != nil {
-		return err
+	if isTag {
+		// for tags, the toID is the commitID the tag will point to
+		toID = featureCommitID
+	} else {
+		slog.Debug("Computing expected merge tree...")
+		mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
+		if err != nil {
+			return err
+		}
+		toID = mergeTreeID
 	}
-	toID = mergeTreeID
 
 	slog.Debug("Loading current set of attestations...")
 	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
@@ -111,7 +125,12 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	if !hasAuthorization {
 		// Create a new reference authorization and embed in env
 		slog.Debug("Creating new reference authorization...")
-		statement, err := attestations.NewReferenceAuthorization(targetRef, fromID.String(), toID.String())
+		var statement *ita.Statement
+		if isTag {
+			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String())
+		} else {
+			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String())
+		}
 		if err != nil {
 			return err
 		}
@@ -138,6 +157,9 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	commitMessage := fmt.Sprintf("Add reference authorization for '%s' from '%s' to '%s'", targetRef, fromID, toID)
+	if isTag {
+		commitMessage = fmt.Sprintf("Add reference authorization for '%s' at '%s'", targetRef, toID.String())
+	}
 
 	slog.Debug("Committing attestations...")
 	return allAttestations.Commit(r.r, commitMessage, signCommit)
