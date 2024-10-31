@@ -6,8 +6,9 @@ package authorizations
 import "errors"
 
 var (
-	ErrInvalidAuthorization  = errors.New("authorization attestation does not match expected details")
-	ErrAuthorizationNotFound = errors.New("requested authorization not found")
+	ErrInvalidAuthorization        = errors.New("authorization attestation does not match expected details")
+	ErrAuthorizationNotFound       = errors.New("requested authorization not found")
+	ErrUnknownAuthorizationVersion = errors.New("unknown reference authorization version")
 )
 
 // ReferenceAuthorization represents an attestation that approves a change to a

@@ -10,27 +10,55 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
-// NewReferenceAuthorization creates a new reference authorization for the
+// NewReferenceAuthorizationForCommit creates a new reference authorization for
+// the provided information. The authorization is embedded in an in-toto
+// "statement" and returned with the appropriate "predicate type" set. The
+// `fromID` and `toID` specify the change to `targetRef` that is to be
+// authorized by invoking this function. Since this is for a commit, the `toID`
+// is expected to be a Git tree ID.
+func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID)
+}
+
+// NewReferenceAuthorizationForTag creates a new reference authorization for the
 // provided information. The authorization is embedded in an in-toto "statement"
 // and returned with the appropriate "predicate type" set. The `fromID` and
 // `toID` specify the change to `targetRef` that is to be authorized by invoking
-// this function.
-func NewReferenceAuthorization(targetRef, fromID, toID string) (*ita.Statement, error) {
-	return authorizationsv01.NewReferenceAuthorization(targetRef, fromID, toID)
+// this function. Since this is for a tag, the `toID` is expected to be a Git
+// commit ID.
+func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID)
 }
 
 // SetReferenceAuthorization writes the new reference authorization attestation
 // to the object store and tracks it in the current attestations state.
 func (a *Attestations) SetReferenceAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
-	// TODO: we'll probably support validating multiple versions here for cross
-	// compatibility
-	if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
-		return err
+	payloadBytes, err := env.DecodeB64Payload()
+	if err != nil {
+		return fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+
+	inspectAuthorization := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectAuthorization); err != nil {
+		return fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+	switch inspectAuthorization["predicate_type"] {
+	case authorizationsv01.PredicateType:
+		if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
+			return err
+		}
+	case authorizationsv02.PredicateType:
+		if err := authorizationsv02.Validate(env, refName, fromID, toID); err != nil {
+			return err
+		}
+	default:
+		return authorizations.ErrUnknownAuthorizationVersion
 	}
 
 	envBytes, err := json.Marshal(env)
@@ -82,10 +110,26 @@ func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repositor
 		return nil, err
 	}
 
-	// TODO: this will probably be updated to support multiple versions as
-	// they're introduced
-	if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
-		return nil, err
+	payloadBytes, err := env.DecodeB64Payload()
+	if err != nil {
+		return nil, fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+
+	inspectAuthorization := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectAuthorization); err != nil {
+		return nil, fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+	switch inspectAuthorization["predicate_type"] {
+	case authorizationsv01.PredicateType:
+		if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
+			return nil, err
+		}
+	case authorizationsv02.PredicateType:
+		if err := authorizationsv02.Validate(env, refName, fromID, toID); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, authorizations.ErrUnknownAuthorizationVersion
 	}
 
 	return env, nil

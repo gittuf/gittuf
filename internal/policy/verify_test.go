@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -701,7 +702,7 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("successful verification with higher threshold", func(t *testing.T) {
+	t.Run("successful verification with higher threshold using v0.1 reference authorization", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
@@ -717,7 +718,62 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change
-		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		// We're explicitly using the old type here to ensure policy
+		// verification still works
+		authorization, err := authorizationsv01.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("successful verification with higher threshold using latest reference authorization", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change
+		// This uses the latest reference authorization version
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -808,7 +864,7 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("successful verification with higher threshold but using GitHub approval and reference authorization", func(t *testing.T) {
+	t.Run("successful verification with higher threshold but using GitHub approval and reference authorization v0.2", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
@@ -857,7 +913,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -988,6 +1044,65 @@ func TestVerifyTagEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
+	t.Run("with threshold tag specific policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagRefName := "refs/tags/v1"
+
+		// Create authorization for this change
+		// This uses the latest reference authorization version
+		// As this is for a tag, the target is the commit the tag points to,
+		// taken from the RSL entry we just created for it
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
 	t.Run("with tag specific policy, unauthorized", func(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithTagPolicyForUnauthorizedTest)
 		refName := "refs/heads/main"
@@ -1005,6 +1120,66 @@ func TestVerifyTagEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
+	})
+
+	t.Run("with threshold tag specific policy, unauthorized", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagRefName := "refs/tags/v1"
+
+		// Create authorization for this change
+		// This uses the latest reference authorization version
+		// As this is for a tag, the target is the commit the tag points to,
+		// taken from the RSL entry we just created for it
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// The policy expects targets1Key but we're signing with targets2Key
+		signer := setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 	})
 }
