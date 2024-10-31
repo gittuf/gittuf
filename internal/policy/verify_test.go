@@ -19,7 +19,6 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1261,16 +1260,19 @@ func TestVerifier(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	rootPubKey := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
-	targetsPubKey := ssh.NewKeyFromBytes(t, targets1PubKeyBytes)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootPubKeyR := rootSigner.MetadataKey()
+	rootPubKey := tufv01.NewKeyFromSSLibKey(rootPubKeyR)
+
 	targetsSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+	targetsPubKeyR := targetsSigner.MetadataKey()
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsPubKeyR)
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
 	commitID := commitIDs[0]
@@ -1308,7 +1310,7 @@ func TestVerifier(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		keys        []*signerverifier.SSLibKey
+		principals  []tuf.Principal
 		threshold   int
 		gitObjectID gitinterface.Hash
 		attestation *sslibdsse.Envelope
@@ -1316,73 +1318,73 @@ func TestVerifier(t *testing.T) {
 		expectedError error
 	}{
 		"commit, no attestation, valid key, threshold 1": {
-			keys:        []*signerverifier.SSLibKey{gpgKey},
+			principals:  []tuf.Principal{gpgKey},
 			threshold:   1,
 			gitObjectID: commitID,
 		},
 		"commit, no attestation, valid key, threshold 2": {
-			keys:          []*signerverifier.SSLibKey{gpgKey},
+			principals:    []tuf.Principal{gpgKey},
 			threshold:     2,
 			gitObjectID:   commitID,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"commit, attestation, valid key, threshold 1": {
-			keys:        []*signerverifier.SSLibKey{gpgKey},
+			principals:  []tuf.Principal{gpgKey},
 			threshold:   1,
 			gitObjectID: commitID,
 			attestation: attestation,
 		},
 		"commit, attestation, valid keys, threshold 2": {
-			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey},
+			principals:  []tuf.Principal{gpgKey, rootPubKey},
 			threshold:   2,
 			gitObjectID: commitID,
 			attestation: attestation,
 		},
 		"commit, invalid signed attestation, threshold 2": {
-			keys:          []*signerverifier.SSLibKey{gpgKey, rootPubKey},
+			principals:    []tuf.Principal{gpgKey, rootPubKey},
 			threshold:     2,
 			gitObjectID:   commitID,
 			attestation:   invalidAttestation,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"commit, attestation, valid keys, threshold 3": {
-			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey, targetsPubKey},
+			principals:  []tuf.Principal{gpgKey, rootPubKey, targetsPubKey},
 			threshold:   3,
 			gitObjectID: commitID,
 			attestation: attestationWithTwoSigs,
 		},
 		"tag, no attestation, valid key, threshold 1": {
-			keys:        []*signerverifier.SSLibKey{gpgKey},
+			principals:  []tuf.Principal{gpgKey},
 			threshold:   1,
 			gitObjectID: tagID,
 		},
 		"tag, no attestation, valid key, threshold 2": {
-			keys:          []*signerverifier.SSLibKey{gpgKey},
+			principals:    []tuf.Principal{gpgKey},
 			threshold:     2,
 			gitObjectID:   tagID,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"tag, attestation, valid key, threshold 1": {
-			keys:        []*signerverifier.SSLibKey{gpgKey},
+			principals:  []tuf.Principal{gpgKey},
 			threshold:   1,
 			gitObjectID: tagID,
 			attestation: attestation,
 		},
 		"tag, attestation, valid keys, threshold 2": {
-			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey},
+			principals:  []tuf.Principal{gpgKey, rootPubKey},
 			threshold:   2,
 			gitObjectID: tagID,
 			attestation: attestation,
 		},
 		"tag, invalid signed attestation, threshold 2": {
-			keys:          []*signerverifier.SSLibKey{gpgKey, rootPubKey},
+			principals:    []tuf.Principal{gpgKey, rootPubKey},
 			threshold:     2,
 			gitObjectID:   tagID,
 			attestation:   invalidAttestation,
 			expectedError: ErrVerifierConditionsUnmet,
 		},
 		"tag, attestation, valid keys, threshold 3": {
-			keys:        []*signerverifier.SSLibKey{gpgKey, rootPubKey, targetsPubKey},
+			principals:  []tuf.Principal{gpgKey, rootPubKey, targetsPubKey},
 			threshold:   3,
 			gitObjectID: tagID,
 			attestation: attestationWithTwoSigs,
@@ -1393,7 +1395,7 @@ func TestVerifier(t *testing.T) {
 		verifier := Verifier{
 			repository: repo,
 			name:       "test-verifier",
-			keys:       test.keys,
+			principals: test.principals,
 			threshold:  test.threshold,
 		}
 

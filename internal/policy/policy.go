@@ -22,7 +22,6 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const (
@@ -238,7 +237,7 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 		return nil, err
 	}
 
-	allPublicKeys := targetsMetadata.GetPrincipals()
+	allPrincipals := targetsMetadata.GetPrincipals()
 	// each entry is a list of delegations from a particular metadata file
 	groupedDelegations := [][]tuf.Rule{
 		targetsMetadata.GetRules(),
@@ -270,15 +269,11 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 				verifier := &Verifier{
 					repository: s.repository,
 					name:       delegation.ID(),
-					keys:       make([]*signerverifier.SSLibKey, 0, delegation.GetPrincipalIDs().Len()),
+					principals: make([]tuf.Principal, 0, delegation.GetPrincipalIDs().Len()),
 					threshold:  delegation.GetThreshold(),
 				}
-				for _, keyID := range delegation.GetPrincipalIDs().Contents() {
-					key := allPublicKeys[keyID]
-					// This is temporary: verifier will need to be separately
-					// updated with notions of multi-key principals where only
-					// one must be trusted
-					verifier.keys = append(verifier.keys, key.Keys()...)
+				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+					verifier.principals = append(verifier.principals, allPrincipals[principalID])
 				}
 				verifiers = append(verifiers, verifier)
 
@@ -294,8 +289,8 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 
 					seenRoles[delegation.ID()] = true
 
-					for keyID, key := range delegatedMetadata.GetPrincipals() {
-						allPublicKeys[keyID] = key
+					for principalID, principal := range delegatedMetadata.GetPrincipals() {
+						allPrincipals[principalID] = principal
 					}
 
 					// Add the current metadata's further delegations upfront to
@@ -393,16 +388,15 @@ func (s *State) Verify(ctx context.Context) error {
 
 			env := s.DelegationEnvelopes[delegation.ID()]
 
-			keys := []*signerverifier.SSLibKey{}
-			for _, keyID := range delegation.GetPrincipalIDs().Contents() {
-				// This is temporary until verifiers support multi-key principals
-				keys = append(keys, delegationKeys[keyID].Keys()...)
+			principals := []tuf.Principal{}
+			for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+				principals = append(principals, delegationKeys[principalID])
 			}
 
 			verifier := &Verifier{
 				repository: s.repository,
 				name:       delegation.ID(),
-				keys:       keys,
+				principals: principals,
 				threshold:  delegation.GetThreshold(),
 			}
 
@@ -862,15 +856,9 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	keys := []*signerverifier.SSLibKey{}
 	principals, err := rootMetadata.GetRootPrincipals()
 	if err != nil {
 		return nil, err
-	}
-	for _, principal := range principals {
-		// TODO: this is temporary, we need to update verifier's implementation
-		// Right now, each principal has a single key
-		keys = append(keys, principal.Keys()...)
 	}
 
 	threshold, err := rootMetadata.GetRootThreshold()
@@ -880,7 +868,7 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 
 	return &Verifier{
 		repository: s.repository,
-		keys:       keys,
+		principals: principals,
 		threshold:  threshold,
 	}, nil
 }
@@ -891,15 +879,9 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	keys := []*signerverifier.SSLibKey{}
 	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
 	if err != nil {
 		return nil, err
-	}
-	for _, principal := range principals {
-		// TODO: this is temporary, we need to update verifier's implementation
-		// Right now, each principal has a single key
-		keys = append(keys, principal.Keys()...)
 	}
 
 	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
@@ -909,7 +891,7 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 
 	return &Verifier{
 		repository: s.repository,
-		keys:       keys,
+		principals: principals,
 		threshold:  threshold,
 	}, nil
 }

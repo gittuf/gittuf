@@ -17,7 +17,6 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -339,7 +338,8 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
 		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
-		key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		keyR := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(keyR)
 
 		tests := map[string]struct {
 			path      string
@@ -348,17 +348,17 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 			"verifiers for files 1": {
 				path: "file:1/*",
 				verifiers: []*Verifier{{
-					name:      "1",
-					keys:      []*signerverifier.SSLibKey{key},
-					threshold: 1,
+					name:       "1",
+					principals: []tuf.Principal{key},
+					threshold:  1,
 				}},
 			},
 			"verifiers for files": {
 				path: "file:2/*",
 				verifiers: []*Verifier{{
-					name:      "2",
-					keys:      []*signerverifier.SSLibKey{key},
-					threshold: 1,
+					name:       "2",
+					principals: []tuf.Principal{key},
+					threshold:  1,
 				}},
 			},
 			"verifiers for unprotected branch": {
