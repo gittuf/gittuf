@@ -53,18 +53,19 @@ func (t *TargetsMetadata) Validate() error {
 }
 
 // AddRule adds a new delegation to TargetsMetadata.
-func (t *TargetsMetadata) AddRule(ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if ruleName == tuf.AllowRuleName {
 		return tuf.ErrCannotManipulateAllowRule
 	}
 
-	authorizedKeyIDs := set.NewSet[string]()
-	for _, key := range authorizedKeys {
-		if err := t.Delegations.addKey(key); err != nil {
-			return err
+	for _, principalID := range authorizedPrincipalIDs {
+		if _, has := t.Delegations.Keys[principalID]; !has {
+			return tuf.ErrPrincipalNotFound
 		}
+	}
 
-		authorizedKeyIDs.Add(key.ID())
+	if len(authorizedPrincipalIDs) < threshold {
+		return tuf.ErrCannotMeetThreshold
 	}
 
 	allDelegations := t.Delegations.Roles
@@ -77,7 +78,7 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedKeys []tuf.Principa
 		Paths:       rulePatterns,
 		Terminating: false,
 		Role: Role{
-			KeyIDs:    authorizedKeyIDs,
+			KeyIDs:    set.NewSetFromItems(authorizedPrincipalIDs...),
 			Threshold: threshold,
 		},
 	}
@@ -87,22 +88,19 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedKeys []tuf.Principa
 }
 
 // UpdateRule is used to amend a delegation in TargetsMetadata.
-func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if ruleName == tuf.AllowRuleName {
 		return tuf.ErrCannotManipulateAllowRule
 	}
 
-	if len(authorizedKeys) < threshold {
-		return tuf.ErrCannotMeetThreshold
+	for _, principalID := range authorizedPrincipalIDs {
+		if _, has := t.Delegations.Keys[principalID]; !has {
+			return tuf.ErrPrincipalNotFound
+		}
 	}
 
-	authorizedKeyIDs := set.NewSet[string]()
-	for _, key := range authorizedKeys {
-		if err := t.Delegations.addKey(key); err != nil {
-			return err
-		}
-
-		authorizedKeyIDs.Add(key.ID())
+	if len(authorizedPrincipalIDs) < threshold {
+		return tuf.ErrCannotMeetThreshold
 	}
 
 	allDelegations := []*Delegation{}
@@ -119,7 +117,7 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedKeys []tuf.Princ
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
 			delegation.Role = Role{
-				KeyIDs:    authorizedKeyIDs,
+				KeyIDs:    set.NewSetFromItems(authorizedPrincipalIDs...),
 				Threshold: threshold,
 			}
 		}

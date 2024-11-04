@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -74,7 +75,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -111,7 +112,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Adding rule to rule file...")
-	if err := targetsMetadata.AddRule(ruleName, authorizedKeys, rulePatterns, threshold); err != nil {
+	if err := targetsMetadata.AddRule(ruleName, authorizedPrincipalIDs, rulePatterns, threshold); err != nil {
 		return err
 	}
 
@@ -140,7 +141,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
 // policy.
-func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedKeys []tuf.Principal, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -172,7 +173,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Updating rule in rule file...")
-	if err := targetsMetadata.UpdateRule(ruleName, authorizedKeys, rulePatterns, threshold); err != nil {
+	if err := targetsMetadata.UpdateRule(ruleName, authorizedPrincipalIDs, rulePatterns, threshold); err != nil {
 		return err
 	}
 
@@ -308,9 +309,9 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	return state.Commit(r.r, commitMessage, signCommit)
 }
 
-// AddKeyToTargets is the interface for a user to add a trusted key to the
-// gittuf policy.
-func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedKeys []tuf.Principal, signCommit bool) error {
+// AddPrincipalToTargets is the interface for a user to add a trusted principal
+// to gittuf rule file metadata.
+func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipals []tuf.Principal, signCommit bool) error {
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -330,9 +331,9 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	keyIDs := ""
-	for _, key := range authorizedKeys {
-		keyIDs += fmt.Sprintf("\n%s", key.ID())
+	principalIDs := ""
+	for _, principal := range authorizedPrincipals {
+		principalIDs += fmt.Sprintf("\n%s", principal.ID())
 	}
 
 	slog.Debug("Loading current rule file...")
@@ -341,9 +342,9 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 		return err
 	}
 
-	slog.Debug("Adding key to rule file...")
-	for _, authorizedKey := range authorizedKeys {
-		if err := targetsMetadata.AddPrincipal(authorizedKey); err != nil {
+	for _, principal := range authorizedPrincipals {
+		slog.Debug(fmt.Sprintf("Adding principal '%s' to rule file...", strings.TrimSpace(principal.ID())))
+		if err := targetsMetadata.AddPrincipal(principal); err != nil {
 			return err
 		}
 	}
@@ -365,7 +366,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 		state.DelegationEnvelopes[targetsRoleName] = env
 	}
 
-	commitMessage := fmt.Sprintf("Add keys to policy '%s'\n%s", targetsRoleName, keyIDs)
+	commitMessage := fmt.Sprintf("Add principals to policy '%s'\n%s", targetsRoleName, principalIDs)
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, signCommit)

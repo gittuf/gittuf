@@ -58,18 +58,19 @@ func (t *TargetsMetadata) Validate() error {
 }
 
 // AddRule adds a new delegation to TargetsMetadata.
-func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipals []tuf.Principal, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if ruleName == tuf.AllowRuleName {
 		return tuf.ErrCannotManipulateAllowRule
 	}
 
-	authorizedPrincipalIDs := set.NewSet[string]()
-	for _, principal := range authorizedPrincipals {
-		if err := t.Delegations.addPrincipal(principal); err != nil {
-			return err
+	for _, principalID := range authorizedPrincipalIDs {
+		if _, has := t.Delegations.Principals[principalID]; !has {
+			return tuf.ErrPrincipalNotFound
 		}
+	}
 
-		authorizedPrincipalIDs.Add(principal.ID())
+	if len(authorizedPrincipalIDs) < threshold {
+		return tuf.ErrCannotMeetThreshold
 	}
 
 	allDelegations := t.Delegations.Roles
@@ -82,7 +83,7 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipals []tuf.Pr
 		Paths:       rulePatterns,
 		Terminating: false,
 		Role: Role{
-			PrincipalIDs: authorizedPrincipalIDs,
+			PrincipalIDs: set.NewSetFromItems(authorizedPrincipalIDs...),
 			Threshold:    threshold,
 		},
 	}
@@ -92,22 +93,19 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipals []tuf.Pr
 }
 
 // UpdateRule is used to amend a delegation in TargetsMetadata.
-func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipals []tuf.Principal, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if ruleName == tuf.AllowRuleName {
 		return tuf.ErrCannotManipulateAllowRule
 	}
 
-	if len(authorizedPrincipals) < threshold {
-		return tuf.ErrCannotMeetThreshold
+	for _, principalID := range authorizedPrincipalIDs {
+		if _, has := t.Delegations.Principals[principalID]; !has {
+			return tuf.ErrPrincipalNotFound
+		}
 	}
 
-	authorizedPrincipalIDs := set.NewSet[string]()
-	for _, principal := range authorizedPrincipals {
-		if err := t.Delegations.addPrincipal(principal); err != nil {
-			return err
-		}
-
-		authorizedPrincipalIDs.Add(principal.ID())
+	if len(authorizedPrincipalIDs) < threshold {
+		return tuf.ErrCannotMeetThreshold
 	}
 
 	allDelegations := []*Delegation{}
@@ -124,7 +122,7 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipals []tuf
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
 			delegation.Role = Role{
-				PrincipalIDs: authorizedPrincipalIDs,
+				PrincipalIDs: set.NewSetFromItems(authorizedPrincipalIDs...),
 				Threshold:    threshold,
 			}
 		}

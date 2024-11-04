@@ -5,6 +5,7 @@ package policy
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/addkey"
+	"github.com/gittuf/gittuf/internal/cmd/policy/addperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
 	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listprincipals"
@@ -30,6 +31,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addkey.New(o))
+	cmd.AddCommand(addperson.New(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(listprincipals.New())

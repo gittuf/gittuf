@@ -82,7 +82,11 @@ func TestAddDelegation(t *testing.T) {
 		assert.Equal(t, 2, len(targetsMetadata.GetRules()))
 		assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
 
-		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeys, rulePatterns, 1, false)
+		if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeys, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -125,7 +129,11 @@ func TestUpdateDelegation(t *testing.T) {
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 	targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
-	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []tuf.Principal{gpgKey, targetsKey}, []string{"git:refs/heads/main"}, 1, false)
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey, targetsKey}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -149,12 +157,17 @@ func TestUpdateDelegation(t *testing.T) {
 
 func TestReorderDelegations(t *testing.T) {
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 	r := createTestRepositoryWithPolicy(t, "")
 
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{targetsKey}, false); err != nil {
+		t.Fatal(err)
+	}
+
 	ruleNames := []string{"rule-1", "rule-2", "rule-3"}
 	for _, ruleName := range ruleNames {
-		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, nil, nil, 1, false)
+		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsKey.KeyID}, []string{ruleName}, 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,7 +208,11 @@ func TestRemoveDelegation(t *testing.T) {
 	authorizedKeys := []tuf.Principal{targetsPubKey}
 	rulePatterns := []string{"git:branch=main"}
 
-	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, authorizedKeys, rulePatterns, 1, false)
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeys, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -230,7 +247,7 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
 }
 
-func TestAddKeyToTargets(t *testing.T) {
+func TestAddPrincipalToTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
@@ -254,7 +271,7 @@ func TestAddKeyToTargets(t *testing.T) {
 	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
 	assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
 
-	err = r.AddKeyToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
