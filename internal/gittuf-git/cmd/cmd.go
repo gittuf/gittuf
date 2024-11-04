@@ -73,15 +73,10 @@ func SyncWithRemote(gitArgs args.Args) error {
 		return err
 	}
 
-	rslCmdArgs := []string{}
-	policyCmdArgs := []string{}
 	if gitArgs.Command == "pull" || gitArgs.Command == "fetch" {
-		// use git fetch to get the updates to the RSL.
-		rslCmdArgs = append(rslCmdArgs, "fetch")
-		policyCmdArgs = append(policyCmdArgs, "fetch")
+		fetchCmdArgs := []string{"fetch", "--atomic"}
 
-		// in case of a pull, the remote needs to be specified for the git
-		// fetch command in case of a simple `git pull`.
+		// Add remote if required by pull command with simple git pull
 		if gitArgs.Command == "pull" && len(gitArgs.Parameters) == 0 {
 			gitConfig, err := args.GetGitConfig(".git")
 			if err != nil {
@@ -89,35 +84,21 @@ func SyncWithRemote(gitArgs args.Args) error {
 				return err
 			}
 			remote := gitConfig["branch.main.remote"]
-			rslCmdArgs = append(rslCmdArgs, remote)
-			policyCmdArgs = append(policyCmdArgs, remote)
+			fetchCmdArgs = append(fetchCmdArgs, remote)
 		}
+
+		fetchCmdArgs = append(fetchCmdArgs,
+			"refs/gittuf/reference-state-log:refs/gittuf/reference-state-log",
+			"refs/gittuf/policy:refs/gittuf/policy")
+
+		gitFetchCmd := exec.Command(gitPath, fetchCmdArgs...)
+		gitFetchCmd.Stdout = os.Stdout
+		gitFetchCmd.Stderr = os.Stderr
+
+		return gitFetchCmd.Run()
 	}
 
-	if len(gitArgs.Parameters) > 0 {
-		rslCmdArgs = append(rslCmdArgs, gitArgs.Parameters...)
-	}
-	rslCmdArgs = append(rslCmdArgs, "refs/gittuf/reference-state-log:refs/gittuf/reference-state-log")
-
-	if len(gitArgs.Parameters) > 0 {
-		policyCmdArgs = append(policyCmdArgs, gitArgs.Parameters...)
-	}
-	policyCmdArgs = append(policyCmdArgs, "refs/gittuf/policy:refs/gittuf/policy")
-
-	gitSyncRSLCmd := exec.Command(gitPath, rslCmdArgs...)
-	gitSyncRSLCmd.Stdout = os.Stdout
-	gitSyncRSLCmd.Stderr = os.Stderr
-
-	gitSyncPolicyCmd := exec.Command(gitPath, policyCmdArgs...)
-	gitSyncPolicyCmd.Stdout = os.Stdout
-	gitSyncPolicyCmd.Stderr = os.Stderr
-
-	if err := gitSyncRSLCmd.Run(); err != nil {
-		return err
-	}
-
-	// Sync policy changes
-	return gitSyncPolicyCmd.Run()
+	return nil
 }
 
 // Commit handles the commit operation for gittuf + git
