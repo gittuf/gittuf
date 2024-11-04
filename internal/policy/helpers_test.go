@@ -17,6 +17,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 )
 
 var (
@@ -113,6 +114,73 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	}
 	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
 	if err := targetsMetadata.AddRule("protect-files-1-and-2", []tuf.Principal{gpgKey}, []string{"file:1", "file:2"}, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []tuf.Principal{key},
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID: "jane.doe@example.com",
+		PublicKeys: map[string]*tufv02.Key{
+			gpgKey.KeyID: gpgKey,
+		},
+	}
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddRule("protect-main", []tuf.Principal{person}, []string{"git:refs/heads/main"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", []tuf.Principal{person}, []string{"file:1", "file:2"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
