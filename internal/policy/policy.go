@@ -19,8 +19,9 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 )
 
 const (
@@ -231,12 +232,12 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 
 	// This envelope is verified when state is loaded, as this is
 	// the start for all delegation graph searches
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, true) // migrating is fine since this is purely a query, let's start using tufv02 metadata
 	if err != nil {
 		return nil, err
 	}
 
-	allPublicKeys := targetsMetadata.GetPrincipals()
+	allPrincipals := targetsMetadata.GetPrincipals()
 	// each entry is a list of delegations from a particular metadata file
 	groupedDelegations := [][]tuf.Rule{
 		targetsMetadata.GetRules(),
@@ -268,15 +269,11 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 				verifier := &Verifier{
 					repository: s.repository,
 					name:       delegation.ID(),
-					keys:       make([]*signerverifier.SSLibKey, 0, delegation.GetPrincipalIDs().Len()),
+					principals: make([]tuf.Principal, 0, delegation.GetPrincipalIDs().Len()),
 					threshold:  delegation.GetThreshold(),
 				}
-				for _, keyID := range delegation.GetPrincipalIDs().Contents() {
-					key := allPublicKeys[keyID]
-					// This is temporary: verifier will need to be separately
-					// updated with notions of multi-key principals where only
-					// one must be trusted
-					verifier.keys = append(verifier.keys, key.Keys()...)
+				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+					verifier.principals = append(verifier.principals, allPrincipals[principalID])
 				}
 				verifiers = append(verifiers, verifier)
 
@@ -285,15 +282,15 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 				}
 
 				if s.HasTargetsRole(delegation.ID()) {
-					delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID())
+					delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), true) // migrating is fine since this is purely a query, let's start using tufv02 metadata
 					if err != nil {
 						return nil, err
 					}
 
 					seenRoles[delegation.ID()] = true
 
-					for keyID, key := range delegatedMetadata.GetPrincipals() {
-						allPublicKeys[keyID] = key
+					for principalID, principal := range delegatedMetadata.GetPrincipals() {
+						allPrincipals[principalID] = principal
 					}
 
 					// Add the current metadata's further delegations upfront to
@@ -337,7 +334,7 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check GitHub app approvals
-	rootMetadata, err := s.GetRootMetadata()
+	rootMetadata, err := s.GetRootMetadata(false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
 	if err != nil {
 		return err
 	}
@@ -363,7 +360,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
 	if err != nil {
 		return err
 	}
@@ -391,16 +388,15 @@ func (s *State) Verify(ctx context.Context) error {
 
 			env := s.DelegationEnvelopes[delegation.ID()]
 
-			keys := []*signerverifier.SSLibKey{}
-			for _, keyID := range delegation.GetPrincipalIDs().Contents() {
-				// This is temporary until verifiers support multi-key principals
-				keys = append(keys, delegationKeys[keyID].Keys()...)
+			principals := []tuf.Principal{}
+			for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+				principals = append(principals, delegationKeys[principalID])
 			}
 
 			verifier := &Verifier{
 				repository: s.repository,
 				name:       delegation.ID(),
-				keys:       keys,
+				principals: principals,
 				threshold:  delegation.GetThreshold(),
 			}
 
@@ -408,7 +404,7 @@ func (s *State) Verify(ctx context.Context) error {
 				return err
 			}
 
-			delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID())
+			delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
 			if err != nil {
 				return err
 			}
@@ -561,7 +557,7 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 }
 
 func (s *State) GetRootKeys() ([]tuf.Principal, error) {
-	rootMetadata, err := s.GetRootMetadata()
+	rootMetadata, err := s.GetRootMetadata(false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
 	if err != nil {
 		return nil, err
 	}
@@ -570,21 +566,57 @@ func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 }
 
 // GetRootMetadata returns the deserialized payload of the State's RootEnvelope.
-func (s *State) GetRootMetadata() (tuf.RootMetadata, error) {
+// The `migrate` parameter determines if the schema must be converted to a newer
+// version.
+func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
 
-	rootMetadata := &tufv01.RootMetadata{}
-	if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
-		return nil, err
+	inspectRootMetadata := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectRootMetadata); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 	}
 
-	return rootMetadata, nil
+	schemaVersion, hasSchemaVersion := inspectRootMetadata["schemaVersion"]
+	switch {
+	case !hasSchemaVersion:
+		// this is tufv01
+		// Something that's not tufv01 may also lack the schemaVersion field and
+		// enter this code path. At that point, we're relying on the unmarshal
+		// to return something that's close to tufv01. We may see strange bugs
+		// if this happens, but it's also likely someone trying to submit
+		// incorrect metadata / trigger a version rollback, which we do want to
+		// be aware of.
+		rootMetadata := &tufv01.RootMetadata{}
+		if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		}
+
+		if migrate {
+			return migrations.MigrateRootMetadataV01ToV02(rootMetadata), nil
+		}
+
+		return rootMetadata, nil
+
+	case schemaVersion == tufv02.RootVersion:
+		rootMetadata := &tufv02.RootMetadata{}
+		if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		}
+
+		return rootMetadata, nil
+
+	default:
+		return nil, tuf.ErrUnknownRootMetadataVersion
+	}
 }
 
-func (s *State) GetTargetsMetadata(roleName string) (tuf.TargetsMetadata, error) {
+// GetTargetsMetadata returns the deserialized payload of the State's
+// TargetsEnvelope for the specified `roleName`.  The `migrate` parameter
+// determines if the schema must be converted to a newer version.
+func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMetadata, error) {
 	e := s.TargetsEnvelope
 	if roleName != TargetsRoleName {
 		env, ok := s.DelegationEnvelopes[roleName]
@@ -603,12 +635,43 @@ func (s *State) GetTargetsMetadata(roleName string) (tuf.TargetsMetadata, error)
 		return nil, err
 	}
 
-	targetsMetadata := &tufv01.TargetsMetadata{}
-	if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
-		return nil, err
+	inspectTargetsMetadata := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectTargetsMetadata); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
 	}
 
-	return targetsMetadata, nil
+	schemaVersion, hasSchemaVersion := inspectTargetsMetadata["schemaVersion"]
+	switch {
+	case !hasSchemaVersion:
+		// this is tufv01
+		// Something that's not tufv01 may also lack the schemaVersion field and
+		// enter this code path. At that point, we're relying on the unmarshal
+		// to return something that's close to tufv01. We may see strange bugs
+		// if this happens, but it's also likely someone trying to submit
+		// incorrect metadata / trigger a version rollback, which we do want to
+		// be aware of.
+		targetsMetadata := &tufv01.TargetsMetadata{}
+		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+		}
+
+		if migrate {
+			return migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata), nil
+		}
+
+		return targetsMetadata, nil
+
+	case schemaVersion == tufv02.TargetsVersion:
+		targetsMetadata := &tufv02.TargetsMetadata{}
+		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+		}
+
+		return targetsMetadata, nil
+
+	default:
+		return nil, tuf.ErrUnknownTargetsMetadataVersion
+	}
 }
 
 func (s *State) HasTargetsRole(roleName string) bool {
@@ -631,7 +694,7 @@ func (s *State) loadRuleNames() error {
 
 	s.ruleNames = set.NewSet[string]()
 
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		return err
 	}
@@ -653,7 +716,7 @@ func (s *State) loadRuleNames() error {
 	}
 
 	for delegatedRoleName := range s.DelegationEnvelopes {
-		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName)
+		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName, false)
 		if err != nil {
 			return err
 		}
@@ -687,7 +750,7 @@ func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef str
 		return nil, nil
 	}
 
-	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, true)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +779,7 @@ func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef str
 		}
 
 		if state.HasTargetsRole(currentDelegation.Delegation.ID()) {
-			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.ID())
+			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.ID(), true)
 			if err != nil {
 				return nil, err
 			}
@@ -753,7 +816,7 @@ func (s *State) hasFileRule() (bool, error) {
 		return false, nil
 	}
 
-	targetsRole, err := s.GetTargetsMetadata(TargetsRoleName)
+	targetsRole, err := s.GetTargetsMetadata(TargetsRoleName, true)
 	if err != nil {
 		return false, err
 	}
@@ -763,7 +826,7 @@ func (s *State) hasFileRule() (bool, error) {
 	// This doesn't consider whether a delegated role is reachable because we
 	// don't know what artifact path this is for
 	for roleName := range s.DelegationEnvelopes {
-		delegatedRole, err := s.GetTargetsMetadata(roleName)
+		delegatedRole, err := s.GetTargetsMetadata(roleName, true)
 		if err != nil {
 			return false, err
 		}
@@ -788,20 +851,14 @@ func (s *State) hasFileRule() (bool, error) {
 }
 
 func (s *State) getRootVerifier() (*Verifier, error) {
-	rootMetadata, err := s.GetRootMetadata()
+	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return nil, err
 	}
 
-	keys := []*signerverifier.SSLibKey{}
 	principals, err := rootMetadata.GetRootPrincipals()
 	if err != nil {
 		return nil, err
-	}
-	for _, principal := range principals {
-		// TODO: this is temporary, we need to update verifier's implementation
-		// Right now, each principal has a single key
-		keys = append(keys, principal.Keys()...)
 	}
 
 	threshold, err := rootMetadata.GetRootThreshold()
@@ -811,26 +868,20 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 
 	return &Verifier{
 		repository: s.repository,
-		keys:       keys,
+		principals: principals,
 		threshold:  threshold,
 	}, nil
 }
 
 func (s *State) getTargetsVerifier() (*Verifier, error) {
-	rootMetadata, err := s.GetRootMetadata()
+	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return nil, err
 	}
 
-	keys := []*signerverifier.SSLibKey{}
 	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
 	if err != nil {
 		return nil, err
-	}
-	for _, principal := range principals {
-		// TODO: this is temporary, we need to update verifier's implementation
-		// Right now, each principal has a single key
-		keys = append(keys, principal.Keys()...)
 	}
 
 	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
@@ -840,7 +891,7 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 
 	return &Verifier{
 		repository: s.repository,
-		keys:       keys,
+		principals: principals,
 		threshold:  threshold,
 	}, nil
 }
@@ -904,7 +955,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 		return nil, err
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		return nil, err
 	}

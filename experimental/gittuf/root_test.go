@@ -31,7 +31,7 @@ func TestInitializeRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 
@@ -60,7 +60,7 @@ func TestAddRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
 	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
@@ -88,7 +88,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestRemoveRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
 	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
@@ -195,7 +195,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestAddGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
 	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
@@ -269,7 +269,7 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestTrustGitHubApp(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rootMetadata, err := state.GetRootMetadata()
+		rootMetadata, err := state.GetRootMetadata(false)
 		assert.Nil(t, err)
 
 		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
@@ -345,7 +345,7 @@ func TestTrustGitHubApp(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rootMetadata, err = state.GetRootMetadata()
+		rootMetadata, err = state.GetRootMetadata(false)
 		assert.Nil(t, err)
 
 		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
@@ -369,7 +369,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
 	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
@@ -385,7 +385,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
 	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
@@ -400,7 +400,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
 	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
@@ -416,7 +416,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +474,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +501,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err = state.GetRootMetadata()
+	rootMetadata, err = state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}

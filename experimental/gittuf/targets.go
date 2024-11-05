@@ -105,7 +105,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 		return policy.ErrMetadataNotFound
 	}
 
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return err
 	}
@@ -336,7 +336,7 @@ func (r *Repository) AddKeyToTargets(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	slog.Debug("Loading current rule file...")
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return err
 	}
