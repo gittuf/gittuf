@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
-	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 )
 
 var (
@@ -25,11 +24,11 @@ var (
 // are trusted during gittuf verification.
 type PullRequestApprovalAttestation interface {
 	// GetApprovers returns the list of approvers witnessed by the GitHub app.
-	GetApprovers() []*tufv01.Key
+	GetApprovers() []string
 
 	// GetDismissedApprovers returns the list of approvers who later dismissed
 	// their review.
-	GetDismissedApprovers() []*tufv01.Key
+	GetDismissedApprovers() []string
 
 	authorizations.ReferenceAuthorization
 }

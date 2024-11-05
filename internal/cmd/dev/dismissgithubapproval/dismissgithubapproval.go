@@ -39,7 +39,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.dismissedApprover,
 		"dismiss-approver",
 		"",
-		"signing key representing approver whose review must be dismissed (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)",
+		"identity of the reviewer whose review was dismissed",
 	)
 	cmd.MarkFlagRequired("dismiss-approver") //nolint:errcheck
 
@@ -63,12 +63,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	dismissedApproverKey, err := gittuf.LoadPublicKey(o.dismissedApprover)
-	if err != nil {
-		return err
-	}
-
-	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, o.reviewID, dismissedApproverKey, true)
+	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, o.reviewID, o.dismissedApprover, true)
 }
 
 func New() *cobra.Command {

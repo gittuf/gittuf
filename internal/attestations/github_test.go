@@ -11,11 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
-	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,17 +23,7 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseHost := "github.com"
 	appName := "github"
 
-	approvers := []tuf.Principal{
-		&tufv01.Key{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: sigstore.KeyType,
-			Scheme:  sigstore.KeyScheme,
-			KeyVal: signerverifier.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
 	featureZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testAnotherRef, testID, testID, approvers)
@@ -70,17 +56,7 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseURL := "https://github.com"
 	appName := "github"
 
-	approvers := []tuf.Principal{
-		&tufv01.Key{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: sigstore.KeyType,
-			Scheme:  sigstore.KeyScheme,
-			KeyVal: signerverifier.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
 	featureZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testAnotherRef, testID, testID, approvers)
@@ -108,7 +84,7 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.Equal(t, featureZeroZero, featureAuth)
 }
 
-func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []tuf.Principal) *sslibdsse.Envelope {
+func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []string) *sslibdsse.Envelope {
 	t.Helper()
 
 	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, nil)
