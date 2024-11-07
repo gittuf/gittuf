@@ -82,7 +82,11 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	}
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []tuf.Principal{gpgKey}, []string{"git:refs/heads/main"}, 1, false); err != nil {
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false); err != nil {
 		t.Fatal(err)
 	}
 

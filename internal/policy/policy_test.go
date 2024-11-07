@@ -21,6 +21,8 @@ import (
 func TestLoadState(t *testing.T) {
 	t.Run("loading while verifying multiple states", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -39,7 +41,11 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-1", []tuf.Principal{}, []string{""}, 1); err != nil {
+		if err := targetsMetadata.AddPrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -48,8 +54,6 @@ func TestLoadState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, signer)
 		if err != nil {
@@ -66,7 +70,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-2", []tuf.Principal{}, []string{""}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -106,6 +110,8 @@ func TestLoadState(t *testing.T) {
 
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -124,7 +130,11 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-1", []tuf.Principal{}, []string{""}, 1); err != nil {
+		if err := targetsMetadata.AddPrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -133,8 +143,6 @@ func TestLoadState(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, signer)
 		if err != nil {
@@ -151,7 +159,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-2", []tuf.Principal{}, []string{""}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -215,16 +223,19 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
 	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("new-rule", []tuf.Principal{}, []string{"*"}, 1); err != nil { // just a dummy rule
+	if err := targetsMetadata.AddPrincipal(key); err != nil {
 		t.Fatal(err)
 	}
-
-	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
+		t.Fatal(err)
+	}
 
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
@@ -448,7 +459,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := tufv01.NewKeyFromSSLibKey(keyR)
-	if err := targetsMetadata.AddRule("new-rule", []tuf.Principal{key}, []string{"*"}, 1); err != nil { // just a dummy rule
+	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
 

@@ -8,17 +8,17 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	p              *persistent.Options
-	policyName     string
-	ruleName       string
-	authorizedKeys []string
-	rulePatterns   []string
-	threshold      int
+	p                      *persistent.Options
+	policyName             string
+	ruleName               string
+	authorizedKeys         []string
+	authorizedPrincipalIDs []string
+	rulePatterns           []string
+	threshold              int
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -43,7 +43,15 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		[]string{},
 		"authorized public key for rule",
 	)
-	cmd.MarkFlagRequired("authorize-key") //nolint:errcheck
+	cmd.Flags().MarkDeprecated("authorize-key", "use --authorize instead") //nolint:errcheck
+
+	cmd.Flags().StringArrayVar(
+		&o.authorizedPrincipalIDs,
+		"authorize",
+		[]string{},
+		"authorize the principal IDs for the rule",
+	)
+	cmd.MarkFlagsOneRequired("authorize", "authorize-key")
 
 	cmd.Flags().StringArrayVar(
 		&o.rulePatterns,
@@ -72,17 +80,18 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	authorizedKeys := []tuf.Principal{}
+	authorizedPrincipalIDs := []string{}
 	for _, key := range o.authorizedKeys {
 		key, err := gittuf.LoadPublicKey(key)
 		if err != nil {
 			return err
 		}
 
-		authorizedKeys = append(authorizedKeys, key)
+		authorizedPrincipalIDs = append(authorizedPrincipalIDs, key.ID())
 	}
+	authorizedPrincipalIDs = append(authorizedPrincipalIDs, o.authorizedPrincipalIDs...)
 
-	return repo.UpdateDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedKeys, o.rulePatterns, o.threshold, true)
+	return repo.UpdateDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedPrincipalIDs, o.rulePatterns, o.threshold, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

@@ -214,7 +214,14 @@ func TestAddRuleAndGetRules(t *testing.T) {
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
 
-	err := targetsMetadata.AddRule("test-rule", []tuf.Principal{key1, key2}, []string{"test/"}, 1)
+	if err := targetsMetadata.AddPrincipal(key1); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddPrincipal(key2); err != nil {
+		t.Fatal(err)
+	}
+
+	err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -241,7 +248,10 @@ func TestUpdateDelegation(t *testing.T) {
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
 
-	err := targetsMetadata.AddRule("test-rule", []tuf.Principal{key1}, []string{"test/"}, 1)
+	if err := targetsMetadata.AddPrincipal(key1); err != nil {
+		t.Fatal(err)
+	}
+	err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID}, []string{"test/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +265,10 @@ func TestUpdateDelegation(t *testing.T) {
 		Role:        Role{KeyIDs: set.NewSetFromItems(key1.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
 
-	err = targetsMetadata.UpdateRule("test-rule", []tuf.Principal{key1, key2}, []string{"test/"}, 1)
+	if err := targetsMetadata.AddPrincipal(key2); err != nil {
+		t.Fatal(err)
+	}
+	err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -276,17 +289,24 @@ func TestReorderRules(t *testing.T) {
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
 
-	err := targetsMetadata.AddRule("rule-1", []tuf.Principal{key1}, []string{"path1/"}, 1)
+	if err := targetsMetadata.AddPrincipal(key1); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddPrincipal(key2); err != nil {
+		t.Fatal(err)
+	}
+
+	err := targetsMetadata.AddRule("rule-1", []string{key1.KeyID}, []string{"path1/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = targetsMetadata.AddRule("rule-2", []tuf.Principal{key2}, []string{"path2/"}, 1)
+	err = targetsMetadata.AddRule("rule-2", []string{key2.KeyID}, []string{"path2/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = targetsMetadata.AddRule("rule-3", []tuf.Principal{key1, key2}, []string{"path3/"}, 1)
+	err = targetsMetadata.AddRule("rule-3", []string{key1.KeyID, key2.KeyID}, []string{"path3/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,8 +365,11 @@ func TestRemoveRule(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	if err := targetsMetadata.AddPrincipal(key); err != nil {
+		t.Fatal(err)
+	}
 
-	err := targetsMetadata.AddRule("test-rule", []tuf.Principal{key}, []string{"test/"}, 1)
+	err := targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +385,7 @@ func TestRemoveRule(t *testing.T) {
 func TestGetPrincipals(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-	if err := targetsMetadata.AddRule("test", []tuf.Principal{key1}, []string{"1"}, 1); err != nil {
+	if err := targetsMetadata.AddPrincipal(key1); err != nil {
 		t.Fatal(err)
 	}
 

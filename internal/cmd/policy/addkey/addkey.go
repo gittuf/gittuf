@@ -28,11 +28,11 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringArrayVar(
 		&o.authorizedKeys,
-		"authorize-key",
+		"public-key",
 		[]string{},
-		"authorized public key for rule",
+		"authorized public key",
 	)
-	cmd.MarkFlagRequired("authorize-key") //nolint:errcheck
+	cmd.MarkFlagRequired("public-key") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -56,7 +56,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		authorizedKeys = append(authorizedKeys, key)
 	}
 
-	return repo.AddKeyToTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true)
+	return repo.AddPrincipalToTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
@@ -64,7 +64,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-key",
 		Short:             "Add a trusted key to a policy file",
-		Long:              `This command allows users to add a trusted key to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Long:              `This command allows users to add trusted keys to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
 		PreRunE:           common.CheckIfSigningViableWithFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

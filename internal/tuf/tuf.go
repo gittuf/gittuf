@@ -32,6 +32,7 @@ var (
 	ErrDuplicatedRuleName                       = errors.New("two rules with same name found in policy")
 	ErrInvalidPrincipalID                       = errors.New("principal ID is invalid")
 	ErrInvalidPrincipalType                     = errors.New("invalid principal type (do you have the right gittuf version?)")
+	ErrPrincipalNotFound                        = errors.New("principal not found")
 	ErrRuleNotFound                             = errors.New("cannot find rule entry")
 	ErrMissingRules                             = errors.New("some rules are missing")
 	ErrCannotManipulateAllowRule                = errors.New("cannot change in-built gittuf-allow-rule")
@@ -135,10 +136,10 @@ type TargetsMetadata interface {
 	GetRules() []Rule
 
 	// AddRule adds a rule to the metadata file.
-	AddRule(ruleName string, authorizedPrincipals []Principal, rulePatterns []string, threshold int) error
+	AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
 	// UpdateRule updates an existing rule identified by ruleName with the
 	// provided parameters.
-	UpdateRule(ruleName string, authorizedPrincipals []Principal, rulePatterns []string, threshold int) error
+	UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
 	// ReorderRules accepts the new order of rules (identified by their
 	// ruleNames).
 	ReorderRules(newRuleNames []string) error
@@ -146,8 +147,6 @@ type TargetsMetadata interface {
 	RemoveRule(ruleName string) error
 
 	// AddPrincipal adds a principal to the metadata.
-	// TODO: this isn't associated with a specific rule; with the removal of
-	// verify-commit and verify-tag, it may not make sense anymore
 	AddPrincipal(principal Principal) error
 }
 
