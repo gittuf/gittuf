@@ -48,9 +48,18 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	for _, principal := range principals {
 		fmt.Printf("Principal %s:\n", principal.ID())
+
 		fmt.Printf(indentString + "Keys:\n")
 		for _, key := range principal.Keys() {
 			fmt.Printf(strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType)
+		}
+
+		customMetadata := principal.CustomMetadata()
+		if len(customMetadata) > 0 {
+			fmt.Printf(indentString + "Custom Metadata:\n")
+			for key, value := range principal.CustomMetadata() {
+				fmt.Printf(strings.Repeat(indentString, 2)+"%s: %s\n", key, value)
+			}
 		}
 	}
 	return nil

@@ -39,6 +39,11 @@ func (k *Key) Keys() []*signerverifier.SSLibKey {
 	return []*signerverifier.SSLibKey{&key}
 }
 
+func (k *Key) CustomMetadata() map[string]string {
+	// Key does not support custom metadata
+	return nil
+}
+
 // Role records common characteristics recorded in a role entry in Root metadata
 // and in a delegation entry.
 type Role struct {

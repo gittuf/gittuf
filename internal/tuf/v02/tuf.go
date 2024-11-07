@@ -8,6 +8,7 @@ package v02
 // however, is inspired by or cloned from the go-tuf implementation.
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -16,7 +17,11 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
-const AllowV02MetadataKey = "GITTUF_ALLOW_V02_POLICY"
+const (
+	AllowV02MetadataKey = "GITTUF_ALLOW_V02_POLICY"
+
+	associatedIdentityKey = "(associated identity)"
+)
 
 // AllowV02Metadata returns true if gittuf is in developer mode and
 // GITTUF_ALLOW_V02_POLICY=1.
@@ -54,6 +59,26 @@ func (p *Person) Keys() []*signerverifier.SSLibKey {
 	}
 
 	return keys
+}
+
+func (p *Person) CustomMetadata() map[string]string {
+	var metadata map[string]string
+
+	for provider, identity := range p.AssociatedIdentities {
+		if metadata == nil {
+			metadata = map[string]string{}
+		}
+		metadata[fmt.Sprintf("%s %s", associatedIdentityKey, provider)] = identity
+	}
+
+	for key, value := range p.Custom {
+		if metadata == nil {
+			metadata = map[string]string{}
+		}
+		metadata[key] = value
+	}
+
+	return metadata
 }
 
 // Role records common characteristics recorded in a role entry in Root metadata
