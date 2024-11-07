@@ -10,12 +10,8 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
-	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	ita "github.com/in-toto/attestation/go/v1"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,17 +25,7 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 
-	approvers := []tuf.Principal{
-		&tufv01.Key{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: sigstore.KeyType,
-			Scheme:  sigstore.KeyScheme,
-			KeyVal: signerverifier.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	_, err := NewPullRequestApprovalAttestation(testRef, testID, testID, nil, nil)
 	assert.ErrorIs(t, err, github.ErrInvalidPullRequestApprovalAttestation)
@@ -64,7 +50,7 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.Equal(t, predicate[targetTreeIDKey], testID)
 	assert.Equal(t, predicate[fromRevisionIDKey], testID)
 	// FIXME: this is a really messy assertion
-	assert.Equal(t, approvers[0].ID(), predicate["approvers"].([]any)[0].(map[string]any)["keyid"])
+	assert.Equal(t, approvers[0], predicate["approvers"].([]any)[0])
 }
 
 func TestValidatePullRequestApproval(t *testing.T) {
@@ -72,17 +58,7 @@ func TestValidatePullRequestApproval(t *testing.T) {
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
 
-	approvers := []tuf.Principal{
-		&tufv01.Key{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: sigstore.KeyType,
-			Scheme:  sigstore.KeyScheme,
-			KeyVal: signerverifier.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	mainZeroZero := createTestPullRequestApprovalEnvelope(t, testRef, testID, testID, approvers)
 	featureZeroZero := createTestPullRequestApprovalEnvelope(t, testAnotherRef, testID, testID, approvers)
@@ -97,7 +73,7 @@ func TestValidatePullRequestApproval(t *testing.T) {
 	assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
 }
 
-func createTestPullRequestApprovalEnvelope(t *testing.T, refName, fromID, toID string, approvers []tuf.Principal) *sslibdsse.Envelope {
+func createTestPullRequestApprovalEnvelope(t *testing.T, refName, fromID, toID string, approvers []string) *sslibdsse.Envelope {
 	t.Helper()
 
 	authorization, err := NewPullRequestApprovalAttestation(refName, fromID, toID, approvers, nil)

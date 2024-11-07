@@ -57,6 +57,10 @@ func (s *Set[T]) UnmarshalJSON(jsonBytes []byte) error {
 
 // Contents returns the objects present in the set.
 func (s *Set[T]) Contents() []T {
+	if s.contents == nil {
+		return nil
+	}
+
 	items := []T{}
 	for item := range s.contents {
 		items = append(items, item)

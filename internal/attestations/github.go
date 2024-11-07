@@ -15,7 +15,6 @@ import (
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 )
@@ -54,7 +53,7 @@ func GitHubPullRequestAttestationPath(refName, commitID string) string {
 // embedded in an in-toto "statement" and returned with the appropriate
 // "predicate type" set. The `fromTargetID` and `toTargetID` specify the change
 // to `targetRef` that is approved on the corresponding GitHub pull request.
-func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers, dismissedApprovers []tuf.Principal) (*ita.Statement, error) {
+func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID string, approvers, dismissedApprovers []string) (*ita.Statement, error) {
 	return githubv01.NewPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTreeID, approvers, dismissedApprovers)
 }
 

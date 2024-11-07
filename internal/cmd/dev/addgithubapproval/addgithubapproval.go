@@ -66,7 +66,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.approver,
 		"approver",
 		"",
-		"approver signing key (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)",
+		"identity of the reviewer who approved the change",
 	)
 	cmd.MarkFlagRequired("approver") //nolint:errcheck
 }
@@ -87,12 +87,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	approverKey, err := gittuf.LoadPublicKey(o.approver)
-	if err != nil {
-		return err
-	}
-
-	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, o.approver, true)
 }
 
 func New() *cobra.Command {

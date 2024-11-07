@@ -26,6 +26,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
@@ -433,7 +434,12 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 				continue
 			}
 
-			verifiedUsing, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, approverKeyIDs)
+			// TODO: app name
+			appName := ""
+			if policy.githubAppApprovalsTrusted {
+				appName = policy.githubAppKeys[0].ID()
+			}
+			verifiedUsing, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverKeyIDs)
 			if err != nil {
 				return fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
 			}
@@ -474,7 +480,12 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	}
 
 	// Use each verifier to verify signature
-	if _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, approverKeyIDs); err != nil {
+	// TODO: app name
+	appName := ""
+	if policy.githubAppApprovalsTrusted {
+		appName = policy.githubAppKeys[0].ID()
+	}
+	if _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, appName, approverKeyIDs); err != nil {
 		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
 	}
 
@@ -550,7 +561,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		}
 	}
 
-	approverKeyIDs := set.NewSet[string]()
+	approverIdentities := set.NewSet[string]()
 
 	// When we add other code review systems, we can move this into a
 	// generalized helper that inspects the attestations for each system trusted
@@ -598,13 +609,13 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 				return nil, nil, err
 			}
 
-			for _, approver := range stmt.Predicate.Approvers {
-				approverKeyIDs.Add(approver.ID())
+			for _, approver := range stmt.Predicate.GetApprovers() {
+				approverIdentities.Add(approver)
 			}
 		}
 	}
 
-	return authorizationAttestation, approverKeyIDs, nil
+	return authorizationAttestation, approverIdentities, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the
@@ -640,10 +651,15 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", nil
 	}
 
-	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, approverKeyIDs)
+	// TODO: app name
+	appName := ""
+	if policy.githubAppApprovalsTrusted {
+		appName = policy.githubAppKeys[0].ID()
+	}
+	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, approverKeyIDs)
 }
 
-func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverIDs *set.Set[string]) (string, error) {
+func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string]) (string, error) {
 	if len(verifiers) == 0 {
 		return "", ErrNoVerifiers
 	}
@@ -661,11 +677,36 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			return "", err
 		}
 
-		// Unify the principalIDs we've already used with that listed in
-		// approval attestation
-		// We ensure that someone who has signed an attestation and is listed in
-		// the approval attestation is only counted once
-		usedPrincipalIDs.Extend(approverIDs)
+		if approverIDs != nil {
+			// Unify the principalIDs we've already used with that listed in
+			// approval attestation
+			// We ensure that someone who has signed an attestation and is listed in
+			// the approval attestation is only counted once
+			for _, approverID := range approverIDs.Contents() {
+				// For each approver ID from the app attestation, we try to see
+				// if it matches a principal in the current verifiers.
+				for _, principal := range verifier.principals {
+					if usedPrincipalIDs.Has(principal.ID()) {
+						// This principal has already been counted towards the
+						// threshold
+						continue
+					}
+
+					// We can only match against a principal if it has a notion
+					// of associated identities
+					// Right now, this is just tufv02.Person
+					if principal, isV02 := principal.(*tufv02.Person); isV02 {
+						if associatedIdentity, has := principal.AssociatedIdentities[appName]; has && associatedIdentity == approverID {
+							// The approver ID from the issuer (appName) matches
+							// the principal's associated identity for the same
+							// issuer!
+							usedPrincipalIDs.Add(principal.ID())
+							break
+						}
+					}
+				}
+			}
+		}
 
 		// Get a list of used principals that are also trusted by the verifier
 		trustedUsedPrincipalIDs := trustedPrincipalIDs.Intersection(usedPrincipalIDs)

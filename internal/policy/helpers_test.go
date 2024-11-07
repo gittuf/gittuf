@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -21,16 +22,17 @@ import (
 )
 
 var (
-	testCtx                 = context.Background()
-	rootKeyBytes            = artifacts.SSHRSAPrivate
-	rootPubKeyBytes         = artifacts.SSHRSAPublicSSH
-	targets1KeyBytes        = artifacts.SSHECDSAPrivate
-	targets1PubKeyBytes     = artifacts.SSHECDSAPublicSSH
-	targets2KeyBytes        = artifacts.SSHED25519Private
-	targets2PubKeyBytes     = artifacts.SSHED25519PublicSSH
-	gpgKeyBytes             = artifacts.GPGKey1Private
-	gpgPubKeyBytes          = artifacts.GPGKey1Public
-	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
+	testCtx                    = context.Background()
+	rootKeyBytes               = artifacts.SSHRSAPrivate
+	rootPubKeyBytes            = artifacts.SSHRSAPublicSSH
+	targets1KeyBytes           = artifacts.SSHECDSAPrivate
+	targets1PubKeyBytes        = artifacts.SSHECDSAPublicSSH
+	targets2KeyBytes           = artifacts.SSHED25519Private
+	targets2PubKeyBytes        = artifacts.SSHED25519PublicSSH
+	gpgKeyBytes                = artifacts.GPGKey1Private
+	gpgPubKeyBytes             = artifacts.GPGKey1Public
+	gpgUnauthorizedKeyBytes    = artifacts.GPGKey2Private
+	gpgUnauthorizedPubKeyBytes = artifacts.GPGKey2Public
 )
 
 func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*gitinterface.Repository, *State) {
@@ -360,18 +362,25 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithThresholdPolicyAndGitHubAppTrust sets up a test policy
+// with threshold rules. It uses v0.2 (and higher) policy metadata to support
+// GitHub apps.
+//
+// Usage notes:
+//   - The app key is targets1PubKeyBytes
+//   - The two authorized persons are "jane.doe" and "john.doe"
+//   - jane.doe's signing key is gpgPubKeyBytes
+//   - john.doe's signing key is targets2PubKeyBytes
+//   - The protected namespace is the main branch
+//   - Use either of them as the approver for the app, with the app's signing key
+//     ID set as the app name
 func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	t.Helper()
 
-	state := createTestStateWithPolicy(t)
+	t.Setenv(dev.DevModeKey, "1")
+	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
-	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
-	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	state := createTestStateWithPolicyUsingPersons(t)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -380,6 +389,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
+	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
 		t.Fatal(err)
 	}
@@ -402,15 +412,33 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
+	}
+
+	if err := targetsMetadata.AddPrincipal(person); err != nil {
+		t.Fatal(err)
+	}
+
+	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	approver := &tufv02.Person{
+		PersonID:             "john.doe",
+		PublicKeys:           map[string]*tufv02.Key{approverKey.KeyID: approverKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver); err != nil {
 		t.Fatal(err)
 	}
 
 	// Set threshold = 2 for existing rule with the added key
-	if err := targetsMetadata.UpdateRule("protect-main", []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/heads/main"}, 2); err != nil {
+	if err := targetsMetadata.UpdateRule("protect-main", []string{person.ID(), approver.ID()}, []string{"git:refs/heads/main"}, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -427,24 +455,26 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations sets
+// up a test policy with threshold rules. It uses v0.2 (and higher) policy
+// metadata to support GitHub apps.
+//
+// Usage notes:
+//   - The app key is targets1PubKeyBytes
+//   - The three authorized persons are "jane.doe", "john.doe", and "jill.doe"
+//   - jane.doe's signing key is gpgPubKeyBytes
+//   - john.doe's signing key is targets2PubKeyBytes
+//   - jill.doe's signing key is gpgUnauthorizedPubKeyBytes
+//   - The protected namespace is the main branch
+//   - Use any of them as the approver for the app, with the app's signing key
+//     ID set as the app name
 func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *testing.T) *State {
 	t.Helper()
 
-	state := createTestStateWithPolicy(t)
+	t.Setenv(dev.DevModeKey, "1")
+	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
-	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
-	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-	approver1Key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
-
-	approver2KeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approver2Key := tufv01.NewKeyFromSSLibKey(approver2KeyR)
+	state := createTestStateWithPolicyUsingPersons(t)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -453,6 +483,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 		t.Fatal(err)
 	}
 
+	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
 		t.Fatal(err)
 	}
@@ -475,18 +506,49 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 		t.Fatal(err)
 	}
 
-	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddPrincipal(approver1Key); err != nil {
-		t.Fatal(err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
 	}
-	if err := targetsMetadata.AddPrincipal(approver2Key); err != nil {
+	if err := targetsMetadata.AddPrincipal(person); err != nil {
 		t.Fatal(err)
 	}
 
-	// Set threshold = 2 for existing rule with the added key
-	if err := targetsMetadata.UpdateRule("protect-main", []string{gpgKey.KeyID, approver1Key.KeyID, approver2Key.KeyID}, []string{"git:refs/heads/main"}, 3); err != nil {
+	approver1Key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	if err := targetsMetadata.AddPrincipal(approver1Key); err != nil {
+		t.Fatal(err)
+	}
+	approver1 := &tufv02.Person{
+		PersonID:             "john.doe",
+		PublicKeys:           map[string]*tufv02.Key{approver1Key.KeyID: approver1Key},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver1); err != nil {
+		t.Fatal(err)
+	}
+
+	approver2KeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver2Key := tufv01.NewKeyFromSSLibKey(approver2KeyR)
+	approver2 := &tufv02.Person{
+		PersonID:             "jill.doe",
+		PublicKeys:           map[string]*tufv02.Key{approver2Key.KeyID: approver2Key},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jill.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 3 for existing rule with the added principals
+	if err := targetsMetadata.UpdateRule("protect-main", []string{person.PersonID, approver1.PersonID, approver2.PersonID}, []string{"git:refs/heads/main"}, 3); err != nil {
 		t.Fatal(err)
 	}
 
