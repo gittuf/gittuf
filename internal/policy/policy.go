@@ -70,11 +70,6 @@ type State struct {
 	ruleNames      *set.Set[string]
 }
 
-type DelegationWithDepth struct {
-	Delegation tuf.Rule
-	Depth      int
-}
-
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
@@ -735,74 +730,6 @@ func (s *State) loadRuleNames() error {
 	}
 
 	return nil
-}
-
-// ListRules returns a list of all the rules as an array of the delegations in a
-// pre order traversal of the delegation tree, with the depth of each
-// delegation.
-func ListRules(ctx context.Context, repo *gitinterface.Repository, targetRef string) ([]*DelegationWithDepth, error) {
-	state, err := LoadCurrentState(ctx, repo, targetRef)
-	if err != nil {
-		return nil, err
-	}
-
-	if !state.HasTargetsRole(TargetsRoleName) {
-		return nil, nil
-	}
-
-	topLevelTargetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, true)
-	if err != nil {
-		return nil, err
-	}
-
-	delegationsToSearch := []*DelegationWithDepth{}
-	allDelegations := []*DelegationWithDepth{}
-
-	for _, topLevelDelegation := range topLevelTargetsMetadata.GetRules() {
-		if topLevelDelegation.ID() == tuf.AllowRuleName {
-			continue
-		}
-		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
-	}
-
-	seenRoles := map[string]bool{TargetsRoleName: true}
-
-	for len(delegationsToSearch) > 0 {
-		currentDelegation := delegationsToSearch[0]
-		delegationsToSearch = delegationsToSearch[1:]
-
-		// allDelegations will be the returned list of all the delegations in pre-order traversal, no delegations will be popped off
-		allDelegations = append(allDelegations, currentDelegation)
-
-		if _, seen := seenRoles[currentDelegation.Delegation.ID()]; seen {
-			continue
-		}
-
-		if state.HasTargetsRole(currentDelegation.Delegation.ID()) {
-			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.ID(), true)
-			if err != nil {
-				return nil, err
-			}
-
-			seenRoles[currentDelegation.Delegation.ID()] = true
-
-			// We construct localDelegations first so that we preserve the order
-			// of delegations in currentMetadata in delegationsToSearch
-			localDelegations := []*DelegationWithDepth{}
-			for _, delegation := range currentMetadata.GetRules() {
-				if delegation.ID() == tuf.AllowRuleName {
-					continue
-				}
-				localDelegations = append(localDelegations, &DelegationWithDepth{Delegation: delegation, Depth: currentDelegation.Depth + 1})
-			}
-
-			if len(localDelegations) > 0 {
-				delegationsToSearch = append(localDelegations, delegationsToSearch...)
-			}
-		}
-	}
-
-	return allDelegations, nil
 }
 
 // hasFileRule returns true if the policy state has a single rule in any targets

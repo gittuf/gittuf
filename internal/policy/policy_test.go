@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -16,7 +15,6 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
-	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -487,109 +485,6 @@ func TestGetStateForCommit(t *testing.T) {
 	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
 	assert.Nil(t, err)
 	assertStatesEqual(t, firstState, state)
-}
-
-func TestListRules(t *testing.T) {
-	t.Run("no delegations", func(t *testing.T) {
-		repo, _ := createTestRepository(t, createTestStateWithPolicy)
-
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
-		assert.Nil(t, err)
-
-		expectedRules := []*DelegationWithDepth{
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "protect-main",
-					Paths:       []string{"git:refs/heads/main"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold:    1,
-					},
-				},
-				Depth: 0,
-			},
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "protect-files-1-and-2",
-					Paths:       []string{"file:1", "file:2"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold:    1,
-					},
-				},
-				Depth: 0,
-			},
-		}
-		assert.Equal(t, expectedRules, rules)
-	})
-
-	t.Run("with delegations", func(t *testing.T) {
-		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
-
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
-		assert.Nil(t, err)
-
-		expectedRules := []*DelegationWithDepth{
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "1",
-					Paths:       []string{"file:1/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
-						Threshold:    1,
-					},
-				},
-				Depth: 0,
-			},
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "3",
-					Paths:       []string{"file:1/subpath1/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold:    1,
-					},
-				},
-				Depth: 1,
-			},
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "4",
-					Paths:       []string{"file:1/subpath2/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
-						Threshold:    1,
-					},
-				},
-				Depth: 1,
-			},
-
-			{
-				Delegation: &tufv02.Delegation{
-					Name:        "2",
-					Paths:       []string{"file:2/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tufv02.Role{
-						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
-						Threshold:    1,
-					},
-				},
-				Depth: 0,
-			},
-		}
-		assert.Equal(t, expectedRules, rules)
-	})
 }
 
 func TestStateHasFileRule(t *testing.T) {

@@ -25,6 +25,7 @@ Tools to manage gittuf policies
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
+* [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file

@@ -45,6 +45,7 @@ var (
 type Principal interface {
 	ID() string
 	Keys() []*signerverifier.SSLibKey
+	CustomMetadata() map[string]string
 }
 
 // RootMetadata represents the root of trust metadata for gittuf.
