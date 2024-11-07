@@ -12,6 +12,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
@@ -53,4 +54,11 @@ func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy
 		return policy.ListRules(ctx, r.r, targetRef)
 	}
 	return policy.ListRules(ctx, r.r, "refs/gittuf/"+targetRef)
+}
+
+func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName string) (map[string]tuf.Principal, error) {
+	if strings.HasPrefix(targetRef, "refs/gittuf/") {
+		return policy.ListPrincipals(ctx, r.r, targetRef, policyName)
+	}
+	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
 }
