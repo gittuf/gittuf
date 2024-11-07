@@ -528,8 +528,8 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 func indexPathToComponents(indexPath string) (string, string, string) {
 	components := strings.Split(indexPath, "/")
 
-	fromTo := strings.Split(components[len(components)-1], "-")
-	components = components[:len(components)-1] // remove last item which is from-to
+	fromTo := strings.Split(components[len(components)-2], "-")
+	components = components[:len(components)-2] // remove last two items which are from-to and system
 
 	base := strings.Join(components, "/") // reconstruct ref
 	from := fromTo[0]

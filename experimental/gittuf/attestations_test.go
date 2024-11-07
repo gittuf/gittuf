@@ -323,3 +323,33 @@ func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 		assert.Equal(t, test.expectedPredicate, predicate, fmt.Sprintf("unexpected predicate in test '%s'", name))
 	}
 }
+
+func TestIndexPathToComponents(t *testing.T) {
+	tests := map[string]struct {
+		baseRef string
+		from    string
+		to      string
+	}{
+		"simple ref": {
+			baseRef: "refs/heads/main",
+			from:    gitinterface.ZeroHash.String(),
+			to:      gitinterface.ZeroHash.String(),
+		},
+		"complicated ref": {
+			baseRef: "refs/heads/jane.doe/feature-branch",
+			from:    gitinterface.ZeroHash.String(),
+			to:      gitinterface.ZeroHash.String(),
+		},
+	}
+
+	for name, test := range tests {
+		// construct indexPath programmatically to force breaking changes /
+		// regressions to be detected here
+		indexPath := attestations.GitHubPullRequestApprovalAttestationPath(test.baseRef, test.from, test.to)
+
+		baseRef, from, to := indexPathToComponents(indexPath)
+		assert.Equal(t, test.baseRef, baseRef, fmt.Sprintf("unexpected 'base ref' in test '%s'", name))
+		assert.Equal(t, test.from, from, fmt.Sprintf("unexpected 'from' in test '%s'", name))
+		assert.Equal(t, test.to, to, fmt.Sprintf("unexpected 'to' in test '%s'", name))
+	}
+}
