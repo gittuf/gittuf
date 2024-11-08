@@ -678,6 +678,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 		}
 
 		if approverIDs != nil {
+			slog.Debug("Using approvers from code review tool attestations...")
 			// Unify the principalIDs we've already used with that listed in
 			// approval attestation
 			// We ensure that someone who has signed an attestation and is listed in
@@ -686,9 +687,11 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 				// For each approver ID from the app attestation, we try to see
 				// if it matches a principal in the current verifiers.
 				for _, principal := range verifier.principals {
+					slog.Debug(fmt.Sprintf("Checking if approver identity '%s' matches '%s'...", approverID, principal.ID()))
 					if usedPrincipalIDs.Has(principal.ID()) {
 						// This principal has already been counted towards the
 						// threshold
+						slog.Debug(fmt.Sprintf("Principal '%s' has already been counted towards threshold, skipping...", principal.ID()))
 						continue
 					}
 
@@ -700,6 +703,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 							// The approver ID from the issuer (appName) matches
 							// the principal's associated identity for the same
 							// issuer!
+							slog.Debug(fmt.Sprintf("Principal '%s' has associated identity '%s', counting principal towards threshold...", principal.ID(), approverID))
 							usedPrincipalIDs.Add(principal.ID())
 							break
 						}
@@ -712,6 +716,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 		trustedUsedPrincipalIDs := trustedPrincipalIDs.Intersection(usedPrincipalIDs)
 		if trustedUsedPrincipalIDs.Len() >= verifier.Threshold() {
 			// With approvals, we now meet threshold!
+			slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', threshold met!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
 			verifiedUsing = verifier.Name()
 			break
 		}
