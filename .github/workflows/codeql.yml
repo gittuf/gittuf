@@ -16,10 +16,12 @@ on:
     branches: [ "main" ]
     paths-ignore:
       - "docs/**"
+      - "**.md"
   pull_request:
     branches: [ "main" ]
     paths-ignore:
       - "docs/**"
+      - "**.md"
   schedule:
     - cron: '28 17 * * 6'
 permissions: read-all
@@ -53,11 +55,11 @@ jobs:
         # your codebase is analyzed, see https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/codeql-code-scanning-for-compiled-languages
     steps:
     - name: Checkout repository
-      uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@e2b3eafc8d227b0241d48be5f425d47c2d750a13
+      uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -69,6 +71,6 @@ jobs:
         # queries: security-extended,security-and-quality
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@e2b3eafc8d227b0241d48be5f425d47c2d750a13
+      uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd
       with:
         category: "/language:${{matrix.language}}"

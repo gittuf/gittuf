@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/repository"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +25,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
@@ -39,9 +39,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	// The order is a pre-order traversal of the delegation tree, so that the parent is always before the children.
 
 	for _, curRule := range rules {
-		fmt.Printf(strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.Name)
+		fmt.Printf(strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.ID())
 		gitpaths, filepaths := []string{}, []string{}
-		for _, path := range curRule.Delegation.Paths {
+		for _, path := range curRule.Delegation.GetProtectedNamespaces() {
 			if strings.HasPrefix(path, "git:") {
 				gitpaths = append(gitpaths, path)
 			} else {
@@ -62,11 +62,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		}
 
 		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + "Authorized keys:")
-		for _, key := range curRule.Delegation.Role.KeyIDs {
+		for _, key := range curRule.Delegation.GetPrincipalIDs().Contents() {
 			fmt.Printf(strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
 		}
 
-		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.Role.Threshold))
+		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.GetThreshold()))
 	}
 	return nil
 }

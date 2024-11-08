@@ -3,197 +3,176 @@
 
 package tuf
 
-// This package defines gittuf's take on TUF metadata. There are some minor
-// changes, such as the addition of `custom` to delegation entries. Some of it,
-// however, is inspired by or cloned from the go-tuf implementation.
-
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 
-	"github.com/danwakefield/fnmatch"
+	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+)
 
-	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/secure-systems-lab/go-securesystemslib/cjson"
+const (
+	// RootRoleName defines the expected name for the gittuf root of trust.
+	RootRoleName = "root"
+
+	// TargetsRoleName defines the expected name for the top level gittuf policy file.
+	TargetsRoleName = "targets"
+
+	// GitHubAppRoleName defines the expected name for the GitHub app role in the root of trust metadata.
+	GitHubAppRoleName = "github-app"
+
+	AllowRuleName = "gittuf-allow-rule"
 )
 
 var (
-	ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
+	ErrInvalidRootMetadata                      = errors.New("invalid root metadata")
+	ErrUnknownRootMetadataVersion               = errors.New("unknown schema version for root metadata")
+	ErrUnknownTargetsMetadataVersion            = errors.New("unknown schema version for rule file metadata")
+	ErrPrimaryRuleFileInformationNotFoundInRoot = errors.New("root metadata does not contain primary rule file information")
+	ErrGitHubAppInformationNotFoundInRoot       = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
+	ErrDuplicatedRuleName                       = errors.New("two rules with same name found in policy")
+	ErrInvalidPrincipalID                       = errors.New("principal ID is invalid")
+	ErrInvalidPrincipalType                     = errors.New("invalid principal type (do you have the right gittuf version?)")
+	ErrPrincipalNotFound                        = errors.New("principal not found")
+	ErrRuleNotFound                             = errors.New("cannot find rule entry")
+	ErrMissingRules                             = errors.New("some rules are missing")
+	ErrCannotManipulateAllowRule                = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrCannotMeetThreshold                      = errors.New("insufficient keys to meet threshold")
 )
 
-// Key defines the structure for how public keys are stored in TUF metadata.
-type Key = signerverifier.SSLibKey
-
-// LoadKeyFromBytes returns a pointer to a Key instance created from the
-// contents of the bytes. The key contents are expected to be in the custom
-// securesystemslib format.
-func LoadKeyFromBytes(contents []byte) (*Key, error) {
-	var (
-		key *Key
-		err error
-	)
-
-	// Try to load PEM encoded key
-	key, err = signerverifier.LoadKey(contents)
-	if err == nil {
-		return key, nil
-	}
-
-	// Compatibility with old, custom serialization format if err != nil above
-	if err := json.Unmarshal(contents, &key); err != nil {
-		return nil, err
-	}
-
-	if len(key.KeyID) == 0 {
-		keyID, err := calculateKeyID(key)
-		if err != nil {
-			return nil, err
-		}
-		key.KeyID = keyID
-	}
-
-	return key, nil
+// Principal represents an entity that is granted trust by gittuf metadata. In
+// the simplest case, a principal may be a single public key. On the other hand,
+// a principal may represent a human (who may control multiple keys), a team
+// (consisting of multiple humans) etc.
+type Principal interface {
+	ID() string
+	Keys() []*signerverifier.SSLibKey
+	CustomMetadata() map[string]string
 }
 
-func calculateKeyID(k *Key) (string, error) {
-	key := map[string]any{
-		"keytype":               k.KeyType,
-		"scheme":                k.Scheme,
-		"keyid_hash_algorithms": k.KeyIDHashAlgorithms,
-		"keyval": map[string]string{
-			"public": k.KeyVal.Public,
-		},
-	}
-	canonical, err := cjson.EncodeCanonical(key)
-	if err != nil {
-		return "", err
-	}
-	digest := sha256.Sum256(canonical)
-	return hex.EncodeToString(digest[:]), nil
+// RootMetadata represents the root of trust metadata for gittuf.
+type RootMetadata interface {
+	// SetExpires sets the expiry time for the metadata.
+	// TODO: Does expiry make sense for the gittuf context? This is currently
+	// unenforced
+	SetExpires(expiry string)
+
+	// SchemaVersion returns the metadata schema version.
+	SchemaVersion() string
+
+	// GetPrincipals returns all the principals in the root metadata.
+	GetPrincipals() map[string]Principal
+
+	// AddRootPrincipal adds the corresponding principal to the root metadata
+	// file and marks it as trusted for subsequent root of trust metadata.
+	AddRootPrincipal(principal Principal) error
+	// DeleteRootPrincipal removes the corresponding principal from the set of
+	// trusted principals for the root of trust.
+	DeleteRootPrincipal(principalID string) error
+	// UpdateRootThreshold sets the required number of signatures for root of
+	// trust metadata.
+	UpdateRootThreshold(threshold int) error
+	// GetRootPrincipals returns the principals trusted for the root of trust
+	// metadata.
+	GetRootPrincipals() ([]Principal, error)
+	// GetRootThreshold returns the threshold of principals that must sign the
+	// root of trust metadata.
+	GetRootThreshold() (int, error)
+
+	// AddPrincipalRuleFilePrincipal adds the corresponding principal to the
+	// root metadata file and marks it as trusted for the primary rule file.
+	AddPrimaryRuleFilePrincipal(principal Principal) error
+	// DeletePrimaryRuleFilePrincipal removes the corresponding principal from
+	// the set of trusted principals for the primary rule file.
+	DeletePrimaryRuleFilePrincipal(principalID string) error
+	// UpdatePrimaryRuleFileThreshold sets the required number of signatures for
+	// the primary rule file.
+	UpdatePrimaryRuleFileThreshold(threshold int) error
+	// GetPrimaryRuleFilePrincipals returns the principals trusted for the
+	// primary rule file.
+	GetPrimaryRuleFilePrincipals() ([]Principal, error)
+	// GetPrimaryRuleFileThreshold returns the threshold of principals that must
+	// sign the primary rule file.
+	GetPrimaryRuleFileThreshold() (int, error)
+
+	// AddGitHubAppPrincipal adds the corresponding principal to the root
+	// metadata and is trusted for GitHub app attestations.
+	// TODO: this needs to be generalized across tools
+	AddGitHubAppPrincipal(principal Principal) error
+	// DeleteGitHubAppPrincipal removes the GitHub app attestations role from
+	// the root of trust metadata.
+	// TODO: this needs to be generalized across tools
+	DeleteGitHubAppPrincipal()
+	// EnableGitHubAppApprovals indicates attestations from the GitHub app role
+	// must be trusted.
+	// TODO: this needs to be generalized across tools
+	EnableGitHubAppApprovals()
+	// DisableGitHubAppApprovals indicates attestations from the GitHub app role
+	// must not be trusted thereafter.
+	// TODO: this needs to be generalized across tools
+	DisableGitHubAppApprovals()
+	// IsGitHubAppApprovalTrusted indicates if the GitHub app is trusted.
+	// TODO: this needs to be generalized across tools
+	IsGitHubAppApprovalTrusted() bool
+	// GetGitHubAppPrincipals returns the principals trusted for the GitHub app
+	// attestations.
+	// TODO: this needs to be generalized across tools
+	GetGitHubAppPrincipals() ([]Principal, error)
 }
 
-// Role records common characteristics recorded in a role entry in Root metadata
-// and in a delegation entry.
-type Role struct {
-	KeyIDs    []string `json:"keyids"`
-	Threshold int      `json:"threshold"`
+// TargetsMetadata represents gittuf's rule files. Its name is inspired by TUF.
+type TargetsMetadata interface {
+	// SetExpires sets the expiry time for the metadata.
+	// TODO: Does expiry make sense for the gittuf context? This is currently
+	// unenforced
+	SetExpires(expiry string)
+
+	// SchemaVersion returns the metadata schema version.
+	SchemaVersion() string
+
+	// GetPrincipals returns all the principals in the rule file.
+	GetPrincipals() map[string]Principal
+
+	// GetRules returns all the rules in the metadata.
+	GetRules() []Rule
+
+	// AddRule adds a rule to the metadata file.
+	AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
+	// UpdateRule updates an existing rule identified by ruleName with the
+	// provided parameters.
+	UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
+	// ReorderRules accepts the new order of rules (identified by their
+	// ruleNames).
+	ReorderRules(newRuleNames []string) error
+	// RemoveRule deletes the rule identified by the ruleName.
+	RemoveRule(ruleName string) error
+
+	// AddPrincipal adds a principal to the metadata.
+	AddPrincipal(principal Principal) error
 }
 
-// RootMetadata defines the schema of TUF's Root role.
-type RootMetadata struct {
-	Type                   string          `json:"type"`
-	Expires                string          `json:"expires"`
-	Keys                   map[string]*Key `json:"keys"`
-	Roles                  map[string]Role `json:"roles"`
-	GitHubApprovalsTrusted bool            `json:"githubApprovalsTrusted"`
-}
+// Rule represents a rule entry in a rule file (`TargetsMetadata`).
+type Rule interface {
+	// ID returns the identifier of the rule, typically a name.
+	ID() string
 
-// NewRootMetadata returns a new instance of RootMetadata.
-func NewRootMetadata() *RootMetadata {
-	return &RootMetadata{
-		Type: "root",
-	}
-}
+	// Matches indicates if the rule applies to a specified path.
+	Matches(path string) bool
 
-// SetExpires sets the expiry date of the RootMetadata to the value passed in.
-func (r *RootMetadata) SetExpires(expires string) {
-	r.Expires = expires
-}
+	// GetProtectedNamespaces returns the set of namespaces protected by the
+	// rule.
+	GetProtectedNamespaces() []string
 
-// AddKey adds a key to the RootMetadata instance.
-func (r *RootMetadata) AddKey(key *Key) {
-	if r.Keys == nil {
-		r.Keys = map[string]*Key{}
-	}
+	// GetPrincipalIDs returns the identifiers of the principals that are listed
+	// as trusted by the rule.
+	GetPrincipalIDs() *set.Set[string]
+	// GetThreshold returns the threshold of principals that must approve to
+	// meet the rule.
+	GetThreshold() int
 
-	r.Keys[key.KeyID] = key
-}
-
-// AddRole adds a role object and associates it with roleName in the
-// RootMetadata instance.
-func (r *RootMetadata) AddRole(roleName string, role Role) {
-	if r.Roles == nil {
-		r.Roles = map[string]Role{}
-	}
-
-	r.Roles[roleName] = role
-}
-
-// TargetsMetadata defines the schema of TUF's Targets role.
-type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
-}
-
-// NewTargetsMetadata returns a new instance of TargetsMetadata.
-func NewTargetsMetadata() *TargetsMetadata {
-	return &TargetsMetadata{
-		Type:        "targets",
-		Delegations: &Delegations{},
-	}
-}
-
-// SetExpires sets the expiry date of the TargetsMetadata to the value passed
-// in.
-func (t *TargetsMetadata) SetExpires(expires string) {
-	t.Expires = expires
-}
-
-// Validate ensures the instance of TargetsMetadata matches gittuf expectations.
-func (t *TargetsMetadata) Validate() error {
-	if len(t.Targets) != 0 {
-		return ErrTargetsNotEmpty
-	}
-	return nil
-}
-
-// Delegations defines the schema for specifying delegations in TUF's Targets
-// metadata.
-type Delegations struct {
-	Keys  map[string]*Key `json:"keys"`
-	Roles []Delegation    `json:"roles"`
-}
-
-// AddKey adds a delegations key.
-func (d *Delegations) AddKey(key *Key) {
-	if d.Keys == nil {
-		d.Keys = map[string]*Key{}
-	}
-
-	d.Keys[key.KeyID] = key
-}
-
-// AddDelegation adds a new delegation.
-func (d *Delegations) AddDelegation(delegation Delegation) {
-	if d.Roles == nil {
-		d.Roles = []Delegation{}
-	}
-
-	d.Roles = append(d.Roles, delegation)
-}
-
-// Delegation defines the schema for a single delegation entry. It differs from
-// the standard TUF schema by allowing a `custom` field to record details
-// pertaining to the delegation.
-type Delegation struct {
-	Name        string           `json:"name"`
-	Paths       []string         `json:"paths"`
-	Terminating bool             `json:"terminating"`
-	Custom      *json.RawMessage `json:"custom,omitempty"`
-	Role
-}
-
-// Matches checks if any of the delegation's patterns match the target.
-func (d *Delegation) Matches(target string) bool {
-	for _, pattern := range d.Paths {
-		// We validate pattern when it's added to / updated in the metadata
-		if matches := fnmatch.Match(pattern, target, 0); matches {
-			return true
-		}
-	}
-	return false
+	// IsLastTrustedInRuleFile indicates that subsequent rules in the rule file
+	// are not to be trusted if the current rule matches the namespace under
+	// verification (similar to TUF's terminating behavior). However, the
+	// current rule's delegated rules as well as other rules already in the
+	// queue are trusted.
+	IsLastTrustedInRuleFile() bool
 }

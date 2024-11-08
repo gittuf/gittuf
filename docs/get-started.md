@@ -82,7 +82,7 @@ as `gittuf.exe` from this directory, or add it to your PATH as desired.
 
 To build from source, clone the repository and run
 `make`. This will also run the test suite prior to installing gittuf. Note that
-Go 1.22 or higher is necessary to build gittuf.
+Go 1.23 or higher is necessary to build gittuf.
 
 ```sh
 git clone https://github.com/gittuf/gittuf
@@ -143,13 +143,16 @@ Then, use the policy key to initialize a policy and add a rule protecting the
 `main` branch.
 
 ```bash
+gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
 gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
 ```
 
-Note that `--authorize-key` can also be used to specify a GPG key or a
-[Sigstore] identity for use with [gitsign]. However, we're using SSH keys
-throughout in this guide, as gittuf policy metadata currently cannot be signed
-using GPG and Sigstore (see [#229]).
+Note that `add-key` can also be used to specify a GPG key or a [Sigstore]
+identity for use with [gitsign]. However, we're using SSH keys throughout in
+this guide, as gittuf policy metadata currently cannot be signed using GPG (see
+[#229]). Also, `--authorize-key` in `gittuf policy add-rule` may return a
+deprecation warning. This guide will be updated with the new `--authorize` flag
+in its place.
 
 After adding the required policies, _apply_ them from the policy-staging area.
 This means the policy will be applicable henceforth.

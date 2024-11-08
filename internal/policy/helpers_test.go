@@ -5,28 +5,34 @@ package policy
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 )
 
 var (
-	testCtx                 = context.Background()
-	rootKeyBytes            = artifacts.SSLibKey1Private
-	rootPubKeyBytes         = artifacts.SSLibKey1Public
-	targets1KeyBytes        = artifacts.SSLibKey2Private
-	targets1PubKeyBytes     = artifacts.SSLibKey2Public
-	targets2KeyBytes        = artifacts.SSLibKey3Private
-	targets2PubKeyBytes     = artifacts.SSLibKey3Public
-	gpgKeyBytes             = artifacts.GPGKey1Private
-	gpgPubKeyBytes          = artifacts.GPGKey1Public
-	gpgUnauthorizedKeyBytes = artifacts.GPGKey2Private
+	testCtx                    = context.Background()
+	rootKeyBytes               = artifacts.SSHRSAPrivate
+	rootPubKeyBytes            = artifacts.SSHRSAPublicSSH
+	targets1KeyBytes           = artifacts.SSHECDSAPrivate
+	targets1PubKeyBytes        = artifacts.SSHECDSAPublicSSH
+	targets2KeyBytes           = artifacts.SSHED25519Private
+	targets2PubKeyBytes        = artifacts.SSHED25519PublicSSH
+	gpgKeyBytes                = artifacts.GPGKey1Private
+	gpgPubKeyBytes             = artifacts.GPGKey1Public
+	gpgUnauthorizedKeyBytes    = artifacts.GPGKey2Private
+	gpgUnauthorizedPubKeyBytes = artifacts.GPGKey2Public
 )
 
 func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*gitinterface.Repository, *State) {
@@ -51,17 +57,13 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata := InitializeRootMetadata(key)
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -73,7 +75,7 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	}
 
 	return &State{
-		RootPublicKeys: []*tuf.Key{key},
+		RootPublicKeys: []tuf.Principal{key},
 		RootEnvelope:   rootEnv,
 	}
 }
@@ -81,20 +83,15 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata := InitializeRootMetadata(key)
-
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
-	if err != nil {
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,19 +104,21 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
 	targetsMetadata := InitializeTargetsMetadata()
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey}, []string{"git:refs/heads/main"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-files-1-and-2", []*tuf.Key{gpgKey}, []string{"file:1", "file:2"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -135,7 +134,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	state := &State{
 		RootEnvelope:    rootEnv,
 		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []*tuf.Key{key},
+		RootPublicKeys:  []tuf.Principal{key},
 	}
 
 	if err := state.loadRuleNames(); err != nil {
@@ -145,23 +144,18 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	return state
 }
 
-func createTestStateWithDelegatedPolicies(t *testing.T) *State {
+func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 	t.Helper()
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata := InitializeRootMetadata(key)
-
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
-	if err != nil {
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,21 +168,93 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID: "jane.doe@example.com",
+		PublicKeys: map[string]*tufv02.Key{
+			gpgKey.KeyID: gpgKey,
+		},
+	}
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(person); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-main", []string{person.PersonID}, []string{"git:refs/heads/main"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{person.PersonID}, []string{"file:1", "file:2"}, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []tuf.Principal{key},
+	}
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func createTestStateWithDelegatedPolicies(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
 	// Create the root targets metadata
 	targetsMetadata := InitializeTargetsMetadata()
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "1", []*tuf.Key{key}, []string{"file:1/*"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("1", []string{key.KeyID}, []string{"file:1/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err = AddDelegation(targetsMetadata, "2", []*tuf.Key{key}, []string{"file:2/*"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddRule("2", []string{key.KeyID}, []string{"file:2/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -204,13 +270,14 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	// Create the second level of delegations
 	delegation1Metadata := InitializeTargetsMetadata()
-	delegation1Metadata, err = AddDelegation(delegation1Metadata, "3", []*tuf.Key{gpgKey}, []string{"file:1/subpath1/*"}, 1)
-	if err != nil {
+	if err := delegation1Metadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := delegation1Metadata.AddRule("3", []string{gpgKey.KeyID}, []string{"file:1/subpath1/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	delegation1Metadata, err = AddDelegation(delegation1Metadata, "4", []*tuf.Key{gpgKey}, []string{"file:1/subpath2/*"}, 1)
-	if err != nil {
+	if err := delegation1Metadata.AddRule("4", []string{gpgKey.KeyID}, []string{"file:1/subpath2/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -228,7 +295,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 		RootEnvelope:        rootEnv,
 		TargetsEnvelope:     targetsEnv,
 		DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
-		RootPublicKeys:      []*tuf.Key{key},
+		RootPublicKeys:      []tuf.Principal{key},
 	}
 
 	// Add the delegation envelopes to the state
@@ -255,23 +322,27 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 
 	state := createTestStateWithPolicy(t)
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	approverKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
 		t.Fatal(err)
 	}
 
 	// Set threshold = 2 for existing rule with the added key
-	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
-	if err != nil {
+	if err := targetsMetadata.UpdateRule("protect-main", []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/heads/main"}, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -279,10 +350,9 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -292,44 +362,40 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithThresholdPolicyAndGitHubAppTrust sets up a test policy
+// with threshold rules. It uses v0.2 (and higher) policy metadata to support
+// GitHub apps.
+//
+// Usage notes:
+//   - The app key is targets1PubKeyBytes
+//   - The two authorized persons are "jane.doe" and "john.doe"
+//   - jane.doe's signing key is gpgPubKeyBytes
+//   - john.doe's signing key is targets2PubKeyBytes
+//   - The protected namespace is the main branch
+//   - Use either of them as the approver for the app, with the app's signing key
+//     ID set as the app name
 func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	t.Helper()
 
-	state := createTestStateWithPolicy(t)
+	t.Setenv(dev.DevModeKey, "1")
+	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approverKey, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
+	state := createTestStateWithPolicyUsingPersons(t)
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
+	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
 		t.Fatal(err)
 	}
-
-	rootMetadata, err := state.GetRootMetadata()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootMetadata.EnableGitHubAppApprovals()
 	state.githubAppApprovalsTrusted = true
-	state.githubAppKey = appKey
+	state.githubAppKeys = []tuf.Principal{appKey}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -341,14 +407,38 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	}
 	state.RootEnvelope = rootEnv
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Set threshold = 2 for existing rule with the added key
-	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approverKey}, []string{"git:refs/heads/main"}, 2)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
+	}
+
+	if err := targetsMetadata.AddPrincipal(person); err != nil {
+		t.Fatal(err)
+	}
+
+	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	approver := &tufv02.Person{
+		PersonID:             "john.doe",
+		PublicKeys:           map[string]*tufv02.Key{approverKey.KeyID: approverKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 2 for existing rule with the added key
+	if err := targetsMetadata.UpdateRule("protect-main", []string{person.ID(), approver.ID()}, []string{"git:refs/heads/main"}, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -365,48 +455,41 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations sets
+// up a test policy with threshold rules. It uses v0.2 (and higher) policy
+// metadata to support GitHub apps.
+//
+// Usage notes:
+//   - The app key is targets1PubKeyBytes
+//   - The three authorized persons are "jane.doe", "john.doe", and "jill.doe"
+//   - jane.doe's signing key is gpgPubKeyBytes
+//   - john.doe's signing key is targets2PubKeyBytes
+//   - jill.doe's signing key is gpgUnauthorizedPubKeyBytes
+//   - The protected namespace is the main branch
+//   - Use any of them as the approver for the app, with the app's signing key
+//     ID set as the app name
 func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *testing.T) *State {
 	t.Helper()
 
-	state := createTestStateWithPolicy(t)
+	t.Setenv(dev.DevModeKey, "1")
+	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	appKey, err := tuf.LoadKeyFromBytes(targets1PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approver1Key, err := tuf.LoadKeyFromBytes(targets2PubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	approver2Key, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
+	state := createTestStateWithPolicyUsingPersons(t)
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
+	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
 		t.Fatal(err)
 	}
-
-	rootMetadata, err := state.GetRootMetadata()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata, err = AddGitHubAppKey(rootMetadata, appKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootMetadata, err = EnableGitHubAppApprovals(rootMetadata)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rootMetadata.EnableGitHubAppApprovals()
 	state.githubAppApprovalsTrusted = true
-	state.githubAppKey = appKey
+	state.githubAppKeys = []tuf.Principal{appKey}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -418,14 +501,54 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	}
 	state.RootEnvelope = rootEnv
 
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Set threshold = 2 for existing rule with the added key
-	targetsMetadata, err = UpdateDelegation(targetsMetadata, "protect-main", []*tuf.Key{gpgKey, approver1Key, approver2Key}, []string{"git:refs/heads/main"}, 3)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(person); err != nil {
+		t.Fatal(err)
+	}
+
+	approver1Key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	if err := targetsMetadata.AddPrincipal(approver1Key); err != nil {
+		t.Fatal(err)
+	}
+	approver1 := &tufv02.Person{
+		PersonID:             "john.doe",
+		PublicKeys:           map[string]*tufv02.Key{approver1Key.KeyID: approver1Key},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver1); err != nil {
+		t.Fatal(err)
+	}
+
+	approver2KeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approver2Key := tufv01.NewKeyFromSSLibKey(approver2KeyR)
+	approver2 := &tufv02.Person{
+		PersonID:             "jill.doe",
+		PublicKeys:           map[string]*tufv02.Key{approver2Key.KeyID: approver2Key},
+		AssociatedIdentities: map[string]string{appKey.KeyID: "jill.doe"},
+	}
+	if err := targetsMetadata.AddPrincipal(approver2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set threshold = 3 for existing rule with the added principals
+	if err := targetsMetadata.UpdateRule("protect-main", []string{person.PersonID, approver1.PersonID, approver2.PersonID}, []string{"git:refs/heads/main"}, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -447,26 +570,73 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 
 	state := createTestStateWithPolicy(t)
 
-	gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{gpgKey}, []string{"git:refs/tags/*"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-tags", []string{gpgKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
+	state.TargetsEnvelope = targetsEnv
+
+	if err := state.loadRuleNames(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
+	t.Helper()
+
+	state := createTestStateWithPolicy(t)
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	approverKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-tags", []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/tags/*"}, 2); err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -485,26 +655,24 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 
 	state := createTestStateWithPolicy(t)
 
-	rootKey, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
+	rootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(rootKey); err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "protect-tags", []*tuf.Key{rootKey}, []string{"git:refs/tags/*"}, 1)
-	if err != nil {
+	if err := targetsMetadata.AddRule("protect-tags", []string{rootKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
 	if err != nil {
 		t.Fatal(err)
@@ -516,4 +684,26 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	}
 
 	return state
+}
+
+func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh.Signer {
+	t.Helper()
+
+	keysDir := t.TempDir()
+	privKeyPath := filepath.Join(keysDir, "key")
+	pubKeyPath := filepath.Join(keysDir, "key.pub")
+
+	if err := os.WriteFile(privKeyPath, privateBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pubKeyPath, publicBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	signer, err := ssh.NewSignerFromFile(privKeyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return signer
 }

@@ -1,4 +1,5 @@
 github.com/gittuf/gittuf/docs/cli
+github.com/gittuf/gittuf/experimental/gittuf/options
 github.com/gittuf/gittuf/internal/cmd/addhooks
 github.com/gittuf/gittuf/internal/cmd/clone
 github.com/gittuf/gittuf/internal/cmd/dev
@@ -13,7 +14,6 @@ github.com/gittuf/gittuf/internal/cmd/verifytag
 github.com/gittuf/gittuf/internal/cmd/version
 github.com/gittuf/gittuf/internal/dev
 github.com/gittuf/gittuf/internal/git-remote-gittuf
-github.com/gittuf/gittuf/internal/repository/options
 github.com/gittuf/gittuf/internal/testartifacts
 github.com/gittuf/gittuf/internal/third_party
 github.com/gittuf/gittuf/internal/version

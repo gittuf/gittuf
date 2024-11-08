@@ -10,12 +10,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 var (
@@ -102,7 +103,7 @@ func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
 
 // verifyTagSignature verifies a signature for the specified tag using the
 // provided public key.
-func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tuf.Key) error {
+func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *signerverifier.SSLibKey) error {
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return fmt.Errorf("error opening repository: %w", err)
@@ -114,32 +115,32 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *tu
 	}
 
 	switch key.KeyType {
-	case signerverifier.GPGKeyType:
+	case gpg.KeyType:
 		if _, err := tag.Verify(key.KeyVal.Public); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
+	case ssh.KeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
 		tagSignature := []byte(tag.PGPSignature)
 
-		if err := verifySSHKeySignature(key, tagContents, tagSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
 		return nil
-	case signerverifier.FulcioKeyType:
+	case sigstore.KeyType:
 		tagContents, err := getTagBytesWithoutSignature(tag)
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
 		tagSignature := []byte(tag.PGPSignature)
 
-		if err := verifyGitsignSignature(ctx, key, tagContents, tagSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

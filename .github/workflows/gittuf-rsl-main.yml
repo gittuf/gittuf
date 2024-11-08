@@ -13,11 +13,11 @@ jobs:
       id-token: write
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@a7644594c7def5a72ec719c2424825a5a8831548
+        uses: gittuf/gittuf-installer@5c0fb4a2a0dc9434598cf2e74bb601d76861fc97
       - name: Install gitsign
         uses: chainguard-dev/actions/setup-gitsign@main
       - name: Checkout repository
-        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
       - name: Update RSL

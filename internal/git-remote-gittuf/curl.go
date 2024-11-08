@@ -12,16 +12,16 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/repository"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
 // handleCurl implements the helper for remotes configured to use the curl
 // backend. For this transport, we invoke git-remote-http, only interjecting at
 // specific points to make gittuf specific additions.
-func handleCurl(repo *repository.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
 	// Scan git-remote-gittuf stdin for commands from the parent process
 	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
 	stdInScanner.Split(splitInput)

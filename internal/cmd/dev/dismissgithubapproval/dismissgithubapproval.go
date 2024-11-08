@@ -6,9 +6,8 @@ package dismissgithubapproval
 import (
 	"fmt"
 
-	"github.com/gittuf/gittuf/internal/cmd/common"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +39,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.dismissedApprover,
 		"dismiss-approver",
 		"",
-		"signing key representing approver whose review must be dismissed (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)",
+		"identity of the reviewer whose review was dismissed",
 	)
 	cmd.MarkFlagRequired("dismiss-approver") //nolint:errcheck
 
@@ -54,22 +53,17 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.signingKey)
+	signer, err := gittuf.LoadSigner(repo, o.signingKey)
 	if err != nil {
 		return err
 	}
 
-	dismissedApproverKey, err := common.LoadPublicKey(o.dismissedApprover)
-	if err != nil {
-		return err
-	}
-
-	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, o.reviewID, dismissedApproverKey, true)
+	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, o.reviewID, o.dismissedApprover, true)
 }
 
 func New() *cobra.Command {

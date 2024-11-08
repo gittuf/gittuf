@@ -189,6 +189,43 @@ func TestGetMergeTree(t *testing.T) {
 		_, err = repo.GetMergeTree(commitAID, commitBID)
 		assert.NotNil(t, err)
 	})
+
+	t.Run("fast forward merge", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		// We meed to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		emptyBlobID, err := repo.WriteBlob(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeBuilder := NewTreeBuilder(repo)
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"empty": emptyBlobID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitID, err := repo.Commit(treeID, "refs/heads/main", "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mergeTreeID, err := repo.GetMergeTree(ZeroHash, commitID)
+		assert.Nil(t, err)
+		assert.Equal(t, treeID, mergeTreeID)
+	})
 }
 
 func TestTreeBuilder(t *testing.T) {

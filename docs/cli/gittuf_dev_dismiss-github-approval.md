@@ -10,7 +10,7 @@ gittuf dev dismiss-github-approval [flags]
 
 ```
       --base-URL string           location of GitHub instance (default "https://github.com")
-      --dismiss-approver string   signing key representing approver whose review must be dismissed (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)
+      --dismiss-approver string   identity of the reviewer whose review was dismissed
   -h, --help                      help for dismiss-github-approval
       --review-ID int             pull request review ID (default -1)
   -k, --signing-key string        signing key to use for signing attestation

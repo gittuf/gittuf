@@ -2,6 +2,16 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.7.0
+
+- Added support for metadata signing using Sigstore (currently `GITTUF_DEV`
+  only)
+- Removed use of legacy custom securesystemslib key formats in gittuf's tests
+- Removed vendored signerverifier library
+- Unified SSH signature verification for Git commits and tags
+- Refactored `policy` and `tuf` packages to support versioning policy metadata
+- Updated various dependencies and CI workflows
+
 ## v0.6.2
 
 - Added `git-remote-gittuf` to the release workflow's pre-built artifacts
