@@ -395,11 +395,53 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
-	t.Run("with ref name, before entry ID, until entry number is zero", func(t *testing.T) {
+	t.Run("with ref name and invalid before entry id", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		// RSL structure for the test
+		// 1    <- 2
+		// main <- feature
+		testRefs := []string{"main", "feature"}
 		entryIDs := []gitinterface.Hash{}
-		_, _, err := GetLatestReferenceEntry(repo, BeforeEntryID(entryIDs[1]), UntilEntryNumber(0))
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+		hash, hashErr := gitinterface.NewHash("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3")
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(hash), UntilEntryNumber(0))
+		assert.Empty(t, hashErr)
+		assert.Empty(t, annotations)
+		assert.Empty(t, entry)
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with ref name with until entry number > before entry id", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		// RSL structure for the test
+		// 1    <- 2
+		// main <- feature
+		testRefs := []string{"main", "feature"}
+		entryIDs := []gitinterface.Hash{}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+			latest, err := GetLatestEntry(repo)
+			if err != nil {
+				t.Fatal(err)
+			}
+			entryIDs = append(entryIDs, latest.GetID())
+		}
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[0]), UntilEntryNumber(2))
+		assert.Empty(t, annotations)
+		assert.Empty(t, entry)
 		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
 	})
 
