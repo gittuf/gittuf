@@ -402,16 +402,10 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		// 1    <- 2
 		// main <- feature
 		testRefs := []string{"main", "feature"}
-		entryIDs := []gitinterface.Hash{}
 		for _, ref := range testRefs {
 			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
-			latest, err := GetLatestEntry(repo)
-			if err != nil {
-				t.Fatal(err)
-			}
-			entryIDs = append(entryIDs, latest.GetID())
 		}
 		hash, hashErr := gitinterface.NewHash("a94a8fe5ccb19ba61c4c0873d391e987982fbbd3")
 		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(hash), UntilEntryNumber(0))
