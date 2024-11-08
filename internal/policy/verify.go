@@ -554,6 +554,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		return nil, nil, err
 	}
 
+	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", entry.RefName, fromID.String(), toID.String()))
 	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
@@ -570,6 +571,8 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	// on currently supported systems
 	// TODO: support multiple apps / threshold per system
 	if !isTag && policy.githubAppApprovalsTrusted {
+		slog.Debug("GitHub pull request approvals are trusted, loading applicable attestations...")
+
 		appName := policy.githubAppKeys[0].ID()
 
 		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
@@ -581,6 +584,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 
 		// if it exists
 		if githubApprovalAttestation != nil {
+			slog.Debug("GitHub pull request approval found, verifying attestation signature...")
 			approvalVerifier := &Verifier{
 				repository: policy.repository,
 				name:       tuf.GitHubAppRoleName,
@@ -778,6 +782,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 
 	// First, verify the gitObject's signature if one is presented
 	if gitObjectID != nil && !gitObjectID.IsZero() {
+		slog.Debug(fmt.Sprintf("Verifying signature of Git object with ID '%s'...", gitObjectID.String()))
 		for _, principal := range v.principals {
 			// there are multiple keys we must try
 			keys := principal.Keys()
@@ -786,6 +791,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 				err := v.repository.VerifySignature(ctx, gitObjectID, key)
 				if err == nil {
 					// Signature verification succeeded
+					slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
 					usedPrincipalIDs.Add(principal.ID())
 					usedKeyIDs.Add(key.KeyID)
 					gitObjectVerified = true
