@@ -12,21 +12,30 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/attestations/authorizations"
+	"github.com/gittuf/gittuf/internal/attestations/github"
+	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
+	sigstoreverifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	ita "github.com/in-toto/attestation/go/v1"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 var (
 	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
 	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
 	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrNoVerifiers             = errors.New("no verifiers present for verification")
 	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
 	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
 )
@@ -404,7 +413,10 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 			}
 
 			verified := false
-			if len(verifiedUsing) > 0 {
+			if len(verifiers) == 0 {
+				// Path is not protected
+				verified = true
+			} else if len(verifiedUsing) > 0 {
 				// We've already verified and identified commit signature, we
 				// can just check if that verifier is trusted for the new path.
 				// If not found, we don't make any assumptions about it being a
@@ -422,7 +434,12 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 				continue
 			}
 
-			verifiedUsing, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, approverKeyIDs)
+			// TODO: app name
+			appName := ""
+			if policy.githubAppApprovalsTrusted {
+				appName = policy.githubAppKeys[0].ID()
+			}
+			verifiedUsing, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverKeyIDs)
 			if err != nil {
 				return fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
 			}
@@ -463,7 +480,12 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	}
 
 	// Use each verifier to verify signature
-	if _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, approverKeyIDs); err != nil {
+	// TODO: app name
+	appName := ""
+	if policy.githubAppApprovalsTrusted {
+		appName = policy.githubAppKeys[0].ID()
+	}
+	if _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, appName, approverKeyIDs); err != nil {
 		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
 	}
 
@@ -532,14 +554,15 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		return nil, nil, err
 	}
 
+	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", entry.RefName, fromID.String(), toID.String()))
 	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), toID.String())
 	if err != nil {
-		if !errors.Is(err, attestations.ErrAuthorizationNotFound) {
+		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 			return nil, nil, err
 		}
 	}
 
-	approverKeyIDs := set.NewSet[string]()
+	approverIdentities := set.NewSet[string]()
 
 	// When we add other code review systems, we can move this into a
 	// generalized helper that inspects the attestations for each system trusted
@@ -548,22 +571,25 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	// on currently supported systems
 	// TODO: support multiple apps / threshold per system
 	if !isTag && policy.githubAppApprovalsTrusted {
-		appName := policy.githubAppKey.KeyID
+		slog.Debug("GitHub pull request approvals are trusted, loading applicable attestations...")
+
+		appName := policy.githubAppKeys[0].ID()
 
 		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
 		if err != nil {
-			if !errors.Is(err, attestations.ErrGitHubPullRequestApprovalAttestationNotFound) {
+			if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err
 			}
 		}
 
 		// if it exists
 		if githubApprovalAttestation != nil {
+			slog.Debug("GitHub pull request approval found, verifying attestation signature...")
 			approvalVerifier := &Verifier{
 				repository: policy.repository,
-				name:       GitHubAppRoleName,
-				keys:       []*tuf.Key{policy.githubAppKey},
-				threshold:  1,
+				name:       tuf.GitHubAppRoleName,
+				principals: policy.githubAppKeys,
+				threshold:  1, // TODO: support higher threshold
 			}
 			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
 			if err != nil {
@@ -575,24 +601,25 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 				return nil, nil, err
 			}
 
+			// TODO: support multiple versions
 			type tmpStatement struct {
-				Type          string                                             `json:"_type"`
-				Subject       []*ita.ResourceDescriptor                          `json:"subject"`
-				PredicateType string                                             `json:"predicateType"`
-				Predicate     *attestations.GitHubPullRequestApprovalAttestation `json:"predicate"`
+				Type          string                                    `json:"_type"`
+				Subject       []*ita.ResourceDescriptor                 `json:"subject"`
+				PredicateType string                                    `json:"predicateType"`
+				Predicate     *githubv01.PullRequestApprovalAttestation `json:"predicate"`
 			}
 			stmt := new(tmpStatement)
 			if err := json.Unmarshal(payloadBytes, stmt); err != nil {
 				return nil, nil, err
 			}
 
-			for _, approver := range stmt.Predicate.Approvers {
-				approverKeyIDs.Add(approver.KeyID)
+			for _, approver := range stmt.Predicate.GetApprovers() {
+				approverIdentities.Add(approver)
 			}
 		}
 	}
 
-	return authorizationAttestation, approverKeyIDs, nil
+	return authorizationAttestation, approverIdentities, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the
@@ -623,20 +650,29 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", err
 	}
 
-	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, approverKeyIDs)
-}
-
-func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
 	if len(verifiers) == 0 {
 		// This target is not protected by gittuf policy
 		return "", nil
 	}
 
+	// TODO: app name
+	appName := ""
+	if policy.githubAppApprovalsTrusted {
+		appName = policy.githubAppKeys[0].ID()
+	}
+	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, approverKeyIDs)
+}
+
+func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string]) (string, error) {
+	if len(verifiers) == 0 {
+		return "", ErrNoVerifiers
+	}
+
 	verifiedUsing := ""
 	for _, verifier := range verifiers {
-		trustedKeyIDs := verifier.TrustedKeyIDs()
+		trustedPrincipalIDs := verifier.TrustedPrincipalIDs()
 
-		usedKeyIDs, err := verifier.Verify(ctx, gitID, authorizationAttestation)
+		usedPrincipalIDs, err := verifier.Verify(ctx, gitID, authorizationAttestation)
 		if err == nil {
 			// We meet requirements just from the authorization attestation's sigs
 			verifiedUsing = verifier.Name()
@@ -645,15 +681,46 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			return "", err
 		}
 
-		// Unify the keyIDs we've already used with that listed in approval attestation
-		// We ensure that someone who has signed an attestation and is listed in
-		// the approval attestation is only counted once
-		usedKeyIDs.Extend(approverKeyIDs)
+		if approverIDs != nil {
+			slog.Debug("Using approvers from code review tool attestations...")
+			// Unify the principalIDs we've already used with that listed in
+			// approval attestation
+			// We ensure that someone who has signed an attestation and is listed in
+			// the approval attestation is only counted once
+			for _, approverID := range approverIDs.Contents() {
+				// For each approver ID from the app attestation, we try to see
+				// if it matches a principal in the current verifiers.
+				for _, principal := range verifier.principals {
+					slog.Debug(fmt.Sprintf("Checking if approver identity '%s' matches '%s'...", approverID, principal.ID()))
+					if usedPrincipalIDs.Has(principal.ID()) {
+						// This principal has already been counted towards the
+						// threshold
+						slog.Debug(fmt.Sprintf("Principal '%s' has already been counted towards threshold, skipping...", principal.ID()))
+						continue
+					}
 
-		// Get a list of used keys that are also trusted by the verifier
-		trustedUsedKeyIDs := trustedKeyIDs.Intersection(usedKeyIDs)
-		if trustedUsedKeyIDs.Len() >= verifier.Threshold() {
+					// We can only match against a principal if it has a notion
+					// of associated identities
+					// Right now, this is just tufv02.Person
+					if principal, isV02 := principal.(*tufv02.Person); isV02 {
+						if associatedIdentity, has := principal.AssociatedIdentities[appName]; has && associatedIdentity == approverID {
+							// The approver ID from the issuer (appName) matches
+							// the principal's associated identity for the same
+							// issuer!
+							slog.Debug(fmt.Sprintf("Principal '%s' has associated identity '%s', counting principal towards threshold...", principal.ID(), approverID))
+							usedPrincipalIDs.Add(principal.ID())
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// Get a list of used principals that are also trusted by the verifier
+		trustedUsedPrincipalIDs := trustedPrincipalIDs.Intersection(usedPrincipalIDs)
+		if trustedUsedPrincipalIDs.Len() >= verifier.Threshold() {
 			// With approvals, we now meet threshold!
+			slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', threshold met!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
 			verifiedUsing = verifier.Name()
 			break
 		}
@@ -669,7 +736,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 type Verifier struct {
 	repository *gitinterface.Repository
 	name       string
-	keys       []*tuf.Key
+	principals []tuf.Principal
 	threshold  int
 }
 
@@ -677,21 +744,17 @@ func (v *Verifier) Name() string {
 	return v.name
 }
 
-func (v *Verifier) Keys() []*tuf.Key {
-	return v.keys
-}
-
 func (v *Verifier) Threshold() int {
 	return v.threshold
 }
 
-func (v *Verifier) TrustedKeyIDs() *set.Set[string] {
-	keys := set.NewSet[string]()
-	for _, key := range v.keys {
-		keys.Add(key.KeyID)
+func (v *Verifier) TrustedPrincipalIDs() *set.Set[string] {
+	principalIDs := set.NewSet[string]()
+	for _, principal := range v.principals {
+		principalIDs.Add(principal.ID())
 	}
 
-	return keys
+	return principalIDs
 }
 
 // Verify is used to check for a threshold of signatures using the verifier. The
@@ -700,74 +763,182 @@ func (v *Verifier) TrustedKeyIDs() *set.Set[string] {
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
 func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, env *sslibdsse.Envelope) (*set.Set[string], error) {
-	if v.threshold < 1 || len(v.keys) < 1 {
+	if v.threshold < 1 || len(v.principals) < 1 {
 		return nil, ErrInvalidVerifier
 	}
 
+	// usedPrincipalIDs is ultimately returned to track the set of principals
+	// who have been authenticated
+	usedPrincipalIDs := set.NewSet[string]()
+
+	// usedKeyIDs is tracked to ensure a key isn't duplicated between two
+	// principals, allowing two principals to meet a threshold using the same
+	// key
 	usedKeyIDs := set.NewSet[string]()
+
+	// gitObjectVerified is set to true if the gitObjectID's signature is
+	// verified
 	gitObjectVerified := false
 
 	// First, verify the gitObject's signature if one is presented
 	if gitObjectID != nil && !gitObjectID.IsZero() {
-		for _, key := range v.keys {
-			err := v.repository.VerifySignature(ctx, gitObjectID, key)
-			if err == nil {
-				// Signature verification succeeded
-				usedKeyIDs.Add(key.KeyID)
-				gitObjectVerified = true
+		slog.Debug(fmt.Sprintf("Verifying signature of Git object with ID '%s'...", gitObjectID.String()))
+		for _, principal := range v.principals {
+			// there are multiple keys we must try
+			keys := principal.Keys()
+
+			for _, key := range keys {
+				err := v.repository.VerifySignature(ctx, gitObjectID, key)
+				if err == nil {
+					// Signature verification succeeded
+					slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
+					usedPrincipalIDs.Add(principal.ID())
+					usedKeyIDs.Add(key.KeyID)
+					gitObjectVerified = true
+
+					// No need to try the other keys for this principal, break
+					break
+				}
+				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+					// TODO: this should be removed once we have unified signing
+					// methods across metadata and git signatures
+					continue
+				}
+				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+					return nil, err
+				}
+			}
+
+			if gitObjectVerified {
+				// No need to try other principals, break
 				break
-			}
-			if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-				continue
-			}
-			if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-				return nil, err
 			}
 		}
 	}
 
 	// If threshold is 1 and the Git signature is verified, we can return
 	if v.threshold == 1 && gitObjectVerified {
-		return usedKeyIDs, nil
+		return usedPrincipalIDs, nil
 	}
 
 	if env != nil {
-		// Second, verify signatures on the attestation, subtracting the threshold
-		// by 1 to account for a verified Git signature
-		envelopeThreshold := v.threshold
-		if gitObjectVerified {
-			envelopeThreshold--
-		}
+		// Second, verify signatures on the envelope
 
-		envVerifiers := make([]sslibdsse.Verifier, 0, len(v.keys))
-		for _, key := range v.keys {
-			if usedKeyIDs.Has(key.KeyID) {
-				// Do not create a DSSE verifier for the key used to verify the Git
-				// signature
+		// We have to verify the envelope independently for each principal
+		// trusted in the verifier as a principal may have multiple keys
+		// associated with them.
+		for _, principal := range v.principals {
+			if usedPrincipalIDs.Has(principal.ID()) {
+				// Do not verify using this principal as they were verified for
+				// the Git signature
+				slog.Debug(fmt.Sprintf("Principal '%s' has already been counted towards the threshold, skipping...", principal.ID()))
 				continue
 			}
 
-			verifier, err := signerverifier.NewSignerVerifierFromTUFKey(key) //nolint:staticcheck
-			if err != nil && !errors.Is(err, common.ErrUnknownKeyType) {
+			principalVerifiers := []sslibdsse.Verifier{}
+
+			keys := principal.Keys()
+			for _, key := range keys {
+				if usedKeyIDs.Has(key.KeyID) {
+					// this key has been encountered before, possibly because
+					// another Principal included this key
+					slog.Debug(fmt.Sprintf("Key with ID '%s' has already been used to verify a signature, skipping...", key.KeyID))
+					continue
+				}
+
+				var (
+					dsseVerifier sslibdsse.Verifier
+					err          error
+				)
+				switch key.KeyType {
+				case ssh.KeyType:
+					slog.Debug(fmt.Sprintf("Found SSH key '%s'...", key.KeyID))
+					dsseVerifier, err = ssh.NewVerifierFromKey(key)
+					if err != nil {
+						return nil, err
+					}
+				case gpg.KeyType:
+					slog.Debug(fmt.Sprintf("Found GPG key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
+					continue
+				case sigstore.KeyType:
+					slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
+					opts := []sigstoreverifieropts.Option{}
+					config, err := v.repository.GetGitConfig()
+					if err != nil {
+						return nil, err
+					}
+					if rekorURL, has := config[sigstore.GitConfigRekor]; has {
+						slog.Debug(fmt.Sprintf("Using '%s' as Rekor server...", rekorURL))
+						opts = append(opts, sigstoreverifieropts.WithRekorURL(rekorURL))
+					}
+
+					dsseVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer, opts...)
+				case signerverifier.ED25519KeyType:
+					// These are only used to verify old policy metadata signed before the ssh-signer was added
+					slog.Debug(fmt.Sprintf("Found legacy ED25519 key '%s' in custom securesystemslib format...", key.KeyID))
+					dsseVerifier, err = signerverifier.NewED25519SignerVerifierFromSSLibKey(key)
+					if err != nil {
+						return nil, err
+					}
+				case signerverifier.RSAKeyType:
+					// These are only used to verify old policy metadata signed before the ssh-signer was added
+					slog.Debug(fmt.Sprintf("Found legacy RSA key '%s' in custom securesystemslib format...", key.KeyID))
+					dsseVerifier, err = signerverifier.NewRSAPSSSignerVerifierFromSSLibKey(key)
+					if err != nil {
+						return nil, err
+					}
+				case signerverifier.ECDSAKeyScheme:
+					// These are only used to verify old policy metadata signed before the ssh-signer was added
+					slog.Debug(fmt.Sprintf("Found legacy ECDSA key '%s' in custom securesystemslib format...", key.KeyID))
+					dsseVerifier, err = signerverifier.NewECDSASignerVerifierFromSSLibKey(key)
+					if err != nil {
+						return nil, err
+					}
+				default:
+					return nil, common.ErrUnknownKeyType
+				}
+
+				principalVerifiers = append(principalVerifiers, dsseVerifier)
+			}
+
+			// We have the principal's verifiers: use that to verify the envelope
+			if len(principalVerifiers) == 0 {
+				// TODO: remove this when we have signing method unification
+				// across git and dsse
+				continue
+			}
+
+			// We set threshold to 1 as we only need one of the keys for this
+			// principal to be matched. If more than one key is matched and
+			// returned in acceptedKeys, we count this only once towards the
+			// principal and therefore the verifier's threshold. However, for
+			// safety, we count both keys. If two principals share keys, this
+			// can lead to a problem meeting thresholds. Arguably, they
+			// shouldn't be sharing keys, so this seems reasonable.
+			acceptedKeys, err := dsse.VerifyEnvelope(ctx, env, principalVerifiers, 1)
+			if err != nil && !strings.Contains(err.Error(), "accepted signatures do not match threshold") {
 				return nil, err
 			}
-			envVerifiers = append(envVerifiers, verifier)
+
+			for _, key := range acceptedKeys {
+				// Mark all accepted keys as used: this doesn't count towards
+				// the threshold directly, but if another principal has the same
+				// key, they may not be counted towards the threshold
+				usedKeyIDs.Add(key.KeyID)
+			}
+
+			if len(acceptedKeys) > 0 {
+				// We've verified this principal, one closer to the threshold
+				usedPrincipalIDs.Add(principal.ID())
+			}
 		}
 
-		acceptedKeys, err := dsse.VerifyEnvelope(ctx, env, envVerifiers, envelopeThreshold)
-		if err != nil && !strings.Contains(err.Error(), "accepted signatures do not match threshold") {
-			return nil, err
-		}
-		for _, ak := range acceptedKeys {
-			usedKeyIDs.Add(ak.KeyID)
-		}
-
-		if usedKeyIDs.Len() >= v.Threshold() {
-			return usedKeyIDs, nil
+		if usedPrincipalIDs.Len() >= v.Threshold() {
+			return usedPrincipalIDs, nil
 		}
 	}
 
-	// Return usedKeyIDs so the consumer can decide what to do with the keys
-	// that were used
-	return usedKeyIDs, ErrVerifierConditionsUnmet
+	// Return usedPrincipalIDs so the consumer can decide what to do with the
+	// principals that were used
+	return usedPrincipalIDs, ErrVerifierConditionsUnmet
 }

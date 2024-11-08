@@ -10,56 +10,10 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	sslibsv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
-	"github.com/gittuf/gittuf/internal/tuf"
-	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
-	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
-
-	approvers := []*sslibsv.SSLibKey{
-		{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
-			KeyVal: sslibsv.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
-
-	_, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, nil, nil)
-	assert.ErrorIs(t, err, ErrInvalidGitHubPullRequestApprovalAttestation)
-
-	approvalAttestation, err := NewGitHubPullRequestApprovalAttestation(testRef, testID, testID, approvers, nil)
-	assert.Nil(t, err)
-
-	// Check value of statement type
-	assert.Equal(t, ita.StatementTypeUri, approvalAttestation.Type)
-
-	// Check subject contents
-	assert.Equal(t, 1, len(approvalAttestation.Subject))
-	assert.Contains(t, approvalAttestation.Subject[0].Digest, digestGitTreeKey)
-	assert.Equal(t, approvalAttestation.Subject[0].Digest[digestGitTreeKey], testID)
-
-	// Check predicate type
-	assert.Equal(t, GitHubPullRequestApprovalPredicateType, approvalAttestation.PredicateType)
-
-	// Check predicate
-	predicate := approvalAttestation.Predicate.AsMap()
-	assert.Equal(t, predicate[targetRefKey], testRef)
-	assert.Equal(t, predicate[targetTreeIDKey], testID)
-	assert.Equal(t, predicate[fromRevisionIDKey], testID)
-	// FIXME: this is a really messy assertion
-	assert.Equal(t, approvers[0].KeyID, predicate["approvers"].([]any)[0].(map[string]any)["keyid"])
-}
 
 func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
@@ -69,17 +23,7 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseHost := "github.com"
 	appName := "github"
 
-	approvers := []*sslibsv.SSLibKey{
-		{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
-			KeyVal: sslibsv.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
 	featureZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testAnotherRef, testID, testID, approvers)
@@ -112,17 +56,7 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	baseURL := "https://github.com"
 	appName := "github"
 
-	approvers := []*sslibsv.SSLibKey{
-		{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
-			KeyVal: sslibsv.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
+	approvers := []string{"jane.doe@example.com"}
 
 	mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
 	featureZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testAnotherRef, testID, testID, approvers)
@@ -150,37 +84,7 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.Equal(t, featureZeroZero, featureAuth)
 }
 
-func TestValidateGitHubPullRequestApprovalAttestation(t *testing.T) {
-	testRef := "refs/heads/main"
-	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
-
-	approvers := []*sslibsv.SSLibKey{
-		{
-			KeyID:   "jane.doe@example.com::https://oidc.example.com",
-			KeyType: signerverifier.FulcioKeyType,
-			Scheme:  signerverifier.FulcioKeyScheme,
-			KeyVal: sslibsv.KeyVal{
-				Identity: "jane.doe@example.com",
-				Issuer:   "https://oidc.example.com",
-			},
-		},
-	}
-
-	mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
-	featureZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testAnotherRef, testID, testID, approvers)
-
-	err := validateGitHubPullRequestApprovalAttestation(mainZeroZero, testRef, testID, testID)
-	assert.Nil(t, err)
-
-	err = validateGitHubPullRequestApprovalAttestation(featureZeroZero, testAnotherRef, testID, testID)
-	assert.Nil(t, err)
-
-	err = validateGitHubPullRequestApprovalAttestation(mainZeroZero, testAnotherRef, testID, testID)
-	assert.ErrorIs(t, err, ErrInvalidAuthorization)
-}
-
-func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []*tuf.Key) *sslibdsse.Envelope {
+func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []string) *sslibdsse.Envelope {
 	t.Helper()
 
 	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, nil)

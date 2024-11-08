@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/cmd/common"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +66,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.approver,
 		"approver",
 		"",
-		"approver signing key (path for SSH, gpg:<fingerprint> for GPG) / identity (fulcio:identity::provider)",
+		"identity of the reviewer who approved the change",
 	)
 	cmd.MarkFlagRequired("approver") //nolint:errcheck
 }
@@ -78,22 +77,17 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("invalid format for repository, must be {owner}/{repo}")
 	}
 
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.signingKey)
+	signer, err := gittuf.LoadSigner(repo, o.signingKey)
 	if err != nil {
 		return err
 	}
 
-	approverKey, err := common.LoadPublicKey(o.approver)
-	if err != nil {
-		return err
-	}
-
-	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, approverKey, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, o.approver, true)
 }
 
 func New() *cobra.Command {

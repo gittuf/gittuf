@@ -12,12 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/signerverifier"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 // Commit creates a new commit in the repo and sets targetRef's to the commit.
@@ -158,7 +159,7 @@ func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Ha
 
 // verifyCommitSignature verifies a signature for the specified commit using
 // the provided public key.
-func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, key *tuf.Key) error {
+func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, key *signerverifier.SSLibKey) error {
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return fmt.Errorf("error opening repository: %w", err)
@@ -170,32 +171,32 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 	}
 
 	switch key.KeyType {
-	case signerverifier.GPGKeyType:
+	case gpg.KeyType:
 		if _, err := commit.Verify(key.KeyVal.Public); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
-	case signerverifier.RSAKeyType, signerverifier.ECDSAKeyType, signerverifier.ED25519KeyType, ssh.SSHKeyType:
+	case ssh.KeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
 		commitSignature := []byte(commit.PGPSignature)
 
-		if err := verifySSHKeySignature(key, commitContents, commitSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
 		return nil
-	case signerverifier.FulcioKeyType:
+	case sigstore.KeyType:
 		commitContents, err := getCommitBytesWithoutSignature(commit)
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
 		commitSignature := []byte(commit.PGPSignature)
 
-		if err := verifyGitsignSignature(ctx, key, commitContents, commitSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

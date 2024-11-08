@@ -10,16 +10,19 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/internal/signerverifier"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLoadState(t *testing.T) {
 	t.Run("loading while verifying multiple states", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -33,23 +36,21 @@ func TestLoadState(t *testing.T) {
 
 		assertStatesEqual(t, state, loadedState)
 
-		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddPrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
 
 		env, err := dsse.CreateEnvelope(targetsMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,8 +70,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -110,6 +110,8 @@ func TestLoadState(t *testing.T) {
 
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -123,23 +125,21 @@ func TestLoadState(t *testing.T) {
 
 		assertStatesEqual(t, state, loadedState)
 
-		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName)
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-1", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddPrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
 
 		env, err := dsse.CreateEnvelope(targetsMetadata)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,8 +159,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsMetadata, err = AddDelegation(targetsMetadata, "test-rule-2", []*tuf.Key{}, []string{""}, 1)
-		if err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -170,10 +169,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		badSigner, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(targets1KeyBytes) //nolint:staticcheck
-		if err != nil {
-			t.Fatal(err)
-		}
+		badSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
 
 		env, err = dsse.SignEnvelope(context.Background(), env, badSigner)
 		if err != nil {
@@ -227,19 +223,20 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
 
-	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{}, []string{"*"}, 1) // just a dummy rule
-	if err != nil {
+	if err := targetsMetadata.AddPrincipal(key); err != nil {
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
+	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
+
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
@@ -275,40 +272,6 @@ func TestLoadStateForEntry(t *testing.T) {
 	}
 
 	assertStatesEqual(t, state, loadedState)
-}
-
-func TestStateKeys(t *testing.T) {
-	t.Run("state with delegated policies", func(t *testing.T) {
-		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
-		// coverage to cover s.DelegationEnvelopes in PublicKeys()
-
-		expectedKeys := map[string]*tuf.Key{}
-		rootKey, err := tuf.LoadKeyFromBytes(rootKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expectedKeys[rootKey.KeyID] = rootKey
-
-		gpgKey, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expectedKeys[gpgKey.KeyID] = gpgKey
-
-		keys, err := state.PublicKeys()
-		assert.Nil(t, err, keys)
-		assert.Equal(t, expectedKeys, keys)
-	})
-
-	t.Run("state with only root", func(t *testing.T) {
-		state := createTestStateWithOnlyRoot(t)
-
-		expectedKeys := map[string]*tuf.Key(nil)
-
-		keys, err := state.PublicKeys()
-		assert.Nil(t, err, keys)
-		assert.Equal(t, expectedKeys, keys)
-	})
 }
 
 func TestStateVerify(t *testing.T) {
@@ -369,9 +332,12 @@ func TestStateGetRootMetadata(t *testing.T) {
 	t.Parallel()
 	state := createTestStateWithOnlyRoot(t)
 
-	rootMetadata, err := state.GetRootMetadata()
+	rootMetadata, err := state.GetRootMetadata(true)
 	assert.Nil(t, err)
-	assert.Equal(t, "52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997", rootMetadata.Roles[RootRoleName].KeyIDs[0])
+
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	assert.Nil(t, err)
+	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootPrincipals[0].ID())
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
@@ -381,10 +347,8 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t) // changed from createTestStateWithPolicies to increase test
 		// coverage to cover s.DelegationEnvelopes in PublicKeys()
 
-		key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		keyR := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(keyR)
 
 		tests := map[string]struct {
 			path      string
@@ -393,17 +357,17 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 			"verifiers for files 1": {
 				path: "file:1/*",
 				verifiers: []*Verifier{{
-					name:      "1",
-					keys:      []*tuf.Key{key},
-					threshold: 1,
+					name:       "1",
+					principals: []tuf.Principal{key},
+					threshold:  1,
 				}},
 			},
 			"verifiers for files": {
 				path: "file:2/*",
 				verifiers: []*Verifier{{
-					name:      "2",
-					keys:      []*tuf.Key{key},
-					threshold: 1,
+					name:       "2",
+					principals: []tuf.Principal{key},
+					threshold:  1,
 				}},
 			},
 			"verifiers for unprotected branch": {
@@ -486,22 +450,21 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName)
+	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	keyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetsMetadata, err = AddDelegation(targetsMetadata, "new-rule", []*tuf.Key{key}, []string{"*"}, 1) // just a dummy rule
-	if err != nil {
+	key := tufv01.NewKeyFromSSLibKey(keyR)
+	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
 	if err != nil {
 		t.Fatal(err)
@@ -535,107 +498,6 @@ func TestGetStateForCommit(t *testing.T) {
 	assertStatesEqual(t, firstState, state)
 }
 
-func TestListRules(t *testing.T) {
-	t.Run("no delegations", func(t *testing.T) {
-		repo, _ := createTestRepository(t, createTestStateWithPolicy)
-
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
-		assert.Nil(t, err)
-		expectedRules := []*DelegationWithDepth{
-			{
-				Delegation: tuf.Delegation{
-					Name:        "protect-main",
-					Paths:       []string{"git:refs/heads/main"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
-			{
-				Delegation: tuf.Delegation{
-					Name:        "protect-files-1-and-2",
-					Paths:       []string{"file:1", "file:2"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
-		}
-		assert.Equal(t, expectedRules, rules)
-	})
-	t.Run("with delegations", func(t *testing.T) {
-		repo, _ := createTestRepository(t, createTestStateWithDelegatedPolicies)
-
-		rules, err := ListRules(context.Background(), repo, PolicyRef)
-
-		assert.Nil(t, err)
-		expectedRules := []*DelegationWithDepth{
-			{
-				Delegation: tuf.Delegation{
-					Name:        "1",
-					Paths:       []string{"file:1/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
-			{
-				Delegation: tuf.Delegation{
-					Name:        "3",
-					Paths:       []string{"file:1/subpath1/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
-					},
-				},
-				Depth: 1,
-			},
-			{
-				Delegation: tuf.Delegation{
-					Name:        "4",
-					Paths:       []string{"file:1/subpath2/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"157507bbe151e378ce8126c1dcfe043cdd2db96e"},
-						Threshold: 1,
-					},
-				},
-				Depth: 1,
-			},
-
-			{
-				Delegation: tuf.Delegation{
-					Name:        "2",
-					Paths:       []string{"file:2/*"},
-					Terminating: false,
-					Custom:      nil,
-					Role: tuf.Role{
-						KeyIDs:    []string{"52e3b8e73279d6ebdd62a5016e2725ff284f569665eb92ccb145d83817a02997"},
-						Threshold: 1,
-					},
-				},
-				Depth: 0,
-			},
-		}
-		assert.Equal(t, expectedRules, rules)
-	})
-}
-
 func TestStateHasFileRule(t *testing.T) {
 	t.Parallel()
 	t.Run("with file rules", func(t *testing.T) {
@@ -659,22 +521,16 @@ func TestStateHasFileRule(t *testing.T) {
 func TestApply(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	key, err := tuf.LoadKeyFromBytes(rootPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signer, err := signerverifier.NewSignerVerifierFromSecureSystemsLibFormat(rootKeyBytes) //nolint:staticcheck
+	key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rootMetadata, err := state.GetRootMetadata()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	rootMetadata, err = AddTargetsKey(rootMetadata, key)
-	if err != nil {
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
 		t.Fatal(err)
 	}
 

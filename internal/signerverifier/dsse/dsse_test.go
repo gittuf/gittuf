@@ -13,12 +13,12 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateEnvelope(t *testing.T) {
-	rootMetadata := tuf.NewRootMetadata()
+	rootMetadata := tufv01.NewRootMetadata()
 	env, err := CreateEnvelope(rootMetadata)
 	assert.Nil(t, err)
 	assert.Equal(t, PayloadType, env.PayloadType)

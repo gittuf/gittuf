@@ -1,5 +1,6 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package ssh
 
 import (
@@ -11,7 +12,7 @@ import (
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	sv "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/signerverifier"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,9 +86,10 @@ func TestSSH(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
-			signer := Signer{
-				Verifier: verifier,
-				Path:     keyPath,
+
+			signer, err := NewSignerFromFile(keyPath)
+			if err != nil {
+				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
 			sig, err := signer.Sign(context.Background(), data)
@@ -95,12 +97,12 @@ func TestSSH(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = signer.Verifier.Verify(context.Background(), data, sig)
+			err = verifier.Verify(context.Background(), data, sig)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			err = signer.Verifier.Verify(context.Background(), notData, sig)
+			err = verifier.Verify(context.Background(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
@@ -130,11 +132,11 @@ COb1zE7zaJacJ42tNdVq7Z3x+Hik9PRfgBPt1oF41SFSCp0YRPLxLMFdTjNgV3HZXVNlq6
 }
 
 func TestNewVerifierFromKey(t *testing.T) {
-	sslibKey := &sv.SSLibKey{
+	sslibKey := &signerverifier.SSLibKey{
 		KeyID:   "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E",
 		KeyType: "ssh",
 		Scheme:  "ssh-ed25519",
-		KeyVal:  sv.KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
+		KeyVal:  signerverifier.KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
 	}
 
 	verifier, err := NewVerifierFromKey(sslibKey)

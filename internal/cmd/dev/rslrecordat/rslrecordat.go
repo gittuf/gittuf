@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/repository"
-	rslopts "github.com/gittuf/gittuf/internal/repository/options/rsl"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +47,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}

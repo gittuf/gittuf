@@ -4,9 +4,9 @@
 package addrootkey
 
 import (
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
-	"github.com/gittuf/gittuf/internal/repository"
 	"github.com/spf13/cobra"
 )
 
@@ -26,17 +26,17 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := repository.LoadRepository()
+	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	signer, err := common.LoadSigner(o.p.SigningKey)
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
 
-	newRootKey, err := common.LoadPublicKey(o.newRootKey)
+	newRootKey, err := gittuf.LoadPublicKey(o.newRootKey)
 	if err != nil {
 		return err
 	}

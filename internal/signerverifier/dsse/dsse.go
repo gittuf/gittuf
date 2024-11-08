@@ -7,9 +7,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const PayloadType = "application/vnd.gittuf+json"
@@ -52,9 +57,44 @@ func SignEnvelope(ctx context.Context, envelope *dsse.Envelope, signer dsse.Sign
 		return nil, err
 	}
 
-	signature := dsse.Signature{
-		Sig:   base64.StdEncoding.EncodeToString(sigBytes),
-		KeyID: keyID,
+	var signature dsse.Signature
+	if _, isSigstoreSigner := signer.(*sigstore.Signer); isSigstoreSigner {
+		// Unpack the bundle to get the signature + verification material
+		// Set extension in the signature object
+
+		bundle := protobundle.Bundle{}
+		if err := protojson.Unmarshal(sigBytes, &bundle); err != nil {
+			return nil, err
+		}
+
+		actualSigBytes, err := protojson.Marshal(bundle.GetMessageSignature())
+		if err != nil {
+			return nil, err
+		}
+
+		verificationMaterial := bundle.GetVerificationMaterial()
+		verificationMaterialBytes, err := protojson.Marshal(verificationMaterial)
+		if err != nil {
+			return nil, err
+		}
+		verificationMaterialStruct := new(structpb.Struct)
+		if err := protojson.Unmarshal(verificationMaterialBytes, verificationMaterialStruct); err != nil {
+			return nil, err
+		}
+
+		signature = dsse.Signature{
+			Sig:   base64.StdEncoding.EncodeToString(actualSigBytes),
+			KeyID: keyID,
+			Extension: &dsse.Extension{
+				Kind: sigstore.ExtensionMimeType,
+				Ext:  verificationMaterialStruct,
+			},
+		}
+	} else {
+		signature = dsse.Signature{
+			Sig:   base64.StdEncoding.EncodeToString(sigBytes),
+			KeyID: keyID,
+		}
 	}
 
 	// Preserve signatures that aren't from signer
@@ -77,14 +117,24 @@ func SignEnvelope(ctx context.Context, envelope *dsse.Envelope, signer dsse.Sign
 // a slice of verifiers passed into it. Threshold indicates the number of
 // providers that must validate the envelope.
 func VerifyEnvelope(ctx context.Context, envelope *dsse.Envelope, verifiers []dsse.Verifier, threshold int) ([]dsse.AcceptedKey, error) {
-	if threshold < 1 || threshold > len(verifiers) {
+	if threshold < 1 {
 		return nil, common.ErrInvalidThreshold
 	}
 
-	ev, err := dsse.NewMultiEnvelopeVerifier(threshold, verifiers...)
+	ev, err := dsse.NewEnvelopeVerifier(verifiers...)
 	if err != nil {
 		return nil, err
 	}
 
-	return ev.Verify(ctx, envelope)
+	// We verify with threshold == 1 because we want control over the threshold
+	// checks: we get all the verified keys back
+	acceptedKeys, err := ev.Verify(ctx, envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(acceptedKeys) < threshold {
+		return acceptedKeys, fmt.Errorf("accepted signatures do not match threshold, Found: %d, Expected %d", len(acceptedKeys), threshold)
+	}
+	return acceptedKeys, nil
 }
