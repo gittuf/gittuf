@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 
+	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
@@ -26,12 +27,12 @@ import (
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
-const (
-	githubTokenEnvKey    = "GITHUB_TOKEN" //nolint:gosec
-	defaultGitHubBaseURL = "https://github.com"
-)
+const githubTokenEnvKey = "GITHUB_TOKEN" //nolint:gosec
 
-var ErrNotSigningKey = errors.New("expected signing key")
+var (
+	ErrNotSigningKey = errors.New("expected signing key")
+	ErrNoGitHubToken = errors.New("authentication token for GitHub API not provided")
+)
 
 var githubClient *gogithub.Client
 
@@ -236,15 +237,28 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 
 // AddGitHubPullRequestAttestationForCommit identifies the pull request for a
 // specified commit ID and triggers AddGitHubPullRequestAttestationForNumber for
-// that pull request. Currently, the authentication token for the GitHub API is
-// read from the GITHUB_TOKEN environment variable. Use GITHUB_BASE_URL to
-// point to an enterprise GitHub instance.
-func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository, commitID, baseBranch string, signCommit bool) error {
+// that pull request. The authentication token for the GitHub API can be passed
+// in as an option. If it is not, it is read from the GITHUB_TOKEN environment
+// variable. A custom GitHub instance can be specified via opts.
+func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool, opts ...githubopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	client, err := getGitHubClient(githubBaseURL)
+	options := githubopts.DefaultOptions
+	for _, fn := range opts {
+		fn(options)
+	}
+	if options.GitHubToken == "" {
+		options.GitHubToken = os.Getenv(githubTokenEnvKey)
+
+		if options.GitHubToken == "" {
+			// still empty
+			return ErrNoGitHubToken
+		}
+	}
+
+	client, err := getGitHubClient(options.GitHubBaseURL, options.GitHubToken)
 	if err != nil {
 		return err
 	}
@@ -266,7 +280,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 
 		// pullRequest.Merged is not set on this endpoint for some reason
 		if pullRequest.MergedAt != nil && pullRequestBranch == baseBranch {
-			return r.addGitHubPullRequestAttestation(ctx, signer, githubBaseURL, owner, repository, pullRequest, signCommit)
+			return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, signCommit)
 		}
 	}
 
@@ -275,15 +289,29 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 
 // AddGitHubPullRequestAttestationForNumber wraps the API response for the
 // specified pull request in an in-toto attestation. `pullRequestID` must be the
-// number of the pull request. Currently, the authentication token for the
-// GitHub API is read from the GITHUB_TOKEN environment variable. Use
-// GITHUB_BASE_URL to point to an enterprise GitHub instance.
-func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequestNumber int, signCommit bool) error {
+// number of the pull request. The authentication token for the GitHub API can
+// be passed in as an option. If it is not passed in, it is read from the
+// GITHUB_TOKEN environment variable. A custom GitHub instance can be specified
+// via opts.
+func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool, opts ...githubopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	client, err := getGitHubClient(githubBaseURL)
+	options := githubopts.DefaultOptions
+	for _, fn := range opts {
+		fn(options)
+	}
+	if options.GitHubToken == "" {
+		options.GitHubToken = os.Getenv(githubTokenEnvKey)
+
+		if options.GitHubToken == "" {
+			// still empty
+			return ErrNoGitHubToken
+		}
+	}
+
+	client, err := getGitHubClient(options.GitHubBaseURL, options.GitHubToken)
 	if err != nil {
 		return err
 	}
@@ -294,16 +322,33 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return err
 	}
 
-	return r.addGitHubPullRequestAttestation(ctx, signer, githubBaseURL, owner, repository, pullRequest, signCommit)
+	return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, signCommit)
 }
 
 // AddGitHubPullRequestApprover adds a GitHub pull request approval attestation
 // for the specified parameters. If an attestation already exists, the specified
 // approver is added to the existing attestation's predicate and it is re-signed
-// and stored in the repository. Currently, this is limited to developer mode.
-func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequestNumber int, reviewID int64, approver string, signCommit bool) error {
+// and stored in the repository. To find the review information, the GitHub API
+// is used and the authentication token for the API is passed in as an option.
+// If the token is not passed in, it's read from the GITHUB_TOKEN environment
+// variable. A custom GitHub instance can be specified via opts. Currently, this
+// is limited to developer mode.
+func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, reviewID int64, approver string, signCommit bool, opts ...githubopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
+	}
+
+	options := githubopts.DefaultOptions
+	for _, fn := range opts {
+		fn(options)
+	}
+	if options.GitHubToken == "" {
+		options.GitHubToken = os.Getenv(githubTokenEnvKey)
+
+		if options.GitHubToken == "" {
+			// still empty
+			return ErrNoGitHubToken
+		}
 	}
 
 	currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
@@ -316,7 +361,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, githubBaseURL, owner, repository, pullRequestNumber, reviewID)
+	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, options.GitHubToken, owner, repository, pullRequestNumber, reviewID)
 	if err != nil {
 		return err
 	}
@@ -364,7 +409,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, githubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
@@ -375,11 +420,19 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 }
 
 // DismissGitHubPullRequestApprover removes an approver from the GitHub pull
-// request approval attestation for the specified parameters.
-func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL string, reviewID int64, dismissedApprover string, signCommit bool) error {
+// request approval attestation for the specified parameters. A custom GitHub
+// instance can be specified via opts.
+func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover string, signCommit bool, opts ...githubopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
+
+	options := githubopts.DefaultOptions
+	for _, fn := range opts {
+		fn(options)
+	}
+	// We don't hit the GitHub API for this flow, so no need to check the token
+	// option
 
 	currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
 	if err != nil {
@@ -391,7 +444,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, githubBaseURL, reviewID, keyID)
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, options.GitHubBaseURL, reviewID, keyID)
 	if err != nil {
 		return err
 	}
@@ -436,7 +489,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, githubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
@@ -538,7 +591,7 @@ func indexPathToComponents(indexPath string) (string, string, string) {
 	return base, from, to
 }
 
-func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, githubBaseURL, owner, repository string, pullRequestNumber int, reviewID int64) (string, string, string, error) {
+func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, githubBaseURL, githubToken, owner, repository string, pullRequestNumber int, reviewID int64) (string, string, string, error) {
 	indexPath, has, err := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(githubBaseURL, reviewID)
 	if err != nil {
 		return "", "", "", err
@@ -553,7 +606,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 	// Note: there's the potential for a TOCTOU issue here, we may query the
 	// repo after things have moved in either branch.
 
-	client, err := getGitHubClient(githubBaseURL)
+	client, err := getGitHubClient(githubBaseURL, githubToken)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -590,12 +643,12 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 // getGitHubClient creates a client to interact with a GitHub instance. If a
 // base URL other than https://github.com is supplied, the client is configured
 // to interact with the specified enterprise instance.
-func getGitHubClient(baseURL string) (*gogithub.Client, error) {
+func getGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
 	if githubClient == nil {
-		githubClient = gogithub.NewClient(nil).WithAuthToken(os.Getenv(githubTokenEnvKey))
+		githubClient = gogithub.NewClient(nil).WithAuthToken(githubToken)
 	}
 
-	if baseURL != defaultGitHubBaseURL {
+	if baseURL != githubopts.DefaultGitHubBaseURL {
 		baseURL = strings.TrimSuffix(baseURL, "/")
 
 		endpointAPI := fmt.Sprintf("%s/%s/%s/", baseURL, "api", "v3")
