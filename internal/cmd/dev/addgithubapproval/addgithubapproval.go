@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&o.baseURL,
 		"base-URL",
-		"https://github.com",
+		githubopts.DefaultGitHubBaseURL,
 		"location of GitHub instance",
 	)
 
@@ -87,7 +88,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, o.baseURL, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, o.approver, true)
+	return repo.AddGitHubPullRequestApprover(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, o.reviewID, o.approver, true, githubopts.WithGitHubBaseURL(o.baseURL))
 }
 
 func New() *cobra.Command {
