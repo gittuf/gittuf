@@ -109,6 +109,12 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
 func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+	/*
+		require firstEntry != nil
+		require lastEntry != nil
+		require target != ""
+	*/
+
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
@@ -127,10 +133,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		}
 		currentPolicy = state
 	} else if !errors.Is(err, ErrPolicyNotFound) {
-		// Searcher gives us nil when firstEntry is the very first entry or
-		// close to it (i.e., before a policy was applied)
+		// Searcher gives us nil when firstEntry is the very first entry
+		// or close to it (i.e., before a policy was applied)
 		return err
 	}
+	// require currentPolicy != nil || parent(firstEntry) == nil
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID.String()))
 	initialAttestationsEntry, err := searcher.FindAttestationsEntryFor(firstEntry)
@@ -145,6 +152,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		// if it's some other error
 		return err
 	}
+	// require currentAttestations != nil || (entry.Ref != attestations.Ref for entry in 0..firstEntry)
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
 	slog.Debug("Identifying all entries in range...")
@@ -152,11 +160,13 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	if err != nil {
 		return err
 	}
+	// require len(entries) != 0
 
 	// Verify each entry, looking for a fix when an invalid entry is encountered
 	var invalidEntry *rsl.ReferenceEntry
 	var verificationErr error
 	for len(entries) != 0 {
+		// invariant invalidEntry == nil || inRecoveryMode() == true
 		if invalidEntry == nil {
 			// Pop entry from queue
 			entry := entries[0]
@@ -179,6 +189,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 				if err != nil {
 					return err
 				}
+				// require newPolicy != nil
 
 				if currentPolicy != nil {
 					// currentPolicy can be nil when
@@ -261,6 +272,10 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		if lastGoodEntry.SkippedBy(lastGoodEntryAnnotations) {
 			return ErrLastGoodEntryIsSkipped
 		}
+		// require lastGoodEntry != nil
+
+		// TODO: what if the very first entry for a ref is a violation?
+
 		// gittuf requires the fix to point to a commit that is tree-same as the
 		// last good state
 		lastGoodTreeID, err := repo.GetCommitTreeID(lastGoodEntry.TargetID)
