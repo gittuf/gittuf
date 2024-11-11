@@ -68,8 +68,8 @@ type logScanner struct {
 	scanner *bufio.Scanner
 }
 
-func (l *logScanner) Buffer(buf []byte, max int) {
-	l.scanner.Buffer(buf, max)
+func (l *logScanner) Buffer(buf []byte, maxN int) {
+	l.scanner.Buffer(buf, maxN)
 }
 
 func (l *logScanner) Bytes() []byte {
