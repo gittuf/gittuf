@@ -186,27 +186,34 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			// Read in command from parent process -> this should be
 			// command=fetch with protocol v2
 			var (
-				wroteGittufWants = false // track this in case there are multiple rounds of negotiation
-				wroteWants       = false
+				wroteGittufWantsAndHaves = false // track this in case there are multiple rounds of negotiation
+				wroteWants               = false
 			)
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
 
 				if bytes.Equal(input, flushPkt) {
-					if !wroteGittufWants {
+					if !wroteGittufWantsAndHaves {
 						log("adding gittuf wants")
-						tips, err := getGittufWants(repo, gittufRefsTips)
+						wants, haves, err := getGittufWantsAndHaves(repo, gittufRefsTips)
 						if err != nil {
-							tips = gittufRefsTips
+							wants = gittufRefsTips
 						}
 
-						for _, tip := range tips {
+						for _, tip := range wants {
 							wantCmd := fmt.Sprintf("want %s\n", tip)
 							if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
 								return nil, false, err
 							}
 						}
-						wroteGittufWants = true
+
+						for _, tip := range haves {
+							haveCmd := fmt.Sprintf("have %s\n", tip)
+							if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
+								return nil, false, err
+							}
+						}
+						wroteGittufWantsAndHaves = true
 					}
 					wroteWants = true
 				} else {
