@@ -124,7 +124,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "add-person",
 		Short:             fmt.Sprintf("Add a trusted person to a policy file (requires developer mode and v0.2 policy metadata to be enabled, set %s=1 and %s=1)", dev.DevModeKey, tufv02.AllowV02MetadataKey),
 		Long:              `This command allows users to add a trusted person to the specified policy file. By default, the main policy file is selected. Note that the person's keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
-		PreRunE:           common.CheckIfSigningViableWithFlag,
+		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

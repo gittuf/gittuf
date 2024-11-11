@@ -25,6 +25,14 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 		return ErrInvalidPolicyName
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -78,6 +86,14 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
 	}
 
 	keyID, err := signer.KeyID()
@@ -146,6 +162,14 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 		return ErrInvalidPolicyName
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -203,6 +227,14 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 // ReorderDelegations is the interface for the user to reorder rules in gittuf
 // policy.
 func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleNames []string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return nil
@@ -255,6 +287,14 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
 func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -312,6 +352,14 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 // AddPrincipalToTargets is the interface for a user to add a trusted principal
 // to gittuf rule file metadata.
 func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipals []tuf.Principal, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -375,6 +423,14 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
 func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err

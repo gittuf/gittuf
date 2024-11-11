@@ -5,7 +5,6 @@ package skiprewritten
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +27,6 @@ func New() *cobra.Command {
 		Use:               "skip-rewritten",
 		Short:             "Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref",
 		Args:              cobra.ExactArgs(1),
-		PreRunE:           common.CheckIfSigningViable,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

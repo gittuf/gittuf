@@ -4,12 +4,13 @@
 package common
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/spf13/cobra"
 )
+
+var ErrSigningKeyNotSet = errors.New("required flag \"signing-key\" not set")
 
 // PublicKeys is a custom type to represent a list of paths
 type PublicKeys []string
@@ -30,26 +31,15 @@ func (p *PublicKeys) Type() string {
 	return "public-keys"
 }
 
-// CheckIfSigningViableWithFlag checks if a signing key was specified via the
-// "signing-key" flag, and then calls CheckIfSigningViable
-func CheckIfSigningViableWithFlag(cmd *cobra.Command, _ []string) error {
+// CheckForSigningKeyFlag checks if a signing key was specified via the
+// "signing-key" flag
+func CheckForSigningKeyFlag(cmd *cobra.Command, _ []string) error {
 	signingKeyFlag := cmd.Flags().Lookup("signing-key")
 
 	// Check if a signing key was specified via the "signing-key" flag
 	if signingKeyFlag.Value.String() == "" {
-		return fmt.Errorf("required flag \"signing-key\" not set")
+		return ErrSigningKeyNotSet
 	}
 
-	return CheckIfSigningViable(cmd, nil)
-}
-
-// CheckIfSigningViable checks if we are able to sign RSL entries given the
-// current environment
-func CheckIfSigningViable(_ *cobra.Command, _ []string) error {
-	repo, err := gitinterface.LoadRepository()
-	if err != nil {
-		return err
-	}
-
-	return repo.CanSign()
+	return nil
 }

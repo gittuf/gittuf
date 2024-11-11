@@ -6,7 +6,6 @@ package record
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +37,6 @@ func New() *cobra.Command {
 		Use:               "record",
 		Short:             "Record latest state of a Git reference in the RSL",
 		Args:              cobra.ExactArgs(1),
-		PreRunE:           common.CheckIfSigningViable,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
