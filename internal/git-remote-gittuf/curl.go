@@ -194,6 +194,10 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 
 				if bytes.Equal(input, flushPkt) {
 					if !wroteGittufWantsAndHaves {
+						// We only write gittuf specific haves and wants when we
+						// haven't already written them. We track this because
+						// in multiple rounds of negotiations, we only want to
+						// write them the first time.
 						log("adding gittuf wants")
 						wants, haves, err := getGittufWantsAndHaves(repo, gittufRefsTips)
 						if err != nil {
