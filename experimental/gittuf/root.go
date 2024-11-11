@@ -24,10 +24,19 @@ import (
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
 func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	var (
 		publicKeyRaw *signerverifier.SSLibKey
 		err          error
 	)
+
 	switch signer := signer.(type) {
 	case *ssh.Signer:
 		publicKeyRaw = signer.MetadataKey()
@@ -72,6 +81,14 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
 func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -111,6 +128,14 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 // RemoveRootKey is the interface for the user to de-authorize a key
 // trusted to sign the Root role.
 func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -147,6 +172,14 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
 func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -175,6 +208,14 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 // RemoveTopLevelTargetsKey is the interface for the user to de-authorize a key
 // trusted to sign the top level Targets role / policy file.
 func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKeyID string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -204,6 +245,14 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 // the special GitHub app role. This key is used to verify GitHub pull request
 // approval attestation signatures.
 func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -232,6 +281,14 @@ func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.Signe
 // RemoveGitHubAppKey is the interface for the user to de-authorize the key for
 // the special GitHub app role.
 func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -258,6 +315,14 @@ func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.Si
 // TrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as trusted.
 func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -289,6 +354,14 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 // UntrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as untrusted.
 func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -320,6 +393,14 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 // UpdateRootThreshold sets the threshold of valid signatures required for the
 // Root role.
 func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -348,6 +429,14 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 // UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
 // required for the top level Targets role.
 func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
@@ -376,6 +465,14 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err

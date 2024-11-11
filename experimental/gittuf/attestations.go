@@ -47,6 +47,14 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		return dev.ErrNotInDevMode
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	var err error
 
 	targetRef, err = r.r.AbsoluteReference(targetRef)
@@ -173,6 +181,14 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 		return dev.ErrNotInDevMode
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Ensure only the key that created a reference authorization can remove it
 	slog.Debug("Evaluating if key can sign...")
 	_, err := signer.Sign(ctx, nil)
@@ -245,10 +261,19 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		return dev.ErrNotInDevMode
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	options := githubopts.DefaultOptions
 	for _, fn := range opts {
 		fn(options)
 	}
+
 	if options.GitHubToken == "" {
 		options.GitHubToken = os.Getenv(githubTokenEnvKey)
 
@@ -298,10 +323,19 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return dev.ErrNotInDevMode
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	options := githubopts.DefaultOptions
 	for _, fn := range opts {
 		fn(options)
 	}
+
 	if options.GitHubToken == "" {
 		options.GitHubToken = os.Getenv(githubTokenEnvKey)
 
@@ -312,6 +346,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 	}
 
 	client, err := getGitHubClient(options.GitHubBaseURL, options.GitHubToken)
+
 	if err != nil {
 		return err
 	}
@@ -338,10 +373,19 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return dev.ErrNotInDevMode
 	}
 
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	options := githubopts.DefaultOptions
 	for _, fn := range opts {
 		fn(options)
 	}
+
 	if options.GitHubToken == "" {
 		options.GitHubToken = os.Getenv(githubTokenEnvKey)
 
@@ -425,6 +469,14 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover string, signCommit bool, opts ...githubopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
 	}
 
 	options := githubopts.DefaultOptions

@@ -30,6 +30,14 @@ var (
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
 func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool, opts ...rslopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	options := &rslopts.Options{}
 	for _, fn := range opts {
 		fn(options)
@@ -128,6 +136,14 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
 func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, message string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	rslEntryHashes := []gitinterface.Hash{}
 	for _, id := range rslEntryIDs {
 		hash, err := gitinterface.NewHash(id)
@@ -152,6 +168,14 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 // entries are reapplied over the latest entries in the remote if the local only
 // RSL entries and remote only entries are for different Git references.
 func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName string, sign bool) error {
+	if sign {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
 	remoteURL, err := r.r.GetRemoteURL(remoteName)
 	if err != nil {
 		return err

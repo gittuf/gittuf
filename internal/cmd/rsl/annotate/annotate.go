@@ -5,7 +5,6 @@ package annotate
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +47,6 @@ func New() *cobra.Command {
 		Use:               "annotate",
 		Short:             "Annotate prior RSL entries",
 		Args:              cobra.MinimumNArgs(1),
-		PreRunE:           common.CheckIfSigningViable,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

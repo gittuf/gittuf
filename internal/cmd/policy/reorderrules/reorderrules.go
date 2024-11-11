@@ -48,7 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "reorder-rules",
 		Short:             "Reorder rules in the specified policy file",
 		Long:              "This command allows users to reorder rules in the specified policy file. By default, the main policy file is selected. The rule names need to be passed as arguments, in the new order they must appear in, starting from the first to the last rule. Rule names may contain spaces, so they should be enclosed in quotes if necessary.",
-		PreRunE:           common.CheckIfSigningViableWithFlag,
+		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
