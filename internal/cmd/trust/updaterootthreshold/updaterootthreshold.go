@@ -45,7 +45,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:     "update-root-threshold",
 		Short:   "Update Root threshold in the gittuf root of trust",
 		Long:    "This command allows users to update the threshold of valid signatures required for the root of trust.",
-		PreRunE: common.CheckIfSigningViableWithFlag,
+		PreRunE: common.CheckForSigningKeyFlag,
 		RunE:    o.Run,
 	}
 	o.AddFlags(cmd)

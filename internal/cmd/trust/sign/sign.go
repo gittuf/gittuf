@@ -36,7 +36,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "sign",
 		Short:             "Sign root of trust",
 		Long:              "This command allows users to add their signature to the root of trust file.",
-		PreRunE:           common.CheckIfSigningViableWithFlag,
+		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

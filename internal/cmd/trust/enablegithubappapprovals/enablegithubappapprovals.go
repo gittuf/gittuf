@@ -35,7 +35,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "enable-github-app-approvals",
 		Short:             "Mark GitHub app approvals as trusted henceforth",
-		PreRunE:           common.CheckIfSigningViableWithFlag,
+		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
