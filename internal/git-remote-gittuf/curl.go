@@ -26,6 +26,8 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
 	stdInScanner.Split(splitInput)
 
+	stdOutWriter := &logWriteCloser{name: "git-remote-gittuf stdout", writeCloser: os.Stdout}
+
 	// We invoke git-remote-http, itself a Git remote helper
 	helper := exec.Command("git-remote-http", remoteName, url)
 	helper.Stderr = os.Stderr
@@ -90,7 +92,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 				for helperStdOutScanner.Scan() {
 					output := helperStdOutScanner.Bytes()
 
-					if _, err := os.Stdout.Write(output); err != nil {
+					if _, err := stdOutWriter.Write(output); err != nil {
 						return nil, false, err
 					}
 
@@ -164,7 +166,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 				}
 
 				// Write output to parent process
-				if _, err := os.Stdout.Write(output); err != nil {
+				if _, err := stdOutWriter.Write(output); err != nil {
 					return nil, false, err
 				}
 
@@ -249,7 +251,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 						output := helperStdOutScanner.Bytes()
 
 						// Send along to parent process
-						if _, err := os.Stdout.Write(output); err != nil {
+						if _, err := stdOutWriter.Write(output); err != nil {
 							return nil, false, err
 						}
 
@@ -332,7 +334,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 				}
 
 				// Pass remote ref status to parent process
-				if _, err := os.Stdout.Write(output); err != nil {
+				if _, err := stdOutWriter.Write(output); err != nil {
 					return nil, false, err
 				}
 
@@ -449,14 +451,14 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 						// This should never happen but
 						// if it does, just send it back
 						// to the caller
-						if _, err := os.Stdout.Write(output); err != nil {
+						if _, err := stdOutWriter.Write(output); err != nil {
 							return nil, false, err
 						}
 					} else {
-						if dstRefs.Has(string(outputSplit[1])) {
+						if dstRefs.Has(strings.TrimSpace(string(outputSplit[1]))) {
 							// this was explicitly
 							// pushed by the user
-							if _, err := os.Stdout.Write(output); err != nil {
+							if _, err := stdOutWriter.Write(output); err != nil {
 								return nil, false, err
 							}
 						}
@@ -486,7 +488,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			for helperStdOutScanner.Scan() {
 				output := helperStdOutScanner.Bytes()
 
-				if _, err := os.Stdout.Write(output); err != nil {
+				if _, err := stdOutWriter.Write(output); err != nil {
 					return nil, false, err
 				}
 
