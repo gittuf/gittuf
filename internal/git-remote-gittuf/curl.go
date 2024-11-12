@@ -190,6 +190,8 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			var (
 				wroteGittufWantsAndHaves = false // track this in case there are multiple rounds of negotiation
 				wroteWants               = false
+				allWants                 = set.NewSet[string]()
+				allHaves                 = set.NewSet[string]()
 			)
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
@@ -207,31 +209,51 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 						}
 
 						for _, tip := range wants {
-							wantCmd := fmt.Sprintf("want %s\n", tip)
-							if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
-								return nil, false, err
+							if !allWants.Has(tip) {
+								// indicate we
+								// want the
+								// gittuf obj
+								wantCmd := fmt.Sprintf("want %s\n", tip)
+								if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
+									return nil, false, err
+								}
 							}
 						}
 
 						for _, tip := range haves {
-							haveCmd := fmt.Sprintf("have %s\n", tip)
-							if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
-								return nil, false, err
+							if !allHaves.Has(tip) {
+								// indicate we
+								// have the
+								// gittuf obj
+								haveCmd := fmt.Sprintf("have %s\n", tip)
+								if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
+									return nil, false, err
+								}
 							}
 						}
 						wroteGittufWantsAndHaves = true
 					}
 					wroteWants = true
 				} else {
-					for ref, tip := range gittufRefsTips {
-						wantCmd := fmt.Sprintf("want %s", tip)
-						if bytes.Contains(input, []byte(wantCmd)) {
-							// Take out this ref as
-							// something for us to
-							// update or add wants
-							// for
-							delete(gittufRefsTips, ref)
+					if bytes.Contains(input, []byte("want")) {
+						idx := bytes.Index(input, []byte("want "))
+						sha := string(bytes.TrimSpace(input[idx+len("want "):]))
+						allWants.Add(sha)
+
+						for ref, tip := range gittufRefsTips {
+							if tip == sha {
+								// Take out this ref as
+								// something for us to
+								// update or add wants
+								// for
+								log("taking out", ref, "as it matches", sha)
+								delete(gittufRefsTips, ref)
+							}
 						}
+					} else if bytes.Contains(input, []byte("have")) {
+						idx := bytes.Index(input, []byte("have "))
+						sha := string(bytes.TrimSpace(input[idx+len("have "):]))
+						allHaves.Add(sha)
 					}
 				}
 
