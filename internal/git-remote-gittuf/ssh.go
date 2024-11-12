@@ -35,6 +35,8 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
 	stdInScanner.Split(splitInput)
 
+	stdOutWriter := &logWriteCloser{name: "git-remote-gittuf stdout", writeCloser: os.Stdout}
+
 	var (
 		helperStdOut   io.ReadCloser
 		helperStdIn    io.WriteCloser
@@ -85,7 +87,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 
 			log("cmd: capabilities")
 
-			if _, err := os.Stdout.Write([]byte("stateless-connect\npush\n\n")); err != nil {
+			if _, err := stdOutWriter.Write([]byte("stateless-connect\npush\n\n")); err != nil {
 				return nil, false, err
 			}
 
@@ -173,7 +175,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 			}
 
 			// Indicate connection established successfully
-			if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+			if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
 				return nil, false, err
 			}
 
@@ -189,7 +191,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				// If server doesn't support v2, as soon as we connect,
 				// it tells us the ref statuses
 
-				if _, err := os.Stdout.Write(output); err != nil {
+				if _, err := stdOutWriter.Write(output); err != nil {
 					return nil, false, err
 				}
 
@@ -253,7 +255,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				}
 
 				// Write output to parent process
-				if _, err := os.Stdout.Write(output); err != nil {
+				if _, err := stdOutWriter.Write(output); err != nil {
 					return nil, false, err
 				}
 
@@ -261,7 +263,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 					// For a stateless connection, we must
 					// also add the endOfRead packet
 					// ourselves
-					if _, err := os.Stdout.Write(endOfReadPkt); err != nil {
+					if _, err := stdOutWriter.Write(endOfReadPkt); err != nil {
 						return nil, false, err
 					}
 					break
@@ -356,7 +358,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 						output := helperStdOutScanner.Bytes()
 
 						// Send along to parent process
-						if _, err := os.Stdout.Write(output); err != nil {
+						if _, err := stdOutWriter.Write(output); err != nil {
 							return nil, false, err
 						}
 
@@ -368,7 +370,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 							}
 						} else if bytes.Equal(output, flushPkt) {
 							if packReusedSeen {
-								if _, err := os.Stdout.Write(endOfReadPkt); err != nil {
+								if _, err := stdOutWriter.Write(endOfReadPkt); err != nil {
 									return nil, false, err
 								}
 								break
@@ -462,7 +464,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 					// We don't use ref, instead we use refAdSplit[1]. This
 					// allows us to propagate remote capabilities to the parent
 					// process
-					if _, err := os.Stdout.Write([]byte(fmt.Sprintf("%s %s\n", tip, refAdSplit[1]))); err != nil {
+					if _, err := stdOutWriter.Write([]byte(fmt.Sprintf("%s %s\n", tip, refAdSplit[1]))); err != nil {
 						return nil, false, err
 					}
 				}
@@ -470,7 +472,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				if bytes.Equal(output, flushPkt) {
 					// Add trailing new line as we're bridging git-receive-pack
 					// output with git remote helper output
-					if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+					if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
 						return nil, false, err
 					}
 					break
@@ -621,7 +623,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				output := helperStdOutScanner.Bytes()
 
 				if len(output) == 4 {
-					if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+					if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
 						return nil, false, err
 					}
 
@@ -638,18 +640,18 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 
 				output = output[4:] // remove length prefix
 				outputSplit := bytes.Split(output, []byte(" "))
+				pushedRef := strings.TrimSpace(string(outputSplit[1]))
 				if bytes.HasPrefix(output, []byte("ok")) {
-					if dstRefs.Has(string(outputSplit[1])) {
-						if _, err := os.Stdout.Write(output); err != nil {
+					if dstRefs.Has(pushedRef) {
+						if _, err := stdOutWriter.Write(output); err != nil {
 							return nil, false, err
 						}
 					}
 				} else if bytes.HasPrefix(output, []byte("ng")) {
-					output = bytes.TrimPrefix(output, []byte("ng"))
-					output = append([]byte("error"), output...) // replace ng with error
-
-					if dstRefs.Has(string(outputSplit[1])) {
-						if _, err := os.Stdout.Write(output); err != nil {
+					if dstRefs.Has(pushedRef) {
+						output = bytes.TrimPrefix(output, []byte("ng"))
+						output = append([]byte("error"), output...) // replace ng with error
+						if _, err := stdOutWriter.Write(output); err != nil {
 							return nil, false, err
 						}
 					}
@@ -657,7 +659,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 			}
 
 			// Trailing newline for end of output
-			if _, err := os.Stdout.Write([]byte("\n")); err != nil {
+			if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
 				return nil, false, err
 			}
 		default:
