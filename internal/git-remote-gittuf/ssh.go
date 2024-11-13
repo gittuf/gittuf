@@ -285,6 +285,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				wroteWants               = false
 				allWants                 = set.NewSet[string]()
 				allHaves                 = set.NewSet[string]()
+				gittufObjects            = set.NewSet[string]()
 			)
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
@@ -324,6 +325,8 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 								if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
 									return nil, false, err
 								}
+
+								gittufObjects.Add(tip)
 							}
 						}
 
@@ -336,6 +339,8 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 								if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
 									return nil, false, err
 								}
+
+								gittufObjects.Add(tip)
 							}
 						}
 						wroteGittufWantsAndHaves = true
@@ -379,9 +384,23 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 					for helperStdOutScanner.Scan() {
 						output := helperStdOutScanner.Bytes()
 
-						// Send along to parent process
-						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+						if bytes.Contains(output, []byte("ACK")) {
+							idx := bytes.Index(output, []byte("ACK"))
+							ackLine := bytes.TrimSpace(output[idx:])
+							ackSplit := bytes.Split(ackLine, []byte(" "))
+							sha := ackSplit[1]
+							if !gittufObjects.Has(string(sha)) {
+								// Send along to parent process
+								if _, err := stdOutWriter.Write(output); err != nil {
+									return nil, false, err
+								}
+							}
+						} else {
+							// Send along to parent process
+							if _, err := stdOutWriter.Write(output); err != nil {
+								return nil, false, err
+							}
+
 						}
 
 						if len(output) > 4 {
@@ -390,6 +409,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 							if line[0] == 2 && bytes.Contains(line, []byte("pack-reused")) {
 								packReusedSeen = true // we see this at the end
 							}
+
 						} else if bytes.Equal(output, flushPkt) {
 							if packReusedSeen {
 								if _, err := stdOutWriter.Write(endOfReadPkt); err != nil {

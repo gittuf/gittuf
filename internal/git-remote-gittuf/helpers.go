@@ -146,8 +146,8 @@ func getGittufWantsAndHaves(repo *gittuf.Repository, remoteTips map[string]strin
 
 		if currentTip.String() != tip {
 			wants[remoteRef] = tip
+			currentTips.Add(currentTip.String())
 		}
-		currentTips.Add(currentTip.String())
 	}
 
 	return wants, currentTips.Contents(), nil
