@@ -23,7 +23,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	// initialize policy
 	// add rule for protecting refs/gittuf/hooks
 
-	return repo.InitializeHooks(cmd.Context())
+	return repo.InitializeHooks()
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

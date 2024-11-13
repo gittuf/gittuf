@@ -1,27 +1,17 @@
 package hooks
 
 import (
-	"context"
-	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 
-	//"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	//"github.com/gittuf/gittuf/internal/policy"
-	//"github.com/gittuf/gittuf/internal/rsl"
-	//"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	//sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	//"io/ioutil"
 	"log/slog"
-	//"os"
 	"path"
-	//"path/filepath"
 	"strings"
 )
 
@@ -37,9 +27,9 @@ const (
 )
 
 var (
-	ErrMetadataNotFound          = errors.New("unable to find requested metadata file; has it been initialized?")
+	ErrMetadataNotFound          = errors.New("unable to find requested metadata file")
 	ErrPolicyNotFound            = errors.New("cannot find policy")
-	ErrHooksMetadataHashMismatch = errors.New("Error verifying Hooks metadata - hashes do not match.")
+	ErrHooksMetadataHashMismatch = errors.New("error verifying Hooks metadata - hashes do not match")
 )
 
 // Hooks metadata should be encoded on existing policy metadata
@@ -61,21 +51,16 @@ type StateWrapper struct {
 	Repository          *gitinterface.Repository
 }
 
-type HooksMetadata struct {
-	HooksInfo map[string]*HooksInformation `json:"HooksInfo"`
-	Bindings  map[string]string            `json:"Bindings"`
+type Metadata struct {
+	HooksInfo map[string]*Information `json:"HooksInfo"`
+	Bindings  map[string]string       `json:"Bindings"`
 }
 
-type HooksInformation struct {
+type Information struct {
 	SHA256Hash string   `json:"SHA256Hash"`
 	BlobID     string   `json:"BlobID"`
 	Stage      string   `json:"Stage"`
 	Branches   []string `json:"Branches"`
-}
-
-type searcher interface {
-	FindHooksEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error)
-	FindFirstHooksEntry() (*rsl.ReferenceEntry, error)
 }
 
 type regularSearcher struct {
@@ -209,7 +194,7 @@ func LoadState(repo *gitinterface.Repository, requestedEntry *rsl.ReferenceEntry
 	return initialHooksState, nil
 }
 
-func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository) (*StateWrapper, error) {
+func LoadCurrentState(repo *gitinterface.Repository) (*StateWrapper, error) {
 	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(HooksRef))
 	if err != nil {
 		return nil, err
@@ -220,25 +205,25 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository) (*Stat
 
 // LoadFirstState returns the State corresponding to the first Hooks commit.
 // Verification of RoT is skipped since it is the initial commit.
-func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*StateWrapper, error) {
-	policyState, err := policy.LoadCurrentState(ctx, repo, HooksRef)
-	if err != nil {
-		return nil, err
-	}
-	slog.Debug("policyState fetch did not return err")
-	returnState := StateWrapper{
-		Repository:          repo,
-		TargetsEnvelope:     policyState.TargetsEnvelope,
-		DelegationEnvelopes: policyState.DelegationEnvelopes,
-	}
-	return &returnState, nil
+//func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*StateWrapper, error) {
+//	policyState, err := policy.LoadCurrentState(ctx, repo, HooksRef)
+//	if err != nil {
+//		return nil, err
+//	}
+//	slog.Debug("policyState fetch did not return err")
+//	returnState := StateWrapper{
+//		Repository:          repo,
+//		TargetsEnvelope:     policyState.TargetsEnvelope,
+//		DelegationEnvelopes: policyState.DelegationEnvelopes,
+//	}
+//	return &returnState, nil
+//}
+
+func InitializeHooksMetadata() Metadata {
+	return Metadata{HooksInfo: make(map[string]*Information), Bindings: make(map[string]string)}
 }
 
-func InitializeHooksMetadata() HooksMetadata {
-	return HooksMetadata{HooksInfo: make(map[string]*HooksInformation), Bindings: make(map[string]string)}
-}
-
-func (s *StateWrapper) GetHooksMetadata() (*HooksMetadata, error) {
+func (s *StateWrapper) GetHooksMetadata() (*Metadata, error) {
 	h := s.HooksEnvelope
 	if h == nil {
 		slog.Debug("Could not find requested metadata file; initializing hooks metadata")
@@ -251,7 +236,7 @@ func (s *StateWrapper) GetHooksMetadata() (*HooksMetadata, error) {
 	}
 
 	slog.Debug(string(payloadBytes))
-	hooksMetadata := &HooksMetadata{}
+	hooksMetadata := &Metadata{}
 	if err := json.Unmarshal(payloadBytes, hooksMetadata); err != nil {
 		return nil, err
 	}
@@ -328,8 +313,8 @@ func (s *StateWrapper) Commit(repo *gitinterface.Repository, commitMessage, hook
 	return nil
 }
 
-func (h *HooksMetadata) GenerateMetadataFor(hookName, stage string, blobID, sha256HashSum gitinterface.Hash) error {
-	hookInfo := HooksInformation{
+func (h *Metadata) GenerateMetadataFor(hookName, stage string, blobID, sha256HashSum gitinterface.Hash) error {
+	hookInfo := Information{
 		SHA256Hash: sha256HashSum.String(),
 		Stage:      stage,
 		BlobID:     blobID.String(),

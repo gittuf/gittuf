@@ -34,7 +34,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"filepath of the script to be run as a hook",
 	)
-	cmd.MarkFlagRequired("file")
+	cmd.MarkFlagRequired("file") //nolint:errcheck
 
 	cmd.Flags().StringVar(
 		&o.stage,
@@ -42,7 +42,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"stage at which the hook must be run",
 	)
-	cmd.MarkFlagRequired("stage")
+	cmd.MarkFlagRequired("stage") //nolint:errcheck
 
 	cmd.Flags().StringVar(
 		&o.hookname,
