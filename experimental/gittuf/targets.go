@@ -424,7 +424,7 @@ func (r *Repository) InitializeHooks() error {
 	repo := r.GetGitRepository()
 	stateChecker, err := hooks.LoadCurrentState(repo)
 	if stateChecker != nil {
-		return fmt.Errorf("Hooks ref already initialized, cannot initialize again")
+		return fmt.Errorf("hooks ref already initialized, cannot initialize again")
 	}
 
 	state := &hooks.StateWrapper{Repository: repo}
@@ -450,7 +450,7 @@ func (r *Repository) InitializeHooks() error {
 	return state.Commit(repo, hooks.DefaultCommitMessage, "", nil, true)
 }
 
-func (r *Repository) AddHooks(filePath, stage, hookName string) error {
+func (r *Repository) AddHooks(filePath, stage, hookName, execenv string, modules []string) error {
 	repo := r.GetGitRepository()
 	hooksTip, err := repo.GetReference(hooks.HooksRef)
 	if err != nil {
@@ -495,7 +495,7 @@ func (r *Repository) AddHooks(filePath, stage, hookName string) error {
 		return err
 	}
 	fmt.Println(blobID)
-	if err := currentHooksMetadata.GenerateMetadataFor(hookName, stage, blobID, sha256HashSum); err != nil {
+	if err := currentHooksMetadata.GenerateMetadataFor(hookName, stage, execenv, blobID, sha256HashSum, modules); err != nil {
 		return err
 	}
 

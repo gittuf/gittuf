@@ -57,10 +57,12 @@ type Metadata struct {
 }
 
 type Information struct {
-	SHA256Hash string   `json:"SHA256Hash"`
-	BlobID     string   `json:"BlobID"`
-	Stage      string   `json:"Stage"`
-	Branches   []string `json:"Branches"`
+	SHA256Hash  string   `json:"SHA256Hash"`
+	BlobID      string   `json:"BlobID"`
+	Stage       string   `json:"Stage"`
+	Branches    []string `json:"Branches"`
+	Environment string   `json:"Environment"`
+	Modules     []string `json:"Modules"`
 }
 
 type regularSearcher struct {
@@ -313,11 +315,13 @@ func (s *StateWrapper) Commit(repo *gitinterface.Repository, commitMessage, hook
 	return nil
 }
 
-func (h *Metadata) GenerateMetadataFor(hookName, stage string, blobID, sha256HashSum gitinterface.Hash) error {
+func (h *Metadata) GenerateMetadataFor(hookName, stage, env string, blobID, sha256HashSum gitinterface.Hash, modules []string) error {
 	hookInfo := Information{
-		SHA256Hash: sha256HashSum.String(),
-		Stage:      stage,
-		BlobID:     blobID.String(),
+		SHA256Hash:  sha256HashSum.String(),
+		Stage:       stage,
+		BlobID:      blobID.String(),
+		Environment: env,
+		Modules:     modules,
 	}
 	h.HooksInfo[hookName] = &hookInfo
 	h.Bindings[stage] = hookName
