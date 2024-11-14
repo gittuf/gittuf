@@ -1,6 +1,7 @@
 package add
 
 import (
+	"errors"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
@@ -71,11 +72,8 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"modules",
 		"m",
 		nil,
-		"Modules which the Lua hook must run",
+		"Modules which the Lua hook must run. Usage: -m module1,module2,modulen",
 	)
-	if strings.ToLower(o.env) == "lua" {
-		cmd.MarkFlagRequired("modules") //nolint:errcheck
-	}
 
 }
 
@@ -85,6 +83,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	if (strings.ToLower(o.env) == "lua") && (o.modules == nil) {
+		return errors.New("must specify modules using --modules flag for Lua sandbox environment")
+	}
 	return repo.AddHooks(o.filepath, o.stage, o.hookname, o.env, o.modules)
 }
 
