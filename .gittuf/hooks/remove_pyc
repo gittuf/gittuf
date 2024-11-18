@@ -1,0 +1,9 @@
+local rootDir = getRootDir()
+local output = scanDir(rootDir, true)
+local files = splitString(output, "\n")
+  for _, filePath in ipairs(files) do
+    if string.match(filePath, "%.pyc$") then
+        local result = removeFile(filePath)
+    end
+end
+
