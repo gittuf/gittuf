@@ -30,11 +30,6 @@ const (
 	// PolicyStagingRef defines the Git namespace used as a staging area when creating or updating gittuf policies.
 	PolicyStagingRef = "refs/gittuf/policy-staging"
 
-	// HooksRef defines the Git namespace used for storing and distributing hooks in gittuf
-	HooksRef = "refs/gittuf/hooks"
-
-	// HooksRoleName reserves the default policy name for protecting the hooks namespace
-	HooksRoleName = "protect-hooks"
 	// RootRoleName defines the expected name for the gittuf root of trust.
 	RootRoleName = "root"
 

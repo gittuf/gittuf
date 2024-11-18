@@ -427,7 +427,7 @@ func (r *Repository) InitializeHooks() error {
 		return fmt.Errorf("hooks ref already initialized, cannot initialize again")
 	}
 
-	state := &hooks.StateWrapper{Repository: repo}
+	state := &hooks.HookState{Repository: repo}
 
 	slog.Debug("Creating initial rule file...")
 	targetsMetadata := policy.InitializeTargetsMetadata()
@@ -450,7 +450,13 @@ func (r *Repository) InitializeHooks() error {
 	return state.Commit(repo, hooks.DefaultCommitMessage, "", nil, true)
 }
 
-func (r *Repository) AddHooks(filePath, stage, hookName, execenv string, modules []string) error {
+func (r *Repository) AddHooks(ctx context.Context, o hooks.HookIdentifiers) error {
+	filePath := o.Filepath
+	stage := o.Stage
+	hookName := o.Hookname
+	execenv := o.Environment
+	modules := o.Modules
+
 	repo := r.GetGitRepository()
 	hooksTip, err := repo.GetReference(hooks.HooksRef)
 	if err != nil {
@@ -500,6 +506,10 @@ func (r *Repository) AddHooks(filePath, stage, hookName, execenv string, modules
 	}
 
 	env, err := dsse.CreateEnvelope(currentHooksMetadata)
+	if err != nil {
+		return err
+	}
+
 	state.HooksEnvelope = env
 
 	commitMessage := "Add " + hookName
@@ -551,7 +561,7 @@ func (r *Repository) ApplyHooks() error {
 
 // VerifyHooks verifies the signature of the metadata env
 // through dsse.VerifyEnvelope
-func (r *Repository) VerifyHooks(state *hooks.StateWrapper) error {
+func (r *Repository) VerifyHooks(state *hooks.HookState) error {
 	h := state.HooksEnvelope
 	payloadBytes, err := h.DecodeB64Payload()
 	if err != nil {
@@ -567,10 +577,6 @@ func (r *Repository) VerifyHooks(state *hooks.StateWrapper) error {
 		return err
 	}
 
-	// verify that both hashes are the same.
-	// to check hooksHash is going to be a string because the metadata is JSON encoded
-	// 	=> sha256HashSumGit needs to be converted to a string => needs to be of the type
-	// 	gitinterface.Hash
 	sha256HashSumGit := gitinterface.Hash(sha256HashSum)
 	hooksHash := targetsMetadata.GetHooksField()
 	if hooksHash != sha256HashSumGit.String() {
@@ -581,10 +587,10 @@ func (r *Repository) VerifyHooks(state *hooks.StateWrapper) error {
 }
 
 // LoadHooks should load the latest hooks metadata and load the hook files
-// todo: change workflow to work with Lua and gVisor - return the bytestream
+// todo:change workflow to work with Lua and gVisor - return the bytestream
 //
-//		instead of writing the file. The logic for deciding whether to write
-//	 the file or not should be in gittuf-git/cmd
+//	instead of writing the file. The logic for deciding whether to write
+//	the file or not should be in gittuf-git/cmd
 func (r *Repository) LoadHooks() error {
 	repo := r.GetGitRepository()
 	hooksTip, err := repo.GetReference(hooks.HooksRef)
@@ -613,7 +619,8 @@ func (r *Repository) LoadHooks() error {
 	}
 
 	for filename, hookInfo := range hooksMetadata.HooksInfo {
-		hookContents, err := repo.ReadBlobFromString(hookInfo.BlobID)
+		hookBlobID, err := gitinterface.NewHash(hookInfo.BlobID)
+		hookContents, err := repo.ReadBlob(hookBlobID)
 		if err != nil {
 			return err
 		}

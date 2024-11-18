@@ -1,8 +1,12 @@
+// Copyright The gittuf Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package add
 
 import (
 	"errors"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/experimental/gittuf/hooks"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 	"strings"
@@ -78,22 +82,34 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	if (strings.ToLower(o.env) == "lua") && (o.modules == nil) {
+		return errors.New("must specify modules using --modules flag for Lua sandbox environment")
+	}
+
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	if (strings.ToLower(o.env) == "lua") && (o.modules == nil) {
-		return errors.New("must specify modules using --modules flag for Lua sandbox environment")
+	// a hooks.HookIdentifiers object is being used to pass in the value for repo.AddHooks because it's too many
+	// arguments to be passed into the function otherwise.
+	identifiers := hooks.HookIdentifiers{
+		Filepath:    o.filepath,
+		Stage:       o.stage,
+		Hookname:    o.hookname,
+		Environment: o.env,
+		Modules:     o.modules,
 	}
-	return repo.AddHooks(o.filepath, o.stage, o.hookname, o.env, o.modules)
+
+	return repo.AddHooks(cmd.Context(), identifiers)
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:               "add",
-		Short:             "add a script to be run as a hook and mention when to run it.",
+		Short:             "add a script to be run as a hook, specify when and where to run it.",
+		Long:              "add a script to be run as a hook, specify when and which environment to run it in. Environment can be among lua, gvisor, docker and local.", // placeholder. modify once environments are finalized.
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
