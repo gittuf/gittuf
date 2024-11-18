@@ -6,6 +6,7 @@ package v01
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"strings"
 
 	"github.com/danwakefield/fnmatch"
@@ -31,6 +32,16 @@ func NewTargetsMetadata() *TargetsMetadata {
 		Type:        "targets",
 		Delegations: &Delegations{Roles: []*Delegation{AllowRule()}},
 	}
+}
+
+func (t *TargetsMetadata) SetHooksField(hooksID gitinterface.Hash) {
+	t.Targets = map[string]any{
+		"hooks": hooksID.String(),
+	}
+}
+
+func (t *TargetsMetadata) GetHooksField() any {
+	return t.Targets["hooks"]
 }
 
 // SetExpires sets the expiry date of the TargetsMetadata to the value passed

@@ -5,6 +5,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,6 +13,12 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
+)
+
+const (
+	RSLRefspec    = "refs/gittuf/reference-state-log:refs/gittuf/reference-state-log"
+	PolicyRefspec = "refs/gittuf/policy:refs/gittuf/policy"
+	HooksRefspec  = "refs/gittuf/hooks:refs/gittuf/hookss"
 )
 
 // Clone handles the clone operation for gittuf + git
@@ -31,7 +38,7 @@ func Clone(gitArgs args.Args) error {
 		dir = ""
 	}
 
-	_, err := gittuf.Clone(context.Background(), gitArgs.Parameters[0], dir, "", nil)
+	_, err := gittuf.Clone(context.Background(), gitArgs.Parameters[0], dir, "", []tuf.Principal{})
 	return err
 }
 
@@ -73,6 +80,9 @@ func SyncWithRemote(gitArgs args.Args) error {
 		return err
 	}
 
+
+	// when adding support for hooks and doing git fetch HooksRef, it is important to
+	// fetch the rsl also. it already being done here, but this is as a reminder.
 	if gitArgs.Command == "pull" || gitArgs.Command == "fetch" {
 		fetchCmdArgs := []string{"fetch", "--atomic"}
 
@@ -119,6 +129,11 @@ func Commit(gitArgs args.Args) error {
 		fmt.Println("Verification unsuccessful with error: ", err)
 	} else {
 		fmt.Println("Verification success")
+	}
+
+	err = repo.LoadHookByStage("pre-commit")
+	if err != nil {
+		return err
 	}
 
 	// Commit irrespective of failed verification. However, verification is

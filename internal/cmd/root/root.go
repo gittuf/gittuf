@@ -4,6 +4,7 @@
 package root
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/hooks"
 	"log/slog"
 	"os"
 
@@ -93,6 +94,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
+	cmd.AddCommand(hooks.New())
 	cmd.AddCommand(rsl.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
