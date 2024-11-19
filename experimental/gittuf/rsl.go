@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -513,4 +514,18 @@ func GetRSLEntryLog(repo *Repository) ([]*rsl.ReferenceEntry, map[string][]*rsl.
 
 	slices.Reverse(entries)
 	return entries, annotationMap, nil
+}
+
+func DisplayRSLLogIncrementally(repo *Repository, bufferedWriter io.WriteCloser) error {
+	firstEntry, _, err := rsl.GetFirstEntry(repo.r)
+	if err != nil {
+		return err
+	}
+
+	lastEntry, err := rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		return err
+	}
+
+	return rsl.PrintAllEntriesInRangeFor(repo.r, firstEntry.GetID(), lastEntry.GetID(), "", bufferedWriter)
 }
