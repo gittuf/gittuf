@@ -38,29 +38,30 @@ func pageWriter(pagerBin string, defaultOutput io.Writer) *pager {
 }
 
 type pager struct {
-	command *exec.Cmd
+	command     *exec.Cmd
+	stdInWriter io.WriteCloser
+	started     bool
 }
 
 func (p *pager) Write(contents []byte) (int, error) {
-	stdInWriter, err := p.command.StdinPipe()
+	// Initialize the command and stdin pipe if not already started
+	if !p.started {
+		stdInWriter, err := p.command.StdinPipe()
+		if err != nil {
+			return -1, err
+		}
+		p.stdInWriter = stdInWriter
+
+		if err := p.command.Start(); err != nil {
+			return -1, err
+		}
+
+		p.started = true
+	}
+
+	// Write to the pager's stdin pipe
+	written, err := p.stdInWriter.Write(contents)
 	if err != nil {
-		return -1, err
-	}
-
-	if err := p.command.Start(); err != nil {
-		return -1, err
-	}
-
-	written, writeErr := stdInWriter.Write(contents)
-	if writeErr != nil {
-		return -1, writeErr
-	}
-
-	if err := stdInWriter.Close(); err != nil {
-		return -1, err
-	}
-
-	if err := p.command.Wait(); err != nil {
 		return -1, err
 	}
 
@@ -68,6 +69,20 @@ func (p *pager) Write(contents []byte) (int, error) {
 }
 
 func (p *pager) Close() error {
+	// Close the stdin writer if it's open
+	if p.stdInWriter != nil {
+		if err := p.stdInWriter.Close(); err != nil {
+			return err
+		}
+	}
+
+	// Wait for the pager command to finish
+	if p.started {
+		if err := p.command.Wait(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

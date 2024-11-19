@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -900,6 +901,151 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 	return allEntries, annotationMap, nil
 }
 
+func PrintAllEntriesInRangeFor(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string, bufferedWriter io.WriteCloser) error {
+	// We have to iterate from latest to get the annotations that refer to the
+	// last requested entry
+	iterator, err := GetLatestEntry(repo)
+	if err != nil {
+		return err
+	}
+
+	allAnnotations := []*AnnotationEntry{}
+	for !iterator.GetID().Equal(lastID) {
+		// Until we find the entry corresponding to lastID, we just store
+		// annotations
+		if annotation, isAnnotation := iterator.(*AnnotationEntry); isAnnotation {
+			allAnnotations = append(allAnnotations, annotation)
+		}
+
+		parent, err := GetParentForEntry(repo, iterator)
+		if err != nil {
+			return err
+		}
+		iterator = parent
+	}
+
+	entryStack := []*ReferenceEntry{}
+	inRange := map[string]bool{}
+	for !iterator.GetID().Equal(firstID) {
+		// Here, all items are relevant until the one corresponding to first is
+		// found
+		switch it := iterator.(type) {
+		case *ReferenceEntry:
+			if len(refName) == 0 || it.RefName == refName || isRelevantGittufRef(it.RefName) {
+				// It's a relevant entry if:
+				// a) there's no refName set, or
+				// b) the entry's refName matches the set refName, or
+				// c) the entry is for a gittuf namespace
+				entryStack = append(entryStack, it)
+				inRange[it.ID.String()] = true
+			}
+		case *AnnotationEntry:
+			allAnnotations = append(allAnnotations, it)
+		}
+
+		parent, err := GetParentForEntry(repo, iterator)
+		if err != nil {
+			return err
+		}
+		iterator = parent
+	}
+
+	// Handle the item corresponding to first explicitly
+	// If it's an annotation, ignore it as it refers to something before the
+	// range we care about
+	if entry, isEntry := iterator.(*ReferenceEntry); isEntry {
+		if len(refName) == 0 || entry.RefName == refName || isRelevantGittufRef(entry.RefName) {
+			// It's a relevant entry if:
+			// a) there's no refName set, or
+			// b) the entry's refName matches the set refName, or
+			// c) the entry is for a gittuf namespace
+			entryStack = append(entryStack, entry)
+			inRange[entry.ID.String()] = true
+		}
+	}
+
+	// For each annotation, add the entry to each relevant entry it refers to
+	// Process annotations in reverse order so that annotations are listed in
+	// order of occurrence in the map
+	annotationMap := map[string][]*AnnotationEntry{}
+	for i := len(allAnnotations) - 1; i >= 0; i-- {
+		annotation := allAnnotations[i]
+		for _, entryID := range annotation.RSLEntryIDs {
+			if _, relevant := inRange[entryID.String()]; relevant {
+				// Annotation is relevant because the entry it refers to was in
+				// the specified range
+				if _, exists := annotationMap[entryID.String()]; !exists {
+					annotationMap[entryID.String()] = []*AnnotationEntry{}
+				}
+
+				annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
+			}
+		}
+	}
+
+	//Print RSL log in reverse order
+	for i := 0; i < len(entryStack); i++ {
+		arrayOfCurrentEntry := []*ReferenceEntry{entryStack[i]}
+		formatedOutput := PrepareRSLLogOutput(arrayOfCurrentEntry, annotationMap)
+		_, err = bufferedWriter.Write([]byte(formatedOutput))
+		if err != nil {
+			return err
+		}
+	}
+
+	bufferedWriter.Close()
+
+	return nil
+}
+
+func PrepareRSLLogOutput(entries []*ReferenceEntry, annotationMap map[string][]*AnnotationEntry) string {
+	log := ""
+
+	for _, entry := range entries {
+		log += fmt.Sprintf("entry %s", entry.ID.String())
+
+		skipped := false
+		if annotations, ok := annotationMap[entry.ID.String()]; ok {
+			for _, annotation := range annotations {
+				if annotation.Skip {
+					skipped = true
+					break
+				}
+			}
+		}
+
+		if skipped {
+			log += " (skipped)"
+		}
+		log += "\n"
+
+		log += fmt.Sprintf("\n  Ref:    %s", entry.RefName)
+		log += fmt.Sprintf("\n  Target: %s", entry.TargetID.String())
+		if entry.Number != 0 {
+			log += fmt.Sprintf("\n  Number: %d", entry.Number)
+		}
+
+		if annotations, ok := annotationMap[entry.ID.String()]; ok {
+			for _, annotation := range annotations {
+				log += "\n"
+				log += fmt.Sprintf("\n    Annotation ID: %s", annotation.ID.String())
+				if annotation.Skip {
+					log += "\n    Skip:          yes"
+				} else {
+					log += "\n    Skip:          no"
+				}
+				if annotation.Number != 0 {
+					log += fmt.Sprintf("\n    Number:        %d", annotation.Number)
+				}
+				log += fmt.Sprintf("\n    Message:\n      %s", annotation.Message)
+			}
+		}
+
+		log += "\n\n"
+	}
+
+	return log[:len(log)-1]
+}
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
 	if strings.HasPrefix(text, AnnotationEntryHeader) {
 		return parseAnnotationEntryText(id, text)
