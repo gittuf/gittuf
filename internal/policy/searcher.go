@@ -72,7 +72,7 @@ func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEnt
 // FindPolicyEntriesInRange returns all policy RSL entries in the specified
 // range. firstEntry and lastEntry are included if they are for the policy ref.
 func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
-	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef)
+	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef, true)
 	if err != nil {
 		return nil, err
 	}

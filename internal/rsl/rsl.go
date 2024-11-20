@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -800,8 +799,8 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 // in the range. The annotations map is keyed by the ID of the reference entry,
 // with the value being a list of annotations that apply to that reference
 // entry.
-func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
-	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "")
+func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, isReturnEntriesOrdered bool) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "", isReturnEntriesOrdered)
 }
 
 // GetReferenceEntriesInRangeForRef returns a list of reference entries for the
@@ -809,7 +808,7 @@ func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID g
 // reference entry in the range. The annotations map is keyed by the ID of the
 // reference entry, with the value being a list of annotations that apply to
 // that reference entry.
-func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string, isReturnEntriesInorder bool) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
 	// We have to iterate from latest to get the annotations that refer to the
 	// last requested entry
 	iterator, err := GetLatestEntry(repo)
@@ -891,113 +890,43 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 		}
 	}
 
-	// Reverse entryStack so that it's in order of occurrence rather than in
-	// order of walking back the RSL
-	allEntries := make([]*ReferenceEntry, 0, len(entryStack))
-	for i := len(entryStack) - 1; i >= 0; i-- {
-		allEntries = append(allEntries, entryStack[i])
+	orderedEntries := make([]*ReferenceEntry, 0, len(entryStack))
+
+	//Reversing the entry stack can potentially be skipped for efficiency
+	//for example in this case gittuf rsl log is called the (reversed) entryStack
+	//should be returned directly
+	if isReturnEntriesInorder {
+		for i := len(entryStack) - 1; i >= 0; i-- {
+			orderedEntries = append(orderedEntries, entryStack[i])
+		}
+
+		return orderedEntries, annotationMap, nil
 	}
 
-	return allEntries, annotationMap, nil
+	return entryStack, annotationMap, nil
 }
 
-func PrintAllEntriesInRangeFor(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string, bufferedWriter io.WriteCloser) error {
-	// We have to iterate from latest to get the annotations that refer to the
-	// last requested entry
-	iterator, err := GetLatestEntry(repo)
-	if err != nil {
-		return err
-	}
+// PrepareRSLLogOutput takes the RSL, and returns a string representation of it,
+// with annotations attached to entries. This function is a helper for PrintAllEntriesInRangeFor.
+/* Output format:
+entry <entryID> (skipped)
 
-	allAnnotations := []*AnnotationEntry{}
-	for !iterator.GetID().Equal(lastID) {
-		// Until we find the entry corresponding to lastID, we just store
-		// annotations
-		if annotation, isAnnotation := iterator.(*AnnotationEntry); isAnnotation {
-			allAnnotations = append(allAnnotations, annotation)
-		}
+  Ref:    <refName>
+  Target: <targetID>
+  Number: <number>
 
-		parent, err := GetParentForEntry(repo, iterator)
-		if err != nil {
-			return err
-		}
-		iterator = parent
-	}
+    Annotation ID: <annotationID>
+    Skip:          <yes/no>
+    Number:        <number>
+    Message:
+      <message>
 
-	entryStack := []*ReferenceEntry{}
-	inRange := map[string]bool{}
-	for !iterator.GetID().Equal(firstID) {
-		// Here, all items are relevant until the one corresponding to first is
-		// found
-		switch it := iterator.(type) {
-		case *ReferenceEntry:
-			if len(refName) == 0 || it.RefName == refName || isRelevantGittufRef(it.RefName) {
-				// It's a relevant entry if:
-				// a) there's no refName set, or
-				// b) the entry's refName matches the set refName, or
-				// c) the entry is for a gittuf namespace
-				entryStack = append(entryStack, it)
-				inRange[it.ID.String()] = true
-			}
-		case *AnnotationEntry:
-			allAnnotations = append(allAnnotations, it)
-		}
-
-		parent, err := GetParentForEntry(repo, iterator)
-		if err != nil {
-			return err
-		}
-		iterator = parent
-	}
-
-	// Handle the item corresponding to first explicitly
-	// If it's an annotation, ignore it as it refers to something before the
-	// range we care about
-	if entry, isEntry := iterator.(*ReferenceEntry); isEntry {
-		if len(refName) == 0 || entry.RefName == refName || isRelevantGittufRef(entry.RefName) {
-			// It's a relevant entry if:
-			// a) there's no refName set, or
-			// b) the entry's refName matches the set refName, or
-			// c) the entry is for a gittuf namespace
-			entryStack = append(entryStack, entry)
-			inRange[entry.ID.String()] = true
-		}
-	}
-
-	// For each annotation, add the entry to each relevant entry it refers to
-	// Process annotations in reverse order so that annotations are listed in
-	// order of occurrence in the map
-	annotationMap := map[string][]*AnnotationEntry{}
-	for i := len(allAnnotations) - 1; i >= 0; i-- {
-		annotation := allAnnotations[i]
-		for _, entryID := range annotation.RSLEntryIDs {
-			if _, relevant := inRange[entryID.String()]; relevant {
-				// Annotation is relevant because the entry it refers to was in
-				// the specified range
-				if _, exists := annotationMap[entryID.String()]; !exists {
-					annotationMap[entryID.String()] = []*AnnotationEntry{}
-				}
-
-				annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
-			}
-		}
-	}
-
-	//Print RSL log in reverse order
-	for i := 0; i < len(entryStack); i++ {
-		arrayOfCurrentEntry := []*ReferenceEntry{entryStack[i]}
-		formatedOutput := PrepareRSLLogOutput(arrayOfCurrentEntry, annotationMap)
-		_, err = bufferedWriter.Write([]byte(formatedOutput))
-		if err != nil {
-			return err
-		}
-	}
-
-	bufferedWriter.Close()
-
-	return nil
-}
-
+    Annotation ID: <annotationID>
+    Skip:          <yes/no>
+    Number:        <number>
+    Message:
+      <message>
+*/
 func PrepareRSLLogOutput(entries []*ReferenceEntry, annotationMap map[string][]*AnnotationEntry) string {
 	log := ""
 
@@ -1046,6 +975,7 @@ func PrepareRSLLogOutput(entries []*ReferenceEntry, annotationMap map[string][]*
 
 	return log[:len(log)-1]
 }
+
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
 	if strings.HasPrefix(text, AnnotationEntryHeader) {
 		return parseAnnotationEntryText(id, text)

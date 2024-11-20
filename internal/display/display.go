@@ -4,6 +4,7 @@
 package display
 
 import (
+	"bufio"
 	"io"
 	"os"
 	"os/exec"
@@ -25,7 +26,11 @@ func NewDisplayWriter(defaultOutput io.Writer, page bool) io.WriteCloser {
 	case io.WriteCloser:
 		return output
 	default:
-		return &noopwriter{writer: defaultOutput}
+		return &noopwriter{
+			writer:  defaultOutput,
+			buffer:  bufio.NewWriter(defaultOutput),
+			flushed: false,
+		}
 	}
 }
 
@@ -87,13 +92,32 @@ func (p *pager) Close() error {
 }
 
 type noopwriter struct {
-	writer io.Writer
+	writer  io.Writer
+	buffer  *bufio.Writer
+	flushed bool
 }
 
 func (n *noopwriter) Write(contents []byte) (int, error) {
-	return n.writer.Write(contents)
+	if n.flushed {
+		return 0, io.ErrClosedPipe
+	}
+	return n.buffer.Write(contents)
+}
+
+func (n *noopwriter) Flush() error {
+	if n.flushed {
+		return io.ErrClosedPipe
+	}
+	return n.buffer.Flush()
 }
 
 func (n *noopwriter) Close() error {
+	if n.flushed {
+		return nil
+	}
+	if err := n.Flush(); err != nil {
+		return err
+	}
+	n.flushed = true
 	return nil
 }
