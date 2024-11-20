@@ -8,6 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/display"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/spf13/cobra"
 )
 
@@ -47,8 +48,24 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		o.page = false // override page since we're not writing to stdout
 	}
 
-	writer := display.NewDisplayWriter(output, o.page)
-	return gittuf.DisplayRSLLogIncrementally(repo, writer)
+	bufferedWriter := display.NewDisplayWriter(output, o.page)
+	entries, annotationMap, err := gittuf.GetRSLEntryLog(repo, false)
+
+	for i := 0; i < len(entries); i++ {
+		arrayOfCurrentEntry := []*rsl.ReferenceEntry{entries[i]}
+		formatedOutput := display.PrepareRSLLogOutput(arrayOfCurrentEntry, annotationMap)
+		_, err = bufferedWriter.Write([]byte(formatedOutput))
+		if err != nil {
+			return err
+		}
+	}
+
+	err = bufferedWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func New() *cobra.Command {

@@ -864,7 +864,7 @@ func TestPullRSL(t *testing.T) {
 func TestGetRSLEntryLog(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
-	entries, annotationMap, err := GetRSLEntryLog(r)
+	entries, annotationMap, err := GetRSLEntryLog(r, true)
 	assert.Nil(t, err)
 
 	firstEntry, _, err := rsl.GetFirstEntry(r.r)
@@ -877,7 +877,7 @@ func TestGetRSLEntryLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected, _, err := rsl.GetReferenceEntriesInRange(r.r, firstEntry.GetID(), lastEntry.GetID())
+	expected, _, err := rsl.GetReferenceEntriesInRange(r.r, firstEntry.GetID(), lastEntry.GetID(), true)
 	if err != nil {
 		t.Fatal(err)
 	}

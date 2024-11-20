@@ -7,9 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"slices"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
@@ -496,7 +494,7 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 
 // GetRSLEntryLog gives us a list of all the rsl entries, and a map with a key being
 // a reference entry, and the value being an array of all applicable annotations for that reference entry
-func GetRSLEntryLog(repo *Repository) ([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, error) {
+func GetRSLEntryLog(repo *Repository, isReturnEntriesOrdered bool) ([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, error) {
 	firstEntry, _, err := rsl.GetFirstEntry(repo.r)
 	if err != nil {
 		return nil, nil, err
@@ -507,25 +505,10 @@ func GetRSLEntryLog(repo *Repository) ([]*rsl.ReferenceEntry, map[string][]*rsl.
 		return nil, nil, err
 	}
 
-	entries, annotationMap, err := rsl.GetReferenceEntriesInRange(repo.r, firstEntry.GetID(), lastEntry.GetID())
+	entries, annotationMap, err := rsl.GetReferenceEntriesInRange(repo.r, firstEntry.GetID(), lastEntry.GetID(), isReturnEntriesOrdered)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	slices.Reverse(entries)
 	return entries, annotationMap, nil
-}
-
-func DisplayRSLLogIncrementally(repo *Repository, bufferedWriter io.WriteCloser) error {
-	firstEntry, _, err := rsl.GetFirstEntry(repo.r)
-	if err != nil {
-		return err
-	}
-
-	lastEntry, err := rsl.GetLatestEntry(repo.r)
-	if err != nil {
-		return err
-	}
-
-	return rsl.PrintAllEntriesInRangeFor(repo.r, firstEntry.GetID(), lastEntry.GetID(), "", bufferedWriter)
 }
