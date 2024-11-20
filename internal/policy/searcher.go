@@ -17,9 +17,11 @@ import (
 // the RSL.
 type searcher interface {
 	FindFirstPolicyEntry() (*rsl.ReferenceEntry, error)
+	FindLatestPolicyEntry() (*rsl.ReferenceEntry, error)
 	FindPolicyEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
 	FindPolicyEntriesInRange(rsl.Entry, rsl.Entry) ([]*rsl.ReferenceEntry, error)
 	FindAttestationsEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
+	FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error)
 }
 
 func newSearcher(repo *gitinterface.Repository) searcher {
@@ -44,6 +46,11 @@ func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 	}
 
 	return entry, nil
+}
+
+func (r *regularSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
+	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(PolicyRef))
+	return entry, err
 }
 
 // FindPolicyEntryFor identifies the latest policy entry for the specified
@@ -106,4 +113,9 @@ func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.Refere
 
 func newRegularSearcher(repo *gitinterface.Repository) *regularSearcher {
 	return &regularSearcher{repo: repo}
+}
+
+func (r *regularSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
+	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(attestations.Ref))
+	return entry, err
 }

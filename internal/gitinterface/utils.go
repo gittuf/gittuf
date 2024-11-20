@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"testing"
 )
 
 // ResetDueToError reverses a change applied to a ref to the specified target
@@ -38,6 +39,21 @@ func RemoteRef(refName, remoteName string) string {
 	}
 
 	return remotePath
+}
+
+// RestoreWorktree is a test helper to fix the worktree in tests where we need
+// to operate in a checked out copy of the repository. This is primarily needed
+// for support with older Git versions.
+func (r *Repository) RestoreWorktree(t *testing.T) {
+	t.Helper()
+
+	if _, err := r.executor("restore", "--staged", ".").executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := r.executor("checkout", "--", ".").executeString(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // IsNiceGitVersion determines whether the version of git is "nice". Certain Git
