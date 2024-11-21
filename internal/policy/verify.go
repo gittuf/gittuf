@@ -32,12 +32,13 @@ import (
 )
 
 var (
-	ErrUnauthorizedSignature   = errors.New("unauthorized signature")
-	ErrInvalidEntryNotSkipped  = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped  = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrNoVerifiers             = errors.New("no verifiers present for verification")
-	ErrInvalidVerifier         = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet = errors.New("verifier's key and threshold constraints not met")
+	ErrUnauthorizedSignature          = errors.New("unauthorized signature")
+	ErrInvalidEntryNotSkipped         = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped         = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrNoVerifiers                    = errors.New("no verifiers present for verification")
+	ErrInvalidVerifier                = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet        = errors.New("verifier's key and threshold constraints not met")
+	ErrCannotVerifyMergeableForTagRef = errors.New("cannot verify mergeable into tag reference")
 )
 
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
@@ -104,6 +105,162 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
 	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, fromEntry, latestEntry, target)
+}
+
+// VerifyMergeable checks if the targetRef can be updated to reflect the changes
+// in featureRef. It checks if sufficient authorizations / approvals exist for
+// the merge to happen, indicated by the error being nil. Additionally, a
+// boolean value is also returned that indicates whethere a final authorized
+// signature is still necessary via the RSL entry for the merge.
+//
+// Summary of return combinations:
+// (false, err) -> merge is not possible
+// (false, nil) -> merge is possible and can be performed by anyone
+// (true,  nil) -> merge is possible but it MUST be performed by an authorized
+// person for the rule, i.e., an authorized person must sign the merge's RSL
+// entry
+func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetRef, featureRef string) (bool, error) {
+	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
+		return false, ErrCannotVerifyMergeableForTagRef
+	}
+
+	var (
+		currentPolicy       *State
+		currentAttestations *attestations.Attestations
+		err                 error
+	)
+
+	searcher := newSearcher(repo)
+
+	// Load latest policy
+	slog.Debug("Loading latest policy...")
+	initialPolicyEntry, err := searcher.FindLatestPolicyEntry()
+	if err != nil {
+		return false, err
+	}
+	state, err := LoadState(ctx, repo, initialPolicyEntry)
+	if err != nil {
+		return false, err
+	}
+	currentPolicy = state
+
+	// Load latest attestations
+	slog.Debug("Loading latest attestations...")
+	initialAttestationsEntry, err := searcher.FindLatestAttestationsEntry()
+	if err == nil {
+		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+		if err != nil {
+			return false, err
+		}
+		currentAttestations = attestationsState
+	} else if !errors.Is(err, attestations.ErrAttestationsNotFound) {
+		// Attestations are not compulsory, so return err only
+		// if it's some other error
+		return false, err
+	}
+
+	var fromID gitinterface.Hash
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	targetEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
+	switch {
+	case err == nil:
+		fromID = targetEntry.TargetID
+	case errors.Is(err, rsl.ErrRSLEntryNotFound):
+		fromID = gitinterface.ZeroHash
+	default:
+		return false, err
+	}
+
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
+	featureEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
+	if err != nil {
+		return false, err
+	}
+
+	// We're specifically focused on commit merges here, this doesn't apply to
+	// tags
+	mergeTreeID, err := repo.GetMergeTree(fromID, featureEntry.TargetID)
+	if err != nil {
+		return false, err
+	}
+
+	authorizationAttestation, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
+	if err != nil {
+		return false, err
+	}
+
+	verifiers, err := currentPolicy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef))
+	if err != nil {
+		return false, err
+	}
+
+	var appName string
+	if currentPolicy.githubAppApprovalsTrusted {
+		appName = currentPolicy.githubAppKeys[0].ID()
+	}
+
+	_, rslEntrySignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitinterface.ZeroHash, authorizationAttestation, appName, approverIDs, true)
+	if err != nil {
+		return false, fmt.Errorf("not enough approvals to meet Git namespace policies, %w", ErrUnauthorizedSignature)
+	}
+
+	hasFileRule, err := currentPolicy.hasFileRule()
+	if err != nil {
+		return false, err
+	}
+	if !hasFileRule {
+		return rslEntrySignatureNeededForThreshold, nil
+	}
+
+	// Verify modified files
+	commitIDs, err := repo.GetCommitsBetweenRange(featureEntry.TargetID, fromID)
+	if err != nil {
+		return false, err
+	}
+
+	for _, commitID := range commitIDs {
+		paths, err := repo.GetFilePathsChangedByCommit(commitID)
+		if err != nil {
+			return false, err
+		}
+
+		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
+		for _, path := range paths {
+			verifiers, err := currentPolicy.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
+			if err != nil {
+				return false, err
+			}
+
+			verified := false
+			if len(verifiedUsing) > 0 {
+				// We've already verified and identified the commit signature,
+				// we can just check if that verifier is trusted for the new
+				// path.  If not found, we don't make any assumptions about it
+				// being a failure in case of name mismatches. So, the signature
+				// check proceeds as usual.
+				for _, verifier := range verifiers {
+					if verifier.Name() == verifiedUsing {
+						verified = true
+						break
+					}
+				}
+			}
+
+			if verified {
+				continue
+			}
+
+			// We don't use verifyMergeable=true here
+			// File verification rules are not met using the signature on the
+			// RSL entry, so we don't count threshold-1 here
+			verifiedUsing, _, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverIDs, false)
+			if err != nil {
+				return false, fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
+			}
+		}
+	}
+
+	return rslEntrySignatureNeededForThreshold, nil
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
@@ -391,7 +548,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	}
 
 	// Verify Git namespace policies using the RSL entry and attestations
-	if _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.ID, authorizationAttestation, approverKeyIDs); err != nil {
+	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.ID, authorizationAttestation, approverKeyIDs); err != nil {
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
 	}
 
@@ -454,7 +611,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 			if policy.githubAppApprovalsTrusted {
 				appName = policy.githubAppKeys[0].ID()
 			}
-			verifiedUsing, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverKeyIDs)
+			verifiedUsing, _, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverKeyIDs, false)
 			if err != nil {
 				return fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
 			}
@@ -500,7 +657,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	if policy.githubAppApprovalsTrusted {
 		appName = policy.githubAppKeys[0].ID()
 	}
-	if _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, appName, approverKeyIDs); err != nil {
+	if _, _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, appName, approverKeyIDs, false); err != nil {
 		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
 	}
 
@@ -569,8 +726,16 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		return nil, nil, err
 	}
 
-	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", entry.RefName, fromID.String(), toID.String()))
-	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, entry.RefName, fromID.String(), toID.String())
+	return getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)
+}
+
+func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID gitinterface.Hash, isTag bool) (*sslibdsse.Envelope, *set.Set[string], error) {
+	if attestationsState == nil {
+		return nil, nil, nil
+	}
+
+	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", targetRef, fromID.String(), toID.String()))
+	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, targetRef, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 			return nil, nil, err
@@ -590,7 +755,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 
 		appName := policy.githubAppKeys[0].ID()
 
-		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, entry.RefName, fromID.String(), toID.String())
+		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, targetRef, fromID.String(), toID.String())
 		if err != nil {
 			if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err
@@ -659,15 +824,15 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 	return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.TargetID)
 }
 
-func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, error) {
+func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, bool, error) {
 	verifiers, err := policy.FindVerifiersForPath(target)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	if len(verifiers) == 0 {
 		// This target is not protected by gittuf policy
-		return "", nil
+		return "", false, nil
 	}
 
 	// TODO: app name
@@ -675,15 +840,18 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 	if policy.githubAppApprovalsTrusted {
 		appName = policy.githubAppKeys[0].ID()
 	}
-	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, approverKeyIDs)
+	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, approverKeyIDs, false)
 }
 
-func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string]) (string, error) {
+func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*Verifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string], verifyMergeable bool) (string, bool, error) {
 	if len(verifiers) == 0 {
-		return "", ErrNoVerifiers
+		return "", false, ErrNoVerifiers
 	}
 
-	verifiedUsing := ""
+	var (
+		verifiedUsing                       string
+		rslEntrySignatureNeededForThreshold bool
+	)
 	for _, verifier := range verifiers {
 		trustedPrincipalIDs := verifier.TrustedPrincipalIDs()
 
@@ -693,7 +861,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			verifiedUsing = verifier.Name()
 			break
 		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-			return "", err
+			return "", false, err
 		}
 
 		if approverIDs != nil {
@@ -739,13 +907,23 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			verifiedUsing = verifier.Name()
 			break
 		}
+
+		// If verifyMergeable is true, we only need to meet threshold - 1
+		if verifyMergeable && verifier.Threshold() > 1 {
+			if trustedUsedPrincipalIDs.Len() >= verifier.Threshold()-1 {
+				slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', policies can be met if the merge is by authorized person!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
+				verifiedUsing = verifier.Name()
+				rslEntrySignatureNeededForThreshold = true
+				break
+			}
+		}
 	}
 
 	if verifiedUsing != "" {
-		return verifiedUsing, nil
+		return verifiedUsing, rslEntrySignatureNeededForThreshold, nil
 	}
 
-	return "", ErrVerifierConditionsUnmet
+	return "", false, ErrVerifierConditionsUnmet
 }
 
 type Verifier struct {
