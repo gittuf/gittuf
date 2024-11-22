@@ -204,11 +204,7 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 		return false, fmt.Errorf("not enough approvals to meet Git namespace policies, %w", ErrUnauthorizedSignature)
 	}
 
-	hasFileRule, err := currentPolicy.hasFileRule()
-	if err != nil {
-		return false, err
-	}
-	if !hasFileRule {
+	if !currentPolicy.hasFileRule {
 		return rslEntrySignatureNeededForThreshold, nil
 	}
 
@@ -553,12 +549,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	}
 
 	// Check if policy has file rules at all for efficiency
-	hasFileRule, err := policy.hasFileRule()
-	if err != nil {
-		return err
-	}
-
-	if !hasFileRule {
+	if !policy.hasFileRule {
 		// No file rules to verify
 		return nil
 	}
