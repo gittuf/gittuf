@@ -5,9 +5,23 @@ package display
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/gittuf/gittuf/internal/rsl"
 )
+
+type LogWriterFunc func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
+
+func BufferedLogToConsole(entries []*rsl.ReferenceEntry, annotationMap map[string][]*rsl.AnnotationEntry, bufferedWriter io.WriteCloser) error {
+	formatedOutput := PrepareRSLLogOutput(entries, annotationMap)
+
+	_, err := bufferedWriter.Write([]byte(formatedOutput))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // PrepareRSLLogOutput takes the RSL, and returns a string representation of it,
 // with annotations attached to entries

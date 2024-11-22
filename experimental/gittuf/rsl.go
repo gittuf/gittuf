@@ -7,12 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/display"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
@@ -492,23 +494,58 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 	return latestUnskippedEntry.TargetID.Equal(targetID), nil
 }
 
-// GetRSLEntryLog gives us a list of all the rsl entries, and a map with a key being
-// a reference entry, and the value being an array of all applicable annotations for that reference entry
-func GetRSLEntryLog(repo *Repository, isReturnEntriesOrdered bool) ([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, error) {
+// PrintRSLEntryLog prints a list of all rsl entries to the console, both reading entries and writing entries happens
+// in a buffered manner, the buffer size is dictated by the max buffer size
+func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFunction display.LogWriterFunc, maxBufferSize int) error {
 	firstEntry, _, err := rsl.GetFirstEntry(repo.r)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	lastEntry, err := rsl.GetLatestEntry(repo.r)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	entries, annotationMap, err := rsl.GetReferenceEntriesInRange(repo.r, firstEntry.GetID(), lastEntry.GetID(), isReturnEntriesOrdered)
+	annotationMap := map[string][]*rsl.AnnotationEntry{}
+	iterator := lastEntry.GetID()
+
+	// Print first entry of rsl log
+	referenceEntry, ok := lastEntry.(*rsl.ReferenceEntry)
+	if !ok {
+		return err
+	}
+
+	err = displayFunction([]*rsl.ReferenceEntry{referenceEntry}, annotationMap, bufferedWriter)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	return entries, annotationMap, nil
+	// Print all following entries of the rsl log
+	for {
+		referenceEntryStack, annotationMap, err := rsl.GetNextReferenceEntryBuffer(repo.r, iterator, annotationMap, maxBufferSize)
+		if err != nil {
+			return err
+		}
+
+		err = displayFunction(referenceEntryStack, annotationMap, bufferedWriter)
+		if err != nil {
+			return err
+		}
+
+		// Check whether the last element in the stack is the first rsl entry
+		n := len(referenceEntryStack)
+		if referenceEntryStack[n-1].GetID().Equal(firstEntry.GetID()) {
+			break
+		}
+
+		iterator = referenceEntryStack[n-1].GetID()
+	}
+
+	err = bufferedWriter.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
