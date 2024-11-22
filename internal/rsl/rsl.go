@@ -906,6 +906,57 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 	return entryStack, annotationMap, nil
 }
 
+// GetNextReferenceEntryBuffer returns a list of reference entries, up to a length of max buffer size,
+// which all preceed the start entry that is provided as a the second arguement, in the case that
+// the start entry is the first entry an empty array is returned
+func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID gitinterface.Hash, allAnnotations map[string][]*AnnotationEntry, maxBufferSize int) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+	entryStack := []*ReferenceEntry{}
+
+	firstEntry, _, err := GetFirstEntry(repo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// return empty stack if start entry is the first entry
+	firstEntryID := firstEntry.GetID()
+	if startEntryID.Equal(firstEntryID) {
+		return entryStack, allAnnotations, nil
+	}
+
+	count := 0
+	iterator := startEntryID
+
+	for count < maxBufferSize {
+		currentEntry, err := GetEntry(repo, iterator)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		nextEntry, err := GetParentForEntry(repo, currentEntry)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		switch entry := nextEntry.(type) {
+		case *ReferenceEntry:
+			entryStack = append(entryStack, entry)
+			count++
+
+		case *AnnotationEntry:
+			//allAnnotations[entry.] = append(allAnnotations[entry.ParentID], entry)
+			continue
+		}
+
+		if nextEntry.GetID().Equal(firstEntryID) {
+			return entryStack, allAnnotations, nil
+		}
+
+		iterator = nextEntry.GetID()
+	}
+
+	return entryStack, allAnnotations, nil
+}
+
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
 	if strings.HasPrefix(text, AnnotationEntryHeader) {
 		return parseAnnotationEntryText(id, text)
