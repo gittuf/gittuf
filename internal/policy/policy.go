@@ -68,6 +68,7 @@ type State struct {
 	repository     *gitinterface.Repository
 	verifiersCache map[string][]*Verifier
 	ruleNames      *set.Set[string]
+	hasFileRule    bool
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
@@ -682,7 +683,10 @@ func (s *State) HasRuleName(name string) bool {
 	return s.ruleNames.Has(name)
 }
 
-func (s *State) loadRuleNames() error {
+// preprocess handles several "one time" tasks when the state is first loaded.
+// This includes things like loading the set of rule names present in the state,
+// checking if it has file rules, etc.
+func (s *State) preprocess() error {
 	if s.TargetsEnvelope == nil {
 		return nil
 	}
@@ -704,6 +708,16 @@ func (s *State) loadRuleNames() error {
 		}
 
 		s.ruleNames.Add(rule.ID())
+
+		if !s.hasFileRule {
+			patterns := rule.GetProtectedNamespaces()
+			for _, pattern := range patterns {
+				if strings.HasPrefix(pattern, fileRuleScheme) {
+					s.hasFileRule = true
+					break
+				}
+			}
+		}
 	}
 
 	if len(s.DelegationEnvelopes) == 0 {
@@ -726,55 +740,20 @@ func (s *State) loadRuleNames() error {
 			}
 
 			s.ruleNames.Add(rule.ID())
-		}
-	}
 
-	return nil
-}
-
-// hasFileRule returns true if the policy state has a single rule in any targets
-// role with the file namespace scheme. Note that this function has no concept
-// of role reachability, as it is not invoked for a specific path. So, it might
-// return true even if the role in question is not reachable for some path (or
-// at all).
-func (s *State) hasFileRule() (bool, error) {
-	if s.TargetsEnvelope == nil {
-		// No top level targets, we don't need to check for delegated roles
-		return false, nil
-	}
-
-	targetsRole, err := s.GetTargetsMetadata(TargetsRoleName, true)
-	if err != nil {
-		return false, err
-	}
-
-	rolesToCheck := []tuf.TargetsMetadata{targetsRole}
-
-	// This doesn't consider whether a delegated role is reachable because we
-	// don't know what artifact path this is for
-	for roleName := range s.DelegationEnvelopes {
-		delegatedRole, err := s.GetTargetsMetadata(roleName, true)
-		if err != nil {
-			return false, err
-		}
-		rolesToCheck = append(rolesToCheck, delegatedRole)
-	}
-
-	for _, role := range rolesToCheck {
-		for _, delegation := range role.GetRules() {
-			if delegation.ID() == tuf.AllowRuleName {
-				continue
-			}
-
-			for _, path := range delegation.GetProtectedNamespaces() {
-				if strings.HasPrefix(path, "file:") {
-					return true, nil
+			if !s.hasFileRule {
+				patterns := rule.GetProtectedNamespaces()
+				for _, pattern := range patterns {
+					if strings.HasPrefix(pattern, fileRuleScheme) {
+						s.hasFileRule = true
+						break
+					}
 				}
 			}
 		}
 	}
 
-	return false, nil
+	return nil
 }
 
 func (s *State) getRootVerifier() (*Verifier, error) {
@@ -878,7 +857,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 		}
 	}
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		return nil, err
 	}
 
