@@ -799,8 +799,8 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 // in the range. The annotations map is keyed by the ID of the reference entry,
 // with the value being a list of annotations that apply to that reference
 // entry.
-func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, isReturnEntriesOrdered bool) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
-	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "", isReturnEntriesOrdered)
+func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "")
 }
 
 // GetReferenceEntriesInRangeForRef returns a list of reference entries for the
@@ -808,7 +808,7 @@ func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID g
 // reference entry in the range. The annotations map is keyed by the ID of the
 // reference entry, with the value being a list of annotations that apply to
 // that reference entry.
-func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string, isReturnEntriesInorder bool) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
 	// We have to iterate from latest to get the annotations that refer to the
 	// last requested entry
 	iterator, err := GetLatestEntry(repo)
@@ -888,19 +888,6 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 				annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
 			}
 		}
-	}
-
-	orderedEntries := make([]*ReferenceEntry, 0, len(entryStack))
-
-	//Reversing the entry stack can potentially be skipped for efficiency
-	//for example in this case gittuf rsl log is called the (reversed) entryStack
-	//should be returned directly
-	if isReturnEntriesInorder {
-		for i := len(entryStack) - 1; i >= 0; i-- {
-			orderedEntries = append(orderedEntries, entryStack[i])
-		}
-
-		return orderedEntries, annotationMap, nil
 	}
 
 	return entryStack, annotationMap, nil
