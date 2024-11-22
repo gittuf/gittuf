@@ -156,7 +156,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
 	slog.Debug("Identifying all entries in range...")
-	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target, true)
+	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
 	}
