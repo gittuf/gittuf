@@ -1343,7 +1343,7 @@ func TestGetReferenceEntriesInRange(t *testing.T) {
 	}
 
 	// Each entry has one annotation
-	entries, annotationMap, err := GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, true)
+	entries, annotationMap, err := GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
@@ -1367,7 +1367,7 @@ func TestGetReferenceEntriesInRange(t *testing.T) {
 	expectedAnnotationMap[expectedEntries[len(expectedEntries)-1].ID.String()] = []*AnnotationEntry{latestEntry.(*AnnotationEntry)}
 
 	// Expected values include the feature branch entry and annotation
-	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, true)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
@@ -1385,7 +1385,7 @@ func TestGetReferenceEntriesInRange(t *testing.T) {
 	expectedAnnotationMap[expectedEntries[0].ID.String()] = append(expectedAnnotationMap[expectedEntries[0].ID.String()], annotation)
 	expectedAnnotationMap[expectedEntries[1].ID.String()] = append(expectedAnnotationMap[expectedEntries[1].ID.String()], annotation)
 
-	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, true)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
@@ -1400,7 +1400,7 @@ func TestGetReferenceEntriesInRange(t *testing.T) {
 	}
 	expectedEntries = append(expectedEntries, latestEntry.(*ReferenceEntry))
 
-	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID, true)
+	entries, annotationMap, err = GetReferenceEntriesInRange(repo, expectedEntries[0].ID, expectedEntries[len(expectedEntries)-1].ID)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedEntries, entries)
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
