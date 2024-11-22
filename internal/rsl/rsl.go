@@ -896,7 +896,7 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 // GetNextReferenceEntryBuffer returns a list of reference entries, up to a length of max buffer size,
 // which all preceed the start entry that is provided as a the second arguement, in the case that
 // the start entry is the first entry an empty array is returned
-func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID gitinterface.Hash, allAnnotations map[string][]*AnnotationEntry, maxBufferSize int) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID gitinterface.Hash, annotationMap map[string][]*AnnotationEntry, maxBufferSize int) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
 	entryStack := []*ReferenceEntry{}
 
 	firstEntry, _, err := GetFirstEntry(repo)
@@ -907,7 +907,7 @@ func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID git
 	// return empty stack if start entry is the first entry
 	firstEntryID := firstEntry.GetID()
 	if startEntryID.Equal(firstEntryID) {
-		return entryStack, allAnnotations, nil
+		return entryStack, annotationMap, nil
 	}
 
 	count := 0
@@ -930,18 +930,24 @@ func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID git
 			count++
 
 		case *AnnotationEntry:
-			//allAnnotations[entry.] = append(allAnnotations[entry.ParentID], entry)
-			continue
+			annotation := entry
+			for _, entryID := range annotation.RSLEntryIDs {
+				if _, exists := annotationMap[entryID.String()]; !exists {
+					annotationMap[entryID.String()] = []*AnnotationEntry{}
+				}
+
+				annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
+			}
 		}
 
 		if nextEntry.GetID().Equal(firstEntryID) {
-			return entryStack, allAnnotations, nil
+			return entryStack, annotationMap, nil
 		}
 
 		iterator = nextEntry.GetID()
 	}
 
-	return entryStack, allAnnotations, nil
+	return entryStack, annotationMap, nil
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {

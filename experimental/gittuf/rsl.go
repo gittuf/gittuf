@@ -510,18 +510,16 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 	annotationMap := map[string][]*rsl.AnnotationEntry{}
 	iterator := lastEntry.GetID()
 
-	// Print first entry of rsl log
-	referenceEntry, ok := lastEntry.(*rsl.ReferenceEntry)
-	if !ok {
-		return err
-	}
-
-	err = displayFunction([]*rsl.ReferenceEntry{referenceEntry}, annotationMap, bufferedWriter)
-	if err != nil {
-		return err
+	// Print the first reference entry of the rsl log
+	if latestReferenceEntry, ok := lastEntry.(*rsl.ReferenceEntry); ok {
+		err = displayFunction([]*rsl.ReferenceEntry{latestReferenceEntry}, annotationMap, bufferedWriter)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Print all following entries of the rsl log
+	// Note that if the first entry is an annotation, then the first reference entry will be in the first buffer
 	for {
 		referenceEntryStack, annotationMap, err := rsl.GetNextReferenceEntryBuffer(repo.r, iterator, annotationMap, maxBufferSize)
 		if err != nil {
