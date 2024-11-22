@@ -503,8 +503,7 @@ func TestStateHasFileRule(t *testing.T) {
 	t.Run("with file rules", func(t *testing.T) {
 		state := createTestStateWithDelegatedPolicies(t)
 
-		hasFileRule, err := state.hasFileRule()
-		assert.Nil(t, err)
+		hasFileRule := state.hasFileRule
 		assert.True(t, hasFileRule)
 	})
 
@@ -512,8 +511,7 @@ func TestStateHasFileRule(t *testing.T) {
 		t.Parallel()
 		state := createTestStateWithOnlyRoot(t)
 
-		hasFileRule, err := state.hasFileRule()
-		assert.Nil(t, err)
+		hasFileRule := state.hasFileRule
 		assert.False(t, hasFileRule)
 	})
 }
