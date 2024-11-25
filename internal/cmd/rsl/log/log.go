@@ -4,6 +4,7 @@
 package log
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -48,6 +49,8 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 	}
 
 	const maxBufferSize = 64
+	fmt.Printf("Buffer size: %d \n", maxBufferSize)
+
 	bufferedWriter := display.NewDisplayWriter(output, o.page)
 	err = gittuf.PrintRSLEntryLog(repo, bufferedWriter, display.BufferedLogToConsole, maxBufferSize)
 	if err != nil {

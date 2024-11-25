@@ -497,7 +497,7 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 // PrintRSLEntryLog prints a list of all rsl entries to the console, both reading entries and writing entries happens
 // in a buffered manner, the buffer size is dictated by the max buffer size
 func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFunction display.LogWriterFunc, maxBufferSize int) error {
-	firstEntry, _, err := rsl.GetFirstEntry(repo.r)
+	firstEntry, allAnnotations, err := rsl.GetFirstEntry(repo.r)
 	if err != nil {
 		return err
 	}
@@ -507,10 +507,11 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 		return err
 	}
 
-	annotationMap := map[string][]*rsl.AnnotationEntry{}
+	annotationMap := rsl.BuildAnnotationMapFromList(allAnnotations)
 	iterator := lastEntry.GetID()
 
-	// Print the first reference entry of the rsl log
+	// Handle the edge case where the first entry is a reference entry and therefore will not
+	// be printed by the proceeding loop
 	if latestReferenceEntry, ok := lastEntry.(*rsl.ReferenceEntry); ok {
 		err = displayFunction([]*rsl.ReferenceEntry{latestReferenceEntry}, annotationMap, bufferedWriter)
 		if err != nil {
@@ -518,10 +519,11 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 		}
 	}
 
-	// Print all following entries of the rsl log
-	// Note that if the first entry is an annotation, then the first reference entry will be in the first buffer
+	// Note that if the first entry is an annotation, then the first reference entry will be contained
+	// within the first returned entry stack, this means that the all reference entries including
+	// the first will be printed by this loop
 	for {
-		referenceEntryStack, annotationMap, err := rsl.GetNextReferenceEntryBuffer(repo.r, iterator, annotationMap, maxBufferSize)
+		referenceEntryStack, err := rsl.GetNextReferenceEntryBuffer(repo.r, firstEntry.GetID(), iterator, maxBufferSize)
 		if err != nil {
 			return err
 		}
@@ -532,12 +534,12 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 		}
 
 		// Check whether the last element in the stack is the first rsl entry
-		n := len(referenceEntryStack)
-		if referenceEntryStack[n-1].GetID().Equal(firstEntry.GetID()) {
+		lastEntryIndex := len(referenceEntryStack) - 1
+		if referenceEntryStack[lastEntryIndex].GetID().Equal(firstEntry.GetID()) {
 			break
 		}
 
-		iterator = referenceEntryStack[n-1].GetID()
+		iterator = referenceEntryStack[lastEntryIndex].GetID()
 	}
 
 	err = bufferedWriter.Close()
