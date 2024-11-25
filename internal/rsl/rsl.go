@@ -680,9 +680,9 @@ func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef strin
 		return nil, nil, ErrRSLEntryNotFound
 	}
 
-	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
+	//annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
 
-	return firstEntry, annotations, nil
+	return firstEntry, allAnnotations, nil
 }
 
 // SkipAllInvalidReferenceEntriesForRef identifies invalid RSL reference entries.
@@ -894,20 +894,14 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 }
 
 // GetNextReferenceEntryBuffer returns a list of reference entries, up to a length of max buffer size,
-// which all preceed the start entry that is provided as a the second arguement, in the case that
+// which all precede the start entry that is provided as a the second arguement, in the case that
 // the start entry is the first entry an empty array is returned
-func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID gitinterface.Hash, annotationMap map[string][]*AnnotationEntry, maxBufferSize int) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, firstEntryID, startEntryID gitinterface.Hash, maxBufferSize int) ([]*ReferenceEntry, error) {
 	entryStack := []*ReferenceEntry{}
 
-	firstEntry, _, err := GetFirstEntry(repo)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// return empty stack if start entry is the first entry
-	firstEntryID := firstEntry.GetID()
+	// Handle edge case where startEntryID is the first entry.
 	if startEntryID.Equal(firstEntryID) {
-		return entryStack, annotationMap, nil
+		return entryStack, nil
 	}
 
 	count := 0
@@ -916,12 +910,12 @@ func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID git
 	for count < maxBufferSize {
 		currentEntry, err := GetEntry(repo, iterator)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		nextEntry, err := GetParentForEntry(repo, currentEntry)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		switch entry := nextEntry.(type) {
@@ -930,24 +924,18 @@ func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID git
 			count++
 
 		case *AnnotationEntry:
-			annotation := entry
-			for _, entryID := range annotation.RSLEntryIDs {
-				if _, exists := annotationMap[entryID.String()]; !exists {
-					annotationMap[entryID.String()] = []*AnnotationEntry{}
-				}
-
-				annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
-			}
+			iterator = nextEntry.GetID()
+			continue
 		}
 
 		if nextEntry.GetID().Equal(firstEntryID) {
-			return entryStack, annotationMap, nil
+			return entryStack, nil
 		}
 
 		iterator = nextEntry.GetID()
 	}
 
-	return entryStack, annotationMap, nil
+	return entryStack, nil
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
@@ -1081,4 +1069,20 @@ func isRelevantGittufRef(refName string) bool {
 	}
 
 	return true
+}
+
+func BuildAnnotationMapFromList(allAnnotations []*AnnotationEntry) map[string][]*AnnotationEntry {
+	annotationMap := map[string][]*AnnotationEntry{}
+
+	for _, annotation := range allAnnotations {
+		for _, entryID := range annotation.RSLEntryIDs {
+			if _, exists := annotationMap[entryID.String()]; !exists {
+				annotationMap[entryID.String()] = []*AnnotationEntry{}
+			}
+
+			annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
+		}
+	}
+
+	return annotationMap
 }
