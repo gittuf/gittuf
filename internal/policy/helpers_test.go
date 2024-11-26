@@ -137,7 +137,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		RootPublicKeys:  []tuf.Principal{key},
 	}
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +207,7 @@ func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 		RootPublicKeys:  []tuf.Principal{key},
 	}
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,7 +310,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	//   /\
 	//  3  4
 
-	if err := curState.loadRuleNames(); err != nil {
+	if err := curState.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -598,7 +598,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	}
 	state.TargetsEnvelope = targetsEnv
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -643,7 +643,7 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 	}
 	state.TargetsEnvelope = targetsEnv
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -679,7 +679,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	}
 	state.TargetsEnvelope = targetsEnv
 
-	if err := state.loadRuleNames(); err != nil {
+	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
 	}
 
