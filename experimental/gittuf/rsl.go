@@ -497,55 +497,39 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 // PrintRSLEntryLog prints a list of all rsl entries to the console, both reading entries and writing entries happens
 // in a buffered manner, the buffer size is dictated by the max buffer size
 func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFunction display.LogWriterFunc, maxBufferSize int) error {
-	firstEntry, allAnnotations, err := rsl.GetFirstEntry(repo.r)
+	defer bufferedWriter.Close() //nolint:errcheck
+	annotationMap := make(map[string][]*rsl.AnnotationEntry)
+
+	iteratorEntry, err := rsl.GetLatestEntry(repo.r)
 	if err != nil {
 		return err
 	}
 
-	lastEntry, err := rsl.GetLatestEntry(repo.r)
-	if err != nil {
-		return err
-	}
-
-	annotationMap := rsl.BuildAnnotationMapFromList(allAnnotations)
-	iterator := lastEntry.GetID()
-
-	// Handle the edge case where the first entry is a reference entry and therefore will not
-	// be printed by the proceeding loop
-	if latestReferenceEntry, ok := lastEntry.(*rsl.ReferenceEntry); ok {
-		err = displayFunction([]*rsl.ReferenceEntry{latestReferenceEntry}, annotationMap, bufferedWriter)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Note that if the first entry is an annotation, then the first reference entry will be contained
-	// within the first returned entry stack, this means that the all reference entries including
-	// the first will be printed by this loop
 	for {
-		referenceEntryStack, err := rsl.GetNextReferenceEntryBuffer(repo.r, firstEntry.GetID(), iterator, maxBufferSize)
+		switch iteratorEntry := iteratorEntry.(type) {
+		case *rsl.ReferenceEntry:
+			if err := displayFunction([]*rsl.ReferenceEntry{iteratorEntry}, annotationMap, bufferedWriter); err != nil {
+				return nil
+			}
+		case *rsl.AnnotationEntry:
+			for _, targetID := range iteratorEntry.RSLEntryIDs {
+				if _, has := annotationMap[targetID.String()]; !has {
+					annotationMap[targetID.String()] = []*rsl.AnnotationEntry{}
+				}
+
+				annotationMap[targetID.String()] = append(annotationMap[targetID.String()], iteratorEntry)
+			}
+		}
+
+		parentEntry, err := rsl.GetParentForEntry(repo.r, iteratorEntry)
 		if err != nil {
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				return nil
+			}
+
 			return err
 		}
 
-		err = displayFunction(referenceEntryStack, annotationMap, bufferedWriter)
-		if err != nil {
-			return err
-		}
-
-		// Check whether the last element in the stack is the first rsl entry
-		lastEntryIndex := len(referenceEntryStack) - 1
-		if referenceEntryStack[lastEntryIndex].GetID().Equal(firstEntry.GetID()) {
-			break
-		}
-
-		iterator = referenceEntryStack[lastEntryIndex].GetID()
+		iteratorEntry = parentEntry
 	}
-
-	err = bufferedWriter.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
