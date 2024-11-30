@@ -48,7 +48,12 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 	}
 
 	bufferedWriter := display.NewDisplayWriter(output, o.page)
-	err = gittuf.PrintRSLEntryLog(repo, bufferedWriter, display.BufferedLogToConsole, 1)
+	d := display.DisplayFunctionHolder{
+		DisplayLog:    display.BufferedLogToConsole,
+		DisplayHeader: display.PrintHeader,
+	}
+
+	err = gittuf.PrintRSLEntryLog(repo, bufferedWriter, d)
 	if err != nil {
 		return err
 	}
