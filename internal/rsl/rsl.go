@@ -680,9 +680,9 @@ func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef strin
 		return nil, nil, ErrRSLEntryNotFound
 	}
 
-	//annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
 
-	return firstEntry, allAnnotations, nil
+	return firstEntry, annotations, nil
 }
 
 // SkipAllInvalidReferenceEntriesForRef identifies invalid RSL reference entries.
@@ -890,55 +890,14 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 		}
 	}
 
-	return entryStack, annotationMap, nil
-}
-
-// GetNextReferenceEntryBuffer returns a list of reference entries, up to a length of max buffer size,
-// which all precede the start entry that is provided as a the second arguement, in the case that
-// the start entry is the first entry an empty array is returned
-func GetNextReferenceEntryBuffer(repo *gitinterface.Repository, startEntryID gitinterface.Hash, maxBufferSize int) ([]*ReferenceEntry, map[string][]*AnnotationEntry, bool, error) {
-	entryStack := []*ReferenceEntry{}
-
-	count := 0
-	iterator := startEntryID
-
-	annotationMap := map[string][]*AnnotationEntry{}
-	done := false
-
-	for count < maxBufferSize {
-		currentEntry, err := GetEntry(repo, iterator)
-		if err != nil {
-			return nil, nil, false, err
-		}
-
-		nextEntry, err := GetParentForEntry(repo, currentEntry)
-		if err != nil {
-			if !errors.Is(err, ErrRSLEntryNotFound) {
-				return nil, nil, false, err
-			}
-
-			done = true
-			break
-		}
-
-		switch entry := nextEntry.(type) {
-		case *ReferenceEntry:
-			entryStack = append(entryStack, entry)
-			count++
-
-		case *AnnotationEntry:
-			if _, exists := annotationMap[entry.GetID().String()]; !exists {
-				annotationMap[entry.GetID().String()] = []*AnnotationEntry{}
-			}
-
-			annotationMap[entry.GetID().String()] = append(annotationMap[entry.GetID().String()], entry)
-			continue
-		}
-
-		iterator = nextEntry.GetID()
+	// Reverse entryStack so that it's in order of occurrence rather than in
+	// order of walking back the RSL
+	allEntries := make([]*ReferenceEntry, 0, len(entryStack))
+	for i := len(entryStack) - 1; i >= 0; i-- {
+		allEntries = append(allEntries, entryStack[i])
 	}
 
-	return entryStack, annotationMap, done, nil
+	return allEntries, annotationMap, nil
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
@@ -1072,20 +1031,4 @@ func isRelevantGittufRef(refName string) bool {
 	}
 
 	return true
-}
-
-func BuildAnnotationMapFromList(allAnnotations []*AnnotationEntry) map[string][]*AnnotationEntry {
-	annotationMap := map[string][]*AnnotationEntry{}
-
-	for _, annotation := range allAnnotations {
-		for _, entryID := range annotation.RSLEntryIDs {
-			if _, exists := annotationMap[entryID.String()]; !exists {
-				annotationMap[entryID.String()] = []*AnnotationEntry{}
-			}
-
-			annotationMap[entryID.String()] = append(annotationMap[entryID.String()], annotation)
-		}
-	}
-
-	return annotationMap
 }

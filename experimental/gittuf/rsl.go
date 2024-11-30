@@ -496,8 +496,11 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 
 // PrintRSLEntryLog prints a list of all rsl entries to the console, both reading entries and writing entries happens
 // in a buffered manner, the buffer size is dictated by the max buffer size
-func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFunction display.LogWriterFunc, maxBufferSize int) error {
+func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display display.DisplayFunctionHolder) error {
 	defer bufferedWriter.Close() //nolint:errcheck
+
+	allReferenceEntries := []*rsl.ReferenceEntry{}
+	emptyAnnotationMap := make(map[string][]*rsl.AnnotationEntry)
 	annotationMap := make(map[string][]*rsl.AnnotationEntry)
 
 	iteratorEntry, err := rsl.GetLatestEntry(repo.r)
@@ -505,10 +508,12 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 		return err
 	}
 
+	// Display all reference entries
 	for {
 		switch iteratorEntry := iteratorEntry.(type) {
 		case *rsl.ReferenceEntry:
-			if err := displayFunction([]*rsl.ReferenceEntry{iteratorEntry}, annotationMap, bufferedWriter); err != nil {
+			allReferenceEntries = append(allReferenceEntries, iteratorEntry)
+			if err := display.DisplayLog([]*rsl.ReferenceEntry{iteratorEntry}, emptyAnnotationMap, bufferedWriter); err != nil {
 				return nil
 			}
 		case *rsl.AnnotationEntry:
@@ -524,7 +529,7 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 		parentEntry, err := rsl.GetParentForEntry(repo.r, iteratorEntry)
 		if err != nil {
 			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-				return nil
+				break
 			}
 
 			return err
@@ -532,4 +537,22 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, displayFu
 
 		iteratorEntry = parentEntry
 	}
+
+	// Display all annotation entries
+
+	for index, entry := range allReferenceEntries {
+		if index == 0 {
+			display.DisplayHeader(bufferedWriter, "Annotations")
+		}
+
+		targetID := entry.GetID().String()
+		if _, exists := annotationMap[targetID]; exists {
+			if err := display.DisplayLog([]*rsl.ReferenceEntry{entry}, annotationMap, bufferedWriter); err != nil {
+				return nil
+			}
+
+		}
+	}
+
+	return nil
 }

@@ -10,7 +10,10 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-type LogWriterFunc func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
+type DisplayFunctionHolder struct {
+	DisplayLog    func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
+	DisplayHeader func(io.WriteCloser, string) error
+}
 
 func BufferedLogToConsole(entries []*rsl.ReferenceEntry, annotationMap map[string][]*rsl.AnnotationEntry, bufferedWriter io.WriteCloser) error {
 	formatedOutput := PrepareRSLLogOutput(entries, annotationMap)
@@ -21,6 +24,16 @@ func BufferedLogToConsole(entries []*rsl.ReferenceEntry, annotationMap map[strin
 	}
 
 	return nil
+}
+
+func PrintHeader(bufferedWriter io.WriteCloser, title string) error {
+	header := fmt.Sprintf(
+		"\n---------------------------------------------------\n%s\n---------------------------------------------------\n\n",
+		title,
+	)
+
+	_, err := bufferedWriter.Write([]byte(header))
+	return err
 }
 
 // PrepareRSLLogOutput takes the RSL, and returns a string representation of it,
@@ -83,7 +96,7 @@ func PrepareRSLLogOutput(entries []*rsl.ReferenceEntry, annotationMap map[string
 				if annotation.Number != 0 {
 					log += fmt.Sprintf("\n    Number:        %d", annotation.Number)
 				}
-				log += fmt.Sprintf("\n    Message:\n      %s", annotation.Message)
+				log += fmt.Sprintf("\n    Message:\n      %s\n", annotation.Message)
 			}
 		}
 
