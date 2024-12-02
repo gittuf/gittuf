@@ -104,6 +104,7 @@ entry %s (skipped)
     Number:        3
     Message:
       msg
+
 `, tagEntry.ID.String(), branchEntry.ID.String(), annotationEntry.GetID().String())
 
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{tagEntry, branchEntry}, map[string][]*rsl.AnnotationEntry{branchEntry.ID.String(): {annotationEntry.(*rsl.AnnotationEntry)}})

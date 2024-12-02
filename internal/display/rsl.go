@@ -10,7 +10,7 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-type DisplayFunctionHolder struct {
+type FunctionHolder struct {
 	DisplayLog    func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
 	DisplayHeader func(io.WriteCloser, string) error
 }
