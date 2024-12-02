@@ -48,7 +48,7 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 	}
 
 	bufferedWriter := display.NewDisplayWriter(output, o.page)
-	d := display.DisplayFunctionHolder{
+	d := display.FunctionHolder{
 		DisplayLog:    display.BufferedLogToConsole,
 		DisplayHeader: display.PrintHeader,
 	}

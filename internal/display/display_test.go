@@ -5,6 +5,7 @@ package display
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -49,6 +50,14 @@ func TestNewDisplayWriter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			if closer, ok := writer.(io.Closer); ok {
+				err := closer.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
 			gotOutput := defaultOutput.String()
 			if runtime.GOOS == "windows" {
 				gotOutput = strings.TrimSpace(gotOutput)

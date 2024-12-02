@@ -496,7 +496,7 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 
 // PrintRSLEntryLog prints a list of all rsl entries to the console, both reading entries and writing entries happens
 // in a buffered manner, the buffer size is dictated by the max buffer size
-func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display display.DisplayFunctionHolder) error {
+func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display display.FunctionHolder) error {
 	defer bufferedWriter.Close() //nolint:errcheck
 
 	allReferenceEntries := []*rsl.ReferenceEntry{}
@@ -542,7 +542,9 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display d
 
 	for index, entry := range allReferenceEntries {
 		if index == 0 {
-			display.DisplayHeader(bufferedWriter, "Annotations")
+			if err := display.DisplayHeader(bufferedWriter, "Annotations"); err != nil {
+				return nil
+			}
 		}
 
 		targetID := entry.GetID().String()
@@ -550,7 +552,6 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display d
 			if err := display.DisplayLog([]*rsl.ReferenceEntry{entry}, annotationMap, bufferedWriter); err != nil {
 				return nil
 			}
-
 		}
 	}
 
