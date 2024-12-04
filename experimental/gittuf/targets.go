@@ -117,7 +117,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		return policy.ErrMetadataNotFound
 	}
 
-	// TODO: verify is role can be signed using the presented key. This requires
+	// TODO: verify if role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
@@ -186,7 +186,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 		return policy.ErrMetadataNotFound
 	}
 
-	// TODO: verify is role can be signed using the presented key. This requires
+	// TODO: verify if role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
@@ -311,7 +311,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 		return policy.ErrMetadataNotFound
 	}
 
-	// TODO: verify is role can be signed using the presented key. This requires
+	// TODO: verify if role can be signed using the presented key. This requires
 	// the user to pass in the delegating role as well as we do not want to
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.

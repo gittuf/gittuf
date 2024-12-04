@@ -160,7 +160,7 @@ func run() error {
 		// ref because Git separately tries to update-ref.
 		// During wants, check if the latest remote gittuf ref tips are
 		// requested. Use _only_ the latest so as to avoid any unnecessary blob
-		// collissions.
+		// collisions.
 		for ref, tip := range gittufRefsTips {
 			tipH, err := gitinterface.NewHash(tip)
 			if err != nil {
