@@ -110,7 +110,7 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes
 // in featureRef. It checks if sufficient authorizations / approvals exist for
 // the merge to happen, indicated by the error being nil. Additionally, a
-// boolean value is also returned that indicates whethere a final authorized
+// boolean value is also returned that indicates whether a final authorized
 // signature is still necessary via the RSL entry for the merge.
 //
 // Summary of return combinations:

@@ -614,7 +614,7 @@ func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) 
 
 	// tmpGitHubPullRequestApprovalStatement is essentially a definition of
 	// in-toto's v1 Statement. The difference is that we fix the predicate to be
-	// the GitHub pull request approval type, making unmarshaling easier.
+	// the GitHub pull request approval type, making unmarshalling easier.
 	type tmpGitHubPullRequestApprovalStatement struct {
 		Type          string                                    `json:"_type"`
 		Subject       []*ita.ResourceDescriptor                 `json:"subject"`

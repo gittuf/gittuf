@@ -24,7 +24,7 @@ type HookType string
 
 var HookPrePush = HookType("pre-push")
 
-// UpdateHook updates a git hook in the repositorie's .git/hooks folder.
+// UpdateHook updates a git hook in the repository's .git/hooks folder.
 // Existing hook files are not overwritten, unless force flag is set.
 func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) error {
 	// TODO: rely on go-git to find .git folder, once
