@@ -38,11 +38,6 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	entries, annotationMap, err := gittuf.GetRSLEntryLog(repo)
-	if err != nil {
-		return err
-	}
-
 	output := os.Stdout
 	if o.filePath != "" {
 		output, err = os.Create(o.filePath)
@@ -52,11 +47,18 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		o.page = false // override page since we're not writing to stdout
 	}
 
-	outputContents := display.PrepareRSLLogOutput(entries, annotationMap)
-	writer := display.NewDisplayWriter(output, o.page)
+	bufferedWriter := display.NewDisplayWriter(output, o.page)
+	d := display.FunctionHolder{
+		DisplayLog:    display.BufferedLogToConsole,
+		DisplayHeader: display.PrintHeader,
+	}
 
-	_, err = writer.Write([]byte(outputContents))
-	return err
+	err = gittuf.PrintRSLEntryLog(repo, bufferedWriter, d)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func New() *cobra.Command {

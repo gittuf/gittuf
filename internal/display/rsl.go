@@ -5,9 +5,36 @@ package display
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/gittuf/gittuf/internal/rsl"
 )
+
+type FunctionHolder struct {
+	DisplayLog    func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
+	DisplayHeader func(io.WriteCloser, string) error
+}
+
+func BufferedLogToConsole(entries []*rsl.ReferenceEntry, annotationMap map[string][]*rsl.AnnotationEntry, bufferedWriter io.WriteCloser) error {
+	formatedOutput := PrepareRSLLogOutput(entries, annotationMap)
+
+	_, err := bufferedWriter.Write([]byte(formatedOutput))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func PrintHeader(bufferedWriter io.WriteCloser, title string) error {
+	header := fmt.Sprintf(
+		"---------------------------------------------------\n%s\n---------------------------------------------------\n\n",
+		title,
+	)
+
+	_, err := bufferedWriter.Write([]byte(header))
+	return err
+}
 
 // PrepareRSLLogOutput takes the RSL, and returns a string representation of it,
 // with annotations attached to entries
@@ -76,5 +103,5 @@ func PrepareRSLLogOutput(entries []*rsl.ReferenceEntry, annotationMap map[string
 		log += "\n\n"
 	}
 
-	return log[:len(log)-1]
+	return log
 }
