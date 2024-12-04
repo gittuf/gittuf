@@ -612,15 +612,17 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				if _, err := helperStdIn.Write(packetEncode(pushCmd)); err != nil {
 					return nil, false, err
 				}
-				if _, err := helperStdIn.Write(flushPkt); err != nil {
-					return nil, false, err
-				}
 				if newTip != gitinterface.ZeroHash.String() {
 					pushObjects.Add(newTip)
 				}
 				if oldTip != gitinterface.ZeroHash.String() {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
 				}
+			}
+
+			// Write the flush packet as we're done with ref processing
+			if _, err := helperStdIn.Write(flushPkt); err != nil {
+				return nil, false, err
 			}
 
 			cmd := exec.Command("git", "pack-objects", "--all-progress-implied", "--revs", "--stdout", "--thin", "--delta-base-offset", "--progress")
