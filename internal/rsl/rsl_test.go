@@ -178,6 +178,15 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		}
 		_, _, err = GetLatestReferenceEntry(repo, UntilEntryNumber(10))
 		assert.ErrorIs(t, err, ErrInvalidUntilEntryNumberCondition)
+
+		// a reference older than until entry number is being asked for (configuration mismatch)
+		if err := NewReferenceEntry("feature", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(emptyTreeID), UntilEntryNumber(2))
+		assert.Nil(t, annotations)
+		assert.Nil(t, entry)
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceEntryOptions)
 	})
 
 	t.Run("with ref name and until entry number", func(t *testing.T) {
@@ -392,6 +401,28 @@ func TestGetLatestReferenceEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[2], entry.ID)
 
 		_, _, err = GetLatestReferenceEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[3]), UntilEntryNumber(3))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("with ref name but before entry ID is not found in initial walk", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		// RSL structure for the test
+		// 1    <- 2
+		// main <- feature
+		testRefs := []string{"main", "feature"}
+		for _, ref := range testRefs {
+			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		emptyTreeID, err := repo.EmptyTree()
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry, annotations, err := GetLatestReferenceEntry(repo, ForReference("main"), BeforeEntryID(emptyTreeID))
+		assert.Nil(t, annotations)
+		assert.Nil(t, entry)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 	})
 
