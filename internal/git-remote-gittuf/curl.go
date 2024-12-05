@@ -196,7 +196,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
 
-				if bytes.Equal(input, flushPkt) {
+				if bytes.Equal(input, flushPkt) || bytes.Contains(input, []byte("done")) {
 					if !wroteGittufWantsAndHaves {
 						// We only write gittuf specific haves and wants when we
 						// haven't already written them. We track this because
@@ -233,7 +233,17 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 						}
 						wroteGittufWantsAndHaves = true
 					}
-					wroteWants = true
+
+					if bytes.Equal(input, flushPkt) {
+						// On a clone, we see `done` and
+						// then flush. We need to write
+						// our wants before done, but
+						// wroteWants can't be set to
+						// true until the next buffer
+						// with flush is written to the
+						// remote.
+						wroteWants = true
+					}
 				} else {
 					if bytes.Contains(input, []byte("want")) {
 						idx := bytes.Index(input, []byte("want "))
