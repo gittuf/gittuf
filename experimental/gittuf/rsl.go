@@ -517,8 +517,9 @@ func GetRSLEntryLog(repo *Repository) ([]*rsl.ReferenceEntry, map[string][]*rsl.
 	return entries, annotationMap, nil
 }
 
-// PrintRSLEntryLog prints all rsl entries to the console, first all reference entries are printed,
-// then all the annotation entries are printed with their corresponding references
+// PrintRSLEntryLog prints all rsl entries to the console, first printing all
+// reference entries, and then all annotation entries with their corresponding
+// references.
 func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display display.FunctionHolder) error {
 	defer bufferedWriter.Close() //nolint:errcheck
 
@@ -529,6 +530,10 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display d
 	iteratorEntry, err := rsl.GetLatestEntry(repo.r)
 	if err != nil {
 		return err
+	}
+
+	if err := display.DisplayHeader(bufferedWriter, "Reference Entries"); err != nil {
+		return nil
 	}
 
 	// Display all reference entries
@@ -561,14 +566,14 @@ func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display d
 		iteratorEntry = parentEntry
 	}
 
-	// Display all annotation entries
-	for index, entry := range allReferenceEntries {
-		if index == 0 {
-			if err := display.DisplayHeader(bufferedWriter, "Annotations"); err != nil {
-				return nil
-			}
+	if len(annotationMap) != 0 {
+		if err := display.DisplayHeader(bufferedWriter, "Annotation Entries"); err != nil {
+			return nil
 		}
+	}
 
+	// Display all annotation entries
+	for _, entry := range allReferenceEntries {
 		targetID := entry.GetID().String()
 		if _, exists := annotationMap[targetID]; exists {
 			if err := display.DisplayLog([]*rsl.ReferenceEntry{entry}, annotationMap, bufferedWriter); err != nil {
