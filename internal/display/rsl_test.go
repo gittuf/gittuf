@@ -28,6 +28,7 @@ entry 0000000000000000000000000000000000000000
 
   Ref:    refs/tags/v1
   Target: 0000000000000000000000000000000000000000
+
 `
 
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{branchEntry, tagEntry}, nil)
@@ -53,6 +54,7 @@ entry 0000000000000000000000000000000000000000
   Ref:    refs/tags/v1
   Target: 0000000000000000000000000000000000000000
   Number: 2
+
 `
 
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{branchEntry, tagEntry}, nil)
@@ -104,6 +106,7 @@ entry %s (skipped)
     Number:        3
     Message:
       msg
+
 `, tagEntry.ID.String(), branchEntry.ID.String(), annotationEntry.GetID().String())
 
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{tagEntry, branchEntry}, map[string][]*rsl.AnnotationEntry{branchEntry.ID.String(): {annotationEntry.(*rsl.AnnotationEntry)}})
