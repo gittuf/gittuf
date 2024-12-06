@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
@@ -858,4 +859,30 @@ func TestPullRSL(t *testing.T) {
 		err := localRepo.PullRSL(remoteName)
 		assert.ErrorIs(t, err, ErrPullingRSL)
 	})
+}
+
+func TestGetRSLEntryLog(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	entries, annotationMap, err := GetRSLEntryLog(r)
+	assert.Nil(t, err)
+
+	firstEntry, _, err := rsl.GetFirstEntry(r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lastEntry, err := rsl.GetLatestEntry(r.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected, _, err := rsl.GetReferenceEntriesInRange(r.r, firstEntry.GetID(), lastEntry.GetID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slices.Reverse(expected)
+	assert.Equal(t, expected, entries)
+	assert.Equal(t, map[string][]*rsl.AnnotationEntry{}, annotationMap)
 }

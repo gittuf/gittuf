@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/display"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
@@ -515,72 +513,4 @@ func GetRSLEntryLog(repo *Repository) ([]*rsl.ReferenceEntry, map[string][]*rsl.
 
 	slices.Reverse(entries)
 	return entries, annotationMap, nil
-}
-
-// PrintRSLEntryLog prints all rsl entries to the console, first printing all
-// reference entries, and then all annotation entries with their corresponding
-// references.
-func PrintRSLEntryLog(repo *Repository, bufferedWriter io.WriteCloser, display display.FunctionHolder) error {
-	defer bufferedWriter.Close() //nolint:errcheck
-
-	allReferenceEntries := []*rsl.ReferenceEntry{}
-	emptyAnnotationMap := make(map[string][]*rsl.AnnotationEntry)
-	annotationMap := make(map[string][]*rsl.AnnotationEntry)
-
-	iteratorEntry, err := rsl.GetLatestEntry(repo.r)
-	if err != nil {
-		return err
-	}
-
-	if err := display.DisplayHeader(bufferedWriter, "Reference Entries"); err != nil {
-		return nil
-	}
-
-	// Display all reference entries
-	for {
-		switch iteratorEntry := iteratorEntry.(type) {
-		case *rsl.ReferenceEntry:
-			allReferenceEntries = append(allReferenceEntries, iteratorEntry)
-			if err := display.DisplayLog([]*rsl.ReferenceEntry{iteratorEntry}, emptyAnnotationMap, bufferedWriter); err != nil {
-				return nil
-			}
-		case *rsl.AnnotationEntry:
-			for _, targetID := range iteratorEntry.RSLEntryIDs {
-				if _, has := annotationMap[targetID.String()]; !has {
-					annotationMap[targetID.String()] = []*rsl.AnnotationEntry{}
-				}
-
-				annotationMap[targetID.String()] = append(annotationMap[targetID.String()], iteratorEntry)
-			}
-		}
-
-		parentEntry, err := rsl.GetParentForEntry(repo.r, iteratorEntry)
-		if err != nil {
-			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-				break
-			}
-
-			return err
-		}
-
-		iteratorEntry = parentEntry
-	}
-
-	if len(annotationMap) != 0 {
-		if err := display.DisplayHeader(bufferedWriter, "Annotation Entries"); err != nil {
-			return nil
-		}
-	}
-
-	// Display all annotation entries
-	for _, entry := range allReferenceEntries {
-		targetID := entry.GetID().String()
-		if _, exists := annotationMap[targetID]; exists {
-			if err := display.DisplayLog([]*rsl.ReferenceEntry{entry}, annotationMap, bufferedWriter); err != nil {
-				return nil
-			}
-		}
-	}
-
-	return nil
 }
