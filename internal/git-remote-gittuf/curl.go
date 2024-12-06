@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,8 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
+
+var ErrFailedAuthentication = errors.New("failed getting remote refs")
 
 // handleCurl implements the helper for remotes configured to use the curl
 // backend. For this transport, we invoke git-remote-http, only interjecting at
@@ -94,6 +97,12 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 
 					if _, err := stdOutWriter.Write(output); err != nil {
 						return nil, false, err
+					}
+
+					// If nothing is returned, the user has likely failed to
+					// authenticate with the remote
+					if len(output) == 0 {
+						return nil, false, ErrFailedAuthentication
 					}
 
 					// flushPkt is used to indicate the end of
@@ -346,6 +355,12 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 
 			for helperStdOutScanner.Scan() {
 				output := helperStdOutScanner.Bytes()
+
+				// If nothing is returned, the user has likely failed to
+				// authenticate with the remote
+				if len(output) == 0 {
+					return nil, false, ErrFailedAuthentication
+				}
 
 				refAdSplit := strings.Split(strings.TrimSpace(string(output)), " ")
 				if len(refAdSplit) >= 2 {
