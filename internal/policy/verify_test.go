@@ -1294,6 +1294,35 @@ func TestVerifyMergeable(t *testing.T) {
 		assert.ErrorIs(t, err, ErrUnauthorizedSignature)
 		assert.False(t, rslSignatureRequired)
 	})
+
+	t.Run("unprotected base branch", func(t *testing.T) {
+		refName := "refs/heads/unprotected" // overriding refName
+
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		// Set feature to the same commit as base
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureEntry := rsl.NewReferenceEntry(featureRefName, featureCommitIDs[1]) // latest commit
+		featureEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, featureEntry, gpgKeyBytes)
+		featureEntry.ID = featureEntryID
+
+		rslSignatureRequired, err := VerifyMergeable(testCtx, repo, refName, featureRefName)
+		assert.Nil(t, err)
+		assert.False(t, rslSignatureRequired)
+	})
 }
 
 func TestVerifyRelativeForRef(t *testing.T) {

@@ -50,7 +50,14 @@ func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 
 func (r *regularSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
 	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(PolicyRef))
-	return entry, err
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// we don't have a policy entry
+			return nil, ErrPolicyNotFound
+		}
+		return nil, err
+	}
+	return entry, nil
 }
 
 // FindPolicyEntryFor identifies the latest policy entry for the specified
@@ -117,5 +124,12 @@ func newRegularSearcher(repo *gitinterface.Repository) *regularSearcher {
 
 func (r *regularSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
 	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(attestations.Ref))
-	return entry, err
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			// we don't have an attestations entry
+			return nil, attestations.ErrAttestationsNotFound
+		}
+		return nil, err
+	}
+	return entry, nil
 }
