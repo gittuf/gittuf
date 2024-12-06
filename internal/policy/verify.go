@@ -193,6 +193,10 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 	if err != nil {
 		return false, err
 	}
+	if len(verifiers) == 0 {
+		// No verifiers -> not protected
+		return false, nil
+	}
 
 	var appName string
 	if currentPolicy.githubAppApprovalsTrusted {
