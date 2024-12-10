@@ -205,7 +205,8 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
 
-				if bytes.Equal(input, flushPkt) {
+				switch {
+				case bytes.Equal(input, flushPkt), bytes.Contains(input, []byte("done")):
 					if !wroteGittufWantsAndHaves {
 						// We only write gittuf specific haves and wants when we
 						// haven't already written them. We track this because
@@ -242,28 +243,36 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 						}
 						wroteGittufWantsAndHaves = true
 					}
-					wroteWants = true
-				} else {
-					if bytes.Contains(input, []byte("want")) {
-						idx := bytes.Index(input, []byte("want "))
-						sha := string(bytes.TrimSpace(input[idx+len("want "):]))
-						allWants.Add(sha)
 
-						for ref, tip := range gittufRefsTips {
-							if tip == sha {
-								// Take out this ref as
-								// something for us to
-								// update or add wants
-								// for
-								log("taking out", ref, "as it matches", sha)
-								delete(gittufRefsTips, ref)
-							}
-						}
-					} else if bytes.Contains(input, []byte("have")) {
-						idx := bytes.Index(input, []byte("have "))
-						sha := string(bytes.TrimSpace(input[idx+len("have "):]))
-						allHaves.Add(sha)
+					if bytes.Equal(input, flushPkt) {
+						// On a clone, we see `done` and
+						// then flush. We need to write
+						// our wants before done, but
+						// wroteWants can't be set to
+						// true until the next buffer
+						// with flush is written to the
+						// remote.
+						wroteWants = true
 					}
+				case bytes.Contains(input, []byte("want")):
+					idx := bytes.Index(input, []byte("want "))
+					sha := string(bytes.TrimSpace(input[idx+len("want "):]))
+					allWants.Add(sha)
+
+					for ref, tip := range gittufRefsTips {
+						if tip == sha {
+							// Take out this ref as
+							// something for us to
+							// update or add wants
+							// for
+							log("taking out", ref, "as it matches", sha)
+							delete(gittufRefsTips, ref)
+						}
+					}
+				case bytes.Contains(input, []byte("have")):
+					idx := bytes.Index(input, []byte("have "))
+					sha := string(bytes.TrimSpace(input[idx+len("have "):]))
+					allHaves.Add(sha)
 				}
 
 				if _, err := helperStdIn.Write(input); err != nil {
