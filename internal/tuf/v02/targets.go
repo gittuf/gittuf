@@ -236,6 +236,11 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addPrincipal(principal)
 }
 
+// TODO: RemovePrincipal
+func (t *TargetsMetadata) RemovePrincipal(principal tuf.Principal) error {
+	return t.Delegations.removePrincipal(principal)
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
@@ -307,6 +312,18 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 		return tuf.ErrInvalidPrincipalType
 	}
 
+	return nil
+}
+
+// TODO: removePrincipal
+func (d *Delegations) removePrincipal(principal tuf.Principal) error {
+	if principal.ID() == "" {
+		return tuf.ErrInvalidPrincipalID
+	}
+	if d.Principals == nil {
+		// should error?
+	}
+	delete(d.Principals, principal.ID())
 	return nil
 }
 
