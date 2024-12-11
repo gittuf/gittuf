@@ -5,8 +5,8 @@ package tuf
 
 import (
 	"errors"
-
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -38,6 +38,16 @@ var (
 	ErrCannotManipulateAllowRule                = errors.New("cannot change in-built gittuf-allow-rule")
 	ErrCannotMeetThreshold                      = errors.New("insufficient keys to meet threshold")
 )
+
+type Hook struct {
+	SHA256Hash  string   `json:"SHA256Hash"`
+	BlobID      string   `json:"BlobID"`
+	Stage       string   `json:"Stage"`
+	Branches    []string `json:"Branches"`
+	Environment string   `json:"Environment"`
+	Modules     []string `json:"Modules"`
+	KeyIDs      []string `json:"KeyIDs"`
+}
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
 // the simplest case, a principal may be a single public key. On the other hand,
@@ -125,6 +135,16 @@ type TargetsMetadata interface {
 	// TODO: Does expiry make sense for the gittuf context? This is currently
 	// unenforced
 	SetExpires(expiry string)
+
+	//SetHooksField(hooksID gitinterface.Hash)
+
+	InitializeHooks()
+
+	SetTargets(hookName, stage, env string, blobID, sha256HashSum gitinterface.Hash, modules, keyIDs []string)
+
+	GetTargets() map[string]Hook
+
+	UpdateTargets(hookName string, updatedHookIdentifiers *Hook)
 
 	// SchemaVersion returns the metadata schema version.
 	SchemaVersion() string

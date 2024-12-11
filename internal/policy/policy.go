@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/hooks"
 	"log/slog"
 	"path"
 	"reflect"
@@ -485,6 +486,79 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		return err
 	}
 
+	return nil
+}
+
+func (s *State) CommitHooks(repo *gitinterface.Repository, commitMessage string, blobsMapping map[string]gitinterface.Hash, sign bool) error {
+	if len(commitMessage) == 0 {
+		commitMessage = DefaultCommitMessage
+	}
+
+	metadata := map[string]*sslibdsse.Envelope{}
+	if s.TargetsEnvelope != nil {
+		metadata[TargetsRoleName] = s.TargetsEnvelope
+	}
+	if s.RootEnvelope != nil {
+		metadata[RootRoleName] = s.RootEnvelope
+	}
+
+	allTreeEntries := map[string]gitinterface.Hash{}
+	for name, env := range metadata {
+		envContents, err := json.Marshal(env)
+		if err != nil {
+			return err
+		}
+
+		blobID, err := repo.WriteBlob(envContents)
+		if err != nil {
+			return err
+		}
+
+		allTreeEntries[path.Join(metadataTreeEntryName, name+".json")] = blobID
+	}
+
+	// structure of blobsMapping is {hookname: blobID}
+	if len(blobsMapping) > 0 {
+		for hookName, blobID := range blobsMapping {
+			allTreeEntries[path.Join(hooks.HooksTreeEntryName, hookName)] = blobID
+		}
+	}
+
+	slog.Debug("building and populating new tree...")
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+
+	hooksRootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allTreeEntries)
+	if err != nil {
+		return err
+	}
+
+	originalCommitID, err := repo.GetReference(PolicyStagingRef)
+	if err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return err
+		}
+	}
+	commitID, err := repo.Commit(hooksRootTreeID, PolicyStagingRef, commitMessage, sign)
+	if err != nil {
+		return err
+	}
+	slog.Debug("committing hooks metadata successful!")
+
+	// record changes to RSL; reset to original policy commit if err != nil
+
+	newReferenceEntry := rsl.NewReferenceEntry(PolicyStagingRef, commitID)
+	if err := newReferenceEntry.Commit(repo, true); err != nil {
+		if !originalCommitID.IsZero() {
+			return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
+		}
+
+		return err
+	}
+	slog.Debug("RSL entry recording successful!")
+	hooksTip, err := repo.GetReference(PolicyStagingRef)
+	if err := repo.SetReference(PolicyStagingRef, hooksTip); err != nil {
+		return fmt.Errorf("failed to set new hooks reference: %w", err)
+	}
 	return nil
 }
 

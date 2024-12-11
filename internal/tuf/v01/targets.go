@@ -6,6 +6,7 @@ package v01
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"strings"
 
 	"github.com/danwakefield/fnmatch"
@@ -19,10 +20,10 @@ const (
 
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
+	Type        string              `json:"type"`
+	Expires     string              `json:"expires"`
+	Targets     map[string]tuf.Hook `json:"targets"`
+	Delegations *Delegations        `json:"delegations"`
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
@@ -31,6 +32,35 @@ func NewTargetsMetadata() *TargetsMetadata {
 		Type:        "targets",
 		Delegations: &Delegations{Roles: []*Delegation{AllowRule()}},
 	}
+}
+
+//func (t *TargetsMetadata) SetHooksField(hooksID gitinterface.Hash) {
+//	t.Targets = map[string]any{
+//		"hooks": hooksID.String(),
+//	}
+//}
+
+func (t *TargetsMetadata) InitializeHooks() {
+	t.Targets = map[string]tuf.Hook{}
+}
+
+func (t *TargetsMetadata) SetTargets(hookName, stage, env string, blobID, sha256HashSum gitinterface.Hash, modules, keyIDs []string) {
+	hookInfo := tuf.Hook{
+		SHA256Hash:  sha256HashSum.String(),
+		Stage:       stage,
+		BlobID:      blobID.String(),
+		Environment: env,
+		Modules:     modules,
+	}
+	t.Targets[hookName] = hookInfo
+}
+
+func (t *TargetsMetadata) GetTargets() map[string]tuf.Hook {
+	return t.Targets
+}
+
+func (t *TargetsMetadata) UpdateTargets(hookName string, updatedHookIdentifiers *tuf.Hook) {
+	t.Targets[hookName] = *updatedHookIdentifiers
 }
 
 // SetExpires sets the expiry date of the TargetsMetadata to the value passed

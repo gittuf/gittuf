@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"strings"
 
 	"github.com/danwakefield/fnmatch"
@@ -22,11 +23,34 @@ var ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata 
 
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Version     string         `json:"schemaVersion"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
+	Type        string              `json:"type"`
+	Version     string              `json:"schemaVersion"`
+	Expires     string              `json:"expires"`
+	Targets     map[string]tuf.Hook `json:"targets"`
+	Delegations *Delegations        `json:"delegations"`
+}
+
+func (t *TargetsMetadata) UpdateTargets(hookName string, updatedHookIdentifiers *tuf.Hook) {
+	t.Targets[hookName] = *updatedHookIdentifiers
+}
+
+func (t *TargetsMetadata) SetTargets(hookName, stage, env string, blobID, sha256HashSum gitinterface.Hash, modules, keyIDs []string) {
+	hookInfo := tuf.Hook{
+		SHA256Hash:  sha256HashSum.String(),
+		Stage:       stage,
+		BlobID:      blobID.String(),
+		Environment: env,
+		Modules:     modules,
+	}
+	t.Targets[hookName] = hookInfo
+}
+
+func (t *TargetsMetadata) InitializeHooks() {
+	t.Targets = make(map[string]tuf.Hook)
+}
+
+func (t *TargetsMetadata) GetTargets() map[string]tuf.Hook {
+	return t.Targets
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
