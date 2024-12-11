@@ -2,6 +2,8 @@
 
 Last Modified: January 21, 2023
 
+Status: Draft
+
 By default, Git uses the SHA-1 hash algorithm to calculate unique identifiers.
 There is experimental support for SHA-256 identifiers, but:
 1. repositories can't currently use both SHA-1 and SHA-256 identifiers, so
