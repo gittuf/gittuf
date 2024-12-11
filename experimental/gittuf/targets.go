@@ -420,9 +420,9 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	return state.Commit(r.r, commitMessage, signCommit)
 }
 
-// TODO: RemovePrincipalFromTargets is the interface for a user to remove a trusted principal
+// TODO: RemovePrincipalFromTargets is the interface for a user to remove a principal
 // from gittuf rule file metadata.
-func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipals []tuf.Principal, signCommit bool) error {
+func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipalIDs []string, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -446,8 +446,8 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	}
 
 	principalIDs := ""
-	for _, principal := range authorizedPrincipals {
-		principalIDs += fmt.Sprintf("\n%s", principal.ID())
+	for _, principalID := range authorizedPrincipalIDs {
+		principalIDs += fmt.Sprintf("\n%s", principalID)
 	}
 
 	slog.Debug("Loading current rule file...")
@@ -456,9 +456,9 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 		return err
 	}
 
-	for _, principal := range authorizedPrincipals {
-		slog.Debug(fmt.Sprintf("Adding principal '%s' to rule file...", strings.TrimSpace(principal.ID())))
-		if err := targetsMetadata.RemovePrincipal(principal); err != nil {
+	for _, principalID := range authorizedPrincipalIDs {
+		slog.Debug(fmt.Sprintf("Removing principal '%s' from rule file...", strings.TrimSpace(principalID)))
+		if err := targetsMetadata.RemovePrincipal(principalID); err != nil {
 			return err
 		}
 	}

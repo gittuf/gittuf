@@ -230,8 +230,8 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addKey(principal)
 }
 
-func (t *TargetsMetadata) RemovePrincipal(principal tuf.Principal) error {
-	return t.Delegations.removeKey(principal)
+func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
+	return t.Delegations.removeKey(principalID)
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets
@@ -256,17 +256,12 @@ func (d *Delegations) addKey(key tuf.Principal) error {
 	return nil
 }
 
-func (d *Delegations) removeKey(key tuf.Principal) error {
+func (d *Delegations) removeKey(keyID string) error {
 	if d.Keys == nil {
 		// return error
 	}
 
-	_, isKnownType := key.(*Key)
-	if !isKnownType {
-		return tuf.ErrInvalidPrincipalType
-	}
-
-	delete(d.Keys, key.ID())
+	delete(d.Keys, keyID)
 	return nil
 }
 

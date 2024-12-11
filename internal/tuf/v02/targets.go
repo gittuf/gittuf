@@ -237,8 +237,8 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 }
 
 // TODO: RemovePrincipal
-func (t *TargetsMetadata) RemovePrincipal(principal tuf.Principal) error {
-	return t.Delegations.removePrincipal(principal)
+func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
+	return t.Delegations.removePrincipal(principalID)
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets
@@ -316,14 +316,14 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 }
 
 // TODO: removePrincipal
-func (d *Delegations) removePrincipal(principal tuf.Principal) error {
-	if principal.ID() == "" {
-		return tuf.ErrInvalidPrincipalID
-	}
+func (d *Delegations) removePrincipal(principalID string) error {
 	if d.Principals == nil {
 		// should error?
 	}
-	delete(d.Principals, principal.ID())
+	if principalID == "" {
+		return tuf.ErrInvalidPrincipalID
+	}
+	delete(d.Principals, principalID)
 	return nil
 }
 
