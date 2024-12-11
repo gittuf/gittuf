@@ -2,6 +2,23 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.8.0
+
+- Added an experimental gittuf Go API
+- Added an experimental version (`v0.2`) of policy metadata, which adds support
+  for "principals" in gittuf
+- Added an experimental flow to determine a feature ref's mergeability
+- Optimized some preprocessing flows in the `policy` package
+- Improved gittuf's design documentation
+- Improved testing coverage of `gittuf` and `rsl`
+- Fixed an internal issue with git-remote-gittuf and Go's builtin max
+- Fixed issue with `git-remote-gittuf` with server responses on push
+- Fixed issue with `git-remote-gittuf` when pushing to a remote repository
+  without gittuf enabled
+- Fixed issue with `git-remote-gittuf` freezing upon failure to authenticate
+  with the remote repository when using HTTP
+- Updated various dependencies and CI workflows
+
 ## v0.7.0
 
 - Added support for metadata signing using Sigstore (currently `GITTUF_DEV`
