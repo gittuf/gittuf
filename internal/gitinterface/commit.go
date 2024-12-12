@@ -226,7 +226,7 @@ func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
 		return ZeroHash, err
 	}
 
-	stdOut, err := r.executor("show", "-s", "--format=%T", commitID.String()).executeString()
+	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^{tree}", commitID.String())).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
 	}
@@ -244,12 +244,12 @@ func (r *Repository) GetCommitParentIDs(commitID Hash) ([]Hash, error) {
 		return nil, err
 	}
 
-	stdOut, err := r.executor("show", "-s", "--format=%P", commitID.String()).executeString()
+	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^@", commitID.String())).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
 	}
 
-	commitIDSplit := strings.Split(stdOut, " ")
+	commitIDSplit := strings.Split(stdOut, "\n")
 	if len(commitIDSplit) == 0 {
 		return nil, nil
 	}
