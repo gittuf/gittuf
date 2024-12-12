@@ -1,0 +1,32 @@
+name: Run demo
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    
+
+jobs:
+  demo:
+    name: Run demo 
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout demo repository
+        uses: actions/checkout@v3
+        with:
+          repository: gittuf/demo
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install gittuf-installer
+        uses: gittuf/gittuf-installer@5c0fb4a2a0dc9434598cf2e74bb601d76861fc97
+
+      - name: Run demo script
+        run: python run-demo.py --no-prompt
