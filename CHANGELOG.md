@@ -2,6 +2,13 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.8.1
+
+- Fixed loading of legacy ECDSA key format
+- Replaced `show` with `rev-parse` in some gitinterface APIs
+- Added gittuf/demo run to CI
+- Updated various dependencies and CI workflows
+
 ## v0.8.0
 
 - Added an experimental gittuf Go API
