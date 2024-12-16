@@ -1075,7 +1075,7 @@ func (v *Verifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, en
 					if err != nil {
 						return nil, err
 					}
-				case signerverifier.ECDSAKeyScheme:
+				case signerverifier.ECDSAKeyType:
 					// These are only used to verify old policy metadata signed before the ssh-signer was added
 					slog.Debug(fmt.Sprintf("Found legacy ECDSA key '%s' in custom securesystemslib format...", key.KeyID))
 					dsseVerifier, err = signerverifier.NewECDSASignerVerifierFromSSLibKey(key)
