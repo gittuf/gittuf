@@ -462,6 +462,41 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+// AddGlobalRule adds a global rule to the root metadata.
+func (r *Repository) AddGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding global rule...")
+	if err := rootMetadata.AddGlobalRule(name, patterns, threshold); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add global rule '%s' to root metadata", name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
