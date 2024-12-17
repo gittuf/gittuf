@@ -5,6 +5,7 @@ package trust
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubappkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
@@ -33,6 +34,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addgithubappkey.New(o))
+	cmd.AddCommand(addglobalrule.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addrootkey.New(o))
 	cmd.AddCommand(apply.New())

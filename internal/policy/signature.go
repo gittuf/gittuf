@@ -24,10 +24,11 @@ import (
 )
 
 type SignatureVerifier struct {
-	repository *gitinterface.Repository
-	name       string
-	principals []tuf.Principal
-	threshold  int
+	repository         *gitinterface.Repository
+	name               string
+	principals         []tuf.Principal
+	threshold          int
+	verifyExhaustively bool // verifyExhaustively checks all possible signatures and returns all matched principals, even if threshold is already met
 }
 
 func (v *SignatureVerifier) Name() string {
@@ -106,10 +107,13 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 		}
 	}
 
-	// If threshold is 1 and the Git signature is verified, we can return
-	if v.threshold == 1 && gitObjectVerified {
+	// If we don't have to verify exhaustively and threshold is 1 and the Git
+	// signature is verified, we can return
+	if !v.verifyExhaustively && v.threshold == 1 && gitObjectVerified {
 		return usedPrincipalIDs, nil
 	}
+
+	slog.Debug("Proceeding with verification of attestations...")
 
 	if env != nil {
 		// Second, verify signatures on the envelope
@@ -214,11 +218,8 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 				// Mark all accepted keys as used: this doesn't count towards
 				// the threshold directly, but if another principal has the same
 				// key, they may not be counted towards the threshold
+				slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of attestation, counting '%s' towards threshold...", key.KeyID, principal.ID(), principal.ID()))
 				usedKeyIDs.Add(key.KeyID)
-			}
-
-			if len(acceptedKeys) > 0 {
-				// We've verified this principal, one closer to the threshold
 				usedPrincipalIDs.Add(principal.ID())
 			}
 		}

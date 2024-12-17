@@ -9,6 +9,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 )
 
 const (
@@ -23,6 +24,7 @@ type RootMetadata struct {
 	Principals             map[string]tuf.Principal `json:"principals"`
 	Roles                  map[string]Role          `json:"roles"`
 	GitHubApprovalsTrusted bool                     `json:"githubApprovalsTrusted"`
+	GlobalRules            []*GlobalRule            `json:"globalRules,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -306,6 +308,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Principals             map[string]json.RawMessage `json:"principals"`
 		Roles                  map[string]Role            `json:"roles"`
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
+		GlobalRules            []*GlobalRule              `json:"globalRules,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -355,6 +358,33 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// AddGlobalRule adds a new global rule to RootMetadata.
+func (r *RootMetadata) AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error {
+	allGlobalRules := r.GlobalRules
+	if allGlobalRules == nil {
+		allGlobalRules = []*GlobalRule{}
+	}
+
+	// FIXME: check for duplicates
+	newRule := &GlobalRule{
+		Name:      ruleName,
+		Paths:     rulePatterns,
+		Threshold: threshold,
+	}
+	allGlobalRules = append(allGlobalRules, newRule)
+	r.GlobalRules = allGlobalRules
+	return nil
+}
+
+// GetGlobalRules returns all the global rules in the root metadata.
+func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
+	globalRules := make([]tuf.GlobalRule, 0, len(r.GlobalRules))
+	for _, rule := range r.GlobalRules {
+		globalRules = append(globalRules, rule)
+	}
+	return globalRules
+}
+
 // addPrincipal adds a principal to the RootMetadata instance.  v02 of the
 // metadata supports Key and Person as supported principal types.
 func (r *RootMetadata) addPrincipal(principal tuf.Principal) error {
@@ -380,3 +410,5 @@ func (r *RootMetadata) addRole(roleName string, role Role) {
 
 	r.Roles[roleName] = role
 }
+
+type GlobalRule = tufv01.GlobalRule

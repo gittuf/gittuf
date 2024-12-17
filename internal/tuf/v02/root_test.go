@@ -509,3 +509,25 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	trusted = rootMetadata.IsGitHubAppApprovalTrusted()
 	assert.True(t, trusted)
 }
+
+func TestGlobalRule(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+
+	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
+
+	err := rootMetadata.AddGlobalRule("threshold-2-main", []string{"git:refs/heads/main"}, 2)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 1, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].Name)
+
+	expectedGlobalRule := &GlobalRule{
+		Name:      "threshold-2-main",
+		Paths:     []string{"git:refs/heads/main"},
+		Threshold: 2,
+	}
+	globalRules := rootMetadata.GetGlobalRules()
+	assert.Equal(t, expectedGlobalRule.GetName(), globalRules[0].GetName())
+	assert.Equal(t, expectedGlobalRule.GetProtectedNamespaces(), globalRules[0].GetProtectedNamespaces())
+	assert.Equal(t, expectedGlobalRule.GetThreshold(), globalRules[0].GetThreshold())
+}

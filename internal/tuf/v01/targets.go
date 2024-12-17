@@ -54,8 +54,8 @@ func (t *TargetsMetadata) Validate() error {
 
 // AddRule adds a new delegation to TargetsMetadata.
 func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
-	if ruleName == tuf.AllowRuleName {
-		return tuf.ErrCannotManipulateAllowRule
+	if strings.HasPrefix(ruleName, tuf.GittufPrefix) {
+		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
 
 	for _, principalID := range authorizedPrincipalIDs {
@@ -89,8 +89,8 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 
 // UpdateRule is used to amend a delegation in TargetsMetadata.
 func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
-	if ruleName == tuf.AllowRuleName {
-		return tuf.ErrCannotManipulateAllowRule
+	if strings.HasPrefix(ruleName, tuf.GittufPrefix) {
+		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
 
 	for _, principalID := range authorizedPrincipalIDs {
@@ -157,7 +157,7 @@ func (t *TargetsMetadata) ReorderRules(ruleNames []string) error {
 		onlyInSpecifiedRules := specifiedRules.Minus(currentRules)
 		if onlyInSpecifiedRules.Len() != 0 {
 			if onlyInSpecifiedRules.Has(tuf.AllowRuleName) {
-				return fmt.Errorf("%w: do not specify allow rule", tuf.ErrCannotManipulateAllowRule)
+				return fmt.Errorf("%w: do not specify allow rule", tuf.ErrCannotManipulateRulesWithGittufPrefix)
 			}
 
 			contents := onlyInSpecifiedRules.Contents()
@@ -183,8 +183,8 @@ func (t *TargetsMetadata) ReorderRules(ruleNames []string) error {
 
 // RemoveRule deletes a delegation entry from TargetsMetadata.
 func (t *TargetsMetadata) RemoveRule(ruleName string) error {
-	if ruleName == tuf.AllowRuleName {
-		return tuf.ErrCannotManipulateAllowRule
+	if strings.HasPrefix(ruleName, tuf.GittufPrefix) {
+		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
 
 	allDelegations := t.Delegations.Roles
