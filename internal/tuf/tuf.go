@@ -148,6 +148,9 @@ type TargetsMetadata interface {
 
 	// AddPrincipal adds a principal to the metadata.
 	AddPrincipal(principal Principal) error
+
+	// RemovePrincipal removes a principal from the metadata.
+	RemovePrincipal(principalID string) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
