@@ -1,6 +1,8 @@
 # gittuf on the Forge
 
-Last Modified: October 21, 2024
+Last Modified: December 18, 2024
+
+Stats: Draft
 
 gittuf can be deployed at the forge that all developers push changes to. This
 instance of gittuf must behave differently from regular gittuf clients because
@@ -75,3 +77,10 @@ clients to push to.
 The staging namespace cannot be used with a pre-receive hook as it must reflect
 a push in progress. The post-receive hook is a better fit if a Git server-side
 hook is to be used.
+
+## Verification of Changes
+
+The forge receives changes to one or more refs as well as the RSL entry
+together, as they are pushed atomically by the client. If the verification of
+any of the RSL entries fails (for the corresponding update to the ref), then the
+entire push is aborted.

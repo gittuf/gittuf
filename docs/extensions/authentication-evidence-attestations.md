@@ -1,12 +1,16 @@
 # Authentication Evidence Attestations
 
-Last Modified: October 21, 2024
+Last Modified: December 18, 2024
+
+Status: Draft
 
 In certain workflows, it is necessary to authenticate an actor outside of the
 context of gittuf. For example, later in this document is a description of a
 recovery mechanism where a gittuf user must create an RSL entry on behalf of
 another non-gittuf user after authenticating them. gittuf requires evidence of
 this authentication to be recorded in the repository using an attestation.
+
+## Authentication Evidence Structure
 
 Primarily, this attestation is recorded for pushes that are not accompanied by
 RSL reference entries. As such, this attestation workflow focuses on that
@@ -45,3 +49,34 @@ Authentication evidence attestations are stored in a directory called
 `authentication-evidence` in the attestations namespace. Each attestation must
 have the in-toto predicate type:
 `https://gittuf.dev/authentication-evidence/v<VERSION>`.
+
+## Using Authentication Evidence
+
+The authentication evidence can be used to create RSL entries on behalf of other
+developers. This mechanism is necessary for adoptions where a subset of
+developers do not use gittuf. When they submit changes to the main copy of the
+repository, they do not include RSL entries. Therefore, when a change is pushed
+to a branch by a non-gittuf user A, a gittuf user B can submit an RSL entry on
+their behalf. Additionally, the entry must identify the original user and
+include some evidence about why B thinks the change came from A.
+
+The evidence that the change came from A may be of several types, depending on
+the context. If user B completely controls the infrastructure hosting that copy
+of the repository, the evidence could be the communication of A to B that
+submitted the change. For example, if A pushes to B's repository using an SSH
+key associated with A, B has reasonable guarantees the change was indeed pushed
+by A. Here, B may be another developer managing a "local" copy of the repository
+or an online bot used by a self hosted Git server, where the bot can reason
+about the communication from A. In cases where this degree of control is
+unavailable, for example when using a third party forge such as GitHub, B has no
+means to reason directly about A's communication with the remote repository. In
+such cases, B may rely on other data to determine the push was from A, such as
+the GitHub API for repository activity which logs all pushes after
+authenticating the user performing the push.
+
+Note that if A is a Git user who still signs their commits, a commit signature
+signed with A's key is not sufficient to say A performed the push. Creating a
+commit is distinct from pushing it to a remote repository, and can be performed
+by different users. When creating an RSL entry on behalf of another user in
+gittuf, the push event (which is captured in the RSL) is more important than the
+commit event.
