@@ -10,7 +10,8 @@ import (
 )
 
 type options struct {
-	dstRef string
+	dstRef             string
+	skipDuplicateCheck bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -20,6 +21,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of destination reference, if it differs from source reference",
 	)
+
+	cmd.Flags().BoolVar(
+		&o.skipDuplicateCheck,
+		"skip-duplicate-check",
+		false,
+		"skip check to see if latest entry for reference has same target",
+	)
 }
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
@@ -28,7 +36,12 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	return repo.RecordRSLEntryForReference(args[0], true, rslopts.WithOverrideRefName(o.dstRef))
+	opts := []rslopts.Option{rslopts.WithOverrideRefName(o.dstRef)}
+	if o.skipDuplicateCheck {
+		opts = append(opts, rslopts.WithSkipCheckForDuplicateEntry())
+	}
+
+	return repo.RecordRSLEntryForReference(args[0], true, opts...)
 }
 
 func New() *cobra.Command {
