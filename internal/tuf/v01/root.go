@@ -4,6 +4,7 @@
 package v01
 
 import (
+	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
@@ -19,6 +20,7 @@ type RootMetadata struct {
 	Keys                   map[string]*Key `json:"keys"`
 	Roles                  map[string]Role `json:"roles"`
 	GitHubApprovalsTrusted bool            `json:"githubApprovalsTrusted"`
+	GlobalRules            []*GlobalRule   `json:"globalRules,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -310,6 +312,32 @@ func (r *RootMetadata) GetGitHubAppPrincipals() ([]tuf.Principal, error) {
 	return principals, nil
 }
 
+// AddGlobalRule adds a new global rule to RootMetadata.
+func (r *RootMetadata) AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error {
+	allGlobalRules := r.GlobalRules
+	if allGlobalRules == nil {
+		allGlobalRules = []*GlobalRule{}
+	}
+
+	// FIXME: check for duplicates
+	newRule := &GlobalRule{
+		Name:      ruleName,
+		Paths:     rulePatterns,
+		Threshold: threshold,
+	}
+	allGlobalRules = append(allGlobalRules, newRule)
+	r.GlobalRules = allGlobalRules
+	return nil
+}
+
+func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
+	globalRules := make([]tuf.GlobalRule, 0, len(r.GlobalRules))
+	for _, rule := range r.GlobalRules {
+		globalRules = append(globalRules, rule)
+	}
+	return globalRules
+}
+
 // addKey adds a key to the RootMetadata instance.
 func (r *RootMetadata) addKey(key tuf.Principal) error {
 	if r.Keys == nil {
@@ -333,4 +361,32 @@ func (r *RootMetadata) addRole(roleName string, role Role) {
 	}
 
 	r.Roles[roleName] = role
+}
+
+type GlobalRule struct {
+	Name      string   `json:"name"`
+	Paths     []string `json:"paths"`
+	Threshold int      `json:"threshold"`
+}
+
+func (g *GlobalRule) GetName() string {
+	return g.Name
+}
+
+func (g *GlobalRule) Matches(path string) bool {
+	for _, pattern := range g.Paths {
+		// We validate pattern when it's added to / updated in the metadata
+		if matches := fnmatch.Match(pattern, path, 0); matches {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *GlobalRule) GetProtectedNamespaces() []string {
+	return g.Paths
+}
+
+func (g *GlobalRule) GetThreshold() int {
+	return g.Threshold
 }

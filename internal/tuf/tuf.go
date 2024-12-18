@@ -94,6 +94,9 @@ type RootMetadata interface {
 	// sign the primary rule file.
 	GetPrimaryRuleFileThreshold() (int, error)
 
+	AddGlobalRule(string, []string, int) error
+	GetGlobalRules() []GlobalRule
+
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
 	// TODO: this needs to be generalized across tools
@@ -175,4 +178,14 @@ type Rule interface {
 	// current rule's delegated rules as well as other rules already in the
 	// queue are trusted.
 	IsLastTrustedInRuleFile() bool
+}
+
+type GlobalRule interface {
+	GetName() string
+
+	Matches(path string) bool
+
+	GetProtectedNamespaces() []string
+
+	GetThreshold() int
 }
