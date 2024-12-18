@@ -71,13 +71,18 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool,
 		return err
 	}
 
-	slog.Debug("Checking for existing entry for reference with same target...")
-	isDuplicate, err := r.isDuplicateEntry(refName, refTip)
-	if err != nil {
-		return err
-	}
-	if isDuplicate {
-		return nil
+	if !options.SkipCheckForDuplicate {
+		slog.Debug("Checking if latest entry for reference has same target...")
+		isDuplicate, err := r.isDuplicateEntry(refName, refTip)
+		if err != nil {
+			return err
+		}
+		if isDuplicate {
+			slog.Debug("The latest entry has the same target, skipping creation of new entry...")
+			return nil
+		}
+	} else {
+		slog.Debug("Not checking if latest entry for reference has same target")
 	}
 
 	// TODO: once policy verification is in place, the signing key used by
@@ -479,7 +484,7 @@ func (r *Repository) PullRSL(remoteName string) error {
 }
 
 // isDuplicateEntry checks if the latest unskipped entry for the ref has the
-// same target ID Note that it's legal for the RSL to have target A, then B,
+// same target ID. Note that it's legal for the RSL to have target A, then B,
 // then A again, this is not considered a duplicate entry
 func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash) (bool, error) {
 	latestUnskippedEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(refName), rsl.IsUnskipped())

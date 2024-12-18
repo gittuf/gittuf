@@ -102,6 +102,24 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 
 	assert.Equal(t, newCommitID, entry.TargetID)
 	assert.Equal(t, "refs/heads/not-main", entry.RefName)
+
+	// Record entry for a different dst ref and skip check for duplicate
+	currentEntryID := entry.GetID()
+	err = repo.RecordRSLEntryForReference("refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"), rslopts.WithSkipCheckForDuplicateEntry())
+	assert.Nil(t, err)
+
+	entryT, err = rsl.GetLatestEntry(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, ok = entryT.(*rsl.ReferenceEntry)
+	if !ok {
+		t.Fatal(fmt.Errorf("invalid entry type"))
+	}
+
+	assert.NotEqual(t, currentEntryID, entry.GetID())
+	assert.Equal(t, newCommitID, entry.TargetID)
+	assert.Equal(t, "refs/heads/not-main", entry.RefName)
 }
 
 func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
