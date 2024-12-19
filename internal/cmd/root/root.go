@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
+	"github.com/gittuf/gittuf/internal/cmd/policy/hooks"
 	"github.com/gittuf/gittuf/internal/cmd/profile"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
@@ -93,6 +94,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
+	cmd.AddCommand(hooks.New())
 	cmd.AddCommand(rsl.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
