@@ -1,43 +1,52 @@
 # gittuf Design Document
 
-Last Modified: October 21, 2024
+Last Modified: December 18, 2024
 
 ## Introduction
 
-This document describes gittuf, a security layer for Git repositories. gittuf
-applies several key properties part of the
-[The Update Framework (TUF)](https://theupdateframework.io/) such as
-delegations, secure key distribution, key revocation, trust rotation, read /
-write access control, and namespaces to Git repositories. This enables owners of
-the repositories to distribute (and revoke) contributor signing keys and define
-policies about which contributors can make changes to some namespaces within the
-repository. gittuf also protects against reference state attacks by extending
-the Reference State Log design which was originally described in an
-[academic paper](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/torres-arias).
-Finally, gittuf can be used as a foundation to build other desirable features
-such as cryptographic algorithm agility, the ability to store secrets, storing
-in-toto attestations pertaining to the repository, and more.
+This document describes gittuf, a security layer for Git repositories.
+With gittuf, any developer who can pull from a Git repository can independently
+verify that the repository's security policies were followed. gittuf's policy,
+inspired by [The Update Framework (TUF)](https://theupdateframework.io/),
+handles key management for all trusted developers in a repository, allows for
+setting permissions for repository namespaces such as branches, tags, and files,
+and provides protections against
+[attacks targeting Git metadata](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/torres-arias).
+At the same time, gittuf is backwards compatible with existing source control
+platforms ("forges") such as GitHub, GitLab, and Bitbucket. gittuf is currently
+a sandbox project at the
+[Open Source Security Foundation (OpenSSF)](https://openssf.org/) as part of the
+[Supply Chain Integrity Working Group](https://github.com/ossf/wg-supply-chain-integrity).
+The core concepts of gittuf described in this document have been
+[peer reviewed](https://ssl.engineering.nyu.edu/papers/yelgundhalli_gittuf_ndss_2025.pdf).
 
-This document is scoped to describing how TUF's access control policies are
-applied to Git repositories. It contains the corresponding workflows for
-developers and their gittuf clients. Note that gittuf is designed in a manner
-that enables other security features. These descriptions will be in standalone
-specifications alongside this one, and will describe modifications or extensions
-to the "default" workflows in this document.
+This document is scoped to describing how gittuf's write access control policies
+are applied to Git repositories. Other additions to gittuf's featureset are
+described in standalone ["extensions" documents](/docs/extensions/).
 
 ## Definitions
 
 This document uses several terms or phrases in specific ways. These are defined
 here.
 
-### Git Reference (Ref)
+### Git References (Refs) and Objects
 
 A Git reference is a "simple name" that typically points to a particular Git
 commit. Generally, development in Git repositories are centered in one or more
 refs, and they're updated as commits are added to the ref under development. By
-default, Git defines two of refs: branches (heads) and tags. Git allows for the
-creation of other arbitrary refs that users can store other information as long
-as they are formatted using Git's object types.
+default, Git defines two of refs: branches ("heads") and tags. Git allows for
+the creation of other arbitrary refs that users can store other information as
+long as they are formatted using Git's object types.
+
+Git employs a content addressed object store, with support for four types of
+objects. An essential Git object is the "commit", which is a self-contained
+representation of the whole repository. Each commit points to a "tree" object
+that represents the state of the files in the root of the repository at that
+commit. A tree object contains one or more entries that are either other tree
+objects (representing subdirectories) or "blob" objects (representing files).
+The final type of Git object is the "tag" object, used as a static pointer to
+another Git object. While a tag object can point to any other Git object, it is
+frequently used to point to a commit.
 
 ```
 Repository
@@ -64,76 +73,191 @@ Repository
 ```
 
 
-### Actors
+### Actors and Authentication
 
-In a Git repository, an "actor" is any user who makes changes to the repository.
-These changes can involve any part of the repository, such as modifying files,
-branches or tags. In the gittuf system, each actor is identified by a unique
-signing key that they use to sign their contributions. This means that when a
-policy allows an actor to make certain changes, it's actually allowing the
-person who has the specific signing key to make those changes. To maintain
-security, all actions made in the repository, such as adding or modifying files,
-are checked for authenticity. This is done by verifying the digital signature
-attached to the action, which must match the public key associated with the
-actor who is supposed to have made the change.
+In a Git repository, an "actor" is any party, human or bot, who makes changes to
+the repository. These changes can involve any part of the repository, such as
+modifying files, branches or tags. In gittuf, each actor is identified by a
+unique signing key that they use to cryptographically sign their contributions.
+gittuf uses cryptographic signatures to authenticate actors as these signatures
+can be verified by anyone who has the corresponding public key, fundamental to
+gittuf's mission to enable independent verification of repository actions. Note
+that gittuf does not rely on Git commit metadata (e.g., author email, committer
+email) to identify the actor who created it, as that may be trivially spoofed.
+
+In practice, a gittuf policy allows an actor to make certain changes by granting
+trust to the actor's signing key to make those changes. To maintain security,
+all actions made in the repository, such as adding or modifying files, are
+checked for authenticity. This is done by verifying the digital signature
+attached to the action, which must match the trusted public key associated with
+the actor who is supposed to have made the change.
 
 ### State
 
 The term "state" refers to the latest values or conditions of the tracked
 references (like branches and tags) in a Git repository.  These are determined
-by the most recent entries in the [reference state
-log](#reference-state-log-rsl). Note that when verifying changes in the
-repository, a workflow may only verify specific references rather than all state
-updates in the reference state log.
+by the most recent entries in the
+[reference state log](#reference-state-log-rsl). Note that when verifying
+changes in the repository, a workflow may only verify specific references rather
+than all state updates in the reference state log.
 
 ## Threat Model
 
-gittuf considers a standard Git setting, i.e., a version control system that
-manages a repository in a distributed fashion. Individual developers have local
-copies of the repository, to which they commit their work. There is also a
-remote repository, hosted on a Git server, which serves as a synchronization
-point: developers push their contributions to the remote repository, and fetch
-other developers' contributions from the remote repository. Most organizations
-that own a repository find it useful to define the developers' read and write
-permissions on various portions of the repository, based on an access control
-policy. Unfortunately, Git repositories do not support fine-grained read and
-write access control policies. This is one place where gittuf adds value.
+The following threat model is taken from the
+[peer reviewed publication](https://ssl.engineering.nyu.edu/papers/yelgundhalli_gittuf_ndss_2025.pdf)
+describing gittuf.
 
-The threat model departs from this standard Git setting in that gittuf reduces
-the trust needed in the various system actors. Such a model accounts for the
-fact that some of these actors may act maliciously.
+We consider the standard scenario where a forge is used to manage a Git
+repository on a centralized synchronization point. This forge can be a publicly
+hosted solution (e.g., the github.com service), or self-hosted on premises by an
+enterprise. Either option exposes the forge instance to both external attackers
+and insider threats. External attackers may circumvent security measures and
+compromise the version control system, manifesting themselves as advanced
+persistent threats (APT) and making unnoticed changes to the system. Similarly,
+insider threats may be posed by rogue employees with escalated privileges who
+abuse their authority to make unnoticed changes.
 
-First, gittuf's design assumes that the Git server which manages the remote Git
-repository is not trustworthy. The server does respond to push and pull requests
-from clients (i.e., developers), since a non-responsive server would be easily
-detected and replaced. However, the server may try to modify data that is stored
-in the repository or may try to tamper with the client pull and push requests,
-for example by dropping push requests, or serving stale data to pull requests.
-Such behavior models a compromised or faulty server.
+To protect the integrity of the repository’s contents, the maintainers of the
+repository define security controls such as which contributors can write to
+different parts of the repository. gittuf is meant to protect against scenarios
+where any party, individual developers, bots that make changes, or the forge
+itself, may be compromised and act in an arbitrarily malicious way as seen in
+prior incidents. This includes scenarios such as:
 
-Second, gittuf's design assumes that developers are not trusted to act within
-the confines defined by the access control policy. For example, developers may
-try to write into folders where they are not authorized to write, or may try to
-merge changes into branches where they do not have permission to do so. They may
-also try to read parts of the repository which they are not allowed to read.
-Such behavior models developers who make mistakes, or developers whose account
-has been compromised, or even disgruntled employees.
+* T1: Modifying configured repository security policies, such as to weaken them
+* T2: Tampering with the contents of the repository’s activity log, such as by
+      reordering, dropping, or otherwise manipulating log entries
+* T3: Subverting the enforcement of security policies, such as by accepting
+      invalid changes instead of rejecting them
 
-Note: the threat model considers violations of read access control policies as
-in-scope, but gittuf currently does not protect against such violations. This
-feature is part of gittuf's [roadmap](/docs/roadmap.md).
+Note that we consider out of scope a freeze attack, where the forge serves stale
+data, as development workflows involve a substantial amount of out-of-band
+communication which prevents such attacks from going unnoticed. We similarly
+consider weaknesses in cryptographic algorithms as out of scope.
 
-## gittuf
+## gittuf Design
 
-To begin with, gittuf carves out a namespace for itself within the repository.
-All gittuf-specific metadata and information are tracked in a separate Git ref,
-`refs/gittuf`.
+gittuf records additional metadata describing the repository's policy and
+activity in the repository itself. Effectively, gittuf treats security policies,
+activity information, and policy decisions as a content tracking problem. To
+avoid collisions with regular repository contents, gittuf stores its metadata in
+custom references under `refs/gittuf/`.
 
-### Reference State Log (RSL)
+### gittuf Policy
 
-Note: This document presents only a summary of the academic paper and a
-description of gittuf's implementation of RSL. A full read of the paper is
-recommended.
+Note: This section assumes some prior knowledge of the
+[TUF specification](https://theupdateframework.github.io/specification/).
+
+The repository's policy metadata handles the distribution of the repository's
+trusted keys (representing actors) as well as write access control rules. There
+are two types of metadata used by gittuf, which are stored in a custom reference
+`refs/gittuf/policy`.
+
+#### Root of Trust
+
+gittuf's policy metadata includes root of trust metadata, which
+establishes why the policy must be trusted. The root of trust metadata (similar
+to TUF's root metadata) declares the keys belonging to the repository owners as
+well as a numerical threshold that indicates the minimum number of signatures
+for the metadata to be considered valid. The root of trust metadata is signed by
+a threshold of root keys, and the initial set of root keys for a repository must
+be distributed using out-of-band mechanisms or rely on trust-on-first-use
+(TOFU). Subsequent changes to the set of root keys are handled in-band, with a
+new version of the root of trust metadata created. This new version must be
+signed by a threshold of root keys trusted in the previous version.
+
+#### Rule Files
+
+The rules protecting the repository's namespaces are declared in one or more
+rule files. A rule file is similar to TUF's targets metadata. It declares the
+public keys for the trusted actors, as well as namespaced "delegations" which
+specify protected namespaces within the repository and which actors are trusted
+to write to them.
+
+A threshold of trusted actors for any delegation (or rule) can extend this trust
+to other actors by signing a new rule file with the same name as the delegation.
+In this rule file, they can add the actors who must be trusted for the same (or
+a subset) of namespaces.
+
+All repositories must contain a primary rule file (typically called
+"targets.json" to match TUF's behavior). This rule file may contain no rules,
+signifying that no repository namespaces are protected. The primary rule file
+derives its trust directly from the root of trust metadata; it must be signed by
+a threshold of actors trusted to manage the repository's primary rule file. All
+other rule files derive their trust directly or indirectly from the primary rule
+file through delegations.
+
+![Policy delegations](/docs/media/policy-delegations.png)
+_In this example, the repository administrator grants write permissions to Carol 
+for the main branch, to Alice for the alice-dev branch, and to Bob for the
+/tests folder (under any of the existing branches)._
+
+A significant difference between typical TUF metadata and those used by gittuf
+is in the expectations of the policies. Typical TUF deployments are explicit
+about the artifacts they are distributing. Any artifact not listed in TUF
+metadata is rejected. In gittuf, policies are written only to express
+_restrictions_. As such, when verifying changes to unprotected namespaces,
+gittuf must allow any key to sign for these changes. This means that after all
+explicit policies (expressed as delegations) are processed, and none apply to
+the namespace being verified, an implicit `allow-rule` is applied, allowing
+verification to succeed.
+
+#### Example gittuf Policy
+
+The following example is taken from the
+[peer reviewed publication](https://ssl.engineering.nyu.edu/papers/yelgundhalli_gittuf_ndss_2025.pdf)
+of gittuf's design. It shows a gittuf policy state with its root of trust and
+three distinct rule files connected using delegations. The root of trust
+declares the trusted signers for the next version of the root of trust as well
+as the primary rule file. Signatures are omitted.
+
+```
+rootOfTrust:
+keys: {R1, R2, R3, P1, P2, P3}
+signers:
+    rootOfTrust: (2, {R1, R2, R3})
+    primary: (2, {P1, P2, P3})
+
+ruleFile: primary
+keys: {Alice, Bob, Carol, Helen, Ilda}
+rules:
+    protect-main-prod: {git:refs/heads/main,
+                        git:refs/heads/prod}
+        -> (2, {Alice, Bob, Carol})
+    protect-ios-app: {file:ios/*}
+        -> (1, {Alice})
+    protect-android-app: {file:android/*}
+        -> (1, {Bob})
+    protect-core-libraries: {file:src/*}
+        -> (2, {Carol, Helen, Ilda})
+
+ruleFile: protect-ios-app
+keys: {Dana, George}
+rules:
+    authorize-ios-team: {file:ios/*}
+        -> (1, {Dana, George})
+
+ruleFile: protect-android-app
+keys: {Eric, Frank}
+rules:
+    authorize-android-team: {file:android/*}
+        -> (1, {Eric, Frank})
+```
+
+### Tracking Repository Activity
+
+gittuf leverages a "Reference State Log (RSL)" to track changes to the
+repository's references. In addition, gittuf uses the
+[in-toto Attestation Framework](https://github.com/in-toto/attestation) to
+record other repository activity such as code review approvals.
+
+#### Reference State Log (RSL)
+
+Note: This document presents a summary of the RSL. For a full understanding of
+the attacks mitigated by the RSL, please refer to the
+[academic](https://www.usenix.org/system/files/conference/usenixsecurity16/sec16_paper_torres-arias.pdf)
+[papers](https://ssl.engineering.nyu.edu/papers/yelgundhalli_gittuf_ndss_2025.pdf)
+underpinning gittuf's design.
 
 The Reference State Log contains a series of entries that each describe some
 change to a Git ref. Such entries are known as RSL reference entries. Each entry
@@ -144,11 +268,13 @@ Additionally, the RSL supports annotation entries that refer to prior reference
 entries. An annotation entry can be used to attach additional user-readable
 messages to prior RSL entries or to mark those entries as revoked.
 
-Given that each entry in effect points to its parent entry using its hash, an
-RSL is a hash chain. gittuf's implementation of the RSL uses Git's underlying
-Merkle graph. Generally, gittuf is designed to ensure the RSL is linear but a
-privileged attacker may be able to cause the RSL to branch, resulting in a
-forking attack.
+Given that each entry points to its parent entry using its hash, an RSL is a
+hash chain. gittuf's implementation of the RSL uses Git's underlying Merkle
+graph. Generally, gittuf is designed to ensure the RSL is linear but a
+privileged attacker may be able to cause the RSL to branch, resulting in a fork*
+attack where different actors are presented different versions of the RSL. The
+feasibility and implications of such an attack are discussed later in this
+document.
 
 The RSL is tracked at `refs/gittuf/reference-state-log`, and is implemented as a
 distinct commit graph. Each commit corresponds to one entry in the RSL, and
@@ -167,7 +293,7 @@ the RSL's tip. The use of an online timestamp does not guarantee that actors
 will receive the correct RSL tip. This may evolve in future versions of the
 gittuf design.
 
-#### RSL Reference Entries
+##### RSL Reference Entries
 
 These entries are the standard variety described above. They contain the name of
 the reference they apply to and a target ID. As such, they have the following
@@ -185,7 +311,7 @@ The `targetID` is typically the ID of a commit for references that are branches.
 However, for entries that record the state of a Git tag, `targetID` is the ID of
 the annotated tag object.
 
-#### RSL Annotation Entries
+##### RSL Annotation Entries
 
 Apart from regular entries, the RSL can include annotations that apply to prior
 RSL entries. Annotations can be used to add more information as a message about
@@ -208,7 +334,7 @@ number: <number>
 ------END MESSAGE------
 ```
 
-#### Example Entries
+##### Example Entries
 
 Here's a sample RSL, with the output taken from `gittuf rsl log`:
 
@@ -301,82 +427,7 @@ U2tpcHBpbmcgUlNMIGVudHJ5
 -----END MESSAGE-----
 ```
 
-### Actor Access Control Policies
-
-Note: This section assumes some prior knowledge of the TUF specification.
-
-There are several aspects to how defining the access privileges an actor has.
-First, actors must be established in the repository unambiguously, and gittuf
-uses TUF's mechanisms to associate actors with their signing keys. TUF metadata
-distributes the public keys of all the actors in the repository and if a key is
-compromised, new metadata is issued to revoke its trust.
-
-Second, TUF allows for defining _namespaces_ for the repository. TUF's notion of
-namespaces aligns with Git's, and TUF namespaces can be used to reason about
-both Git refs and files tracked within the repository. Namespaces are combined
-with TUF's _delegations_ to define sets of actors who are authorized to make
-changes to some namespace. As such, the owner of the repository can use gittuf
-to define actors representing other contributors to the repository, and delegate
-to them only the necessary authority to make changes to different namespaces of
-the repository.
-
-Policies for gittuf access are defined using a subset of TUF roles. The owners
-of the repository hold the keys used to sign the Root role that delegates trust
-to the other roles. The top level Targets role and any Targets roles it
-delegates to contain restrictions on protected namespaces. The specifics of the
-delegation structure vary from repository to repository as each will have its
-own constraints.
-
-A typical TUF delegation connects two TUF Targets roles. Therefore, delegations
-can be represented as a directed graph where each node is a Targets role, and
-each edge connects the delegating role to a delegatee role for some specified
-namespace. When verifying or fetching a target, the graph is traversed using the
-namespaces that match the target until a Targets entry is found for it. The
-Targets entry contains, among other information, the hashes and length of the
-target. gittuf applies this namespaced delegations graph traversal to Git and
-also incorporate RSLs and Git's implicit change tracking mechanisms.
-
-In gittuf, the delegations graph is similarly traversed, except that it
-explicitly does not expect any Targets metadata to contain a target entry.
-Instead, the delegation mechanism is used to identify the set of keys authorized
-to sign the target such as an RSL entry or commit being verified. Therefore, the
-delegation graph is used to decide which keys git actions should trust, but no
-targets entries are used.  Any key which delegated trust up to this part of the 
-namespace (including the last delegation), is trusted to sign the git actions.
-
-![Policy delegations](/docs/media/policy-delegations.png)
-_In this example, the repository administrator grants write permissions to Carol 
-for the main branch, to Alice for the alice-dev branch, and to Bob for the
-/tests folder (under any of the existing branches)._
-
-This mechanism is employed when verifying both RSL entries for Git ref updates
-_and_ when verifying the commits introduced between two ref updates. The latter
-option allows for defining policies to files and directories tracked by the
-repository. It also enables repository owners to define closed sets of
-developers authorized to make changes to the repository. Note that gittuf does
-not by default use Git commit metadata to identify the actor who created it as
-that may be trivially spoofed.
-
-Another difference between standard TUF policies and those used by gittuf is a
-more fundamental difference in expectations of the policies. Typical TUF
-deployments are explicit about the artifacts they are distributing. Any artifact
-not listed in TUF metadata is rejected. In gittuf, policies are written only to
-express _restrictions_. As such, when verifying changes to unprotected
-namespaces, gittuf must allow any key to sign for these changes. This means that
-after all explicit policies (expressed as delegations) are processed, and none
-apply to the namespace being verified, an implicit `allow-rule` is applied,
-allowing verification to succeed.
-
-In summary, a repository secured by gittuf stores metadata for the Root role and
-one or more Targets roles. Further, it embeds the public keys used to verify the
-Root role's signatures, the veracity of which are established out of band. The
-metadata and the public keys are stored as Git blobs and updates to them are
-tracked through a standalone Git commit graph. This is tracked at
-`refs/gittuf/policy`. The RSL MUST track the state of this reference so that the
-policy namespace is protected from reference state attacks. Further, RSL entries
-are used to identify historical policy states that may apply to older changes.
-
-### Attestations for Authorization Records
+#### Attestations for Authorization Records
 
 gittuf makes use of the signing capability provided by Git for commits and tags
 significantly. However, it is sometimes necessary to attach more than a single
@@ -384,11 +435,12 @@ signature to a Git object or repository action. For example, a policy may
 require more than one developer to sign off and approve a change such as merging
 something to the `main` branch. To support these workflows (while also remaining
 compatible with standard Git clients), gittuf uses the concept of "detached
-authorizations", implemented using signed
-[in-toto attestations](https://github.com/in-toto/attestation). Attestations are
-tracked in the custom gittuf namespace: `refs/gittuf/attestations`.
-
-#### Reference Authorization
+authorizations", implemented using signed [in-toto
+attestations](https://github.com/in-toto/attestation). Attestations are tracked
+in the custom Git reference `refs/gittuf/attestations`. The gittuf design
+currently supports the "reference authorization" type to represent code review
+approvals. Other types may be added to this document or via extensions in
+future.
 
 A reference authorization is an attestation that accompanies an RSL reference
 entry, allowing additional developers to issue signatures authorizing the change
@@ -420,119 +472,38 @@ Reference authorizations are stored in a directory called
 must have the in-toto predicate type:
 `https://gittuf.dev/reference-authorization/v<VERSION>`.
 
-#### Authentication Evidence Attestations
+## gittuf Workflows
 
-See the corresponding [WIP
-extension](/docs/extensions/authentication-evidence-attestations.md).
+gittuf introduces some new workflows that are gittuf-specific, such as the
+creation of policies and their verification. In addition, gittuf interposes in
+some Git workflows so as to capture repository activity information.
 
-## Example of Using gittuf
+### Policy Initialization and Changes
 
-Consider project `foo`'s Git repository maintained by Alice and Bob. Alice and
-Bob are the only actors authorized to update the state of the main branch. This
-is accomplished by defining a TUF delegation to Alice and Bob's keys for the
-namespace corresponding to the main branch. All changes to the main branch's
-state MUST have a corresponding entry in the repository's RSL signed by either
-Alice or Bob.
+When the policy is initialized or updated (this can be a change to the root of
+trust metadata or one or more rule files), a new policy state is created that
+contains the full set of gittuf policy metadata. This is recorded as a commit in
+the custom ref used to track the policy metadata (typically
+`refs/gittuf/policy`). In turn, the commit to the custom ref is recorded in the
+RSL, indicating the policy state to use for subsequent changes in the
+repository.
 
-Further, `foo` has another contributor, Clara, who does not have maintainer
-privileges. This means that Clara is free to make changes to other Git branches
-but only Alice or Bob may merge Clara's changes from other unprotected branches
-into the main branch.
+### Syncing gittuf References
 
-Over time, `foo` grows to incorporate several subprojects with other
-contributors Dave and Ella. Alice and Bob take the decision to reorganize the
-repository into a monorepo containing two projects, `bar` and `baz`. Clara and
-Dave work exclusively on bar and Ella works on baz with Bob. In this situation,
-Alice and Bob retain their privileges to merge changes to the main branch.
-Further, they set up delegations for each subproject's path within the
-repository. Clara and Dave are only authorized to work on files within `bar/*`
-and Ella is restricted to `baz/*`. As Bob is a maintainer of foo, he is not
-restricted to working only on `baz/*`.
-
-## Actor Workflows
-
-gittuf does not modify the underlying Git implementation itself. For the most
-part, developers can continue using their usual Git workflows and add some
-gittuf specific invocations to update the RSL and sync gittuf namespaces.
-
-### Managing gittuf root of trust
-
-The gittuf root of trust is a TUF Root stored in the gittuf policy namespace.
-The keys used to sign the root role are expected to be securely managed by the
-owners of the repository. TODO: Discuss detached roots, and root specific
-protections for the policy namespace.
-
-The root of trust is responsible for managing the root of gittuf policies. Each
-gittuf policy file is a TUF Targets role. The top level Targets role's keys are
-managed in the root of trust. All other policy files are delegated to directly
-or indirectly by the top level Targets role.
-
-```bash
-gittuf trust init
-gittuf trust add-policy-key
-gittuf trust remove-policy-key
-```
-
-Note: the commands listed here are examples and not exhaustive. Please refer to
-gittuf's help documentation for more specific information about gittuf's usage.
-
-### Managing gittuf policies
-
-Developers can initialize a policy file if it does not already exist by
-specifying its name. Further, they must present its signing keys. The policy
-file will only be initialized if the presented keys are authorized for the
-policy. That is, gittuf verifies that there exists a path in the delegations
-graph from the top level Targets role to the newly named policy, and that the
-delegation path contains the keys presented for the new policy. If this check
-succeeds, the new policy is created with the default `allow-rule`.
-
-After a policy is initialized and stored in the gittuf policy namespace, new
-protection rules can be added to the file. In each instance, the policy file is
-re-signed, and therefore, authorized keys for that policy must be presented.
-
-```bash
-gittuf policy init
-gittuf policy add-rule
-gittuf policy remove-rule
-```
-
-Note: the commands listed here are examples and not exhaustive. Please refer to
-gittuf's help documentation for more specific information about gittuf's usage.
-
-### Recording updates in the RSL
-
-The RSL records changes to the policy namespace automatically. To record changes
-to other Git references, the developer must invoke the gittuf client and specify
-the reference. gittuf then examines the reference and creates a new RSL entry.
-
-Similarly, gittuf can also be invoked to create new RSL annotations. In this
-case, the developer must specify the RSL entries the annotation applies to using
-the target entries' Git identifiers.
-
-```bash
-gittuf rsl record
-gittuf rsl annotate
-```
-
-Note: the commands listed here are examples and not exhaustive. Please refer to
-gittuf's help documentation for more specific information about gittuf's usage.
-
-### Syncing gittuf namespaces with the main repository
-
-gittuf clients uses the `origin` Git remote to identify the main repository. As
-the RSL must be linear with no branches, gittuf employs a variation of the
-`Secure_Fetch` and `Secure_Push` workflows described in the RSL academic paper.
+As the RSL must be linear with no branches, gittuf employs a variation of the
+`Secure_Fetch` and `Secure_Push` workflows described in the
+[RSL academic paper](https://www.usenix.org/system/files/conference/usenixsecurity16/sec16_paper_torres-arias.pdf).
 
 ![Using gittuf with legacy servers](/docs/media/gittuf-with-legacy-servers.png)
-_Note that gittuf can be used even if the main repository is not gittuf-enabled.
-The repository can host the gittuf namespaces which other gittuf clients can
-pull from for verification. In this example, a gittuf client with a changeset to
-commit to the dev branch (step 1), creates in its local repository a new commit
-object and the associated RSL entry (step 2). These changes are pushed next to a
-remote Git repository (step 3), from where other gittuf or legacy Git clients
-pull the changes (step 4)._
+_Note that gittuf can be used even if the synchronization point is not
+gittuf-enabled. The repository can host the gittuf namespaces which other gittuf
+clients can pull from for verification. In this example, a gittuf client with a
+changeset to commit to the dev branch (step 1), creates in its local repository
+a new commit object and the associated RSL entry (step 2). These changes are
+pushed next to a remote Git repository (step 3), from where other gittuf or
+legacy Git clients pull the changes (step 4)._
 
-#### RSLFetch: Receiving remote RSL changes
+#### `RSLFetch`: Receiving Remote RSL Changes
 
 Before local RSL changes can be made or pushed, it is necessary to verify that
 they are compatible with the remote RSL state. If the remote RSL has entries
@@ -542,7 +513,7 @@ C. If the remote has entry B after A with B being the tip, attempting to push C
 which also comes right after A will fail. Instead, the local RSL must first
 fetch entry B and then create entry C. This is because entries in the RSL must
 be made serially. As each entry includes the ID of the previous entry, a local
-entry that does not incorporate the latest RSL entries on the remote is invalid.
+entry that does not incorporate the latest RSL entry on the remote is invalid.
 The workflow is as follows:
 
 1. Fetch remote RSL to the local remote tracker
@@ -554,15 +525,20 @@ The workflow is as follows:
    workflow is performed for each Git reference in the new entries, relative to
    the local state of each reference. If verification fails, abort and warn
    user. Note that the verification workflow must fetch each Git reference to
-   its corresponding remote tracker, `refs/remotes/origin/<ref>`. TODO: discuss
-   if verification is skipped for entries that work with namespaces not present
-   locally.
+   its corresponding remote tracker, `refs/remotes/origin/<ref>`.
 1. For each modified Git reference, update the local state. As all the refs have
    been successfully verified, each ref's remote state can be applied to the
    local repository, so `refs/heads/<ref>` matches `refs/remotes/origin/<ref>`.
 1. Set local RSL to the remote RSL's tip.
 
-#### RSLPush: Submitting local RSL changes
+NOTE: Some aspects of this workflow are under discussion and are subject to
+change. The gittuf implementation does not implement precisely this workflow.
+Specifically, the implementation does not verify new entries in the remote
+automatically. Additionally, the RSL may contain entries for references a client
+does not have, making verification of those entries unfeasible. See
+https://github.com/gittuf/gittuf/issues/708.
+
+#### `RSLPush`: Submitting Local RSL Changes
 
 1. Execute `RSLFetch` repeatedly until there are no new RSL entries in the
    remote RSL. Every time there is a remote update, the user must be prompted to
@@ -572,62 +548,79 @@ The workflow is as follows:
 1. Verify the validity of the RSL entries being submitted using locally
    available gittuf policies to ensure the user is authorized for the changes.
    If verification fails, abort and warn user.
-1. For each new local RSL entry:
-   1. Push the RSL entry to the remote. At this point, the remote is in an
-      invalid state as changes to modified Git references have not been pushed.
-      However, by submitting the RSL entry first, other gittuf clients that may
-      be pushing to the repository must wait until this push is complete.
-   1. If the entry is a normal entry, push the changes to the remote.
-   1. TODO: discuss if RSL entries must be submitted one by one. If yes,
-      `RSLFetch` probably needs to happen after each push. On the other hand, if
-      all RSL entries are submitted first, other clients can recognize a push is
-      in progress while other Git references are updated.
+1. Perform an atomic Git push to the remote of the RSL as well as the modified
+   Git references. If the push fails, it is likely because another actor pushed
+   their changes first. Restart the `RSLPush` workflow.
 
-#### Invoking RSLFetch and RSLPush
+NOTE: Some aspects of this workflow are under discussion and are subject to
+change. The gittuf implementation does not implement precisely this workflow.
+This workflow is closely related to other push operations performed in the
+repository, and therefore, this section may be incorporated with other
+workflows. See https://github.com/gittuf/gittuf/issues/708.
 
-While `RSLFetch` and `RSLPush` are invoked directly by the user to sync changes
-with the remote, gittuf executes `RSLFetch` implicitly when a new RSL entry is
-recorded. As RSL entries are typically recorded right before changes are
-submitted to the remote, this ensures that new entries are created using the
-latest remote RSL.
+### Regular Pushes
 
-## Verification Workflow
+When an actor pushes a change to a remote repository, this update to the
+corresponding ref (or refs) must be recorded in the RSL. For each ref being
+pushed, the gittuf client creates a new RSL entry. Then, `RSLPush` is used to
+submit these changes to the remote repository.
+
+### Force Pushes
+
+Due to the linear nature of the RSL, it is not possible to remove a reference
+entry. A force push makes one or more prior reference entries for the pushed ref
+invalid as the targets recorded in those entries may not be reachable any
+longer. Thus, these entries must be marked as "skipped" in the RSL using an
+annotation entry. After an annotation for these reference entries is created, a
+reference entry is created recording the current state of the ref. Then,
+`RSLPush` is used to submit these changes to the remote repository.
+
+### Verification Workflow
 
 There are several aspects to verification. First, the right policy state must be
 identified by walking back RSL entries to find the last change to that
 namespace. Next, authorized keys must be identified to verify that commit or RSL
 entry signatures are valid.
 
-### Identifying Authorized Signers for Protected Namespaces
+#### Identifying Authorized Signers for Protected Namespaces
 
 When verifying a commit or RSL entry, the first step is identifying the set of
 keys authorized to sign a commit or RSL entry in their respective namespaces.
-With commits, the relevant namespaces pertain to the files they modify, tracked
-by the repository. On the other hand, RSL entries pertain to Git refs. Assume
-the relevant policy state entry is `P` and the namespace being checked is `N`.
-Then:
+This is achieved by performing pre-ordered depth first search over the
+delegations graph in a gittuf policy state. Assume the relevant policy state
+entry is `P` and the namespace being checked is `N`. Then:
 
-1. Validate `P`'s Root metadata using the TUF workflow, ignore expiration date
-   checks.
-1. Begin traversing the delegations graph rooted at the top level Targets
-   metadata. Set `current` to top level Targets and `parent` to Root metadata.
-1. Create empty set `K` to record keys authorized to sign for `N`.
-1. While `K` is empty:
-   1. Load and verify signatures of `current` using keys provided in `parent`.
-      Abort if signature verification fails.
-   1. Identify delegation entry that matches `N`, `D`.
-   1. If `D` is the `allow-rule`:
-      1. Explicitly indicate any key is authorized to sign changes as `N` is not
-         protected. Returning empty `K` alone is not sufficient.
-   1. Else:
-      1. If repository contains metadata with the role name in `D`:
-         1. Set `parent` to `current`, `current` to delegatee role.
-         1. Continue to next iteration.
-      1. Else:
-         1. Set `K` to keys authorized in the delegations entry.
+1. Validate `P`'s root metadata using the TUF workflow starting from the initial
+   root of trust metadata, ignore expiration date checks (see
+   https://github.com/gittuf/gittuf/issues/280).
+1. Create empty set `K` to record authorized verifiers for `N`.
+1. Create empty set `queue` to track the rules (or delegations) that must be
+   checked.
+1. Begin traversing the delegations graph rooted at the primary rule file
+   metadata.
+1. Verify the signatures of the primary rule file using the trusted keys in the
+   root of trust. If a threshold of signatures cannot be verified, abort.
+1. Populate `queue` with the rules in the primary rule file.
+1. While `queue` is not empty:
+   1. Set `rule` to the first item in `queue`, removing it from `queue`.
+   1. If `rule` is the `allow-rule`:
+      1. Proceed to the next iteration.
+   1. If the patterns of `rule` match `N` (i.e., the rule applies to the
+      namespace being verified):
+      1. Create a verifier with the trusted keys in `rule` and the specified
+         threshold.
+      1. Add this verifier to `K`.
+      1. If `P` contains a rule file with the same name as `rule` (i.e., a
+         delegated rule file exists):
+         1. Verify that the delegated rule file is signed by a threshold of
+            valid signatures using the keys declared in delegating rule file.
+            Abort if verification fails.
+         1. Add the rules in `current` to the front of `queue` (ensuring the
+            delegated rules are prioritized to match pre-order depth first
+            search behavior).
 1. Return `K`.
 
-### Verifying Changes Made
+#### Verifying Changes Made
 
 In gittuf, verifying the validity of changes is _relative_. Verification of a
 new state depends on comparing it against some prior, verified state. For some
@@ -636,21 +629,20 @@ available state entry is `D`:
 
 1. Fetch all changes made to `X` between the commit recorded in `S` and that
    recorded in `D`, including the latest commit into a temporary branch.
-1. Walk back from `S` until a state entry `P` is found that updated the gittuf
+1. Walk back from `S` until an RSL entry `P` is found that updated the gittuf
    policy namespace. This identifies the policy that was active for changes made
-   immediately after `S`.
+   immediately after `S`. If a policy entry is not found, abort.
+1. Walk back from `S` until an RSL entry `A` is found that updated the gittuf
+   attestations ref. This identifies the set of attestations applicable for the
+   changes made immediately after `S`.
 1. Validate `P`'s metadata using the TUF workflow, ignore expiration date
-   checks.
-1. Walk back from `D` until `S` and create an ordered list of all state updates
-   that targeted either `X` or the gittuf policy namespace. During this process,
-   all state updates that affect `X` and the policy namespace must be recorded.
-   Entries pertaining to other refs MAY be ignored. Additionally, all annotation
-   entries must be recorded using a dictionary where the key is the ID of the
-   entry referred to and the value the annotation itself. Each entry referred to
-   in an annotation, therefore, must have a corresponding entry in the
-   dictionary.
+   checks (see https://github.com/gittuf/gittuf/issues/280).
+1. Walk back from `D` until `S` and create an ordered list of all RSL updates
+   that targeted either `X` or gittuf namespaces. Entries pertaining to other
+   refs MAY be ignored. Annotation entries MUST be recorded.
 1. The verification workflow has an ordered list of states
    `[I1, I2, ..., In, D]` that are to be verified.
+1. Set trusted set for `X` to `S`.
 1. For each set of consecutive states starting with `(S, I1)` to `(In, D)`:
    1. Check if an annotation exists for the second state. If it does, verify if
       the annotation indicates the state is to be skipped. It true, proceed to
@@ -658,35 +650,47 @@ available state entry is `D`:
    1. If second state changes gittuf policy:
       1. Validate new policy metadata using the TUF workflow and `P`'s contents
          to established authorized signers for new policy. Ignore expiration
-         date checks. If verification passes, update `P` to new policy state.
+         date checks (see https://github.com/gittuf/gittuf/issues/280). If
+         verification passes, update `P` to new policy state.
+   1. If second state is for attestations:
+      1. Set `A` to the new attestations state.
    1. Verify the second state entry was signed by an authorized key as defined
-      in P. If the gittuf policy requires more than one signature, search for a
-      reference authorization attestation for the same change. Verify the
-      signatures on the attestation are issued by authorized keys to meet the
-      threshold, ignoring any signatures from the same key as the one used to
-      sign the entry.
-   1. Enumerate all commits between that recorded in the first state and the
-      second state with the signing key used for each commit. Verify each
-      commit's signature using public key recorded in `P`.
-   1. Identify the net or combined set of files modified between the commits in
-      the first and second states as `F`.
-   1. If all commits are signed by the same key, individual commits need not be
-      validated. Instead, `F` can be used directly. For each path:
-         1. Find the set of keys authorized to make changes to the path in `P`.
-         1. Verify key used is in authorized set. If not, terminate verification
-            workflow with an error.
-   1. If not, iterate over each commit. For each commit:
-      1. Identify the file paths modified by the commit. For each path:
-         1. Find the set of keys authorized to make changes to the path in `P`.
-         1. Verify key used is in authorized set. If not, check if path is
-            present in `F`, as an unauthorized change may have been corrected
+      in `P` for the ref `X`. If the gittuf policy requires more than one
+      signature, search for a reference authorization attestation for the same
+      change. Verify the signatures on the attestation are issued by authorized
+      keys to meet the threshold, ignoring any signatures from the same key as
+      the one used to sign the entry.
+   1. If `P` contains rules protecting files in the repository:
+      1. Enumerate all commits between that recorded in trusted state and the
+         second state with the signing key used for each commit.
+      1. Identify the net or combined set of files modified between the commits
+         in the first and second states as `F`.
+      1. If all commits are signed by the same key, individual commits need not
+         be validated. Instead, `F` can be used directly. For each path:
+            1. Find the set of keys authorized to make changes to the path in
+               `P`.
+            1. Verify key used is in authorized set. If not, terminate
+               verification workflow with an error.
+      1. If not, iterate over each commit. For each commit:
+         1. Identify the file paths modified by the commit. For each path:
+            1. Find the set of keys authorized to make changes to the path in
+               `P`.
+            1. Verify key used is in authorized set. If not, check if path is
+               present in `F`, as an unauthorized change may have been corrected
             subsequently. This merely acts as a hint as path may have been also
             changed subsequently by an authorized user, meaning it is in `F`. If
             path is not in `F`, continue with verification. Else, request user
             input, indicating potential policy violation.
-   1. Set trusted state for `X` to second state of current iteration.
+      1. Set trusted state for `X` to second state of current iteration.
+1. Return indicating successful verification.
 
-## Recovery
+NOTE: Some aspects of this workflow are under discussion and are subject to
+change. The gittuf implementation does not implement precisely this workflow,
+instead also including aspects of the recovery workflow to see if a change that
+fails verification has already been recovered from. See
+https://github.com/gittuf/gittuf/issues/708.
+
+### Recovery
 
 If every user were using gittuf and were performing each operation by
 generating all of the correct metadata, following the specification, etc., then
@@ -698,18 +702,14 @@ something has not gone according to protocol. The goal is to recover to a
 "known good" situation which does match the metadata which a set of valid
 gittuf clients would generate.
 
-### Recovery Mechanisms
+#### Recovery Mechanisms
 
-gittuf uses two basic mechanisms for recovery. We describe these core building
-blocks for recovery before we discuss the exact scenarios when they are applied
-and why they provide the desired security properties.
-
-#### M1: Removing information to reset to known good state
-
-This mechanism is utilized in scenarios where some change is rejected. For
-example, one or more commits may have been pushed to a branch that do not meet
-gittuf policy. The repository is updated such that these commits are neutralized
-and all Git refs match their latest RSL entries. This can take two forms:
+When gittuf verification fails, the following recovery workflow must be
+employed. This mechanism is utilized in scenarios where some change is rejected.
+For example, one or more commits may have been pushed to a branch that do not
+meet gittuf policy. The repository is updated such that these commits are
+neutralized and all Git refs match their latest RSL entries. This can take two
+forms:
 
 1. The rejected commit is removed and the state of the repo is set to the prior
 commit which is known to be good. This is used when all rejected commits are
@@ -738,49 +738,12 @@ reference in question are also considered to be invalid. Therefore, in addition
 to the fix RSL entry, gittuf also expects skip annotations for the original
 invalid entry and intermediate entries for the reference.
 
-#### M2: Create RSL entry on behalf of another user
+#### Recovery Scenarios
 
-This mechanism is necessary for adoptions where a subset of developers do not
-use gittuf. When they submit changes to the main copy of the repository, they do
-not include RSL entries. Therefore, when a change is pushed to a branch by a
-non-gittuf user A, a gittuf user B can submit an RSL entry on their behalf.
-Additionally, the entry must identify the original user and include some
-evidence about why B thinks the change came from A.
+These scenarios are some examples where recovery is necessary. This is not meant
+to be an exhaustive set of gittuf's recovery scenarios.
 
-The evidence that the change came from A may be of several types, depending on
-the context. If user B completely controls the infrastructure hosting that copy
-of the repository, the evidence could be the communication of A to B that
-submitted the change. For example, if A pushes to B's repository using an SSH
-key associated with A, B has reasonable guarantees the change was indeed pushed
-by A. Here, B may be another developer managing a "local" copy of the repository
-or an online bot used by a self hosted Git server, where the bot can reason
-about the communication from A. In cases where this degree of control is
-unavailable, for example when using a third party forge such as GitHub, B has no
-means to reason directly about A's communication with the remote repository. In
-such cases, B may rely on other data to determine the push was from A, such as
-the GitHub API for repository activity which logs all pushes after
-authenticating the user performing the push.
-
-Note that if A is a Git user who still signs their commits, a commit signature
-signed with A's key is not sufficient to say A performed the push. Creating a
-commit is distinct from pushing it to a remote repository, and can be performed
-by different users. When creating an RSL entry on behalf of another user in
-gittuf, the push event (which is captured in the RSL) is more important than the
-commit event.
-
-### Recovery Scenarios
-
-These scenarios are some examples where recovery is necessary.
-
-#### A change is made without an RSL entry
-
-Bob does not use gittuf and pushes to a branch. Alice notices this as her gittuf
-client detects a push to the branch without an accompanying RSL entry. She
-validates that the change came from Bob and creates an RSL entry on his behalf,
-identifying him and including information about how she verified it was him.
-Alice applies M2.
-
-#### An incorrect RSL entry is added
+##### An Incorrect RSL Entry is Added
 
 There are several ways in which an RSL entry can be considered "incorrect". If
 an entry is malformed (structurally), Git may catch it if it's not a valid
@@ -798,40 +761,28 @@ examples of such invalid entries are:
   RSL entries (i.e. the annotation points to other commits in the repository)
 
 Note that as invalid RSL entries are only created by buggy or malicious gittuf
-clients, these entries cannot be detected prior to them being pushed to the main
-repository.
+clients, these entries cannot be detected prior to them being pushed to the
+synchronization point.
 
 As correctly implemented gittuf clients verify the validity of RSL entries when
-they pull from the main repository, the user is warned if invalid entries are
-encountered. Then, the user can then use M1 to invalidate the incorrect entry.
-Other clients with the invalid entry only need to fetch the latest RSL entries
-to recover. Additionally, the client that created the invalid entries must
-switch to a correct implementation of gittuf before further interactions with
-the main repository.
+they pull from the synchronization point, the user is warned if invalid entries
+are encountered. Then, the user can then use the recovery workflow to invalidate
+the incorrect entry. Other clients with the invalid entry only need to fetch the
+latest RSL entries to recover. Additionally, the client that created the invalid
+entries must switch to a correct implementation of gittuf before further
+interactions with the main repository, but this is left to out-of-band
+synchronization between the actors who notice the issue and the actor using a
+buggy client.
 
-If the main repository is also gittuf enabled, such incidents can be caught
-before other users receive the incorrect RSL entries. The repository, though,
-must not behave like a typical gittuf client. Instead, gittuf's repository
-behavior is slightly different as RSL entries are submitted before the changes
-they represent. The repository must wait to receive the full changes rather than
-immediately rejecting the RSL entry. TODO: the repository-specific behavior
-needs further discussion.
+##### A gittuf Access Control Policy is Violated
 
-Consider this example as a representative of this scenario. Bob has a buggy
-gittuf client and pushes an invalid entry to the main repository. Alice pulls
-and receives a warning from her gittuf client. Alice reverses Bob's changes,
-creating an RSL entry for the affected branch if needed, and includes an RSL
-annotation skipping Bob's RSL entry.
+An actor, Bob, creates an RSL entry for a branch he's not authorized for by
+gittuf policy. He pushes a change to that branch. Another actor, Alice, notices
+this when her gittuf client indicates a failure in the verification workflow.
+Alice creates an RSL annotation marking Bob's entry as one to be skipped. Alice
+also reverses Bob's change, creating a new RSL entry reflecting that.
 
-#### A gittuf access control policy is violated
-
-Bob creates an RSL entry for a branch he's not authorized for by gittuf policy.
-He pushes a change to that branch. Alice notices this (TODO: decide if alice
-needs to be authorized). Alice reverses Bob's change, creating a new RSL entry
-reflecting that. Alice also creates an RSL annotation marking Bob's entry as
-one to be skipped. Alice, therefore, uses M1.
-
-#### Attacker modifies or deletes historical RSL entry
+##### Attacker Modifies or Deletes Historical RSL Entry
 
 Overwriting or deleting an historical RSL entry is a complicated proposition.
 Git's content addressable properties mean that a SHA-1 collision is necessary to
@@ -848,31 +799,25 @@ signatures are generated and verified using stronger hash algorithms. Therefore,
 a successful SHA-1 collision for an RSL entry will not go undetected as all
 entries are signed.
 
-#### Dealing with fork* attacks
+##### Forge Attempts Fork* Attacks
 
-An attacker may attempt a forking attack where different developers receive
-different RSL states. This is the case where the attacker wants to rewrite the
-RSL's history by modifying an historical entry (which also requires a key
-compromise so the attacker can re-sign the modified entry) or deleting it
-altogether. To carry out this attack, the attacker must maintain and serve at
-least two versions of the RSL. This is because at least one developer must have
-the affected RSL entries--the author of the modified or deleted entries.
-Maintaining and sending the expected RSL entry for each user is not trivial,
-especially if multiple users have a version of the RSL without the attack. Also,
-the attacker may be able to serve multiple versions of the RSL from a central
-repository they control but any direct interactions between users that have the
-original RSL and the attacked RSL will expose the attack.  These characteristics
-indicate that while a fork* attack is not impossible, it is highly unlikely to
-be carried out given its overhead and high chances of detection.
+An attacker who controls the forge may attempt a fork* attack where different
+developers receive different RSL states. For example, the attacker may drop a
+push from an actor, Alice, from the RSL. Other developers such as Bob and Carol
+would continue adding their RSL entries, unaware of the dropped entry. However,
+Alice will observe the divergence in the RSL as she cannot receive Bob's and
+Carol's changes.
 
-Finally, while gittuf primarily uses TUF's root of trust and delegations, it is
-possible that TUF's timestamp role can be leveraged to further mitigate fork*
-attacks. A future version of the gittuf design may explore the use of the
-timestamp role in this context.
+The attacker cannot simply reapply Bob's and Carol's changes over Alice's RSL
+entry without also controlling Bob's and Carol's keys. The attacker may attempt
+a freeze attack targeted against Alice, where she's always told her entry is the
+latest in the RSL. However, any out-of-band communication between Alice and
+either Bob or Carol (common during development workflows) will highlight the
+attack.
 
-#### An authorized key is compromised
+##### An Authorized Key is Compromised
 
-When a key authorized by gittuf policies is compromised, it must be revoked and
+When a key authorized by gittuf policy is compromised, it must be revoked and
 rotated so that an attacker cannot use it to sign repository objects. gittuf
 policies that grant permissions to the key must be updated to revoke the key,
 possibly adding the actor's new key in the process. Further, if a security
@@ -882,3 +827,27 @@ key must be skipped. This ensures that gittuf clients do not consider attacker
 created RSL entries as valid states for the corresponding Git references.
 Clients that have an older RSL from before the attack can skip past the
 malicious entries altogether.
+
+## Example of Using gittuf
+
+Consider project `foo`'s Git repository maintained by Alice and Bob. Alice and
+Bob are the only actors authorized to update the state of the main branch. This
+is accomplished by defining a TUF delegation to Alice and Bob's keys for the
+namespace corresponding to the main branch. All changes to the main branch's
+state MUST have a corresponding entry in the repository's RSL signed by either
+Alice or Bob.
+
+Further, `foo` has another contributor, Clara, who does not have maintainer
+privileges. This means that Clara is free to make changes to other Git branches
+but only Alice or Bob may merge Clara's changes from other unprotected branches
+into the main branch.
+
+Over time, `foo` grows to incorporate several subprojects with other
+contributors Dave and Ella. Alice and Bob take the decision to reorganize the
+repository into a monorepo containing two projects, `bar` and `baz`. Clara and
+Dave work exclusively on bar and Ella works on baz with Bob. In this situation,
+Alice and Bob retain their privileges to merge changes to the main branch.
+Further, they set up delegations for each subproject's path within the
+repository. Clara and Dave are only authorized to work on files within `bar/*`
+and Ella is restricted to `baz/*`. As Bob is a maintainer of foo, he is not
+restricted to working only on `baz/*`.
