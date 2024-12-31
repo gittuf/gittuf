@@ -1,3 +1,6 @@
 dist/*
 *.prof
 vendor*
+git-remote-gittuf
+experimental/.DS_Store
+.DS_Store

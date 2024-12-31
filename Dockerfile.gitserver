@@ -1,0 +1,24 @@
+FROM debian:bullseye-slim
+
+# Install Git and other necessary packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a folder for repositories and initialize a bare repo named 'test.git'
+RUN mkdir -p /git-server/test.git \
+    && cd /git-server/test.git \
+    && git init --bare
+
+# Expose the default Git daemon port
+EXPOSE 9418
+
+# Run git daemon in the foreground
+CMD ["git", "daemon", \
+     "--verbose", \
+     "--base-path=/git-server", \
+     "--export-all", \
+     "--enable=receive-pack", \
+     "--informative-errors", \
+     "--listen=0.0.0.0", \
+     "--port=9418"]
