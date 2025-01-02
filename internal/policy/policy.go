@@ -81,21 +81,33 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 	// before the entry. This is why we don't just load the state and return
 	// if entry is for the staging ref.
 
+	slog.Debug(fmt.Sprintf("Loading policy at entry '%s'...", requestedEntry.GetID().String()))
+
+	// TODO: should this searcher be inherited when invoked via Verifier?
 	searcher := newSearcher(repo)
 
+	slog.Debug("Finding first policy entry...")
 	firstPolicyEntry, err := searcher.FindFirstPolicyEntry()
 	if err != nil {
 		if errors.Is(err, ErrPolicyNotFound) {
 			// we don't have a policy entry yet
 			// we just return the state for the requested entry
+			slog.Debug("No applied policy found, loading requested policy without further verification...")
 			return loadStateForEntry(repo, requestedEntry)
 		}
 		return nil, err
 	}
 
+	if firstPolicyEntry.ID.Equal(requestedEntry.ID) {
+		slog.Debug("Requested policy's entry is the same as first policy entry, loading it without further verification...")
+		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.ID.String()))
+		return loadStateForEntry(repo, requestedEntry)
+	}
+
 	// check if firstPolicyEntry is **after** requested entry
 	// this can happen when the requested entry is for policy-staging before
 	// Apply() was ever called
+	slog.Debug("Checking if first policy entry was after requested policy's entry...")
 	knows, err := repo.KnowsCommit(firstPolicyEntry.ID, requestedEntry.ID)
 	if err != nil {
 		return nil, err
@@ -104,11 +116,13 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		// the first policy entry knows the requested entry, meaning the
 		// requested entry is an ancestor of the first policy entry
 		// we just return the state for the requested entry
+		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy without verification...")
 		return loadStateForEntry(repo, requestedEntry)
 	}
 
 	// If requestedEntry.RefName == policy, then allPolicyEntries includes requestedEntry
 	// If requestedEntry.RefName == policy-staging, then allPolicyEntries does not include requestedEntry
+	slog.Debug("Finding all policies between first policy and requested policy...")
 	allPolicyEntries, err := searcher.FindPolicyEntriesInRange(firstPolicyEntry, requestedEntry)
 	if err != nil {
 		return nil, err
@@ -149,10 +163,12 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		// This state is stored in verifiedState, we can do an internal
 		// verification check and return
 
+		slog.Debug("Validating requested policy's state...")
 		if err := verifiedState.Verify(ctx); err != nil {
 			return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 		}
 
+		slog.Debug(fmt.Sprintf("Successfully loaded policy at entry '%s'!", requestedEntry.ID.String()))
 		return verifiedState, nil
 	}
 
