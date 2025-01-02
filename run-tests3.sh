@@ -66,7 +66,7 @@ git checkout -b "$GITTUF_TEST_BRANCH"
 echo "Test file" > test_file.txt
 git add test_file.txt
 git commit -m "Add test file for $GITTUF_TEST_BRANCH"
-git push -u "$TEST_REMOTE_NAME" "$GITTUF_TEST_BRANCH"
+git push -u "$TEST_REMOTE_NAME" "$GITTUF_TEST_BRANCH" --force
 
 echo "Push operation completed successfully."
 
