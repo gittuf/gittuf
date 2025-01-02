@@ -25,7 +25,7 @@ type searcher interface {
 }
 
 func newSearcher(repo *gitinterface.Repository) searcher {
-	return newRegularSearcher(repo)
+	return newCacheSearcher(repo)
 }
 
 // regularSearcher implements the searcher interface. It walks back the RSL from
@@ -118,10 +118,6 @@ func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.Refere
 	return attestationsEntry, nil
 }
 
-func newRegularSearcher(repo *gitinterface.Repository) *regularSearcher {
-	return &regularSearcher{repo: repo}
-}
-
 func (r *regularSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
 	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(attestations.Ref))
 	if err != nil {
@@ -132,4 +128,57 @@ func (r *regularSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, er
 		return nil, err
 	}
 	return entry, nil
+}
+
+func newRegularSearcher(repo *gitinterface.Repository) *regularSearcher {
+	return &regularSearcher{repo: repo}
+}
+
+// cacheSearcher implements the searcher interface. It checks the persistent
+// cache for results before falling back to the regular searcher if the
+// persistent cache yields no results.
+type cacheSearcher struct {
+	repo     *gitinterface.Repository
+	searcher *regularSearcher
+}
+
+// FindFirstPolicyEntry identifies the very first policy entry in the RSL.
+func (c *cacheSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindFirstPolicyEntry()
+}
+
+func (c *cacheSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindLatestPolicyEntry()
+}
+
+// FindPolicyEntryFor identifies the latest policy entry for the specified
+// entry.
+func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindPolicyEntryFor(entry)
+}
+
+// FindPolicyEntriesInRange returns all policy RSL entries in the specified
+// range. firstEntry and lastEntry are included if they are for the policy ref.
+func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
+}
+
+// FindAttestationsEntryFor identifies the latest attestations entry for the
+// specified entry.
+func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindAttestationsEntryFor(entry)
+}
+
+func (c *cacheSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
+	// TODO: check cache
+	return c.searcher.FindLatestAttestationsEntry()
+}
+
+func newCacheSearcher(repo *gitinterface.Repository) *cacheSearcher {
+	return &cacheSearcher{repo: repo, searcher: newRegularSearcher(repo)}
 }
