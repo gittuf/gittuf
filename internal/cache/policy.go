@@ -11,12 +11,16 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 )
 
+func (p *Persistent) GetPolicyEntries() []RSLEntryIndex {
+	return p.PolicyEntries
+}
+
 func (p *Persistent) HasPolicyEntryNumber(entryNumber uint64) (gitinterface.Hash, bool) {
 	if len(p.PolicyEntries) == 0 || entryNumber == 0 {
 		return gitinterface.ZeroHash, false
 	}
 
-	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{entryNumber: entryNumber}, binarySearch)
+	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: entryNumber}, binarySearch)
 	if !has {
 		return gitinterface.ZeroHash, false
 	}
@@ -29,10 +33,12 @@ func (p *Persistent) HasPolicyEntryNumber(entryNumber uint64) (gitinterface.Hash
 
 func (p *Persistent) FindPolicyEntryNumberForEntry(entryNumber uint64) RSLEntryIndex {
 	if len(p.PolicyEntries) == 0 {
-		return RSLEntryIndex{entryNumber: 0} // this is a special case
+		return RSLEntryIndex{EntryNumber: 0} // this is a special case
 	}
 
-	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{entryNumber: entryNumber}, binarySearch)
+	slog.Debug(fmt.Sprintf("Finding policy entry in cache before entry %d...", entryNumber))
+
+	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: entryNumber}, binarySearch)
 	if has {
 		// The entry number given to us is the first entry which happens
 		// to be the start of verification as well
@@ -40,9 +46,37 @@ func (p *Persistent) FindPolicyEntryNumberForEntry(entryNumber uint64) RSLEntryI
 		return p.PolicyEntries[index]
 	}
 
+	if !has && index == 0 {
+		// this happens when a policy entry doesn't exist before the specified
+		// entryNumber
+		return RSLEntryIndex{EntryNumber: 0}
+	}
+
 	// When !has, index is point of insertion, but we want the applicable
 	// entry which is index-1
 	return p.PolicyEntries[index-1]
+}
+
+func (p *Persistent) FindPolicyEntriesInRange(firstNumber, lastNumber uint64) ([]RSLEntryIndex, error) {
+	if len(p.PolicyEntries) == 0 {
+		return nil, ErrNoPersistentCache // TODO: check if custom error makes sense
+	}
+
+	firstIndex, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: firstNumber}, binarySearch)
+	if !has {
+		// When !has, index is point of insertion, but we want the applicable
+		// entry which is index-1
+		firstIndex--
+	}
+
+	lastIndex, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: lastNumber}, binarySearch)
+	if has {
+		// When has, lastIndex is an entry we want to return, so we increment
+		// lastIndex to ensure the corresponding entry is included in the return
+		lastIndex++
+	}
+
+	return p.PolicyEntries[firstIndex:lastIndex], nil
 }
 
 func (p *Persistent) InsertPolicyEntryNumber(entryNumber uint64, entryID gitinterface.Hash) {
@@ -59,13 +93,15 @@ func (p *Persistent) InsertPolicyEntryNumber(entryNumber uint64, entryID gitinte
 
 	if len(p.PolicyEntries) == 0 {
 		// No entries yet, just add the current entry
-		p.PolicyEntries = []RSLEntryIndex{{entryNumber: entryNumber, entryID: entryID}}
+		slog.Debug("No policy entries in cache, adding current entry as sole item...")
+		p.PolicyEntries = []RSLEntryIndex{{EntryNumber: entryNumber, EntryID: entryID.String()}}
 		return
 	}
 
 	if p.PolicyEntries[len(p.PolicyEntries)-1].GetEntryNumber() < entryNumber {
 		// Current entry clearly belongs at the very end
-		p.PolicyEntries = append(p.PolicyEntries, RSLEntryIndex{entryNumber: entryNumber, entryID: entryID})
+		slog.Debug("Current entry belongs at the end of ordered list of attestations entry, appending...")
+		p.PolicyEntries = append(p.PolicyEntries, RSLEntryIndex{EntryNumber: entryNumber, EntryID: entryID.String()})
 		return
 	}
 
@@ -74,21 +110,20 @@ func (p *Persistent) InsertPolicyEntryNumber(entryNumber uint64, entryID gitinte
 	// chronologically. Worst case, binary search fallthrough below will still
 	// handle it
 
-	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{entryNumber: entryNumber}, binarySearch)
+	slog.Debug("Searching for insertion point...")
+	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: entryNumber}, binarySearch)
 	if has {
 		// We could assume that if we've seen an entry with a number greater
 		// than this, we should have seen this one too, but for now...
+		slog.Debug("Entry with same number found, skipping addition of entry...")
 		return
 	}
+	slog.Debug(fmt.Sprintf("Found insertion point %d", index))
 
 	newSlice := make([]RSLEntryIndex, 0, len(p.PolicyEntries)+1)
-	for i := 0; i < index; i++ {
-		newSlice[i] = p.PolicyEntries[i]
-	}
-	for i := index + 1; i < len(p.PolicyEntries)+1; i++ {
-		newSlice[i] = p.PolicyEntries[i-1]
-	}
-	newSlice[index] = RSLEntryIndex{entryNumber: entryNumber, entryID: entryID}
+	newSlice = append(newSlice, p.PolicyEntries[:index]...)
+	newSlice = append(newSlice, RSLEntryIndex{EntryNumber: entryNumber, EntryID: entryID.String()})
+	newSlice = append(newSlice, p.PolicyEntries[index:]...)
 
 	p.PolicyEntries = newSlice
 }
