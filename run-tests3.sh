@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # set -e  # Exit immediately if a command exits with a non-zero status
-# set -o pipefail  # Ensure pipeline errors propagate
-# set -u  # Treat unset variables as an error
+set -o pipefail  # Ensure pipeline errors propagate
+set -u  # Treat unset variables as an error
 
 # Constants
 GITTUF_BINARY="git-remote-gittuf"
@@ -27,15 +27,7 @@ fi
 
 echo "Cleaned up previous test environment."
 
-# Check if SSH is working
-echo "Testing SSH authentication..."
-if ssh -T git@github.com &>/dev/null; then
-    echo "SSH authentication successful. Using SSH URL."
-    REPO_URL="$TEST_REPO_URL_SSH"
-else
-    echo "SSH authentication failed. Falling back to HTTPS URL."
-    REPO_URL="$TEST_REPO_URL_HTTPS"
-fi
+REPO_URL="$TEST_REPO_URL_HTTPS"
 
 # Test cloning the repository
 echo "Testing clone using $REPO_URL..."
