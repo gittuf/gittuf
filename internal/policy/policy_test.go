@@ -352,11 +352,11 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 
 		tests := map[string]struct {
 			path      string
-			verifiers []*Verifier
+			verifiers []*SignatureVerifier
 		}{
 			"verifiers for files 1": {
 				path: "file:1/*",
-				verifiers: []*Verifier{{
+				verifiers: []*SignatureVerifier{{
 					name:       "1",
 					principals: []tuf.Principal{key},
 					threshold:  1,
@@ -364,7 +364,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 			},
 			"verifiers for files": {
 				path: "file:2/*",
-				verifiers: []*Verifier{{
+				verifiers: []*SignatureVerifier{{
 					name:       "2",
 					principals: []tuf.Principal{key},
 					threshold:  1,
@@ -372,11 +372,11 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 			},
 			"verifiers for unprotected branch": {
 				path:      "git:refs/heads/unprotected",
-				verifiers: []*Verifier{},
+				verifiers: []*SignatureVerifier{},
 			},
 			"verifiers for unprotected files": {
 				path:      "file:unprotected",
-				verifiers: []*Verifier{},
+				verifiers: []*SignatureVerifier{},
 			},
 		}
 
