@@ -66,7 +66,7 @@ type State struct {
 	githubAppKeys             []tuf.Principal
 
 	repository     *gitinterface.Repository
-	verifiersCache map[string][]*Verifier
+	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
 	hasFileRule    bool
 }
@@ -211,10 +211,10 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.
-func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
+func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) {
 	if s.verifiersCache == nil {
 		slog.Debug("Initializing path cache in policy...")
-		s.verifiersCache = map[string][]*Verifier{}
+		s.verifiersCache = map[string][]*SignatureVerifier{}
 	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
 		// Cache hit for this path in this policy
 		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
@@ -242,7 +242,7 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 	seenRoles := map[string]bool{TargetsRoleName: true}
 
 	var currentDelegationGroup []tuf.Rule
-	verifiers := []*Verifier{}
+	verifiers := []*SignatureVerifier{}
 	for {
 		if len(groupedDelegations) == 0 {
 			s.verifiersCache[path] = verifiers
@@ -262,7 +262,7 @@ func (s *State) FindVerifiersForPath(path string) ([]*Verifier, error) {
 			currentDelegationGroup = currentDelegationGroup[1:]
 
 			if delegation.Matches(path) {
-				verifier := &Verifier{
+				verifier := &SignatureVerifier{
 					repository: s.repository,
 					name:       delegation.ID(),
 					principals: make([]tuf.Principal, 0, delegation.GetPrincipalIDs().Len()),
@@ -389,7 +389,7 @@ func (s *State) Verify(ctx context.Context) error {
 				principals = append(principals, delegationKeys[principalID])
 			}
 
-			verifier := &Verifier{
+			verifier := &SignatureVerifier{
 				repository: s.repository,
 				name:       delegation.ID(),
 				principals: principals,
@@ -756,7 +756,7 @@ func (s *State) preprocess() error {
 	return nil
 }
 
-func (s *State) getRootVerifier() (*Verifier, error) {
+func (s *State) getRootVerifier() (*SignatureVerifier, error) {
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return nil, err
@@ -772,14 +772,14 @@ func (s *State) getRootVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	return &Verifier{
+	return &SignatureVerifier{
 		repository: s.repository,
 		principals: principals,
 		threshold:  threshold,
 	}, nil
 }
 
-func (s *State) getTargetsVerifier() (*Verifier, error) {
+func (s *State) getTargetsVerifier() (*SignatureVerifier, error) {
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return nil, err
@@ -795,7 +795,7 @@ func (s *State) getTargetsVerifier() (*Verifier, error) {
 		return nil, err
 	}
 
-	return &Verifier{
+	return &SignatureVerifier{
 		repository: s.repository,
 		principals: principals,
 		threshold:  threshold,
