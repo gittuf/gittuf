@@ -34,49 +34,68 @@ var (
 	ErrCannotVerifyMergeableForTagRef = errors.New("cannot verify mergeable into tag reference")
 )
 
+// PolicyVerifier implements various gittuf verification workflows.
+type PolicyVerifier struct { //nolint:revive
+	// We want to call this PolicyVerifier to avoid any confusion with
+	// SignatureVerifier.
+
+	repo     *gitinterface.Repository
+	searcher searcher
+}
+
+func NewPolicyVerifier(repo *gitinterface.Repository) *PolicyVerifier {
+	searcher := newSearcher(repo)
+	verifier := &PolicyVerifier{
+		repo:     repo,
+		searcher: searcher,
+	}
+
+	return verifier
+}
+
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func VerifyRef(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
 
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, latestEntry, latestEntry, target)
+	return latestEntry.TargetID, v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func VerifyRefFull(ctx context.Context, repo *gitinterface.Repository, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug("Identifying first RSL entry...")
-	firstEntry, _, err := rsl.GetFirstEntry(repo)
+	firstEntry, _, err := rsl.GetFirstEntry(v.repo)
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
 
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, firstEntry, latestEntry, target)
+	return latestEntry.TargetID, v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
-	fromEntryT, err := rsl.GetEntry(repo, entryID)
+	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -90,14 +109,14 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
-	latestEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(target))
+	latestEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
 
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.TargetID, VerifyRelativeForRef(ctx, repo, fromEntry, latestEntry, target)
+	return latestEntry.TargetID, v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target)
 }
 
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes
@@ -112,7 +131,7 @@ func VerifyRefFromEntry(ctx context.Context, repo *gitinterface.Repository, targ
 // (true,  nil) -> merge is possible but it MUST be performed by an authorized
 // person for the rule, i.e., an authorized person must sign the merge's RSL
 // entry
-func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetRef, featureRef string) (bool, error) {
+func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, featureRef string) (bool, error) {
 	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
 		return false, ErrCannotVerifyMergeableForTagRef
 	}
@@ -123,15 +142,13 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 		err                 error
 	)
 
-	searcher := newSearcher(repo)
-
 	// Load latest policy
 	slog.Debug("Loading latest policy...")
-	initialPolicyEntry, err := searcher.FindLatestPolicyEntry()
+	initialPolicyEntry, err := v.searcher.FindLatestPolicyEntry()
 	if err != nil {
 		return false, err
 	}
-	state, err := LoadState(ctx, repo, initialPolicyEntry)
+	state, err := LoadState(ctx, v.repo, initialPolicyEntry)
 	if err != nil {
 		return false, err
 	}
@@ -139,9 +156,9 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 
 	// Load latest attestations
 	slog.Debug("Loading latest attestations...")
-	initialAttestationsEntry, err := searcher.FindLatestAttestationsEntry()
+	initialAttestationsEntry, err := v.searcher.FindLatestAttestationsEntry()
 	if err == nil {
-		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+		attestationsState, err := attestations.LoadAttestationsForEntry(v.repo, initialAttestationsEntry)
 		if err != nil {
 			return false, err
 		}
@@ -154,7 +171,7 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 
 	var fromID gitinterface.Hash
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
-	targetEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
+	targetEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
 	switch {
 	case err == nil:
 		fromID = targetEntry.TargetID
@@ -165,19 +182,19 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 	}
 
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
-	featureEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
+	featureEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
 	if err != nil {
 		return false, err
 	}
 
 	// We're specifically focused on commit merges here, this doesn't apply to
 	// tags
-	mergeTreeID, err := repo.GetMergeTree(fromID, featureEntry.TargetID)
+	mergeTreeID, err := v.repo.GetMergeTree(fromID, featureEntry.TargetID)
 	if err != nil {
 		return false, err
 	}
 
-	authorizationAttestation, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
+	authorizationAttestation, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, v.repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
 	if err != nil {
 		return false, err
 	}
@@ -206,13 +223,13 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 	}
 
 	// Verify modified files
-	commitIDs, err := repo.GetCommitsBetweenRange(featureEntry.TargetID, fromID)
+	commitIDs, err := v.repo.GetCommitsBetweenRange(featureEntry.TargetID, fromID)
 	if err != nil {
 		return false, err
 	}
 
 	for _, commitID := range commitIDs {
-		paths, err := repo.GetFilePathsChangedByCommit(commitID)
+		paths, err := v.repo.GetFilePathsChangedByCommit(commitID)
 		if err != nil {
 			return false, err
 		}
@@ -258,7 +275,7 @@ func VerifyMergeable(ctx context.Context, repo *gitinterface.Repository, targetR
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
+func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry *rsl.ReferenceEntry, target string) error {
 	/*
 		require firstEntry != nil
 		require lastEntry != nil
@@ -271,13 +288,11 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 		err                 error
 	)
 
-	searcher := newSearcher(repo)
-
 	// Load policy applicable at firstEntry
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.ID.String()))
-	initialPolicyEntry, err := searcher.FindPolicyEntryFor(firstEntry)
+	initialPolicyEntry, err := v.searcher.FindPolicyEntryFor(firstEntry)
 	if err == nil {
-		state, err := LoadState(ctx, repo, initialPolicyEntry)
+		state, err := LoadState(ctx, v.repo, initialPolicyEntry)
 		if err != nil {
 			return err
 		}
@@ -290,9 +305,9 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 	// require currentPolicy != nil || parent(firstEntry) == nil
 
 	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.ID.String()))
-	initialAttestationsEntry, err := searcher.FindAttestationsEntryFor(firstEntry)
+	initialAttestationsEntry, err := v.searcher.FindAttestationsEntryFor(firstEntry)
 	if err == nil {
-		attestationsState, err := attestations.LoadAttestationsForEntry(repo, initialAttestationsEntry)
+		attestationsState, err := attestations.LoadAttestationsForEntry(v.repo, initialAttestationsEntry)
 		if err != nil {
 			return err
 		}
@@ -306,7 +321,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 	// Enumerate RSL entries between firstEntry and lastEntry, ignoring irrelevant ones
 	slog.Debug("Identifying all entries in range...")
-	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(repo, firstEntry.ID, lastEntry.ID, target)
+	entries, annotations, err := rsl.GetReferenceEntriesInRangeForRef(v.repo, firstEntry.ID, lastEntry.ID, target)
 	if err != nil {
 		return err
 	}
@@ -335,7 +350,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 					continue
 				}
 
-				newPolicy, err := loadStateForEntry(repo, entry)
+				newPolicy, err := loadStateForEntry(v.repo, entry)
 				if err != nil {
 					return err
 				}
@@ -361,7 +376,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 			slog.Debug("Checking if entry is for attestations reference...")
 			if entry.RefName == attestations.Ref {
-				newAttestationsState, err := attestations.LoadAttestationsForEntry(repo, entry)
+				newAttestationsState, err := attestations.LoadAttestationsForEntry(v.repo, entry)
 				if err != nil {
 					return err
 				}
@@ -374,7 +389,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 			if currentPolicy == nil {
 				return ErrPolicyNotFound
 			}
-			if err := verifyEntry(ctx, repo, currentPolicy, currentAttestations, entry); err != nil {
+			if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
 				slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
 				slog.Debug("Checking if entry has been revoked...")
 				// If the invalid entry is never marked as skipped, we return err
@@ -414,7 +429,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 		// 1. What's the last good state?
 		slog.Debug("Identifying last valid state...")
-		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(invalidEntry.RefName), rsl.BeforeEntryID(invalidEntry.ID), rsl.IsUnskipped())
+		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(invalidEntry.RefName), rsl.BeforeEntryID(invalidEntry.ID), rsl.IsUnskipped())
 		if err != nil {
 			return err
 		}
@@ -428,7 +443,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 
 		// gittuf requires the fix to point to a commit that is tree-same as the
 		// last good state
-		lastGoodTreeID, err := repo.GetCommitTreeID(lastGoodEntry.TargetID)
+		lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.TargetID)
 		if err != nil {
 			return err
 		}
@@ -454,7 +469,7 @@ func VerifyRelativeForRef(ctx context.Context, repo *gitinterface.Repository, fi
 				continue
 			}
 
-			newCommitTreeID, err := repo.GetCommitTreeID(newEntry.TargetID)
+			newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.TargetID)
 			if err != nil {
 				return err
 			}

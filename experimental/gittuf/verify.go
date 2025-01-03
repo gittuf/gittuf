@@ -59,10 +59,12 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
 
+	verifier := policy.NewPolicyVerifier(r.r)
+
 	if options.LatestOnly {
-		expectedTip, err = policy.VerifyRef(ctx, r.r, refName)
+		expectedTip, err = verifier.VerifyRef(ctx, refName)
 	} else {
-		expectedTip, err = policy.VerifyRefFull(ctx, r.r, refName)
+		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
 	}
 	if err != nil {
 		return err
@@ -118,7 +120,8 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 	}
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
-	expectedTip, err := policy.VerifyRefFromEntry(ctx, r.r, refName, entryIDHash)
+	verifier := policy.NewPolicyVerifier(r.r)
+	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
 		return err
 	}
@@ -159,7 +162,8 @@ func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef 
 	}
 
 	slog.Debug(fmt.Sprintf("Inspecting gittuf policies to identify if '%s' can be merged into '%s' with current approvals...", featureRef, targetRef))
-	needRSLSignature, err := policy.VerifyMergeable(ctx, r.r, targetRef, featureRef)
+	verifier := policy.NewPolicyVerifier(r.r)
+	needRSLSignature, err := verifier.VerifyMergeable(ctx, targetRef, featureRef)
 	if err != nil {
 		return false, err
 	}
