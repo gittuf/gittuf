@@ -522,8 +522,8 @@ github.com/sigstore/cosign/v2 v2.4.1 h1:b8UXEfJFks3hmTwyxrRNrn6racpmccUycBHxDMkE
 github.com/sigstore/cosign/v2 v2.4.1/go.mod h1:GvzjBeUKigI+XYnsoVQDmMAsMMc6engxztRSuxE+x9I=
 github.com/sigstore/fulcio v1.6.5 h1:A9DtV2hmeJ835mtqqxgvV0Sie0HOPKaLPgvFVF4FU7c=
 github.com/sigstore/fulcio v1.6.5/go.mod h1:wUei0BMnlz5iY10keKAx5FXFGnMX0N25ZSe4jGRA65M=
-github.com/sigstore/gitsign v0.11.0 h1:0EZIg1KaVdV2DaxwFywdNT0c3ih7gNCk2t0GhAbeN2A=
-github.com/sigstore/gitsign v0.11.0/go.mod h1:r6FQ1cawHl6oST/36q49mV7EC97JFgVpFzHneNt1P28=
+github.com/sigstore/gitsign v0.12.0 h1:tdSrYKhhEn1hh14yZ8f63GC61MzxGjYc/e4SmvFZCtE=
+github.com/sigstore/gitsign v0.12.0/go.mod h1:eE5Y3g1rorXrii6H5M74dTfvtbrC/lVBFUAXRFpcvVQ=
 github.com/sigstore/protobuf-specs v0.3.2 h1:nCVARCN+fHjlNCk3ThNXwrZRqIommIeNKWwQvORuRQo=
 github.com/sigstore/protobuf-specs v0.3.2/go.mod h1:RZ0uOdJR4OB3tLQeAyWoJFbNCBFrPQdcokntde4zRBA=
 github.com/sigstore/rekor v1.3.7 h1:Z5UW5TmqbTZnyOFkMRfi32q/CWcxK6VuzIkx+33mbq8=
