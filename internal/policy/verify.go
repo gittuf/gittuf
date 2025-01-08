@@ -229,21 +229,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 		return false, err
 	}
 
-	verifiers, err := currentPolicy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef))
-	if err != nil {
-		return false, err
-	}
-	if len(verifiers) == 0 {
-		// No verifiers -> not protected
-		return false, nil
-	}
-
-	var appName string
-	if currentPolicy.githubAppApprovalsTrusted {
-		appName = currentPolicy.githubAppKeys[0].ID()
-	}
-
-	_, rslEntrySignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitinterface.ZeroHash, authorizationAttestation, appName, approverIDs, true)
+	_, rslEntrySignatureNeededForThreshold, err := verifyGitObjectAndAttestations(ctx, currentPolicy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef), gitinterface.ZeroHash, authorizationAttestation, withApproverPrincipalIDs(approverIDs), withVerifyMergeable())
 	if err != nil {
 		return false, fmt.Errorf("not enough approvals to meet Git namespace policies, %w", ErrUnauthorizedSignature)
 	}
@@ -266,34 +252,14 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for _, path := range paths {
-			verifiers, err := currentPolicy.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
-			if err != nil {
-				return false, err
-			}
-
-			verified := false
-			if len(verifiedUsing) > 0 {
-				// We've already verified and identified the commit signature,
-				// we can just check if that verifier is trusted for the new
-				// path.  If not found, we don't make any assumptions about it
-				// being a failure in case of name mismatches. So, the signature
-				// check proceeds as usual.
-				for _, verifier := range verifiers {
-					if verifier.Name() == verifiedUsing {
-						verified = true
-						break
-					}
-				}
-			}
-
-			if verified {
-				continue
-			}
-
-			// We don't use verifyMergeable=true here
-			// File verification rules are not met using the signature on the
-			// RSL entry, so we don't count threshold-1 here
-			verifiedUsing, _, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverIDs, false)
+			// If we've already verified and identified commit signature, we can
+			// just check if that verifier is trusted for the new path. If not
+			// found, we don't make any assumptions about it being a failure in
+			// case of name mismatches. So, the signature check proceeds as
+			// usual. Also, we don't use verifyMergeable=true here. File
+			// verification rules are not met using the signature on the RSL
+			// entry, so we don't count threshold-1 here.
+			verifiedUsing, _, err = verifyGitObjectAndAttestations(ctx, currentPolicy, fmt.Sprintf("%s:%s", fileRuleScheme, path), commitID, authorizationAttestation, withApproverPrincipalIDs(approverIDs), withTrustedVerifier(verifiedUsing))
 			if err != nil {
 				return false, fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
 			}
@@ -610,7 +576,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	}
 
 	// Verify Git namespace policies using the RSL entry and attestations
-	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.ID, authorizationAttestation, approverKeyIDs); err != nil {
+	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.ID, authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs)); err != nil {
 		return fmt.Errorf("verifying Git namespace policies failed, %w", ErrUnauthorizedSignature)
 	}
 
@@ -636,39 +602,12 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 
 		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
 		for _, path := range paths {
-			verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", fileRuleScheme, path))
-			if err != nil {
-				return err
-			}
-
-			verified := false
-			if len(verifiers) == 0 {
-				// Path is not protected
-				verified = true
-			} else if len(verifiedUsing) > 0 {
-				// We've already verified and identified commit signature, we
-				// can just check if that verifier is trusted for the new path.
-				// If not found, we don't make any assumptions about it being a
-				// failure in case of name mismatches. So, the signature check
-				// proceeds as usual.
-				for _, verifier := range verifiers {
-					if verifier.Name() == verifiedUsing {
-						verified = true
-						break
-					}
-				}
-			}
-
-			if verified {
-				continue
-			}
-
-			// TODO: app name
-			appName := ""
-			if policy.githubAppApprovalsTrusted {
-				appName = policy.githubAppKeys[0].ID()
-			}
-			verifiedUsing, _, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, commitID, authorizationAttestation, appName, approverKeyIDs, false)
+			// If we've already verified and identified commit signature, we
+			// can just check if that verifier is trusted for the new path.
+			// If not found, we don't make any assumptions about it being a
+			// failure in case of name mismatches. So, the signature check
+			// proceeds as usual.
+			verifiedUsing, _, err = verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", fileRuleScheme, path), commitID, authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs), withTrustedVerifier(verifiedUsing))
 			if err != nil {
 				return fmt.Errorf("verifying file namespace policies failed, %w", ErrUnauthorizedSignature)
 			}
@@ -698,48 +637,8 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return err
 	}
 
-	// Find authorized verifiers for tag's RSL entry
-	verifiers, err := policy.FindVerifiersForPath(fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName))
-	if err != nil {
-		return err
-	}
-
-	if len(verifiers) == 0 {
-		return nil
-	}
-
-	// Use each verifier to verify signature
-	// TODO: app name
-	appName := ""
-	if policy.githubAppApprovalsTrusted {
-		appName = policy.githubAppKeys[0].ID()
-	}
-	if _, _, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, entry.ID, authorizationAttestation, appName, approverKeyIDs, false); err != nil {
-		return fmt.Errorf("verifying RSL entry failed, %w", ErrUnauthorizedSignature)
-	}
-
-	// Verify tag object
-	tagObjVerified := false
-	for _, verifier := range verifiers {
-		// explicitly not looking at the attestation
-		// that applies to the _push_
-		// thus, we also set threshold to 1
-		verifier.threshold = 1
-
-		_, err := verifier.Verify(ctx, entry.TargetID, nil)
-		if err == nil {
-			// Signature verification succeeded
-			tagObjVerified = true
-			break
-		} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-			// Unexpected error
-			return err
-		}
-		// Haven't found a valid verifier, continue with next verifier
-	}
-
-	if !tagObjVerified {
-		return fmt.Errorf("verifying tag object's signature failed, %w", ErrUnauthorizedSignature)
+	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.GetID(), authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs), withTagObjectID(entry.TargetID)); err != nil {
+		return fmt.Errorf("verifying tag entry failed, %w: %w", ErrUnauthorizedSignature, err)
 	}
 
 	return nil
@@ -881,7 +780,58 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 	return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.TargetID)
 }
 
-func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, approverKeyIDs *set.Set[string]) (string, bool, error) {
+// verifyGitObjectAndAttestationsOptions contains the configurable options for
+// verifyGitObjectAndAttestations.
+type verifyGitObjectAndAttestationsOptions struct {
+	approverPrincipalIDs *set.Set[string]
+	verifyMergeable      bool
+	trustedVerifier      string
+	tagObjectID          gitinterface.Hash
+}
+
+type verifyGitObjectAndAttestationsOption func(o *verifyGitObjectAndAttestationsOptions)
+
+// withApproverPrincipalIDs allows for optionally passing in approver IDs to
+// verifyGitObjectAndAttestations. These IDs may be obtained via a code review
+// tool such as GitHub pull request approvals.
+func withApproverPrincipalIDs(approverPrincipalIDs *set.Set[string]) verifyGitObjectAndAttestationsOption {
+	return func(o *verifyGitObjectAndAttestationsOptions) {
+		o.approverPrincipalIDs = approverPrincipalIDs
+	}
+}
+
+// withVerifyMergeable indicates that the verification must check if a change
+// can be merged.
+func withVerifyMergeable() verifyGitObjectAndAttestationsOption {
+	return func(o *verifyGitObjectAndAttestationsOptions) {
+		o.verifyMergeable = true
+	}
+}
+
+// withTrustedVerifier is used to specify the name of a verifier that has
+// already been used to verify in the past. If the newly discovered set of
+// verifiers includes the trusted verifier, then we can return early.
+func withTrustedVerifier(name string) verifyGitObjectAndAttestationsOption {
+	return func(o *verifyGitObjectAndAttestationsOptions) {
+		o.trustedVerifier = name
+	}
+}
+
+// withTagObjectID is used to set the Git ID of a tag object. When this is set,
+// the tag object's signature is also verified in addition to the RSL entry for
+// the tag.
+func withTagObjectID(objID gitinterface.Hash) verifyGitObjectAndAttestationsOption {
+	return func(o *verifyGitObjectAndAttestationsOptions) {
+		o.tagObjectID = objID
+	}
+}
+
+func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
+	options := &verifyGitObjectAndAttestationsOptions{tagObjectID: gitinterface.ZeroHash}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	verifiers, err := policy.FindVerifiersForPath(target)
 	if err != nil {
 		return "", false, err
@@ -892,12 +842,54 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", false, nil
 	}
 
-	// TODO: app name
+	if options.trustedVerifier != "" {
+		for _, verifier := range verifiers {
+			if verifier.Name() == options.trustedVerifier {
+				return options.trustedVerifier, false, nil
+			}
+		}
+	}
+
+	// TODO: app name is likely not always going to be the signer ID
+	// We should probably make that an option?
 	appName := ""
 	if policy.githubAppApprovalsTrusted {
 		appName = policy.githubAppKeys[0].ID()
 	}
-	return verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, approverKeyIDs, false)
+	verifiedUsing, rslSignatureNeeded, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, options.approverPrincipalIDs, options.verifyMergeable)
+	if err != nil {
+		return "", false, err
+	}
+
+	if !options.tagObjectID.IsZero() {
+		// Verify tag object's signature as well
+		tagObjVerified := false
+		for _, verifier := range verifiers {
+			// explicitly not looking at the attestation
+			// that applies to the _push_
+			// thus, we also set threshold to 1
+			verifier.threshold = 1
+
+			_, err := verifier.Verify(ctx, options.tagObjectID, nil)
+			if err == nil {
+				// Signature verification succeeded
+				tagObjVerified = true
+				// TODO: should we check if a different verifier / signer was
+				// matched for the tag object compared with the RSL entry?
+				break
+			} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+				// Unexpected error
+				return "", false, err
+			}
+			// Haven't found a valid verifier, continue with next verifier
+		}
+
+		if !tagObjVerified {
+			return "", false, fmt.Errorf("verifying tag object's signature failed")
+		}
+	}
+
+	return verifiedUsing, rslSignatureNeeded, nil
 }
 
 func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string], verifyMergeable bool) (string, bool, error) {
