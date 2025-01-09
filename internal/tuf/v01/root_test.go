@@ -6,6 +6,7 @@ package v01
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -403,24 +404,74 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	assert.True(t, trusted)
 }
 
-func TestGlobalRule(t *testing.T) {
+func TestGlobalRules(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
 	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
 
-	err := rootMetadata.AddGlobalRule("threshold-2-main", []string{"git:refs/heads/main"}, 2)
+	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1, len(rootMetadata.GlobalRules))
-	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].Name)
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 
-	expectedGlobalRule := &GlobalRule{
+	expectedGlobalRule := &GlobalRuleThreshold{
 		Name:      "threshold-2-main",
 		Paths:     []string{"git:refs/heads/main"},
 		Threshold: 2,
 	}
 	globalRules := rootMetadata.GetGlobalRules()
 	assert.Equal(t, expectedGlobalRule.GetName(), globalRules[0].GetName())
-	assert.Equal(t, expectedGlobalRule.GetProtectedNamespaces(), globalRules[0].GetProtectedNamespaces())
-	assert.Equal(t, expectedGlobalRule.GetThreshold(), globalRules[0].GetThreshold())
+	assert.Equal(t, expectedGlobalRule.GetProtectedNamespaces(), globalRules[0].(tuf.GlobalRuleThreshold).GetProtectedNamespaces())
+	assert.Equal(t, expectedGlobalRule.GetThreshold(), globalRules[0].(tuf.GlobalRuleThreshold).GetThreshold())
+
+	forcePushesGlobalRule, err := NewGlobalRuleBlockForcePushes("block-force-pushes", []string{"git:refs/heads/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rootMetadata.AddGlobalRule(forcePushesGlobalRule)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+}
+
+func TestNewGlobalRuleBlockForcePushes(t *testing.T) {
+	tests := map[string]struct {
+		patterns      []string
+		expectedError error
+	}{
+		"no error, single git pattern": {
+			patterns: []string{"git:refs/heads/main"},
+		},
+		"no error, multiple git patterns": {
+			patterns: []string{"git:refs/heads/main", "git:refs/heads/feature"},
+		},
+		"no error, multiple git patterns including wildcards": {
+			patterns: []string{"git:refs/heads/main", "git:refs/heads/release/*"},
+		},
+		"error, single non-git pattern": {
+			patterns:      []string{"file:foo"},
+			expectedError: tuf.ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths,
+		},
+		"error, multiple non-git patterns including wildcards": {
+			patterns:      []string{"file:foo", "file:bar", "file:baz/*"},
+			expectedError: tuf.ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths,
+		},
+		"error, mix of git and non-git patterns including wildcards": {
+			patterns:      []string{"git:refs/heads/main", "git:refs/heads/release/*", "file:foo", "file:bar", "file:baz/*"},
+			expectedError: tuf.ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths,
+		},
+	}
+
+	for name, test := range tests {
+		rule, err := NewGlobalRuleBlockForcePushes("test-block-force-pushes", test.patterns)
+		if test.expectedError == nil {
+			assert.Nil(t, err, fmt.Sprintf("unexpected error '%v' in test '%s'", err, name))
+			assert.Equal(t, test.patterns, rule.Paths)
+		} else {
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error '%v', expected '%v' in test '%s'", err, test.expectedError, name))
+		}
+	}
 }

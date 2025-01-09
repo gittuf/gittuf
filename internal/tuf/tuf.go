@@ -24,22 +24,27 @@ const (
 	ExhaustiveVerifierName = "gittuf-exhaustive-verifier"
 
 	GittufPrefix = "gittuf-"
+
+	GlobalRuleThresholdType        = "threshold"
+	GlobalRuleBlockForcePushesType = "block-force-pushes"
 )
 
 var (
-	ErrInvalidRootMetadata                      = errors.New("invalid root metadata")
-	ErrUnknownRootMetadataVersion               = errors.New("unknown schema version for root metadata")
-	ErrUnknownTargetsMetadataVersion            = errors.New("unknown schema version for rule file metadata")
-	ErrPrimaryRuleFileInformationNotFoundInRoot = errors.New("root metadata does not contain primary rule file information")
-	ErrGitHubAppInformationNotFoundInRoot       = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
-	ErrDuplicatedRuleName                       = errors.New("two rules with same name found in policy")
-	ErrInvalidPrincipalID                       = errors.New("principal ID is invalid")
-	ErrInvalidPrincipalType                     = errors.New("invalid principal type (do you have the right gittuf version?)")
-	ErrPrincipalNotFound                        = errors.New("principal not found")
-	ErrRuleNotFound                             = errors.New("cannot find rule entry")
-	ErrMissingRules                             = errors.New("some rules are missing")
-	ErrCannotManipulateRulesWithGittufPrefix    = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
-	ErrCannotMeetThreshold                      = errors.New("insufficient keys to meet threshold")
+	ErrInvalidRootMetadata                             = errors.New("invalid root metadata")
+	ErrUnknownRootMetadataVersion                      = errors.New("unknown schema version for root metadata")
+	ErrUnknownTargetsMetadataVersion                   = errors.New("unknown schema version for rule file metadata")
+	ErrPrimaryRuleFileInformationNotFoundInRoot        = errors.New("root metadata does not contain primary rule file information")
+	ErrGitHubAppInformationNotFoundInRoot              = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
+	ErrDuplicatedRuleName                              = errors.New("two rules with same name found in policy")
+	ErrInvalidPrincipalID                              = errors.New("principal ID is invalid")
+	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
+	ErrPrincipalNotFound                               = errors.New("principal not found")
+	ErrRuleNotFound                                    = errors.New("cannot find rule entry")
+	ErrMissingRules                                    = errors.New("some rules are missing")
+	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
+	ErrCannotMeetThreshold                             = errors.New("insufficient keys to meet threshold")
+	ErrUnknownGlobalRuleType                           = errors.New("unknown global rule type")
+	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
@@ -98,7 +103,7 @@ type RootMetadata interface {
 	GetPrimaryRuleFileThreshold() (int, error)
 
 	// AddGlobalRule adds the corresponding rule to the root metadata.
-	AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error
+	AddGlobalRule(globalRule GlobalRule) error
 	// GetGlobalRules returns the global rules declared in the root metadata.
 	GetGlobalRules() []GlobalRule
 
@@ -190,6 +195,12 @@ type Rule interface {
 type GlobalRule interface {
 	// GetName returns the name of the global rule.
 	GetName() string
+}
+
+// GlobalRuleThreshold indicates the number of required approvals for a change
+// to the specified namespaces to be valid.
+type GlobalRuleThreshold interface {
+	GlobalRule
 
 	// Matches indicates if the rule applies to a specified path.
 	Matches(path string) bool
@@ -201,4 +212,17 @@ type GlobalRule interface {
 	// GetThreshold returns the threshold of principals that must approve to
 	// meet the rule.
 	GetThreshold() int
+}
+
+// GlobalRuleBlockForcePushes prevents force pushes or rewriting of history for
+// the specified namespaces.
+type GlobalRuleBlockForcePushes interface {
+	GlobalRule
+
+	// Matches indicates if the rule applies to a specified path.
+	Matches(path string) bool
+
+	// GetProtectedNamespaces returns the set of namespaces protected by the
+	// rule.
+	GetProtectedNamespaces() []string
 }

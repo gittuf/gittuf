@@ -223,10 +223,11 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 				usedPrincipalIDs.Add(principal.ID())
 			}
 		}
+	}
 
-		if usedPrincipalIDs.Len() >= v.Threshold() {
-			return usedPrincipalIDs, nil
-		}
+	if v.verifyExhaustively || usedPrincipalIDs.Len() >= v.Threshold() {
+		// TODO: double check that this is okay!
+		return usedPrincipalIDs, nil
 	}
 
 	// Return usedPrincipalIDs so the consumer can decide what to do with the

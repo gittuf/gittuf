@@ -4,6 +4,10 @@
 package v01
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -15,12 +19,12 @@ const (
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type                   string          `json:"type"`
-	Expires                string          `json:"expires"`
-	Keys                   map[string]*Key `json:"keys"`
-	Roles                  map[string]Role `json:"roles"`
-	GitHubApprovalsTrusted bool            `json:"githubApprovalsTrusted"`
-	GlobalRules            []*GlobalRule   `json:"globalRules,omitempty"`
+	Type                   string           `json:"type"`
+	Expires                string           `json:"expires"`
+	Keys                   map[string]*Key  `json:"keys"`
+	Roles                  map[string]Role  `json:"roles"`
+	GitHubApprovalsTrusted bool             `json:"githubApprovalsTrusted"`
+	GlobalRules            []tuf.GlobalRule `json:"globalRules,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -313,29 +317,75 @@ func (r *RootMetadata) GetGitHubAppPrincipals() ([]tuf.Principal, error) {
 }
 
 // AddGlobalRule adds a new global rule to RootMetadata.
-func (r *RootMetadata) AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error {
+func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
 	allGlobalRules := r.GlobalRules
 	if allGlobalRules == nil {
-		allGlobalRules = []*GlobalRule{}
+		allGlobalRules = []tuf.GlobalRule{}
 	}
 
 	// FIXME: check for duplicates
-	newRule := &GlobalRule{
-		Name:      ruleName,
-		Paths:     rulePatterns,
-		Threshold: threshold,
-	}
-	allGlobalRules = append(allGlobalRules, newRule)
+	allGlobalRules = append(allGlobalRules, globalRule)
 	r.GlobalRules = allGlobalRules
 	return nil
 }
 
 func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
-	globalRules := make([]tuf.GlobalRule, 0, len(r.GlobalRules))
-	for _, rule := range r.GlobalRules {
-		globalRules = append(globalRules, rule)
+	return r.GlobalRules
+}
+
+func (r *RootMetadata) UnmarshalJSON(data []byte) error {
+	// this type _has_ to be a copy of RootMetadata, minus the use of
+	// json.RawMessage in place of tuf.GlobalRule
+	type tempType struct {
+		Type                   string            `json:"type"`
+		Expires                string            `json:"expires"`
+		Keys                   map[string]*Key   `json:"keys"`
+		Roles                  map[string]Role   `json:"roles"`
+		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
+		GlobalRules            []json.RawMessage `json:"globalRules,omitempty"`
 	}
-	return globalRules
+
+	temp := &tempType{}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	r.Type = temp.Type
+	r.Expires = temp.Expires
+	r.Keys = temp.Keys
+	r.Roles = temp.Roles
+	r.GitHubApprovalsTrusted = temp.GitHubApprovalsTrusted
+
+	r.GlobalRules = []tuf.GlobalRule{}
+	for _, globalRuleBytes := range temp.GlobalRules {
+		tempGlobalRule := map[string]any{}
+		if err := json.Unmarshal(globalRuleBytes, &tempGlobalRule); err != nil {
+			return fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+
+		switch tempGlobalRule["type"] {
+		case tuf.GlobalRuleThresholdType:
+			globalRule := &GlobalRuleThreshold{}
+			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			r.GlobalRules = append(r.GlobalRules, globalRule)
+
+		case tuf.GlobalRuleBlockForcePushesType:
+			globalRule := &GlobalRuleBlockForcePushes{}
+			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			r.GlobalRules = append(r.GlobalRules, globalRule)
+
+		default:
+			return tuf.ErrUnknownGlobalRuleType
+		}
+	}
+
+	return nil
 }
 
 // addKey adds a key to the RootMetadata instance.
@@ -363,17 +413,27 @@ func (r *RootMetadata) addRole(roleName string, role Role) {
 	r.Roles[roleName] = role
 }
 
-type GlobalRule struct {
+type GlobalRuleThreshold struct {
 	Name      string   `json:"name"`
+	Type      string   `json:"type"`
 	Paths     []string `json:"paths"`
 	Threshold int      `json:"threshold"`
 }
 
-func (g *GlobalRule) GetName() string {
+func NewGlobalRuleThreshold(name string, paths []string, threshold int) *GlobalRuleThreshold {
+	return &GlobalRuleThreshold{
+		Name:      name,
+		Type:      tuf.GlobalRuleThresholdType,
+		Paths:     paths,
+		Threshold: threshold,
+	}
+}
+
+func (g *GlobalRuleThreshold) GetName() string {
 	return g.Name
 }
 
-func (g *GlobalRule) Matches(path string) bool {
+func (g *GlobalRuleThreshold) Matches(path string) bool {
 	for _, pattern := range g.Paths {
 		// We validate pattern when it's added to / updated in the metadata
 		if matches := fnmatch.Match(pattern, path, 0); matches {
@@ -383,10 +443,47 @@ func (g *GlobalRule) Matches(path string) bool {
 	return false
 }
 
-func (g *GlobalRule) GetProtectedNamespaces() []string {
+func (g *GlobalRuleThreshold) GetProtectedNamespaces() []string {
 	return g.Paths
 }
 
-func (g *GlobalRule) GetThreshold() int {
+func (g *GlobalRuleThreshold) GetThreshold() int {
 	return g.Threshold
+}
+
+type GlobalRuleBlockForcePushes struct {
+	Name  string   `json:"name"`
+	Type  string   `json:"type"`
+	Paths []string `json:"paths"`
+}
+
+func NewGlobalRuleBlockForcePushes(name string, paths []string) (*GlobalRuleBlockForcePushes, error) {
+	for _, path := range paths {
+		if !strings.HasPrefix(path, "git:") { // TODO: set prefix correctly
+			return nil, tuf.ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths
+		}
+	}
+	return &GlobalRuleBlockForcePushes{
+		Name:  name,
+		Type:  tuf.GlobalRuleBlockForcePushesType,
+		Paths: paths,
+	}, nil
+}
+
+func (g *GlobalRuleBlockForcePushes) GetName() string {
+	return g.Name
+}
+
+func (g *GlobalRuleBlockForcePushes) Matches(path string) bool {
+	for _, pattern := range g.Paths {
+		// We validate pattern when it's added to / updated in the metadata
+		if matches := fnmatch.Match(pattern, path, 0); matches {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *GlobalRuleBlockForcePushes) GetProtectedNamespaces() []string {
+	return g.Paths
 }

@@ -463,8 +463,8 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
-// AddGlobalRule adds a global rule to the root metadata.
-func (r *Repository) AddGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
+// AddGlobalRuleThreshold adds a threshold global rule to the root metadata.
+func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -493,12 +493,56 @@ func (r *Repository) AddGlobalRule(ctx context.Context, signer sslibdsse.SignerV
 		return err
 	}
 
-	slog.Debug("Adding global rule...")
-	if err := rootMetadata.AddGlobalRule(name, patterns, threshold); err != nil {
+	slog.Debug("Adding threshold global rule...")
+	if err := rootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold(name, patterns, threshold)); err != nil {
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add global rule '%s' to root metadata", name)
+	commitMessage := fmt.Sprintf("Add global rule (%s) '%s' to root metadata", tuf.GlobalRuleThresholdType, name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// AddGlobalRuleBlockForcePushes adds a global rule that blocks force pushes to the root metadata.
+func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	globalRule, err := tufv01.NewGlobalRuleBlockForcePushes(name, patterns)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding threshold global rule...")
+	if err := rootMetadata.AddGlobalRule(globalRule); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add global rule (%s) '%s' to root metadata", tuf.GlobalRuleBlockForcePushesType, name)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 

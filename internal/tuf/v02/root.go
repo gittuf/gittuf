@@ -24,7 +24,7 @@ type RootMetadata struct {
 	Principals             map[string]tuf.Principal `json:"principals"`
 	Roles                  map[string]Role          `json:"roles"`
 	GitHubApprovalsTrusted bool                     `json:"githubApprovalsTrusted"`
-	GlobalRules            []*GlobalRule            `json:"globalRules,omitempty"`
+	GlobalRules            []tuf.GlobalRule         `json:"globalRules,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -300,7 +300,7 @@ func (r *RootMetadata) GetGitHubAppPrincipals() ([]tuf.Principal, error) {
 
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
-	// json.RawMessage in place of tuf.Principal
+	// json.RawMessage in place of tuf.Principal and tuf.GlobalRule
 	type tempType struct {
 		Type                   string                     `json:"type"`
 		Version                string                     `json:"schemaVersion"`
@@ -308,7 +308,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Principals             map[string]json.RawMessage `json:"principals"`
 		Roles                  map[string]Role            `json:"roles"`
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
-		GlobalRules            []*GlobalRule              `json:"globalRules,omitempty"`
+		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -355,34 +355,54 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	r.Roles = temp.Roles
 	r.GitHubApprovalsTrusted = temp.GitHubApprovalsTrusted
 
+	r.GlobalRules = []tuf.GlobalRule{}
+	for _, globalRuleBytes := range temp.GlobalRules {
+		tempGlobalRule := map[string]any{}
+		if err := json.Unmarshal(globalRuleBytes, &tempGlobalRule); err != nil {
+			return fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+
+		switch tempGlobalRule["type"] {
+		case tuf.GlobalRuleThresholdType:
+			globalRule := &GlobalRuleThreshold{}
+			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			r.GlobalRules = append(r.GlobalRules, globalRule)
+
+		case tuf.GlobalRuleBlockForcePushesType:
+			globalRule := &GlobalRuleBlockForcePushes{}
+			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			r.GlobalRules = append(r.GlobalRules, globalRule)
+
+		default:
+			return tuf.ErrUnknownGlobalRuleType
+		}
+	}
+
 	return nil
 }
 
 // AddGlobalRule adds a new global rule to RootMetadata.
-func (r *RootMetadata) AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error {
+func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
 	allGlobalRules := r.GlobalRules
 	if allGlobalRules == nil {
-		allGlobalRules = []*GlobalRule{}
+		allGlobalRules = []tuf.GlobalRule{}
 	}
 
 	// FIXME: check for duplicates
-	newRule := &GlobalRule{
-		Name:      ruleName,
-		Paths:     rulePatterns,
-		Threshold: threshold,
-	}
-	allGlobalRules = append(allGlobalRules, newRule)
+	allGlobalRules = append(allGlobalRules, globalRule)
 	r.GlobalRules = allGlobalRules
 	return nil
 }
 
 // GetGlobalRules returns all the global rules in the root metadata.
 func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
-	globalRules := make([]tuf.GlobalRule, 0, len(r.GlobalRules))
-	for _, rule := range r.GlobalRules {
-		globalRules = append(globalRules, rule)
-	}
-	return globalRules
+	return r.GlobalRules
 }
 
 // addPrincipal adds a principal to the RootMetadata instance.  v02 of the
@@ -411,4 +431,8 @@ func (r *RootMetadata) addRole(roleName string, role Role) {
 	r.Roles[roleName] = role
 }
 
-type GlobalRule = tufv01.GlobalRule
+type GlobalRuleThreshold = tufv01.GlobalRuleThreshold
+type GlobalRuleBlockForcePushes = tufv01.GlobalRuleBlockForcePushes
+
+var NewGlobalRuleThreshold = tufv01.NewGlobalRuleThreshold
+var NewGlobalRuleBlockForcePushes = tufv01.NewGlobalRuleBlockForcePushes

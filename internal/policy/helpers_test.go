@@ -144,10 +144,11 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	return state
 }
 
-// createTestStateWithGlobalConstraint creates a policy state with no explicit
-// branch protection rules but with a two-approval constraint on changes to the
-// main branch. The two keys trusted are `rootPubKeyBytes` and `gpgPubKeyBytes`.
-func createTestStateWithGlobalConstraint(t *testing.T) *State {
+// createTestStateWithGlobalConstraintThreshold creates a policy state with no
+// explicit branch protection rules but with a two-approval constraint on
+// changes to the main branch. The two keys trusted are `rootPubKeyBytes` and
+// `gpgPubKeyBytes`.
+func createTestStateWithGlobalConstraintThreshold(t *testing.T) *State {
 	t.Helper()
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
@@ -162,7 +163,75 @@ func createTestStateWithGlobalConstraint(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	if err := rootMetadata.AddGlobalRule("threshold-2-main", []string{"git:refs/heads/main"}, 2); err != nil {
+	if err := rootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2)); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []tuf.Principal{key},
+	}
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+// createTestStateWithGlobalConstraintBlockForcePushes creates a policy state
+// with no explicit branch protection rules but with a rule that blocks force
+// pushes to main.
+func createTestStateWithGlobalConstraintBlockForcePushes(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	forcePushesGlobalRule, err := tufv01.NewGlobalRuleBlockForcePushes("block-force-pushes-main", []string{"git:refs/heads/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rootMetadata.AddGlobalRule(forcePushesGlobalRule); err != nil {
 		t.Fatal(err)
 	}
 
