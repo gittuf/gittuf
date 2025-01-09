@@ -4,15 +4,83 @@
 package display
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-type FunctionHolder struct {
-	DisplayLog    func([]*rsl.ReferenceEntry, map[string][]*rsl.AnnotationEntry, io.WriteCloser) error
-	DisplayHeader func(io.WriteCloser, string) error
+// PrintRSLEntryLog prints all rsl entries to the console, first printing all
+// reference entries, and then all annotation entries with their corresponding
+// references.
+func PrintRSLEntryLog(repo *gitinterface.Repository, bufferedWriter io.WriteCloser) error {
+	defer bufferedWriter.Close() //nolint:errcheck
+
+	allReferenceEntries := []*rsl.ReferenceEntry{}
+	emptyAnnotationMap := make(map[string][]*rsl.AnnotationEntry)
+	annotationMap := make(map[string][]*rsl.AnnotationEntry)
+
+	iteratorEntry, err := rsl.GetLatestEntry(repo)
+	if err != nil {
+		return err
+	}
+
+	// Display header and all reference entries
+	if err := PrintHeader(bufferedWriter, "Reference Entries"); err != nil {
+		return nil
+	}
+
+	for {
+		switch iteratorEntry := iteratorEntry.(type) {
+		case *rsl.ReferenceEntry:
+			allReferenceEntries = append(allReferenceEntries, iteratorEntry)
+
+			// emptyAnnotationMap forces reference entries to be printed
+			// without the corresponding annotations
+			if err := BufferedLogToConsole([]*rsl.ReferenceEntry{iteratorEntry}, emptyAnnotationMap, bufferedWriter); err != nil {
+				return nil
+			}
+		case *rsl.AnnotationEntry:
+			for _, targetID := range iteratorEntry.RSLEntryIDs {
+				if _, has := annotationMap[targetID.String()]; !has {
+					annotationMap[targetID.String()] = []*rsl.AnnotationEntry{}
+				}
+
+				annotationMap[targetID.String()] = append(annotationMap[targetID.String()], iteratorEntry)
+			}
+		}
+
+		parentEntry, err := rsl.GetParentForEntry(repo, iteratorEntry)
+		if err != nil {
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				break
+			}
+
+			return err
+		}
+
+		iteratorEntry = parentEntry
+	}
+
+	// Display header and all annotation entries
+	if len(annotationMap) != 0 {
+		if err := PrintHeader(bufferedWriter, "Annotation Entries"); err != nil {
+			return nil
+		}
+	}
+
+	for _, entry := range allReferenceEntries {
+		targetID := entry.GetID().String()
+		if _, exists := annotationMap[targetID]; exists {
+			if err := BufferedLogToConsole([]*rsl.ReferenceEntry{entry}, annotationMap, bufferedWriter); err != nil {
+				return nil
+			}
+		}
+	}
+
+	return nil
 }
 
 func BufferedLogToConsole(entries []*rsl.ReferenceEntry, annotationMap map[string][]*rsl.AnnotationEntry, bufferedWriter io.WriteCloser) error {

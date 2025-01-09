@@ -4,6 +4,7 @@
 package display
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -112,4 +113,101 @@ entry %s (skipped)
 		logOutput := PrepareRSLLogOutput([]*rsl.ReferenceEntry{tagEntry, branchEntry}, map[string][]*rsl.AnnotationEntry{branchEntry.ID.String(): {annotationEntry.(*rsl.AnnotationEntry)}})
 		assert.Equal(t, expectedOutput, logOutput)
 	})
+}
+
+func TestPrintRSLEntryLog(t *testing.T) {
+	t.Run("log without annotations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+
+		branchEntry := rsl.NewReferenceEntry("refs/gittuf/policy-staging", gitinterface.ZeroHash)
+		if err := branchEntry.Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		branchEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference("refs/gittuf/policy-staging"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedOutput := fmt.Sprintf(`---------------------------------------------------
+Reference Entries
+---------------------------------------------------
+
+entry %s
+
+  Ref:    refs/gittuf/policy-staging
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+`, branchEntry.ID.String())
+
+		defaultOutput := &bytes.Buffer{}
+		bufferedWriter := NewDisplayWriter(defaultOutput, false)
+
+		if err := PrintRSLEntryLog(repo, bufferedWriter); err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, expectedOutput, defaultOutput.String())
+	})
+
+	t.Run("log with annotations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+
+		branchEntry := rsl.NewReferenceEntry("refs/gittuf/policy-staging", gitinterface.ZeroHash)
+		if err := branchEntry.Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		branchEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference("refs/gittuf/policy-staging"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		msg := "This is the first entry in the rsl. It was created by gittuf init"
+		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{branchEntry.GetID()}, false, msg)
+		if err := annotation.Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedOutput := `---------------------------------------------------
+Reference Entries
+---------------------------------------------------
+
+entry 7744e81067dfe6fbb5023b3af9824d5c60025c03
+
+  Ref:    refs/gittuf/policy-staging
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+---------------------------------------------------
+Annotation Entries
+---------------------------------------------------
+
+entry 7744e81067dfe6fbb5023b3af9824d5c60025c03
+
+  Ref:    refs/gittuf/policy-staging
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+    Annotation ID: 1e75f24796ef3546e47f057351a9aee3c0936689
+    Skip:          no
+    Number:        2
+    Message:
+      This is the first entry in the rsl. It was created by gittuf init
+
+`
+
+		defaultOutput := &bytes.Buffer{}
+		bufferedWriter := NewDisplayWriter(defaultOutput, false)
+
+		if err := PrintRSLEntryLog(repo, bufferedWriter); err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, expectedOutput, defaultOutput.String())
+	})
+
 }
