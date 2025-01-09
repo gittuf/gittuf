@@ -141,7 +141,7 @@ func LoadPersistentCache(repo *gitinterface.Repository) (*Persistent, error) {
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
 			// Persistent cache doesn't exist
-			slog.Debug("Persistent cache does not exist, creating new instance...")
+			slog.Debug("Persistent cache does not exist")
 			return nil, ErrNoPersistentCache
 		}
 
@@ -162,7 +162,7 @@ func LoadPersistentCache(repo *gitinterface.Repository) (*Persistent, error) {
 	if !has {
 		// Persistent cache doesn't seem to exist? This maybe warrants
 		// an error but we may have more than one file here in future?
-		slog.Debug("Persistent cache does not exist, creating new instance...")
+		slog.Debug("Persistent cache does not exist")
 		return nil, ErrNoPersistentCache
 	}
 

@@ -524,13 +524,16 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 
 	if !options.BeforeEntryID.IsZero() && options.BeforeEntryNumber != 0 {
 		// Only one of the Before options can be set
+		slog.Debug("Found both before entry ID and before entry number conditions, aborting...")
 		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
 	}
 	if !options.UntilEntryID.IsZero() && options.UntilEntryNumber != 0 {
 		// Only one of the Until options can be set
+		slog.Debug("Found both until entry ID and until entry number conditions, aborting...")
 		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
 	}
 	if options.BeforeEntryNumber != 0 && options.UntilEntryNumber != 0 && options.BeforeEntryNumber < options.UntilEntryNumber {
+		slog.Debug(fmt.Sprintf("Cannot search for entry before entry number %d and until entry number %d, aborting...", options.BeforeEntryNumber, options.UntilEntryNumber))
 		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
 	}
 
@@ -548,12 +551,14 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 			return nil, nil, ErrCannotUseEntryNumberFilter
 		}
 	} else if options.UntilEntryNumber != 0 && iteratorT.GetNumber() < options.UntilEntryNumber {
+		slog.Debug(fmt.Sprintf("Latest entry's number %d is less than the until number condition %d, aborting...", iteratorT.GetNumber(), options.UntilEntryNumber))
 		return nil, nil, ErrInvalidUntilEntryNumberCondition
 	}
 
 	// Do initial walk if either before condition is set
 	if !options.BeforeEntryID.IsZero() || options.BeforeEntryNumber != 0 {
-		for !iteratorT.GetID().Equal(options.BeforeEntryID) && iteratorT.GetNumber() != options.BeforeEntryNumber {
+		slog.Debug("Scanning RSL for search start point using before condition...")
+		for !iteratorT.GetID().Equal(options.BeforeEntryID) && (iteratorT.GetNumber() == 0 || iteratorT.GetNumber() != options.BeforeEntryNumber) {
 			if annotation, isAnnotation := iteratorT.(*AnnotationEntry); isAnnotation {
 				allAnnotations = append(allAnnotations, annotation)
 			}
@@ -567,6 +572,8 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 				return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
 			}
 		}
+
+		slog.Debug(fmt.Sprintf("Found entry '%s' matching before condition...", iteratorT.GetID().String()))
 
 		// we've found the before anchor entry, track it if it's an
 		// annotation

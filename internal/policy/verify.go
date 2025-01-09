@@ -570,6 +570,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 
 	// Load the applicable reference authorization and approvals from trusted
 	// code review systems
+	slog.Debug("Searching for applicable reference authorizations and code reviews...")
 	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return err
@@ -650,6 +651,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	}
 
 	firstEntry := false
+	slog.Debug(fmt.Sprintf("Searching for RSL entry for '%s' before entry '%s'...", entry.RefName, entry.ID.String()))
 	priorRefEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
