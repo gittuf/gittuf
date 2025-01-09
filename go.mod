@@ -14,7 +14,7 @@ require (
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/sigstore/gitsign v0.12.0
 	github.com/sigstore/protobuf-specs v0.3.2
-	github.com/sigstore/sigstore v1.8.11
+	github.com/sigstore/sigstore v1.8.12
 	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
@@ -29,7 +29,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cloudflare/circl v1.5.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
-	github.com/coreos/go-oidc/v3 v3.11.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.12.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/cyberphone/json-canonicalization v0.0.0-20241213102144-19d51d7fe467 // indirect
 	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
@@ -127,7 +127,7 @@ require (
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/term v0.28.0 // indirect
