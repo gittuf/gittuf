@@ -22,6 +22,7 @@ Tools for gittuf's root of trust
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 * [gittuf trust add-github-app-key](gittuf_trust_add-github-app-key.md)	 - Add GitHub app key to gittuf root of trust
+* [gittuf trust add-global-rule](gittuf_trust_add-global-rule.md)	 - Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy

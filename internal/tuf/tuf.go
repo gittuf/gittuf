@@ -20,7 +20,10 @@ const (
 	// GitHubAppRoleName defines the expected name for the GitHub app role in the root of trust metadata.
 	GitHubAppRoleName = "github-app"
 
-	AllowRuleName = "gittuf-allow-rule"
+	AllowRuleName          = "gittuf-allow-rule"
+	ExhaustiveVerifierName = "gittuf-exhaustive-verifier"
+
+	GittufPrefix = "gittuf-"
 )
 
 var (
@@ -35,7 +38,7 @@ var (
 	ErrPrincipalNotFound                        = errors.New("principal not found")
 	ErrRuleNotFound                             = errors.New("cannot find rule entry")
 	ErrMissingRules                             = errors.New("some rules are missing")
-	ErrCannotManipulateAllowRule                = errors.New("cannot change in-built gittuf-allow-rule")
+	ErrCannotManipulateRulesWithGittufPrefix    = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
 	ErrCannotMeetThreshold                      = errors.New("insufficient keys to meet threshold")
 )
 
@@ -93,6 +96,11 @@ type RootMetadata interface {
 	// GetPrimaryRuleFileThreshold returns the threshold of principals that must
 	// sign the primary rule file.
 	GetPrimaryRuleFileThreshold() (int, error)
+
+	// AddGlobalRule adds the corresponding rule to the root metadata.
+	AddGlobalRule(ruleName string, rulePatterns []string, threshold int) error
+	// GetGlobalRules returns the global rules declared in the root metadata.
+	GetGlobalRules() []GlobalRule
 
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
@@ -175,4 +183,22 @@ type Rule interface {
 	// current rule's delegated rules as well as other rules already in the
 	// queue are trusted.
 	IsLastTrustedInRuleFile() bool
+}
+
+// GlobalRule represents a repository-wide constraint set by the owners in the
+// root metadata.
+type GlobalRule interface {
+	// GetName returns the name of the global rule.
+	GetName() string
+
+	// Matches indicates if the rule applies to a specified path.
+	Matches(path string) bool
+
+	// GetProtectedNamespaces returns the set of namespaces protected by the
+	// rule.
+	GetProtectedNamespaces() []string
+
+	// GetThreshold returns the threshold of principals that must approve to
+	// meet the rule.
+	GetThreshold() int
 }

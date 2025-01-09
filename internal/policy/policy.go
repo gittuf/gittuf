@@ -68,7 +68,9 @@ type State struct {
 	repository     *gitinterface.Repository
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
+	allPrincipals  map[string]tuf.Principal
 	hasFileRule    bool
+	globalRules    []tuf.GlobalRule
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
@@ -237,6 +239,61 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 		return verifiers, nil
 	}
 
+	verifiers, err := s.findVerifiersForPathIfProtected(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(verifiers) > 0 {
+		// protected, we have specific set of verifiers to return
+		slog.Debug(fmt.Sprintf("Path '%s' is explicitly protected, returning corresponding verifiers...", path))
+		// add to cache
+		s.verifiersCache[path] = verifiers
+		// return verifiers
+		return verifiers, nil
+	}
+
+	slog.Debug("Checking if any global constraints exist")
+	if len(s.globalRules) == 0 {
+		slog.Debug("No global constraints found")
+		s.verifiersCache[path] = verifiers
+		return verifiers, nil
+	}
+
+	slog.Debug("Global constraints found, returning exhaustive verifier...")
+	// At least one global rule exists, return an exhaustive verifier
+	verifier := &SignatureVerifier{
+		repository: s.repository,
+		name:       tuf.ExhaustiveVerifierName,
+		principals: []tuf.Principal{}, // we'll add all principals below
+
+		// threshold doesn't matter since we set verifyExhaustively to true
+		threshold:          1,
+		verifyExhaustively: true, // very important!
+	}
+
+	for _, principal := range s.allPrincipals {
+		verifier.principals = append(verifier.principals, principal)
+	}
+
+	verifiers = []*SignatureVerifier{verifier}
+
+	// Note: we could loop through all global constraints and create a
+	// verifier with all principals but targeting a specific constraint (or
+	// an aggregate constraint that has the highest threshold requirement of
+	// all the constraints that match path). However, this probably paints
+	// us into a corner (only threshold requirements between two constraints
+	// can be compared, we may have uncomparable constraints later), and we
+	// would also want to verify every applicable global constraint for
+	// safety, so we would be doing extra work for no reason.
+
+	// add to cache
+	s.verifiersCache[path] = verifiers
+	// return verifiers
+	return verifiers, nil
+}
+
+func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifier, error) {
 	if !s.HasTargetsRole(TargetsRoleName) {
 		// No policies exist
 		return nil, ErrMetadataNotFound
@@ -261,7 +318,6 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 	verifiers := []*SignatureVerifier{}
 	for {
 		if len(groupedDelegations) == 0 {
-			s.verifiersCache[path] = verifiers
 			return verifiers, nil
 		}
 
@@ -318,6 +374,10 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 			}
 		}
 	}
+}
+
+func (s *State) GetAllPrincipals() map[string]tuf.Principal {
+	return s.allPrincipals
 }
 
 // Verify verifies the contents of the State for internal consistency.
@@ -703,6 +763,21 @@ func (s *State) HasRuleName(name string) bool {
 // This includes things like loading the set of rule names present in the state,
 // checking if it has file rules, etc.
 func (s *State) preprocess() error {
+	rootMetadata, err := s.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+
+	s.globalRules = rootMetadata.GetGlobalRules()
+
+	if s.allPrincipals == nil {
+		s.allPrincipals = map[string]tuf.Principal{}
+	}
+
+	for principalID, principal := range rootMetadata.GetPrincipals() {
+		s.allPrincipals[principalID] = principal
+	}
+
 	if s.TargetsEnvelope == nil {
 		return nil
 	}
@@ -712,6 +787,10 @@ func (s *State) preprocess() error {
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
 		return err
+	}
+
+	for principalID, principal := range targetsMetadata.GetPrincipals() {
+		s.allPrincipals[principalID] = principal
 	}
 
 	for _, rule := range targetsMetadata.GetRules() {
@@ -744,6 +823,10 @@ func (s *State) preprocess() error {
 		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName, false)
 		if err != nil {
 			return err
+		}
+
+		for principalID, principal := range delegatedMetadata.GetPrincipals() {
+			s.allPrincipals[principalID] = principal
 		}
 
 		for _, rule := range delegatedMetadata.GetRules() {

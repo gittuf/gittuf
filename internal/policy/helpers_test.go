@@ -144,6 +144,70 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithGlobalConstraint creates a policy state with no explicit
+// branch protection rules but with a two-approval constraint on changes to the
+// main branch. The two keys trusted are `rootPubKeyBytes` and `gpgPubKeyBytes`.
+func createTestStateWithGlobalConstraint(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddGlobalRule("threshold-2-main", []string{"git:refs/heads/main"}, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		RootEnvelope:    rootEnv,
+		TargetsEnvelope: targetsEnv,
+		RootPublicKeys:  []tuf.Principal{key},
+	}
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
 func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 	t.Helper()
 

@@ -357,7 +357,7 @@ func TestReorderRules(t *testing.T) {
 		},
 		"allow rule appears in the new order": {
 			ruleNames:     []string{"rule-2", "rule-3", "rule-1", tuf.AllowRuleName},
-			expectedError: tuf.ErrCannotManipulateAllowRule,
+			expectedError: tuf.ErrCannotManipulateRulesWithGittufPrefix,
 		},
 	}
 
