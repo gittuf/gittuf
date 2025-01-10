@@ -13,6 +13,7 @@ gittuf trust add-global-rule [flags]
       --rule-name string           name of rule
       --rule-pattern stringArray   patterns used to identify namespaces rule applies to
       --threshold int              threshold of required valid signatures (default 1)
+      --type string                type of rule (threshold|block-force-pushes)
 ```
 
 ### Options inherited from parent commands

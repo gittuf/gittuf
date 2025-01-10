@@ -541,7 +541,7 @@ func TestSignRoot(t *testing.T) {
 	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
 }
 
-func TestAddGlobalRule(t *testing.T) {
+func TestAddGlobalRuleThreshold(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
 	r := createTestRepositoryWithRoot(t, "")
@@ -561,7 +561,7 @@ func TestAddGlobalRule(t *testing.T) {
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	err = r.AddGlobalRule(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
+	err = r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
@@ -577,8 +577,47 @@ func TestAddGlobalRule(t *testing.T) {
 	globalRules = rootMetadata.GetGlobalRules()
 	assert.Len(t, globalRules, 1)
 	assert.Equal(t, "require-approval-for-main", globalRules[0].GetName())
-	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].GetProtectedNamespaces())
-	assert.Equal(t, 1, globalRules[0].GetThreshold())
+	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleThreshold).GetProtectedNamespaces())
+	assert.Equal(t, 1, globalRules[0].(tuf.GlobalRuleThreshold).GetThreshold())
+}
+
+func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	r := createTestRepositoryWithRoot(t, "")
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	globalRules := rootMetadata.GetGlobalRules()
+	assert.Empty(t, globalRules)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	err = r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
+	assert.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err = state.GetRootMetadata(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	globalRules = rootMetadata.GetGlobalRules()
+	assert.Len(t, globalRules, 1)
+	assert.Equal(t, "block-force-pushes-for-main", globalRules[0].GetName())
+	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleBlockForcePushes).GetProtectedNamespaces())
 }
 
 func getRootPrincipalIDs(t *testing.T, rootMetadata tuf.RootMetadata) *set.Set[string] {

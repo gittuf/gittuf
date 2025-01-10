@@ -510,24 +510,35 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	assert.True(t, trusted)
 }
 
-func TestGlobalRule(t *testing.T) {
+func TestGlobalRules(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
 	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
 
-	err := rootMetadata.AddGlobalRule("threshold-2-main", []string{"git:refs/heads/main"}, 2)
+	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1, len(rootMetadata.GlobalRules))
-	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].Name)
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 
-	expectedGlobalRule := &GlobalRule{
+	expectedGlobalRule := &GlobalRuleThreshold{
 		Name:      "threshold-2-main",
 		Paths:     []string{"git:refs/heads/main"},
 		Threshold: 2,
 	}
 	globalRules := rootMetadata.GetGlobalRules()
 	assert.Equal(t, expectedGlobalRule.GetName(), globalRules[0].GetName())
-	assert.Equal(t, expectedGlobalRule.GetProtectedNamespaces(), globalRules[0].GetProtectedNamespaces())
-	assert.Equal(t, expectedGlobalRule.GetThreshold(), globalRules[0].GetThreshold())
+	assert.Equal(t, expectedGlobalRule.GetProtectedNamespaces(), globalRules[0].(tuf.GlobalRuleThreshold).GetProtectedNamespaces())
+	assert.Equal(t, expectedGlobalRule.GetThreshold(), globalRules[0].(tuf.GlobalRuleThreshold).GetThreshold())
+
+	forcePushesGlobalRule, err := NewGlobalRuleBlockForcePushes("block-force-pushes", []string{"git:refs/heads/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rootMetadata.AddGlobalRule(forcePushesGlobalRule)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
 }

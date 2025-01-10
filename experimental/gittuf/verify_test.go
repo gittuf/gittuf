@@ -146,7 +146,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 		"absolute ref, from violating": {
 			localRefName: "refs/heads/main",
 			fromEntryID:  violatingEntryID,
-			err:          policy.ErrUnauthorizedSignature,
+			err:          policy.ErrVerificationFailed,
 		},
 		"relative ref, from non-violating": {
 			localRefName: "main",
@@ -155,7 +155,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 		"relative ref, from violating": {
 			localRefName: "main",
 			fromEntryID:  violatingEntryID,
-			err:          policy.ErrUnauthorizedSignature,
+			err:          policy.ErrVerificationFailed,
 		},
 		"unknown ref": {
 			localRefName: "refs/heads/unknown",
@@ -192,5 +192,5 @@ func TestVerifyRefFromEntry(t *testing.T) {
 
 	// Verifying from violating entry tells us unauthorized signature
 	err = repo.VerifyRefFromEntry(testCtx, refName, violatingEntryID.String())
-	assert.ErrorIs(t, err, policy.ErrUnauthorizedSignature)
+	assert.ErrorIs(t, err, policy.ErrVerificationFailed)
 }
