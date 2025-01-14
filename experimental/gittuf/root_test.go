@@ -579,6 +579,9 @@ func TestAddGlobalRuleThreshold(t *testing.T) {
 	assert.Equal(t, "require-approval-for-main", globalRules[0].GetName())
 	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleThreshold).GetProtectedNamespaces())
 	assert.Equal(t, 1, globalRules[0].(tuf.GlobalRuleThreshold).GetThreshold())
+
+	err = r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
+	assert.ErrorIs(t, err, tuf.ErrGlobalRuleAlreadyExists)
 }
 
 func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
@@ -618,6 +621,107 @@ func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
 	assert.Len(t, globalRules, 1)
 	assert.Equal(t, "block-force-pushes-for-main", globalRules[0].GetName())
 	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleBlockForcePushes).GetProtectedNamespaces())
+}
+func TestRemoveGlobalRule(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	t.Run("remove threshold global rule", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
+		assert.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules := rootMetadata.GetGlobalRules()
+		assert.Len(t, globalRules, 1)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false)
+		assert.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules = rootMetadata.GetGlobalRules()
+		assert.Empty(t, globalRules)
+	})
+
+	t.Run("remove force push global rule", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
+		assert.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules := rootMetadata.GetGlobalRules()
+		assert.Len(t, globalRules, 1)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "block-force-pushes-for-main", false)
+		assert.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules = rootMetadata.GetGlobalRules()
+		assert.Empty(t, globalRules)
+	})
+
+	t.Run("remove global rule when none exist", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules := rootMetadata.GetGlobalRules()
+		assert.Empty(t, globalRules)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false)
+		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+	})
 }
 
 func getRootPrincipalIDs(t *testing.T, rootMetadata tuf.RootMetadata) *set.Set[string] {

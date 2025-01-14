@@ -323,9 +323,33 @@ func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
 		allGlobalRules = []tuf.GlobalRule{}
 	}
 
-	// FIXME: check for duplicates
+	// check for duplicates
+	for _, rule := range allGlobalRules {
+		if rule.GetName() == globalRule.GetName() {
+			return tuf.ErrGlobalRuleAlreadyExists
+		}
+	}
+
 	allGlobalRules = append(allGlobalRules, globalRule)
 	r.GlobalRules = allGlobalRules
+	return nil
+}
+
+// DeleteGlobalRule removes the specified global rule from the RootMetadata.
+func (r *RootMetadata) DeleteGlobalRule(ruleName string) error {
+	allGlobalRules := r.GlobalRules
+	updatedGlobalRules := []tuf.GlobalRule{}
+
+	if len(allGlobalRules) == 0 {
+		return tuf.ErrGlobalRuleNotFound
+	}
+
+	for _, rule := range allGlobalRules {
+		if rule.GetName() != ruleName {
+			updatedGlobalRules = append(updatedGlobalRules, rule)
+		}
+	}
+	r.GlobalRules = updatedGlobalRules
 	return nil
 }
 

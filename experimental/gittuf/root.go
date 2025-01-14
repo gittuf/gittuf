@@ -546,6 +546,45 @@ func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer s
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+// RemoveGlobalRule removes a global rule from the root metadata.
+func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Removing global rule...")
+	if err := rootMetadata.DeleteGlobalRule(name); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Remove global rule '%s' from root metadata", name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {

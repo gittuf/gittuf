@@ -13,6 +13,7 @@ import (
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubappkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/sign"
@@ -42,6 +43,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubappkey.New(o))
+	cmd.AddCommand(removeglobalrule.New(o))
 	cmd.AddCommand(removepolicykey.New(o))
 	cmd.AddCommand(removerootkey.New(o))
 	cmd.AddCommand(sign.New(o))
