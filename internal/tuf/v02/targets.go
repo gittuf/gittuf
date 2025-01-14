@@ -11,6 +11,7 @@ import (
 
 	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -20,12 +21,19 @@ const (
 
 var ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata must be empty")
 
+// Hooks defines the schema that groups hooks by stage.
+type Hooks struct {
+	PreCommit map[string]Hook `json:"pre-commit"`
+	PrePush   map[string]Hook `json:"pre-push"`
+}
+
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
 	Type        string         `json:"type"`
 	Version     string         `json:"schemaVersion"`
 	Expires     string         `json:"expires"`
 	Targets     map[string]any `json:"targets"`
+	Hooks       Hooks          `json:"hooks"`
 	Delegations *Delegations   `json:"delegations"`
 }
 
@@ -236,6 +244,75 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addPrincipal(principal)
 }
 
+// AddHook adds the specified hook to the metadata.
+func (t *TargetsMetadata) AddHook(stage, hookName, env string, hashes map[string]gitinterface.Hash, modules, principalIDs []string) error {
+	for _, principalID := range principalIDs {
+		if _, has := t.Delegations.Principals[principalID]; !has {
+			return tuf.ErrPrincipalNotFound
+		}
+	}
+
+	newHook := Hook{
+		Name:         hookName,
+		PrincipalIDs: set.NewSetFromItems(principalIDs...),
+		Hashes:       hashes,
+		Environment:  env,
+		Modules:      modules,
+	}
+
+	switch stage {
+	case "pre-commit":
+		if t.Hooks.PreCommit == nil {
+			t.Hooks.PreCommit = make(map[string]Hook, 1)
+		}
+		t.Hooks.PreCommit[hookName] = newHook
+	case "pre-push":
+		if t.Hooks.PrePush == nil {
+			t.Hooks.PrePush = make(map[string]Hook, 1)
+		}
+		t.Hooks.PrePush[hookName] = newHook
+	default:
+		return tuf.ErrInvalidHookStage
+	}
+
+	return nil
+}
+
+// RemoveHook removes the hook specified by stage and hookName.
+func (t *TargetsMetadata) RemoveHook(stage, hookName string) error {
+	switch stage {
+	case "pre-commit":
+		delete(t.Hooks.PreCommit, hookName)
+	case "pre-push":
+		delete(t.Hooks.PrePush, hookName)
+	default:
+		return tuf.ErrInvalidHookStage
+	}
+
+	return nil
+}
+
+// GetHooks returns the hooks for the specified stage.
+func (t *TargetsMetadata) GetHooks(stage string) (map[string]tuf.Applet, error) {
+	var originMap map[string]Hook
+	switch stage {
+	case "pre-commit":
+		originMap = t.Hooks.PreCommit
+	case "pre-push":
+		originMap = t.Hooks.PrePush
+	default:
+		return nil, tuf.ErrInvalidHookStage
+	}
+
+	var appletMap = make(map[string]tuf.Applet)
+
+	for name, hook := range originMap {
+		appletMap[name] = &hook
+	}
+
+	return appletMap, nil
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
@@ -374,4 +451,38 @@ func (d *Delegation) IsLastTrustedInRuleFile() bool {
 // delegation.
 func (d *Delegation) GetProtectedNamespaces() []string {
 	return d.Paths
+}
+
+// Hook defines the schema for a hook.
+type Hook struct {
+	Name         string                       `json:"name"`
+	PrincipalIDs *set.Set[string]             `json:"principals"`
+	Hashes       map[string]gitinterface.Hash `json:"hashes"`
+	Environment  string                       `json:"environment"`
+	Modules      []string                     `json:"modules"`
+}
+
+// ID returns the identifier of the hook, its name.
+func (h *Hook) ID() string {
+	return h.Name
+}
+
+// GetPrincipalIDs returns the principals that must run this hook.
+func (h *Hook) GetPrincipalIDs() *set.Set[string] {
+	return h.PrincipalIDs
+}
+
+// GetHashes returns the hashes of the hook file.
+func (h *Hook) GetHashes() map[string]gitinterface.Hash {
+	return h.Hashes
+}
+
+// GetEnvironment returns the environment that the hook is to run in.
+func (h *Hook) GetEnvironment() string {
+	return h.Environment
+}
+
+// GetModules returns the Lua modules that the hook will have access to.
+func (h *Hook) GetModules() []string {
+	return h.Modules
 }

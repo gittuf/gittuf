@@ -62,3 +62,10 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	}
 	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
 }
+
+func (r *Repository) ListHooks(ctx context.Context, targetRef, policyName string) (map[string]map[string]tuf.Applet, error) {
+	if strings.HasPrefix(targetRef, "refs/gittuf/") {
+		return policy.ListHooks(ctx, r.r, targetRef, policyName)
+	}
+	return policy.ListHooks(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
+}
