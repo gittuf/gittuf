@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -48,6 +49,9 @@ var (
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 	ErrGlobalRuleNotFound                              = errors.New("global rule not found")
 	ErrGlobalRuleAlreadyExists                         = errors.New("global rule already exists")
+	ErrDuplicatedHookName                              = errors.New("two hooks with same name found in policy")
+	ErrInvalidHookStage                                = errors.New("invalid stage for hook")
+	ErrHookNotFound                                    = errors.New("cannot find hook entry")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
@@ -173,6 +177,13 @@ type TargetsMetadata interface {
 
 	// AddPrincipal adds a principal to the metadata.
 	AddPrincipal(principal Principal) error
+
+	// AddHook adds a hook to the metadata file.
+	AddHook(stage, hookName, env string, hashes map[string]gitinterface.Hash, modules, principalIDs []string) error
+	// RemoveHook removes the hook identified by hookName.
+	RemoveHook(stage, hookName string) error
+	// GetHooks returns all hooks in the metadata.
+	GetHooks(stage string) (map[string]Applet, error)
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
@@ -237,4 +248,23 @@ type GlobalRuleBlockForcePushes interface {
 	// GetProtectedNamespaces returns the set of namespaces protected by the
 	// rule.
 	GetProtectedNamespaces() []string
+}
+
+// Applet represents a hook entry in a rule file ('TargetsMetadata').
+type Applet interface {
+	// ID returns the identifier of the hook, typically a name.
+	ID() string
+
+	// GetPrincipalIDs returns the identifiers of the principals that must run
+	// the hook.
+	GetPrincipalIDs() *set.Set[string]
+
+	// GetHashes returns the hashes identifying the hook file itself.
+	GetHashes() map[string]gitinterface.Hash
+
+	// GetEnvironment returns the environment that the hook is to run in.
+	GetEnvironment() string
+
+	// GetModules returns the lua modules to load in, only for lua-based hooks.
+	GetModules() []string
 }

@@ -4,12 +4,15 @@
 package gittuf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 )
 
 type ErrHookExists struct {
@@ -56,6 +59,14 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 	if err := os.WriteFile(hookFile, content, 0o700); err != nil { // nolint:gosec
 		return fmt.Errorf("writing %s hook: %w", hookType, err)
 	}
+	return nil
+}
+
+// InvokeHook runs the hooks defined in the specified stage for the user defined
+// by the supplied signer. A check is performed that the user holds the private
+// key necessary for signing, to support the generation of attestations.
+func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibdsse.Signer) error { //nolint:revive
+	// TODO: check if we can sign and then invoke the appropriate lua hook...
 	return nil
 }
 

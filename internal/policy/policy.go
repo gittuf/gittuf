@@ -42,6 +42,8 @@ const (
 
 	metadataTreeEntryName = "metadata"
 
+	hooksTreeEntryName = "hooks"
+
 	gitReferenceRuleScheme = "git"
 	fileRuleScheme         = "file"
 )
@@ -55,12 +57,15 @@ var (
 )
 
 // State contains the full set of metadata and root keys present in a policy
-// state.
+// state, as well as optionally hooks.
 type State struct {
 	RootEnvelope        *sslibdsse.Envelope
 	TargetsEnvelope     *sslibdsse.Envelope
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
 	RootPublicKeys      []tuf.Principal
+
+	PreCommitHooks map[string]gitinterface.Hash
+	PrePushHooks   map[string]gitinterface.Hash
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
@@ -497,8 +502,8 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy-staging namespace. It also creates
-// an RSL entry recording the new tip of the policy-staging namespace.
+// Commit verifies and writes the State to the policy-staging namespace. It also
+// creates an RSL entry recording the new tip of the policy-staging namespace.
 func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
@@ -530,6 +535,14 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		}
 
 		allTreeEntries[path.Join(metadataTreeEntryName, name+".json")] = blobID
+	}
+
+	for name, blobID := range s.PreCommitHooks {
+		allTreeEntries[path.Join(hooksTreeEntryName, "pre-commit", name+".lua")] = blobID
+	}
+
+	for name, blobID := range s.PrePushHooks {
+		allTreeEntries[path.Join(hooksTreeEntryName, "pre-push", name+".lua")] = blobID
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
@@ -757,6 +770,30 @@ func (s *State) HasTargetsRole(roleName string) bool {
 
 func (s *State) HasRuleName(name string) bool {
 	return s.ruleNames.Has(name)
+}
+
+// LoadHooksIntoState populates the hooks fields inside the state with the hooks
+// currently defined in the metadata.
+func (s *State) LoadHooksIntoState(t tuf.TargetsMetadata) error {
+	hooks, err := t.GetHooks("pre-commit")
+	if err != nil {
+		return err
+	}
+	slog.Debug("a")
+	for name, hook := range hooks {
+		s.PreCommitHooks[name] = hook.GetHashes()["sha1"]
+	}
+
+	hooks, err = t.GetHooks("pre-push")
+	if err != nil {
+		return err
+	}
+	slog.Debug("b")
+	for name, hook := range hooks {
+		s.PreCommitHooks[name] = hook.GetHashes()["sha1"]
+	}
+
+	return nil
 }
 
 // preprocess handles several "one time" tasks when the state is first loaded.
