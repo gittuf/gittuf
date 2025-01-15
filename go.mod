@@ -3,7 +3,7 @@ module github.com/gittuf/gittuf
 go 1.23.4
 
 require (
-	github.com/ProtonMail/go-crypto v1.1.4
+	github.com/ProtonMail/go-crypto v1.1.5
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
 	github.com/go-git/go-git/v5 v5.13.1
 	github.com/google/go-github/v61 v61.0.0
