@@ -32,5 +32,6 @@ Tools to manage gittuf policies
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
+* [gittuf policy tui](gittuf_policy_tui.md)	 - Start the TUI for managing policies
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
 
