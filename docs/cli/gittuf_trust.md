@@ -31,6 +31,7 @@ Tools for gittuf's root of trust
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app-key](gittuf_trust_remove-github-app-key.md)	 - Remove GitHub app key from gittuf root of trust
+* [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust

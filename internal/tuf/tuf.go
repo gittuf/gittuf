@@ -27,6 +27,7 @@ const (
 
 	GlobalRuleThresholdType        = "threshold"
 	GlobalRuleBlockForcePushesType = "block-force-pushes"
+	RemoveGlobalRuleType           = "remove"
 )
 
 var (
@@ -45,6 +46,8 @@ var (
 	ErrCannotMeetThreshold                             = errors.New("insufficient keys to meet threshold")
 	ErrUnknownGlobalRuleType                           = errors.New("unknown global rule type")
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
+	ErrGlobalRuleNotFound                              = errors.New("global rule not found")
+	ErrGlobalRuleAlreadyExists                         = errors.New("global rule already exists")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
@@ -106,6 +109,8 @@ type RootMetadata interface {
 	AddGlobalRule(globalRule GlobalRule) error
 	// GetGlobalRules returns the global rules declared in the root metadata.
 	GetGlobalRules() []GlobalRule
+	// DeleteGlobalRule removes the global rule from the root metadata.
+	DeleteGlobalRule(ruleName string) error
 
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
