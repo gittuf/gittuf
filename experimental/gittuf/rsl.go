@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strings"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
@@ -163,6 +165,40 @@ func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, messag
 
 	slog.Debug("Creating RSL annotation entry...")
 	return rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit)
+}
+
+func (r *Repository) SyncControllerRepositories(ctx context.Context) error {
+	currentPolicy, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+	if err != nil {
+		return fmt.Errorf("unable to load current policy: %w", err)
+	}
+
+	rootMetadata, err := currentPolicy.GetRootMetadata(false)
+	if err != nil {
+		return fmt.Errorf("unable to load root metadata: %w", err)
+	}
+
+	for _, controllerRepositoryDetails := range rootMetadata.GetControllerRepositories() {
+		tempDir, err := os.MkdirTemp("", "gittuf-controller")
+		if err != nil {
+			return fmt.Errorf("unable to make temporary directory to inspect controller repository: %w", err)
+		}
+		defer os.RemoveAll(tempDir) //nolint:errcheck
+
+		controllerRepository, err := Clone(ctx, controllerRepositoryDetails.GetLocation(), tempDir, "", controllerRepositoryDetails.GetRootPrincipals())
+		if err != nil {
+			return fmt.Errorf("unable to clone controller repository: %w", err)
+		}
+
+		if err := controllerRepository.r.FetchRefSpec(controllerRepositoryDetails.GetLocation(), []string{"refs/gittuf/*:refs/gittuf/*"}); err != nil {
+			return fmt.Errorf("unable to fetch gittuf namespaces of controller repository: %w", err)
+		}
+
+		// TODO: check last import into current RSL
+		// TODO: import new changes into current RSL
+	}
+
+	return nil
 }
 
 // ReconcileLocalRSLWithRemote checks the local RSL against the specified remote
