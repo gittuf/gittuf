@@ -15,17 +15,24 @@ import (
 )
 
 const (
-	Ref                        = "refs/gittuf/reference-state-log"
-	ReferenceEntryHeader       = "RSL Reference Entry"
-	RefKey                     = "ref"
-	TargetIDKey                = "targetID"
+	Ref                  = "refs/gittuf/reference-state-log"
+	ReferenceEntryHeader = "RSL Reference Entry"
+	RefKey               = "ref"
+	TargetIDKey          = "targetID"
+
 	AnnotationEntryHeader      = "RSL Annotation Entry"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
 	EndMessage                 = "-----END MESSAGE-----"
 	EntryIDKey                 = "entryID"
 	SkipKey                    = "skip"
-	NumberKey                  = "number"
+
+	ImportEntryHeader              = "RSL Import Entry"
+	ControllerLocationKey          = "controllerLocation"
+	ControllerPolicyEntryIDKey     = "controllerPolicyEntryID"
+	ControllerPolicyEntryNumberKey = "controllerPolicyEntryNumber"
+
+	NumberKey = "number"
 
 	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
 	gittufNamespacePrefix  = "refs/gittuf/"
@@ -372,6 +379,74 @@ func (a *AnnotationEntry) commitWithoutNumber(repo *gitinterface.Repository) err
 
 	_, err = repo.Commit(emptyTreeID, Ref, message, false)
 	return err
+}
+
+type ImportEntry struct {
+	// ID contains the Git hash for the commit corresponding to the entry.
+	ID gitinterface.Hash
+
+	ControllerLocation string
+
+	ControllerPolicyEntryID gitinterface.Hash
+
+	ControllerPolicyEntryNumber uint64
+
+	// Number contains a strictly increasing number that hints at entry ordering.
+	Number uint64
+}
+
+func (i *ImportEntry) GetID() gitinterface.Hash {
+	return i.ID
+}
+
+func (i *ImportEntry) GetNumber() uint64 {
+	return i.Number
+}
+
+func (i *ImportEntry) Commit(repo *gitinterface.Repository, sign bool) error {
+	if err := i.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, _ := i.createCommitMessage(true) // we have an error return for annotations, always nil here
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
+	return err
+}
+
+func (i *ImportEntry) createCommitMessage(includeNumber bool) (string, error) {
+	lines := []string{
+		ImportEntryHeader,
+		"",
+		fmt.Sprintf("%s: %s", ControllerLocationKey, i.ControllerLocation),
+		fmt.Sprintf("%s: %s", ControllerPolicyEntryIDKey, i.ControllerPolicyEntryID.String()),
+		fmt.Sprintf("%s: %d", ControllerPolicyEntryNumberKey, i.ControllerPolicyEntryNumber),
+	}
+	if includeNumber && i.Number > 0 {
+		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, i.Number))
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+func (i *ImportEntry) setEntryNumber(repo *gitinterface.Repository) error {
+	latestEntry, err := GetLatestEntry(repo)
+	if err == nil {
+		i.Number = latestEntry.GetNumber() + 1
+	} else {
+		if errors.Is(err, ErrRSLEntryNotFound) {
+			// First entry
+			i.Number = 1
+		} else {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetEntry returns the entry corresponding to entryID.
@@ -908,10 +983,16 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
-	if strings.HasPrefix(text, AnnotationEntryHeader) {
+	switch {
+	case strings.HasPrefix(text, ReferenceEntryHeader):
+		return parseReferenceEntryText(id, text)
+	case strings.HasPrefix(text, AnnotationEntryHeader):
 		return parseAnnotationEntryText(id, text)
+	case strings.HasPrefix(text, ImportEntryHeader):
+		return parseImportEntryText(id, text)
+	default:
+		return nil, ErrInvalidRSLEntry
 	}
-	return parseReferenceEntryText(id, text)
 }
 
 func parseReferenceEntryText(id gitinterface.Hash, text string) (*ReferenceEntry, error) {
@@ -1010,6 +1091,55 @@ func parseAnnotationEntryText(id gitinterface.Hash, text string) (*AnnotationEnt
 	}
 
 	return annotation, nil
+}
+
+func parseImportEntryText(id gitinterface.Hash, text string) (*ImportEntry, error) {
+	lines := strings.Split(text, "\n")
+	if len(lines) < 5 {
+		return nil, ErrInvalidRSLEntry
+	}
+	lines = lines[2:]
+
+	entry := &ImportEntry{ID: id}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+
+		ls := strings.Split(l, ":")
+		if len(ls) < 2 {
+			return nil, ErrInvalidRSLEntry
+		}
+
+		switch strings.TrimSpace(ls[0]) {
+		case ControllerLocationKey:
+			entry.ControllerLocation = strings.TrimSpace(ls[1])
+
+		case ControllerPolicyEntryIDKey:
+			targetHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
+			if err != nil {
+				return nil, err
+			}
+
+			entry.ControllerPolicyEntryID = targetHash
+
+		case ControllerPolicyEntryNumberKey:
+			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			entry.ControllerPolicyEntryNumber = number
+
+		case NumberKey:
+			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			entry.Number = number
+		}
+	}
+
+	return entry, nil
 }
 
 func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID gitinterface.Hash) []*AnnotationEntry {
