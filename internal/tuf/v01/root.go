@@ -26,6 +26,7 @@ type RootMetadata struct {
 	Roles                  map[string]Role  `json:"roles"`
 	GitHubApprovalsTrusted bool             `json:"githubApprovalsTrusted"`
 	GlobalRules            []tuf.GlobalRule `json:"globalRules,omitempty"`
+	MultiRepository        *MultiRepository `json:"multiRepository,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -369,6 +370,78 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
 }
 
+func (r *RootMetadata) IsController() bool {
+	if r.MultiRepository == nil {
+		return false
+	}
+
+	return r.MultiRepository.IsController
+}
+
+func (r *RootMetadata) AddControllerRepository(location string, rootPrincipals []tuf.Principal) error {
+	// TODO: handle duplicate in locations?
+
+	if rootPrincipals == nil || len(rootPrincipals) == 0 {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	if r.MultiRepository == nil {
+		r.MultiRepository = &MultiRepository{
+			ControllerRepositories: []*OtherRepository{},
+		}
+	}
+
+	otherRepository := &OtherRepository{
+		Location: location,
+	}
+	for _, principal := range rootPrincipals {
+		keyT, isKnownType := principal.(*Key)
+		if !isKnownType {
+			return tuf.ErrInvalidPrincipalType
+		}
+		otherRepository.RootPrincipals = append(otherRepository.RootPrincipals, keyT)
+	}
+
+	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
+	return nil
+}
+
+func (r *RootMetadata) AddNetworkRepository(location string, rootPrincipals []tuf.Principal) error {
+	// TODO: handle duplicate in locations?
+
+	if rootPrincipals == nil || len(rootPrincipals) == 0 {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	if r.MultiRepository == nil {
+		r.MultiRepository = &MultiRepository{
+			NetworkRepositories: []*OtherRepository{},
+		}
+	}
+
+	otherRepository := &OtherRepository{
+		Location: location,
+	}
+	for _, principal := range rootPrincipals {
+		keyT, isKnownType := principal.(*Key)
+		if !isKnownType {
+			return tuf.ErrInvalidPrincipalType
+		}
+		otherRepository.RootPrincipals = append(otherRepository.RootPrincipals, keyT)
+	}
+
+	r.MultiRepository.NetworkRepositories = append(r.MultiRepository.NetworkRepositories, otherRepository)
+	return nil
+}
+
+func (r *RootMetadata) GetControllerRepositories() []tuf.OtherRepository {
+	otherRepositories := []tuf.OtherRepository{}
+	for _, otherRepository := range r.MultiRepository.ControllerRepositories {
+		otherRepositories = append(otherRepositories, otherRepository)
+	}
+	return otherRepositories
+}
+
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage in place of tuf.GlobalRule
@@ -380,6 +453,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Roles                  map[string]Role   `json:"roles"`
 		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage `json:"globalRules,omitempty"`
+		MultiRepository        *MultiRepository  `json:"multiRepository,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -423,6 +497,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	r.MultiRepository = temp.MultiRepository
+
 	return nil
 }
 
@@ -449,6 +525,29 @@ func (r *RootMetadata) addRole(roleName string, role Role) {
 	}
 
 	r.Roles[roleName] = role
+}
+
+type MultiRepository struct {
+	IsController           bool               `json:"isController,omitempty"`
+	ControllerRepositories []*OtherRepository `json:"controllerRepositories,omitempty"`
+	NetworkRepositories    []*OtherRepository `json:"networkRepositories,omitempty"`
+}
+
+type OtherRepository struct {
+	Location       string `json:"location,omitempty"`
+	RootPrincipals []*Key `json:"rootPrincipals,omitempty"` // todo should this declare keys inline?
+}
+
+func (o *OtherRepository) GetLocation() string {
+	return o.Location
+}
+
+func (o *OtherRepository) GetRootPrincipals() []tuf.Principal {
+	principals := []tuf.Principal{}
+	for _, key := range o.RootPrincipals {
+		principals = append(principals, key)
+	}
+	return principals
 }
 
 type GlobalRuleThreshold struct {
