@@ -21,6 +21,7 @@ const (
 type RootMetadata struct {
 	Type                   string           `json:"type"`
 	Expires                string           `json:"expires"`
+	RepositoryLocation     string           `json:"repositoryLocation,omitempty"`
 	Keys                   map[string]*Key  `json:"keys"`
 	Roles                  map[string]Role  `json:"roles"`
 	GitHubApprovalsTrusted bool             `json:"githubApprovalsTrusted"`
@@ -42,6 +43,17 @@ func (r *RootMetadata) SetExpires(expires string) {
 // SchemaVersion returns the metadata schema version.
 func (r *RootMetadata) SchemaVersion() string {
 	return rootVersion
+}
+
+// GetRepositoryLocation returns the canonical location of the Git repository.
+func (r *RootMetadata) GetRepositoryLocation() string {
+	return r.RepositoryLocation
+}
+
+// SetRepositoryLocation sets the specified repository location in the root
+// metadata.
+func (r *RootMetadata) SetRepositoryLocation(location string) {
+	r.RepositoryLocation = location
 }
 
 // AddRootPrincipal adds the specified key to the root metadata and authorizes the key
@@ -339,6 +351,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	type tempType struct {
 		Type                   string            `json:"type"`
 		Expires                string            `json:"expires"`
+		RepositoryLocation     string            `json:"repositoryLocation,omitempty"`
 		Keys                   map[string]*Key   `json:"keys"`
 		Roles                  map[string]Role   `json:"roles"`
 		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
@@ -352,6 +365,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 
 	r.Type = temp.Type
 	r.Expires = temp.Expires
+	r.RepositoryLocation = temp.RepositoryLocation
 	r.Keys = temp.Keys
 	r.Roles = temp.Roles
 	r.GitHubApprovalsTrusted = temp.GitHubApprovalsTrusted

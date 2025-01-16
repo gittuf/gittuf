@@ -67,6 +67,13 @@ type RootMetadata interface {
 	// SchemaVersion returns the metadata schema version.
 	SchemaVersion() string
 
+	// GetRepositoryLocation returns the canonical location of the Git
+	// repository.
+	GetRepositoryLocation() string
+	// SetRepositoryLocation sets the specified repository location in the
+	// root metadata.
+	SetRepositoryLocation(location string)
+
 	// GetPrincipals returns all the principals in the root metadata.
 	GetPrincipals() map[string]Principal
 

@@ -1,11 +1,10 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package init
+package setrepositorylocation
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
@@ -23,6 +22,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"location of repository",
 	)
+	cmd.MarkFlagRequired("location") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -36,14 +36,14 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.InitializeRoot(cmd.Context(), signer, true, rootopts.WithRepositoryLocation(o.location))
+	return repo.SetRepositoryLocation(cmd.Context(), signer, o.location, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "init",
-		Short:             "Initialize gittuf root of trust for repository",
+		Use:               "set-repository-location",
+		Short:             "Set repository location",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

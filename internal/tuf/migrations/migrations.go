@@ -24,6 +24,9 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	// Set same expires
 	newRootMetadata.Expires = rootMetadata.Expires
 
+	// Set repository location
+	newRootMetadata.RepositoryLocation = rootMetadata.RepositoryLocation
+
 	// Set keys
 	newRootMetadata.Principals = map[string]tuf.Principal{}
 	for keyID, key := range rootMetadata.Keys {
