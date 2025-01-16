@@ -1,15 +1,15 @@
-## gittuf trust init
+## gittuf trust set-repository-location
 
-Initialize gittuf root of trust for repository
+Set repository location
 
 ```
-gittuf trust init [flags]
+gittuf trust set-repository-location [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for init
+  -h, --help              help for set-repository-location
       --location string   location of repository
 ```
 

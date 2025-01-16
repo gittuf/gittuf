@@ -54,6 +54,17 @@ func TestRootMetadata(t *testing.T) {
 		principals := rootMetadata.GetPrincipals()
 		assert.Equal(t, expectedPrincipals, principals)
 	})
+
+	t.Run("test rootLocation", func(t *testing.T) {
+		currentLocation := rootMetadata.GetRepositoryLocation()
+		assert.Equal(t, "", currentLocation)
+
+		location := "https://example.com/repository/location"
+		rootMetadata.SetRepositoryLocation(location)
+
+		currentLocation = rootMetadata.GetRepositoryLocation()
+		assert.Equal(t, location, currentLocation)
+	})
 }
 
 func TestRootMetadataWithSSHKey(t *testing.T) {

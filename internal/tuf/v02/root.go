@@ -21,6 +21,7 @@ type RootMetadata struct {
 	Type                   string                   `json:"type"`
 	Version                string                   `json:"schemaVersion"`
 	Expires                string                   `json:"expires"`
+	RepositoryLocation     string                   `json:"repositoryLocation,omitempty"`
 	Principals             map[string]tuf.Principal `json:"principals"`
 	Roles                  map[string]Role          `json:"roles"`
 	GitHubApprovalsTrusted bool                     `json:"githubApprovalsTrusted"`
@@ -43,6 +44,17 @@ func (r *RootMetadata) SetExpires(expires string) {
 // SchemaVersion returns the metadata schema version.
 func (r *RootMetadata) SchemaVersion() string {
 	return r.Version
+}
+
+// GetRepositoryLocation returns the canonical location of the Git repository.
+func (r *RootMetadata) GetRepositoryLocation() string {
+	return r.RepositoryLocation
+}
+
+// SetRepositoryLocation sets the specified repository location in the root
+// metadata.
+func (r *RootMetadata) SetRepositoryLocation(location string) {
+	r.RepositoryLocation = location
 }
 
 // AddRootPrincipal adds the specified principal to the root metadata and
@@ -305,6 +317,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Type                   string                     `json:"type"`
 		Version                string                     `json:"schemaVersion"`
 		Expires                string                     `json:"expires"`
+		RepositoryLocation     string                     `json:"repositoryLocation,omitempty"`
 		Principals             map[string]json.RawMessage `json:"principals"`
 		Roles                  map[string]Role            `json:"roles"`
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
@@ -319,6 +332,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	r.Type = temp.Type
 	r.Version = temp.Version
 	r.Expires = temp.Expires
+	r.RepositoryLocation = temp.RepositoryLocation
 
 	r.Principals = make(map[string]tuf.Principal)
 	for principalID, principalBytes := range temp.Principals {

@@ -34,6 +34,7 @@ Tools for gittuf's root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
+* [gittuf trust set-repository-location](gittuf_trust_set-repository-location.md)	 - Set repository location
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust
 * [gittuf trust update-policy-threshold](gittuf_trust_update-policy-threshold.md)	 - Update Policy threshold in the gittuf root of trust
 * [gittuf trust update-root-threshold](gittuf_trust_update-root-threshold.md)	 - Update Root threshold in the gittuf root of trust

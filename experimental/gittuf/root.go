@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
@@ -24,13 +25,18 @@ import (
 
 // InitializeRoot is the interface for the user to create the repository's root
 // of trust.
-func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...root.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
+	}
+
+	options := &root.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	var (
@@ -57,6 +63,11 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
+	if options.RepositoryLocation != "" {
+		slog.Debug("Setting repository location...")
+		rootMetadata.SetRepositoryLocation(options.RepositoryLocation)
+	}
+
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
 		return err
@@ -77,6 +88,37 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, signCommit)
+}
+
+func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse.SignerVerifier, location string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata.SetRepositoryLocation(location)
+
+	commitMessage := fmt.Sprintf("Set repository location to '%s' in root", location)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
 // AddRootKey is the interface for the user to add an authorized key

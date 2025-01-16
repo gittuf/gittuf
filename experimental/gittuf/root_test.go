@@ -6,8 +6,10 @@ package gittuf
 import (
 	"testing"
 
+	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -18,14 +20,71 @@ import (
 )
 
 func TestInitializeRoot(t *testing.T) {
-	// The helper also runs InitializeRoot for this test
+	t.Run("no repository location", func(t *testing.T) {
+		// The helper also runs InitializeRoot for this test
+		r := createTestRepositoryWithRoot(t, "")
+
+		key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+		verifier, err := ssh.NewVerifierFromKey(key)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+
+		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
+
+		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with repository location", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		r := &Repository{r: repo}
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		location := "https://example.com/repository/location"
+		err := r.InitializeRoot(testCtx, signer, false, rootopts.WithRepositoryLocation(location))
+		assert.Nil(t, err)
+
+		if err := policy.Apply(testCtx, repo, false); err != nil {
+			t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+		}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, location, rootMetadata.GetRepositoryLocation())
+	})
+}
+
+func TestSetRepositoryLocation(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
-	key := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
-	verifier, err := ssh.NewVerifierFromKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	location := "https://example.com/repository/location"
+	err := r.SetRepositoryLocation(testCtx, sv, location, false)
+	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -34,12 +93,7 @@ func TestInitializeRoot(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
-	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
-
-	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
-
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
-	assert.Nil(t, err)
+	assert.Equal(t, location, rootMetadata.GetRepositoryLocation())
 }
 
 func TestAddRootKey(t *testing.T) {
