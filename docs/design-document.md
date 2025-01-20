@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: December 18, 2024
+Last Modified: January 20, 2025
 
 ## Introduction
 
@@ -22,7 +22,7 @@ The core concepts of gittuf described in this document have been
 
 This document is scoped to describing how gittuf's write access control policies
 are applied to Git repositories. Other additions to gittuf's featureset are
-described in standalone ["extensions" documents](/docs/extensions/).
+described in standalone [gittuf Augmentation Proposals (GAPs)](/docs/gaps/).
 
 ## Definitions
 
@@ -439,8 +439,8 @@ authorizations", implemented using signed [in-toto
 attestations](https://github.com/in-toto/attestation). Attestations are tracked
 in the custom Git reference `refs/gittuf/attestations`. The gittuf design
 currently supports the "reference authorization" type to represent code review
-approvals. Other types may be added to this document or via extensions in
-future.
+approvals. Other types may be added to this document or via [GAPs](/docs/gaps/)
+in future.
 
 A reference authorization is an attestation that accompanies an RSL reference
 entry, allowing additional developers to issue signatures authorizing the change
