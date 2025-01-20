@@ -156,8 +156,8 @@ may choose to reject the proposed changes after assessing the GAP. Even in these
 cases, the document must be merged into the repository with the status indicated
 in the document's metadata section. Note that a GAP must only be withdrawn or
 rejected on the basis of technical reasons (e.g., a better solution is proposed
-or a security issue is discovered a consequence of the proposal). The reasoning
-section of the GAP must capture these technical considerations.
+or a security issue is discovered as a consequence of the proposal). The
+reasoning section of the GAP must capture these technical considerations.
 
 ### Implementing a GAP
 
@@ -170,10 +170,13 @@ subject to approval from the gittuf maintainers.
 
 ### Removing a GAP's implementation
 
-If a GAP's implementation is removed, then the GAP must be updated to indicate
-this change. In addition to the corresponding changes to the metadata section,
-other sections such as the reasoning, implementation, backwards compatibility,
-and changelog must also be updated.
+After a GAP is implemented, the corresponding changes or feature additions may
+be reverted (e.g., the feature leads to repeated security issues while being
+used rarely or gittuf's design as a whole evolves in a way that makes the GAP
+redundant). In such scenarios, the GAP must be updated to indicate this change.
+In addition to the corresponding changes to the metadata section, other sections
+such as the reasoning, implementation, backwards compatibility, and changelog
+must also be updated.
 
 ## Acknowledgements
 
