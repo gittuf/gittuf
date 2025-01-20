@@ -88,7 +88,11 @@ The participants in a GAP have specific responsibilities.
 
 Every GAP must have at least one sponsor. There is no limit to the number of
 sponsors a GAP may have. Each sponsor must be listed in the GAP's metadata
-section.
+section. The sponsors are the original proposers of a GAP and take on the
+responsibility of authoring the document and submitting it for review by the
+gittuf maintainers. Additionally, the sponsors should update the GAP based on
+feedback or changes to the corresponding implementations, thus ensuring the
+document reflects the latest status of the proposed changes.
 
 ### Contributor
 
