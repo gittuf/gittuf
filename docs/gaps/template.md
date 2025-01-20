@@ -4,10 +4,10 @@
 
 * **Number:**
 * **Title:** GAP Template (update with title of GAP)
-* **Status:** Draft
+* **Implemented:** No
+* **Withdrawn/Rejected:** No
 * **Sponsors:**
 * **Contributors:**
-* **Reviewers:**
 * **Last Modified:**
 
 ## Abstract
