@@ -1,7 +1,9 @@
 # Contributing Guide
 
 Contributions to gittuf can be of several types:
-* changes to the design documents stored in the `docs/` folder
+* changes to the [design document](/docs/design-document.md) or
+  [gittuf Augmentation Proposals (GAPs)](/docs/gaps/README.md) stored in the
+  `docs/` folder
 * code changes for bug fixes, new features, documentation, and other
   enhancements to the implementation
 * new issues or feature requests
@@ -12,9 +14,14 @@ to get started!
 ## Contributor Workflow
 
 When submitting changes to the gittuf docs or implementation, contributors must
-open a GitHub pull request to the repository. gittuf uses the NYU Secure
-Systems Lab
-[development workflow](https://github.com/secure-systems-lab/lab-guidelines/blob/master/dev-workflow.md).
+open a GitHub pull request to the repository. If a proposed change is a
+significant deviation from gittuf's [design document](/docs/design-document.md),
+a [GAP](/docs/gaps/README.md) may be necessary. When in doubt, contributors are
+advised to file an issue in the repository for the
+[maintainers](MAINTAINERS.txt) to determine the best way forward.
+
+gittuf uses the NYU Secure Systems Lab [development
+workflow](https://github.com/secure-systems-lab/lab-guidelines/blob/master/dev-workflow.md).
 Pull requests must include tests for the changes in behavior they introduce.
 They are reviewed by one or more [maintainers](MAINTAINERS.txt) and undergo
 automated testing such as (but not limited to):
