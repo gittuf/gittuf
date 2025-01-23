@@ -57,13 +57,13 @@ func TestClone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.RecordRSLEntryForReference(refName, false); err != nil {
+	if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := remoteRepo.r.SetReference(anotherRefName, commitID); err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.RecordRSLEntryForReference(anotherRefName, false); err != nil {
+	if err := remoteRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false); err != nil {
 		t.Fatal(err)
 	}
 

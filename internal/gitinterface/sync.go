@@ -63,7 +63,7 @@ func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly boo
 	return r.FetchRefSpec(remoteName, refSpecs)
 }
 
-func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string) (*Repository, error) {
+func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string, bare bool) (*Repository, error) {
 	if dir == "" {
 		return nil, fmt.Errorf("target directory must be specified")
 	}
@@ -77,12 +77,17 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 	}
 	args = append(args, dir)
 
+	if bare {
+		args = append(args, "--bare")
+		repo.gitDirPath = dir
+	} else {
+		repo.gitDirPath = path.Join(dir, ".git")
+	}
+
 	_, stdErr, err := repo.executor(args...).execute()
 	if err != nil {
 		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
 	}
-
-	repo.gitDirPath = path.Join(dir, ".git")
 
 	return repo, repo.Fetch(DefaultRemoteName, refs, true)
 }

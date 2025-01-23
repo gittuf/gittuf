@@ -7,6 +7,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addpropagation"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
@@ -38,6 +39,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addgithubapp.New(o))
 	cmd.AddCommand(addglobalrule.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
+	cmd.AddCommand(addpropagation.New(o))
 	cmd.AddCommand(addrootkey.New(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))

@@ -32,13 +32,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.MarkFlagRequired("message") //nolint:errcheck
 }
 
-func (o *options) Run(_ *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	return repo.RecordRSLAnnotation(args, o.skip, o.message, true)
+	return repo.RecordRSLAnnotation(cmd.Context(), args, o.skip, o.message, true)
 }
 
 func New() *cobra.Command {

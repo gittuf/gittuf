@@ -248,12 +248,12 @@ func NewTreeBuilder(repo *Repository) *TreeBuilder {
 // WriteTreeFromEntries accepts list of TreeEntry representations, and returns
 // the Git ID of the tree that contains these entries. It constructs the
 // required intermediate trees.
-func (t *TreeBuilder) WriteTreeFromEntries(files []TreeEntry) (Hash, error) {
+func (t *TreeBuilder) WriteTreeFromEntries(entries []TreeEntry) (Hash, error) {
 	rootNodeKey := ""
 	t.trees = map[string]*entryTree{rootNodeKey: {}}
 	t.entries = map[string]TreeEntry{}
 
-	for _, entry := range files {
+	for _, entry := range entries {
 		t.identifyIntermediates(entry)
 	}
 

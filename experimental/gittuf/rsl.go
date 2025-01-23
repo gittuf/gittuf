@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strings"
 
@@ -15,7 +16,10 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
@@ -29,7 +33,7 @@ var (
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
-func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool, opts ...rslopts.Option) error {
+func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName string, signCommit bool, opts ...rslopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -41,6 +45,10 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool,
 	options := &rslopts.Options{}
 	for _, fn := range opts {
 		fn(options)
+	}
+
+	if err := r.PropagateChangesFromLatestMetadata(ctx, signCommit); err != nil {
+		return err
 	}
 
 	slog.Debug("Identifying absolute reference path...")
@@ -94,7 +102,8 @@ func (r *Repository) RecordRSLEntryForReference(refName string, signCommit bool,
 
 // RecordRSLEntryForReferenceAtTarget is a special version of
 // RecordRSLEntryForReference used for evaluation. It is only invoked when
-// gittuf is explicitly set in developer mode.
+// gittuf is explicitly set in developer mode. Also, this function does not
+// propagate repository changes.
 func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string, signingKeyBytes []byte, opts ...rslopts.Option) error {
 	// Double check that gittuf is in developer mode
 	if !dev.InDevMode() {
@@ -140,13 +149,17 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
-func (r *Repository) RecordRSLAnnotation(rslEntryIDs []string, skip bool, message string, signCommit bool) error {
+func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := r.PropagateChangesFromLatestMetadata(ctx, signCommit); err != nil {
+		return err
 	}
 
 	rslEntryHashes := []gitinterface.Hash{}
@@ -344,7 +357,81 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	}
 
 	slog.Debug("Updated local RSL!")
+
+	if err := r.PropagateChangesFromLatestMetadata(ctx, sign); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (r *Repository) PropagateChangesFromLatestMetadata(ctx context.Context, sign bool) error {
+	slog.Debug("Checking if upstream changes must be propagated...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil
+		}
+
+		return err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+
+	// FIXME
+	var directives []*tufv01.Propagation
+	switch rootMetadata := rootMetadata.(type) {
+	case *tufv01.RootMetadata:
+		directives = rootMetadata.Propagations
+	case *tufv02.RootMetadata:
+		directives = rootMetadata.Propagations
+	}
+
+	return r.PropagateChanges(directives, sign)
+}
+
+func (r *Repository) PropagateChanges(directives []*tufv01.Propagation, sign bool) error {
+	upstreamRepositoryDirectivesMapping := map[string][]*tufv01.Propagation{}
+	for _, directive := range directives {
+		// Group directives for the same repository together
+		if _, has := upstreamRepositoryDirectivesMapping[directive.UpstreamRepository]; !has {
+			upstreamRepositoryDirectivesMapping[directive.UpstreamRepository] = []*tufv01.Propagation{}
+		}
+
+		upstreamRepositoryDirectivesMapping[directive.UpstreamRepository] = append(upstreamRepositoryDirectivesMapping[directive.UpstreamRepository], directive)
+	}
+
+	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
+		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
+		if err != nil {
+			return err
+		}
+
+		fetchReferences := []string{rsl.Ref, policy.PolicyRef}
+		for _, directive := range directives {
+			fetchReferences = append(fetchReferences, directive.UpstreamReference)
+		}
+
+		upstreamRepository, err := gitinterface.CloneAndFetchRepository(upstreamRepositoryURL, upstreamRepositoryLocation, "", fetchReferences, true)
+		if err != nil {
+			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
+		}
+
+		if err := rsl.PropagateChanges(r.r, upstreamRepository, directives, sign); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type PropagationDetails struct {
+	UpstreamRef    string
+	DownstreamRef  string
+	DownstreamPath string
 }
 
 func getRSLEntriesUntil(repo *gitinterface.Repository, start, until gitinterface.Hash) ([]rsl.Entry, error) {

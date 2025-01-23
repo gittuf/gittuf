@@ -12,20 +12,27 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 )
 
 const (
-	Ref                        = "refs/gittuf/reference-state-log"
-	ReferenceEntryHeader       = "RSL Reference Entry"
-	RefKey                     = "ref"
-	TargetIDKey                = "targetID"
+	Ref       = "refs/gittuf/reference-state-log"
+	NumberKey = "number"
+
+	ReferenceEntryHeader = "RSL Reference Entry"
+	RefKey               = "ref"
+	TargetIDKey          = "targetID"
+
 	AnnotationEntryHeader      = "RSL Annotation Entry"
 	AnnotationMessageBlockType = "MESSAGE"
 	BeginMessage               = "-----BEGIN MESSAGE-----"
 	EndMessage                 = "-----END MESSAGE-----"
 	EntryIDKey                 = "entryID"
 	SkipKey                    = "skip"
-	NumberKey                  = "number"
+
+	PropagationEntryHeader = "RSL Propagation Entry"
+	UpstreamRepositoryKey  = "upstreamRepository"
+	UpstreamEntryIDKey     = "upstreamEntryID"
 
 	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
 	gittufNamespacePrefix  = "refs/gittuf/"
@@ -372,6 +379,119 @@ func (a *AnnotationEntry) commitWithoutNumber(repo *gitinterface.Repository) err
 
 	_, err = repo.Commit(emptyTreeID, Ref, message, false)
 	return err
+}
+
+// PropagationEntry represents a record of execution of gittuf's repository
+// propagation workflow. It indicates which reference was updated with an
+// upstream repository's contents, as well as details about the upstream
+// repository such as its location and the specific entry whose contents were
+// propagated.
+type PropagationEntry struct {
+	// ID contains the Git hash for the commit corresponding to the entry.
+	ID gitinterface.Hash
+
+	// RefName contains the Git reference the entry is for.
+	RefName string
+
+	// TargetID contains the Git hash for the object expected at RefName.
+	TargetID gitinterface.Hash
+
+	// UpstreamRepository records the location of the upstream repository.
+	UpstreamRepository string
+
+	// UpstreamEntryID records the upstream repository's RSL entry ID whose
+	// contents were propagated.
+	UpstreamEntryID gitinterface.Hash
+
+	// Number contains a strictly increasing number that hints at entry ordering.
+	Number uint64
+}
+
+func NewPropagationEntry(refName string, targetID gitinterface.Hash, upstreamRepository string, upstreamEntryID gitinterface.Hash) *PropagationEntry {
+	return &PropagationEntry{RefName: refName, TargetID: targetID, UpstreamRepository: upstreamRepository, UpstreamEntryID: upstreamEntryID}
+}
+
+func (e *PropagationEntry) GetID() gitinterface.Hash {
+	return e.ID
+}
+
+// Commit creates a commit object in the RSL for the PropagationEntry. The
+// function looks up the latest committed entry in the RSL and increments the
+// number in the new entry. If a parent entry does not exist or the parent
+// entry's number is 0 (unset), the current entry's number is set to 1. The
+// numbering starts from 1 as 0 is used to signal the lack of numbering.
+func (e *PropagationEntry) Commit(repo *gitinterface.Repository, sign bool) error {
+	if err := e.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
+	return err
+}
+
+// CommitUsingSpecificKey creates a commit object in the RSL for the
+// PropagationEntry. The commit is signed using the provided PEM encoded SSH or
+// GPG private key. This is only intended for use in gittuf's developer mode or
+// in tests. The function looks up the latest committed entry in the RSL and
+// increments the number in the new entry. If a parent entry does not exist or
+// the parent entry's number is 0 (unset), the current entry's number is set to
+// 1. The numbering starts from 1 as 0 is used to signal the lack of numbering.
+func (e *PropagationEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, signingKeyBytes []byte) error {
+	if err := e.setEntryNumber(repo); err != nil {
+		return err
+	}
+
+	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
+	return err
+}
+
+func (e PropagationEntry) GetNumber() uint64 {
+	return e.Number
+}
+
+func (e *PropagationEntry) setEntryNumber(repo *gitinterface.Repository) error {
+	latestEntry, err := GetLatestEntry(repo)
+	if err == nil {
+		e.Number = latestEntry.GetNumber() + 1
+	} else {
+		if errors.Is(err, ErrRSLEntryNotFound) {
+			// First entry
+			e.Number = 1
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (e *PropagationEntry) createCommitMessage(includeNumber bool) (string, error) {
+	lines := []string{
+		PropagationEntryHeader,
+		"",
+		fmt.Sprintf("%s: %s", RefKey, e.RefName),
+		fmt.Sprintf("%s: %s", TargetIDKey, e.TargetID.String()),
+		fmt.Sprintf("%s: %s", UpstreamRepositoryKey, e.UpstreamRepository),
+		fmt.Sprintf("%s: %s", UpstreamEntryIDKey, e.UpstreamEntryID.String()),
+	}
+	if includeNumber && e.Number > 0 {
+		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 // GetEntry returns the entry corresponding to entryID.
@@ -907,11 +1027,76 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 	return allEntries, annotationMap, nil
 }
 
-func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
-	if strings.HasPrefix(text, AnnotationEntryHeader) {
-		return parseAnnotationEntryText(id, text)
+func PropagateChanges(downstreamRepo, upstreamRepo *gitinterface.Repository, details []*tufv01.Propagation, sign bool) error {
+	// We assume here that downstreamRepo and upstreamRepo have their gittuf
+	// refs already synced.
+
+	for _, detail := range details {
+		latestUpstreamEntry, _, err := GetLatestReferenceEntry(upstreamRepo, ForReference(detail.UpstreamReference), IsUnskipped())
+		if err != nil {
+			if !errors.Is(err, ErrRSLEntryNotFound) {
+				return err
+			}
+
+			continue
+		}
+
+		// We want to check if propagation is necessary
+		// What if it's already been propagated?
+
+		// TODO: handle divergence from latest RSL entry for ref downstream?
+		currentRefTip, err := downstreamRepo.GetReference(detail.DownstreamReference)
+		if err != nil {
+			return err // TODO: should we handle this differently?
+		}
+
+		currentTreeID, err := downstreamRepo.GetCommitTreeID(currentRefTip)
+		if err != nil {
+			return err // TODO: should we handle this differently?
+		}
+
+		currentPathTreeID, err := downstreamRepo.GetPathIDInTree(detail.DownstreamPath, currentTreeID)
+		if err != nil {
+			if !errors.Is(err, gitinterface.ErrTreeDoesNotHavePath) {
+				return err
+			}
+		}
+
+		upstreamTreeID, err := upstreamRepo.GetCommitTreeID(latestUpstreamEntry.TargetID)
+		if err != nil {
+			return err
+		}
+
+		if !currentPathTreeID.IsZero() && currentPathTreeID.Equal(upstreamTreeID) {
+			// Nothing to do
+			continue
+		}
+
+		// TODO: batch this up?
+		commitID, err := downstreamRepo.PropagateUpstreamRepositoryContents(upstreamRepo, latestUpstreamEntry.TargetID, detail.DownstreamReference, detail.DownstreamPath)
+		if err != nil {
+			return err
+		}
+
+		if err := NewPropagationEntry(detail.DownstreamReference, commitID, detail.UpstreamRepository, latestUpstreamEntry.ID).Commit(downstreamRepo, sign); err != nil {
+			return err
+		}
 	}
-	return parseReferenceEntryText(id, text)
+
+	return nil
+}
+
+func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
+	switch {
+	case strings.HasPrefix(text, ReferenceEntryHeader):
+		return parseReferenceEntryText(id, text)
+	case strings.HasPrefix(text, AnnotationEntryHeader):
+		return parseAnnotationEntryText(id, text)
+	case strings.HasPrefix(text, PropagationEntryHeader):
+		return parsePropagationEntryText(id, text)
+	}
+
+	return nil, ErrInvalidRSLEntry
 }
 
 func parseReferenceEntryText(id gitinterface.Hash, text string) (*ReferenceEntry, error) {
@@ -1010,6 +1195,59 @@ func parseAnnotationEntryText(id gitinterface.Hash, text string) (*AnnotationEnt
 	}
 
 	return annotation, nil
+}
+
+func parsePropagationEntryText(id gitinterface.Hash, text string) (*PropagationEntry, error) {
+	lines := strings.Split(text, "\n")
+	if len(lines) < 6 {
+		return nil, ErrInvalidRSLEntry
+	}
+	lines = lines[2:]
+
+	entry := &PropagationEntry{ID: id}
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+
+		ls := strings.Split(l, ":")
+		if len(ls) < 2 {
+			return nil, ErrInvalidRSLEntry
+		}
+
+		switch strings.TrimSpace(ls[0]) {
+		case RefKey:
+			entry.RefName = strings.TrimSpace(ls[1])
+
+		case TargetIDKey:
+			targetHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
+			if err != nil {
+				return nil, err
+			}
+
+			entry.TargetID = targetHash
+
+		case UpstreamRepositoryKey:
+			// The location may also have `:`, so we need to handle all items in ls
+			entry.UpstreamRepository = strings.TrimSpace(strings.Join(ls[1:], ":"))
+
+		case UpstreamEntryIDKey:
+			upstreamEntryIDHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
+			if err != nil {
+				return nil, err
+			}
+
+			entry.UpstreamEntryID = upstreamEntryIDHash
+
+		case NumberKey:
+			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			entry.Number = number
+		}
+	}
+
+	return entry, nil
 }
 
 func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID gitinterface.Hash) []*AnnotationEntry {

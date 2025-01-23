@@ -627,6 +627,44 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+func (r *Repository) AddPropagation(ctx context.Context, signer sslibdsse.SignerVerifier, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding propagation directive...")
+	if err := rootMetadata.AddPropagation(upstreamRepository, upstreamReference, downstreamReference, downstreamPath); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add propagation directive for '%s' of '%s' into '%s' at '%s'", upstreamReference, upstreamRepository, downstreamReference, downstreamPath)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
