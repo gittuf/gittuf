@@ -1,15 +1,15 @@
-## gittuf trust remove-github-app-key
+## gittuf trust remove-github-app
 
-Remove GitHub app key from gittuf root of trust
+Remove GitHub app from gittuf root of trust
 
 ```
-gittuf trust remove-github-app-key [flags]
+gittuf trust remove-github-app [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for remove-github-app-key
+  -h, --help   help for remove-github-app
 ```
 
 ### Options inherited from parent commands

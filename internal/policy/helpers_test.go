@@ -517,18 +517,21 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
+	appName := tuf.GitHubAppRoleName // TODO: this should be generalized more
+
 	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
+	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
 	rootMetadata.EnableGitHubAppApprovals()
 	state.githubAppApprovalsTrusted = true
 	state.githubAppKeys = []tuf.Principal{appKey}
+	state.githubAppRoleName = appName
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -553,7 +556,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	person := &tufv02.Person{
 		PersonID:             "jane.doe",
 		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
-		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
+		AssociatedIdentities: map[string]string{appName: "jane.doe"},
 	}
 
 	if err := targetsMetadata.AddPrincipal(person); err != nil {
@@ -564,7 +567,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	approver := &tufv02.Person{
 		PersonID:             "john.doe",
 		PublicKeys:           map[string]*tufv02.Key{approverKey.KeyID: approverKey},
-		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+		AssociatedIdentities: map[string]string{appName: "john.doe"},
 	}
 	if err := targetsMetadata.AddPrincipal(approver); err != nil {
 		t.Fatal(err)
@@ -611,18 +614,21 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
+	appName := tuf.GitHubAppRoleName // TODO: this should be generalized more
+
 	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	appKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
+	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
 	rootMetadata.EnableGitHubAppApprovals()
 	state.githubAppApprovalsTrusted = true
 	state.githubAppKeys = []tuf.Principal{appKey}
+	state.githubAppRoleName = appName
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -647,7 +653,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	person := &tufv02.Person{
 		PersonID:             "jane.doe",
 		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
-		AssociatedIdentities: map[string]string{appKey.KeyID: "jane.doe"},
+		AssociatedIdentities: map[string]string{appName: "jane.doe"},
 	}
 	if err := targetsMetadata.AddPrincipal(person); err != nil {
 		t.Fatal(err)
@@ -660,7 +666,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	approver1 := &tufv02.Person{
 		PersonID:             "john.doe",
 		PublicKeys:           map[string]*tufv02.Key{approver1Key.KeyID: approver1Key},
-		AssociatedIdentities: map[string]string{appKey.KeyID: "john.doe"},
+		AssociatedIdentities: map[string]string{appName: "john.doe"},
 	}
 	if err := targetsMetadata.AddPrincipal(approver1); err != nil {
 		t.Fatal(err)
@@ -674,7 +680,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	approver2 := &tufv02.Person{
 		PersonID:             "jill.doe",
 		PublicKeys:           map[string]*tufv02.Key{approver2Key.KeyID: approver2Key},
-		AssociatedIdentities: map[string]string{appKey.KeyID: "jill.doe"},
+		AssociatedIdentities: map[string]string{appName: "jill.doe"},
 	}
 	if err := targetsMetadata.AddPrincipal(approver2); err != nil {
 		t.Fatal(err)

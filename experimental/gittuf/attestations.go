@@ -22,6 +22,7 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
@@ -404,6 +405,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	if err != nil {
 		return err
 	}
+	appName := tuf.GitHubAppRoleName // TODO: make this configurable, check appName's key matches signer
 
 	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, options.GitHubToken, owner, repository, pullRequestNumber, reviewID)
 	if err != nil {
@@ -412,7 +414,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 
 	// TODO: if the helper above has an indexPath, we can directly load that blob, simplifying the logic here
 	hasApprovalAttestation := false
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, keyID, baseRef, fromID, toID)
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, appName, baseRef, fromID, toID)
 	if err == nil {
 		slog.Debug("Found existing GitHub pull request approval attestation...")
 		hasApprovalAttestation = true
@@ -453,7 +455,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
@@ -495,8 +497,9 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 	if err != nil {
 		return err
 	}
+	appName := tuf.GitHubAppRoleName
 
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, options.GitHubBaseURL, reviewID, keyID)
+	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, options.GitHubBaseURL, reviewID, appName)
 	if err != nil {
 		return err
 	}
@@ -541,7 +544,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, keyID, baseRef, fromID, toID); err != nil {
+	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
 		return err
 	}
 

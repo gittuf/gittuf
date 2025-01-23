@@ -1,20 +1,20 @@
-## gittuf trust add-github-app-key
+## gittuf trust add-github-app
 
-Add GitHub app key to gittuf root of trust
+Add GitHub app to gittuf root of trust
 
 ### Synopsis
 
-This command allows users to add a trusted key for the special GitHub app role. This key is used to verify signatures on GitHub pull request approval attestations. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
+This command allows users to add a name and trusted key for the special GitHub app role. This key is used to verify signatures on GitHub pull request approval attestations. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
 
 ```
-gittuf trust add-github-app-key [flags]
+gittuf trust add-github-app [flags]
 ```
 
 ### Options
 
 ```
       --app-key string   app key to add to root of trust
-  -h, --help             help for add-github-app-key
+  -h, --help             help for add-github-app
 ```
 
 ### Options inherited from parent commands

@@ -229,10 +229,10 @@ func TestAddGitHubAppPrincipal(t *testing.T) {
 
 	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	err := rootMetadata.AddGitHubAppPrincipal(nil)
+	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, nil)
 	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
 
-	err = rootMetadata.AddGitHubAppPrincipal(appKey)
+	err = rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
 	assert.Nil(t, err)
 	assert.Equal(t, appKey, rootMetadata.Keys[appKey.KeyID])
 	assert.Equal(t, set.NewSetFromItems(appKey.KeyID), rootMetadata.Roles[tuf.GitHubAppRoleName].KeyIDs)
@@ -243,10 +243,10 @@ func TestDeleteGitHubAppPrincipal(t *testing.T) {
 
 	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	err := rootMetadata.AddGitHubAppPrincipal(appKey)
+	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
 	assert.Nil(t, err)
 
-	rootMetadata.DeleteGitHubAppPrincipal()
+	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
 	assert.Nil(t, rootMetadata.Roles[tuf.GitHubAppRoleName].KeyIDs)
 }
 
@@ -382,7 +382,7 @@ func TestGetGitHubAppPrincipals(t *testing.T) {
 
 	t.Run("role exists", func(t *testing.T) {
 		rootMetadata := initialTestRootMetadata(t)
-		err := rootMetadata.AddGitHubAppPrincipal(key)
+		err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
 		assert.Nil(t, err)
 
 		expectedPrincipals := []tuf.Principal{key}
@@ -407,7 +407,7 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	assert.False(t, trusted)
 
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
-	err := rootMetadata.AddGitHubAppPrincipal(key)
+	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
 	assert.Nil(t, err)
 
 	rootMetadata.EnableGitHubAppApprovals()

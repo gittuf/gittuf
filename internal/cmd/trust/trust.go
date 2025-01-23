@@ -4,7 +4,7 @@
 package trust
 
 import (
-	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubappkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
@@ -12,7 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
-	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubappkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
@@ -35,7 +35,7 @@ func New() *cobra.Command {
 	o.AddPersistentFlags(cmd)
 
 	cmd.AddCommand(i.New(o))
-	cmd.AddCommand(addgithubappkey.New(o))
+	cmd.AddCommand(addgithubapp.New(o))
 	cmd.AddCommand(addglobalrule.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addrootkey.New(o))
@@ -43,7 +43,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(remote.New())
-	cmd.AddCommand(removegithubappkey.New(o))
+	cmd.AddCommand(removegithubapp.New(o))
 	cmd.AddCommand(removeglobalrule.New(o))
 	cmd.AddCommand(removepolicykey.New(o))
 	cmd.AddCommand(removerootkey.New(o))

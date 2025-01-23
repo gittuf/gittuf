@@ -121,12 +121,10 @@ type RootMetadata interface {
 
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
-	// TODO: this needs to be generalized across tools
-	AddGitHubAppPrincipal(principal Principal) error
+	AddGitHubAppPrincipal(appName string, principal Principal) error
 	// DeleteGitHubAppPrincipal removes the GitHub app attestations role from
 	// the root of trust metadata.
-	// TODO: this needs to be generalized across tools
-	DeleteGitHubAppPrincipal()
+	DeleteGitHubAppPrincipal(appName string)
 	// EnableGitHubAppApprovals indicates attestations from the GitHub app role
 	// must be trusted.
 	// TODO: this needs to be generalized across tools
