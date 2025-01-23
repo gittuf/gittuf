@@ -284,10 +284,10 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
-// AddGitHubAppKey is the interface for the user to add the authorized key for
-// the special GitHub app role. This key is used to verify GitHub pull request
-// approval attestation signatures.
-func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool) error {
+// AddGitHubApp is the interface for the user to add the authorized key for the
+// trusted GitHub app. This key is used to verify GitHub pull request approval
+// attestation signatures recorded by the app.
+func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -313,7 +313,7 @@ func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	slog.Debug("Adding GitHub app key...")
-	if err := rootMetadata.AddGitHubAppPrincipal(appKey); err != nil {
+	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		return fmt.Errorf("failed to add GitHub app key: %w", err)
 	}
 
@@ -321,9 +321,9 @@ func (r *Repository) AddGitHubAppKey(ctx context.Context, signer sslibdsse.Signe
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
-// RemoveGitHubAppKey is the interface for the user to de-authorize the key for
-// the special GitHub app role.
-func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+// RemoveGitHubApp is the interface for the user to de-authorize the key for the
+// special GitHub app role.
+func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -349,7 +349,7 @@ func (r *Repository) RemoveGitHubAppKey(ctx context.Context, signer sslibdsse.Si
 	}
 
 	slog.Debug("Removing GitHub app key...")
-	rootMetadata.DeleteGitHubAppPrincipal()
+	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
 
 	commitMessage := "Remove GitHub app key from root"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)

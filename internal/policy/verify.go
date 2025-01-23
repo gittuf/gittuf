@@ -711,9 +711,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 	if !isTag && policy.githubAppApprovalsTrusted {
 		slog.Debug("GitHub pull request approvals are trusted, loading applicable attestations...")
 
-		appName := policy.githubAppKeys[0].ID()
-
-		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, targetRef, fromID.String(), toID.String())
+		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, policy.githubAppRoleName, targetRef, fromID.String(), toID.String())
 		if err != nil {
 			if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
 				return nil, nil, err
@@ -731,7 +729,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 			}
 			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to verify GitHub app approval attestation, signed by untrusted key")
+				return nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
 			}
 
 			payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
@@ -852,11 +850,9 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		}
 	}
 
-	// TODO: app name is likely not always going to be the signer ID
-	// We should probably make that an option?
 	appName := ""
 	if policy.githubAppApprovalsTrusted {
-		appName = policy.githubAppKeys[0].ID()
+		appName = policy.githubAppRoleName
 	}
 	verifiedUsing, acceptedPrincipalIDs, rslSignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, options.approverPrincipalIDs, options.verifyMergeable)
 	if err != nil {

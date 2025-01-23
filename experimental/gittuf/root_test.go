@@ -281,13 +281,13 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestAddGitHubAppKey(t *testing.T) {
+func TestAddGitHubApp(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
-	err := r.AddGitHubAppKey(testCtx, sv, key, false)
+	err := r.AddGitHubApp(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -308,13 +308,13 @@ func TestAddGitHubAppKey(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestRemoveGitHubAppKey(t *testing.T) {
+func TestRemoveGitHubApp(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
-	err := r.AddGitHubAppKey(testCtx, sv, key, false)
+	err := r.AddGitHubApp(testCtx, sv, key, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestRemoveGitHubAppKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	err = r.RemoveGitHubAppKey(testCtx, sv, false)
+	err = r.RemoveGitHubApp(testCtx, sv, false)
 	assert.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -389,7 +389,7 @@ func TestTrustGitHubApp(t *testing.T) {
 
 		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
 
-		err = r.AddGitHubAppKey(testCtx, sv, key, false)
+		err = r.AddGitHubApp(testCtx, sv, key, false)
 		assert.Nil(t, err)
 
 		err = r.TrustGitHubApp(testCtx, sv, false)
@@ -429,7 +429,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 
 	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
 
-	err = r.AddGitHubAppKey(testCtx, sv, key, false)
+	err = r.AddGitHubApp(testCtx, sv, key, false)
 	assert.Nil(t, err)
 
 	err = r.TrustGitHubApp(testCtx, sv, false)

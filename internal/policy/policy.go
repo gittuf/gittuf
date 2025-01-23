@@ -64,6 +64,7 @@ type State struct {
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
+	githubAppRoleName         string
 
 	repository     *gitinterface.Repository
 	verifiersCache map[string][]*SignatureVerifier
@@ -976,6 +977,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 	githubAppPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
 	if err == nil {
 		state.githubAppKeys = githubAppPrincipals
+		state.githubAppRoleName = tuf.GitHubAppRoleName
 	} else if state.githubAppApprovalsTrusted {
 		return nil, tuf.ErrGitHubAppInformationNotFoundInRoot
 	}

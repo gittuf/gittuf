@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package addgithubappkey
+package addgithubapp
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -41,14 +41,14 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.AddGitHubAppKey(cmd.Context(), signer, appKey, true)
+	return repo.AddGitHubApp(cmd.Context(), signer, appKey, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-github-app-key",
-		Short:             "Add GitHub app key to gittuf root of trust",
+		Use:               "add-github-app",
+		Short:             "Add GitHub app to gittuf root of trust",
 		Long:              `This command allows users to add a trusted key for the special GitHub app role. This key is used to verify signatures on GitHub pull request approval attestations. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,

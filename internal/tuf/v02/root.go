@@ -159,7 +159,7 @@ func (r *RootMetadata) DeletePrimaryRuleFilePrincipal(principalID string) error 
 // AddGitHubAppPrincipal adds the 'principal' as a trusted principal in
 // 'rootMetadata' for the special GitHub app role. This key is used to verify
 // GitHub pull request approval attestation signatures.
-func (r *RootMetadata) AddGitHubAppPrincipal(principal tuf.Principal) error {
+func (r *RootMetadata) AddGitHubAppPrincipal(name string, principal tuf.Principal) error {
 	if principal == nil {
 		return tuf.ErrInvalidPrincipalType
 	}
@@ -172,15 +172,15 @@ func (r *RootMetadata) AddGitHubAppPrincipal(principal tuf.Principal) error {
 		PrincipalIDs: set.NewSetFromItems(principal.ID()),
 		Threshold:    1,
 	}
-	r.addRole(tuf.GitHubAppRoleName, role) // AddRole replaces the specified role if it already exists
+	r.addRole(name, role) // AddRole replaces the specified role if it already exists
 	return nil
 }
 
 // DeleteGitHubAppPrincipal removes the special GitHub app role from the root
 // metadata.
-func (r *RootMetadata) DeleteGitHubAppPrincipal() {
+func (r *RootMetadata) DeleteGitHubAppPrincipal(name string) {
 	// TODO: support multiple principals / threshold for app
-	delete(r.Roles, tuf.GitHubAppRoleName)
+	delete(r.Roles, name)
 }
 
 // EnableGitHubAppApprovals sets GitHubApprovalsTrusted to true in the
