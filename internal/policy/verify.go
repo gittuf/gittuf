@@ -729,7 +729,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 			}
 			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to verify GitHub app approval attestation, signed by untrusted key")
+				return nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
 			}
 
 			payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()

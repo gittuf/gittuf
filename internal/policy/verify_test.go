@@ -2216,6 +2216,64 @@ func TestVerifyEntry(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
+	t.Run("unsuccessful verification with higher threshold but using GitHub approval due to invalid app key", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "1")
+		t.Setenv(tufv02.AllowV02MetadataKey, "1")
+
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This is using the jane.doe signer
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create authorization for this change using john.doe trusted as approver
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is NOT trusted in the root setup by
+		// the policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
 	t.Run("successful verification with higher threshold but using GitHub approval and reference authorization v0.2", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
@@ -2293,6 +2351,85 @@ func TestVerifyEntry(t *testing.T) {
 
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+	})
+
+	t.Run("unsuccessful verification with higher threshold but using GitHub approval from untrusted key and reference authorization v0.2", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This is the jane.doe principal
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Approved by jill.doe
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is NOT trusted in the root setup by
+		// the policy state creator helper
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Add reference authorization for john.doe
+		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval", func(t *testing.T) {
