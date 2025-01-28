@@ -5,12 +5,14 @@ package verifymergeable
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
 	baseBranch    string
 	featureBranch string
+	bypassRSL     bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -29,6 +31,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"feature branch for proposed merge",
 	)
 	cmd.MarkFlagRequired("feature-branch") //nolint:errcheck
+
+	cmd.Flags().BoolVar(
+		&o.bypassRSL,
+		"bypass-RSL",
+		false,
+		"bypass RSL when identifying current state of feature ref",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -37,7 +46,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	_, err = repo.VerifyMergeable(cmd.Context(), o.baseBranch, o.featureBranch)
+	opts := []verifymergeable.Option{}
+	if o.bypassRSL {
+		opts = append(opts, verifymergeable.WithBypassRSLForFeatureRef())
+	}
+
+	_, err = repo.VerifyMergeable(cmd.Context(), o.baseBranch, o.featureBranch, opts...)
 	return err
 }
 

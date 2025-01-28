@@ -1377,6 +1377,640 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 }
 
+func TestVerifyMergeableForCommit(t *testing.T) {
+	refName := "refs/heads/main"
+	featureRefName := "refs/heads/feature"
+
+	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		featureID := commitIDs[0]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up approval attestation with "john.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.True(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		featureID := commitIDs[0]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up approval attestation with "jill.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up reference authorization from "john.doe"
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer is for the SSH keys associated with john.doe
+		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
+		env, err = dsse.CreateEnvelope(refAuthorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.True(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		featureID := commitIDs[0]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add approval with "jane.doe" and "john.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.False(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit zero, not mergeable", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		featureID := commitIDs[0]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add approval with "alice" and "bob"
+		// These are untrusted identities
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+		assert.False(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+		repo.RestoreWorktree(t)
+
+		// Set feature to the same commit as main
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureID := featureCommitIDs[1]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up approval attestation with "john.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.True(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit not zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+		repo.RestoreWorktree(t)
+
+		// Set feature to the same commit as main
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureID := featureCommitIDs[1]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up approval attestation with "jill.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Set up reference authorization from "john.doe"
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, baseCommitIDs[1].String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This is the key associated with john.doe
+		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
+
+		env, err = dsse.CreateEnvelope(refAuthorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.True(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+		repo.RestoreWorktree(t)
+
+		// Set feature to the same commit as main
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureID := featureCommitIDs[1]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add approval with "jane.doe" and "john.doe"
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe", "jane.doe"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.False(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit not zero, not mergeable", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+		repo.RestoreWorktree(t)
+
+		// Set feature to the same commit as main
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureID := featureCommitIDs[1]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Add approval with "alice" and "bob"
+		// These are untrusted approvals
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// This signer for the GitHub app is trusted in the root setup by the
+		// policy state creator helper
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+		assert.False(t, rslSignatureRequired)
+	})
+
+	t.Run("unprotected base branch", func(t *testing.T) {
+		refName := "refs/heads/unprotected" // overriding refName
+
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
+		baseEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, baseEntry, gpgKeyBytes)
+		baseEntry.ID = baseEntryID
+
+		if err := repo.SetReference("HEAD", baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		// Set feature to the same commit as base
+		if err := repo.SetReference(featureRefName, baseCommitIDs[1]); err != nil {
+			t.Fatal(err)
+		}
+
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
+		featureID := featureCommitIDs[1]
+		repo.RestoreWorktree(t)
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+		assert.Nil(t, err)
+		assert.False(t, rslSignatureRequired)
+	})
+}
+
 func TestVerifyRelativeForRef(t *testing.T) {
 	t.Run("no recovery", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)

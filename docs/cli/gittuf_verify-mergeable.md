@@ -10,6 +10,7 @@ gittuf verify-mergeable [flags]
 
 ```
       --base-branch string      base branch for proposed merge
+      --bypass-RSL              bypass RSL when identifying current state of feature ref
       --feature-branch string   feature branch for proposed merge
   -h, --help                    help for verify-mergeable
 ```

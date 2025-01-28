@@ -10,6 +10,7 @@ import (
 	"log/slog"
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
+	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -148,8 +149,13 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 // (true,  nil) -> merge is possible but it MUST be performed by an authorized
 // person for the rule, i.e., an authorized person must sign the merge's RSL
 // entry
-func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef string) (bool, error) {
+func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef string, opts ...verifymergeableopts.Option) (bool, error) {
 	var err error
+
+	options := &verifymergeableopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
 
 	slog.Debug("Identifying absolute reference paths...")
 	targetRef, err = r.r.AbsoluteReference(targetRef)
@@ -163,15 +169,33 @@ func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef 
 
 	slog.Debug(fmt.Sprintf("Inspecting gittuf policies to identify if '%s' can be merged into '%s' with current approvals...", featureRef, targetRef))
 	verifier := policy.NewPolicyVerifier(r.r)
-	needRSLSignature, err := verifier.VerifyMergeable(ctx, targetRef, featureRef)
-	if err != nil {
-		return false, err
+
+	var needRSLSignature bool
+
+	if options.BypassRSLForFeatureRef {
+		slog.Debug("Not using RSL for feature ref...")
+		featureID, err := r.r.GetReference(featureRef)
+		if err != nil {
+			return false, err
+		}
+
+		needRSLSignature, err = verifier.VerifyMergeableForCommit(ctx, targetRef, featureID)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		needRSLSignature, err = verifier.VerifyMergeable(ctx, targetRef, featureRef)
+		if err != nil {
+			return false, err
+		}
 	}
+
 	if needRSLSignature {
 		slog.Debug("Merge is allowed but must be performed by authorized user who has not already issued an approval!")
 	} else {
 		slog.Debug("Merge is allowed and can be performed by any user!")
 	}
+
 	return needRSLSignature, nil
 }
 
