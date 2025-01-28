@@ -166,10 +166,71 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 		return false, ErrCannotVerifyMergeableForTagRef
 	}
 
+	var fromID gitinterface.Hash
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	targetEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
+	switch {
+	case err == nil:
+		fromID = targetEntry.TargetID
+	case errors.Is(err, rsl.ErrRSLEntryNotFound):
+		fromID = gitinterface.ZeroHash
+	default:
+		return false, err
+	}
+
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
+	featureEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
+	if err != nil {
+		return false, err
+	}
+
+	return v.verifyMergeable(ctx, targetRef, fromID, featureEntry.TargetID)
+}
+
+// VerifyMergeableForCommit checks if the targetRef can be updated to reflect
+// the changes in featureID. It checks if sufficient authorizations / approvals
+// exist for the merge to happen, indicated by the error being nil.
+// Additionally, a boolean value is also returned that indicates whether a final
+// authorized signature is still necessary via the RSL entry for the merge.
+// Note: this function DOES NOT use the RSL to identify the tip of the feature
+// ref.
+//
+// Summary of return combinations:
+// (false, err) -> merge is not possible
+// (false, nil) -> merge is possible and can be performed by anyone
+// (true,  nil) -> merge is possible but it MUST be performed by an authorized
+// person for the rule, i.e., an authorized person must sign the merge's RSL
+// entry
+func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef string, featureID gitinterface.Hash) (bool, error) {
+	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
+		return false, ErrCannotVerifyMergeableForTagRef
+	}
+
+	var fromID gitinterface.Hash
+	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	targetEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
+	switch {
+	case err == nil:
+		fromID = targetEntry.TargetID
+	case errors.Is(err, rsl.ErrRSLEntryNotFound):
+		fromID = gitinterface.ZeroHash
+	default:
+		return false, err
+	}
+
+	return v.verifyMergeable(ctx, targetRef, fromID, featureID)
+}
+
+func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, fromID, featureID gitinterface.Hash) (bool, error) {
+	// We're specifically focused on commit merges here, this doesn't apply to
+	// tags
+	mergeTreeID, err := v.repo.GetMergeTree(fromID, featureID)
+	if err != nil {
+		return false, err
+	}
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
-		err                 error
 	)
 
 	// Load latest policy
@@ -199,31 +260,6 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 		return false, err
 	}
 
-	var fromID gitinterface.Hash
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
-	targetEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
-	switch {
-	case err == nil:
-		fromID = targetEntry.TargetID
-	case errors.Is(err, rsl.ErrRSLEntryNotFound):
-		fromID = gitinterface.ZeroHash
-	default:
-		return false, err
-	}
-
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
-	featureEntry, _, err := rsl.GetLatestReferenceEntry(v.repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
-	if err != nil {
-		return false, err
-	}
-
-	// We're specifically focused on commit merges here, this doesn't apply to
-	// tags
-	mergeTreeID, err := v.repo.GetMergeTree(fromID, featureEntry.TargetID)
-	if err != nil {
-		return false, err
-	}
-
 	authorizationAttestation, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, v.repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
 	if err != nil {
 		return false, err
@@ -239,7 +275,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 	}
 
 	// Verify modified files
-	commitIDs, err := v.repo.GetCommitsBetweenRange(featureEntry.TargetID, fromID)
+	commitIDs, err := v.repo.GetCommitsBetweenRange(featureID, fromID)
 	if err != nil {
 		return false, err
 	}
