@@ -1,0 +1,41 @@
+name: remote tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        git-version: [2.34.1, 2.40.1]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Git
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git
+
+    - name: Set up GitHub SSH key (if using SSH)
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.GITHUB_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+    - name: Build and install git-remote-gittuf
+      run: |
+        go build -o /usr/local/bin/git-remote-gittuf ./cmd/git-remote-gittuf
+
+    - name: Run integration tests
+      run: |
+        ./scripts/run-tests.sh
