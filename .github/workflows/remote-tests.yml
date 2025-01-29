@@ -32,9 +32,8 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-    - name: Build and install git-remote-gittuf
-      run: |
-        go build -o /usr/local/bin/git-remote-gittuf ./cmd/git-remote-gittuf
+    - name: Build project
+      run: make
 
     - name: Run integration tests
       run: |
