@@ -9,11 +9,11 @@ on:
       - main
 
 jobs:
-  integration-tests:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ['1.23']
 
     steps:

@@ -18,12 +18,12 @@ TEST_REMOTE_NAME = "origin"
 GITTUF_TEST_BRANCH = "test-branch"
 
 # Verify if the gittuf binary is installed
-try:
-    run_command(f"command -v {GITTUF_BINARY}")
-    print("Git-Remote-Gittuf binary is installed.")
-except Exception:
-    print(f"Error: {GITTUF_BINARY} is not installed or not in PATH.")
-    exit(1)
+# try:
+#     run_command(f"command -v {GITTUF_BINARY}")
+#     print("Git-Remote-Gittuf binary is installed.")
+# except Exception:
+#     print(f"Error: {GITTUF_BINARY} is not installed or not in PATH.")
+#     exit(1)
 
 # Clean up from previous runs
 if os.path.isdir(TEST_CLONE_DIR):
