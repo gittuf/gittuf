@@ -39,9 +39,8 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		PublicKeys: map[string]*Key{key.KeyID: key},
 	}
 
-	delegations := &Delegations{}
-
 	t.Run("test addPrincipal", func(t *testing.T) {
+		delegations := &Delegations{}
 		assert.Nil(t, delegations.Principals)
 
 		err := delegations.addPrincipal(key)
@@ -51,6 +50,32 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		err = delegations.addPrincipal(person)
 		assert.Nil(t, err)
 		assert.Equal(t, person, delegations.Principals[person.PersonID])
+	})
+
+	t.Run("test removePrincipal", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := delegations.addPrincipal(key)
+		assert.Nil(t, err)
+		assert.Equal(t, key, delegations.Principals[key.KeyID])
+
+		err = delegations.addPrincipal(person)
+		assert.Nil(t, err)
+		assert.Equal(t, person, delegations.Principals[person.PersonID])
+
+		assert.NotEmpty(t, delegations.Principals)
+
+		err = delegations.removePrincipal(key.KeyID)
+		assert.Nil(t, err)
+		_, exists := delegations.Principals[key.KeyID]
+		assert.False(t, exists)
+
+		err = delegations.removePrincipal(person.PersonID)
+		assert.Nil(t, err)
+		_, exists = delegations.Principals[person.PersonID]
+		assert.False(t, exists)
+
+		assert.Empty(t, delegations.Principals)
 	})
 }
 

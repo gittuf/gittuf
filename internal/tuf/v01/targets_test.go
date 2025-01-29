@@ -35,13 +35,25 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
-	delegations := &Delegations{}
-
 	t.Run("test addKey", func(t *testing.T) {
+		delegations := &Delegations{}
+
 		assert.Nil(t, delegations.Keys)
 		err := delegations.addKey(key)
 		assert.Nil(t, err)
 		assert.Equal(t, key, delegations.Keys[key.KeyID])
+	})
+
+	t.Run("test removeKey", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := delegations.addKey(key)
+		assert.Nil(t, err)
+		assert.Equal(t, key, delegations.Keys[key.KeyID])
+
+		err = delegations.removeKey(key.KeyID)
+		assert.Nil(t, err)
+		assert.Empty(t, delegations.Keys)
 	})
 }
 
