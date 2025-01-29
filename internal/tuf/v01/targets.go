@@ -261,7 +261,7 @@ func (d *Delegations) removeKey(keyID string) error {
 		return tuf.ErrPrincipalNotFound
 	}
 	for _, curRole := range d.Roles {
-		if curRole.Role.KeyIDs.Has(keyID) {
+		if curRole.GetPrincipalIDs() != nil && curRole.GetPrincipalIDs().Has(keyID) {
 			return tuf.ErrPrincipalStillInUse
 		}
 	}

@@ -325,7 +325,7 @@ func (d *Delegations) removePrincipal(principalID string) error {
 		return tuf.ErrInvalidPrincipalID
 	}
 	for _, curRole := range d.Roles {
-		if curRole.Role.PrincipalIDs.Has(principalID) {
+		if curRole.GetPrincipalIDs() != nil && curRole.GetPrincipalIDs().Has(principalID) {
 			return tuf.ErrPrincipalStillInUse
 		}
 	}

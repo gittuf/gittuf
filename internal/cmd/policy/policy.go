@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/listprincipals"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/policy/removekey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removeperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
@@ -33,6 +34,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addkey.New(o))
+	cmd.AddCommand(removekey.New(o))
 	cmd.AddCommand(addperson.New(o))
 	cmd.AddCommand(removeperson.New(o))
 	cmd.AddCommand(apply.New())

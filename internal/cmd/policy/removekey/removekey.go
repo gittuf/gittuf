@@ -45,17 +45,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	keyIDsToRemove := []string{}
-	for _, key := range o.keysToRemove {
-		key, err := gittuf.LoadPublicKey(key)
-		if err != nil {
-			return err
-		}
-
-		keyIDsToRemove = append(keyIDsToRemove, key.ID())
-	}
-
-	return repo.RemovePrincipalFromTargets(cmd.Context(), signer, o.policyName, keyIDsToRemove, true)
+	return repo.RemovePrincipalFromTargets(cmd.Context(), signer, o.policyName, o.keysToRemove, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
