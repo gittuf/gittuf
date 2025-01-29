@@ -38,4 +38,4 @@ jobs:
     - name: Run integration tests
       run: |
         chmod +x .github/workflows/runtests.py
-        ./.github/workflows/runtests.py
+        python .github/workflows/runtests.py
