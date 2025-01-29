@@ -36,4 +36,4 @@ jobs:
       run: make
 
     - name: Run integration tests
-      run: ./.github/workflows/runtests.sh
+      run: ./.github/workflows/runtests.py
