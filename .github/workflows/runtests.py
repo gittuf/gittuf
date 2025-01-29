@@ -10,8 +10,7 @@ def run_command(cmd, expected_retcode=0):
         raise Exception(f"Expected {expected_retcode} from process but it exited with {retcode}.")
 
 # Constants
-GITTUF_BINARY = "git-remote-gittuf"
-TEST_REPO_URL_SSH = "gittuf::git@github.com:gittuf/zsun6"
+GITTUF_TRANSPORT_BINARY = "git-remote-gittuf"
 TEST_REPO_URL_HTTPS = "gittuf::https://github.com/zsun6/gittuf-remote-test_repo"
 TEST_CLONE_DIR = "test_clone"
 TEST_REMOTE_NAME = "origin"
@@ -19,10 +18,10 @@ GITTUF_TEST_BRANCH = "test-branch"
 
 # Verify if the gittuf binary is installed
 # try:
-#     run_command(f"command -v {GITTUF_BINARY}")
+#     run_command(f"command -v {GITTUF_TRANSPORT_BINARY}")
 #     print("Git-Remote-Gittuf binary is installed.")
 # except Exception:
-#     print(f"Error: {GITTUF_BINARY} is not installed or not in PATH.")
+#     print(f"Error: {GITTUF_TRANSPORT_BINARY} is not installed or not in PATH.")
 #     exit(1)
 
 # Clean up from previous runs

@@ -24,15 +24,8 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
 
-    - name: Set up GitHub SSH key (if using SSH)
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.GITHUB_DEPLOY_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
-
-    - name: Build project
-      run: make
+    - name: Build gittuf
+      run: make just-install
 
     - name: Run integration tests
       run: |
