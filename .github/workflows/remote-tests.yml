@@ -38,4 +38,4 @@ jobs:
 
     - name: Run integration tests
       run: |
-        ./scripts/run-tests.sh
+        ./scripts/runtests.py
