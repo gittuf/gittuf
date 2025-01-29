@@ -576,14 +576,8 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 
 	switch stage {
 	case "pre-commit":
-		if state.PreCommitHooks == nil {
-			state.PreCommitHooks = make(map[string]gitinterface.Hash)
-		}
 		state.PreCommitHooks[hookName] = blobID
 	case "pre-push":
-		if state.PrePushHooks == nil {
-			state.PrePushHooks = make(map[string]gitinterface.Hash)
-		}
 		state.PrePushHooks[hookName] = blobID
 	default:
 		return tuf.ErrInvalidHookStage

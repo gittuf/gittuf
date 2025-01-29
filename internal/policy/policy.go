@@ -779,7 +779,9 @@ func (s *State) LoadHooksIntoState(t tuf.TargetsMetadata) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("a")
+
+	s.PreCommitHooks = make(map[string]gitinterface.Hash)
+
 	for name, hook := range hooks {
 		s.PreCommitHooks[name] = hook.GetHashes()["sha1"]
 	}
@@ -788,7 +790,9 @@ func (s *State) LoadHooksIntoState(t tuf.TargetsMetadata) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("b")
+
+	s.PrePushHooks = make(map[string]gitinterface.Hash)
+
 	for name, hook := range hooks {
 		s.PreCommitHooks[name] = hook.GetHashes()["sha1"]
 	}
