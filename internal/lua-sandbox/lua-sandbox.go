@@ -5,18 +5,24 @@
 // https://github.com/kikito/lua-sandbox/blob/master/sandbox.lua, and licensed
 // under the MIT License
 
-package lua
+//nolint:unused
+package sandbox
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/common/set"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -49,19 +55,25 @@ function scanDir(path, recursive) return goScanDir(path, recursive) end
 
 function getRootDir() return allowedDir end
 
+function readFileAsString(fileName) return goReadFile(fileName) end
+
+function getDiff() return goGetDiff() end
+
+function getWorkTree() return goGetWorkTree() end
+
 function execute(command) 
 	output = goExecute(command)
 	print(output)
 	return output
 end
 
+function regexMatch(text, patterns) return goRegexMatch(text, patterns) end
 `
 
-var allowedExecutables = set.NewSetFromItems[string]("golangci-lint", "git")
 var allowedDir = getGitRoot()
 
 // NewLuaEnvironment creates a new Lua sandbox with the specified environment
-func NewLuaEnvironment(luaMode string) (*lua.LState, error) {
+func NewLuaEnvironment(allowedModules []string) (*lua.LState, error) {
 	// Create a new Lua state
 	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
 
@@ -76,19 +88,6 @@ func NewLuaEnvironment(luaMode string) (*lua.LState, error) {
 		{lua.StringLibName, lua.OpenString},
 		{lua.MathLibName, lua.OpenMath},
 		{lua.CoroutineLibName, lua.OpenCoroutine},
-	}
-
-	switch luaMode {
-	case "lessStrict":
-		modules = append(modules, struct {
-			n string
-			f lua.LGFunction
-		}{lua.OsLibName, lua.OpenOs})
-		setTimeOut(context.Background(), lState, 5000)
-	case "default":
-		// Todo: Specify a default mode for lua sandbox
-		enableOnlySafeFunctions(lState)
-		setInstructionQuota(lState, int64(100000))
 	}
 
 	// Load the modules to the Lua state
@@ -112,11 +111,19 @@ func NewLuaEnvironment(luaMode string) (*lua.LState, error) {
 	lState.SetGlobal("goExecute", lState.NewFunction(goExecute))
 	lState.SetGlobal("goScanDir", lState.NewFunction(goScanDir))
 	lState.SetGlobal("allowedDir", lua.LString(allowedDir))
+	lState.SetGlobal("goReadFile", lState.NewFunction(goReadFile))
+	lState.SetGlobal("goRegexMatch", lState.NewFunction(goRegexMatch))
+	lState.SetGlobal("goGetDiff", lState.NewFunction(goGetDiff))
+	lState.SetGlobal("goGetWorkTree", lState.NewFunction(goGetWorkTree))
 
 	// Load the pre-written pure Lua helper functions into the Lua state
 	if err := lState.DoString(helpers); err != nil {
 		return nil, err
 	}
+
+	lState.SetGlobal("hookParameters", lua.LString(""))
+	lState.SetGlobal("hookExitCode", lua.LNumber(0))
+	lState.SetGlobal("allowedExecutables", lua.LString(strings.Join(allowedModules, ",")))
 
 	return lState, nil
 }
@@ -215,7 +222,6 @@ func goExecute(l *lua.LState) int {
 	commands := strings.Split(command, " ")
 
 	// TODO: Verify the integrity of the executable
-
 	var executable string
 	var args []string
 
@@ -223,7 +229,7 @@ func goExecute(l *lua.LState) int {
 	executable = commands[0]
 	args = commands[1:]
 
-	if !allowedExecutables.Has(executable) {
+	if !strings.Contains(l.GetGlobal("allowedExecutables").String(), executable) {
 		l.Push(lua.LString("Error: Executable not allowed"))
 		return 1
 	}
@@ -363,4 +369,440 @@ func goScanDir(l *lua.LState) int {
 	// Return all scanned files as a string to the Lua sandbox
 	l.Push(lua.LString(strings.Join(files, "\n")))
 	return 1
+}
+
+func goReadFile(l *lua.LState) int {
+	filePath := l.ToString(1)
+	if !isPathAllowed(filePath) {
+		l.Push(lua.LString("Error: Access to this file is not allowed"))
+		return 1
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		l.Push(lua.LString(fmt.Sprintf("Error reading file: %s", err.Error())))
+		return 1
+	}
+
+	l.Push(lua.LString(string(data)))
+	return 1
+}
+
+func goGetDiff(l *lua.LState) int {
+	cmd := exec.Command("git", "diff", "HEAD", "--no-ext-diff", "--unified=0", "-a", "--no-prefix")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 1
+}
+
+func goGetWorkTree(l *lua.LState) int {
+	cmd := exec.Command("git", "ls-files")
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 1
+}
+
+// goRegexMatch processes input text and searches for patterns
+func goRegexMatch(l *lua.LState) int {
+	startTime := time.Now()
+
+	// Get input parameters from Lua state
+	gitDiffOutput := l.ToString(1) // The git diff text
+	patterns := l.ToTable(2)       // Table of provided regex patterns
+
+	// Initialize tracking variables
+	results := map[string][]map[string]interface{}{} // Store matches per file
+	currentFile := ""                                // Track current file being processed
+	lineNumber := 0                                  // Track current line number
+
+	// Split input into lines for processing
+	parseStart := time.Now()
+	lines := strings.Split(gitDiffOutput, "\n")
+	log.Printf("Parse: %v", time.Since(parseStart))
+
+	// Process each line of the diff
+	regexStart := time.Now()
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "+++"):
+			// Found new file header, update current file being processed
+			currentFile = strings.TrimPrefix(line, "+++ ")
+
+		case strings.HasPrefix(line, "@@"):
+			// Found diff hunk header, extract starting line number
+			parts := strings.Split(line, " ")
+			if len(parts) >= 3 {
+				lineNumber, _ = strconv.Atoi(strings.Trim(strings.Split(parts[2], ",")[0], "+"))
+			}
+
+		case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+			// For each added line, check against regex patterns
+			lineNumber++
+			for _, pattern := range patternsToMap(patterns) {
+				if match, _ := regexp.MatchString(pattern.Value, line); match {
+					// Initialize results array for file
+					if _, ok := results[currentFile]; !ok {
+						results[currentFile] = []map[string]interface{}{}
+					}
+					// Record the match details
+					results[currentFile] = append(results[currentFile], map[string]interface{}{
+						"type":     pattern.Key,
+						"line_num": lineNumber,
+						"content":  line,
+					})
+				}
+			}
+		case strings.HasPrefix(line, " "):
+			// Increment line counter
+			lineNumber++
+		}
+	}
+	log.Printf("Match: %v", time.Since(regexStart))
+
+	// Convert results to Lua tables
+	luaResults := l.NewTable()
+	for file, matches := range results {
+		fileTable := l.NewTable()
+		for _, match := range matches {
+			matchTable := l.NewTable()
+			matchTable.RawSetString("type", lua.LString(match["type"].(string)))
+			matchTable.RawSetString("line_num", lua.LNumber(match["line_num"].(int)))
+			matchTable.RawSetString("content", lua.LString(match["content"].(string)))
+			fileTable.Append(matchTable)
+		}
+		luaResults.RawSetString(file, fileTable)
+	}
+
+	// Return results to Lua
+	l.Push(luaResults)
+	log.Printf("Total time: %v", time.Since(startTime))
+	return 1
+}
+
+func patternsToMap(patterns *lua.LTable) []struct{ Key, Value string } {
+	result := []struct{ Key, Value string }{}
+	patterns.ForEach(func(key lua.LValue, value lua.LValue) {
+		result = append(result, struct{ Key, Value string }{
+			Key:   key.String(),
+			Value: value.String(),
+		})
+	})
+	return result
+}
+
+func getGitDiffOutput() (string, error) {
+	cmd := exec.Command("git", "diff", "HEAD", "--no-ext-diff", "--unified=0", "-a", "--no-prefix")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+func getGitDiffFiles() ([]string, error) {
+	cmd := exec.Command("git", "diff", "--staged", "--name-only", "--diff-filter=A")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
+}
+
+func getWorkTreeFiles() ([]string, error) {
+	cmd := exec.Command("git", "ls-files")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
+}
+
+type RegexPattern struct {
+	Key   string
+	Regex *regexp.Regexp
+}
+
+func patternsToList(patterns *lua.LTable) []RegexPattern {
+	var patternsList []RegexPattern
+	patterns.ForEach(func(key, value lua.LValue) {
+		patternsList = append(patternsList, RegexPattern{
+			Key:   key.String(),
+			Regex: regexp.MustCompile(value.String()),
+		})
+	})
+	return patternsList
+}
+
+func goProcessGitDiff(l *lua.LState) int {
+	start := time.Now()
+
+	output, err := getGitDiffOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	patterns := patternsToList(l.ToTable(1))
+	results := map[string][]map[string]interface{}{}
+
+	currentFile := ""
+	lineNumber := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		switch {
+		case strings.HasPrefix(line, "+++"):
+			currentFile = strings.TrimPrefix(line, "+++ ")
+		case strings.HasPrefix(line, "@@"):
+			parts := strings.Split(line, " ")
+			if len(parts) >= 3 {
+				lineNumber, _ = strconv.Atoi(strings.Trim(strings.Split(parts[2], ",")[0], "+"))
+			}
+		case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+			lineNumber++
+			for _, pattern := range patterns {
+				if pattern.Regex.MatchString(line) {
+					if _, ok := results[currentFile]; !ok {
+						results[currentFile] = []map[string]interface{}{}
+					}
+					results[currentFile] = append(results[currentFile], map[string]interface{}{
+						"type":     pattern.Key,
+						"line_num": lineNumber,
+						"content":  line,
+					})
+				}
+			}
+		}
+	}
+	log.Printf("match: %v", time.Since(start))
+
+	if err := scanner.Err(); err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	// Convert results to Lua table
+	luaResults := l.NewTable()
+	for file, matches := range results {
+		fileTable := l.NewTable()
+		for _, match := range matches {
+			matchTable := l.NewTable()
+			matchTable.RawSetString("type", lua.LString(match["type"].(string)))
+			matchTable.RawSetString("line_num", lua.LNumber(match["line_num"].(int)))
+			matchTable.RawSetString("content", lua.LString(match["content"].(string)))
+			fileTable.Append(matchTable)
+		}
+		luaResults.RawSetString(file, fileTable)
+	}
+
+	l.Push(luaResults)
+	return 0
+}
+
+func checkAddedLargeFile(l *lua.LState) int {
+	maxSizeKB := l.ToInt(1)
+	enforceAll := l.ToBool(2)
+
+	var files []string
+	var err error
+
+	if enforceAll {
+		files, err = getWorkTreeFiles()
+	} else {
+		files, err = getGitDiffFiles()
+	}
+
+	if err != nil {
+		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+		return 1
+	}
+
+	largeFiles := l.NewTable()
+	for _, file := range files {
+		info, err := os.Stat(file)
+		if err != nil {
+			continue
+		}
+		if info.Size() > int64(maxSizeKB*1024) {
+			largeFiles.Append(lua.LString(file))
+		}
+	}
+
+	l.Push(largeFiles)
+	return 0
+}
+
+func checkMergeConflict(l *lua.LState) int {
+	var files []string
+	var err error
+
+	files, err = getGitDiffFiles()
+
+	if err != nil {
+		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+		return 1
+	}
+
+	conflictFiles := l.NewTable()
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		if bytes.Contains(data, []byte("<<<<<<< ")) ||
+			bytes.Contains(data, []byte("======= ")) ||
+			bytes.Contains(data, []byte(">>>>>>> ")) {
+			conflictFiles.Append(lua.LString(file))
+		}
+	}
+
+	l.Push(conflictFiles)
+	return 0
+}
+
+func checkJSON(l *lua.LState) int {
+	var files []string
+	var err error
+
+	files, err = getWorkTreeFiles()
+
+	if err != nil {
+		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+		return 1
+	}
+
+	jsonFiles := l.NewTable()
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		if json.Valid(data) {
+			jsonFiles.Append(lua.LString(file))
+		}
+	}
+
+	l.Push(jsonFiles)
+	return 0
+}
+
+func checkNoCommitOnBranch(l *lua.LState) int {
+	protectedBranches := l.ToTable(1)
+	patterns := l.ToTable(2)
+
+	branchName, err := getCurrentBranchName()
+	if err != nil {
+		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+		return 1
+	}
+
+	for i := 1; i <= protectedBranches.Len(); i++ {
+		if branchName == protectedBranches.RawGetInt(i).String() {
+			l.Push(lua.LBool(true))
+			return 1
+		}
+	}
+
+	for i := 1; i <= patterns.Len(); i++ {
+		pattern := patterns.RawGetInt(i).String()
+		matched, err := regexp.MatchString(pattern, branchName)
+		if err != nil {
+			l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+			return 1
+		}
+		if matched {
+			l.Push(lua.LBool(true))
+			return 1
+		}
+	}
+
+	l.Push(lua.LBool(false))
+	return 0
+}
+
+func getCurrentBranchName() (string, error) {
+	cmd := exec.Command("git", "symbolic-ref", "--short", "HEAD")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+func getGitArchive() (string, error) {
+	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return string(output), nil
+}
+
+// git plumbing wrapper
+func getGitObject(l *lua.LState) int {
+	object := l.ToString(1)
+
+	cmd := exec.Command("git", "cat-file", "-p", object)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 0
+}
+
+func getGitObjectSize(l *lua.LState) int {
+	object := l.ToString(1)
+
+	cmd := exec.Command("git", "cat-file", "-s", object)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 0
+}
+
+func getGitObjectHash(l *lua.LState) int {
+	object := l.ToString(1)
+
+	cmd := exec.Command("git", "hash-object", "-w", object)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 0
+}
+
+func getGitObjectPath(l *lua.LState) int {
+	object := l.ToString(1)
+
+	cmd := exec.Command("git", "rev-parse", object)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	l.Push(lua.LString(string(output)))
+	return 0
 }

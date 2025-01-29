@@ -12,10 +12,8 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/gittuf-git/args"
-	lua "github.com/gittuf/gittuf/internal/lua-sandbox"
+	"github.com/gittuf/gittuf/internal/policy"
 )
-
-const gittufHooksDir = ".gittuf/hooks"
 
 // Clone handles the clone operation for gittuf + git
 func Clone(gitArgs args.Args) error {
@@ -124,24 +122,25 @@ func Commit(gitArgs args.Args) error {
 		fmt.Println("Verification success")
 	}
 
-	// TODO: parse correct hook file from refs
+	var attest = true
 
-	// TODO: parse mode from refs
-	luaMode := "default"
+	// TODO: Check for a better way to pass signing key via gittuf-git
+	keyPath := os.Getenv("GITTUF_GIT_KEYPATH")
 
-	// Lua hook point for pre-commit hooks
-	L, err := lua.NewLuaEnvironment(luaMode)
+	signer, err := gittuf.LoadSigner(repo, keyPath)
+	if err != nil {
+		attest = false
+	}
+
+	// Invoke pre-commit hook
+	err = repo.InvokeHook(context.Background(), "pre-commit", signer, policy.TargetsRoleName, attest)
 	if err != nil {
 		return err
 	}
-
-	defer L.Close()
-
-	if _, err := os.Stat(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err == nil {
-		if err := L.DoFile(fmt.Sprintf("%s/%s/pre-commit", gitArgs.RootDir, gittufHooksDir)); err != nil {
-			return fmt.Errorf("hook file: %s", strings.Split(err.Error(), "\n")[0])
-		}
-	}
+	// TODO: Discuss the specs for lua sandbox exit codes
+	// } else if exitCodes != nil {
+	// 	return fmt.Errorf("pre-commit hook failed with exit code %d, changes not committed", exitCodes)
+	// }
 
 	// Commit irrespective of failed verification. However, verification is
 	// important for debugging purposes. The user should be able to keep

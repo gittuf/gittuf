@@ -56,6 +56,24 @@ func (r *Repository) RestoreWorktree(t *testing.T) {
 	}
 }
 
+// DiffStagedFiles returns a list of files that are staged for commit in the
+// given Git repository.
+func (r *Repository) DiffStagedFiles() ([]string, error) {
+	stdOut, err := r.executor("diff", "--name-only", "--cached").executeString()
+	if err != nil {
+		return nil, fmt.Errorf("unable to list staged files: %w", err)
+	}
+	return strings.Fields(stdOut), nil
+}
+
+// IsSquashMerge returns true if the current merge is a squash merge.
+func (r *Repository) IsSquashMerge() bool {
+	if _, err := r.executor("rev-parse", "--verify", "MERGE_HEAD").executeString(); err != nil {
+		return false
+	}
+	return true
+}
+
 // IsNiceGitVersion determines whether the version of git is "nice". Certain Git
 // subcommands that gittuf uses were added in newer versions than some common
 // client versions. Instead of using a workaround for all clients, we determine
