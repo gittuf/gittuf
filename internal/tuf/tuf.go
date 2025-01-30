@@ -140,6 +140,11 @@ type RootMetadata interface {
 	// attestations.
 	// TODO: this needs to be generalized across tools
 	GetGitHubAppPrincipals() ([]Principal, error)
+
+	IsController() bool
+	AddControllerRepository(location string, rootPrincipals []Principal) error
+	AddNetworkRepository(location string, rootPrincipals []Principal) error
+	GetControllerRepositories() []OtherRepository
 }
 
 // TargetsMetadata represents gittuf's rule files. Its name is inspired by TUF.
@@ -235,4 +240,9 @@ type GlobalRuleBlockForcePushes interface {
 	// GetProtectedNamespaces returns the set of namespaces protected by the
 	// rule.
 	GetProtectedNamespaces() []string
+}
+
+type OtherRepository interface {
+	GetLocation() string
+	GetRootPrincipals() []Principal
 }

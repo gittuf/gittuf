@@ -49,6 +49,35 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	// Set global rules
 	newRootMetadata.GlobalRules = rootMetadata.GlobalRules
 
+	// Set multi repository
+	if rootMetadata.MultiRepository != nil {
+		newRootMetadata.MultiRepository = &tufv02.MultiRepository{
+			IsController:           rootMetadata.MultiRepository.IsController,
+			ControllerRepositories: []*tufv02.OtherRepository{},
+			NetworkRepositories:    []*tufv02.OtherRepository{},
+		}
+		for _, otherRepository := range rootMetadata.MultiRepository.ControllerRepositories {
+			newOtherRepository := &tufv02.OtherRepository{
+				Location:       otherRepository.Location,
+				RootPrincipals: []tuf.Principal{},
+			}
+			for _, key := range otherRepository.RootPrincipals {
+				newOtherRepository.RootPrincipals = append(newOtherRepository.RootPrincipals, key)
+			}
+			newRootMetadata.MultiRepository.ControllerRepositories = append(newRootMetadata.MultiRepository.ControllerRepositories, newOtherRepository)
+		}
+		for _, otherRepository := range rootMetadata.MultiRepository.NetworkRepositories {
+			newOtherRepository := &tufv02.OtherRepository{
+				Location:       otherRepository.Location,
+				RootPrincipals: []tuf.Principal{},
+			}
+			for _, key := range otherRepository.RootPrincipals {
+				newOtherRepository.RootPrincipals = append(newOtherRepository.RootPrincipals, key)
+			}
+			newRootMetadata.MultiRepository.NetworkRepositories = append(newRootMetadata.MultiRepository.NetworkRepositories, newOtherRepository)
+		}
+	}
+
 	return newRootMetadata
 }
 
