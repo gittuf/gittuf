@@ -40,6 +40,7 @@ var (
 	ErrInvalidPrincipalID                              = errors.New("principal ID is invalid")
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
+	ErrPrincipalStillInUse                             = errors.New("principal is still in use")
 	ErrRuleNotFound                                    = errors.New("cannot find rule entry")
 	ErrMissingRules                                    = errors.New("some rules are missing")
 	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
@@ -171,6 +172,9 @@ type TargetsMetadata interface {
 
 	// AddPrincipal adds a principal to the metadata.
 	AddPrincipal(principal Principal) error
+
+	// RemovePrincipal removes a principal from the metadata.
+	RemovePrincipal(principalID string) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
