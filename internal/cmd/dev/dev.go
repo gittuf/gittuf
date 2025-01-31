@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/dev/addgithubapproval"
 	"github.com/gittuf/gittuf/internal/cmd/dev/attestgithub"
 	"github.com/gittuf/gittuf/internal/cmd/dev/authorize"
+	"github.com/gittuf/gittuf/internal/cmd/dev/copy"
 	"github.com/gittuf/gittuf/internal/cmd/dev/dismissgithubapproval"
 	"github.com/gittuf/gittuf/internal/cmd/dev/populatecache"
 	"github.com/gittuf/gittuf/internal/cmd/dev/rslrecordat"
@@ -27,6 +28,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(attestgithub.New())
 	cmd.AddCommand(addgithubapproval.New())
 	cmd.AddCommand(authorize.New())
+	cmd.AddCommand(copy.New())
 	cmd.AddCommand(dismissgithubapproval.New())
 	cmd.AddCommand(populatecache.New())
 	cmd.AddCommand(rslrecordat.New())
