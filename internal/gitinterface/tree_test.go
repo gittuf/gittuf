@@ -22,6 +22,217 @@ func TestRepositoryEmptyTree(t *testing.T) {
 	assert.Equal(t, "4b825dc642cb6eb9a060e54bf8d69288fbee4904", hash.String())
 }
 
+func TestGetPathIDInTree(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+	treeBuilder := NewTreeBuilder(repo)
+
+	blobAID, err := repo.WriteBlob([]byte("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobBID, err := repo.WriteBlob([]byte("b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+	t.Run("no items", func(t *testing.T) {
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, emptyTreeID, treeID.String())
+
+		pathID, err := repo.GetPathIDInTree("a", treeID)
+		assert.ErrorIs(t, err, ErrTreeDoesNotHavePath)
+		assert.Nil(t, pathID)
+	})
+
+	t.Run("no subdirectories", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"a": blobAID,
+			"b": blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		itemID, err := repo.GetPathIDInTree("a", treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, blobAID, itemID)
+	})
+
+	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"foo/a": blobAID,
+			"b":     blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		itemID, err := repo.GetPathIDInTree("foo/a", treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, blobAID, itemID)
+	})
+
+	t.Run("multiple levels", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"foo/bar/foobar/a": blobAID,
+			"foobar/foo/bar/b": blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// find tree ID for foo/bar/foobar
+		expectedItemID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		itemID, err := repo.GetPathIDInTree("foo/bar/foobar", treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedItemID, itemID)
+
+		// find tree ID for foo/bar
+		expectedItemID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"foobar/a": blobAID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		itemID, err = repo.GetPathIDInTree("foo/bar", treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedItemID, itemID)
+
+		// find tree ID for foobar/foo
+		expectedItemID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"bar/b": blobBID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		itemID, err = repo.GetPathIDInTree("foobar/foo", treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedItemID, itemID)
+
+		itemID, err = repo.GetPathIDInTree("foobar/foo/foobar", treeID)
+		assert.ErrorIs(t, err, ErrTreeDoesNotHavePath)
+		assert.Nil(t, itemID)
+	})
+}
+
+func TestGetTreeItems(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+	treeBuilder := NewTreeBuilder(repo)
+
+	blobAID, err := repo.WriteBlob([]byte("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobBID, err := repo.WriteBlob([]byte("b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+	t.Run("no items", func(t *testing.T) {
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, emptyTreeID, treeID.String())
+
+		treeItems, err := repo.GetTreeItems(treeID)
+		assert.Nil(t, err)
+		assert.Nil(t, treeItems)
+	})
+
+	t.Run("no subdirectories", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"a": blobAID,
+			"b": blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		treeItems, err := repo.GetTreeItems(treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, exhaustiveItems, treeItems)
+	})
+
+	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"foo/a": blobAID,
+			"b":     blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fooTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedTreeItems := map[string]Hash{
+			"foo": fooTreeID,
+			"b":   blobBID,
+		}
+
+		treeItems, err := repo.GetTreeItems(treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedTreeItems, treeItems)
+	})
+
+	t.Run("one file in foo tree, one file in bar", func(t *testing.T) {
+		exhaustiveItems := map[string]Hash{
+			"foo/a": blobAID,
+			"bar/b": blobBID,
+		}
+
+		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fooTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		barTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobBID})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedTreeItems := map[string]Hash{
+			"foo": fooTreeID,
+			"bar": barTreeID,
+		}
+
+		treeItems, err := repo.GetTreeItems(treeID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedTreeItems, treeItems)
+	})
+}
+
 func TestGetMergeTree(t *testing.T) {
 	t.Run("no conflict", func(t *testing.T) {
 		tmpDir := t.TempDir()

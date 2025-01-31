@@ -5,9 +5,14 @@ package gitinterface
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
+)
+
+var (
+	ErrTreeDoesNotHavePath = errors.New("tree does not have requested path")
 )
 
 func (r *Repository) EmptyTree() (Hash, error) {
@@ -22,6 +27,81 @@ func (r *Repository) EmptyTree() (Hash, error) {
 	}
 
 	return hash, nil
+}
+
+// GetPathIDInTree returns the Git ID pointed to by the path in the specified
+// tree if the path exists. If not, a corresponding error is returned.  For
+// example, if the tree contains a single blob `foo/bar/baz`, querying the ID
+// for `foo/bar/baz` will return the blob ID for baz. Querying the ID for
+// `foo/bar` will return the intermediate tree ID for bar, while querying for
+// `foo/baz` will return an error.
+func (r *Repository) GetPathIDInTree(treePath string, treeID Hash) (Hash, error) {
+	treePath = strings.TrimSuffix(treePath, "/")
+	components := strings.Split(treePath, "/")
+
+	currentTreeID := treeID
+	for len(components) != 0 {
+		items, err := r.GetTreeItems(currentTreeID)
+		if err != nil {
+			return nil, err
+		}
+
+		entryID, has := items[components[0]]
+		if !has {
+			return nil, fmt.Errorf("%w: %s", ErrTreeDoesNotHavePath, treePath)
+		}
+
+		currentTreeID = entryID
+		components = components[1:]
+	}
+
+	return currentTreeID, nil
+}
+
+// GetTreeItems returns the items in a specified Git tree without recursively
+// expanding subtrees.
+func (r *Repository) GetTreeItems(treeID Hash) (map[string]Hash, error) {
+	// From Git 2.36, we can use --format here. However, it appears a not
+	// insignificant number of developers are still on Git 2.34.1, a side effect
+	// of being on Ubuntu 22.04. 22.04 is still widely used in WSL2 environments.
+	// So, we're removing --format and parsing the output differently to handle
+	// the extra information for each entry we don't need.
+	stdOut, err := r.executor("ls-tree", treeID.String()).executeString()
+	if err != nil {
+		return nil, fmt.Errorf("unable to enumerate items in tree '%s': %w", treeID.String(), err)
+	}
+
+	if stdOut == "" {
+		return nil, nil // alternatively, just check if treeID is empty tree?
+	}
+
+	entries := strings.Split(stdOut, "\n")
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	items := map[string]Hash{}
+	for _, entry := range entries {
+		// Without --format, the output is in the following format:
+		// <mode> SP <type> SP <object> TAB <file>
+		// From: https://git-scm.com/docs/git-ls-tree/2.34.1#_output_format
+
+		entrySplit := strings.Split(entry, " ")
+		// entrySplit[0] is <mode> -- discard
+		// entrySplit[1] is <type> -- discard
+		// entrySplit[2] is <object> TAB <file> -- keep
+		entrySplit = strings.Split(entrySplit[2], "\t")
+
+		// <object> is really the object ID
+		hash, err := NewHash(entrySplit[0])
+		if err != nil {
+			return nil, fmt.Errorf("invalid Git ID '%s' for path '%s': %w", entrySplit[0], entrySplit[1], err)
+		}
+
+		items[entrySplit[1]] = hash
+	}
+
+	return items, nil
 }
 
 // GetAllFilesInTree returns all filepaths and the corresponding blob hashes in
