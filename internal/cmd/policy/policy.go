@@ -17,6 +17,7 @@ import (
 	tui "github.com/gittuf/gittuf/internal/cmd/policy/tui"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
@@ -34,6 +35,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addkey.New(o))
 	cmd.AddCommand(addperson.New(o))
 	cmd.AddCommand(apply.New())
+	cmd.AddCommand(discard.New())
 	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(listprincipals.New())
 	cmd.AddCommand(listrules.New())
