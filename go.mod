@@ -9,12 +9,12 @@ require (
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/google/go-github/v61 v61.0.0
 	github.com/hiddeco/sshsig v0.1.0
-	github.com/in-toto/attestation v1.1.0
+	github.com/in-toto/attestation v1.1.1
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/sigstore/gitsign v0.12.0
-	github.com/sigstore/protobuf-specs v0.3.3
+	github.com/sigstore/protobuf-specs v0.4.0
 	github.com/sigstore/sigstore v1.8.12
 	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
