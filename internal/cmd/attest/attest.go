@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package authorize
+package attest
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/attest/authorize"
@@ -9,7 +9,13 @@ import (
 )
 
 func New() *cobra.Command {
-	cmd := authorize.New()
-	cmd.Deprecated = "switch to \"gittuf attest authorize\""
+	cmd := &cobra.Command{
+		Use:               "attest",
+		Short:             "Tools for attesting to code contributions",
+		DisableAutoGenTag: true,
+	}
+
+	cmd.AddCommand(authorize.New())
+
 	return cmd
 }

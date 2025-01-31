@@ -42,12 +42,7 @@ var githubClient *gogithub.Client
 // last RSL entry for the target ref. The to ID is that of the expected Git tree
 // created by merging the feature ref into the target ref. The commit used to
 // calculate the merge tree ID is identified using the RSL for the feature ref.
-// Currently, this is limited to developer mode.
 func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, signCommit bool) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -176,12 +171,8 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
-// their key. Currently, this is limited to developer mode.
+// their key.
 func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, fromID, toID string, signCommit bool) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()

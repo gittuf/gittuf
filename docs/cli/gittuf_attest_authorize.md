@@ -1,9 +1,9 @@
-## gittuf dev authorize
+## gittuf attest authorize
 
-Add or revoke reference authorization (developer mode only, set GITTUF_DEV=1)
+Add or revoke reference authorization
 
 ```
-gittuf dev authorize [flags]
+gittuf attest authorize [flags]
 ```
 
 ### Options
@@ -26,5 +26,5 @@ gittuf dev authorize [flags]
 
 ### SEE ALSO
 
-* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
+* [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
 
