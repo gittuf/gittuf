@@ -15,6 +15,7 @@ A security layer for Git repositories, powered by TUF
 ### SEE ALSO
 
 * [gittuf add-hooks](gittuf_add-hooks.md)	 - Add git hooks that automatically create and sync RSL
+* [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
 * [gittuf clone](gittuf_clone.md)	 - Clone repository and its gittuf references
 * [gittuf dev](gittuf_dev.md)	 - Developer mode commands
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies

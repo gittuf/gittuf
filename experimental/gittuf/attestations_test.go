@@ -15,7 +15,6 @@ import (
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -23,8 +22,6 @@ import (
 )
 
 func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("for commit", func(t *testing.T) {
 		testDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, testDir, false)
