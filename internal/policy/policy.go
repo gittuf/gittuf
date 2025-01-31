@@ -67,6 +67,7 @@ type State struct {
 	githubAppRoleName         string
 
 	repository     *gitinterface.Repository
+	policyID       gitinterface.Hash
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
 	allPrincipals  map[string]tuf.Principal
@@ -225,6 +226,10 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 	}
 
 	return LoadState(ctx, repo, commitPolicyEntry)
+}
+
+func (s *State) GetID() gitinterface.Hash {
+	return s.policyID
 }
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
@@ -922,7 +927,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry)
 		return nil, err
 	}
 
-	state := &State{repository: repo}
+	state := &State{repository: repo, policyID: entry.TargetID}
 
 	for name, blobID := range allTreeEntries {
 		contents, err := repo.ReadBlob(blobID)

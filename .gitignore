@@ -1,3 +1,5 @@
 dist/*
 *.prof
 vendor*
+*.json
+*.jsonl

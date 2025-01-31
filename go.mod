@@ -9,7 +9,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.2
 	github.com/google/go-github/v61 v61.0.0
 	github.com/hiddeco/sshsig v0.1.0
-	github.com/in-toto/attestation v1.1.0
+	github.com/in-toto/attestation v1.1.1-0.20250116170412-11ca4fce9b7a
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/cosign/v2 v2.4.1
