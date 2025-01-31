@@ -69,7 +69,8 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.GetGitRepository().CopyTreeFromRepositoryToPathInRef(remoteRepository, remoteTip, map[string]string{o.localRef: o.localDir})
+	_, err = repo.GetGitRepository().PropagateUpstreamRepositoryContents(remoteRepository, remoteTip, map[string]string{o.localRef: o.localDir})
+	return err
 }
 
 func New() *cobra.Command {

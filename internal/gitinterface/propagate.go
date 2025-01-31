@@ -14,43 +14,44 @@ var (
 	ErrCopyingBlobIDsDoNotMatch = errors.New("blob ID in local repository does not match upstream repository")
 )
 
-func (r *Repository) CopyTreeFromRepositoryToPathInRef(upstream *Repository, upstreamCommitID Hash, refDirectoryMapping map[string]string) error {
+func (r *Repository) PropagateUpstreamRepositoryContents(upstream *Repository, upstreamCommitID Hash, refDirectoryMapping map[string]string) (map[string]Hash, error) {
 	treeID, err := upstream.GetCommitTreeID(upstreamCommitID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	filesToCopy, err := upstream.GetAllFilesInTree(treeID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, blobID := range filesToCopy {
 		blob, err := upstream.ReadBlob(blobID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		localBlobID, err := r.WriteBlob(blob)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !localBlobID.Equal(blobID) {
-			return ErrCopyingBlobIDsDoNotMatch
+			return nil, ErrCopyingBlobIDsDoNotMatch
 		}
 	}
 
 	treeBuilder := NewTreeBuilder(r)
+	refHashes := map[string]Hash{}
 	for ref, directory := range refDirectoryMapping {
 		currentTip, err := r.GetReference(ref)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		currentRefTree, err := r.GetCommitTreeID(currentTip)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		currentFiles, err := r.GetAllFilesInTree(currentRefTree)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Delete entries for `directory` to account for deletions
@@ -73,14 +74,16 @@ func (r *Repository) CopyTreeFromRepositoryToPathInRef(upstream *Repository, ups
 
 		newTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(currentFiles)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		_, err = r.Commit(newTreeID, ref, fmt.Sprintf("Updating contents of %s", directory), false)
+		hash, err := r.Commit(newTreeID, ref, fmt.Sprintf("Updating contents of %s", strings.TrimPrefix(directory, "/")), false)
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		refHashes[ref] = hash
 	}
 
-	return nil
+	return refHashes, nil
 }
