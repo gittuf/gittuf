@@ -629,8 +629,8 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 	return nil
 }
 
-// Discard resets the policy staging ref , discarding any changes made to the policy staging ref.
-func Discard(ctx context.Context, repo *gitinterface.Repository) error {
+// Discard resets the policy staging ref, discarding any changes made to the policy staging ref.
+func Discard(repo *gitinterface.Repository) error {
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {

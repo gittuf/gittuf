@@ -18,15 +18,16 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.DiscardPolicy(cmd.Context())
+	return repo.DiscardPolicy()
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "discard",
-		Short: "Validate and discard the  changes from policy-staging to policy",
-		RunE:  o.Run,
+		Use:               "discard",
+		Short:             "Discard the currently staged changes to policy",
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

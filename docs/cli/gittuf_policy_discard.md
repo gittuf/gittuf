@@ -1,6 +1,6 @@
 ## gittuf policy discard
 
-Validate and discard the  changes from policy-staging to policy
+Discard the currently staged changes to policy
 
 ```
 gittuf policy discard [flags]

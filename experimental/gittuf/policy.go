@@ -49,8 +49,8 @@ func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
 	return policy.Apply(ctx, r.r, signRSLEntry)
 }
 
-func (r *Repository) DiscardPolicy(ctx context.Context) error {
-	return policy.Discard(ctx, r.r)
+func (r *Repository) DiscardPolicy() error {
+	return policy.Discard(r.r)
 }
 
 func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {

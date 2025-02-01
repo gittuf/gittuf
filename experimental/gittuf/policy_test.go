@@ -4,7 +4,6 @@
 package gittuf
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -130,7 +129,7 @@ func TestDiscardPolicy(t *testing.T) {
 		_, err = localRepo.r.GetReference(policy.PolicyStagingRef)
 		assert.Nil(t, err)
 
-		err = policy.Discard(testCtx, localRepo.r)
+		err = policy.Discard(localRepo.r)
 		assert.Nil(t, err)
 
 		stagingRefAfterDiscard, err := localRepo.r.GetReference(policy.PolicyStagingRef)
@@ -142,11 +141,11 @@ func TestDiscardPolicy(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		err := policy.Discard(testCtx, repo)
+		err := policy.Discard(repo)
 		assert.Nil(t, err)
 
 		_, err = repo.GetReference(policy.PolicyStagingRef)
-		assert.True(t, errors.Is(err, gitinterface.ErrReferenceNotFound))
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 
 	t.Run("discard with only PolicyStagingRef existing", func(t *testing.T) {
@@ -157,10 +156,10 @@ func TestDiscardPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := policy.Discard(testCtx, repo)
+		err := policy.Discard(repo)
 		assert.Nil(t, err)
 
 		_, err = repo.GetReference(policy.PolicyStagingRef)
-		assert.True(t, errors.Is(err, gitinterface.ErrReferenceNotFound))
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 }
