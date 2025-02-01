@@ -180,7 +180,7 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 		allAttestations[path.Join(codeReviewApprovalAttestationsTreeEntryName, name)] = blobID
 	}
 
-	attestationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allAttestations)
+	attestationsTreeID, err := treeBuilder.WriteTreeFromEntryIDs(allAttestations)
 	if err != nil {
 		return err
 	}

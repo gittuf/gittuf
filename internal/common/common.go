@@ -100,7 +100,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 			objects[fmt.Sprintf("%d", j+1)] = emptyBlobHash
 		}
 
-		treeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(objects)
+		treeHash, err := treeBuilder.WriteTreeFromEntryIDs(objects)
 		if err != nil {
 			t.Fatal(err)
 		}

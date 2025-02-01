@@ -25,7 +25,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		blobIDs = append(blobIDs, blobID)
 	}
 
-	emptyTree, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	emptyTree, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,12 +37,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	// in a previous test
 
 	t.Run("modify single file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,12 +63,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("rename single file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobIDs[0]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"b": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,12 +89,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("swap two files around", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1], "b": blobIDs[0]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[1], "b": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,12 +115,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,12 +141,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("delete file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -167,12 +167,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("modify file and create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[2], "b": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[2], "b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -193,7 +193,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("no parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -209,12 +209,12 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with commit matching parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -250,17 +250,17 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with no matching parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"b": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeC, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"c": blobIDs[2]})
+		treeC, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"c": blobIDs[2]})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -296,17 +296,17 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[0]})
+		treeA, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[0]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeB, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[1]})
+		treeB, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[1]})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeC, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobIDs[2]})
+		treeC, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobIDs[2]})
 		if err != nil {
 			t.Fatal(err)
 		}

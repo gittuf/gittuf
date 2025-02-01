@@ -244,23 +244,23 @@ func NewTreeBuilder(repo *Repository) *TreeBuilder {
 	return &TreeBuilder{repo: repo}
 }
 
-// WriteRootTreeFromBlobIDs accepts a map of paths to their blob IDs and returns
-// the root tree ID that contains these files.
-func (t *TreeBuilder) WriteRootTreeFromBlobIDs(files map[string]Hash) (Hash, error) {
-	rootNoteKey := ""
-	t.trees = map[string]*entry{rootNoteKey: {}}
+// WriteTreeFromEntryIDs accepts a map of paths to their Git IDs and returns the
+// tree ID that contains these files.
+func (t *TreeBuilder) WriteTreeFromEntryIDs(files map[string]Hash) (Hash, error) {
+	rootNodeKey := ""
+	t.trees = map[string]*entry{rootNodeKey: {}}
 	t.entries = map[string]*entry{}
 
 	for path, gitID := range files {
-		t.buildIntermediates(path, gitID)
+		t.identifyIntermediates(path, gitID)
 	}
 
-	return t.writeTrees(rootNoteKey, t.trees[rootNoteKey])
+	return t.writeTrees(rootNodeKey, t.trees[rootNodeKey])
 }
 
-// buildIntermediates identifies the intermediate trees that must be constructed
-// for the specified path.
-func (t *TreeBuilder) buildIntermediates(name string, gitID Hash) {
+// identifyIntermediates identifies the intermediate trees that must be
+// constructed for the specified path.
+func (t *TreeBuilder) identifyIntermediates(name string, gitID Hash) {
 	parts := strings.Split(name, "/")
 
 	var fullPath string
@@ -268,13 +268,13 @@ func (t *TreeBuilder) buildIntermediates(name string, gitID Hash) {
 		parent := fullPath
 		fullPath = path.Join(fullPath, part)
 
-		t.buildTree(name, parent, fullPath, gitID)
+		t.populateTree(name, parent, fullPath, gitID)
 	}
 }
 
-// buildTree populates tree and entry information for each tree that must be
+// populateTree populates tree and entry information for each tree that must be
 // created.
-func (t *TreeBuilder) buildTree(name, parent, fullPath string, gitID Hash) {
+func (t *TreeBuilder) populateTree(name, parent, fullPath string, gitID Hash) {
 	if _, ok := t.trees[fullPath]; ok {
 		return
 	}
@@ -286,9 +286,22 @@ func (t *TreeBuilder) buildTree(name, parent, fullPath string, gitID Hash) {
 	entryObj := &entry{name: path.Base(fullPath), gitID: ZeroHash}
 
 	if fullPath == name {
-		entryObj.isDir = false
+		// => This is a leaf node
+		// However, gitID _may_ be a tree ID, and we've inserted an existing
+		// tree object as a subtree here, we want to support this so that we
+		// don't have to recreate trees that already exist
+
+		if err := t.repo.ensureIsTree(gitID); err == nil {
+			// gitID represents tree
+			entryObj.isDir = true
+			entryObj.dirExists = true
+		} else {
+			// gitID is not for a tree
+			entryObj.isDir = false
+		}
 		entryObj.gitID = gitID
 	} else {
+		// => This is an intermediate node, has to be a tree that we must build
 		entryObj.isDir = true
 		t.trees[fullPath] = &entry{}
 	}
@@ -301,7 +314,13 @@ func (t *TreeBuilder) buildTree(name, parent, fullPath string, gitID Hash) {
 // invocation.
 func (t *TreeBuilder) writeTrees(parent string, tree *entry) (Hash, error) {
 	for i, e := range tree.entries {
-		if !e.isDir && !e.gitID.IsZero() {
+		if (e.isDir && e.dirExists) || (!e.isDir && !e.gitID.IsZero()) {
+			// The first condition checks if the entry is for a directory that
+			// already exists. If true, then we don't need to write subtrees.
+			// The second condition checks if the entry is _not_ for a directory
+			// and the entry's ID is _not_ zero, meaning it's a leaf entry
+			// representing a blob. So once again, we don't need to write
+			// subtrees.
 			continue
 		}
 
@@ -352,8 +371,22 @@ func (t *TreeBuilder) writeTree(entries []*entry) (Hash, error) {
 // entry is a helper type that represents an entry in a Git tree. If `isDir` is
 // true, it indicates the entry represents a subtree.
 type entry struct {
-	name    string
-	isDir   bool
-	gitID   Hash
-	entries []*entry // only used when isDir is true
+	name      string
+	isDir     bool
+	dirExists bool
+	gitID     Hash
+	entries   []*entry // only used when isDir is true
+}
+
+// ensureIsTree is a helper to check that the ID represents a Git tree
+// object.
+func (r *Repository) ensureIsTree(treeID Hash) error {
+	objType, err := r.executor("cat-file", "-t", treeID.String()).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to inspect if object is tree: %w", err)
+	} else if objType != "tree" {
+		return fmt.Errorf("requested Git ID '%s' is not a tree object", treeID.String())
+	}
+
+	return nil
 }

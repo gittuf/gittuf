@@ -404,7 +404,7 @@ func TestGetStateForCommit(t *testing.T) {
 	// Create some commits
 	refName := "refs/heads/main"
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

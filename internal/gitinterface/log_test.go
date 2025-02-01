@@ -20,7 +20,7 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -336,7 +336,7 @@ func createTestTrees(t *testing.T, repo *Repository, emptyBlobHash Hash, num int
 			objects[fmt.Sprintf("%d", j+1)] = emptyBlobHash
 		}
 
-		treeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(objects)
+		treeHash, err := treeBuilder.WriteTreeFromEntryIDs(objects)
 		if err != nil {
 			t.Fatal(err)
 		}

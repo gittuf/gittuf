@@ -40,7 +40,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +57,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			"b": blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			"b":     blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,13 +89,13 @@ func TestGetPathIDInTree(t *testing.T) {
 			"foobar/foo/bar/b": blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// find tree ID for foo/bar/foobar
-		expectedItemID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		expectedItemID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobAID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,7 +105,7 @@ func TestGetPathIDInTree(t *testing.T) {
 		assert.Equal(t, expectedItemID, itemID)
 
 		// find tree ID for foo/bar
-		expectedItemID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"foobar/a": blobAID})
+		expectedItemID, err = treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"foobar/a": blobAID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,7 +115,7 @@ func TestGetPathIDInTree(t *testing.T) {
 		assert.Equal(t, expectedItemID, itemID)
 
 		// find tree ID for foobar/foo
-		expectedItemID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"bar/b": blobBID})
+		expectedItemID, err = treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"bar/b": blobBID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,7 +148,7 @@ func TestGetTreeItems(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -165,7 +165,7 @@ func TestGetTreeItems(t *testing.T) {
 			"b": blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -181,12 +181,12 @@ func TestGetTreeItems(t *testing.T) {
 			"b":     blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		fooTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		fooTreeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobAID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -207,17 +207,17 @@ func TestGetTreeItems(t *testing.T) {
 			"bar/b": blobBID,
 		}
 
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(exhaustiveItems)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(exhaustiveItems)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		fooTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		fooTreeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobAID})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		barTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": blobBID})
+		barTreeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"b": blobBID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -256,20 +256,20 @@ func TestGetMergeTree(t *testing.T) {
 		}
 
 		treeBuilder := NewTreeBuilder(repo)
-		emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		treeAID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": emptyBlobID})
+		treeAID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": emptyBlobID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		treeBID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"b": emptyBlobID})
+		treeBID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"b": emptyBlobID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		combinedTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{
+		combinedTreeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{
 			"a": emptyBlobID,
 			"b": emptyBlobID,
 		})
@@ -341,7 +341,7 @@ func TestGetMergeTree(t *testing.T) {
 		}
 
 		treeBuilder := NewTreeBuilder(repo)
-		emptyTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -355,11 +355,11 @@ func TestGetMergeTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		treeAID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"a": blobAID})
+		treeAID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"a": blobAID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		treeBID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{
+		treeBID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{
 			"a": blobBID,
 			"b": emptyBlobID,
 		})
@@ -423,7 +423,7 @@ func TestGetMergeTree(t *testing.T) {
 		}
 
 		treeBuilder := NewTreeBuilder(repo)
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"empty": emptyBlobID})
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"empty": emptyBlobID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -457,11 +457,11 @@ func TestTreeBuilder(t *testing.T) {
 
 	t.Run("no blobs", func(t *testing.T) {
 		treeBuilder := NewTreeBuilder(repo)
-		treeID, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		treeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		assert.Nil(t, err)
 		assert.Equal(t, emptyTreeID, treeID.String())
 
-		treeID, err = treeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{})
+		treeID, err = treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{})
 		assert.Nil(t, err)
 		assert.Equal(t, emptyTreeID, treeID.String())
 	})
@@ -474,7 +474,7 @@ func TestTreeBuilder(t *testing.T) {
 			"b": blobBID,
 		}
 
-		rootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(input)
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(input)
 		assert.Nil(t, err)
 
 		files, err := repo.GetAllFilesInTree(rootTreeID)
@@ -493,7 +493,7 @@ func TestTreeBuilder(t *testing.T) {
 			"dir/b": blobBID,
 		}
 
-		rootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(input)
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(input)
 		assert.Nil(t, err)
 
 		files, err := repo.GetAllFilesInTree(rootTreeID)
@@ -512,7 +512,7 @@ func TestTreeBuilder(t *testing.T) {
 			"bar/b": blobBID,
 		}
 
-		rootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(input)
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(input)
 		assert.Nil(t, err)
 
 		files, err := repo.GetAllFilesInTree(rootTreeID)
@@ -531,7 +531,7 @@ func TestTreeBuilder(t *testing.T) {
 			"foo/bar/foobar/b": blobBID,
 		}
 
-		rootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(input)
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(input)
 		assert.Nil(t, err)
 
 		files, err := repo.GetAllFilesInTree(rootTreeID)
@@ -541,4 +541,88 @@ func TestTreeBuilder(t *testing.T) {
 
 		assert.Equal(t, input, files)
 	})
+
+	t.Run("build tree from intermediate tree", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
+
+		intermediateTreeInput := map[string]Hash{
+			"a": blobAID,
+		}
+
+		intermediateTreeID, err := treeBuilder.WriteTreeFromEntryIDs(intermediateTreeInput)
+		assert.Nil(t, err)
+
+		rootTreeInput := map[string]Hash{
+			"intermediate": intermediateTreeID,
+			"b":            blobBID,
+		}
+
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(rootTreeInput)
+		assert.Nil(t, err)
+
+		expectedFiles := map[string]Hash{
+			"intermediate/a": blobAID,
+			"b":              blobBID,
+		}
+
+		files, err := repo.GetAllFilesInTree(rootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, expectedFiles, files)
+	})
+
+	t.Run("build tree from nested intermediate tree", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
+
+		intermediateTreeInput := map[string]Hash{
+			"a": blobAID,
+		}
+
+		intermediateTreeID, err := treeBuilder.WriteTreeFromEntryIDs(intermediateTreeInput)
+		assert.Nil(t, err)
+
+		rootTreeInput := map[string]Hash{
+			"foo/intermediate": intermediateTreeID,
+			"b":                blobBID,
+		}
+
+		rootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(rootTreeInput)
+		assert.Nil(t, err)
+
+		expectedFiles := map[string]Hash{
+			"foo/intermediate/a": blobAID,
+			"b":                  blobBID,
+		}
+
+		files, err := repo.GetAllFilesInTree(rootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, expectedFiles, files)
+	})
+}
+
+func TestEnsureIsTree(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, true)
+
+	blobID, err := repo.WriteBlob([]byte("foo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	treeBuilder := NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"foo": blobID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = repo.ensureIsTree(treeID)
+	assert.Nil(t, err)
+
+	err = repo.ensureIsTree(blobID)
+	assert.NotNil(t, err)
 }
