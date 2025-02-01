@@ -18,10 +18,13 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/verifymergeable"
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/gittuf/gittuf/internal/cmd/version"
+	"github.com/gittuf/gittuf/internal/display"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
+	noColor           bool
 	verbose           bool
 	profile           bool
 	cpuProfileFile    string
@@ -29,6 +32,13 @@ type options struct {
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().BoolVar(
+		&o.noColor,
+		"no-color",
+		false,
+		"turn off colored output",
+	)
+
 	cmd.PersistentFlags().BoolVar(
 		&o.verbose,
 		"verbose",
@@ -59,13 +69,18 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
+	// Check if colored output must be disabled
+	output := os.Stdout
+	isTerminal := isatty.IsTerminal(output.Fd()) || isatty.IsCygwinTerminal(output.Fd())
+	if o.noColor || !isTerminal {
+		display.DisableColor()
+	}
+
 	// Setup logging
 	level := slog.LevelInfo
-
 	if o.verbose {
 		level = slog.LevelDebug
 	}
-
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 	})))

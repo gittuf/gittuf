@@ -4,6 +4,8 @@
 package log
 
 import (
+	"os"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/display"
 	"github.com/spf13/cobra"
@@ -13,13 +15,13 @@ type options struct{}
 
 func (o *options) AddFlags(_ *cobra.Command) {}
 
-func (o *options) Run(cmd *cobra.Command, _ []string) error {
+func (o *options) Run(_ *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(cmd.OutOrStdout()))
+	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(os.Stdout))
 }
 
 func New() *cobra.Command {

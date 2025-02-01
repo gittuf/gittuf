@@ -93,19 +93,15 @@ func writeRSLEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations
 	         <message>
 	*/
 
-	text := fmt.Sprintf("entry %s", entry.ID.String())
+	text := colorer(fmt.Sprintf("entry %s", entry.ID.String()), yellow)
 
-	skipped := false
 	for _, annotation := range annotations {
 		if annotation.Skip {
-			skipped = true
+			text += fmt.Sprintf(" %s", colorer("(skipped)", red))
 			break
 		}
 	}
 
-	if skipped {
-		text += " (skipped)"
-	}
 	text += "\n"
 
 	text += fmt.Sprintf("\n  Ref:    %s", entry.RefName)
@@ -115,12 +111,13 @@ func writeRSLEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations
 	}
 
 	for _, annotation := range annotations {
+		text += "\n\n"
+		text += colorer(fmt.Sprintf("    Annotation ID: %s", annotation.ID.String()), green)
 		text += "\n"
-		text += fmt.Sprintf("\n    Annotation ID: %s", annotation.ID.String())
 		if annotation.Skip {
-			text += "\n    Skip:          yes"
+			text += colorer("    Skip:          yes", red)
 		} else {
-			text += "\n    Skip:          no"
+			text += "    Skip:          no"
 		}
 		if annotation.Number != 0 {
 			text += fmt.Sprintf("\n    Number:        %d", annotation.Number)

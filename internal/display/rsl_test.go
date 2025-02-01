@@ -96,12 +96,15 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
 
 	output := &bytes.Buffer{}
 	writer := &noopwritecloser{writer: output}
-	err = RSLLog(repo, writer, false)
+	err = RSLLog(repo, writer)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedOutput, output.String())
 }
 
 func TestWriteRSLEntry(t *testing.T) {
+	// Set colorer to off for tests
+	colorer = colorerOff
+
 	t.Run("simple without number, no parent", func(t *testing.T) {
 		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
 		entry.ID = gitinterface.ZeroHash
