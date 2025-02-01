@@ -114,3 +114,52 @@ func TestPullPolicy(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPullingPolicy)
 	})
 }
+
+func TestDiscardPolicy(t *testing.T) {
+	t.Run("successful discard with existing policy", func(t *testing.T) {
+		localRepo := createTestRepositoryWithPolicy(t, "")
+
+		if err := policy.Apply(testCtx, localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		initialPolicyRef, err := localRepo.r.GetReference(policy.PolicyRef)
+		assert.Nil(t, err)
+
+		_, err = localRepo.r.GetReference(policy.PolicyStagingRef)
+		assert.Nil(t, err)
+
+		err = policy.Discard(localRepo.r)
+		assert.Nil(t, err)
+
+		stagingRefAfterDiscard, err := localRepo.r.GetReference(policy.PolicyStagingRef)
+		assert.Nil(t, err)
+		assert.Equal(t, initialPolicyRef, stagingRefAfterDiscard)
+	})
+
+	t.Run("discard with no existing refs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		err := policy.Discard(repo)
+		assert.Nil(t, err)
+
+		_, err = repo.GetReference(policy.PolicyStagingRef)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+	})
+
+	t.Run("discard with only PolicyStagingRef existing", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := repo.SetReference(policy.PolicyStagingRef, gitinterface.ZeroHash); err != nil {
+			t.Fatal(err)
+		}
+
+		err := policy.Discard(repo)
+		assert.Nil(t, err)
+
+		_, err = repo.GetReference(policy.PolicyStagingRef)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+	})
+}
