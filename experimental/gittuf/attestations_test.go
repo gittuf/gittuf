@@ -63,7 +63,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// Add a single commit
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
 		fromCommitID := commitIDs[0]
-		if err := repo.RecordRSLEntryForReference(targetRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -71,7 +71,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// Add two commits
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
 		featureCommitID := commitIDs[1]
-		if err := repo.RecordRSLEntryForReference(featureRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -174,7 +174,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.RecordRSLEntryForReference(fromRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, fromRef, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -204,7 +204,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Add it to RSL
-		if err := repo.RecordRSLEntryForReference(targetTagRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, targetTagRef, false); err != nil {
 			t.Fatal(err)
 		}
 

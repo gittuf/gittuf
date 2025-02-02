@@ -119,6 +119,10 @@ type RootMetadata interface {
 	// DeleteGlobalRule removes the global rule from the root metadata.
 	DeleteGlobalRule(ruleName string) error
 
+	// AddPropagation adds the specified propagation directive. FIXME: make this
+	// named so we can delete propagation directives.
+	AddPropagation(upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) error
+
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
 	AddGitHubAppPrincipal(appName string, principal Principal) error

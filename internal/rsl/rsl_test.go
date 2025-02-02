@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	"github.com/go-git/go-git/v5/plumbing"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1599,7 +1599,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 				RefName:  "refs/heads/main",
 				TargetID: gitinterface.ZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String()),
 		},
 		"entry, non-zero commit": {
 			entry: &ReferenceEntry{
@@ -1614,7 +1614,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 				TargetID: gitinterface.ZeroHash,
 				Number:   1,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 1),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1),
 		},
 		"entry, fully resolved ref, large number": {
 			entry: &ReferenceEntry{
@@ -1622,7 +1622,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 				TargetID: gitinterface.ZeroHash,
 				Number:   math.MaxUint64,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 
@@ -1714,11 +1714,75 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 	}
 }
 
+func TestPropagationEntryCreateCommitMessage(t *testing.T) {
+	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamRepository := "https://git.example.com/example/repository"
+
+	tests := map[string]struct {
+		entry           *PropagationEntry
+		expectedMessage string
+	}{
+		"entry, fully resolved ref": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+		},
+		"entry, non-zero commit": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           nonZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    nonZeroHash,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+		},
+		"entry, fully resolved ref, small number": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+				Number:             1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, 1),
+		},
+		"entry, fully resolved ref, large number": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+				Number:             math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			message, _ := test.entry.createCommitMessage(true)
+			if !assert.Equal(t, test.expectedMessage, message) {
+				t.Errorf("expected\n%s\n\ngot\n%s", test.expectedMessage, message)
+			}
+		})
+	}
+}
+
 func TestParseRSLEntryText(t *testing.T) {
 	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	upstreamRepository := "https://git.example.com/example/repository"
 
 	tests := map[string]struct {
 		expectedEntry Entry
@@ -1802,6 +1866,30 @@ func TestParseRSLEntryText(t *testing.T) {
 			expectedError: ErrInvalidRSLEntry,
 			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String()),
 		},
+		"propagation entry, fully resolved ref": {
+			expectedEntry: &PropagationEntry{
+				ID:                 gitinterface.ZeroHash,
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+			},
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+		},
+		"propagation entry, non-zero commit": {
+			expectedEntry: &PropagationEntry{
+				ID:                 gitinterface.ZeroHash,
+				RefName:            "refs/heads/main",
+				TargetID:           nonZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    nonZeroHash,
+			},
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+		},
+		"propagation entry, missing information": {
+			expectedError: ErrInvalidRSLEntry,
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository),
+		},
 	}
 
 	for name, test := range tests {
@@ -1814,6 +1902,135 @@ func TestParseRSLEntryText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPropagateChanges(t *testing.T) {
+	// Create upstreamRepo
+	upstreamRepoLocation := t.TempDir()
+	upstreamRepo := gitinterface.CreateTestGitRepository(t, upstreamRepoLocation, true)
+
+	downstreamRepoLocation := t.TempDir()
+	downstreamRepo := gitinterface.CreateTestGitRepository(t, downstreamRepoLocation, true)
+
+	propagationDetails := &tufv01.Propagation{
+		UpstreamReference:   "refs/heads/main",
+		UpstreamRepository:  upstreamRepoLocation,
+		DownstreamReference: "refs/heads/main",
+		DownstreamPath:      "upstream",
+	}
+
+	err := PropagateChanges(downstreamRepo, upstreamRepo, []*tufv01.Propagation{propagationDetails}, false)
+	assert.Nil(t, err) // propagation has nothing to do because no RSL exists in upstream
+
+	// Add things to upstreamRepo
+	blobAID, err := upstreamRepo.WriteBlob([]byte("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobBID, err := upstreamRepo.WriteBlob([]byte("b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo)
+	upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("a", blobAID),
+		gitinterface.NewEntryBlob("b", blobBID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamCommitID, err := upstreamRepo.Commit(upstreamRootTreeID, "refs/heads/main", "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewReferenceEntry("refs/heads/main", upstreamCommitID).Commit(upstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+	upstreamEntry, err := GetLatestEntry(upstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = PropagateChanges(downstreamRepo, upstreamRepo, []*tufv01.Propagation{propagationDetails}, false)
+	// TODO: should propagation result in a new local ref?
+	assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+	// Add things to downstreamRepo
+	blobAID, err = downstreamRepo.WriteBlob([]byte("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blobBID, err = downstreamRepo.WriteBlob([]byte("b"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo)
+	downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("a", blobAID),
+		gitinterface.NewEntryBlob("foo/b", blobBID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	downstreamCommitID, err := downstreamRepo.Commit(downstreamRootTreeID, "refs/heads/main", "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewReferenceEntry("refs/heads/main", downstreamCommitID).Commit(downstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = PropagateChanges(downstreamRepo, upstreamRepo, []*tufv01.Propagation{propagationDetails}, false)
+	assert.Nil(t, err)
+
+	latestEntry, err := GetLatestEntry(downstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	propagationEntry, isPropagationEntry := latestEntry.(*PropagationEntry)
+	if !isPropagationEntry {
+		t.Fatal("unexpected entry type in downstream repo")
+	}
+	assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
+	assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
+
+	downstreamRootTreeID, err = downstreamRepo.GetCommitTreeID(propagationEntry.TargetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathTreeID, err := downstreamRepo.GetPathIDInTree("upstream", downstreamRootTreeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the subtree ID in downstream repo matches upstream root tree ID
+	assert.Equal(t, upstreamRootTreeID, pathTreeID)
+
+	// Check the downstream tree still contains other items
+	expectedRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("a", blobAID),
+		gitinterface.NewEntryBlob("foo/b", blobBID),
+		gitinterface.NewEntryBlob("upstream/a", blobAID),
+		gitinterface.NewEntryBlob("upstream/b", blobBID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+	// Nothing to propagate, check that a new entry has not been added in the downstreamRepo
+	err = PropagateChanges(downstreamRepo, upstreamRepo, []*tufv01.Propagation{propagationDetails}, false)
+	assert.Nil(t, err)
+
+	latestEntry, err = GetLatestEntry(downstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, propagationEntry.GetID(), latestEntry.GetID())
 }
 
 func assertAnnotationsReferToEntry(t *testing.T, entry *ReferenceEntry, annotations []*AnnotationEntry) {

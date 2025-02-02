@@ -26,6 +26,7 @@ type RootMetadata struct {
 	Roles                  map[string]Role          `json:"roles"`
 	GitHubApprovalsTrusted bool                     `json:"githubApprovalsTrusted"`
 	GlobalRules            []tuf.GlobalRule         `json:"globalRules,omitempty"`
+	Propagations           []*Propagation           `json:"propagations,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -322,6 +323,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Roles                  map[string]Role            `json:"roles"`
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
+		Propagations           []*Propagation             `json:"propagations,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -398,6 +400,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	r.Propagations = temp.Propagations
+
 	return nil
 }
 
@@ -443,6 +447,21 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
 }
 
+func (r *RootMetadata) AddPropagation(upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) error {
+	if r.Propagations == nil {
+		r.Propagations = []*Propagation{}
+	}
+
+	r.Propagations = append(r.Propagations, &Propagation{
+		UpstreamRepository:  upstreamRepository,
+		UpstreamReference:   upstreamReference,
+		DownstreamReference: downstreamReference,
+		DownstreamPath:      downstreamPath,
+	})
+
+	return nil
+}
+
 // addPrincipal adds a principal to the RootMetadata instance.  v02 of the
 // metadata supports Key and Person as supported principal types.
 func (r *RootMetadata) addPrincipal(principal tuf.Principal) error {
@@ -474,3 +493,5 @@ type GlobalRuleBlockForcePushes = tufv01.GlobalRuleBlockForcePushes
 
 var NewGlobalRuleThreshold = tufv01.NewGlobalRuleThreshold
 var NewGlobalRuleBlockForcePushes = tufv01.NewGlobalRuleBlockForcePushes
+
+type Propagation = tufv01.Propagation

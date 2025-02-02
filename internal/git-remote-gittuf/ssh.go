@@ -548,7 +548,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 				}
 
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
-					if err := repo.RecordRSLEntryForReference(srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry()); err != nil {
+					if err := repo.RecordRSLEntryForReference(context.TODO(), srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry()); err != nil {
 						return nil, false, err
 					}
 				}

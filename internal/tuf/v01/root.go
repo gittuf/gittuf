@@ -26,6 +26,7 @@ type RootMetadata struct {
 	Roles                  map[string]Role  `json:"roles"`
 	GitHubApprovalsTrusted bool             `json:"githubApprovalsTrusted"`
 	GlobalRules            []tuf.GlobalRule `json:"globalRules,omitempty"`
+	Propagations           []*Propagation   `json:"propagations,omitempty"` // TODO: this should be tuf.Propagation interface...
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -369,6 +370,21 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
 }
 
+func (r *RootMetadata) AddPropagation(upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) error {
+	if r.Propagations == nil {
+		r.Propagations = []*Propagation{}
+	}
+
+	r.Propagations = append(r.Propagations, &Propagation{
+		UpstreamRepository:  upstreamRepository,
+		UpstreamReference:   upstreamReference,
+		DownstreamReference: downstreamReference,
+		DownstreamPath:      downstreamPath,
+	})
+
+	return nil
+}
+
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage in place of tuf.GlobalRule
@@ -380,6 +396,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Roles                  map[string]Role   `json:"roles"`
 		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage `json:"globalRules,omitempty"`
+		Propagations           []*Propagation    `json:"propagations,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -422,6 +439,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 			return tuf.ErrUnknownGlobalRuleType
 		}
 	}
+
+	r.Propagations = temp.Propagations
 
 	return nil
 }
@@ -524,4 +543,11 @@ func (g *GlobalRuleBlockForcePushes) Matches(path string) bool {
 
 func (g *GlobalRuleBlockForcePushes) GetProtectedNamespaces() []string {
 	return g.Paths
+}
+
+type Propagation struct {
+	UpstreamRepository  string `json:"upstreamRepository"`
+	UpstreamReference   string `json:"upstreamReference"`
+	DownstreamReference string `json:"downstreamReference"`
+	DownstreamPath      string `json:"downstreamPath"`
 }

@@ -625,7 +625,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{anotherRefName})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{anotherRefName}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -669,7 +669,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{anotherRefName})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{anotherRefName}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -709,7 +709,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
