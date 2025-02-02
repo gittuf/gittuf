@@ -29,7 +29,7 @@ func TestRepositoryCommit(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestRepositoryCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	treeWithContentsID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"README.md": blobID})
+	treeWithContentsID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	treeWithContentsID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"README.md": blobID})
+	treeWithContentsID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	treeWithContentsID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"README.md": blobID})
+	treeWithContentsID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +258,7 @@ func TestKnowsCommit(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestRepositoryGetCommitMessage(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,7 +467,7 @@ func TestGetCommitTreeID(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +477,7 @@ func TestGetCommitTreeID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	treeWithContentsID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"README.md": blobID})
+	treeWithContentsID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +513,7 @@ func TestGetCommitParentIDs(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +548,7 @@ func TestGetCommonAncestor(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

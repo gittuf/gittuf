@@ -47,7 +47,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		// Create common base for main and feature branches
 		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-		emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -166,7 +166,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		// Create common base for main and feature branches
 		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-		emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
 		}

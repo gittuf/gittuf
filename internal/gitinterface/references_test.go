@@ -19,7 +19,7 @@ func TestGetReference(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestSetReference(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestCheckAndSetReference(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestRepositoryRefSpec(t *testing.T) {
 	qualifiedRemoteRefName := "refs/remotes/origin/master"
 
 	treeBuilder := NewTreeBuilder(repo)
-	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

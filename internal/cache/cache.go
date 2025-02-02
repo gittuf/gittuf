@@ -65,7 +65,7 @@ func (p *Persistent) Commit(repo *gitinterface.Repository) error {
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	treeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]gitinterface.Hash{persistentTreeEntryName: blobID})
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob(persistentTreeEntryName, blobID)})
 	if err != nil {
 		return err
 	}

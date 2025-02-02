@@ -1034,7 +1034,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo)
-		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
 
 		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
@@ -1078,7 +1078,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo)
-		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
 
 		skippedEntries := []gitinterface.Hash{}
@@ -1139,7 +1139,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo)
-		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
 
 		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
@@ -1172,7 +1172,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo)
-		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
 
 		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
@@ -1213,7 +1213,7 @@ func TestGetFirstReferenceEntryForCommit(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1541,7 +1541,7 @@ func TestAnnotationEntryRefersTo(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
