@@ -95,12 +95,12 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 	// Create N trees with 1...N artifacts
 	treeHashes := make([]gitinterface.Hash, 0, n)
 	for i := 1; i <= n; i++ {
-		objects := map[string]gitinterface.Hash{}
+		objects := []gitinterface.TreeEntry{}
 		for j := 0; j < i; j++ {
-			objects[fmt.Sprintf("%d", j+1)] = emptyBlobHash
+			objects = append(objects, gitinterface.NewEntryBlob(fmt.Sprintf("%d", j+1), emptyBlobHash))
 		}
 
-		treeHash, err := treeBuilder.WriteTreeFromEntryIDs(objects)
+		treeHash, err := treeBuilder.WriteTreeFromEntries(objects)
 		if err != nil {
 			t.Fatal(err)
 		}

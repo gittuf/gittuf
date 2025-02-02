@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 )
@@ -236,23 +237,24 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 // `buildTreeHelper` in go-git.
 type TreeBuilder struct {
 	repo    *Repository
-	trees   map[string]*entry
-	entries map[string]*entry
+	trees   map[string]*entryTree
+	entries map[string]TreeEntry
 }
 
 func NewTreeBuilder(repo *Repository) *TreeBuilder {
 	return &TreeBuilder{repo: repo}
 }
 
-// WriteTreeFromEntryIDs accepts a map of paths to their Git IDs and returns the
-// tree ID that contains these files.
-func (t *TreeBuilder) WriteTreeFromEntryIDs(files map[string]Hash) (Hash, error) {
+// WriteTreeFromEntries accepts list of TreeEntry representations, and returns
+// the Git ID of the tree that contains these entries. It constructs the
+// required intermediate trees.
+func (t *TreeBuilder) WriteTreeFromEntries(files []TreeEntry) (Hash, error) {
 	rootNodeKey := ""
-	t.trees = map[string]*entry{rootNodeKey: {}}
-	t.entries = map[string]*entry{}
+	t.trees = map[string]*entryTree{rootNodeKey: {}}
+	t.entries = map[string]TreeEntry{}
 
-	for path, gitID := range files {
-		t.identifyIntermediates(path, gitID)
+	for _, entry := range files {
+		t.identifyIntermediates(entry)
 	}
 
 	return t.writeTrees(rootNodeKey, t.trees[rootNodeKey])
@@ -260,21 +262,21 @@ func (t *TreeBuilder) WriteTreeFromEntryIDs(files map[string]Hash) (Hash, error)
 
 // identifyIntermediates identifies the intermediate trees that must be
 // constructed for the specified path.
-func (t *TreeBuilder) identifyIntermediates(name string, gitID Hash) {
-	parts := strings.Split(name, "/")
+func (t *TreeBuilder) identifyIntermediates(entry TreeEntry) {
+	parts := strings.Split(entry.getName(), "/")
 
 	var fullPath string
 	for _, part := range parts {
 		parent := fullPath
 		fullPath = path.Join(fullPath, part)
 
-		t.populateTree(name, parent, fullPath, gitID)
+		t.populateTree(parent, fullPath, entry)
 	}
 }
 
 // populateTree populates tree and entry information for each tree that must be
 // created.
-func (t *TreeBuilder) populateTree(name, parent, fullPath string, gitID Hash) {
+func (t *TreeBuilder) populateTree(parent, fullPath string, entry TreeEntry) {
 	if _, ok := t.trees[fullPath]; ok {
 		return
 	}
@@ -283,27 +285,36 @@ func (t *TreeBuilder) populateTree(name, parent, fullPath string, gitID Hash) {
 		return
 	}
 
-	entryObj := &entry{name: path.Base(fullPath), gitID: ZeroHash}
+	var entryObj TreeEntry
 
-	if fullPath == name {
+	if fullPath == entry.getName() {
 		// => This is a leaf node
 		// However, gitID _may_ be a tree ID, and we've inserted an existing
 		// tree object as a subtree here, we want to support this so that we
 		// don't have to recreate trees that already exist
 
-		if err := t.repo.ensureIsTree(gitID); err == nil {
+		if err := t.repo.ensureIsTree(entry.getID()); err == nil {
 			// gitID represents tree
-			entryObj.isDir = true
-			entryObj.dirExists = true
+			entryObj = &entryTree{
+				name:          path.Base(fullPath),
+				gitID:         entry.getID(),
+				alreadyExists: true,
+			}
 		} else {
 			// gitID is not for a tree
-			entryObj.isDir = false
+			entryObj = &entryBlob{
+				name:  path.Base(fullPath),
+				gitID: entry.getID(),
+			}
 		}
-		entryObj.gitID = gitID
 	} else {
 		// => This is an intermediate node, has to be a tree that we must build
-		entryObj.isDir = true
-		t.trees[fullPath] = &entry{}
+		entryObj = &entryTree{
+			name:          path.Base(fullPath),
+			gitID:         ZeroHash,
+			alreadyExists: false,
+		}
+		t.trees[fullPath] = &entryTree{}
 	}
 
 	t.trees[parent].entries = append(t.trees[parent].entries, entryObj)
@@ -312,26 +323,27 @@ func (t *TreeBuilder) populateTree(name, parent, fullPath string, gitID Hash) {
 // writeTrees recursively stores each tree that must be created in the
 // repository's object store. It returns the ID of the tree created at each
 // invocation.
-func (t *TreeBuilder) writeTrees(parent string, tree *entry) (Hash, error) {
+func (t *TreeBuilder) writeTrees(parent string, tree *entryTree) (Hash, error) {
 	for i, e := range tree.entries {
-		if (e.isDir && e.dirExists) || (!e.isDir && !e.gitID.IsZero()) {
-			// The first condition checks if the entry is for a directory that
-			// already exists. If true, then we don't need to write subtrees.
-			// The second condition checks if the entry is _not_ for a directory
-			// and the entry's ID is _not_ zero, meaning it's a leaf entry
-			// representing a blob. So once again, we don't need to write
-			// subtrees.
+		switch e := e.(type) {
+		case *entryTree:
+			if e.alreadyExists {
+				// The tree already exists and we don't need to write it again.
+				continue
+			}
+
+			p := path.Join(parent, e.name)
+			entryID, err := t.writeTrees(p, t.trees[p])
+			if err != nil {
+				return ZeroHash, err
+			}
+			e.gitID = entryID
+
+			tree.entries[i] = e
+
+		case *entryBlob:
 			continue
 		}
-
-		p := path.Join(parent, e.name)
-		entryID, err := t.writeTrees(p, t.trees[p])
-		if err != nil {
-			return ZeroHash, err
-		}
-		e.gitID = entryID
-
-		tree.entries[i] = e
 	}
 
 	return t.writeTree(tree.entries)
@@ -341,15 +353,17 @@ func (t *TreeBuilder) writeTrees(parent string, tree *entry) (Hash, error) {
 // only supports a typical blob with permission 0o644 and a subtree. This is
 // because it is only intended for use with gittuf specific metadata and tests.
 // Generic tree creation is left to invocations of the Git binary by the user.
-func (t *TreeBuilder) writeTree(entries []*entry) (Hash, error) {
+func (t *TreeBuilder) writeTree(entries []TreeEntry) (Hash, error) {
 	input := ""
 	for _, entry := range entries {
 		// this is very opinionated about the modes right now because the plan
 		// is to use it for gittuf metadata, which requires regular files and
 		// subdirectories
-		if entry.isDir {
+		switch entry := entry.(type) {
+		case *entryTree:
 			input += "040000 tree " + entry.gitID.String() + "\t" + entry.name
-		} else {
+		case *entryBlob:
+			// TODO: support entryBlob's permissions here
 			input += "100644 blob " + entry.gitID.String() + "\t" + entry.name
 		}
 		input += "\n"
@@ -368,14 +382,63 @@ func (t *TreeBuilder) writeTree(entries []*entry) (Hash, error) {
 	return treeID, nil
 }
 
-// entry is a helper type that represents an entry in a Git tree. If `isDir` is
-// true, it indicates the entry represents a subtree.
-type entry struct {
-	name      string
-	isDir     bool
-	dirExists bool
-	gitID     Hash
-	entries   []*entry // only used when isDir is true
+// TreeEntry represents an entry in a Git tree.
+type TreeEntry interface {
+	getName() string
+	getID() Hash
+}
+
+// entryTree implements TreeEntry and indicates the entry is for a Git tree.
+type entryTree struct {
+	name          string
+	gitID         Hash
+	alreadyExists bool
+	entries       []TreeEntry
+}
+
+func (e *entryTree) getName() string {
+	return e.name
+}
+
+func (e *entryTree) getID() Hash {
+	return e.gitID
+}
+
+// NewEntryTree creates a TreeEntry that represents a Git tree. If the tree
+// doesn't exist, i.e., it must be created, gitID must be set to ZeroHash. The
+// name must be set to the full path of the tree object.
+func NewEntryTree(name string, gitID Hash) TreeEntry {
+	entry := &entryTree{name: name, gitID: gitID}
+	if gitID == nil || !gitID.IsZero() {
+		entry.alreadyExists = true
+	}
+	return entry
+}
+
+// entryBlob implements TreeEntry and indicates the entry is for a Git blob.
+type entryBlob struct {
+	name        string
+	gitID       Hash
+	permissions os.FileMode //nolint:unused
+}
+
+func (e *entryBlob) getName() string {
+	return e.name
+}
+
+func (e *entryBlob) getID() Hash {
+	return e.gitID
+}
+
+// NewEntryBlob creates a TreeEntry that represents a Git blob.
+func NewEntryBlob(name string, gitID Hash) TreeEntry {
+	return &entryBlob{name: name, gitID: gitID, permissions: 0o644}
+}
+
+// NewEntryBlobWithPermissions creates a TreeEntry that represents a Git blob.
+// The permissions parameter can be used to set custom permissions.
+func NewEntryBlobWithPermissions(name string, gitID Hash, permissions os.FileMode) TreeEntry {
+	return &entryBlob{name: name, gitID: gitID, permissions: permissions}
 }
 
 // ensureIsTree is a helper to check that the ID represents a Git tree

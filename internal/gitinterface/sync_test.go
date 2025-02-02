@@ -34,9 +34,9 @@ func TestPushRefSpecRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,9 +52,10 @@ func TestPushRefSpecRepository(t *testing.T) {
 		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 
+		expectedFiles := map[string]Hash{"foo": emptyBlobHash}
 		remoteEntries, err := remoteRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.Equal(t, entries, remoteEntries)
+		assert.Equal(t, expectedFiles, remoteEntries)
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
@@ -75,9 +76,9 @@ func TestPushRefSpecRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,9 +121,9 @@ func TestPushRefSpecRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,9 +175,9 @@ func TestPushRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -192,9 +193,10 @@ func TestPushRepository(t *testing.T) {
 		err = localRepo.Push(remoteName, []string{refName})
 		assert.Nil(t, err)
 
+		expectedFiles := map[string]Hash{"foo": emptyBlobHash}
 		remoteEntries, err := remoteRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.Equal(t, entries, remoteEntries)
+		assert.Equal(t, expectedFiles, remoteEntries)
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
@@ -215,9 +217,9 @@ func TestPushRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,9 +262,9 @@ func TestPushRepository(t *testing.T) {
 		// Create a tree in the local repository
 		emptyBlobHash, err := localRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -315,9 +317,9 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -334,9 +336,10 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 
+		expectedFiles := map[string]Hash{"foo": emptyBlobHash}
 		localEntries, err := localRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.Equal(t, entries, localEntries)
+		assert.Equal(t, expectedFiles, localEntries)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -357,9 +360,9 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -403,9 +406,9 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -462,9 +465,9 @@ func TestFetchRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -481,9 +484,10 @@ func TestFetchRepository(t *testing.T) {
 		err = localRepo.Fetch(remoteName, []string{refName}, true)
 		assert.Nil(t, err)
 
+		expectedFiles := map[string]Hash{"foo": emptyBlobHash}
 		localEntries, err := localRepo.GetAllFilesInTree(tree)
 		assert.Nil(t, err)
-		assert.Equal(t, entries, localEntries)
+		assert.Equal(t, expectedFiles, localEntries)
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
@@ -504,9 +508,9 @@ func TestFetchRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -550,9 +554,9 @@ func TestFetchRepository(t *testing.T) {
 		// Create a tree in the remote repository
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -601,9 +605,9 @@ func TestCloneAndFetchRepository(t *testing.T) {
 
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -645,9 +649,9 @@ func TestCloneAndFetchRepository(t *testing.T) {
 
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -689,9 +693,9 @@ func TestCloneAndFetchRepository(t *testing.T) {
 
 		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
 		require.Nil(t, err)
-		entries := map[string]Hash{"foo": emptyBlobHash}
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
 
-		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
 		if err != nil {
 			t.Fatal(err)
 		}

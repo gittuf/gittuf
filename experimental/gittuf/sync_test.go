@@ -27,7 +27,7 @@ func TestClone(t *testing.T) {
 	remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
 	remoteRepo := &Repository{r: remoteR}
 	treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

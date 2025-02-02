@@ -153,7 +153,7 @@ func TestAttestationsCommit(t *testing.T) {
 	attestations := &Attestations{referenceAuthorizations: authorizations}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	expectedTreeID, err := treeBuilder.WriteTreeFromEntryIDs(map[string]gitinterface.Hash{path.Join(referenceAuthorizationsTreeEntryName, ReferenceAuthorizationPath(testRef, testID, testID)): blobID})
+	expectedTreeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob(path.Join(referenceAuthorizationsTreeEntryName, ReferenceAuthorizationPath(testRef, testID, testID)), blobID)})
 	if err != nil {
 		t.Fatal(err)
 	}

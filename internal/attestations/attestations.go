@@ -169,18 +169,18 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
-	allAttestations := map[string]gitinterface.Hash{}
+	allAttestations := []gitinterface.TreeEntry{}
 	for name, blobID := range a.referenceAuthorizations {
-		allAttestations[path.Join(referenceAuthorizationsTreeEntryName, name)] = blobID
+		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(referenceAuthorizationsTreeEntryName, name), blobID))
 	}
 	for name, blobID := range a.githubPullRequestAttestations {
-		allAttestations[path.Join(githubPullRequestAttestationsTreeEntryName, name)] = blobID
+		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(githubPullRequestAttestationsTreeEntryName, name), blobID))
 	}
 	for name, blobID := range a.codeReviewApprovalAttestations {
-		allAttestations[path.Join(codeReviewApprovalAttestationsTreeEntryName, name)] = blobID
+		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(codeReviewApprovalAttestationsTreeEntryName, name), blobID))
 	}
 
-	attestationsTreeID, err := treeBuilder.WriteTreeFromEntryIDs(allAttestations)
+	attestationsTreeID, err := treeBuilder.WriteTreeFromEntries(allAttestations)
 	if err != nil {
 		return err
 	}

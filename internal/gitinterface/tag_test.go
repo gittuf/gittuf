@@ -22,7 +22,7 @@ func TestGetTagTarget(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestRepositoryVerifyTag(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntryIDs(nil)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -517,7 +517,7 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		}
 	}
 
-	allTreeEntries := map[string]gitinterface.Hash{}
+	allTreeEntries := []gitinterface.TreeEntry{}
 
 	for name, env := range metadata {
 		envContents, err := json.Marshal(env)
@@ -530,12 +530,12 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 			return err
 		}
 
-		allTreeEntries[path.Join(metadataTreeEntryName, name+".json")] = blobID
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(path.Join(metadataTreeEntryName, name+".json"), blobID))
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
-	policyRootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(allTreeEntries)
+	policyRootTreeID, err := treeBuilder.WriteTreeFromEntries(allTreeEntries)
 	if err != nil {
 		return err
 	}
