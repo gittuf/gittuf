@@ -36,7 +36,7 @@ func TestPushRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestPushRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +122,7 @@ func TestPushRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestPushRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +217,7 @@ func TestPushRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,7 +262,7 @@ func TestPushRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := localTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := localTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -317,7 +317,7 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -359,7 +359,7 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -405,7 +405,7 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -464,7 +464,7 @@ func TestFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -506,7 +506,7 @@ func TestFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -552,7 +552,7 @@ func TestFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -603,7 +603,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -647,7 +647,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -691,7 +691,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		entries := map[string]Hash{"foo": emptyBlobHash}
 
-		tree, err := remoteTreeBuilder.WriteRootTreeFromBlobIDs(entries)
+		tree, err := remoteTreeBuilder.WriteTreeFromEntryIDs(entries)
 		if err != nil {
 			t.Fatal(err)
 		}

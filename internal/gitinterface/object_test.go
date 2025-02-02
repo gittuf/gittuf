@@ -32,7 +32,7 @@ func TestHasObject(t *testing.T) {
 	assert.True(t, repo.HasObject(blobID)) // now repo has it too
 
 	backupRepoTreeBuilder := NewTreeBuilder(backupRepo)
-	treeID, err := backupRepoTreeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"file": blobID})
+	treeID, err := backupRepoTreeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"file": blobID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestHasObject(t *testing.T) {
 	assert.False(t, repo.HasObject(treeID))      // repo does not
 
 	repoTreeBuilder := NewTreeBuilder(repo)
-	if _, err := repoTreeBuilder.WriteRootTreeFromBlobIDs(map[string]Hash{"file": blobID}); err != nil {
+	if _, err := repoTreeBuilder.WriteTreeFromEntryIDs(map[string]Hash{"file": blobID}); err != nil {
 		t.Fatal(err)
 	}
 

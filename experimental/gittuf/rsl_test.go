@@ -26,7 +26,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	repo := &Repository{r: r}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 			repo := &Repository{r: r}
 
 			treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-			emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+			emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -222,7 +222,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
-	emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -337,7 +337,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -382,7 +382,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -447,7 +447,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -541,7 +541,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -619,7 +619,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -663,7 +663,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -699,7 +699,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -745,7 +745,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		remoteRepo := &Repository{r: remoteR}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
-		emptyTreeHash, err := treeBuilder.WriteRootTreeFromBlobIDs(nil)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntryIDs(nil)
 		if err != nil {
 			t.Fatal(err)
 		}

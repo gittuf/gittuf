@@ -535,7 +535,7 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
-	policyRootTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allTreeEntries)
+	policyRootTreeID, err := treeBuilder.WriteTreeFromEntryIDs(allTreeEntries)
 	if err != nil {
 		return err
 	}
