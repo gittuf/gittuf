@@ -4,77 +4,132 @@
 package display
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
+	"strings"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 )
 
-// PrepareRSLLogOutput takes the RSL, and returns a string representation of it,
-// with annotations attached to entries
-/* Output format:
-entry <entryID> (skipped)
+// RSLLog implements the display function for `gittuf rsl log`.
+func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
+	defer writer.Close() //nolint:errcheck
 
-  Ref:    <refName>
-  Target: <targetID>
-  Number: <number>
+	annotationsMap := make(map[string][]*rsl.AnnotationEntry)
 
-    Annotation ID: <annotationID>
-    Skip:          <yes/no>
-    Number:        <number>
-    Message:
-      <message>
-
-    Annotation ID: <annotationID>
-    Skip:          <yes/no>
-    Number:        <number>
-    Message:
-      <message>
-*/
-func PrepareRSLLogOutput(entries []*rsl.ReferenceEntry, annotationMap map[string][]*rsl.AnnotationEntry) string {
-	log := ""
-
-	for _, entry := range entries {
-		log += fmt.Sprintf("entry %s", entry.ID.String())
-
-		skipped := false
-		if annotations, ok := annotationMap[entry.ID.String()]; ok {
-			for _, annotation := range annotations {
-				if annotation.Skip {
-					skipped = true
-					break
-				}
-			}
-		}
-
-		if skipped {
-			log += " (skipped)"
-		}
-		log += "\n"
-
-		log += fmt.Sprintf("\n  Ref:    %s", entry.RefName)
-		log += fmt.Sprintf("\n  Target: %s", entry.TargetID.String())
-		if entry.Number != 0 {
-			log += fmt.Sprintf("\n  Number: %d", entry.Number)
-		}
-
-		if annotations, ok := annotationMap[entry.ID.String()]; ok {
-			for _, annotation := range annotations {
-				log += "\n"
-				log += fmt.Sprintf("\n    Annotation ID: %s", annotation.ID.String())
-				if annotation.Skip {
-					log += "\n    Skip:          yes"
-				} else {
-					log += "\n    Skip:          no"
-				}
-				if annotation.Number != 0 {
-					log += fmt.Sprintf("\n    Number:        %d", annotation.Number)
-				}
-				log += fmt.Sprintf("\n    Message:\n      %s", annotation.Message)
-			}
-		}
-
-		log += "\n\n"
+	iteratorEntry, err := rsl.GetLatestEntry(repo)
+	if err != nil {
+		return err
 	}
 
-	return log[:len(log)-1]
+	for {
+		hasParent := true // assume an entry has a parent
+		parentEntry, err := rsl.GetParentForEntry(repo, iteratorEntry)
+		if err != nil {
+			if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				return err
+			}
+
+			// only reachable when err is ErrRSLEntryNotFound
+			// Now we know the iteratorEntry does not have a parent
+			hasParent = false
+		}
+
+		switch iteratorEntry := iteratorEntry.(type) {
+		case *rsl.ReferenceEntry:
+			slog.Debug(fmt.Sprintf("Writing reference entry '%s'...", iteratorEntry.ID.String()))
+			if err := writeRSLEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
+				// We return nil here to avoid noisy output when the writer is
+				// unexpectedly closed, such as by killing the pager
+				return nil
+			}
+		case *rsl.AnnotationEntry:
+			slog.Debug(fmt.Sprintf("Tracking annotation entry '%s'...", iteratorEntry.ID.String()))
+			for _, targetID := range iteratorEntry.RSLEntryIDs {
+				targetIDString := targetID.String()
+
+				if _, has := annotationsMap[targetIDString]; !has {
+					annotationsMap[targetIDString] = []*rsl.AnnotationEntry{}
+				}
+
+				annotationsMap[targetIDString] = append(annotationsMap[targetIDString], iteratorEntry)
+			}
+		}
+
+		if !hasParent {
+			// We're done
+			return nil
+		}
+
+		iteratorEntry = parentEntry
+	}
+}
+
+// writeRSLEntry prepares the output for the given entry and its annotations. It
+// then writes the output to the provided writer. If hasParent is false, then
+// the prepared output for the entry has a single trailing newline. Otherwise,
+// an additional newline is added to separate entries from one another.
+func writeRSLEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations []*rsl.AnnotationEntry, hasParent bool) error {
+	/* Output format:
+	   entry <entryID> (skipped)
+
+	     Ref:    <refName>
+	     Target: <targetID>
+	     Number: <number>
+
+	       Annotation ID: <annotationID>
+	       Skip:          <yes/no>
+	       Number:        <number>
+	       Message:
+	         <message>
+
+	       Annotation ID: <annotationID>
+	       Skip:          <yes/no>
+	       Number:        <number>
+	       Message:
+	         <message>
+	*/
+
+	text := colorer(fmt.Sprintf("entry %s", entry.ID.String()), yellow)
+
+	for _, annotation := range annotations {
+		if annotation.Skip {
+			text += fmt.Sprintf(" %s", colorer("(skipped)", red))
+			break
+		}
+	}
+
+	text += "\n"
+
+	text += fmt.Sprintf("\n  Ref:    %s", entry.RefName)
+	text += fmt.Sprintf("\n  Target: %s", entry.TargetID.String())
+	if entry.Number != 0 {
+		text += fmt.Sprintf("\n  Number: %d", entry.Number)
+	}
+
+	for _, annotation := range annotations {
+		text += "\n\n"
+		text += colorer(fmt.Sprintf("    Annotation ID: %s", annotation.ID.String()), green)
+		text += "\n"
+		if annotation.Skip {
+			text += colorer("    Skip:          yes", red)
+		} else {
+			text += "    Skip:          no"
+		}
+		if annotation.Number != 0 {
+			text += fmt.Sprintf("\n    Number:        %d", annotation.Number)
+		}
+		text += fmt.Sprintf("\n    Message:\n      %s", strings.TrimSpace(annotation.Message))
+	}
+
+	text += "\n" // single trailing newline by default
+	if hasParent {
+		text += "\n" // extra newline for all intermediate (i.e., not last) entries
+	}
+
+	_, err := writer.Write([]byte(text))
+	return err
 }

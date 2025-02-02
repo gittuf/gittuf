@@ -1,6 +1,6 @@
 ## gittuf rsl log
 
-Display the Reference State Log
+Display the repository's Reference State Log
 
 ```
 gittuf rsl log [flags]
@@ -9,14 +9,13 @@ gittuf rsl log [flags]
 ### Options
 
 ```
-      --file string   write log to file at specified path
-  -h, --help          help for log
-      --page          page log using system's default PAGER, only enabled if displaying to stdout (default true)
+  -h, --help   help for log
 ```
 
 ### Options inherited from parent commands
 
 ```
+      --no-color                     turn off colored output
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")

@@ -5,58 +5,62 @@ package display
 
 import (
 	"bytes"
-	"os"
+	"fmt"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestNewDisplayWriter(t *testing.T) {
-	// Use 'cat' as the PAGER for this test. 'cat' will simply output the contents it receives.
-	os.Setenv("PAGER", "cat")
-	defer os.Unsetenv("PAGER") // Ensure we clean up the environment variable after the test
+func getPagerTestCat() string {
+	return "cat"
+}
 
-	tests := []struct {
-		name            string
-		page            bool
-		contents        []byte
-		wantOutput      string
-		wantErrorOutput string
+func getPagerTestNone() string {
+	return ""
+}
+
+func TestNewDisplayWriter(t *testing.T) {
+	tests := map[string]struct {
+		contents []byte
+		page     bool
 	}{
-		{
-			name:            "simple output without paging",
-			page:            false,
-			contents:        []byte("Hello, world!"),
-			wantOutput:      "Hello, world!",
-			wantErrorOutput: "",
+		"without paging": {
+			contents: []byte("Hello, world!"),
+			page:     false,
 		},
-		{
-			name:            "simple test with paging",
-			page:            true,
-			contents:        []byte("Hello, world!"),
-			wantOutput:      "Hello, world!",
-			wantErrorOutput: "",
+		"with paging": {
+			contents: []byte("Hello, world!"),
+			page:     true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defaultOutput := &bytes.Buffer{}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if test.page {
+				getPager = getPagerTestCat
+			} else {
+				getPager = getPagerTestNone
+			}
 
-			writer := NewDisplayWriter(defaultOutput, tt.page)
+			output := &bytes.Buffer{}
+			writer := NewDisplayWriter(output)
 
-			_, err := writer.Write(tt.contents)
+			_, err := writer.Write(test.contents)
 			if err != nil {
 				t.Fatal(err)
 			}
-			gotOutput := defaultOutput.String()
+
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			gotOutput := output.String()
 			if runtime.GOOS == "windows" {
 				gotOutput = strings.TrimSpace(gotOutput)
 			}
-
-			if gotOutput != tt.wantOutput {
-				t.Errorf("unexpected result with Display(), got stdout = %v, want %v", gotOutput, tt.wantOutput)
-			}
+			assert.Equal(t, string(test.contents), gotOutput, fmt.Sprintf("unexpected result in test '%s', got '%s', want '%s'", name, gotOutput, string(test.contents)))
 		})
 	}
 }

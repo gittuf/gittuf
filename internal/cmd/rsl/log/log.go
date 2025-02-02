@@ -11,26 +11,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct {
-	page     bool
-	filePath string
-}
+type options struct{}
 
-func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(
-		&o.page,
-		"page",
-		true,
-		"page log using system's default PAGER, only enabled if displaying to stdout",
-	)
-
-	cmd.Flags().StringVar(
-		&o.filePath,
-		"file",
-		"",
-		"write log to file at specified path",
-	)
-}
+func (o *options) AddFlags(_ *cobra.Command) {}
 
 func (o *options) Run(_ *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository()
@@ -38,32 +21,14 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	entries, annotationMap, err := gittuf.GetRSLEntryLog(repo)
-	if err != nil {
-		return err
-	}
-
-	output := os.Stdout
-	if o.filePath != "" {
-		output, err = os.Create(o.filePath)
-		if err != nil {
-			return err
-		}
-		o.page = false // override page since we're not writing to stdout
-	}
-
-	outputContents := display.PrepareRSLLogOutput(entries, annotationMap)
-	writer := display.NewDisplayWriter(output, o.page)
-
-	_, err = writer.Write([]byte(outputContents))
-	return err
+	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(os.Stdout))
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:               "log",
-		Short:             "Display the Reference State Log",
+		Short:             "Display the repository's Reference State Log",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
