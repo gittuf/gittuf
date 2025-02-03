@@ -26,6 +26,7 @@ Tools to manage gittuf policies
 * [gittuf policy add-person](gittuf_policy_add-person.md)	 - Add a trusted person to a policy file (requires developer mode and v0.2 policy metadata to be enabled, set GITTUF_DEV=1 and GITTUF_ALLOW_V02_POLICY=1)
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
+* [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state

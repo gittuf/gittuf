@@ -50,6 +50,15 @@ func (r *Repository) SetReference(refName string, gitID Hash) error {
 	return nil
 }
 
+// DeleteReference deletes the specified Git reference.
+func (r *Repository) DeleteReference(refName string) error {
+	_, err := r.executor("update-ref", "-d", refName).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to delete Git reference '%s': %w", refName, err)
+	}
+	return nil
+}
+
 // CheckAndSetReference sets the specified reference to the provided Git ID if
 // the reference is currently set to `oldGitID`.
 func (r *Repository) CheckAndSetReference(refName string, newGitID, oldGitID Hash) error {

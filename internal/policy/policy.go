@@ -629,6 +629,27 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 	return nil
 }
 
+// Discard resets the policy staging ref, discarding any changes made to the policy staging ref.
+func Discard(repo *gitinterface.Repository) error {
+	policyTip, err := repo.GetReference(PolicyRef)
+	if err != nil {
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			if err := repo.DeleteReference(PolicyStagingRef); err != nil && !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+				return fmt.Errorf("failed to delete policy staging reference %s: %w", PolicyStagingRef, err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
+	}
+
+	// Reset PolicyStagingRef to match the actual policy ref
+	if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+		return fmt.Errorf("failed to reset policy staging reference %s: %w", PolicyStagingRef, err)
+	}
+
+	return nil
+}
+
 func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 	rootMetadata, err := s.GetRootMetadata(false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
 	if err != nil {
