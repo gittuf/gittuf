@@ -49,6 +49,10 @@ func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
 	return policy.Apply(ctx, r.r, signRSLEntry)
 }
 
+func (r *Repository) DiscardPolicy() error {
+	return policy.Discard(r.r)
+}
+
 func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {
 	if strings.HasPrefix(targetRef, "refs/gittuf/") {
 		return policy.ListRules(ctx, r.r, targetRef)

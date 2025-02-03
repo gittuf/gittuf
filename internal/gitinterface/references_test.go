@@ -306,3 +306,28 @@ func TestTagReferenceName(t *testing.T) {
 		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
 	}
 }
+func TestDeleteReference(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	require.Nil(t, err)
+
+	refTip, err := repo.GetReference(refName)
+	require.Nil(t, err)
+	require.Equal(t, commitID, refTip)
+
+	err = repo.DeleteReference(refName)
+	assert.Nil(t, err)
+
+	_, err = repo.GetReference(refName)
+	assert.ErrorIs(t, err, ErrReferenceNotFound)
+}

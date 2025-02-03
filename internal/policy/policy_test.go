@@ -577,6 +577,103 @@ func TestApply(t *testing.T) {
 	assertStatesEqual(t, staging, policy)
 }
 
+func TestDiscard(t *testing.T) {
+	t.Parallel()
+
+	t.Run("discard changes when policy ref exists", func(t *testing.T) {
+		t.Parallel()
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddPrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test-rule"}, 1); err != nil {
+			t.Fatal(err)
+		}
+
+		env, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.SignEnvelope(context.Background(), env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.TargetsEnvelope = env
+
+		if err := state.Commit(repo, "", false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyTip, err := repo.GetReference(PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, policyTip, stagingTip)
+
+		err = Discard(repo)
+		assert.Nil(t, err)
+
+		policyTip, err = repo.GetReference(PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stagingTip, err = repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, policyTip, stagingTip)
+	})
+
+	t.Run("discard changes when policy ref does not exist", func(t *testing.T) {
+		t.Parallel()
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitID, err := repo.Commit(emptyTreeHash, PolicyStagingRef, "test commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, commitID, stagingTip)
+
+		err = Discard(repo)
+		assert.Nil(t, err)
+
+		_, err = repo.GetReference(PolicyStagingRef)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+	})
+}
+
 func assertStatesEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
