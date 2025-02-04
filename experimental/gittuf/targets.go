@@ -420,6 +420,65 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	return state.Commit(r.r, commitMessage, signCommit)
 }
 
+// RemovePrincipalFromTargets is the interface for a user to remove a principal
+// from gittuf rule file metadata.
+func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, principalID string, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current rule file...")
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Removing principal '%s' from rule file...", strings.TrimSpace(principalID)))
+	if err := targetsMetadata.RemovePrincipal(principalID); err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.TargetsEnvelope = env
+	} else {
+		state.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Remove principal from policy '%s'\n%s", targetsRoleName, principalID)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, signCommit)
+}
+
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
 func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {

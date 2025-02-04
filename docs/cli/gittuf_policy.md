@@ -31,6 +31,8 @@ Tools to manage gittuf policies
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
+* [gittuf policy remove-key](gittuf_policy_remove-key.md)	 - Remove a key from a policy file
+* [gittuf policy remove-person](gittuf_policy_remove-person.md)	 - Remove a person from a policy file (requires developer mode and v0.2 policy metadata to be enabled, set GITTUF_DEV=1 and GITTUF_ALLOW_V02_POLICY=1)
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
