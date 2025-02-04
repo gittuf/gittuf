@@ -25,6 +25,7 @@ Tools for gittuf's root of trust
 * [gittuf trust add-github-app](gittuf_trust_add-github-app.md)	 - Add GitHub app to gittuf root of trust
 * [gittuf trust add-global-rule](gittuf_trust_add-global-rule.md)	 - Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
+* [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
@@ -34,6 +35,7 @@ Tools for gittuf's root of trust
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
+* [gittuf trust remove-propagation-directive](gittuf_trust_remove-propagation-directive.md)	 - Remove propagation directive from gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
 * [gittuf trust set-repository-location](gittuf_trust_set-repository-location.md)	 - Set repository location
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust

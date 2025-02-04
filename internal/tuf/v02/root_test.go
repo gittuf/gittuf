@@ -76,6 +76,34 @@ func TestRootMetadata(t *testing.T) {
 		currentLocation = rootMetadata.GetRepositoryLocation()
 		assert.Equal(t, location, currentLocation)
 	})
+
+	t.Run("test propagation directives", func(t *testing.T) {
+		directives := rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		directive := &PropagationDirective{
+			Name:                "test",
+			UpstreamRepository:  "https://example.com/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(directive)
+		assert.Nil(t, err)
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
+		err = rootMetadata.DeletePropagationDirective("test")
+		assert.Nil(t, err)
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		err = rootMetadata.DeletePropagationDirective("test")
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
+	})
 }
 
 func TestRootMetadataWithSSHKey(t *testing.T) {

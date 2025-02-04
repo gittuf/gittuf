@@ -19,13 +19,14 @@ const (
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type                   string           `json:"type"`
-	Expires                string           `json:"expires"`
-	RepositoryLocation     string           `json:"repositoryLocation,omitempty"`
-	Keys                   map[string]*Key  `json:"keys"`
-	Roles                  map[string]Role  `json:"roles"`
-	GitHubApprovalsTrusted bool             `json:"githubApprovalsTrusted"`
-	GlobalRules            []tuf.GlobalRule `json:"globalRules,omitempty"`
+	Type                   string                     `json:"type"`
+	Expires                string                     `json:"expires"`
+	RepositoryLocation     string                     `json:"repositoryLocation,omitempty"`
+	Keys                   map[string]*Key            `json:"keys"`
+	Roles                  map[string]Role            `json:"roles"`
+	GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
+	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
+	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -369,9 +370,41 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
 }
 
+// AddPropagationDirective adds a propagation directive to the root metadata.
+func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirective) error {
+	// TODO: handle duplicates / updates
+	r.Propagations = append(r.Propagations, directive)
+	return nil
+}
+
+// GetPropagationDirectives returns the propagation directives found in the root
+// metadata.
+func (r *RootMetadata) GetPropagationDirectives() []tuf.PropagationDirective {
+	return r.Propagations
+}
+
+// DeletePropagationDirective removes a propagation directive from the root
+// metadata.
+func (r *RootMetadata) DeletePropagationDirective(name string) error {
+	index := -1
+	for i, directive := range r.Propagations {
+		if directive.GetName() == name {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return tuf.ErrPropagationDirectiveNotFound
+	}
+
+	r.Propagations = append(r.Propagations[:index], r.Propagations[index+1:]...)
+	return nil
+}
+
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
-	// json.RawMessage in place of tuf.GlobalRule
+	// json.RawMessage for tuf interfaces
 	type tempType struct {
 		Type                   string            `json:"type"`
 		Expires                string            `json:"expires"`
@@ -380,6 +413,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Roles                  map[string]Role   `json:"roles"`
 		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage `json:"globalRules,omitempty"`
+		Propagations           []json.RawMessage `json:"propagations,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -398,14 +432,14 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	for _, globalRuleBytes := range temp.GlobalRules {
 		tempGlobalRule := map[string]any{}
 		if err := json.Unmarshal(globalRuleBytes, &tempGlobalRule); err != nil {
-			return fmt.Errorf("unable to unmarshal json: %w", err)
+			return fmt.Errorf("unable to unmarshal json for global rule: %w", err)
 		}
 
 		switch tempGlobalRule["type"] {
 		case tuf.GlobalRuleThresholdType:
 			globalRule := &GlobalRuleThreshold{}
 			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
-				return fmt.Errorf("unable to unmarshal json: %w", err)
+				return fmt.Errorf("unable to unmarshal json for global rule: %w", err)
 			}
 
 			r.GlobalRules = append(r.GlobalRules, globalRule)
@@ -413,7 +447,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		case tuf.GlobalRuleBlockForcePushesType:
 			globalRule := &GlobalRuleBlockForcePushes{}
 			if err := json.Unmarshal(globalRuleBytes, globalRule); err != nil {
-				return fmt.Errorf("unable to unmarshal json: %w", err)
+				return fmt.Errorf("unable to unmarshal json for global rule: %w", err)
 			}
 
 			r.GlobalRules = append(r.GlobalRules, globalRule)
@@ -421,6 +455,16 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		default:
 			return tuf.ErrUnknownGlobalRuleType
 		}
+	}
+
+	r.Propagations = []tuf.PropagationDirective{}
+	for _, propagationDirectiveBytes := range temp.Propagations {
+		propagationDirective := &PropagationDirective{}
+		if err := json.Unmarshal(propagationDirectiveBytes, propagationDirective); err != nil {
+			return fmt.Errorf("unable to unmarshal json for propagation directive: %w", err)
+		}
+
+		r.Propagations = append(r.Propagations, propagationDirective)
 	}
 
 	return nil
@@ -524,4 +568,42 @@ func (g *GlobalRuleBlockForcePushes) Matches(path string) bool {
 
 func (g *GlobalRuleBlockForcePushes) GetProtectedNamespaces() []string {
 	return g.Paths
+}
+
+type PropagationDirective struct {
+	Name                string `json:"name"`
+	UpstreamRepository  string `json:"upstreamRepository"`
+	UpstreamReference   string `json:"upstreamReference"`
+	DownstreamReference string `json:"downstreamReference"`
+	DownstreamPath      string `json:"downstreamPath"`
+}
+
+func (p *PropagationDirective) GetName() string {
+	return p.Name
+}
+
+func (p *PropagationDirective) GetUpstreamRepository() string {
+	return p.UpstreamRepository
+}
+
+func (p *PropagationDirective) GetUpstreamReference() string {
+	return p.UpstreamReference
+}
+
+func (p *PropagationDirective) GetDownstreamReference() string {
+	return p.DownstreamReference
+}
+
+func (p *PropagationDirective) GetDownstreamPath() string {
+	return p.DownstreamPath
+}
+
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
+	return &PropagationDirective{
+		Name:                name,
+		UpstreamRepository:  upstreamRepository,
+		UpstreamReference:   upstreamReference,
+		DownstreamReference: downstreamReference,
+		DownstreamPath:      downstreamPath,
+	}
 }

@@ -18,14 +18,15 @@ const (
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type                   string                   `json:"type"`
-	Version                string                   `json:"schemaVersion"`
-	Expires                string                   `json:"expires"`
-	RepositoryLocation     string                   `json:"repositoryLocation,omitempty"`
-	Principals             map[string]tuf.Principal `json:"principals"`
-	Roles                  map[string]Role          `json:"roles"`
-	GitHubApprovalsTrusted bool                     `json:"githubApprovalsTrusted"`
-	GlobalRules            []tuf.GlobalRule         `json:"globalRules,omitempty"`
+	Type                   string                     `json:"type"`
+	Version                string                     `json:"schemaVersion"`
+	Expires                string                     `json:"expires"`
+	RepositoryLocation     string                     `json:"repositoryLocation,omitempty"`
+	Principals             map[string]tuf.Principal   `json:"principals"`
+	Roles                  map[string]Role            `json:"roles"`
+	GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
+	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
+	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -312,7 +313,7 @@ func (r *RootMetadata) GetGitHubAppPrincipals() ([]tuf.Principal, error) {
 
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
-	// json.RawMessage in place of tuf.Principal and tuf.GlobalRule
+	// json.RawMessage in place of tuf interfaces
 	type tempType struct {
 		Type                   string                     `json:"type"`
 		Version                string                     `json:"schemaVersion"`
@@ -322,6 +323,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		Roles                  map[string]Role            `json:"roles"`
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
+		Propagations           []json.RawMessage          `json:"propagations,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -398,6 +400,16 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		}
 	}
 
+	r.Propagations = []tuf.PropagationDirective{}
+	for _, propagationDirectiveBytes := range temp.Propagations {
+		propagationDirective := &PropagationDirective{}
+		if err := json.Unmarshal(propagationDirectiveBytes, propagationDirective); err != nil {
+			return fmt.Errorf("unable to unmarshal json for propagation directive: %w", err)
+		}
+
+		r.Propagations = append(r.Propagations, propagationDirective)
+	}
+
 	return nil
 }
 
@@ -443,6 +455,38 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
 }
 
+// AddPropagationDirective adds a propagation directive to the root metadata.
+func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirective) error {
+	// TODO: handle duplicates / updates
+	r.Propagations = append(r.Propagations, directive)
+	return nil
+}
+
+// GetPropagationDirectives returns the propagation directives found in the root
+// metadata.
+func (r *RootMetadata) GetPropagationDirectives() []tuf.PropagationDirective {
+	return r.Propagations
+}
+
+// DeletePropagationDirective removes a propagation directive from the root
+// metadata.
+func (r *RootMetadata) DeletePropagationDirective(name string) error {
+	index := -1
+	for i, directive := range r.Propagations {
+		if directive.GetName() == name {
+			index = i
+			break
+		}
+	}
+
+	if index == -1 {
+		return tuf.ErrPropagationDirectiveNotFound
+	}
+
+	r.Propagations = append(r.Propagations[:index], r.Propagations[index+1:]...)
+	return nil
+}
+
 // addPrincipal adds a principal to the RootMetadata instance.  v02 of the
 // metadata supports Key and Person as supported principal types.
 func (r *RootMetadata) addPrincipal(principal tuf.Principal) error {
@@ -474,3 +518,15 @@ type GlobalRuleBlockForcePushes = tufv01.GlobalRuleBlockForcePushes
 
 var NewGlobalRuleThreshold = tufv01.NewGlobalRuleThreshold
 var NewGlobalRuleBlockForcePushes = tufv01.NewGlobalRuleBlockForcePushes
+
+type PropagationDirective = tufv01.PropagationDirective
+
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
+	return &PropagationDirective{
+		Name:                name,
+		UpstreamRepository:  upstreamRepository,
+		UpstreamReference:   upstreamReference,
+		DownstreamReference: downstreamReference,
+		DownstreamPath:      downstreamPath,
+	}
+}
