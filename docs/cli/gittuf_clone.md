@@ -9,6 +9,7 @@ gittuf clone [flags]
 ### Options
 
 ```
+      --bare                   make a bare Git repository
   -b, --branch string          specify branch to check out
   -h, --help                   help for clone
       --root-key public-keys   set of initial root of trust keys for the repository (supported values: paths to SSH keys, GPG key fingerprints, Sigstore/Fulcio identities)

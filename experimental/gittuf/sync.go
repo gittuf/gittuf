@@ -28,7 +28,7 @@ var (
 // to the standard refs. It performs a verification of the RSL against the
 // specified HEAD after cloning the repository.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []tuf.Principal) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []tuf.Principal, bare bool) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -55,7 +55,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	refs := []string{"refs/gittuf/*"}
 
 	slog.Debug("Cloning repository...")
-	r, err := gitinterface.CloneAndFetchRepository(remoteURL, dir, initialBranch, refs)
+	r, err := gitinterface.CloneAndFetchRepository(remoteURL, dir, initialBranch, refs, bare)
 	if err != nil {
 		if e := os.RemoveAll(dir); e != nil {
 			return nil, errors.Join(ErrCloningRepository, err, e)

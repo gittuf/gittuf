@@ -297,7 +297,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -354,7 +354,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -399,7 +399,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -464,7 +464,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -558,7 +558,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -636,7 +636,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -680,7 +680,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -716,7 +716,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -762,7 +762,7 @@ func TestCheckRemoteRSLForUpdates(t *testing.T) {
 		// TODO: this should be handled by the Repository package
 		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
 		defer os.RemoveAll(localTmpDir) //nolint:errcheck
-		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
 		if err != nil {
 			t.Fatal(err)
 		}
