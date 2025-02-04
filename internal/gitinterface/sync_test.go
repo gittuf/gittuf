@@ -5,6 +5,8 @@ package gitinterface
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -595,7 +597,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
-	t.Run("clone and fetch remote repository, verify refs match", func(t *testing.T) {
+	t.Run("clone and fetch remote repository, verify refs match, not bare", func(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -625,7 +627,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{anotherRefName})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{anotherRefName}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -637,9 +639,16 @@ func TestCloneAndFetchRepository(t *testing.T) {
 
 		assert.Equal(t, mainCommit, localMainCommit)
 		assert.Equal(t, otherCommit, localOtherCommit)
+
+		assert.True(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(strings.TrimSuffix(localRepo.gitDirPath, ".git"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "foo", dirEntries[1].Name()) // [0] will be the entry for the .git directory
 	})
 
-	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match", func(t *testing.T) {
+	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match, not bare", func(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -669,7 +678,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{anotherRefName})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{anotherRefName}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -681,9 +690,16 @@ func TestCloneAndFetchRepository(t *testing.T) {
 
 		assert.Equal(t, mainCommit, localMainCommit)
 		assert.Equal(t, otherCommit, localOtherCommit)
+
+		assert.True(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(strings.TrimSuffix(localRepo.gitDirPath, ".git"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "foo", dirEntries[1].Name()) // [0] will be the entry for the .git directory
 	})
 
-	t.Run("clone and fetch remote repository with only one ref, verify refs match", func(t *testing.T) {
+	t.Run("clone and fetch remote repository with only one ref, verify refs match, not bare", func(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -709,7 +725,7 @@ func TestCloneAndFetchRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{})
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{}, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -717,5 +733,157 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		localMainCommit, err := localRepo.GetReference(refName)
 		assert.Nil(t, err)
 		assert.Equal(t, mainCommit, localMainCommit)
+
+		assert.True(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(strings.TrimSuffix(localRepo.gitDirPath, ".git"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "foo", dirEntries[1].Name()) // [0] will be the entry for the .git directory
+	})
+
+	t.Run("clone and fetch remote repository, verify refs match, bare", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
+
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
+
+		remoteTreeBuilder := NewTreeBuilder(remoteRepo)
+
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
+
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		otherCommit, err := remoteRepo.Commit(tree, anotherRefName, "Commit to feature", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := remoteRepo.SetReference("HEAD", mainCommit); err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{anotherRefName}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localMainCommit, err := localRepo.GetReference(refName)
+		assert.Nil(t, err)
+		localOtherCommit, err := localRepo.GetReference(anotherRefName)
+		assert.Nil(t, err)
+
+		assert.Equal(t, mainCommit, localMainCommit)
+		assert.Equal(t, otherCommit, localOtherCommit)
+
+		assert.False(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(localRepo.gitDirPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
+	})
+
+	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match, bare", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
+
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
+
+		remoteTreeBuilder := NewTreeBuilder(remoteRepo)
+
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
+
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		otherCommit, err := remoteRepo.Commit(tree, anotherRefName, "Commit to feature", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := remoteRepo.SetReference("HEAD", mainCommit); err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{anotherRefName}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localMainCommit, err := localRepo.GetReference(refName)
+		assert.Nil(t, err)
+		localOtherCommit, err := localRepo.GetReference(anotherRefName)
+		assert.Nil(t, err)
+
+		assert.Equal(t, mainCommit, localMainCommit)
+		assert.Equal(t, otherCommit, localOtherCommit)
+
+		assert.False(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(localRepo.gitDirPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
+	})
+
+	t.Run("clone and fetch remote repository with only one ref, verify refs match, bare", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+		localTmpDir := t.TempDir()
+
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
+
+		remoteTreeBuilder := NewTreeBuilder(remoteRepo)
+
+		emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+		require.Nil(t, err)
+		entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
+
+		tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mainCommit, err := remoteRepo.Commit(tree, refName, "Commit to main", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := remoteRepo.SetReference("HEAD", mainCommit); err != nil {
+			t.Fatal(err)
+		}
+
+		localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "", []string{}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		localMainCommit, err := localRepo.GetReference(refName)
+		assert.Nil(t, err)
+		assert.Equal(t, mainCommit, localMainCommit)
+
+		assert.False(t, strings.HasSuffix(localRepo.gitDirPath, ".git"))
+		dirEntries, err := os.ReadDir(localRepo.gitDirPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
 	})
 }

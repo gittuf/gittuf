@@ -13,6 +13,7 @@ import (
 type options struct {
 	branch           string
 	expectedRootKeys common.PublicKeys
+	bare             bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -23,10 +24,18 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"specify branch to check out",
 	)
+
 	cmd.Flags().Var(
 		&o.expectedRootKeys,
 		"root-key",
 		"set of initial root of trust keys for the repository (supported values: paths to SSH keys, GPG key fingerprints, Sigstore/Fulcio identities)",
+	)
+
+	cmd.Flags().BoolVar(
+		&o.bare,
+		"bare",
+		false,
+		"make a bare Git repository",
 	)
 }
 
@@ -47,7 +56,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		expectedRootKeys[index] = key
 	}
 
-	_, err := gittuf.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys)
+	_, err := gittuf.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys, o.bare)
 	return err
 }
 
