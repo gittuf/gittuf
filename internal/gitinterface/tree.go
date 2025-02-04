@@ -13,7 +13,9 @@ import (
 )
 
 var (
-	ErrTreeDoesNotHavePath = errors.New("tree does not have requested path")
+	ErrTreeDoesNotHavePath             = errors.New("tree does not have requested path")
+	ErrCopyingBlobIDsDoNotMatch        = errors.New("blob ID in local repository does not match upstream repository")
+	ErrCannotCreateSubtreeIntoRootTree = errors.New("subtree path target cannot be empty or root of tree")
 )
 
 func (r *Repository) EmptyTree() (Hash, error) {
@@ -231,6 +233,134 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 	}
 
 	return treeHash, nil
+}
+
+// CreateSubtreeFromUpstreamRepository accepts an upstream repository handler
+// and a commit ID in the upstream repository. This information is used to copy
+// the entire contents of the commit's Git tree into the specified localPath in
+// the localRef. A new commit is added to localRef with the changes made to
+// localPath. localPath represents a directory path where the changes are copied
+// to. Existing items in that directory are overwritten in the subsequently
+// created commit in localRef. localPath must be specified, if left blank (say
+// to imply copying into the root directory of the downstream repository),
+// creating a subtree will fail.
+func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, upstreamCommitID Hash, localRef, localPath string) (Hash, error) {
+	if localPath == "" {
+		return nil, ErrCannotCreateSubtreeIntoRootTree
+	}
+	currentTip, err := r.GetReference(localRef)
+	if err != nil {
+		if !errors.Is(err, ErrReferenceNotFound) {
+			return nil, err
+		}
+	}
+
+	entries := []TreeEntry{}
+	if !currentTip.IsZero() {
+		currentRefTree, err := r.GetCommitTreeID(currentTip)
+		if err != nil {
+			return nil, err
+		}
+		currentFiles, err := r.GetAllFilesInTree(currentRefTree)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ignore entries for `localPath` to account for upstream deletions
+		// If localPath is foo/, we want to ignore all items under foo/
+		// If localPath is foo, we want to ignore all items under foo/
+		// If localPath is foo, we DO NOT want to remove all items under foobar/
+		// So, add the / suffix if necessary to localPath
+		if !strings.HasSuffix(localPath, "/") {
+			localPath += "/"
+		}
+
+		// Create list of TreeEntry objects representing all blobs except those
+		// currently under localPath
+		for filePath, blobID := range currentFiles {
+			if !strings.HasPrefix(filePath, localPath) {
+				entries = append(entries, NewEntryBlob(filePath, blobID))
+			}
+		}
+	}
+
+	// Remove trailing "/" now
+	localPath = strings.TrimSuffix(localPath, "/")
+
+	treeID, err := upstream.GetCommitTreeID(upstreamCommitID)
+	if err != nil {
+		return nil, err
+	}
+
+	if r.HasObject(treeID) {
+		// Use existing intermediate tree
+		entries = append(entries, NewEntryTree(localPath, treeID))
+	} else {
+		// We have to create the intermediate tree for localPath
+		filesToCopy, err := upstream.GetAllFilesInTree(treeID)
+		if err != nil {
+			return nil, err
+		}
+
+		for blobPath, blobID := range filesToCopy {
+			// if blob already exists, we don't need to carry out expensive
+			// read/write
+			if !r.HasObject(blobID) {
+				blob, err := upstream.ReadBlob(blobID)
+				if err != nil {
+					return nil, err
+				}
+				localBlobID, err := r.WriteBlob(blob)
+				if err != nil {
+					return nil, err
+				}
+				if !localBlobID.Equal(blobID) {
+					return nil, ErrCopyingBlobIDsDoNotMatch
+				}
+			}
+
+			// add blob to entries, with the path including the localPath prefix
+			entries = append(entries, NewEntryBlob(path.Join(localPath, blobPath), blobID))
+		}
+	}
+
+	treeBuilder := NewTreeBuilder(r)
+	newTreeID, err := treeBuilder.WriteTreeFromEntries(entries)
+	if err != nil {
+		return nil, err
+	}
+
+	commitID, err := r.Commit(newTreeID, localRef, fmt.Sprintf("Update contents of '%s'\n", localPath), false)
+	if err != nil {
+		return nil, err
+	}
+
+	if !r.IsBare() {
+		head, err := r.GetSymbolicReferenceTarget("HEAD")
+		if err != nil {
+			return nil, err
+		}
+		if head == localRef {
+			worktree := strings.TrimSuffix(r.gitDirPath, ".git") // TODO: this doesn't support detached git dir
+			cwd, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+			if err := os.Chdir(worktree); err != nil {
+				return nil, err
+			}
+			defer os.Chdir(cwd) //nolint:errcheck
+
+			if _, err := r.executor("restore", "--staged", localPath).executeString(); err != nil {
+				return nil, err
+			}
+			if _, err := r.executor("restore", localPath).executeString(); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return commitID, nil
 }
 
 // TreeBuilder is used to create multi-level trees in a repository.  Based on
