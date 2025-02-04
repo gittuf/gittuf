@@ -81,6 +81,17 @@ func (r *Repository) GetSymbolicReferenceTarget(refName string) (string, error) 
 	return symTarget, nil
 }
 
+// SetSymbolicReference sets the specified symbolic reference to the specified
+// target reference.
+func (r *Repository) SetSymbolicReference(symRefName, targetRefName string) error {
+	_, err := r.executor("symbolic-ref", symRefName, targetRefName).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to set symbolic Git reference '%s' to '%s': %w", symRefName, targetRefName, err)
+	}
+
+	return nil
+}
+
 // AbsoluteReference returns the fully qualified reference path for the provided
 // Git ref.
 // Source: https://git-scm.com/docs/gitrevisions#Documentation/gitrevisions.txt-emltrefnamegtemegemmasterememheadsmasterememrefsheadsmasterem
