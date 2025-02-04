@@ -112,10 +112,38 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 	_, err = repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
 	require.Nil(t, err)
 
-	// HEAD must be set to the main branch
+	// HEAD must be set to the main branch -> this is handled by git init
 	head, err := repo.GetSymbolicReferenceTarget("HEAD")
 	assert.Nil(t, err)
 	assert.Equal(t, refName, head)
+}
+
+func TestSetSymbolicReference(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/not-main" // we want to ensure it's set to something other than the default main
+	treeBuilder := NewTreeBuilder(repo)
+
+	// Write empty tree
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	require.Nil(t, err)
+
+	head, err := repo.GetSymbolicReferenceTarget("HEAD")
+	require.Nil(t, err)
+	assert.Equal(t, "refs/heads/main", head)
+
+	err = repo.SetSymbolicReference("HEAD", refName)
+	assert.Nil(t, err)
+
+	head, err = repo.GetSymbolicReferenceTarget("HEAD")
+	require.Nil(t, err)
+	assert.Equal(t, refName, head) // not main anymore
 }
 
 func TestRepositoryRefSpec(t *testing.T) {
