@@ -236,6 +236,11 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addPrincipal(principal)
 }
 
+// RemovePrincipal removes a principal from the metadata.
+func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
+	return t.Delegations.removePrincipal(principalID)
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
@@ -307,6 +312,24 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 		return tuf.ErrInvalidPrincipalType
 	}
 
+	return nil
+}
+
+// removePrincipal removes a delegations key or person. v02 supports Key and
+// Person as principal types.
+func (d *Delegations) removePrincipal(principalID string) error {
+	if d.Principals == nil {
+		return tuf.ErrPrincipalNotFound
+	}
+	if principalID == "" {
+		return tuf.ErrInvalidPrincipalID
+	}
+	for _, curRole := range d.Roles {
+		if curRole.GetPrincipalIDs() != nil && curRole.GetPrincipalIDs().Has(principalID) {
+			return tuf.ErrPrincipalStillInUse
+		}
+	}
+	delete(d.Principals, principalID)
 	return nil
 }
 
