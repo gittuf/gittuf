@@ -39,6 +39,13 @@ func (r *Repository) GetGitDir() string {
 	return r.gitDirPath
 }
 
+// IsBare returns true if the repository is a bare repository.
+func (r *Repository) IsBare() bool {
+	// TODO: this may not work when the repo is cloned with GIT_DIR set
+	// elsewhere. We don't support this at the moment, so it's probably okay?
+	return !strings.HasSuffix(r.gitDirPath, ".git")
+}
+
 // LoadRepository returns a Repository instance using the current working
 // directory. It also inspects the PATH to ensure Git is installed.
 func LoadRepository() (*Repository, error) {
