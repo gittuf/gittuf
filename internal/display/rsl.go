@@ -41,7 +41,7 @@ func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
 		switch iteratorEntry := iteratorEntry.(type) {
 		case *rsl.ReferenceEntry:
 			slog.Debug(fmt.Sprintf("Writing reference entry '%s'...", iteratorEntry.ID.String()))
-			if err := writeRSLEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
+			if err := writeRSLReferenceEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
 				// We return nil here to avoid noisy output when the writer is
 				// unexpectedly closed, such as by killing the pager
 				return nil
@@ -57,6 +57,15 @@ func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
 
 				annotationsMap[targetIDString] = append(annotationsMap[targetIDString], iteratorEntry)
 			}
+
+		case *rsl.PropagationEntry:
+			slog.Debug(fmt.Sprintf("Writing propagation entry '%s'...", iteratorEntry.ID.String()))
+			if err := writeRSLPropagationEntry(writer, iteratorEntry, hasParent); err != nil {
+				// We return nil here to avoid noisy output when
+				// the writer is unexpectedly closed, such as by
+				// killing the pager
+				return nil
+			}
 		}
 
 		if !hasParent {
@@ -68,11 +77,12 @@ func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
 	}
 }
 
-// writeRSLEntry prepares the output for the given entry and its annotations. It
-// then writes the output to the provided writer. If hasParent is false, then
-// the prepared output for the entry has a single trailing newline. Otherwise,
-// an additional newline is added to separate entries from one another.
-func writeRSLEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations []*rsl.AnnotationEntry, hasParent bool) error {
+// writeRSLReferenceEntry prepares the output for the given entry and its
+// annotations. It then writes the output to the provided writer. If hasParent
+// is false, then the prepared output for the entry has a single trailing
+// newline. Otherwise, an additional newline is added to separate entries from
+// one another.
+func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations []*rsl.AnnotationEntry, hasParent bool) error {
 	/* Output format:
 	   entry <entryID> (skipped)
 
@@ -123,6 +133,36 @@ func writeRSLEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, annotations
 			text += fmt.Sprintf("\n    Number:        %d", annotation.Number)
 		}
 		text += fmt.Sprintf("\n    Message:\n      %s", strings.TrimSpace(annotation.Message))
+	}
+
+	text += "\n" // single trailing newline by default
+	if hasParent {
+		text += "\n" // extra newline for all intermediate (i.e., not last) entries
+	}
+
+	_, err := writer.Write([]byte(text))
+	return err
+}
+
+func writeRSLPropagationEntry(writer io.WriteCloser, entry *rsl.PropagationEntry, hasParent bool) error {
+	/* Output format:
+	   propagation entry <entryID>
+	     Ref:           <refName>
+	     Target:        <targetID>
+		 UpstreamRepo:  <upstreamRepoLocation>
+		 UpstreamEntry: <upstreamEntryID>
+	     Number:        <number>
+	*/
+
+	text := colorer(fmt.Sprintf("propagation entry %s", entry.ID.String()), yellow)
+	text += "\n"
+
+	text += fmt.Sprintf("\n  Ref:           %s", entry.RefName)
+	text += fmt.Sprintf("\n  Target:        %s", entry.TargetID.String())
+	text += fmt.Sprintf("\n  UpstreamRepo:  %s", entry.UpstreamRepository)
+	text += fmt.Sprintf("\n  UpstreamEntry: %s", entry.UpstreamEntryID.String())
+	if entry.Number != 0 {
+		text += fmt.Sprintf("\n  Number:        %d", entry.Number)
 	}
 
 	text += "\n" // single trailing newline by default

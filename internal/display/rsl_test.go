@@ -101,7 +101,7 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
 	assert.Equal(t, expectedOutput, output.String())
 }
 
-func TestWriteRSLEntry(t *testing.T) {
+func TestWriteRSLReferenceEntry(t *testing.T) {
 	// Set colorer to off for tests
 	colorer = colorerOff
 
@@ -117,7 +117,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err := writeRSLEntry(testWriter, entry, nil, false)
+		err := writeRSLReferenceEntry(testWriter, entry, nil, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -135,7 +135,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err := writeRSLEntry(testWriter, entry, nil, true)
+		err := writeRSLReferenceEntry(testWriter, entry, nil, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -153,7 +153,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err := writeRSLEntry(testWriter, entry, nil, false)
+		err := writeRSLReferenceEntry(testWriter, entry, nil, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -172,7 +172,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err := writeRSLEntry(testWriter, entry, nil, true)
+		err := writeRSLReferenceEntry(testWriter, entry, nil, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -214,7 +214,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -257,7 +257,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -299,7 +299,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -342,7 +342,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -384,7 +384,7 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -427,7 +427,94 @@ func TestWriteRSLEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+}
+
+func TestWriteRSLPropagationEntry(t *testing.T) {
+	// Set colorer to off for tests
+	colorer = colorerOff
+
+	t.Run("simple, without number, without parent", func(t *testing.T) {
+		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry.ID = gitinterface.ZeroHash
+
+		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
+
+  Ref:           refs/heads/main
+  Target:        0000000000000000000000000000000000000000
+  UpstreamRepo:  https://git.example.com/repository
+  UpstreamEntry: 0000000000000000000000000000000000000000
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLPropagationEntry(testWriter, entry, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("simple, with number, without parent", func(t *testing.T) {
+		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry.Number = 1
+		entry.ID = gitinterface.ZeroHash
+
+		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
+
+  Ref:           refs/heads/main
+  Target:        0000000000000000000000000000000000000000
+  UpstreamRepo:  https://git.example.com/repository
+  UpstreamEntry: 0000000000000000000000000000000000000000
+  Number:        1
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLPropagationEntry(testWriter, entry, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("simple, without number, with parent", func(t *testing.T) {
+		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry.ID = gitinterface.ZeroHash
+
+		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
+
+  Ref:           refs/heads/main
+  Target:        0000000000000000000000000000000000000000
+  UpstreamRepo:  https://git.example.com/repository
+  UpstreamEntry: 0000000000000000000000000000000000000000
+
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLPropagationEntry(testWriter, entry, true)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("simple, with number, with parent", func(t *testing.T) {
+		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry.Number = 1
+		entry.ID = gitinterface.ZeroHash
+
+		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
+
+  Ref:           refs/heads/main
+  Target:        0000000000000000000000000000000000000000
+  UpstreamRepo:  https://git.example.com/repository
+  UpstreamEntry: 0000000000000000000000000000000000000000
+  Number:        1
+
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLPropagationEntry(testWriter, entry, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
