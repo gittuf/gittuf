@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -100,7 +101,7 @@ const (
 	gittufRefPrefix = "refs/gittuf/"
 )
 
-func run() error {
+func run(ctx context.Context) error {
 	if len(os.Args) < 3 {
 		return fmt.Errorf("usage: %s <remote-name> <url>", os.Args[0])
 	}
@@ -109,7 +110,7 @@ func run() error {
 	remoteName := os.Args[1]
 	url := os.Args[2]
 
-	var handler func(*gittuf.Repository, string, string) (map[string]string, bool, error)
+	var handler func(context.Context, *gittuf.Repository, string, string) (map[string]string, bool, error)
 	switch {
 	case strings.HasPrefix(url, "https://"), strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "ftp://"), strings.HasPrefix(url, "ftps://"):
 		log("Prefix indicates curl remote helper must be used")
@@ -127,7 +128,7 @@ func run() error {
 		return err
 	}
 
-	gittufRefsTips, isPush, err := handler(repo, remoteName, url)
+	gittufRefsTips, isPush, err := handler(ctx, repo, remoteName, url)
 	if err != nil {
 		return err
 	}
@@ -227,7 +228,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(); err != nil {
+	if err := run(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
