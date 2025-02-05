@@ -102,12 +102,19 @@ func (e *ReferenceEntry) Commit(repo *gitinterface.Repository, sign bool) error 
 
 	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
+	_, err = repo.Commit(treeID, Ref, message, sign)
 	return err
 }
 
@@ -125,12 +132,19 @@ func (e *ReferenceEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, s
 
 	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
+	_, err = repo.CommitUsingSpecificKey(treeID, Ref, message, signingKeyBytes)
 	return err
 }
 
@@ -185,12 +199,19 @@ func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error)
 func (e *ReferenceEntry) commitWithoutNumber(repo *gitinterface.Repository) error {
 	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	_, err = repo.Commit(treeID, Ref, message, false)
 	return err
 }
 
@@ -247,12 +268,19 @@ func (a *AnnotationEntry) Commit(repo *gitinterface.Repository, sign bool) error
 		return err
 	}
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
+	_, err = repo.Commit(treeID, Ref, message, sign)
 	return err
 }
 
@@ -280,12 +308,19 @@ func (a *AnnotationEntry) CommitUsingSpecificKey(repo *gitinterface.Repository, 
 		return err
 	}
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
+	_, err = repo.CommitUsingSpecificKey(treeID, Ref, message, signingKeyBytes)
 	return err
 }
 
@@ -372,12 +407,19 @@ func (a *AnnotationEntry) commitWithoutNumber(repo *gitinterface.Repository) err
 		return err
 	}
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.Commit(emptyTreeID, Ref, message, false)
+	_, err = repo.Commit(treeID, Ref, message, false)
 	return err
 }
 
@@ -432,12 +474,19 @@ func (e *PropagationEntry) Commit(repo *gitinterface.Repository, sign bool) erro
 
 	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.Commit(emptyTreeID, Ref, message, sign)
+	_, err = repo.Commit(treeID, Ref, message, sign)
 	return err
 }
 
@@ -455,12 +504,19 @@ func (e *PropagationEntry) CommitUsingSpecificKey(repo *gitinterface.Repository,
 
 	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
 
-	emptyTreeID, err := repo.EmptyTree()
+	blobID, err := repo.WriteBlob([]byte(message))
+	if err != nil {
+		return err
+	}
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("message", blobID),
+	})
 	if err != nil {
 		return err
 	}
 
-	_, err = repo.CommitUsingSpecificKey(emptyTreeID, Ref, message, signingKeyBytes)
+	_, err = repo.CommitUsingSpecificKey(treeID, Ref, message, signingKeyBytes)
 	return err
 }
 
@@ -506,12 +562,38 @@ func GetEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (Entry, 
 		return entry, nil
 	}
 
-	commitMessage, err := repo.GetCommitMessage(entryID)
+	treeID, err := repo.GetCommitTreeID(entryID)
 	if err != nil {
-		return nil, errors.Join(ErrRSLEntryNotFound, err)
+		return nil, err
+	}
+	emptyTreeID, err := repo.EmptyTree()
+	if err != nil {
+		return nil, err
 	}
 
-	entry, err = parseRSLEntryText(entryID, commitMessage)
+	var message string
+	if treeID.Equal(emptyTreeID) {
+		message, err = repo.GetCommitMessage(entryID)
+		if err != nil {
+			return nil, errors.Join(ErrRSLEntryNotFound, err)
+		}
+	} else {
+		files, err := repo.GetAllFilesInTree(treeID)
+		if err != nil {
+			return nil, err
+		}
+		blobID, has := files["message"]
+		if !has {
+			return nil, errors.Join(ErrRSLEntryNotFound, err)
+		}
+		contents, err := repo.ReadBlob(blobID)
+		if err != nil {
+			return nil, errors.Join(ErrRSLEntryNotFound, err)
+		}
+		message = string(contents)
+	}
+
+	entry, err = parseRSLEntryText(entryID, message)
 	if err != nil {
 		return nil, err
 	}
