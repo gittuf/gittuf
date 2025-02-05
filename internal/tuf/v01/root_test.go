@@ -65,6 +65,34 @@ func TestRootMetadata(t *testing.T) {
 		currentLocation = rootMetadata.GetRepositoryLocation()
 		assert.Equal(t, location, currentLocation)
 	})
+
+	t.Run("test propagation directives", func(t *testing.T) {
+		directives := rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		directive := &PropagationDirective{
+			Name:                "test",
+			UpstreamRepository:  "https://example.com/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(directive)
+		assert.Nil(t, err)
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
+		err = rootMetadata.DeletePropagationDirective("test")
+		assert.Nil(t, err)
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		err = rootMetadata.DeletePropagationDirective("test")
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
+	})
 }
 
 func TestRootMetadataWithSSHKey(t *testing.T) {
@@ -498,4 +526,18 @@ func TestNewGlobalRuleBlockForcePushes(t *testing.T) {
 			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error '%v', expected '%v' in test '%s'", err, test.expectedError, name))
 		}
 	}
+}
+
+func TestPropagationDirective(t *testing.T) {
+	name := "test"
+	upstreamRepository := "https://example.com/git/repository"
+	refName := "refs/heads/main"
+	localPath := "upstream/"
+
+	directive := NewPropagationDirective(name, upstreamRepository, refName, refName, localPath)
+	assert.Equal(t, name, directive.GetName())
+	assert.Equal(t, upstreamRepository, directive.GetUpstreamRepository())
+	assert.Equal(t, refName, directive.GetUpstreamReference())
+	assert.Equal(t, refName, directive.GetDownstreamReference())
+	assert.Equal(t, localPath, directive.GetDownstreamPath())
 }

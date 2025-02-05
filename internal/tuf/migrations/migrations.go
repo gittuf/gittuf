@@ -49,6 +49,9 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	// Set global rules
 	newRootMetadata.GlobalRules = rootMetadata.GlobalRules
 
+	// Set propagations
+	newRootMetadata.Propagations = rootMetadata.Propagations
+
 	return newRootMetadata
 }
 

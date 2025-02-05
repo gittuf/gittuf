@@ -49,6 +49,7 @@ var (
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 	ErrGlobalRuleNotFound                              = errors.New("global rule not found")
 	ErrGlobalRuleAlreadyExists                         = errors.New("global rule already exists")
+	ErrPropagationDirectiveNotFound                    = errors.New("specified propagation directive not found")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
@@ -141,6 +142,16 @@ type RootMetadata interface {
 	// attestations.
 	// TODO: this needs to be generalized across tools
 	GetGitHubAppPrincipals() ([]Principal, error)
+
+	// AddPropagationDirective adds a propagation directive to the root
+	// metadata.
+	AddPropagationDirective(directive PropagationDirective) error
+	// GetPropagationDirectives returns the propagation directives found in the
+	// root metadata.
+	GetPropagationDirectives() []PropagationDirective
+	// DeletePropagationDirective removes a propagation directive from the root
+	// metadata.
+	DeletePropagationDirective(name string) error
 }
 
 // TargetsMetadata represents gittuf's rule files. Its name is inspired by TUF.
@@ -239,4 +250,29 @@ type GlobalRuleBlockForcePushes interface {
 	// GetProtectedNamespaces returns the set of namespaces protected by the
 	// rule.
 	GetProtectedNamespaces() []string
+}
+
+// PropagationDirective represents an instruction to a gittuf client to carry
+// out the propagation workflow.
+type PropagationDirective interface {
+	// GetName returns the name of the directive.
+	GetName() string
+
+	// GetUpstreamRepository returns the clone-friendly location of the upstream
+	// repository.
+	GetUpstreamRepository() string
+
+	// GetUpstreamReference returns the reference that must be propagated from
+	// the upstream repository.
+	GetUpstreamReference() string
+
+	// GetDownstreamReference returns the reference that the upstream components
+	// must be propagated into in the downstream repository (i.e., the
+	// repository where this directive is set.)
+	GetDownstreamReference() string
+
+	// GetDownstreamPath() returns the path in the Git tree of the downstream
+	// reference where the upstream repository's contents must be stored by the
+	// propagation workflow.
+	GetDownstreamPath() string
 }
