@@ -877,3 +877,668 @@ func TestPullRSL(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPullingRSL)
 	})
 }
+
+func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	t.Run("single upstream repo", func(t *testing.T) {
+		// Create upstreamRepo
+		upstreamRepoLocation := t.TempDir()
+		upstreamRepo := createTestRepositoryWithRoot(t, upstreamRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		refName := "refs/heads/main"
+		localPath := "upstream"
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName, refName, localPath, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := downstreamRepo.ApplyPolicy(testCtx, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.NotNil(t, err) // TODO: upstream doesn't have main at all
+
+		// Add things to upstreamRepo
+		blobAID, err := upstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err := upstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry, err := rsl.GetLatestEntry(upstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		// TODO: should propagation result in a new local ref?
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Add things to downstreamRepo
+		blobAID, err = downstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err = downstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
+		assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
+
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry.TargetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(localPath, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check the subtree ID in downstream repo matches upstream root tree ID
+		assert.Equal(t, upstreamRootTreeID, pathTreeID)
+
+		// Check the downstream tree still contains other items
+		expectedRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+			gitinterface.NewEntryBlob("upstream/a", blobAID),
+			gitinterface.NewEntryBlob("upstream/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+		// Nothing to propagate, check that a new entry has not been added in the downstreamRepo
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err = rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, propagationEntry.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("single upstream repo, multiple upstream refs into same downstream ref", func(t *testing.T) {
+		// Create upstreamRepo
+		upstreamRepoLocation := t.TempDir()
+		upstreamRepo := createTestRepositoryWithRoot(t, upstreamRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		refName1 := "refs/heads/main"
+		refName2 := "refs/heads/feature"
+		localPath1 := "main"
+		localPath2 := "feature"
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, refName1, localPath1, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, refName1, localPath2, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := downstreamRepo.ApplyPolicy(testCtx, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.NotNil(t, err) // TODO: upstream doesn't have main at all
+
+		// Add things to upstreamRepo
+		blobAID, err := upstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err := upstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(refName1, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(refName2, false); err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry2, err := rsl.GetLatestEntry(upstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry1, err := rsl.GetParentForEntry(upstreamRepo.r, upstreamEntry2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		// TODO: should propagation result in a new local ref?
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Add things to downstreamRepo
+		blobAID, err = downstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err = downstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(refName1, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		priorEntry, err := rsl.GetParentForEntry(downstreamRepo.r, latestEntry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry2, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		propagationEntry1, isPropagationEntry := priorEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		assert.Equal(t, upstreamRepoLocation, propagationEntry1.UpstreamRepository)
+		assert.Equal(t, upstreamRepoLocation, propagationEntry2.UpstreamRepository)
+		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
+		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
+
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(localPath1, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTree2ID, err := downstreamRepo.r.GetPathIDInTree(localPath2, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check the subtree IDs in downstream repo matches upstream root tree IDs
+		assert.Equal(t, upstreamRootTreeID, pathTree1ID)
+		assert.Equal(t, upstreamRootTreeID, pathTree2ID)
+
+		// Check the downstream tree still contains other items
+		expectedRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+			gitinterface.NewEntryBlob("main/a", blobAID),
+			gitinterface.NewEntryBlob("main/b", blobBID),
+			gitinterface.NewEntryBlob("feature/a", blobAID),
+			gitinterface.NewEntryBlob("feature/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+		// Nothing to propagate, check that a new entry has not been added in the downstreamRepo
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err = rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("single upstream repo, multiple upstream refs into different downstream refs", func(t *testing.T) {
+		// Create upstreamRepo
+		upstreamRepoLocation := t.TempDir()
+		upstreamRepo := createTestRepositoryWithRoot(t, upstreamRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		refName1 := "refs/heads/main"
+		refName2 := "refs/heads/feature"
+		localPath := "upstream"
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, refName1, localPath, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, refName2, localPath, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := downstreamRepo.ApplyPolicy(testCtx, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.NotNil(t, err) // TODO: upstream doesn't have main at all
+
+		// Add things to upstreamRepo
+		blobAID, err := upstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err := upstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(refName1, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(refName2, false); err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry2, err := rsl.GetLatestEntry(upstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry1, err := rsl.GetParentForEntry(upstreamRepo.r, upstreamEntry2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		// TODO: should propagation result in a new local ref?
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Add things to downstreamRepo
+		blobAID, err = downstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err = downstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(refName1, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(refName2, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		priorEntry, err := rsl.GetParentForEntry(downstreamRepo.r, latestEntry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry2, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		propagationEntry1, isPropagationEntry := priorEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		assert.Equal(t, upstreamRepoLocation, propagationEntry1.UpstreamRepository)
+		assert.Equal(t, upstreamRepoLocation, propagationEntry2.UpstreamRepository)
+		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
+		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
+		assert.Equal(t, refName1, propagationEntry1.RefName)
+		assert.Equal(t, refName2, propagationEntry2.RefName)
+
+		// Check the downstream tree still contains other items
+		expectedRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+			gitinterface.NewEntryBlob("upstream/a", blobAID),
+			gitinterface.NewEntryBlob("upstream/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(localPath, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check the subtree ID in downstream repo matches upstream root tree ID
+		assert.Equal(t, upstreamRootTreeID, pathTreeID)
+		// Check the tree as a whole is as expected
+		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+		// Do the same thing for the other propagation entry's tree (this is a different ref!)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry1.TargetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTreeID, err = downstreamRepo.r.GetPathIDInTree(localPath, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check the subtree ID in downstream repo matches upstream root tree ID
+		assert.Equal(t, upstreamRootTreeID, pathTreeID)
+		// Check the tree as a whole is as expected
+		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+		// Nothing to propagate, check that a new entry has not been added in the downstreamRepo
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err = rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("multiple upstream repos", func(t *testing.T) {
+		// Create upstreamRepos
+		upstreamRepo1Location := t.TempDir()
+		upstreamRepo1 := createTestRepositoryWithRoot(t, upstreamRepo1Location)
+
+		upstreamRepo2Location := t.TempDir()
+		upstreamRepo2 := createTestRepositoryWithRoot(t, upstreamRepo2Location)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		refName := "refs/heads/main"
+		localPath1 := "upstream1"
+		localPath2 := "upstream2"
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-1", upstreamRepo1Location, refName, refName, localPath1, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-2", upstreamRepo2Location, refName, refName, localPath2, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := downstreamRepo.ApplyPolicy(testCtx, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.NotNil(t, err) // TODO: upstream repos don't have main at all
+
+		// Add things to upstreamRepos
+		blobAID, err := upstreamRepo1.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err := upstreamRepo1.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder1 := gitinterface.NewTreeBuilder(upstreamRepo1.r)
+		upstreamRootTree1ID, err := upstreamTreeBuilder1.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstreamRepo1.r.Commit(upstreamRootTree1ID, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo1.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntry1, err := rsl.GetLatestEntry(upstreamRepo1.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobCID, err := upstreamRepo2.r.WriteBlob([]byte("c"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobDID, err := upstreamRepo2.r.WriteBlob([]byte("d"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder2 := gitinterface.NewTreeBuilder(upstreamRepo2.r)
+		upstreamRootTree2ID, err := upstreamTreeBuilder2.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("c", blobCID),
+			gitinterface.NewEntryBlob("d", blobDID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := upstreamRepo2.r.Commit(upstreamRootTree2ID, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo2.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamEntry2, err := rsl.GetLatestEntry(upstreamRepo2.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		// TODO: should propagation result in a new local ref?
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Add things to downstreamRepo
+		blobAID, err = downstreamRepo.r.WriteBlob([]byte("a"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		blobBID, err = downstreamRepo.r.WriteBlob([]byte("b"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry2, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		priorEntry, err := rsl.GetParentForEntry(downstreamRepo.r, latestEntry)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry1, isPropagationEntry := priorEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+
+		// Check the two propagation entries are right
+		assert.Equal(t, upstreamRepo1Location, propagationEntry1.UpstreamRepository)
+		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
+		assert.Equal(t, upstreamRepo2Location, propagationEntry2.UpstreamRepository)
+		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
+
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(localPath1, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pathTree2ID, err := downstreamRepo.r.GetPathIDInTree(localPath2, downstreamRootTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Check the subtree IDs in downstream repo matches upstream root tree IDs
+		assert.Equal(t, upstreamRootTree1ID, pathTree1ID)
+		assert.Equal(t, upstreamRootTree2ID, pathTree2ID)
+
+		// Check the downstream tree still contains other items
+		expectedRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("a", blobAID),
+			gitinterface.NewEntryBlob("foo/b", blobBID),
+			gitinterface.NewEntryBlob("upstream1/a", blobAID),
+			gitinterface.NewEntryBlob("upstream1/b", blobBID),
+			gitinterface.NewEntryBlob("upstream2/c", blobCID),
+			gitinterface.NewEntryBlob("upstream2/d", blobDID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
+
+		// Nothing to propagate, check that a new entry has not been added in the downstreamRepo
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.Nil(t, err)
+
+		latestEntry, err = rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
+	})
+}
