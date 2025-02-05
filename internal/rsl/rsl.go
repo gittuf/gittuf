@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const (
@@ -1029,6 +1030,70 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 	}
 
 	return allEntries, annotationMap, nil
+}
+
+// PropagateChangesFromUpstreamRepository executes gittuf's propagation workflow
+// to create a subtree of the contents of an upstream repository's reference
+// into the specified reference and path in the downstream repository.
+func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitinterface.Repository, details []tuf.PropagationDirective, sign bool) error {
+	// FIXME: We assume here that downstreamRepo and upstreamRepo have their
+	// gittuf refs already synced.
+
+	for _, detail := range details {
+		latestUpstreamEntry, _, err := GetLatestReferenceEntry(upstreamRepo, ForReference(detail.GetUpstreamReference()), IsUnskipped())
+		if err != nil {
+			if !errors.Is(err, ErrRSLEntryNotFound) {
+				return err
+			}
+
+			continue
+		}
+
+		// We want to check if propagation is necessary
+		// What if it's already been propagated?
+
+		// TODO: handle divergence from latest RSL entry for ref downstream?
+		currentRefTip, err := downstreamRepo.GetReference(detail.GetDownstreamReference())
+		if err != nil {
+			return err // TODO: should we handle this differently?
+		}
+
+		currentTreeID, err := downstreamRepo.GetCommitTreeID(currentRefTip)
+		if err != nil {
+			return err // TODO: should we handle this differently?
+		}
+
+		currentPathTreeID, err := downstreamRepo.GetPathIDInTree(detail.GetDownstreamPath(), currentTreeID)
+		if err != nil {
+			if !errors.Is(err, gitinterface.ErrTreeDoesNotHavePath) {
+				return err
+			}
+		}
+
+		upstreamTreeID, err := upstreamRepo.GetCommitTreeID(latestUpstreamEntry.TargetID)
+		if err != nil {
+			return err
+		}
+
+		if !currentPathTreeID.IsZero() && currentPathTreeID.Equal(upstreamTreeID) {
+			// Nothing to do
+			continue
+		}
+
+		commitID, err := downstreamRepo.CreateSubtreeFromUpstreamRepository(upstreamRepo, latestUpstreamEntry.TargetID, detail.GetDownstreamReference(), detail.GetDownstreamPath())
+		if err != nil {
+			return err
+		}
+
+		if err := NewPropagationEntry(detail.GetDownstreamReference(), commitID, detail.GetUpstreamRepository(), latestUpstreamEntry.ID).Commit(downstreamRepo, sign); err != nil {
+			return err
+		}
+
+		// TODO: error management should revert propagation entries?
+		// atomicity?
+	}
+
+	return nil
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
