@@ -24,7 +24,7 @@ var ErrFailedAuthentication = errors.New("failed getting remote refs")
 // handleCurl implements the helper for remotes configured to use the curl
 // backend. For this transport, we invoke git-remote-http, only interjecting at
 // specific points to make gittuf specific additions.
-func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
 	// Scan git-remote-gittuf stdin for commands from the parent process
 	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
 	stdInScanner.Split(splitInput)
@@ -410,7 +410,7 @@ func handleCurl(repo *gittuf.Repository, remoteName, url string) (map[string]str
 			}
 
 			if len(gittufRefsTips) != 0 {
-				if err := repo.ReconcileLocalRSLWithRemote(context.TODO(), remoteName, true); err != nil {
+				if err := repo.ReconcileLocalRSLWithRemote(ctx, remoteName, true); err != nil {
 					return nil, false, err
 				}
 			}

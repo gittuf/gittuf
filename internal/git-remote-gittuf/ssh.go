@@ -22,7 +22,7 @@ import (
 
 // handleSSH implements the helper for remotes configured to use SSH. For this
 // transport, we invoke the installed ssh binary to interact with the remote.
-func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
 	url = strings.TrimPrefix(url, "ssh://")
 	url = strings.TrimPrefix(url, "git+ssh://")
 	url = strings.TrimPrefix(url, "ssh+git://")
@@ -522,7 +522,7 @@ func handleSSH(repo *gittuf.Repository, remoteName, url string) (map[string]stri
 			}
 
 			if len(gittufRefsTips) != 0 {
-				if err := repo.ReconcileLocalRSLWithRemote(context.TODO(), remoteName, true); err != nil {
+				if err := repo.ReconcileLocalRSLWithRemote(ctx, remoteName, true); err != nil {
 					return nil, false, err
 				}
 			}
