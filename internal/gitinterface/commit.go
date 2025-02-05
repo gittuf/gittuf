@@ -16,9 +16,14 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/go-git/go-git/v5/plumbing"
+	commitgraph "github.com/go-git/go-git/v5/plumbing/format/commitgraph/v2"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+)
+
+var (
+	ErrNoCommitGraph = errors.New("commit-graph not found")
 )
 
 // Commit creates a new commit in the repo and sets targetRef's to the commit.
@@ -222,6 +227,11 @@ func (r *Repository) GetCommitMessage(commitID Hash) (string, error) {
 
 // GetCommitTreeID returns the commit's Git tree ID.
 func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
+	commitData, err := r.getCommitDataUsingCommitGraph(commitID)
+	if err == nil {
+		return Hash(commitData.TreeHash[:]), nil
+	}
+
 	if err := r.ensureIsCommit(commitID); err != nil {
 		return ZeroHash, err
 	}
@@ -240,6 +250,18 @@ func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
 
 // GetCommitParentIDs returns the commit's parent commit IDs.
 func (r *Repository) GetCommitParentIDs(commitID Hash) ([]Hash, error) {
+	commitData, err := r.getCommitDataUsingCommitGraph(commitID)
+	if err == nil {
+		hashes := []Hash{}
+		for _, hash := range commitData.ParentHashes {
+			hashes = append(hashes, Hash(hash[:]))
+		}
+		if len(hashes) == 0 {
+			return nil, nil
+		}
+		return hashes, nil
+	}
+
 	if err := r.ensureIsCommit(commitID); err != nil {
 		return nil, err
 	}
@@ -323,6 +345,21 @@ func (r *Repository) ensureIsCommit(commitID Hash) error {
 	}
 
 	return nil
+}
+
+func (r *Repository) getCommitDataUsingCommitGraph(commitID Hash) (*commitgraph.CommitData, error) {
+	if r.commitGraphIndex == nil {
+		return nil, ErrNoCommitGraph
+	}
+	index, err := r.commitGraphIndex.GetIndexByHash(plumbing.Hash(commitID[:]))
+	if err != nil {
+		return nil, ErrNoCommitGraph
+	}
+	commitData, err := r.commitGraphIndex.GetCommitDataByIndex(index)
+	if err != nil {
+		return nil, ErrNoCommitGraph
+	}
+	return commitData, nil
 }
 
 func getCommitBytesWithoutSignature(commit *object.Commit) ([]byte, error) {
