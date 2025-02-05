@@ -548,7 +548,8 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				}
 
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
-					if err := repo.RecordRSLEntryForReference(srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry()); err != nil {
+					// TODO: skipping propagation; invoke it once total instead of per ref
+					if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithSkipPropagation()); err != nil {
 						return nil, false, err
 					}
 				}

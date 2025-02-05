@@ -12,6 +12,7 @@ gittuf rsl record [flags]
       --dst-ref string         name of destination reference, if it differs from source reference
   -h, --help                   help for record
       --skip-duplicate-check   skip check to see if latest entry for reference has same target
+      --skip-propagation       skip propagation workflow
 ```
 
 ### Options inherited from parent commands
