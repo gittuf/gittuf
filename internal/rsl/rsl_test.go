@@ -1714,11 +1714,75 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 	}
 }
 
+func TestPropagationEntryCreateCommitMessage(t *testing.T) {
+	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamRepository := "https://git.example.com/example/repository"
+
+	tests := map[string]struct {
+		entry           *PropagationEntry
+		expectedMessage string
+	}{
+		"entry, fully resolved ref": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+		},
+		"entry, non-zero commit": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           nonZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    nonZeroHash,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+		},
+		"entry, fully resolved ref, small number": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+				Number:             1,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, 1),
+		},
+		"entry, fully resolved ref, large number": {
+			entry: &PropagationEntry{
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+				Number:             math.MaxUint64,
+			},
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			message, _ := test.entry.createCommitMessage(true)
+			if !assert.Equal(t, test.expectedMessage, message) {
+				t.Errorf("expected\n%s\n\ngot\n%s", test.expectedMessage, message)
+			}
+		})
+	}
+}
+
 func TestParseRSLEntryText(t *testing.T) {
 	nonZeroHash, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	upstreamRepository := "https://git.example.com/example/repository"
 
 	tests := map[string]struct {
 		expectedEntry Entry
@@ -1801,6 +1865,30 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, missing information": {
 			expectedError: ErrInvalidRSLEntry,
 			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String()),
+		},
+		"propagation entry, fully resolved ref": {
+			expectedEntry: &PropagationEntry{
+				ID:                 gitinterface.ZeroHash,
+				RefName:            "refs/heads/main",
+				TargetID:           gitinterface.ZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    gitinterface.ZeroHash,
+			},
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+		},
+		"propagation entry, non-zero commit": {
+			expectedEntry: &PropagationEntry{
+				ID:                 gitinterface.ZeroHash,
+				RefName:            "refs/heads/main",
+				TargetID:           nonZeroHash,
+				UpstreamRepository: upstreamRepository,
+				UpstreamEntryID:    nonZeroHash,
+			},
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, "abcdef12345678900987654321fedcbaabcdef12"),
+		},
+		"propagation entry, missing information": {
+			expectedError: ErrInvalidRSLEntry,
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, "abcdef12345678900987654321fedcbaabcdef12", UpstreamRepositoryKey, upstreamRepository),
 		},
 	}
 
