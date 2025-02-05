@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -1495,10 +1496,19 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 
 		// Check the two propagation entries are right
-		assert.Equal(t, upstreamRepo1Location, propagationEntry1.UpstreamRepository)
-		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
-		assert.Equal(t, upstreamRepo2Location, propagationEntry2.UpstreamRepository)
-		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
+		// We empty a set of items because the order of repos may change,
+		// sometimes we may propagate repo A then repo B, and vice versa.
+		// So instead, we empty the set of expected items based on what we see
+		// in the propagation entries and ensure the set is empty so there's a
+		// propagation entry for each expected item.
+		expectedLocations := set.NewSetFromItems(upstreamRepo1Location, upstreamRepo2Location)
+		expectedLocations.Remove(propagationEntry1.UpstreamRepository)
+		expectedLocations.Remove(propagationEntry2.UpstreamRepository)
+		assert.Equal(t, 0, expectedLocations.Len())
+		expectedUpstreamIDs := set.NewSetFromItems(upstreamEntry1.GetID().String(), upstreamEntry2.GetID().String())
+		expectedUpstreamIDs.Remove(propagationEntry1.UpstreamEntryID.String())
+		expectedUpstreamIDs.Remove(propagationEntry2.UpstreamEntryID.String())
+		assert.Equal(t, 0, expectedUpstreamIDs.Len())
 
 		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
 		if err != nil {
