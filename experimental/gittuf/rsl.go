@@ -8,13 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
@@ -495,4 +498,71 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 	}
 
 	return latestUnskippedEntry.TargetID.Equal(targetID), nil
+}
+
+// PropagateChangesFromUpstreamRepositories invokes gittuf's propagation
+// workflow. It inspects the latest policy metadata to find the applicable
+// propagation directives, and executes the workflow on each one.
+func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Context, sign bool) error {
+	if !dev.InDevMode() {
+		slog.Debug("Propagation is only supported in developer mode, skipping check...")
+		return nil
+	}
+
+	slog.Debug("Checking if upstream changes must be propagated...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil
+		}
+
+		return err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+	directives := rootMetadata.GetPropagationDirectives()
+	if len(directives) == 0 {
+		slog.Debug("No propagation directives found")
+		return nil
+	}
+
+	upstreamRepositoryDirectivesMapping := map[string][]tuf.PropagationDirective{}
+	for _, directive := range directives {
+		// Group directives for the same repository together
+		if _, has := upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()]; !has {
+			upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()] = []tuf.PropagationDirective{}
+		}
+
+		upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()] = append(upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()], directive)
+	}
+
+	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
+		slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", upstreamRepositoryURL))
+		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
+
+		fetchReferences := set.NewSetFromItems(rsl.Ref)
+		for _, directive := range directives {
+			fetchReferences.Add(directive.GetUpstreamReference())
+		}
+
+		upstreamRepository, err := gitinterface.CloneAndFetchRepository(upstreamRepositoryURL, upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
+		if err != nil {
+			// TODO: we see this error when required upstream ref isn't found, handle gracefully?
+			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
+		}
+
+		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+			// TODO: atomic? abort?
+			return err
+		}
+	}
+
+	return nil
 }
