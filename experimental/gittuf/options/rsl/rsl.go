@@ -6,6 +6,7 @@ package rsl
 type Options struct {
 	RefNameOverride       string
 	SkipCheckForDuplicate bool
+	SkipPropagation       bool
 }
 
 type Option func(o *Options)
@@ -21,5 +22,12 @@ func WithOverrideRefName(refNameOverride string) Option {
 func WithSkipCheckForDuplicateEntry() Option {
 	return func(o *Options) {
 		o.SkipCheckForDuplicate = true
+	}
+}
+
+// WithSkipPropagation disables execution of the propagation workflow.
+func WithSkipPropagation() Option {
+	return func(o *Options) {
+		o.SkipPropagation = true
 	}
 }

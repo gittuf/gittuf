@@ -12,6 +12,7 @@ import (
 type options struct {
 	dstRef             string
 	skipDuplicateCheck bool
+	skipPropagation    bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -28,9 +29,16 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		false,
 		"skip check to see if latest entry for reference has same target",
 	)
+
+	cmd.Flags().BoolVar(
+		&o.skipPropagation,
+		"skip-propagation",
+		false,
+		"skip propagation workflow",
+	)
 }
 
-func (o *options) Run(_ *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
@@ -40,8 +48,11 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 	if o.skipDuplicateCheck {
 		opts = append(opts, rslopts.WithSkipCheckForDuplicateEntry())
 	}
+	if o.skipPropagation {
+		opts = append(opts, rslopts.WithSkipPropagation())
+	}
 
-	return repo.RecordRSLEntryForReference(args[0], true, opts...)
+	return repo.RecordRSLEntryForReference(cmd.Context(), args[0], true, opts...)
 }
 
 func New() *cobra.Command {
