@@ -23,7 +23,8 @@ const (
 	AllowRuleName          = "gittuf-allow-rule"
 	ExhaustiveVerifierName = "gittuf-exhaustive-verifier"
 
-	GittufPrefix = "gittuf-"
+	GittufPrefix           = "gittuf-"
+	GittufControllerPrefix = "gittuf-controller"
 
 	GlobalRuleThresholdType        = "threshold"
 	GlobalRuleBlockForcePushesType = "block-force-pushes"
