@@ -5,7 +5,7 @@ package rsl
 
 import "github.com/gittuf/gittuf/internal/gitinterface"
 
-type GetLatestReferenceEntryOptions struct {
+type GetLatestReferenceUpdaterEntryOptions struct {
 	Reference string
 
 	BeforeEntryID     gitinterface.Hash
@@ -17,14 +17,16 @@ type GetLatestReferenceEntryOptions struct {
 	Unskipped bool
 
 	NonGittuf bool
+
+	IsReferenceEntry bool
 }
 
-type GetLatestReferenceEntryOption func(*GetLatestReferenceEntryOptions)
+type GetLatestReferenceUpdaterEntryOption func(*GetLatestReferenceUpdaterEntryOptions)
 
 // ForReference indicates that the reference entry returned must be for a
 // specific Git reference.
-func ForReference(reference string) GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func ForReference(reference string) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.Reference = reference
 	}
 }
@@ -33,8 +35,8 @@ func ForReference(reference string) GetLatestReferenceEntryOption {
 // entry ID. It cannot be used in combination with BeforeEntryNumber.
 // BeforeEntryID is exclusive: the returned entry cannot be the reference entry
 // that matches the specified ID.
-func BeforeEntryID(entryID gitinterface.Hash) GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func BeforeEntryID(entryID gitinterface.Hash) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.BeforeEntryID = entryID
 	}
 }
@@ -43,8 +45,8 @@ func BeforeEntryID(entryID gitinterface.Hash) GetLatestReferenceEntryOption {
 // specified entry number. It cannot be used in combination with BeforeEntryID.
 // BeforeEntryNumber is exclusive: the returned entry cannot be the reference
 // entry that matches the specified number.
-func BeforeEntryNumber(number uint64) GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func BeforeEntryNumber(number uint64) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.BeforeEntryNumber = number
 	}
 }
@@ -53,8 +55,8 @@ func BeforeEntryNumber(number uint64) GetLatestReferenceEntryOption {
 // entry with the specified ID is encountered. It cannot be used in combination
 // with UntilEntryNumber. UntilEntryID is inclusive: the returned entry can be
 // the entry that matches the specified ID.
-func UntilEntryID(entryID gitinterface.Hash) GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func UntilEntryID(entryID gitinterface.Hash) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.UntilEntryID = entryID
 	}
 }
@@ -63,24 +65,30 @@ func UntilEntryID(entryID gitinterface.Hash) GetLatestReferenceEntryOption {
 // an entry with the specified number is encountered. It cannot be used in
 // combination with UntilEntryID. UntilEntryNumber is inclusive: the returned
 // entry can be the entry that matches the specified number.
-func UntilEntryNumber(number uint64) GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func UntilEntryNumber(number uint64) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.UntilEntryNumber = number
 	}
 }
 
 // IsUnskipped ensures that the returned reference entry has not been skipped by
 // a subsequent annotation entry.
-func IsUnskipped() GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func IsUnskipped() GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.Unskipped = true
 	}
 }
 
 // ForNonGittufReference ensures that the returned reference entry is not for a
 // gittuf-specific reference.
-func ForNonGittufReference() GetLatestReferenceEntryOption {
-	return func(o *GetLatestReferenceEntryOptions) {
+func ForNonGittufReference() GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.NonGittuf = true
+	}
+}
+
+func IsReferenceEntry() GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
+		o.IsReferenceEntry = true
 	}
 }

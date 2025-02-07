@@ -34,7 +34,7 @@ func TestPopulateCache(t *testing.T) {
 		}
 
 		// This is sorted in order of occurrence for us
-		allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(repo.r, firstEntry.GetID(), latestEntry.GetID(), policy.PolicyRef)
+		allPolicyEntries, _, err := rsl.GetReferenceUpdaterEntriesInRangeForRef(repo.r, firstEntry.GetID(), latestEntry.GetID(), policy.PolicyRef)
 		if err != nil {
 			t.Fatal(err)
 		}

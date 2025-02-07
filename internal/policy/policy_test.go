@@ -261,7 +261,7 @@ func TestLoadFirstState(t *testing.T) {
 func TestLoadStateForEntry(t *testing.T) {
 	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef))
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
 	if err != nil {
 		t.Fatal(err)
 	}

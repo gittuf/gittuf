@@ -40,14 +40,14 @@ const (
 )
 
 var (
-	ErrRSLEntryNotFound                      = errors.New("unable to find RSL entry")
-	ErrRSLBranchDetected                     = errors.New("potential RSL branch detected, entry has more than one parent")
-	ErrInvalidRSLEntry                       = errors.New("RSL entry has invalid format or is of unexpected type")
-	ErrRSLEntryDoesNotMatchRef               = errors.New("RSL entry does not match requested ref")
-	ErrNoRecordOfCommit                      = errors.New("commit has not been encountered before")
-	ErrInvalidGetLatestReferenceEntryOptions = errors.New("invalid options presented for getting latest reference entry (are both before or until conditions set or is the before number less than the until number?)")
-	ErrCannotUseEntryNumberFilter            = errors.New("current RSL entries are not numbered, cannot use number range options")
-	ErrInvalidUntilEntryNumberCondition      = errors.New("cannot meet until entry number condition")
+	ErrRSLEntryNotFound                             = errors.New("unable to find RSL entry")
+	ErrRSLBranchDetected                            = errors.New("potential RSL branch detected, entry has more than one parent")
+	ErrInvalidRSLEntry                              = errors.New("RSL entry has invalid format or is of unexpected type")
+	ErrRSLEntryDoesNotMatchRef                      = errors.New("RSL entry does not match requested ref")
+	ErrNoRecordOfCommit                             = errors.New("commit has not been encountered before")
+	ErrInvalidGetLatestReferenceUpdaterEntryOptions = errors.New("invalid options presented for getting latest reference updater entry (are both before or until conditions set or is the before number less than the until number?)")
+	ErrCannotUseEntryNumberFilter                   = errors.New("current RSL entries are not numbered, cannot use number range options")
+	ErrInvalidUntilEntryNumberCondition             = errors.New("cannot meet until entry number condition")
 )
 
 // RemoteTrackerRef returns the remote tracking ref for the specified remote
@@ -590,10 +590,10 @@ func GetParentForEntry(repo *gitinterface.Repository, entry Entry) (Entry, error
 	return parentEntry, nil
 }
 
-// GetNonGittufParentReferenceEntryForEntry returns the first RSL reference
-// entry starting from the specified entry's parent that is not for the gittuf
-// namespace.
-func GetNonGittufParentReferenceEntryForEntry(repo *gitinterface.Repository, entry Entry) (*ReferenceEntry, []*AnnotationEntry, error) {
+// GetNonGittufParentReferenceUpdaterEntryForEntry returns the first RSL
+// reference updater entry starting from the specified entry's parent that is
+// not for the gittuf namespace.
+func GetNonGittufParentReferenceUpdaterEntryForEntry(repo *gitinterface.Repository, entry Entry) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
 	it, err := GetLatestEntry(repo)
 	if err != nil {
 		return nil, nil, err
@@ -621,11 +621,11 @@ func GetNonGittufParentReferenceEntryForEntry(repo *gitinterface.Repository, ent
 		}
 	}
 
-	var targetEntry *ReferenceEntry
+	var targetEntry ReferenceUpdaterEntry
 	for {
 		switch iterator := it.(type) {
-		case *ReferenceEntry:
-			if !strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
+		case ReferenceUpdaterEntry:
+			if !strings.HasPrefix(iterator.GetRefName(), gittufNamespacePrefix) {
 				targetEntry = iterator
 			}
 		case *AnnotationEntry:
@@ -643,7 +643,7 @@ func GetNonGittufParentReferenceEntryForEntry(repo *gitinterface.Repository, ent
 		}
 	}
 
-	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.ID)
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, targetEntry.GetID())
 
 	return targetEntry, annotations, nil
 }
@@ -661,10 +661,10 @@ func GetLatestEntry(repo *gitinterface.Repository) (Entry, error) {
 	return GetEntry(repo, commitID)
 }
 
-// GetLatestReferenceEntry returns the latest reference entry in the local RSL
-// that matches the specified conditions.
-func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestReferenceEntryOption) (*ReferenceEntry, []*AnnotationEntry, error) {
-	options := GetLatestReferenceEntryOptions{
+// GetLatestReferenceUpdaterEntry returns the latest reference updater entry in
+// the local RSL that matches the specified conditions.
+func GetLatestReferenceUpdaterEntry(repo *gitinterface.Repository, opts ...GetLatestReferenceUpdaterEntryOption) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
+	options := GetLatestReferenceUpdaterEntryOptions{
 		BeforeEntryID: gitinterface.ZeroHash,
 		UntilEntryID:  gitinterface.ZeroHash,
 	}
@@ -675,16 +675,16 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 	if !options.BeforeEntryID.IsZero() && options.BeforeEntryNumber != 0 {
 		// Only one of the Before options can be set
 		slog.Debug("Found both before entry ID and before entry number conditions, aborting...")
-		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
 	if !options.UntilEntryID.IsZero() && options.UntilEntryNumber != 0 {
 		// Only one of the Until options can be set
 		slog.Debug("Found both until entry ID and until entry number conditions, aborting...")
-		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
 	if options.BeforeEntryNumber != 0 && options.UntilEntryNumber != 0 && options.BeforeEntryNumber < options.UntilEntryNumber {
 		slog.Debug(fmt.Sprintf("Cannot search for entry before entry number %d and until entry number %d, aborting...", options.BeforeEntryNumber, options.UntilEntryNumber))
-		return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
 
 	allAnnotations := []*AnnotationEntry{}
@@ -719,7 +719,7 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 			}
 
 			if iteratorT.GetNumber() < options.UntilEntryNumber {
-				return nil, nil, ErrInvalidGetLatestReferenceEntryOptions
+				return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 			}
 		}
 
@@ -740,24 +740,34 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 		}
 	}
 
-	var targetEntry *ReferenceEntry
+	var targetEntry ReferenceUpdaterEntry
 	for {
 		switch iterator := iteratorT.(type) {
-		case *ReferenceEntry:
+		case ReferenceUpdaterEntry:
 			matchesConditions := true
 
-			if options.Reference != "" && iterator.RefName != options.Reference {
+			if options.Reference != "" && iterator.GetRefName() != options.Reference {
 				matchesConditions = false
 			}
 
-			if matchesConditions && options.Unskipped && iterator.SkippedBy(allAnnotations) {
-				// SkippedBy ensures only the applicable
-				// annotations that refer to the entry
-				// are used
-				matchesConditions = false
+			if matchesConditions && options.IsReferenceEntry {
+				if _, isReferenceEntry := iterator.(*ReferenceEntry); !isReferenceEntry {
+					matchesConditions = false
+				}
 			}
 
-			if matchesConditions && options.NonGittuf && strings.HasPrefix(iterator.RefName, gittufNamespacePrefix) {
+			// Only reference entry can be skipped
+			referenceEntry, isReferenceEntry := iterator.(*ReferenceEntry)
+			if isReferenceEntry {
+				if matchesConditions && options.Unskipped && referenceEntry.SkippedBy(allAnnotations) {
+					// SkippedBy ensures only the applicable
+					// annotations that refer to the entry
+					// are used
+					matchesConditions = false
+				}
+			}
+
+			if matchesConditions && options.NonGittuf && strings.HasPrefix(iterator.GetRefName(), gittufNamespacePrefix) {
 				matchesConditions = false
 			}
 
@@ -793,28 +803,29 @@ func GetLatestReferenceEntry(repo *gitinterface.Repository, opts ...GetLatestRef
 	return targetEntry, annotations, nil
 }
 
-// GetFirstEntry returns the very first entry in the RSL. It is expected to be
-// a reference entry as the first entry in the RSL cannot be an annotation.
-func GetFirstEntry(repo *gitinterface.Repository) (*ReferenceEntry, []*AnnotationEntry, error) {
-	return GetFirstReferenceEntryForRef(repo, "")
+// GetFirstEntry returns the very first entry in the RSL. It is expected to be a
+// reference updater entry as the first entry in the RSL cannot be an
+// annotation.
+func GetFirstEntry(repo *gitinterface.Repository) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
+	return GetFirstReferenceUpdaterEntryForRef(repo, "")
 }
 
 // GetFirstReferenceEntryForRef returns the very first entry in the RSL for the
 // specified ref. It is expected to be a reference entry as the first entry in
 // the RSL for a reference cannot be an annotation.
-func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef string) (*ReferenceEntry, []*AnnotationEntry, error) {
+func GetFirstReferenceUpdaterEntryForRef(repo *gitinterface.Repository, targetRef string) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
 	iteratorT, err := GetLatestEntry(repo)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	allAnnotations := []*AnnotationEntry{}
-	var firstEntry *ReferenceEntry
+	var firstEntry ReferenceUpdaterEntry
 
 	for {
 		switch entry := iteratorT.(type) {
-		case *ReferenceEntry:
-			if targetRef == "" || entry.RefName == targetRef {
+		case ReferenceUpdaterEntry:
+			if targetRef == "" || entry.GetRefName() == targetRef {
 				firstEntry = entry
 			}
 		case *AnnotationEntry:
@@ -837,7 +848,7 @@ func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef strin
 		return nil, nil, ErrRSLEntryNotFound
 	}
 
-	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.ID)
+	annotations := filterAnnotationsForRelevantAnnotations(allAnnotations, firstEntry.GetID())
 
 	return firstEntry, annotations, nil
 }
@@ -850,12 +861,12 @@ func GetFirstReferenceEntryForRef(repo *gitinterface.Repository, targetRef strin
 func SkipAllInvalidReferenceEntriesForRef(repo *gitinterface.Repository, targetRef string, signCommit bool) error {
 	slog.Debug("Checking if RSL entries point to commits not in the target ref...")
 
-	latestEntry, _, err := GetLatestReferenceEntry(repo, ForReference(targetRef))
+	latestEntry, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference(targetRef))
 	if err != nil {
 		return err
 	}
 
-	iteratorEntry, _, err := GetLatestReferenceEntry(repo, ForReference(targetRef), BeforeEntryID(latestEntry.ID))
+	iteratorEntry, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference(targetRef), BeforeEntryID(latestEntry.GetID()))
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			// We don't have a parent to check if invalid
@@ -872,7 +883,7 @@ func SkipAllInvalidReferenceEntriesForRef(repo *gitinterface.Repository, targetR
 
 	for {
 		if entry, ok := iterator.(*ReferenceEntry); ok {
-			isAncestor, err := repo.KnowsCommit(latestEntry.TargetID, entry.TargetID)
+			isAncestor, err := repo.KnowsCommit(latestEntry.GetTargetID(), entry.TargetID)
 			if err != nil {
 				return err
 			}
@@ -901,19 +912,19 @@ func SkipAllInvalidReferenceEntriesForRef(repo *gitinterface.Repository, targetR
 	return NewAnnotationEntry(entriesToSkip, true, "Automated skip of reference entries pointing to non-existent entries").Commit(repo, signCommit)
 }
 
-// GetFirstReferenceEntryForCommit returns the first reference entry in the RSL
-// that either records the commit itself or a descendent of the commit. This
-// establishes the first time a commit was seen in the repository, irrespective
-// of the ref it was associated with, and we can infer things like the active
-// developers who could have signed the commit.
-func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*ReferenceEntry, []*AnnotationEntry, error) {
+// GetFirstReferenceUpdaterEntryForCommit returns the first reference entry in
+// the RSL that either records the commit itself or a descendent of the commit.
+// This establishes the first time a commit was seen in the repository,
+// irrespective of the ref it was associated with, and we can infer things like
+// the active developers who could have signed the commit.
+func GetFirstReferenceUpdaterEntryForCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
 	// checking the parent. The first pair where the parent entry is not
 	// descended from the target commit, we return the other entry in the pair.
 
-	firstEntry, firstAnnotations, err := GetLatestReferenceEntry(repo, ForNonGittufReference())
+	firstEntry, firstAnnotations, err := GetLatestReferenceUpdaterEntry(repo, ForNonGittufReference())
 	if err != nil {
 		if errors.Is(err, ErrRSLEntryNotFound) {
 			return nil, nil, ErrNoRecordOfCommit
@@ -921,7 +932,7 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 		return nil, nil, err
 	}
 
-	knowsCommit, err := repo.KnowsCommit(firstEntry.TargetID, commitID)
+	knowsCommit, err := repo.KnowsCommit(firstEntry.GetTargetID(), commitID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -930,7 +941,7 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 	}
 
 	for {
-		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentReferenceEntryForEntry(repo, firstEntry)
+		iteratorEntry, iteratorAnnotations, err := GetNonGittufParentReferenceUpdaterEntryForEntry(repo, firstEntry)
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
 				return firstEntry, firstAnnotations, nil
@@ -938,7 +949,7 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 			return nil, nil, err
 		}
 
-		knowsCommit, err := repo.KnowsCommit(iteratorEntry.TargetID, commitID)
+		knowsCommit, err := repo.KnowsCommit(iteratorEntry.GetTargetID(), commitID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -951,21 +962,21 @@ func GetFirstReferenceEntryForCommit(repo *gitinterface.Repository, commitID git
 	}
 }
 
-// GetReferenceEntriesInRange returns a list of reference entries between the
-// specified range and a map of annotations that refer to each reference entry
-// in the range. The annotations map is keyed by the ID of the reference entry,
-// with the value being a list of annotations that apply to that reference
-// entry.
-func GetReferenceEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
-	return GetReferenceEntriesInRangeForRef(repo, firstID, lastID, "")
+// GetReferenceUpdaterEntriesInRange returns a list of reference entries between
+// the specified range and a map of annotations that refer to each reference
+// entry in the range. The annotations map is keyed by the ID of the reference
+// entry, with the value being a list of annotations that apply to that
+// reference entry.
+func GetReferenceUpdaterEntriesInRange(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
+	return GetReferenceUpdaterEntriesInRangeForRef(repo, firstID, lastID, "")
 }
 
-// GetReferenceEntriesInRangeForRef returns a list of reference entries for the
-// ref between the specified range and a map of annotations that refer to each
-// reference entry in the range. The annotations map is keyed by the ID of the
-// reference entry, with the value being a list of annotations that apply to
-// that reference entry.
-func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string) ([]*ReferenceEntry, map[string][]*AnnotationEntry, error) {
+// GetReferenceUpdaterEntriesInRangeForRef returns a list of reference entries
+// for the ref between the specified range and a map of annotations that refer
+// to each reference entry in the range. The annotations map is keyed by the ID
+// of the reference entry, with the value being a list of annotations that apply
+// to that reference entry.
+func GetReferenceUpdaterEntriesInRangeForRef(repo *gitinterface.Repository, firstID, lastID gitinterface.Hash, refName string) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
 	// We have to iterate from latest to get the annotations that refer to the
 	// last requested entry
 	iterator, err := GetLatestEntry(repo)
@@ -988,20 +999,20 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 		iterator = parent
 	}
 
-	entryStack := []*ReferenceEntry{}
+	entryStack := []ReferenceUpdaterEntry{}
 	inRange := map[string]bool{}
 	for !iterator.GetID().Equal(firstID) {
 		// Here, all items are relevant until the one corresponding to first is
 		// found
 		switch it := iterator.(type) {
-		case *ReferenceEntry:
-			if len(refName) == 0 || it.RefName == refName || isRelevantGittufRef(it.RefName) {
+		case ReferenceUpdaterEntry:
+			if len(refName) == 0 || it.GetRefName() == refName || isRelevantGittufRef(it.GetRefName()) {
 				// It's a relevant entry if:
 				// a) there's no refName set, or
 				// b) the entry's refName matches the set refName, or
 				// c) the entry is for a gittuf namespace
 				entryStack = append(entryStack, it)
-				inRange[it.ID.String()] = true
+				inRange[it.GetID().String()] = true
 			}
 		case *AnnotationEntry:
 			allAnnotations = append(allAnnotations, it)
@@ -1017,14 +1028,14 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 	// Handle the item corresponding to first explicitly
 	// If it's an annotation, ignore it as it refers to something before the
 	// range we care about
-	if entry, isEntry := iterator.(*ReferenceEntry); isEntry {
-		if len(refName) == 0 || entry.RefName == refName || isRelevantGittufRef(entry.RefName) {
+	if entry, isEntry := iterator.(ReferenceUpdaterEntry); isEntry {
+		if len(refName) == 0 || entry.GetRefName() == refName || isRelevantGittufRef(entry.GetRefName()) {
 			// It's a relevant entry if:
 			// a) there's no refName set, or
 			// b) the entry's refName matches the set refName, or
 			// c) the entry is for a gittuf namespace
 			entryStack = append(entryStack, entry)
-			inRange[entry.ID.String()] = true
+			inRange[entry.GetID().String()] = true
 		}
 	}
 
@@ -1049,7 +1060,7 @@ func GetReferenceEntriesInRangeForRef(repo *gitinterface.Repository, firstID, la
 
 	// Reverse entryStack so that it's in order of occurrence rather than in
 	// order of walking back the RSL
-	allEntries := make([]*ReferenceEntry, 0, len(entryStack))
+	allEntries := make([]ReferenceUpdaterEntry, 0, len(entryStack))
 	for i := len(entryStack) - 1; i >= 0; i-- {
 		allEntries = append(allEntries, entryStack[i])
 	}
@@ -1065,7 +1076,7 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 	// gittuf refs already synced.
 
 	for _, detail := range details {
-		latestUpstreamEntry, _, err := GetLatestReferenceEntry(upstreamRepo, ForReference(detail.GetUpstreamReference()), IsUnskipped())
+		latestUpstreamEntry, _, err := GetLatestReferenceUpdaterEntry(upstreamRepo, ForReference(detail.GetUpstreamReference()), IsUnskipped())
 		if err != nil {
 			if !errors.Is(err, ErrRSLEntryNotFound) {
 				return err
@@ -1095,7 +1106,7 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 			}
 		}
 
-		upstreamTreeID, err := upstreamRepo.GetCommitTreeID(latestUpstreamEntry.TargetID)
+		upstreamTreeID, err := upstreamRepo.GetCommitTreeID(latestUpstreamEntry.GetTargetID())
 		if err != nil {
 			return err
 		}
@@ -1105,12 +1116,12 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 			continue
 		}
 
-		commitID, err := downstreamRepo.CreateSubtreeFromUpstreamRepository(upstreamRepo, latestUpstreamEntry.TargetID, detail.GetDownstreamReference(), detail.GetDownstreamPath())
+		commitID, err := downstreamRepo.CreateSubtreeFromUpstreamRepository(upstreamRepo, latestUpstreamEntry.GetTargetID(), detail.GetDownstreamReference(), detail.GetDownstreamPath())
 		if err != nil {
 			return err
 		}
 
-		if err := NewPropagationEntry(detail.GetDownstreamReference(), commitID, detail.GetUpstreamRepository(), latestUpstreamEntry.ID).Commit(downstreamRepo, sign); err != nil {
+		if err := NewPropagationEntry(detail.GetDownstreamReference(), commitID, detail.GetUpstreamRepository(), latestUpstreamEntry.GetID()).Commit(downstreamRepo, sign); err != nil {
 			return err
 		}
 
