@@ -71,6 +71,28 @@ func TestNewReferenceEntry(t *testing.T) {
 	assert.Contains(t, parentIDs, currentTip)
 }
 
+func TestReferenceUpdaterEntry(t *testing.T) {
+	refName := "refs/heads/main"
+	gitID := gitinterface.ZeroHash
+	upstreamRepository := "http://git.example.com/repository"
+
+	t.Run("reference entry", func(t *testing.T) {
+		entry := Entry(NewReferenceEntry(refName, gitID))
+		updaterEntry, isReferenceUpdaterEntry := entry.(ReferenceUpdaterEntry)
+		assert.True(t, isReferenceUpdaterEntry)
+		assert.Equal(t, refName, updaterEntry.GetRefName())
+		assert.Equal(t, gitID, updaterEntry.GetTargetID())
+	})
+
+	t.Run("propagation entry", func(t *testing.T) {
+		entry := Entry(NewPropagationEntry(refName, gitID, upstreamRepository, gitID))
+		updaterEntry, isReferenceUpdaterEntry := entry.(ReferenceUpdaterEntry)
+		assert.True(t, isReferenceUpdaterEntry)
+		assert.Equal(t, refName, updaterEntry.GetRefName())
+		assert.Equal(t, gitID, updaterEntry.GetTargetID())
+	})
+}
+
 func TestGetLatestEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
