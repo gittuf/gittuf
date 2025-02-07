@@ -29,7 +29,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -100,7 +100,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		loadedState, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		loadedState, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -118,7 +118,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), nil)
 		if err != nil {
 			t.Error(err)
 		}
@@ -200,7 +200,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
+		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), nil)
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
 }

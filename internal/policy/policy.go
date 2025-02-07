@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path"
 	"reflect"
 	"sort"
@@ -47,20 +48,24 @@ const (
 )
 
 var (
-	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
-	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
-	ErrPolicyNotFound             = errors.New("cannot find policy")
-	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
-	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrMetadataNotFound                = errors.New("unable to find requested metadata file; has it been initialized?")
+	ErrDanglingDelegationMetadata      = errors.New("unreachable targets metadata found")
+	ErrPolicyNotFound                  = errors.New("cannot find policy")
+	ErrUnableToMatchRootKeys           = errors.New("unable to match root public keys, gittuf policy is in a broken state")
+	ErrNotAncestor                     = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrControllerContentsNotPropagated = errors.New("expected controller repository root metadata not found")
 )
 
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	RootEnvelope        *sslibdsse.Envelope
-	TargetsEnvelope     *sslibdsse.Envelope
-	DelegationEnvelopes map[string]*sslibdsse.Envelope
-	RootPublicKeys      []tuf.Principal
+	RootEnvelope            *sslibdsse.Envelope
+	TargetsEnvelope         *sslibdsse.Envelope
+	DelegationEnvelopes     map[string]*sslibdsse.Envelope
+	RootPublicKeys          []tuf.Principal
+	ControllerRootEnvelopes map[string]*sslibdsse.Envelope
+
+	stateEntry rsl.ReferenceUpdaterEntry
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
@@ -78,7 +83,7 @@ type State struct {
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
 // policy-staging ref, that entry is returned with no verification.
-func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry) (*State, error) {
+func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry, initialRootPrincipals []tuf.Principal) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
 	// before the entry. This is why we don't just load the state and return
@@ -138,6 +143,19 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
+	if len(initialRootPrincipals) != 0 {
+		initialRoot := initialPolicyState.RootEnvelope
+		verifier := &SignatureVerifier{
+			repository: repo,
+			name:       "initial-root-verifier",
+			principals: initialRootPrincipals,
+			threshold:  len(initialRootPrincipals),
+		}
+		if _, err := verifier.Verify(ctx, nil, initialRoot); err != nil {
+			return nil, fmt.Errorf("failed to verify initial root metadata: %w", err)
+		}
+	}
+
 	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
 	verifiedState := initialPolicyState
 	for _, entry := range allPolicyEntries[1:] {
@@ -190,7 +208,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, entry)
+	return LoadState(ctx, repo, entry, nil)
 }
 
 // LoadFirstState returns the State corresponding to the repository's first
@@ -201,7 +219,7 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*State,
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, firstEntry)
+	return LoadState(ctx, repo, firstEntry, nil)
 }
 
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
@@ -224,7 +242,7 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, commitPolicyEntry)
+	return LoadState(ctx, repo, commitPolicyEntry, nil)
 }
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
@@ -492,6 +510,63 @@ func (s *State) Verify(ctx context.Context) error {
 	for _, reached := range reachedDelegations {
 		if !reached {
 			return ErrDanglingDelegationMetadata
+		}
+	}
+
+	// Check controller root metadata
+	if len(s.ControllerRootEnvelopes) == 0 {
+		return nil
+	}
+
+	controllerRepositories := rootMetadata.GetControllerRepositories()
+	for _, controllerRepositoryDetail := range controllerRepositories {
+		controllerName := controllerRepositoryDetail.GetName()
+		currentRootEnv, has := s.ControllerRootEnvelopes[controllerName]
+		if !has {
+			return ErrControllerContentsNotPropagated
+		}
+
+		tmpDir, err := os.MkdirTemp("", "gittuf-controller-")
+		if err != nil {
+			return fmt.Errorf("unable to clone controller repository: %w", err)
+		}
+
+		controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
+		if err != nil {
+			return fmt.Errorf("unable to clone controller repository: %w", err)
+		}
+
+		// We need to LoadState() the state from which the root is derived
+		// For that, we need to know when it was propagated into this repository
+		upstreamEntryID := gitinterface.ZeroHash
+		if entry, isPropagationEntry := s.stateEntry.(*rsl.PropagationEntry); isPropagationEntry {
+			// Check this entry
+			if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
+				upstreamEntryID = entry.UpstreamEntryID
+			}
+		}
+		if upstreamEntryID.IsZero() {
+			// not found yet
+			// find propagation entry in local repo
+			propagationEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(s.repository, rsl.BeforeEntryID(s.stateEntry.GetID()), rsl.IsPropagationEntryForRepository(controllerRepositoryDetail.GetLocation()), rsl.ForReference(PolicyRef))
+			if err != nil {
+				return fmt.Errorf("unable to verify controller repository: %w", err)
+			}
+			// We know propagationEntry is of this type because of the rsl.IsPropagationEntryForReference opt
+			upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
+		}
+
+		upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
+		if err != nil {
+			return err
+		}
+
+		controllerState, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), controllerRepositoryDetail.GetInitialRootPrincipals())
+		if err != nil {
+			return fmt.Errorf("unable to verify root of trust for controller '%s': %w", controllerName, err)
+		}
+		if controllerState.RootEnvelope != currentRootEnv {
+			return fmt.Errorf("controller root does not match upstream repository")
 		}
 	}
 
@@ -943,7 +1018,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, err
 	}
 
-	state := &State{repository: repo}
+	state := &State{repository: repo, stateEntry: entry}
 
 	for name, blobID := range allTreeEntries {
 		contents, err := repo.ReadBlob(blobID)
@@ -954,7 +1029,8 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		// We have this conditional because once upon a time we used to store
 		// the root keys on disk as well; now we just get them from the root
 		// metadata file. We ignore the keys on disk in the old policy states.
-		if strings.HasPrefix(name, metadataTreeEntryName+"/") {
+		switch {
+		case strings.HasPrefix(name, metadataTreeEntryName+"/"):
 			env := &sslibdsse.Envelope{}
 			if err := json.Unmarshal(contents, env); err != nil {
 				return nil, err
@@ -975,6 +1051,26 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 
 				state.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
 			}
+		case strings.HasPrefix(name, tuf.GittufControllerPrefix+"/"):
+			name = strings.TrimPrefix(name, tuf.GittufControllerPrefix+"/")
+			// now name should be in "controller-name/metadata/<file type>" scheme
+			// only load root.json from the controller, don't inherit from its controllers
+			// TODO: work out how this should be!
+			split := strings.Split(name, "/")
+			controllerName := split[0]
+			if name != fmt.Sprintf("%s/%s/%s.json", controllerName, metadataTreeEntryName, RootRoleName) {
+				continue
+			}
+
+			env := &sslibdsse.Envelope{}
+			if err := json.Unmarshal(contents, env); err != nil {
+				return nil, err
+			}
+
+			if state.ControllerRootEnvelopes == nil {
+				state.ControllerRootEnvelopes = map[string]*sslibdsse.Envelope{}
+			}
+			state.ControllerRootEnvelopes[controllerName] = env
 		}
 	}
 
