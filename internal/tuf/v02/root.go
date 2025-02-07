@@ -27,6 +27,7 @@ type RootMetadata struct {
 	GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
 	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
+	MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -324,6 +325,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
 		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
 		Propagations           []json.RawMessage          `json:"propagations,omitempty"`
+		MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -410,6 +412,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		r.Propagations = append(r.Propagations, propagationDirective)
 	}
 
+	r.MultiRepository = temp.MultiRepository
+
 	return nil
 }
 
@@ -487,6 +491,129 @@ func (r *RootMetadata) DeletePropagationDirective(name string) error {
 	return nil
 }
 
+// IsController indicates if the repository serves as the controller for a
+// multi-repository gittuf network.
+func (r *RootMetadata) IsController() bool {
+	if r.MultiRepository == nil {
+		return false
+	}
+
+	return r.MultiRepository.IsController()
+}
+
+// EnableController marks the current repository as a controller repository.
+func (r *RootMetadata) EnableController() error {
+	if r.MultiRepository == nil {
+		r.MultiRepository = &MultiRepository{}
+	}
+
+	r.MultiRepository.Controller = true
+	return nil // TODO: what if it's already a controller? noop?
+}
+
+// DisableController marks the current repository as not-a-controller.
+func (r *RootMetadata) DisableController() error {
+	if r.MultiRepository == nil {
+		// nothing to do
+		return nil
+	}
+
+	r.MultiRepository.Controller = false
+	// TODO: should we remove the network repository entries?
+	return nil
+}
+
+// AddControllerRepository adds the specified repository as a controller for the
+// current repository.
+func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
+	if r.MultiRepository == nil {
+		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
+	}
+
+	// TODO: check for duplicates
+
+	otherRepository := &OtherRepository{
+		Name:                  name,
+		Location:              location,
+		InitialRootPrincipals: make([]tuf.Principal, 0, len(initialRootPrincipals)),
+	}
+
+	for _, principal := range initialRootPrincipals {
+		switch principal := principal.(type) {
+		case *Key:
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+		case *Person:
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+		default:
+			return tuf.ErrInvalidPrincipalType
+		}
+	}
+
+	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
+
+	// Add the controller as a repository whose policy contents must be
+	// propagated into this repository
+	propagationName := fmt.Sprintf("gittuf-controller-%s", name)
+	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationName))
+}
+
+// AddNetworkRepository adds the specified repository as part of the network for
+// which the current repository is a controller. The current repository must be
+// marked as a controller before this can be used.
+func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
+	if r.MultiRepository == nil || !r.MultiRepository.Controller {
+		// EnableController must be called first
+		return tuf.ErrNotAControllerRepository
+	}
+
+	if r.MultiRepository.NetworkRepositories == nil {
+		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
+	}
+
+	// TODO: check for duplicates
+
+	otherRepository := &OtherRepository{
+		Name:                  name,
+		Location:              location,
+		InitialRootPrincipals: make([]tuf.Principal, 0, len(initialRootPrincipals)),
+	}
+
+	for _, principal := range initialRootPrincipals {
+		switch principal := principal.(type) {
+		case *Key:
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+		case *Person:
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+		default:
+			return tuf.ErrInvalidPrincipalType
+		}
+	}
+
+	r.MultiRepository.NetworkRepositories = append(r.MultiRepository.NetworkRepositories, otherRepository)
+	return nil
+}
+
+// GetControllerRepositories returns the repositories that serve as the
+// controllers for the networks the current repository is a part of.
+func (r *RootMetadata) GetControllerRepositories() []tuf.OtherRepository {
+	if r.MultiRepository == nil {
+		return nil
+	}
+
+	return r.MultiRepository.GetControllerRepositories()
+}
+
+// GetNetworkRepositories returns the repositories that are part of the network
+// for which the current repository is a controller. IsController must return
+// true for this to be set.
+func (r *RootMetadata) GetNetworkRepositories() []tuf.OtherRepository {
+	if r.MultiRepository == nil {
+		return nil
+	}
+
+	return r.MultiRepository.GetNetworkRepositories()
+}
+
 // addPrincipal adds a principal to the RootMetadata instance.  v02 of the
 // metadata supports Key and Person as supported principal types.
 func (r *RootMetadata) addPrincipal(principal tuf.Principal) error {
@@ -529,4 +656,102 @@ func NewPropagationDirective(name, upstreamRepository, upstreamReference, downst
 		DownstreamReference: downstreamReference,
 		DownstreamPath:      downstreamPath,
 	}
+}
+
+type MultiRepository struct {
+	Controller             bool               `json:"controller"`
+	ControllerRepositories []*OtherRepository `json:"controllerRepositories,omitempty"`
+	NetworkRepositories    []*OtherRepository `json:"networkRepositories,omitempty"`
+}
+
+func (m *MultiRepository) IsController() bool {
+	return m.Controller
+}
+
+func (m *MultiRepository) GetControllerRepositories() []tuf.OtherRepository {
+	controllerRepositories := []tuf.OtherRepository{}
+	for _, repository := range m.ControllerRepositories {
+		controllerRepositories = append(controllerRepositories, repository)
+	}
+	return controllerRepositories
+}
+
+func (m *MultiRepository) GetNetworkRepositories() []tuf.OtherRepository {
+	if !m.Controller {
+		return nil
+	}
+
+	networkRepositories := []tuf.OtherRepository{}
+	for _, repository := range m.NetworkRepositories {
+		networkRepositories = append(networkRepositories, repository)
+	}
+	return networkRepositories
+}
+
+type OtherRepository struct {
+	Name                  string          `json:"name"`
+	Location              string          `json:"location"`
+	InitialRootPrincipals []tuf.Principal `json:"initialRootPrincipals"`
+}
+
+func (o *OtherRepository) GetName() string {
+	return o.Name
+}
+
+func (o *OtherRepository) GetLocation() string {
+	return o.Location
+}
+
+func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
+	return o.InitialRootPrincipals
+}
+
+func (o *OtherRepository) UnmarshalJSON(data []byte) error {
+	type tempType struct {
+		Name                  string            `json:"name"`
+		Location              string            `json:"location"`
+		InitialRootPrincipals []json.RawMessage `json:"initialRootPrincipals"`
+	}
+
+	temp := &tempType{}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	o.Name = temp.Name
+	o.Location = temp.Location
+
+	o.InitialRootPrincipals = make([]tuf.Principal, 0, len(temp.InitialRootPrincipals))
+	for _, principalBytes := range temp.InitialRootPrincipals {
+		tempPrincipal := map[string]any{}
+		if err := json.Unmarshal(principalBytes, &tempPrincipal); err != nil {
+			return fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+
+		if _, has := tempPrincipal["keyid"]; has {
+			// this is *Key
+			key := &Key{}
+			if err := json.Unmarshal(principalBytes, key); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			o.InitialRootPrincipals = append(o.InitialRootPrincipals, key)
+			continue
+		}
+
+		if _, has := tempPrincipal["personID"]; has {
+			// this is *Person
+			person := &Person{}
+			if err := json.Unmarshal(principalBytes, person); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+
+			o.InitialRootPrincipals = append(o.InitialRootPrincipals, person)
+			continue
+		}
+
+		return fmt.Errorf("unrecognized principal type '%s'", string(principalBytes))
+	}
+
+	return nil
 }

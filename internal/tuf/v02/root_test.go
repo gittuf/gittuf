@@ -104,6 +104,49 @@ func TestRootMetadata(t *testing.T) {
 		err = rootMetadata.DeletePropagationDirective("test")
 		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
 	})
+
+	t.Run("test multi-repository", func(t *testing.T) {
+		isController := rootMetadata.IsController()
+		assert.False(t, isController)
+
+		name := "test"
+		location := "http://git.example.com/repository"
+		initialRootPrincipals := []tuf.Principal{key, person}
+
+		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		assert.Nil(t, err)
+
+		controllerRepositories := rootMetadata.GetControllerRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, controllerRepositories)
+
+		propagations := rootMetadata.GetPropagationDirectives()
+		found := false
+		for _, propagation := range propagations {
+			if propagation.GetName() == "gittuf-controller-test" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found)
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrNotAControllerRepository)
+
+		err = rootMetadata.EnableController()
+		assert.Nil(t, err)
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.Nil(t, err)
+
+		networkRepositories := rootMetadata.GetNetworkRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, networkRepositories)
+
+		err = rootMetadata.DisableController()
+		assert.Nil(t, err)
+
+		networkRepositories = rootMetadata.GetNetworkRepositories()
+		assert.Nil(t, networkRepositories)
+	})
 }
 
 func TestRootMetadataWithSSHKey(t *testing.T) {
