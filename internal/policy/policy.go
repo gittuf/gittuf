@@ -78,7 +78,7 @@ type State struct {
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
 // policy-staging ref, that entry is returned with no verification.
-func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry *rsl.ReferenceEntry) (*State, error) {
+func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
 	// before the entry. This is why we don't just load the state and return
@@ -101,9 +101,9 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
-	if firstPolicyEntry.ID.Equal(requestedEntry.ID) {
+	if firstPolicyEntry.GetID().Equal(requestedEntry.GetID()) {
 		slog.Debug("Requested policy's entry is the same as first policy entry, loading it without further verification...")
-		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.ID.String()))
+		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
 		return loadStateForEntry(repo, requestedEntry)
 	}
 
@@ -111,7 +111,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 	// this can happen when the requested entry is for policy-staging before
 	// Apply() was ever called
 	slog.Debug("Checking if first policy entry was after requested policy's entry...")
-	knows, err := repo.KnowsCommit(firstPolicyEntry.ID, requestedEntry.ID)
+	knows, err := repo.KnowsCommit(firstPolicyEntry.GetID(), requestedEntry.GetID())
 	if err != nil {
 		return nil, err
 	}
@@ -138,10 +138,10 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
-	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.ID.String()))
+	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
 	verifiedState := initialPolicyState
 	for _, entry := range allPolicyEntries[1:] {
-		if entry.RefName != PolicyRef {
+		if entry.GetRefName() != PolicyRef {
 			// The searcher _may_ include refs/gittuf/attestations
 			// etc. which should be skipped
 			continue
@@ -152,7 +152,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 			return nil, err
 		}
 
-		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.ID.String()))
+		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.GetID().String()))
 		if err := verifiedState.VerifyNewState(ctx, underTestState); err != nil {
 			return nil, fmt.Errorf("unable to verify roots of trust for policy states: %w", err)
 		}
@@ -160,7 +160,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		verifiedState = underTestState
 	}
 
-	if requestedEntry.RefName == PolicyRef {
+	if requestedEntry.GetRefName() == PolicyRef {
 		// We've already loaded it and done successive verification as
 		// it was included in allPolicyEntries
 		// This state is stored in verifiedState, we can do an internal
@@ -171,7 +171,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 			return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 		}
 
-		slog.Debug(fmt.Sprintf("Successfully loaded policy at entry '%s'!", requestedEntry.ID.String()))
+		slog.Debug(fmt.Sprintf("Successfully loaded policy at entry '%s'!", requestedEntry.GetID().String()))
 		return verifiedState, nil
 	}
 
@@ -185,7 +185,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
 func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string) (*State, error) {
-	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(ref))
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(ref))
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 // LoadFirstState returns the State corresponding to the repository's first
 // active policy. It does not verify the root of trust since it is the initial policy.
 func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*State, error) {
-	firstEntry, _, err := rsl.GetFirstReferenceEntryForRef(repo, PolicyRef)
+	firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*State,
 // error is returned. Identifying the policy in this case is left to the calling
 // workflow.
 func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
-	firstSeenEntry, _, err := rsl.GetFirstReferenceEntryForCommit(repo, commitID)
+	firstSeenEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForCommit(repo, commitID)
 	if err != nil {
 		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
 			return nil, nil
@@ -219,7 +219,7 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 		return nil, err
 	}
 
-	commitPolicyEntry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstSeenEntry.ID))
+	commitPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstSeenEntry.GetID()))
 	if err != nil {
 		return nil, err
 	}
@@ -928,12 +928,12 @@ func (s *State) getTargetsVerifier() (*SignatureVerifier, error) {
 // and loading the policy contents. Typically, LoadCurrentState of LoadState
 // must be used. The exception is VerifyRelative... which performs root
 // verification between consecutive policy states.
-func loadStateForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) (*State, error) {
-	if entry.RefName != PolicyRef && entry.RefName != PolicyStagingRef {
+func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdaterEntry) (*State, error) {
+	if entry.GetRefName() != PolicyRef && entry.GetRefName() != PolicyStagingRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	commitTreeID, err := repo.GetCommitTreeID(entry.TargetID)
+	commitTreeID, err := repo.GetCommitTreeID(entry.GetTargetID())
 	if err != nil {
 		return nil, err
 	}

@@ -75,13 +75,13 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Identifying current status of target Git reference...")
-	latestTargetEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(targetRef))
+	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))
 	if err == nil {
 		if isTag {
 			return fmt.Errorf("cannot approve a tag that already exists: %w", gitinterface.ErrTagAlreadyExists)
 		}
 
-		fromID = latestTargetEntry.TargetID
+		fromID = latestTargetEntry.GetTargetID()
 	} else {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return err
@@ -90,13 +90,13 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Identifying current status of feature Git reference...")
-	latestFeatureEntry, _, err := rsl.GetLatestReferenceEntry(r.r, rsl.ForReference(featureRef))
+	latestFeatureEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(featureRef))
 	if err != nil {
 		// We don't have an RSL entry for the feature ref to use to approve the
 		// merge
 		return err
 	}
-	featureCommitID = latestFeatureEntry.TargetID
+	featureCommitID = latestFeatureEntry.GetTargetID()
 
 	if isTag {
 		// for tags, the toID is the commitID the tag will point to

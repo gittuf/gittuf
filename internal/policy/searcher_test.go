@@ -103,7 +103,7 @@ func TestRegularSearcher(t *testing.T) {
 		}
 		firstEntry := latestEntry
 
-		expectedPolicyEntries := []*rsl.ReferenceEntry{latestEntry.(*rsl.ReferenceEntry)}
+		expectedPolicyEntries := []rsl.ReferenceUpdaterEntry{latestEntry.(*rsl.ReferenceEntry)}
 
 		searcher := newRegularSearcher(repo)
 
@@ -337,7 +337,7 @@ func TestCacheSearcher(t *testing.T) {
 		}
 		firstEntry := latestEntry
 
-		expectedPolicyEntries := []*rsl.ReferenceEntry{latestEntry.(*rsl.ReferenceEntry)}
+		expectedPolicyEntries := []rsl.ReferenceUpdaterEntry{latestEntry.(*rsl.ReferenceEntry)}
 
 		searcher := newCacheSearcher(repo, persistentCache)
 

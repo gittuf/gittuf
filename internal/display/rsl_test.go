@@ -22,7 +22,7 @@ func TestRSLLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry, _, err := rsl.GetLatestReferenceEntry(repo)
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestRSLLog(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entry, _, err = rsl.GetLatestReferenceEntry(repo)
+	entry, _, err = rsl.GetLatestReferenceUpdaterEntry(repo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -214,7 +214,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -227,7 +227,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -257,7 +257,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -270,7 +270,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,7 +299,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -312,7 +312,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -355,7 +355,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,7 +384,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, false)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, false)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
@@ -397,7 +397,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, _, err := rsl.GetLatestReferenceEntry(repo)
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -427,7 +427,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 
 		output := &bytes.Buffer{}
 		testWriter := &noopwritecloser{writer: output}
-		err = writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotationEntry}, true)
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, true)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})

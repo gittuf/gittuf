@@ -75,7 +75,7 @@ type Attestations struct {
 // LoadCurrentAttestations inspects the repository's attestations namespace and
 // loads the current attestations.
 func LoadCurrentAttestations(repo *gitinterface.Repository) (*Attestations, error) {
-	entry, _, err := rsl.GetLatestReferenceEntry(repo, rsl.ForReference(Ref))
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(Ref))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return nil, err
@@ -89,12 +89,12 @@ func LoadCurrentAttestations(repo *gitinterface.Repository) (*Attestations, erro
 
 // LoadAttestationsForEntry loads the repository's attestations for a particular
 // RSL entry for the attestations namespace.
-func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) (*Attestations, error) {
-	if entry.RefName != Ref {
+func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdaterEntry) (*Attestations, error) {
+	if entry.GetRefName() != Ref {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	attestationsRootTreeID, err := repo.GetCommitTreeID(entry.TargetID)
+	attestationsRootTreeID, err := repo.GetCommitTreeID(entry.GetTargetID())
 	if err != nil {
 		return nil, err
 	}

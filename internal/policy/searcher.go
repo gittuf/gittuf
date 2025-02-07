@@ -17,12 +17,12 @@ import (
 // searcher defines the interface for finding policy and attestation entries in
 // the RSL.
 type searcher interface {
-	FindFirstPolicyEntry() (*rsl.ReferenceEntry, error)
-	FindLatestPolicyEntry() (*rsl.ReferenceEntry, error)
-	FindPolicyEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
-	FindPolicyEntriesInRange(rsl.Entry, rsl.Entry) ([]*rsl.ReferenceEntry, error)
-	FindAttestationsEntryFor(rsl.Entry) (*rsl.ReferenceEntry, error)
-	FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error)
+	FindFirstPolicyEntry() (rsl.ReferenceUpdaterEntry, error)
+	FindLatestPolicyEntry() (rsl.ReferenceUpdaterEntry, error)
+	FindPolicyEntryFor(rsl.Entry) (rsl.ReferenceUpdaterEntry, error)
+	FindPolicyEntriesInRange(rsl.Entry, rsl.Entry) ([]rsl.ReferenceUpdaterEntry, error)
+	FindAttestationsEntryFor(rsl.Entry) (rsl.ReferenceUpdaterEntry, error)
+	FindLatestAttestationsEntry() (rsl.ReferenceUpdaterEntry, error)
 }
 
 func newSearcher(repo *gitinterface.Repository) searcher {
@@ -44,8 +44,8 @@ type regularSearcher struct {
 }
 
 // FindFirstPolicyEntry identifies the very first policy entry in the RSL.
-func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
-	entry, _, err := rsl.GetFirstReferenceEntryForRef(r.repo, PolicyRef)
+func (r *regularSearcher) FindFirstPolicyEntry() (rsl.ReferenceUpdaterEntry, error) {
+	entry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(r.repo, PolicyRef)
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// we don't have a policy entry yet
@@ -58,8 +58,8 @@ func (r *regularSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 }
 
 // FindLatestPolicyEntry returns the latest policy entry in the RSL.
-func (r *regularSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
-	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(PolicyRef))
+func (r *regularSearcher) FindLatestPolicyEntry() (rsl.ReferenceUpdaterEntry, error) {
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.repo, rsl.ForReference(PolicyRef))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// we don't have a policy entry
@@ -72,14 +72,14 @@ func (r *regularSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
 
 // FindPolicyEntryFor identifies the latest policy entry for the specified
 // entry.
-func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	// If the requested entry itself is for the policy ref, return as is
-	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == PolicyRef {
+	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == PolicyRef {
 		slog.Debug(fmt.Sprintf("Initial entry '%s' is for gittuf policy, setting that as current policy...", entry.GetID().String()))
 		return entry, nil
 	}
 
-	policyEntry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(entry.GetID()))
+	policyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(entry.GetID()))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			slog.Debug(fmt.Sprintf("No policy found before initial entry '%s'", entry.GetID().String()))
@@ -95,8 +95,8 @@ func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEnt
 
 // FindPolicyEntriesInRange returns all policy RSL entries in the specified
 // range. firstEntry and lastEntry are included if they are for the policy ref.
-func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
-	allPolicyEntries, _, err := rsl.GetReferenceEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef)
+func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]rsl.ReferenceUpdaterEntry, error) {
+	allPolicyEntries, _, err := rsl.GetReferenceUpdaterEntriesInRangeForRef(r.repo, firstEntry.GetID(), lastEntry.GetID(), PolicyRef)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +106,14 @@ func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Ent
 
 // FindAttestationsEntryFor identifies the latest attestations entry for the
 // specified entry.
-func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	// If the requested entry itself is for the attestations ref, return as is
-	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == attestations.Ref {
+	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == attestations.Ref {
 		slog.Debug(fmt.Sprintf("Initial entry '%s' is for attestations, setting that as current set of attestations...", entry.GetID().String()))
 		return entry, nil
 	}
 
-	attestationsEntry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(attestations.Ref), rsl.BeforeEntryID(entry.GetID()))
+	attestationsEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.repo, rsl.ForReference(attestations.Ref), rsl.BeforeEntryID(entry.GetID()))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// Attestations may not be used yet, they're not
@@ -130,8 +130,8 @@ func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.Refere
 
 // FindLatestAttestationsEntry returns the latest RSL entry for the attestations
 // reference.
-func (r *regularSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
-	entry, _, err := rsl.GetLatestReferenceEntry(r.repo, rsl.ForReference(attestations.Ref))
+func (r *regularSearcher) FindLatestAttestationsEntry() (rsl.ReferenceUpdaterEntry, error) {
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.repo, rsl.ForReference(attestations.Ref))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// we don't have an attestations entry
@@ -156,7 +156,7 @@ type cacheSearcher struct {
 }
 
 // FindFirstPolicyEntry identifies the very first policy entry in the RSL.
-func (c *cacheSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindFirstPolicyEntry() (rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		return c.searcher.FindFirstPolicyEntry()
 	}
@@ -166,14 +166,14 @@ func (c *cacheSearcher) FindFirstPolicyEntry() (*rsl.ReferenceEntry, error) {
 		return nil, ErrPolicyNotFound
 	}
 
-	entry, err := loadRSLReferenceEntry(c.repo, policyEntries[0].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[0].GetEntryID())
 	if err != nil {
 		return c.searcher.FindFirstPolicyEntry()
 	}
 	return entry, nil
 }
 
-func (c *cacheSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindLatestPolicyEntry() (rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		return c.searcher.FindLatestPolicyEntry()
 	}
@@ -183,7 +183,7 @@ func (c *cacheSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
 		return nil, ErrPolicyNotFound
 	}
 
-	entry, err := loadRSLReferenceEntry(c.repo, policyEntries[len(policyEntries)-1].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[len(policyEntries)-1].GetEntryID())
 	if err != nil {
 		return c.searcher.FindLatestPolicyEntry()
 	}
@@ -192,7 +192,7 @@ func (c *cacheSearcher) FindLatestPolicyEntry() (*rsl.ReferenceEntry, error) {
 
 // FindPolicyEntryFor identifies the latest policy entry for the specified
 // entry.
-func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		slog.Debug("No persistent cache found, falling back to regular searcher...")
 		return c.searcher.FindPolicyEntryFor(entry)
@@ -204,7 +204,7 @@ func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry
 		return c.searcher.FindPolicyEntryFor(entry)
 	}
 
-	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == PolicyRef {
+	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == PolicyRef {
 		slog.Debug("Requested entry is a policy entry, inserting into cache...")
 		c.persistentCache.InsertPolicyEntryNumber(entry.GetNumber(), entry.GetID())
 
@@ -216,7 +216,7 @@ func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry
 		return nil, ErrPolicyNotFound
 	}
 
-	policyEntry, err := loadRSLReferenceEntry(c.repo, policyEntryIndex.GetEntryID())
+	policyEntry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntryIndex.GetEntryID())
 	if err != nil {
 		return c.searcher.FindPolicyEntryFor(entry)
 	}
@@ -225,7 +225,7 @@ func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry
 
 // FindPolicyEntriesInRange returns all policy RSL entries in the specified
 // range. firstEntry and lastEntry are included if they are for the policy ref.
-func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry) ([]rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
 	}
@@ -235,11 +235,11 @@ func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry
 		return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
 	}
 
-	if firstEntry, isReferenceEntry := firstEntry.(*rsl.ReferenceEntry); isReferenceEntry && firstEntry.RefName == PolicyRef {
+	if firstEntry, isReferenceUpdaterEntry := firstEntry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && firstEntry.GetRefName() == PolicyRef {
 		slog.Debug("Requested first entry is a policy entry, inserting into cache...")
 		c.persistentCache.InsertPolicyEntryNumber(firstEntry.GetNumber(), firstEntry.GetID())
 	}
-	if lastEntry, isReferenceEntry := lastEntry.(*rsl.ReferenceEntry); isReferenceEntry && lastEntry.RefName == PolicyRef {
+	if lastEntry, isReferenceUpdaterEntry := lastEntry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && lastEntry.GetRefName() == PolicyRef {
 		slog.Debug("Requested last entry is a policy entry, inserting into cache...")
 		c.persistentCache.InsertPolicyEntryNumber(lastEntry.GetNumber(), lastEntry.GetID())
 	}
@@ -249,9 +249,9 @@ func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry
 		return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
 	}
 
-	entries := []*rsl.ReferenceEntry{}
+	entries := []rsl.ReferenceUpdaterEntry{}
 	for _, index := range policyIndices {
-		entry, err := loadRSLReferenceEntry(c.repo, index.GetEntryID())
+		entry, err := loadRSLReferenceUpdaterEntry(c.repo, index.GetEntryID())
 		if err != nil {
 			return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
 		}
@@ -263,7 +263,7 @@ func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry
 
 // FindAttestationsEntryFor identifies the latest attestations entry for the
 // specified entry.
-func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		slog.Debug("No persistent cache found, falling back to regular searcher...")
 		return c.searcher.FindAttestationsEntryFor(entry)
@@ -275,7 +275,7 @@ func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.Referenc
 		return c.searcher.FindAttestationsEntryFor(entry)
 	}
 
-	if entry, isReferenceEntry := entry.(*rsl.ReferenceEntry); isReferenceEntry && entry.RefName == attestations.Ref {
+	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == attestations.Ref {
 		slog.Debug("Requested entry is an attestations entry, inserting into cache...")
 		c.persistentCache.InsertAttestationEntryNumber(entry.GetNumber(), entry.GetID())
 
@@ -287,14 +287,14 @@ func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (*rsl.Referenc
 		return nil, attestations.ErrAttestationsNotFound
 	}
 
-	attestationsEntry, err := loadRSLReferenceEntry(c.repo, attestationsEntryIndex.GetEntryID())
+	attestationsEntry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntryIndex.GetEntryID())
 	if err != nil {
 		return c.searcher.FindAttestationsEntryFor(entry)
 	}
 	return attestationsEntry, nil
 }
 
-func (c *cacheSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, error) {
+func (c *cacheSearcher) FindLatestAttestationsEntry() (rsl.ReferenceUpdaterEntry, error) {
 	if c.persistentCache == nil {
 		return c.searcher.FindLatestAttestationsEntry()
 	}
@@ -304,7 +304,7 @@ func (c *cacheSearcher) FindLatestAttestationsEntry() (*rsl.ReferenceEntry, erro
 		return nil, attestations.ErrAttestationsNotFound
 	}
 
-	entry, err := loadRSLReferenceEntry(c.repo, attestationsEntries[len(attestationsEntries)-1].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntries[len(attestationsEntries)-1].GetEntryID())
 	if err != nil {
 		return c.searcher.FindLatestAttestationsEntry()
 	}
@@ -319,7 +319,7 @@ func newCacheSearcher(repo *gitinterface.Repository, persistentCache *cache.Pers
 	}
 }
 
-func loadRSLReferenceEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (*rsl.ReferenceEntry, error) {
+func loadRSLReferenceUpdaterEntry(repo *gitinterface.Repository, entryID gitinterface.Hash) (rsl.ReferenceUpdaterEntry, error) {
 	entryT, err := rsl.GetEntry(repo, entryID)
 	if err != nil {
 		return nil, err
