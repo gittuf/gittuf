@@ -2,6 +2,34 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.9.0
+
+### Added
+
+- Added a terminal UI (TUI) to enable managing gittuf policy interactively
+- Added global rules to set thresholds and prohibit force pushes to help set
+  security baselines in repositories with gittuf
+- Added workflows to support synchronizing/propagating policy and RSL changes
+  across multiple repositories
+- Added local persistent cache functionality to reduce the time taken for
+  verification of a repository after successful initial verification
+- Added functionality to set a repository's canonical location in gittuf
+  metadata
+- Added a control for RSL recording to skip checking for duplicates
+- Added the gittuf Augmentation Process (GAP) for formalizing changes to gittuf
+- Added color output for various gittuf logging flows
+- Added functionality to discard currently staged changes to policy
+- Added functionality to remove principals and keys no longer used by rules in
+  the metadata
+
+### Updated
+
+- Updated RSL printing to now use buffered output, improving performance
+- Improved testing coverage of `gitinterface`
+- Updated the design document for clarity and to reflect recent changes to
+  gittuf
+- Updated various dependencies and CI workflows
+
 ## v0.8.1
 
 - Fixed loading of legacy ECDSA key format
