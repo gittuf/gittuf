@@ -65,6 +65,15 @@ type Entry interface {
 	createCommitMessage(bool) (string, error)
 }
 
+// ReferenceUpdaterEntry represents RSL entry types that can record an update to
+// a Git reference. Some examples are the reference entry and the propagation
+// entry.
+type ReferenceUpdaterEntry interface {
+	Entry
+	GetRefName() string
+	GetTargetID() gitinterface.Hash
+}
+
 // ReferenceEntry represents a record of a reference state in the RSL. It
 // implements the Entry interface.
 type ReferenceEntry struct {
@@ -88,6 +97,14 @@ func NewReferenceEntry(refName string, targetID gitinterface.Hash) *ReferenceEnt
 
 func (e *ReferenceEntry) GetID() gitinterface.Hash {
 	return e.ID
+}
+
+func (e *ReferenceEntry) GetRefName() string {
+	return e.RefName
+}
+
+func (e *ReferenceEntry) GetTargetID() gitinterface.Hash {
+	return e.TargetID
 }
 
 // Commit creates a commit object in the RSL for the ReferenceEntry. The
@@ -418,6 +435,14 @@ func NewPropagationEntry(refName string, targetID gitinterface.Hash, upstreamRep
 
 func (e *PropagationEntry) GetID() gitinterface.Hash {
 	return e.ID
+}
+
+func (e *PropagationEntry) GetRefName() string {
+	return e.RefName
+}
+
+func (e *PropagationEntry) GetTargetID() gitinterface.Hash {
+	return e.TargetID
 }
 
 // Commit creates a commit object in the RSL for the PropagationEntry. The
