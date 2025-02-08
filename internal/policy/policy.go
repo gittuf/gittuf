@@ -754,7 +754,19 @@ func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 // The `migrate` parameter determines if the schema must be converted to a newer
 // version.
 func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
-	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
+	return loadRootMetadataFromEnvelope(s.RootEnvelope, migrate)
+}
+
+func (s *State) GetControllerRootMetadata(controllerName string, migrate bool) (tuf.RootMetadata, error) {
+	env, exists := s.ControllerRootEnvelopes[controllerName]
+	if !exists {
+		return nil, ErrControllerContentsNotPropagated
+	}
+	return loadRootMetadataFromEnvelope(env, migrate)
+}
+
+func loadRootMetadataFromEnvelope(env *sslibdsse.Envelope, migrate bool) (tuf.RootMetadata, error) {
+	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
@@ -882,6 +894,16 @@ func (s *State) preprocess() error {
 	}
 
 	s.globalRules = rootMetadata.GetGlobalRules()
+	for controllerName := range s.ControllerRootEnvelopes {
+		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName, false)
+		if err != nil {
+			return err
+		}
+		if s.globalRules == nil {
+			s.globalRules = []tuf.GlobalRule{}
+		}
+		s.globalRules = append(s.globalRules, controllerRootMetadata.GetGlobalRules()...)
+	}
 
 	if s.allPrincipals == nil {
 		s.allPrincipals = map[string]tuf.Principal{}
