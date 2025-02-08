@@ -712,6 +712,158 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Making repository controller...")
+	if err := rootMetadata.EnableController(); err != nil {
+		return err
+	}
+
+	commitMessage := "Make repository controller"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Disabling repository as controller...")
+	if err := rootMetadata.DisableController(); err != nil {
+		return err
+	}
+
+	commitMessage := "Disable repository as controller"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding controller repository...")
+	if err := rootMetadata.AddControllerRepository(repositoryName, repositoryLocation, initialRootPrincipals); err != nil {
+		return err
+	}
+
+	commitMessage := "Add controller repository"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+func (r *Repository) AddNetworkRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding network repository...")
+	if err := rootMetadata.AddNetworkRepository(repositoryName, repositoryLocation, initialRootPrincipals); err != nil {
+		return err
+	}
+
+	commitMessage := "Add network repository"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
 func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
