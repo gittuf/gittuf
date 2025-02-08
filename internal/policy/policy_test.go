@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadState(t *testing.T) {
@@ -307,6 +308,138 @@ func TestStateVerify(t *testing.T) {
 
 		err := state.Verify(testCtx)
 		assert.Nil(t, err)
+	})
+
+	t.Run("successful verification with multiple repositories", func(t *testing.T) {
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithOnlyRoot(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.stateEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.RootEnvelope = networkRootEnv
+		err = networkState.preprocess()
+		require.Nil(t, err)
+		err = networkState.Commit(networkRepository, "Initial policy\n", false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+		latestNetworkEntry, err := rsl.GetLatestEntry(networkRepository)
+		require.Nil(t, err)
+		networkState.stateEntry = latestNetworkEntry.(rsl.ReferenceUpdaterEntry)
+
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(networkRepository)
+		require.Nil(t, err)
+		state, err := loadStateForEntry(networkRepository, latestEntry.(rsl.ReferenceUpdaterEntry))
+		require.Nil(t, err)
+
+		err = state.Verify(testCtx)
+		assert.Nil(t, err)
+	})
+
+	t.Run("unsuccessful verification with multiple repositories due to mismatched keys", func(t *testing.T) {
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithOnlyRoot(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.stateEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))})
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.RootEnvelope = networkRootEnv
+		err = networkState.preprocess()
+		require.Nil(t, err)
+		err = networkState.Commit(networkRepository, "Initial policy\n", false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+		latestNetworkEntry, err := rsl.GetLatestEntry(networkRepository)
+		require.Nil(t, err)
+		networkState.stateEntry = latestNetworkEntry.(rsl.ReferenceUpdaterEntry)
+
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(networkRepository)
+		require.Nil(t, err)
+		state, err := loadStateForEntry(networkRepository, latestEntry.(rsl.ReferenceUpdaterEntry))
+		require.Nil(t, err)
+
+		err = state.Verify(testCtx)
+		assert.ErrorIs(t, err, ErrControllerMetadataNotVerified)
 	})
 }
 
