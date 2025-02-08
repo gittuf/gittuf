@@ -23,8 +23,10 @@ Tools for gittuf's root of trust
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
+* [gittuf trust add-controller-repository](gittuf_trust_add-controller-repository.md)	 - Add a controller repository
 * [gittuf trust add-github-app](gittuf_trust_add-github-app.md)	 - Add GitHub app to gittuf root of trust
 * [gittuf trust add-global-rule](gittuf_trust_add-global-rule.md)	 - Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
+* [gittuf trust add-network-repository](gittuf_trust_add-network-repository.md)	 - Add a network repository
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
 * [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
@@ -33,6 +35,7 @@ Tools for gittuf's root of trust
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
+* [gittuf trust make-controller](gittuf_trust_make-controller.md)	 - Make current repository a controller
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
