@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -203,16 +204,61 @@ func TestLoadState(t *testing.T) {
 		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry))
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
+
+	t.Run("successful load with initial root principals", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}
+		loadedState, err := LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		assert.Nil(t, err)
+
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("expected failure with initial root principals", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
+		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
 }
 
 func TestLoadCurrentState(t *testing.T) {
-	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	t.Run("without initial keys", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
-	if err != nil {
-		t.Error(err)
-	}
-	assertStatesEqual(t, state, loadedState)
+		loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef)
+		assert.Nil(t, err)
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("with initial keys", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}
+		loadedState, err := LoadCurrentState(context.Background(), repo, PolicyRef, policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		assert.Nil(t, err)
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("with wrong initial keys", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
+		_, err := LoadCurrentState(context.Background(), repo, PolicyRef, policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
 }
 
 func TestLoadFirstState(t *testing.T) {
