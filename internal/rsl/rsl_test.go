@@ -754,6 +754,129 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, expectedEntry.GetID(), entry.GetID())
 		assert.Nil(t, annotations)
 	})
+
+	t.Run("success with propagation entry for repository", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamRepository := "http://git.example.com/repository"
+		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsPropagationEntryForRepository(upstreamRepository))
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntry.GetID(), entry.GetID())
+	})
+
+	t.Run("expected failure with propagation entry for repository", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamRepository := "http://git.example.com/repository"
+		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		otherUpstreamRepository := "http://example.com/git/repository"
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsPropagationEntryForRepository(otherUpstreamRepository))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		assert.Nil(t, entry)
+	})
+
+	t.Run("success with propagation entry for repository and ref", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamRepository := "http://git.example.com/repository"
+		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsPropagationEntryForRepository(upstreamRepository), ForReference("refs/heads/feature"))
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntry.GetID(), entry.GetID())
+	})
+
+	t.Run("success with isReferenceEntry", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamRepository := "http://git.example.com/repository"
+		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsReferenceEntry())
+		assert.Nil(t, err)
+		assert.Equal(t, latestEntry.GetID(), entry.GetID())
+	})
+
+	t.Run("expected failure with isReferenceEntry", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		upstreamRepository := "http://git.example.com/repository"
+		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsReferenceEntry())
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		assert.Nil(t, entry)
+	})
+
+	t.Run("invalid options, using both IsReferenceEntry and IsPropagationEntryForRepository", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, IsReferenceEntry(), IsPropagationEntryForRepository("http://example.com/git/repository"))
+		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceUpdaterEntryOptions)
+		assert.Nil(t, entry)
+	})
 }
 
 func TestGetEntry(t *testing.T) {

@@ -686,6 +686,10 @@ func GetLatestReferenceUpdaterEntry(repo *gitinterface.Repository, opts ...GetLa
 		slog.Debug(fmt.Sprintf("Cannot search for entry before entry number %d and until entry number %d, aborting...", options.BeforeEntryNumber, options.UntilEntryNumber))
 		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
+	if options.IsReferenceEntry && options.IsPropagationEntryForRepository != "" {
+		slog.Debug("Found options to require reference entry and propagation entry, aborting...")
+		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
+	}
 
 	allAnnotations := []*AnnotationEntry{}
 
@@ -763,6 +767,13 @@ func GetLatestReferenceUpdaterEntry(repo *gitinterface.Repository, opts ...GetLa
 					// SkippedBy ensures only the applicable
 					// annotations that refer to the entry
 					// are used
+					matchesConditions = false
+				}
+			}
+
+			if matchesConditions && options.IsPropagationEntryForRepository != "" {
+				propagationEntry, isPropagationEntry := iterator.(*PropagationEntry)
+				if !isPropagationEntry || propagationEntry.UpstreamRepository != options.IsPropagationEntryForRepository {
 					matchesConditions = false
 				}
 			}
