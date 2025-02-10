@@ -108,18 +108,34 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 		}
 	}
 
-	applets, err := targetsMetadata.GetHooks(stage)
+	hooks, err := targetsMetadata.GetHooks(stage)
 	if err != nil {
 		return err
 	}
 
-	exitCodes := make([]int, 0, len(applets))
-	for _, applet := range applets {
-		exitCode, err := r.executeLua(stage, applet)
-		exitCodes = append(exitCodes, exitCode) // nolint:staticcheck
+	applets := []tuf.Applet{}
+
+	for _, hook := range hooks {
+		principals := targetsMetadata.GetPrincipals()
+		principalIDs := hook.GetPrincipalIDs()
+		for _, principalID := range principalIDs.Contents() {
+			principal := principals[principalID]
+			keys := principal.Keys()
+			for _, key := range keys {
+				if key.KeyID == keyID {
+					applets = append(applets, hook)
+				}
+			}
+		}
+	}
+
+	exitCodes := make([]int, len(applets))
+	for _, hook := range applets {
+		exitCode, err := r.executeLua(stage, hook)
 		if err != nil {
 			return err
 		}
+		exitCodes = append(exitCodes, exitCode) // nolint:staticcheck
 	}
 
 	if attest {
