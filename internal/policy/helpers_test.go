@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -50,6 +51,12 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 	if err := Apply(testCtx, repo, false); err != nil {
 		t.Fatal(err)
 	}
+
+	latestEntry, err := rsl.GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.stateEntry = latestEntry.(rsl.ReferenceUpdaterEntry)
 
 	return repo, state
 }

@@ -239,7 +239,7 @@ func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, 
 	if err != nil {
 		return false, err
 	}
-	state, err := LoadState(ctx, v.repo, initialPolicyEntry)
+	state, err := LoadState(ctx, v.repo, initialPolicyEntry, nil)
 	if err != nil {
 		return false, err
 	}
@@ -328,7 +328,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.GetID().String()))
 	initialPolicyEntry, err := v.searcher.FindPolicyEntryFor(firstEntry)
 	if err == nil {
-		state, err := LoadState(ctx, v.repo, initialPolicyEntry)
+		state, err := LoadState(ctx, v.repo, initialPolicyEntry, nil)
 		if err != nil {
 			return err
 		}

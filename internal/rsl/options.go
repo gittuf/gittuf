@@ -18,7 +18,9 @@ type GetLatestReferenceUpdaterEntryOptions struct {
 
 	NonGittuf bool
 
-	IsReferenceEntry bool
+	IsReferenceEntry                bool
+	IsPropagationEntryForRepository string
+	IsPropagationEntryForReference  string
 }
 
 type GetLatestReferenceUpdaterEntryOption func(*GetLatestReferenceUpdaterEntryOptions)
@@ -90,5 +92,11 @@ func ForNonGittufReference() GetLatestReferenceUpdaterEntryOption {
 func IsReferenceEntry() GetLatestReferenceUpdaterEntryOption {
 	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.IsReferenceEntry = true
+	}
+}
+
+func IsPropagationEntryForRepository(repositoryLocation string) GetLatestReferenceUpdaterEntryOption {
+	return func(o *GetLatestReferenceUpdaterEntryOptions) {
+		o.IsPropagationEntryForRepository = repositoryLocation
 	}
 }

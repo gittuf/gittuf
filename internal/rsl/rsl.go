@@ -756,6 +756,13 @@ func GetLatestReferenceUpdaterEntry(repo *gitinterface.Repository, opts ...GetLa
 				}
 			}
 
+			if matchesConditions && options.IsPropagationEntryForRepository != "" {
+				propagationEntry, isPropagationEntry := iterator.(*PropagationEntry)
+				if !isPropagationEntry || propagationEntry.UpstreamRepository != options.IsPropagationEntryForRepository {
+					matchesConditions = false
+				}
+			}
+
 			// Only reference entry can be skipped
 			referenceEntry, isReferenceEntry := iterator.(*ReferenceEntry)
 			if isReferenceEntry {

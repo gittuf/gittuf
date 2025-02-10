@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path"
 	"reflect"
 	"sort"
@@ -47,20 +48,25 @@ const (
 )
 
 var (
-	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
-	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
-	ErrPolicyNotFound             = errors.New("cannot find policy")
-	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
-	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrMetadataNotFound                = errors.New("unable to find requested metadata file; has it been initialized?")
+	ErrDanglingDelegationMetadata      = errors.New("unreachable targets metadata found")
+	ErrPolicyNotFound                  = errors.New("cannot find policy")
+	ErrUnableToMatchRootKeys           = errors.New("unable to match root public keys, gittuf policy is in a broken state")
+	ErrNotAncestor                     = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrControllerContentsNotPropagated = errors.New("expected controller repository root metadata not found")
+	ErrControllerMetadataNotVerified   = errors.New("unable to verify controller repository metadata")
 )
 
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	RootEnvelope        *sslibdsse.Envelope
-	TargetsEnvelope     *sslibdsse.Envelope
-	DelegationEnvelopes map[string]*sslibdsse.Envelope
-	RootPublicKeys      []tuf.Principal
+	RootEnvelope            *sslibdsse.Envelope
+	TargetsEnvelope         *sslibdsse.Envelope
+	DelegationEnvelopes     map[string]*sslibdsse.Envelope
+	ControllerRootEnvelopes map[string]*sslibdsse.Envelope
+	RootPublicKeys          []tuf.Principal
+
+	stateEntry rsl.ReferenceUpdaterEntry
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
@@ -78,7 +84,7 @@ type State struct {
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
 // policy-staging ref, that entry is returned with no verification.
-func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry) (*State, error) {
+func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry, initialRootPrincipals []tuf.Principal) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
 	// before the entry. This is why we don't just load the state and return
@@ -102,9 +108,22 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 	}
 
 	if firstPolicyEntry.GetID().Equal(requestedEntry.GetID()) {
-		slog.Debug("Requested policy's entry is the same as first policy entry, loading it without further verification...")
-		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
-		return loadStateForEntry(repo, requestedEntry)
+		slog.Debug("Requested policy's entry is the same as first policy entry, loading it...")
+		state, err := loadStateForEntry(repo, requestedEntry)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(initialRootPrincipals) != 0 {
+			slog.Debug(fmt.Sprintf("Verifying root of trust signatures for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+			if err := verifyRootMetadataSignatures(ctx, repo, state.RootEnvelope, initialRootPrincipals); err != nil {
+				return nil, err
+			}
+		} else {
+			slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+		}
+
+		return state, nil
 	}
 
 	// check if firstPolicyEntry is **after** requested entry
@@ -131,14 +150,20 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
-	// We load the very first policy entry with no additional verification,
-	// the root keys are implicitly trusted
+	// We load the very first policy entry.
 	initialPolicyState, err := loadStateForEntry(repo, firstPolicyEntry)
 	if err != nil {
 		return nil, err
 	}
+	if len(initialRootPrincipals) != 0 {
+		slog.Debug(fmt.Sprintf("Verifying root of trust signatures for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+		if err := verifyRootMetadataSignatures(ctx, repo, initialPolicyState.RootEnvelope, initialRootPrincipals); err != nil {
+			return nil, err
+		}
+	} else {
+		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+	}
 
-	slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
 	verifiedState := initialPolicyState
 	for _, entry := range allPolicyEntries[1:] {
 		if entry.GetRefName() != PolicyRef {
@@ -190,7 +215,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, entry)
+	return LoadState(ctx, repo, entry, nil)
 }
 
 // LoadFirstState returns the State corresponding to the repository's first
@@ -201,7 +226,7 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository) (*State,
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, firstEntry)
+	return LoadState(ctx, repo, firstEntry, nil)
 }
 
 // GetStateForCommit scans the RSL to identify the first time a commit was seen
@@ -224,7 +249,7 @@ func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commi
 		return nil, err
 	}
 
-	return LoadState(ctx, repo, commitPolicyEntry)
+	return LoadState(ctx, repo, commitPolicyEntry, nil)
 }
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
@@ -420,78 +445,129 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check top-level targets
-	if s.TargetsEnvelope == nil {
-		return nil
-	}
-
-	targetsVerifier, err := s.getTargetsVerifier()
-	if err != nil {
-		return err
-	}
-
-	if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.TargetsEnvelope); err != nil {
-		return err
-	}
-
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
-	if err != nil {
-		return err
-	}
-
-	// Check reachable delegations
-	reachedDelegations := map[string]bool{}
-	for delegatedRoleName := range s.DelegationEnvelopes {
-		reachedDelegations[delegatedRoleName] = false
-	}
-
-	delegationsQueue := targetsMetadata.GetRules()
-	delegationKeys := targetsMetadata.GetPrincipals()
-	for {
-		// The last entry in the queue is always the allow rule, which we don't
-		// process during DFS
-		if len(delegationsQueue) <= 1 {
-			break
+	if s.TargetsEnvelope != nil {
+		targetsVerifier, err := s.getTargetsVerifier()
+		if err != nil {
+			return err
 		}
 
-		delegation := delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
+		if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.TargetsEnvelope); err != nil {
+			return err
+		}
 
-		if s.HasTargetsRole(delegation.ID()) {
-			reachedDelegations[delegation.ID()] = true
+		targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
+		if err != nil {
+			return err
+		}
 
-			env := s.DelegationEnvelopes[delegation.ID()]
+		// Check reachable delegations
+		reachedDelegations := map[string]bool{}
+		for delegatedRoleName := range s.DelegationEnvelopes {
+			reachedDelegations[delegatedRoleName] = false
+		}
 
-			principals := []tuf.Principal{}
-			for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-				principals = append(principals, delegationKeys[principalID])
+		delegationsQueue := targetsMetadata.GetRules()
+		delegationKeys := targetsMetadata.GetPrincipals()
+		for {
+			// The last entry in the queue is always the allow rule, which we don't
+			// process during DFS
+			if len(delegationsQueue) <= 1 {
+				break
 			}
 
-			verifier := &SignatureVerifier{
-				repository: s.repository,
-				name:       delegation.ID(),
-				principals: principals,
-				threshold:  delegation.GetThreshold(),
+			delegation := delegationsQueue[0]
+			delegationsQueue = delegationsQueue[1:]
+
+			if s.HasTargetsRole(delegation.ID()) {
+				reachedDelegations[delegation.ID()] = true
+
+				env := s.DelegationEnvelopes[delegation.ID()]
+
+				principals := []tuf.Principal{}
+				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+					principals = append(principals, delegationKeys[principalID])
+				}
+
+				verifier := &SignatureVerifier{
+					repository: s.repository,
+					name:       delegation.ID(),
+					principals: principals,
+					threshold:  delegation.GetThreshold(),
+				}
+
+				if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
+					return err
+				}
+
+				delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
+				if err != nil {
+					return err
+				}
+
+				delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
+				for keyID, key := range delegatedMetadata.GetPrincipals() {
+					delegationKeys[keyID] = key
+				}
+			}
+		}
+
+		for _, reached := range reachedDelegations {
+			if !reached {
+				return ErrDanglingDelegationMetadata
+			}
+		}
+	}
+
+	// Check controller root metadata
+	if len(s.ControllerRootEnvelopes) != 0 {
+		controllerRepositories := rootMetadata.GetControllerRepositories()
+		for _, controllerRepositoryDetail := range controllerRepositories {
+			controllerName := controllerRepositoryDetail.GetName()
+			if _, has := s.ControllerRootEnvelopes[controllerName]; !has {
+				return ErrControllerContentsNotPropagated
 			}
 
-			if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
-				return err
+			tmpDir, err := os.MkdirTemp("", "gittuf-controller-")
+			if err != nil {
+				return fmt.Errorf("unable to clone controller repository: %w", err)
 			}
 
-			delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
+			controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
+			if err != nil {
+				return fmt.Errorf("unable to clone controller repository: %w", err)
+			}
+
+			// We need to LoadState() the state from which the root is derived
+			// For that, we need to know when it was propagated into this repository
+			upstreamEntryID := gitinterface.ZeroHash
+			if entry, isPropagationEntry := s.stateEntry.(*rsl.PropagationEntry); isPropagationEntry {
+				// Check this entry
+				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
+					upstreamEntryID = entry.UpstreamEntryID
+				}
+			}
+			if upstreamEntryID.IsZero() {
+				// not found yet
+				// find propagation entry in local repo
+				propagationEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(s.repository, rsl.BeforeEntryID(s.stateEntry.GetID()), rsl.IsPropagationEntryForRepository(controllerRepositoryDetail.GetLocation()), rsl.ForReference(PolicyRef))
+				if err != nil {
+					return fmt.Errorf("%w, unable to verify controller repository: %w", ErrControllerMetadataNotVerified, err)
+				}
+				// We know propagationEntry is of this type because of the rsl.IsPropagationEntryForReference opt
+				upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
+			}
+
+			upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
 			if err != nil {
 				return err
 			}
 
-			delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
-			for keyID, key := range delegatedMetadata.GetPrincipals() {
-				delegationKeys[keyID] = key
+			// LoadState does full verification up until the requested entry
+			if _, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), controllerRepositoryDetail.GetInitialRootPrincipals()); err != nil {
+				return fmt.Errorf("%w, unable to verify root of trust for controller '%s': %w", ErrControllerMetadataNotVerified, controllerName, err)
 			}
-		}
-	}
 
-	for _, reached := range reachedDelegations {
-		if !reached {
-			return ErrDanglingDelegationMetadata
+			// TODO: verify git tree ID in upstream matches propagated
 		}
 	}
 
@@ -531,6 +607,21 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		}
 
 		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(path.Join(metadataTreeEntryName, name+".json"), blobID))
+	}
+
+	for controllerName, env := range s.ControllerRootEnvelopes {
+		// tree entry name should be "<controller-prefix>/<controller-name>/metadata/<file>"
+		envContents, err := json.Marshal(env)
+		if err != nil {
+			return err
+		}
+
+		blobID, err := repo.WriteBlob(envContents)
+		if err != nil {
+			return err
+		}
+
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(path.Join(tuf.GittufControllerPrefix, controllerName, metadataTreeEntryName, "root.json"), blobID))
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
@@ -663,7 +754,19 @@ func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 // The `migrate` parameter determines if the schema must be converted to a newer
 // version.
 func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
-	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
+	return loadRootMetadataFromEnvelope(s.RootEnvelope, migrate)
+}
+
+func (s *State) GetControllerRootMetadata(controllerName string, migrate bool) (tuf.RootMetadata, error) {
+	env, exists := s.ControllerRootEnvelopes[controllerName]
+	if !exists {
+		return nil, ErrControllerContentsNotPropagated
+	}
+	return loadRootMetadataFromEnvelope(env, migrate)
+}
+
+func loadRootMetadataFromEnvelope(env *sslibdsse.Envelope, migrate bool) (tuf.RootMetadata, error) {
+	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
@@ -791,6 +894,16 @@ func (s *State) preprocess() error {
 	}
 
 	s.globalRules = rootMetadata.GetGlobalRules()
+	for controllerName := range s.ControllerRootEnvelopes {
+		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName, false)
+		if err != nil {
+			return err
+		}
+		if s.globalRules == nil {
+			s.globalRules = []tuf.GlobalRule{}
+		}
+		s.globalRules = append(s.globalRules, controllerRootMetadata.GetGlobalRules()...)
+	}
 
 	if s.allPrincipals == nil {
 		s.allPrincipals = map[string]tuf.Principal{}
@@ -943,7 +1056,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, err
 	}
 
-	state := &State{repository: repo}
+	state := &State{repository: repo, stateEntry: entry}
 
 	for name, blobID := range allTreeEntries {
 		contents, err := repo.ReadBlob(blobID)
@@ -954,7 +1067,8 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		// We have this conditional because once upon a time we used to store
 		// the root keys on disk as well; now we just get them from the root
 		// metadata file. We ignore the keys on disk in the old policy states.
-		if strings.HasPrefix(name, metadataTreeEntryName+"/") {
+		switch {
+		case strings.HasPrefix(name, metadataTreeEntryName+"/"):
 			env := &sslibdsse.Envelope{}
 			if err := json.Unmarshal(contents, env); err != nil {
 				return nil, err
@@ -975,6 +1089,27 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 
 				state.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
 			}
+		case strings.HasPrefix(name, tuf.GittufControllerPrefix+"/"):
+			// name is "<controller-prefix>/<controller-name>/metadata/<file>"
+			name = strings.TrimPrefix(name, tuf.GittufControllerPrefix+"/")
+			// now name should be in "<controller-name>/metadata/<file>" scheme
+			// only load root.json from the controller, don't inherit from its controllers
+			// TODO: work out how this should be!
+			split := strings.Split(name, "/")
+			controllerName := split[0]
+			if name != fmt.Sprintf("%s/%s/%s.json", controllerName, metadataTreeEntryName, RootRoleName) {
+				continue
+			}
+
+			env := &sslibdsse.Envelope{}
+			if err := json.Unmarshal(contents, env); err != nil {
+				return nil, err
+			}
+
+			if state.ControllerRootEnvelopes == nil {
+				state.ControllerRootEnvelopes = map[string]*sslibdsse.Envelope{}
+			}
+			state.ControllerRootEnvelopes[controllerName] = env
 		}
 	}
 
@@ -1020,4 +1155,20 @@ func verifyRootKeysMatch(keys1, keys2 []tuf.Principal) bool {
 	})
 
 	return reflect.DeepEqual(keys1, keys2)
+}
+
+func verifyRootMetadataSignatures(ctx context.Context, repo *gitinterface.Repository, env *sslibdsse.Envelope, initialRootPrincipals []tuf.Principal) error {
+	if len(initialRootPrincipals) != 0 {
+		verifier := &SignatureVerifier{
+			repository: repo,
+			name:       "initial-root-verifier",
+			principals: initialRootPrincipals,
+			threshold:  len(initialRootPrincipals),
+		}
+		if _, err := verifier.Verify(ctx, nil, env); err != nil {
+			return fmt.Errorf("failed to verify initial root metadata: %w", err)
+		}
+	}
+
+	return nil
 }
