@@ -723,6 +723,52 @@ func (p *PropagationDirective) GetDownstreamPath() string {
 	return p.DownstreamPath
 }
 
+//setter added to update exsisting directive
+
+func (p *PropagationDirective) SetUpstreamRepository(upstreamRepository string) {
+	p.UpstreamRepository = upstreamRepository
+}
+
+func (p *PropagationDirective) SetUpstreamReference(upstreamReference string) {
+	p.UpstreamReference = upstreamReference
+}
+
+func (p *PropagationDirective) SetDownstreamReference(downstreamReference string) {
+	p.DownstreamReference = downstreamReference
+}
+
+func (p *PropagationDirective) SetDownstreamPath(downstreamPath string) {
+	p.DownstreamPath = downstreamPath
+}
+
+// Updatepropagation checks if there is a duplicate or update and deal with that
+func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
+
+	//find if there is a duplicate(exact same) or update(same name, different in other)
+	// in the slice in linear search, then update the found propagation
+	for i := range r.Propagations {
+		if r.Propagations[i].GetName() == directive.GetName() {
+			if r.Propagations[i].GetUpstreamRepository() != directive.GetUpstreamRepository() {
+				r.Propagations[i].SetUpstreamRepository(directive.GetUpstreamRepository())
+			}
+			if r.Propagations[i].GetUpstreamReference() != directive.GetUpstreamReference() {
+				r.Propagations[i].SetUpstreamReference(directive.GetUpstreamReference())
+			}
+			if r.Propagations[i].GetDownstreamReference() != directive.GetDownstreamReference() {
+				r.Propagations[i].SetDownstreamReference(directive.GetDownstreamReference())
+			}
+			if r.Propagations[i].GetDownstreamPath() != directive.GetDownstreamPath() {
+				r.Propagations[i].SetDownstreamPath(directive.GetDownstreamPath())
+			}
+			return nil
+		}
+	}
+
+	//if the directive is new, call add propagation directive to deal with it
+	r.AddPropagationDirective(directive)
+	return nil
+}
+
 func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
 	return &PropagationDirective{
 		Name:                name,
