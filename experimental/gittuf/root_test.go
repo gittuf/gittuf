@@ -41,11 +41,11 @@ func TestInitializeRoot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+		assert.Equal(t, key.KeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 
 		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
-		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
+		_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
 		assert.Nil(t, err)
 	})
 
@@ -120,12 +120,10 @@ func TestAddRootKey(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
-	assert.Equal(t, 2, len(state.RootPublicKeys))
-
+	assert.Equal(t, originalKeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 	assert.Equal(t, set.NewSetFromItems(originalKeyID, newRootKey.KeyID), getRootPrincipalIDs(t, rootMetadata))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -150,8 +148,6 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// We should have no additions as we tried to add the same key
-	assert.Equal(t, 1, len(state.RootPublicKeys))
 	rootPrincipals, err := rootMetadata.GetRootPrincipals()
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(rootPrincipals))
@@ -175,9 +171,8 @@ func TestRemoveRootKey(t *testing.T) {
 	rootPrincipalIDs := getRootPrincipalIDs(t, rootMetadata)
 	assert.True(t, rootPrincipalIDs.Has(rootKey.KeyID))
 	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
-	assert.Equal(t, 2, len(state.RootPublicKeys))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
 	newSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
@@ -199,9 +194,8 @@ func TestRemoveRootKey(t *testing.T) {
 	rootPrincipalIDs = getRootPrincipalIDs(t, rootMetadata)
 	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
 	assert.Equal(t, 1, rootPrincipalIDs.Len())
-	assert.Equal(t, 1, len(state.RootPublicKeys))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
 	assert.Nil(t, err)
 }
 
@@ -221,11 +215,11 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
-	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+	assert.Equal(t, key.KeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
 	assert.True(t, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -261,7 +255,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.True(t, targetsPrincipalIDs.Has(rootKey.KeyID))
 	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
@@ -279,7 +273,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 
 	targetsPrincipalIDs = getPrimaryRuleFilePrincipalIDs(t, rootMetadata)
 	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -306,7 +300,7 @@ func TestAddGitHubApp(t *testing.T) {
 	}
 	assert.Equal(t, key, appPrincipals[0])
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -337,7 +331,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	}
 	assert.Equal(t, key, appPrincipals[0])
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveGitHubApp(testCtx, sv, false)
@@ -358,7 +352,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 	assert.Empty(t, appPrincipals)
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -406,7 +400,7 @@ func TestTrustGitHubApp(t *testing.T) {
 		assert.Nil(t, err)
 
 		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
-		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+		_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 		assert.Nil(t, err)
 
 		// Test if we can trust again if already trusted
@@ -446,7 +440,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.UntrustGitHubApp(testCtx, sv, false)
@@ -461,7 +455,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -594,7 +588,7 @@ func TestSignRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
+	assert.Equal(t, 2, len(state.Metadata.RootEnvelope.Signatures))
 }
 
 func TestAddGlobalRuleThreshold(t *testing.T) {

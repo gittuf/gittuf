@@ -67,12 +67,12 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		if state.DelegationEnvelopes == nil {
-			state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+		if state.Metadata.DelegationEnvelopes == nil {
+			state.Metadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
 		}
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Initialize policy '%s'", targetsRoleName)
@@ -144,9 +144,9 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add rule '%s' to policy '%s'", ruleName, targetsRoleName)
@@ -213,9 +213,9 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Update rule '%s' in policy '%s'", ruleName, targetsRoleName)
@@ -273,9 +273,9 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Reorder rules in policy '%s'", targetsRoleName)
@@ -338,9 +338,9 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
@@ -409,9 +409,9 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add principals to policy '%s'\n%s", targetsRoleName, principalIDs)
@@ -468,9 +468,9 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Remove principal from policy '%s'\n%s", targetsRoleName, principalID)
@@ -506,9 +506,9 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 
 	var env *sslibdsse.Envelope
 	if targetsRoleName == policy.TargetsRoleName {
-		env = state.TargetsEnvelope
+		env = state.Metadata.TargetsEnvelope
 	} else {
-		env = state.DelegationEnvelopes[targetsRoleName]
+		env = state.Metadata.DelegationEnvelopes[targetsRoleName]
 	}
 
 	slog.Debug(fmt.Sprintf("Signing rule file using '%s'...", keyID))
@@ -518,9 +518,9 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to policy '%s'", keyID, targetsRoleName)

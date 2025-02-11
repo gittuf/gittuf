@@ -344,5 +344,5 @@ func TestSignTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, len(state.TargetsEnvelope.Signatures))
+	assert.Equal(t, 2, len(state.Metadata.TargetsEnvelope.Signatures))
 }

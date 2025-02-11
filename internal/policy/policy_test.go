@@ -61,7 +61,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 
 		if err := state.Commit(repo, "", false); err != nil {
 			t.Fatal(err)
@@ -86,7 +86,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 
 		if err := state.Commit(repo, "", false); err != nil {
 			t.Fatal(err)
@@ -150,7 +150,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 
 		if err := state.Commit(repo, "", false); err != nil {
 			t.Fatal(err)
@@ -177,7 +177,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 
 		if err := state.Commit(repo, "", false); err != nil {
 			t.Fatal(err)
@@ -291,7 +291,7 @@ func TestLoadFirstState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondState.TargetsEnvelope = targetsEnv
+	secondState.Metadata.TargetsEnvelope = targetsEnv
 	if err := secondState.Commit(repo, "Second state", false); err != nil {
 		t.Fatal(err)
 	}
@@ -328,15 +328,6 @@ func TestStateVerify(t *testing.T) {
 
 		err := state.Verify(testCtx)
 		assert.Nil(t, err)
-	})
-
-	t.Run("only root, remove root keys", func(t *testing.T) {
-		t.Parallel()
-		state := createTestStateWithOnlyRoot(t)
-
-		state.RootPublicKeys = nil
-		err := state.Verify(testCtx)
-		assert.ErrorIs(t, err, ErrUnableToMatchRootKeys)
 	})
 
 	t.Run("with policy", func(t *testing.T) {
@@ -519,7 +510,7 @@ func TestGetStateForCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secondState.TargetsEnvelope = targetsEnv
+	secondState.Metadata.TargetsEnvelope = targetsEnv
 	if err := secondState.Commit(repo, "Second state", false); err != nil {
 		t.Fatal(err)
 	}
@@ -587,7 +578,7 @@ func TestApply(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state.RootEnvelope = rootEnv
+	state.Metadata.RootEnvelope = rootEnv
 
 	if err := state.Commit(repo, "Added target key to root", false); err != nil {
 		t.Fatal(err)
@@ -656,7 +647,7 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 
 		if err := state.Commit(repo, "", false); err != nil {
 			t.Fatal(err)
@@ -723,15 +714,14 @@ func TestDiscard(t *testing.T) {
 func assertStatesEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
-	assert.Equal(t, stateA.RootEnvelope, stateB.RootEnvelope)
-	assert.Equal(t, stateA.TargetsEnvelope, stateB.TargetsEnvelope)
-	assert.Equal(t, stateA.DelegationEnvelopes, stateB.DelegationEnvelopes)
-	assert.Equal(t, stateA.RootPublicKeys, stateB.RootPublicKeys)
+	assert.Equal(t, stateA.Metadata.RootEnvelope, stateB.Metadata.RootEnvelope)
+	assert.Equal(t, stateA.Metadata.TargetsEnvelope, stateB.Metadata.TargetsEnvelope)
+	assert.Equal(t, stateA.Metadata.DelegationEnvelopes, stateB.Metadata.DelegationEnvelopes)
 }
 
 func assertStatesNotEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
 	// at least one of these has to be different
-	assert.True(t, assert.NotEqual(t, stateA.RootEnvelope, stateB.RootEnvelope) || assert.NotEqual(t, stateA.TargetsEnvelope, stateB.TargetsEnvelope) || assert.NotEqual(t, stateA.DelegationEnvelopes, stateB.DelegationEnvelopes) || assert.NotEqual(t, stateA.RootPublicKeys, stateB.RootPublicKeys))
+	assert.True(t, assert.NotEqual(t, stateA.Metadata.RootEnvelope, stateB.Metadata.RootEnvelope) || assert.NotEqual(t, stateA.Metadata.TargetsEnvelope, stateB.Metadata.TargetsEnvelope) || assert.NotEqual(t, stateA.Metadata.DelegationEnvelopes, stateB.Metadata.DelegationEnvelopes))
 }
