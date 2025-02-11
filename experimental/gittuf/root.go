@@ -674,6 +674,52 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
+func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating propagation directive...")
+	var directive tuf.PropagationDirective
+	switch rootMetadata.(type) {
+	case *tufv01.RootMetadata:
+		directive = tufv01.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+	case *tufv02.RootMetadata:
+		directive = tufv02.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+	}
+
+	if err := rootMetadata.UpdatePropagationDirective(directive); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Update propagation directive '%s' in root metadata", directiveName)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
 func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
