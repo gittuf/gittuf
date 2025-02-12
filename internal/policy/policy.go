@@ -475,79 +475,77 @@ func (s *State) Verify(ctx context.Context) error {
 		}
 	}
 
-	// Check top-level targets
-	if s.Metadata.TargetsEnvelope == nil {
-		return nil
-	}
-
-	targetsVerifier, err := s.getTargetsVerifier()
-	if err != nil {
-		return err
-	}
-
-	if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.TargetsEnvelope); err != nil {
-		return err
-	}
-
-	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
-	if err != nil {
-		return err
-	}
-
-	// Check reachable delegations
-	reachedDelegations := map[string]bool{}
-	for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
-		reachedDelegations[delegatedRoleName] = false
-	}
-
-	delegationsQueue := targetsMetadata.GetRules()
-	delegationKeys := targetsMetadata.GetPrincipals()
-	for {
-		// The last entry in the queue is always the allow rule, which we don't
-		// process during DFS
-		if len(delegationsQueue) <= 1 {
-			break
+	// Check top-level targets and delegations
+	if s.Metadata.TargetsEnvelope != nil {
+		targetsVerifier, err := s.getTargetsVerifier()
+		if err != nil {
+			return err
 		}
 
-		delegation := delegationsQueue[0]
-		delegationsQueue = delegationsQueue[1:]
+		if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.TargetsEnvelope); err != nil {
+			return err
+		}
 
-		if s.HasTargetsRole(delegation.ID()) {
-			reachedDelegations[delegation.ID()] = true
+		targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
+		if err != nil {
+			return err
+		}
 
-			env := s.Metadata.DelegationEnvelopes[delegation.ID()]
+		// Check reachable delegations
+		reachedDelegations := map[string]bool{}
+		for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
+			reachedDelegations[delegatedRoleName] = false
+		}
 
-			principals := []tuf.Principal{}
-			for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-				principals = append(principals, delegationKeys[principalID])
+		delegationsQueue := targetsMetadata.GetRules()
+		delegationKeys := targetsMetadata.GetPrincipals()
+		for {
+			// The last entry in the queue is always the allow rule, which we don't
+			// process during DFS
+			if len(delegationsQueue) <= 1 {
+				break
 			}
 
-			verifier := &SignatureVerifier{
-				repository: s.repository,
-				name:       delegation.ID(),
-				principals: principals,
-				threshold:  delegation.GetThreshold(),
-			}
+			delegation := delegationsQueue[0]
+			delegationsQueue = delegationsQueue[1:]
 
-			if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
-				return err
-			}
+			if s.HasTargetsRole(delegation.ID()) {
+				reachedDelegations[delegation.ID()] = true
 
-			delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
-			if err != nil {
-				return err
-			}
+				env := s.Metadata.DelegationEnvelopes[delegation.ID()]
 
-			delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
-			for keyID, key := range delegatedMetadata.GetPrincipals() {
-				delegationKeys[keyID] = key
+				principals := []tuf.Principal{}
+				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
+					principals = append(principals, delegationKeys[principalID])
+				}
+
+				verifier := &SignatureVerifier{
+					repository: s.repository,
+					name:       delegation.ID(),
+					principals: principals,
+					threshold:  delegation.GetThreshold(),
+				}
+
+				if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
+					return err
+				}
+
+				delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
+				if err != nil {
+					return err
+				}
+
+				delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
+				for keyID, key := range delegatedMetadata.GetPrincipals() {
+					delegationKeys[keyID] = key
+				}
 			}
 		}
-	}
 
-	for _, reached := range reachedDelegations {
-		if !reached {
-			return ErrDanglingDelegationMetadata
+		for _, reached := range reachedDelegations {
+			if !reached {
+				return ErrDanglingDelegationMetadata
+			}
 		}
 	}
 
