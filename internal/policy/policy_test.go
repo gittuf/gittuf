@@ -6,8 +6,10 @@ package policy
 import (
 	"context"
 	"fmt"
+	"path"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -17,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadState(t *testing.T) {
@@ -305,19 +308,108 @@ func TestLoadFirstState(t *testing.T) {
 }
 
 func TestLoadStateForEntry(t *testing.T) {
-	repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+	t.Run("regular state", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
-	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	loadedState, err := loadStateForEntry(repo, entry)
-	if err != nil {
-		t.Error(err)
-	}
+		loadedState, err := loadStateForEntry(repo, entry)
+		if err != nil {
+			t.Error(err)
+		}
 
-	assertStatesEqual(t, state, loadedState)
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("with single controller metadata", func(t *testing.T) {
+		// Create a state for controller repo, let's get the metadata from this
+		// state and embed into another
+		controllerState := createTestStateWithOnlyRoot(t)
+		controllerName := "controller"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{controllerName: controllerState.Metadata}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := loadStateForEntry(repo, entry.(*rsl.ReferenceEntry))
+		assert.Nil(t, err)
+
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("with multiple controller metadata", func(t *testing.T) {
+		// Create states for controller repos, let's get the metadata from these
+		// states and embed into another
+		controller1State := createTestStateWithOnlyRoot(t)
+		controller1Name := "controller-1"
+
+		controller2State := createTestStateWithDelegatedPolicies(t)
+		controller2Name := "controller-2"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{
+			controller1Name: controller1State.Metadata,
+			controller2Name: controller2State.Metadata,
+		}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := loadStateForEntry(repo, entry.(*rsl.ReferenceEntry))
+		assert.Nil(t, err)
+
+		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("with nested controller metadata", func(t *testing.T) {
+		// Create states for controller repos, let's get the metadata from these
+		// states and embed into another
+		controller1State := createTestStateWithOnlyRoot(t)
+		controller1Name := "controller-1"
+
+		controller2State := createTestStateWithDelegatedPolicies(t)
+		controller2Name := "controller-2"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{
+			controller1Name: controller1State.Metadata,
+			path.Join(controller1Name, controller2Name): controller2State.Metadata,
+		}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := loadStateForEntry(repo, entry.(*rsl.ReferenceEntry))
+		assert.Nil(t, err)
+
+		assertStatesEqual(t, state, loadedState)
+	})
 }
 
 func TestStateVerify(t *testing.T) {
@@ -348,21 +440,163 @@ func TestStateVerify(t *testing.T) {
 }
 
 func TestStateCommit(t *testing.T) {
-	repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
-	// Commit and Apply are called by the helper
+	t.Run("no controller metadata", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+		// Commit and Apply are called by the helper
 
-	policyTip, err := repo.GetReference(PolicyRef)
-	if err != nil {
-		t.Fatal(err)
-	}
+		policyTip, err := repo.GetReference(PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	tmpEntry, err := rsl.GetLatestEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	entry := tmpEntry.(*rsl.ReferenceEntry)
+		tmpEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entry := tmpEntry.(*rsl.ReferenceEntry)
 
-	assert.Equal(t, entry.TargetID, policyTip)
+		assert.Equal(t, entry.TargetID, policyTip)
+	})
+
+	t.Run("with single controller metadata", func(t *testing.T) {
+		// Create a state for controller repo, let's get the metadata from this
+		// state and embed into another
+		controllerState := createTestStateWithOnlyRoot(t)
+		controllerName := "controller"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{controllerName: controllerState.Metadata}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		// The state commit must contain specific paths, search for them
+		controllerPrefix := path.Join(tuf.GittufControllerPrefix, controllerName, metadataTreeEntryName)
+		expectedPaths := set.NewSetFromItems(
+			path.Join(metadataTreeEntryName, "root.json"),
+			path.Join(metadataTreeEntryName, "targets.json"),
+			path.Join(controllerPrefix, "root.json"),
+		)
+
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		treeID, err := repo.GetCommitTreeID(stagingTip)
+		require.Nil(t, err)
+
+		allFiles, err := repo.GetAllFilesInTree(treeID)
+		require.Nil(t, err)
+		assert.Equal(t, expectedPaths.Len(), len(allFiles))
+
+		for name := range allFiles {
+			expectedPaths.Remove(name)
+		}
+		assert.Equal(t, 0, expectedPaths.Len())
+	})
+
+	t.Run("with multiple controller metadata", func(t *testing.T) {
+		// Create states for controller repos, let's get the metadata from these
+		// states and embed into another
+		controller1State := createTestStateWithOnlyRoot(t)
+		controller1Name := "controller-1"
+
+		controller2State := createTestStateWithDelegatedPolicies(t)
+		controller2Name := "controller-2"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{
+			controller1Name: controller1State.Metadata,
+			controller2Name: controller2State.Metadata,
+		}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		// The state commit must contain specific paths, search for them
+		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, metadataTreeEntryName)
+		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller2Name, metadataTreeEntryName)
+		expectedPaths := set.NewSetFromItems(
+			path.Join(metadataTreeEntryName, "root.json"),
+			path.Join(metadataTreeEntryName, "targets.json"),
+			path.Join(controller1Prefix, "root.json"),
+			path.Join(controller2Prefix, "root.json"),
+			path.Join(controller2Prefix, "targets.json"),
+			path.Join(controller2Prefix, "1.json"),
+		)
+
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		treeID, err := repo.GetCommitTreeID(stagingTip)
+		require.Nil(t, err)
+
+		allFiles, err := repo.GetAllFilesInTree(treeID)
+		require.Nil(t, err)
+		assert.Equal(t, expectedPaths.Len(), len(allFiles))
+
+		for name := range allFiles {
+			expectedPaths.Remove(name)
+		}
+		assert.Equal(t, 0, expectedPaths.Len())
+	})
+
+	t.Run("with nested controller metadata", func(t *testing.T) {
+		// Create states for controller repos, let's get the metadata from these
+		// states and embed into another
+		controller1State := createTestStateWithOnlyRoot(t)
+		controller1Name := "controller-1"
+
+		controller2State := createTestStateWithDelegatedPolicies(t)
+		controller2Name := "controller-2"
+
+		state := createTestStateWithPolicy(t)
+		state.ControllerMetadata = map[string]*StateMetadata{
+			controller1Name: controller1State.Metadata,
+			path.Join(controller1Name, controller2Name): controller2State.Metadata,
+		}
+
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
+		state.repository = repo
+
+		err := state.Commit(repo, "Create test state", false)
+		assert.Nil(t, err)
+
+		// The state commit must contain specific paths, search for them
+		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, metadataTreeEntryName)
+		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, tuf.GittufControllerPrefix, controller2Name, metadataTreeEntryName)
+		expectedPaths := set.NewSetFromItems(
+			path.Join(metadataTreeEntryName, "root.json"),
+			path.Join(metadataTreeEntryName, "targets.json"),
+			path.Join(controller1Prefix, "root.json"),
+			path.Join(controller2Prefix, "root.json"),
+			path.Join(controller2Prefix, "targets.json"),
+			path.Join(controller2Prefix, "1.json"),
+		)
+
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		treeID, err := repo.GetCommitTreeID(stagingTip)
+		require.Nil(t, err)
+
+		allFiles, err := repo.GetAllFilesInTree(treeID)
+		require.Nil(t, err)
+		assert.Equal(t, expectedPaths.Len(), len(allFiles))
+
+		for name := range allFiles {
+			expectedPaths.Remove(name)
+		}
+		assert.Equal(t, 0, expectedPaths.Len())
+	})
 }
 
 func TestStateGetRootMetadata(t *testing.T) {
@@ -714,14 +948,14 @@ func TestDiscard(t *testing.T) {
 func assertStatesEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
-	assert.Equal(t, stateA.Metadata.RootEnvelope, stateB.Metadata.RootEnvelope)
-	assert.Equal(t, stateA.Metadata.TargetsEnvelope, stateB.Metadata.TargetsEnvelope)
-	assert.Equal(t, stateA.Metadata.DelegationEnvelopes, stateB.Metadata.DelegationEnvelopes)
+	assert.Equal(t, stateA.Metadata, stateB.Metadata)
+	assert.Equal(t, stateA.ControllerMetadata, stateB.ControllerMetadata)
 }
 
 func assertStatesNotEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
 	// at least one of these has to be different
-	assert.True(t, assert.NotEqual(t, stateA.Metadata.RootEnvelope, stateB.Metadata.RootEnvelope) || assert.NotEqual(t, stateA.Metadata.TargetsEnvelope, stateB.Metadata.TargetsEnvelope) || assert.NotEqual(t, stateA.Metadata.DelegationEnvelopes, stateB.Metadata.DelegationEnvelopes))
+	assert.True(t, assert.NotEqual(t, stateA.Metadata, stateB.Metadata) ||
+		assert.NotEqual(t, stateA.ControllerMetadata, stateB.ControllerMetadata))
 }

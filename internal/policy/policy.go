@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -56,7 +55,8 @@ var (
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	Metadata *StateMetadata
+	Metadata           *StateMetadata
+	ControllerMetadata map[string]*StateMetadata
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
@@ -74,6 +74,39 @@ type StateMetadata struct {
 	RootEnvelope        *sslibdsse.Envelope
 	TargetsEnvelope     *sslibdsse.Envelope
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
+}
+
+func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
+	metadata := map[string]*sslibdsse.Envelope{}
+	metadata[RootRoleName] = s.RootEnvelope
+	if s.TargetsEnvelope != nil {
+		metadata[TargetsRoleName] = s.TargetsEnvelope
+	}
+
+	if s.DelegationEnvelopes != nil {
+		for k, v := range s.DelegationEnvelopes {
+			metadata[k] = v
+		}
+	}
+
+	allTreeEntries := []gitinterface.TreeEntry{}
+
+	for name, env := range metadata {
+		envContents, err := json.Marshal(env)
+		if err != nil {
+			return nil, err
+		}
+
+		blobID, err := repo.WriteBlob(envContents)
+		if err != nil {
+			return nil, err
+		}
+
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(name+".json", blobID))
+	}
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	return treeBuilder.WriteTreeFromEntries(allTreeEntries)
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
@@ -535,36 +568,34 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 		commitMessage = DefaultCommitMessage
 	}
 
-	metadata := map[string]*sslibdsse.Envelope{}
-	metadata[RootRoleName] = s.Metadata.RootEnvelope
-	if s.Metadata.TargetsEnvelope != nil {
-		metadata[TargetsRoleName] = s.Metadata.TargetsEnvelope
-	}
-
-	if s.Metadata.DelegationEnvelopes != nil {
-		for k, v := range s.Metadata.DelegationEnvelopes {
-			metadata[k] = v
-		}
-	}
-
+	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
 	allTreeEntries := []gitinterface.TreeEntry{}
 
-	for name, env := range metadata {
-		envContents, err := json.Marshal(env)
-		if err != nil {
-			return err
-		}
+	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
+	if err != nil {
+		return nil
+	}
+	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
 
-		blobID, err := repo.WriteBlob(envContents)
-		if err != nil {
-			return err
-		}
+	for absoluteControllerPath, metadata := range s.ControllerMetadata {
+		// If path is "1", it should become gittuf-controller/1/metadata
+		// If path is "1/2", it should become gittuf-controller/1/gittuf-controller/2/metadata
+		// If path is "1/2/3", it should become gittuf-controller/1/gittuf-controller/2/gittuf-controller/3/metadata
 
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(path.Join(metadataTreeEntryName, name+".json"), blobID))
+		pathComponents := strings.Split(absoluteControllerPath, "/")
+		newPath := strings.Join(pathComponents, "/"+tuf.GittufControllerPrefix+"/")
+		// For "1/2/3", newPath is now "1/gittuf-controller/2/gittuf-controller/3"
+		// Add the controller prefix and metadata tree suffix
+		newPath = fmt.Sprintf("%s/%s/%s", tuf.GittufControllerPrefix, newPath, metadataTreeEntryName)
+
+		stateMetadataTreeID, err := metadata.WriteTree(repo)
+		if err != nil {
+			return nil
+		}
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(newPath, stateMetadataTreeID))
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-
 	policyRootTreeID, err := treeBuilder.WriteTreeFromEntries(allTreeEntries)
 	if err != nil {
 		return err
@@ -968,43 +999,102 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, err
 	}
 
-	allTreeEntries, err := repo.GetAllFilesInTree(commitTreeID)
+	treeItems, err := repo.GetTreeItems(commitTreeID)
 	if err != nil {
 		return nil, err
 	}
 
-	state := &State{repository: repo, Metadata: &StateMetadata{}}
+	// metadataQueue is populated with metadata/ subtrees we want to load for
+	// either the current repository or its controllers.
+	metadataQueue := []*policyTreeItem{{name: "", treeID: treeItems[metadataTreeEntryName]}}
+	// controllerQueue is populated with gittuf-controller/ subtrees as we need
+	// to unwrap them to identify the applicable metadata/ tree entries.
+	// Here, the `name` parameter identifies the set of parents. If the
+	// controller subtree is directly declared in the current repository, then
+	// its name is empty.
+	controllerQueue := []*policyTreeItem{}
+	if controllerTreeID, hasController := treeItems[tuf.GittufControllerPrefix]; hasController {
+		controllerQueue = append(controllerQueue, &policyTreeItem{name: "", treeID: controllerTreeID})
+	}
 
-	for name, blobID := range allTreeEntries {
-		contents, err := repo.ReadBlob(blobID)
+	for len(controllerQueue) != 0 {
+		currentControllerEntry := controllerQueue[0]
+		controllerQueue = controllerQueue[1:]
+
+		controllerTreeItems, err := repo.GetTreeItems(currentControllerEntry.treeID)
 		if err != nil {
 			return nil, err
 		}
 
-		// We have this conditional because once upon a time we used to store
-		// the root keys on disk as well; now we just get them from the root
-		// metadata file. We ignore the keys on disk in the old policy states.
-		if strings.HasPrefix(name, metadataTreeEntryName+"/") {
+		// controllerTreeItems should be 1+ subtrees that have the name of the controller in question.
+		// Each subtree in turn has a metadata subtree and optionally more controller subtrees.
+
+		for controllerName, subtreeID := range controllerTreeItems {
+			subtreeItems, err := repo.GetTreeItems(subtreeID)
+			if err != nil {
+				return nil, err
+			}
+
+			absoluteControllerName := currentControllerEntry.name + "/" + controllerName
+			absoluteControllerName = strings.Trim(absoluteControllerName, "/")
+
+			for treeName, treeID := range subtreeItems {
+				if treeName == metadataTreeEntryName {
+					metadataQueue = append(metadataQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
+				} else if treeName == tuf.GittufControllerPrefix {
+					controllerQueue = append(controllerQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
+				}
+			}
+		}
+	}
+
+	state := &State{repository: repo}
+
+	for len(metadataQueue) != 0 {
+		currentMetadataEntry := metadataQueue[0]
+		metadataQueue = metadataQueue[1:]
+
+		metadataItems, err := repo.GetTreeItems(currentMetadataEntry.treeID)
+		if err != nil {
+			return nil, err
+		}
+
+		stateMetadata := &StateMetadata{}
+		for name, blobID := range metadataItems {
+			contents, err := repo.ReadBlob(blobID)
+			if err != nil {
+				return nil, err
+			}
+
 			env := &sslibdsse.Envelope{}
 			if err := json.Unmarshal(contents, env); err != nil {
 				return nil, err
 			}
 
-			metadataName := strings.TrimPrefix(name, metadataTreeEntryName+"/")
-			switch metadataName {
+			switch name {
 			case fmt.Sprintf("%s.json", RootRoleName):
-				state.Metadata.RootEnvelope = env
+				stateMetadata.RootEnvelope = env
 
 			case fmt.Sprintf("%s.json", TargetsRoleName):
-				state.Metadata.TargetsEnvelope = env
+				stateMetadata.TargetsEnvelope = env
 
 			default:
-				if state.Metadata.DelegationEnvelopes == nil {
-					state.Metadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+				if stateMetadata.DelegationEnvelopes == nil {
+					stateMetadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
 				}
 
-				state.Metadata.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
+				stateMetadata.DelegationEnvelopes[strings.TrimSuffix(name, ".json")] = env
 			}
+		}
+
+		if currentMetadataEntry.name == "" {
+			state.Metadata = stateMetadata
+		} else {
+			if state.ControllerMetadata == nil {
+				state.ControllerMetadata = map[string]*StateMetadata{}
+			}
+
+			state.ControllerMetadata[currentMetadataEntry.name] = stateMetadata
 		}
 	}
 
@@ -1028,4 +1118,9 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 	}
 
 	return state, nil
+}
+
+type policyTreeItem struct {
+	name   string
+	treeID gitinterface.Hash
 }
