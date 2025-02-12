@@ -75,8 +75,9 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	}
 
 	return &State{
-		RootPublicKeys: []tuf.Principal{key},
-		RootEnvelope:   rootEnv,
+		Metadata: &StateMetadata{
+			RootEnvelope: rootEnv,
+		},
 	}
 }
 
@@ -132,9 +133,10 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	}
 
 	state := &State{
-		RootEnvelope:    rootEnv,
-		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []tuf.Principal{key},
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
 	}
 
 	if err := state.preprocess(); err != nil {
@@ -197,9 +199,10 @@ func createTestStateWithGlobalConstraintThreshold(t *testing.T) *State {
 	}
 
 	state := &State{
-		RootEnvelope:    rootEnv,
-		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []tuf.Principal{key},
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
 	}
 
 	if err := state.preprocess(); err != nil {
@@ -265,9 +268,10 @@ func createTestStateWithGlobalConstraintBlockForcePushes(t *testing.T) *State {
 	}
 
 	state := &State{
-		RootEnvelope:    rootEnv,
-		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []tuf.Principal{key},
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
 	}
 
 	if err := state.preprocess(); err != nil {
@@ -335,9 +339,10 @@ func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 	}
 
 	state := &State{
-		RootEnvelope:    rootEnv,
-		TargetsEnvelope: targetsEnv,
-		RootPublicKeys:  []tuf.Principal{key},
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
 	}
 
 	if err := state.preprocess(); err != nil {
@@ -425,15 +430,16 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	}
 
 	curState := &State{
-		RootEnvelope:        rootEnv,
-		TargetsEnvelope:     targetsEnv,
-		DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
-		RootPublicKeys:      []tuf.Principal{key},
+		Metadata: &StateMetadata{
+			RootEnvelope:        rootEnv,
+			TargetsEnvelope:     targetsEnv,
+			DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+		},
 	}
 
 	// Add the delegation envelopes to the state
 
-	curState.DelegationEnvelopes["1"] = delegation1Env
+	curState.Metadata.DelegationEnvelopes["1"] = delegation1Env
 
 	// delegation structure
 	//
@@ -490,7 +496,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	return state
 }
@@ -541,7 +547,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.RootEnvelope = rootEnv
+	state.Metadata.RootEnvelope = rootEnv
 
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
@@ -586,7 +592,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	return state
 }
@@ -638,7 +644,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.RootEnvelope = rootEnv
+	state.Metadata.RootEnvelope = rootEnv
 
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
@@ -699,7 +705,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	return state
 }
@@ -735,7 +741,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
@@ -780,7 +786,7 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	if err := state.preprocess(); err != nil {
 		t.Fatal(err)
@@ -816,7 +822,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state.TargetsEnvelope = targetsEnv
+	state.Metadata.TargetsEnvelope = targetsEnv
 
 	if err := state.preprocess(); err != nil {
 		t.Fatal(err)

@@ -81,8 +81,9 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	state := &policy.State{
-		RootPublicKeys: []tuf.Principal{publicKey},
-		RootEnvelope:   env,
+		Metadata: &policy.StateMetadata{
+			RootEnvelope: env,
+		},
 	}
 
 	commitMessage := "Initialize root of trust"
@@ -154,17 +155,6 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		return err
 	}
 
-	found := false
-	for _, key := range state.RootPublicKeys {
-		if key.ID() == newRootKey.ID() {
-			found = true
-			break
-		}
-	}
-	if !found {
-		state.RootPublicKeys = append(state.RootPublicKeys, newRootKey)
-	}
-
 	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.ID())
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
@@ -200,14 +190,6 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	if err := rootMetadata.DeleteRootPrincipal(keyID); err != nil {
 		return err
 	}
-
-	newRootPublicKeys := []tuf.Principal{}
-	for _, key := range state.RootPublicKeys {
-		if key.ID() != keyID {
-			newRootPublicKeys = append(newRootPublicKeys, key)
-		}
-	}
-	state.RootPublicKeys = newRootPublicKeys
 
 	commitMessage := fmt.Sprintf("Remove root key '%s' from root", keyID)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
@@ -734,7 +716,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 		return err
 	}
 
-	env := state.RootEnvelope
+	env := state.Metadata.RootEnvelope
 
 	slog.Debug(fmt.Sprintf("Signing root metadata using '%s'...", keyID))
 	env, err = dsse.SignEnvelope(ctx, env, signer)
@@ -742,7 +724,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 		return err
 	}
 
-	state.RootEnvelope = env
+	state.Metadata.RootEnvelope = env
 
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to root metadata", keyID)
 
@@ -775,7 +757,7 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 		return err
 	}
 
-	env := state.RootEnvelope
+	env := state.Metadata.RootEnvelope
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
@@ -785,7 +767,7 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 		return err
 	}
 
-	state.RootEnvelope = env
+	state.Metadata.RootEnvelope = env
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, signCommit)

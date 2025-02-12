@@ -17,7 +17,6 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
@@ -3649,9 +3648,10 @@ func TestStateVerifyNewState(t *testing.T) {
 			t.Fatal(err)
 		}
 		newPolicy := &State{
-			RootPublicKeys:      []tuf.Principal{key},
-			RootEnvelope:        rootEnv,
-			DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+			Metadata: &StateMetadata{
+				RootEnvelope:        rootEnv,
+				DelegationEnvelopes: map[string]*sslibdsse.Envelope{},
+			},
 		}
 
 		err = currentPolicy.VerifyNewState(testCtx, newPolicy)
