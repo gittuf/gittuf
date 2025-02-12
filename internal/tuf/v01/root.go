@@ -762,7 +762,7 @@ func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirec
 		}
 	}
 
-	// if the directive is new, call add propagation directive to deal with it
+	// if the directive is new, call AddPropagationDirective to deal with it
 	if err := r.AddPropagationDirective(directive); err != nil {
 		return err
 	}
