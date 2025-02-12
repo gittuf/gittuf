@@ -469,7 +469,11 @@ func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirectiv
 
 // Updatepropagation checks if there is a duplicate or update and deal with that
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
+<<<<<<< HEAD
 	// find if there is a duplicate(exact same) or update(same name, different in other)
+=======
+	//find if there is a duplicate(exact same) or update(same name, different in other)
+>>>>>>> 3da6f0b (update propagation directive and fixed lint detected issue)
 	// in the slice in linear search, then update the found propagation
 	for i := range r.Propagations {
 		if r.Propagations[i].GetName() == directive.GetName() {
@@ -489,8 +493,13 @@ func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirec
 		}
 	}
 
+<<<<<<< HEAD
 	// if the directive is new, call add propagation directive to deal with it
 	if err := r.AddPropagationDirective(directive); err != nil {
+=======
+	//if the directive is new, call add propagation directive to deal with it
+	if err := r.AddPropagationDirective(directive); err != nil{
+>>>>>>> 3da6f0b (update propagation directive and fixed lint detected issue)
 		return err
 	}
 	return nil
