@@ -742,37 +742,16 @@ func (p *PropagationDirective) SetDownstreamPath(downstreamPath string) {
 
 // Updatepropagation checks if there is a duplicate or update and deal with that
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
-<<<<<<< HEAD
 	// find if there is a duplicate(exact same) or update(same name, different in other)
-=======
-	//find if there is a duplicate(exact same) or update(same name, different in other)
->>>>>>> 3da6f0b (update propagation directive and fixed lint detected issue)
-	// in the slice in linear search, then update the found propagation
 	for i := range r.Propagations {
-		if r.Propagations[i].GetName() == directive.GetName() {
-			if r.Propagations[i].GetUpstreamRepository() != directive.GetUpstreamRepository() {
-				r.Propagations[i].SetUpstreamRepository(directive.GetUpstreamRepository())
-			}
-			if r.Propagations[i].GetUpstreamReference() != directive.GetUpstreamReference() {
-				r.Propagations[i].SetUpstreamReference(directive.GetUpstreamReference())
-			}
-			if r.Propagations[i].GetDownstreamReference() != directive.GetDownstreamReference() {
-				r.Propagations[i].SetDownstreamReference(directive.GetDownstreamReference())
-			}
-			if r.Propagations[i].GetDownstreamPath() != directive.GetDownstreamPath() {
-				r.Propagations[i].SetDownstreamPath(directive.GetDownstreamPath())
-			}
+		if r.Propagations[1].Name == directive.Name {
+			r.Propagations[i] = directive
 			return nil
 		}
 	}
 
-<<<<<<< HEAD
-	// if the directive is new, call add propagation directive to deal with it
-	if err := r.AddPropagationDirective(directive); err != nil {
-=======
 	//if the directive is new, call add propagation directive to deal with it
 	if err := r.AddPropagationDirective(directive); err != nil{
->>>>>>> 3da6f0b (update propagation directive and fixed lint detected issue)
 		return err
 	}
 	return nil
