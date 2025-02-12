@@ -303,7 +303,7 @@ type PropagationDirective interface {
 	// propagation workflow.
 	GetDownstreamPath() string
 
-	//update the setter into the interface
+	// update the setter into the interface
 	SetUpstreamRepository(upstreamRepository string)
 
 	SetUpstreamReference(upstreamReference string)
