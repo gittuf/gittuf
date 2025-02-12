@@ -469,7 +469,7 @@ func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirectiv
 
 // Updatepropagation checks if there is a duplicate or update and deal with that
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
-	// find if there is a duplicate(exact same) or update(same name, different in other)
+	//find if there is a duplicate(exact same) or update(same name, different in other)
 	// in the slice in linear search, then update the found propagation
 	for i := range r.Propagations {
 		if r.Propagations[1].Name == directive.Name {
