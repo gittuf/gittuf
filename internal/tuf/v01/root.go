@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	rootVersion = "https://gittuf.dev/policy/root/v0.1"
+	rootVersion            = "https://gittuf.dev/policy/root/v0.1"
+	ControllerRepositories = "controller"
+	NetworkRepositories    = "network"
 )
 
 // RootMetadata defines the schema of TUF's Root role.
@@ -443,8 +445,6 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
 
-	// TODO: check for duplicates
-
 	otherRepository := &OtherRepository{
 		Name:                  name,
 		Location:              location,
@@ -456,8 +456,11 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		if !isKey {
 			return tuf.ErrInvalidPrincipalType
 		}
-
-		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
+		if !r.isDuplicate(key, ControllerRepositories) {
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
+		} else {
+			return tuf.ErrDuplicateKey
+		}
 	}
 
 	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
@@ -482,8 +485,6 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
 	}
 
-	// TODO: check for duplicates
-
 	otherRepository := &OtherRepository{
 		Name:                  name,
 		Location:              location,
@@ -496,11 +497,44 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 			return tuf.ErrInvalidPrincipalType
 		}
 
-		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
+		if !r.isDuplicate(key, NetworkRepositories) {
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
+			r.MultiRepository.NetworkRepositories = append(r.MultiRepository.NetworkRepositories, otherRepository)
+		} else {
+			return tuf.ErrDuplicateKey
+		}
 	}
 
-	r.MultiRepository.NetworkRepositories = append(r.MultiRepository.NetworkRepositories, otherRepository)
 	return nil
+}
+
+// IsDuplicate checks if the key is already part of the network.
+func (r *RootMetadata) isDuplicate(key *Key, scope string) bool {
+	if r.MultiRepository == nil {
+		return false
+	}
+
+	switch scope {
+	case "network":
+		for _, repo := range r.MultiRepository.NetworkRepositories {
+			for _, principal := range repo.InitialRootPrincipals {
+				if principal.KeyID == key.KeyID {
+					return true
+				}
+			}
+		}
+	case "controller":
+		for _, repo := range r.MultiRepository.ControllerRepositories {
+			for _, principal := range repo.InitialRootPrincipals {
+				if principal.KeyID == key.KeyID {
+					return true
+				}
+			}
+		}
+	default:
+		return false
+	}
+	return false
 }
 
 // GetControllerRepositories returns the repositories that serve as the
