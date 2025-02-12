@@ -742,7 +742,7 @@ func (p *PropagationDirective) SetDownstreamPath(downstreamPath string) {
 
 // Updatepropagation checks if there is a duplicate or update and deal with that
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
-	//find if there is a duplicate(exact same) or update(same name, different in other)
+	// find if there is a duplicate(exact same) or update(same name, different in other)
 	// in the slice in linear search, then update the found propagation
 	for i := range r.Propagations {
 		if r.Propagations[i].GetName() == directive.GetName() {
@@ -762,8 +762,8 @@ func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirec
 		}
 	}
 
-	//if the directive is new, call add propagation directive to deal with it
-	if err := r.AddPropagationDirective(directive); err != nil{
+	// if the directive is new, call add propagation directive to deal with it
+	if err := r.AddPropagationDirective(directive); err != nil {
 		return err
 	}
 	return nil
