@@ -15,7 +15,7 @@ require (
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/sigstore/gitsign v0.12.0
 	github.com/sigstore/protobuf-specs v0.4.0
-	github.com/sigstore/sigstore v1.8.12
+	github.com/sigstore/sigstore v1.8.14
 	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0
