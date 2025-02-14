@@ -4,6 +4,8 @@
 package addrule
 
 import (
+	"fmt"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
@@ -19,6 +21,7 @@ type options struct {
 	authorizedPrincipalIDs []string
 	rulePatterns           []string
 	threshold              int
+	access                 string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -67,6 +70,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		1,
 		"threshold of required valid signatures",
 	)
+
+	cmd.Flags().StringVar(
+		&o.access,
+		"access",
+		"write",
+		"specify access level: read or write",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -80,6 +90,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	if o.access != "read" && o.access != "write" {
+		return fmt.Errorf("invalid access level: must be 'read' or 'write'")
+	}
+
 	authorizedPrincipalIDs := []string{}
 	for _, key := range o.authorizedKeys {
 		key, err := gittuf.LoadPublicKey(key)
@@ -91,7 +105,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 	authorizedPrincipalIDs = append(authorizedPrincipalIDs, o.authorizedPrincipalIDs...)
 
-	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedPrincipalIDs, o.rulePatterns, o.threshold, true)
+	return repo.AddDelegation(cmd.Context(), signer, o.policyName, o.ruleName, o.access, authorizedPrincipalIDs, o.rulePatterns, o.threshold, true)
+	//NEED TO SOMEWAY FIGURE OUT WHERE THIS IS AND ADD ACCESS TO IT
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

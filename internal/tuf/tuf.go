@@ -196,10 +196,10 @@ type TargetsMetadata interface {
 	GetRules() []Rule
 
 	// AddRule adds a rule to the metadata file.
-	AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
+	AddRule(ruleName, access string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
 	// UpdateRule updates an existing rule identified by ruleName with the
 	// provided parameters.
-	UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
+	UpdateRule(ruleName, access string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
 	// ReorderRules accepts the new order of rules (identified by their
 	// ruleNames).
 	ReorderRules(newRuleNames []string) error

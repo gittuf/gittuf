@@ -27,6 +27,7 @@ func TestLoadState(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+		access := "write"
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -49,7 +50,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-1", access, []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -74,7 +75,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", access, []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -116,6 +117,7 @@ func TestLoadState(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+		access := "write"
 
 		entry, err := rsl.GetLatestEntry(repo)
 		if err != nil {
@@ -138,7 +140,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-1", []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-1", access, []string{key.KeyID}, []string{"test-rule-1"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-1")
@@ -163,7 +165,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule-2", []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule-2", access, []string{key.KeyID}, []string{"test-rule-2"}, 1); err != nil {
 			t.Fatal(err)
 		}
 		state.ruleNames.Add("test-rule-2")
@@ -266,6 +268,7 @@ func TestLoadCurrentState(t *testing.T) {
 
 func TestLoadFirstState(t *testing.T) {
 	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
+	access := "write"
 
 	// Update policy, record in RSL
 	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := state will modify state as well
@@ -282,7 +285,7 @@ func TestLoadFirstState(t *testing.T) {
 	if err := targetsMetadata.AddPrincipal(key); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
+	if err := targetsMetadata.AddRule("new-rule", access, []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
 
@@ -671,6 +674,7 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 func TestGetStateForCommit(t *testing.T) {
 	t.Parallel()
 	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
+	access := "write"
 
 	// Create some commits
 	refName := "refs/heads/main"
@@ -730,7 +734,7 @@ func TestGetStateForCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := tufv01.NewKeyFromSSLibKey(keyR)
-	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
+	if err := targetsMetadata.AddRule("new-rule", access, []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
 		t.Fatal(err)
 	}
 
@@ -984,7 +988,7 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test-rule"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule", "write", []string{key.KeyID}, []string{"test-rule"}, 1); err != nil {
 			t.Fatal(err)
 		}
 
