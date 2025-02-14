@@ -988,7 +988,7 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test-rule"}, 1); err != nil {
+		if err := targetsMetadata.AddRule("test-rule", "write", []string{key.KeyID}, []string{"test-rule"}, 1); err != nil {
 			t.Fatal(err)
 		}
 

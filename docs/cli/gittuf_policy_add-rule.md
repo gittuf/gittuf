@@ -13,6 +13,7 @@ gittuf policy add-rule [flags]
 ### Options
 
 ```
+      --access string              specify access level: read or write (default "write")
       --authorize stringArray      authorize the principal IDs for the rule
   -h, --help                       help for add-rule
       --policy-name string         name of policy file to add rule to (default "targets")
