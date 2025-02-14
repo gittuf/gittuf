@@ -86,6 +86,7 @@ func createTestStateWithPolicy(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+	access := "write"
 
 	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
@@ -115,11 +116,11 @@ func createTestStateWithPolicy(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-main", access, []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
-	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", access, []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -286,6 +287,7 @@ func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+	access := "write"
 
 	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
@@ -321,11 +323,11 @@ func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(person); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("protect-main", []string{person.PersonID}, []string{"git:refs/heads/main"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-main", access, []string{person.PersonID}, []string{"git:refs/heads/main"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
-	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{person.PersonID}, []string{"file:1", "file:2"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", access, []string{person.PersonID}, []string{"file:1", "file:2"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -357,6 +359,7 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+	access := "write"
 
 	rootMetadata, err := InitializeRootMetadata(key)
 	if err != nil {
@@ -388,11 +391,11 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(key); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("1", []string{key.KeyID}, []string{"file:1/*"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("1", access, []string{key.KeyID}, []string{"file:1/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := targetsMetadata.AddRule("2", []string{key.KeyID}, []string{"file:2/*"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("2", access, []string{key.KeyID}, []string{"file:2/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -411,11 +414,11 @@ func createTestStateWithDelegatedPolicies(t *testing.T) *State {
 	if err := delegation1Metadata.AddPrincipal(gpgKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := delegation1Metadata.AddRule("3", []string{gpgKey.KeyID}, []string{"file:1/subpath1/*"}, 1); err != nil {
+	if err := delegation1Metadata.AddRule("3", access, []string{gpgKey.KeyID}, []string{"file:1/subpath1/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := delegation1Metadata.AddRule("4", []string{gpgKey.KeyID}, []string{"file:1/subpath2/*"}, 1); err != nil {
+	if err := delegation1Metadata.AddRule("4", access, []string{gpgKey.KeyID}, []string{"file:1/subpath2/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -460,6 +463,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	t.Helper()
 
 	state := createTestStateWithPolicy(t)
+	access := "write"
 
 	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -481,7 +485,7 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 	}
 
 	// Set threshold = 2 for existing rule with the added key
-	if err := targetsMetadata.UpdateRule("protect-main", []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/heads/main"}, 2); err != nil {
+	if err := targetsMetadata.UpdateRule("protect-main", access, []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/heads/main"}, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,6 +526,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	state := createTestStateWithPolicyUsingPersons(t)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	access := "write"
 
 	appName := tuf.GitHubAppRoleName // TODO: this should be generalized more
 
@@ -580,7 +585,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	}
 
 	// Set threshold = 2 for existing rule with the added key
-	if err := targetsMetadata.UpdateRule("protect-main", []string{person.ID(), approver.ID()}, []string{"git:refs/heads/main"}, 2); err != nil {
+	if err := targetsMetadata.UpdateRule("protect-main", access, []string{person.ID(), approver.ID()}, []string{"git:refs/heads/main"}, 2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -619,6 +624,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	state := createTestStateWithPolicyUsingPersons(t)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	access := "write"
 
 	appName := tuf.GitHubAppRoleName // TODO: this should be generalized more
 
@@ -693,7 +699,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	}
 
 	// Set threshold = 3 for existing rule with the added principals
-	if err := targetsMetadata.UpdateRule("protect-main", []string{person.PersonID, approver1.PersonID, approver2.PersonID}, []string{"git:refs/heads/main"}, 3); err != nil {
+	if err := targetsMetadata.UpdateRule("protect-main", access, []string{person.PersonID, approver1.PersonID, approver2.PersonID}, []string{"git:refs/heads/main"}, 3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -714,6 +720,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	t.Helper()
 
 	state := createTestStateWithPolicy(t)
+	access := "write"
 
 	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -727,7 +734,7 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("protect-tags", []string{gpgKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-tags", access, []string{gpgKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
@@ -754,6 +761,7 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 	t.Helper()
 
 	state := createTestStateWithPolicy(t)
+	access := "write"
 
 	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
 	if err != nil {
@@ -772,7 +780,7 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("protect-tags", []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/tags/*"}, 2); err != nil {
+	if err := targetsMetadata.AddRule("protect-tags", access, []string{gpgKey.KeyID, approverKey.KeyID}, []string{"git:refs/tags/*"}, 2); err != nil {
 		t.Fatal(err)
 	}
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
@@ -799,6 +807,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	t.Helper()
 
 	state := createTestStateWithPolicy(t)
+	access := "write"
 
 	rootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
@@ -808,7 +817,7 @@ func createTestStateWithTagPolicyForUnauthorizedTest(t *testing.T) *State {
 	if err := targetsMetadata.AddPrincipal(rootKey); err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddRule("protect-tags", []string{rootKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
+	if err := targetsMetadata.AddRule("protect-tags", access, []string{rootKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
 	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)

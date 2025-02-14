@@ -63,6 +63,7 @@ func TestAddDelegation(t *testing.T) {
 		targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 		ruleName := "test-rule"
+		access := "write"
 		authorizedKeys := []tuf.Principal{targetsPubKey}
 		rulePatterns := []string{"git:branch=main"}
 
@@ -86,7 +87,7 @@ func TestAddDelegation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
+		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, access, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -102,6 +103,7 @@ func TestAddDelegation(t *testing.T) {
 		assert.Equal(t, 3, len(targetsMetadata.GetRules()))
 		assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
 			Name:        ruleName,
+			AccessType:  access,
 			Paths:       rulePatterns,
 			Terminating: false,
 			Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
@@ -112,7 +114,7 @@ func TestAddDelegation(t *testing.T) {
 	t.Run("invalid rule name", func(t *testing.T) {
 		r := createTestRepositoryWithPolicy(t, "")
 
-		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, policy.RootRoleName, nil, nil, 1, false)
+		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, policy.RootRoleName, "write", nil, nil, 1, false)
 		assert.ErrorIs(t, err, ErrInvalidPolicyName)
 	})
 }
@@ -121,6 +123,7 @@ func TestUpdateDelegation(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	access := "write"
 
 	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
 	if err != nil {
@@ -133,7 +136,7 @@ func TestUpdateDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, false)
+	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", access, []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -149,6 +152,7 @@ func TestUpdateDelegation(t *testing.T) {
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
 	assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
 		Name:        "protect-main",
+		AccessType:  access,
 		Paths:       []string{"git:refs/heads/main"},
 		Terminating: false,
 		Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(gpgKey.KeyID, targetsKey.KeyID), Threshold: 1},
@@ -158,6 +162,7 @@ func TestUpdateDelegation(t *testing.T) {
 func TestReorderDelegations(t *testing.T) {
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 	targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+	access := "write"
 
 	r := createTestRepositoryWithPolicy(t, "")
 
@@ -167,7 +172,7 @@ func TestReorderDelegations(t *testing.T) {
 
 	ruleNames := []string{"rule-1", "rule-2", "rule-3"}
 	for _, ruleName := range ruleNames {
-		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsKey.KeyID}, []string{ruleName}, 1, false)
+		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, access, []string{targetsKey.KeyID}, []string{ruleName}, 1, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -205,6 +210,7 @@ func TestRemoveDelegation(t *testing.T) {
 	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 	ruleName := "test-rule"
+	access := "write"
 	authorizedKeys := []tuf.Principal{targetsPubKey}
 	rulePatterns := []string{"git:branch=main"}
 
@@ -212,7 +218,7 @@ func TestRemoveDelegation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
+	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, access, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -226,6 +232,7 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Equal(t, 3, len(targetsMetadata.GetRules()))
 	assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
 		Name:        ruleName,
+		AccessType:  access,
 		Paths:       rulePatterns,
 		Terminating: false,
 		Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},

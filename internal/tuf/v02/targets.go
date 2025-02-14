@@ -58,7 +58,7 @@ func (t *TargetsMetadata) Validate() error {
 }
 
 // AddRule adds a new delegation to TargetsMetadata.
-func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) AddRule(ruleName, access string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if strings.HasPrefix(ruleName, tuf.GittufPrefix) {
 		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
@@ -80,6 +80,7 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 
 	newDelegation := &Delegation{
 		Name:        ruleName,
+		AccessType:  access,
 		Paths:       rulePatterns,
 		Terminating: false,
 		Role: Role{
@@ -93,7 +94,7 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 }
 
 // UpdateRule is used to amend a delegation in TargetsMetadata.
-func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
+func (t *TargetsMetadata) UpdateRule(ruleName, access string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error {
 	if strings.HasPrefix(ruleName, tuf.GittufPrefix) {
 		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
@@ -121,6 +122,7 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
+			delegation.AccessType = access
 			delegation.Role = Role{
 				PrincipalIDs: set.NewSetFromItems(authorizedPrincipalIDs...),
 				Threshold:    threshold,
@@ -337,6 +339,7 @@ func (d *Delegations) removePrincipal(principalID string) error {
 func AllowRule() *Delegation {
 	return &Delegation{
 		Name:        tuf.AllowRuleName,
+		AccessType:  "write",
 		Paths:       []string{"*"},
 		Terminating: true,
 		Role: Role{
@@ -350,6 +353,7 @@ func AllowRule() *Delegation {
 // pertaining to the delegation. It implements the tuf.Rule interface.
 type Delegation struct {
 	Name        string           `json:"name"`
+	AccessType  string           `json:"access"`
 	Paths       []string         `json:"paths"`
 	Terminating bool             `json:"terminating"`
 	Custom      *json.RawMessage `json:"custom,omitempty"`

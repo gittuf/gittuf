@@ -62,6 +62,7 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	t.Helper()
 
 	r := createTestRepositoryWithRoot(t, location)
+	access := "write"
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -86,7 +87,7 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 		t.Fatal(err)
 	}
 
-	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", access, []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false); err != nil {
 		t.Fatal(err)
 	}
 
