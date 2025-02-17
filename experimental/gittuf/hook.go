@@ -76,41 +76,41 @@ func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) e
 // InvokeHook runs the hooks defined in the specified stage for the user defined
 // by the supplied signer. A check is performed that the user holds the private
 // key necessary for signing, to support the generation of attestations.
-func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibdsse.Signer, targetsRoleName string, attest bool) error {
+func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibdsse.Signer, targetsRoleName string, attest bool) ([]int, error) {
 	// TODO: Below is a check if we can sign and then invoke the appropriate lua
 	// hook. We still need to add impl to sign attestation for invoking the
 	// hook.
 	keyID, err := signer.KeyID()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if attest {
 		// This is to check if we can sign an attestation
 		env, err := dsse.CreateEnvelope(targetsMetadata) // nolint:ineffassign
 		if err != nil {
-			return err
+			return nil, err
 		}
 		env, err = dsse.SignEnvelope(ctx, env, signer) // nolint:ineffassign,staticcheck
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	hooks, err := targetsMetadata.GetHooks(stage)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	applets := []tuf.Applet{}
@@ -133,7 +133,7 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 	for _, hook := range applets {
 		exitCode, err := r.executeLua(stage, hook)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		exitCodes = append(exitCodes, exitCode) // nolint:staticcheck
 	}
@@ -143,7 +143,7 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 		slog.Debug(fmt.Sprintf("Signing hook attestation using '%s'...", keyID))
 	}
 
-	return err
+	return exitCodes, nil
 }
 
 func doesFileExist(path string) (bool, error) {
