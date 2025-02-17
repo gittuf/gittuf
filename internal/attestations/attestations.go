@@ -25,6 +25,8 @@ const (
 	codeReviewApprovalAttestationsTreeEntryName = "code-review-approvals"
 	codeReviewApprovalIndexTreeEntryName        = "review-index.json"
 
+	hooksAttestationTreeEntryName = "hooks-attestations" // hooks? remains to be seen.
+
 	initialCommitMessage = "Initial commit"
 	defaultCommitMessage = "Update attestations"
 )
@@ -70,6 +72,11 @@ type Attestations struct {
 	// attestations namespace as a special blob in the
 	// codeReviewApprovalAttestations tree.
 	codeReviewApprovalIndex map[string]string
+
+	// hooksAttestations maps information about the hooks added through gittuf's
+	// flow for a branch.
+	// todo: exact structure for this needs to be decided
+	hooksAttestations map[string]gitinterface.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -126,6 +133,8 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry *rsl.Referenc
 			attestations.githubPullRequestAttestations[strings.TrimPrefix(name, githubPullRequestAttestationsTreeEntryName+"/")] = blobID
 		case strings.HasPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/"):
 			attestations.codeReviewApprovalAttestations[strings.TrimPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/")] = blobID
+		case strings.HasPrefix(name, hooksAttestationTreeEntryName+"/"):
+			attestations.hooksAttestations[strings.TrimPrefix(name, hooksAttestationTreeEntryName+"/")] = blobID
 		}
 	}
 
@@ -169,6 +178,7 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
+	// todo feb 4: add hooksAttestationsTreeName in this
 	allAttestations := map[string]gitinterface.Hash{}
 	for name, blobID := range a.referenceAuthorizations {
 		allAttestations[path.Join(referenceAuthorizationsTreeEntryName, name)] = blobID
