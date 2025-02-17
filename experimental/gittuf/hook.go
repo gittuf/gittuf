@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -80,10 +81,6 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 	// TODO: Below is a check if we can sign and then invoke the appropriate lua
 	// hook. We still need to add impl to sign attestation for invoking the
 	// hook.
-	keyID, err := signer.KeyID()
-	if err != nil {
-		return err
-	}
 
 	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
@@ -108,15 +105,25 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 		}
 	}
 
+	// load hooks as applets
 	applets, err := targetsMetadata.GetHooks(stage)
 	if err != nil {
 		return err
 	}
 
+	if len(applets) == 0 {
+		slog.Debug("No hooks to invoke")
+		return nil
+	}
+
+	hookNameCommitIDMap := make(map[string]gitinterface.Hash)
 	exitCodes := make([]int, 0, len(applets))
 	for _, applet := range applets {
 		exitCode, err := r.executeLua(stage, applet)
 		exitCodes = append(exitCodes, exitCode) // nolint:staticcheck
+		if exitCode == 0 {
+			hookNameCommitIDMap[applet.ID()] = applet.GetHashes()["sha1"]
+		}
 		if err != nil {
 			return err
 		}
@@ -124,7 +131,43 @@ func (r *Repository) InvokeHook(ctx context.Context, stage string, signer sslibd
 
 	if attest {
 		// TODO...
+		// use exitCodes to understand which hooks were run and what their exit
+		// statuses were, and write that into Attestations
+		allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+		if err != nil {
+			return err
+		}
+		slog.Debug("Loaded all attestations for repo")
+
+		statement, err := attestations.NewHooksAttestation(stage, "alice", hookNameCommitIDMap)
+		if err != nil {
+			return err
+		}
+
+		env, err := dsse.CreateEnvelope(statement)
+		if err != nil {
+			return err
+		}
+
+		keyID, err := signer.KeyID()
+		if err != nil {
+			return err
+		}
 		slog.Debug(fmt.Sprintf("Signing hook attestation using '%s'...", keyID))
+		env, err = dsse.SignEnvelope(ctx, env, signer)
+		if err != nil {
+			return err
+		}
+
+		// add attestation to Attestations object before committing
+		err = allAttestations.SetHookAttestation(r.r, env, stage)
+		if err != nil {
+			return err
+		}
+
+		commitMessage := fmt.Sprintf("Add hook attestation for '%s' after running '%d' hooks.", stage, len(applets))
+		fmt.Println("Committing attestation now...")
+		return allAttestations.Commit(r.r, commitMessage, true)
 	}
 
 	return err
@@ -144,10 +187,10 @@ func doesFileExist(path string) (bool, error) {
 
 func (r *Repository) executeLua(stage string, hook tuf.Applet) (int, error) {
 	var hookContent string
-	allowedExcecutables := hook.GetModules()
+	allowedExecutables := hook.GetModules()
 	hookHashes := hook.GetHashes()
 
-	L, err := sandbox.NewLuaEnvironment(allowedExcecutables)
+	L, err := sandbox.NewLuaEnvironment(allowedExecutables)
 	if err != nil {
 		return -1, err
 	}
