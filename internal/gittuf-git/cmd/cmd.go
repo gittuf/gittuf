@@ -133,14 +133,18 @@ func Commit(gitArgs args.Args) error {
 	}
 
 	// Invoke pre-commit hook
-	err = repo.InvokeHook(context.Background(), "pre-commit", signer, policy.TargetsRoleName, attest)
+	// Invoke pre-commit hook
+	exitCodes, err := repo.InvokeHook(context.Background(), "pre-commit", signer, policy.TargetsRoleName, attest)
 	if err != nil {
 		return err
 	}
-	// TODO: Discuss the specs for lua sandbox exit codes
-	// } else if exitCodes != nil {
-	// 	return fmt.Errorf("pre-commit hook failed with exit code %d, changes not committed", exitCodes)
-	// }
+
+	// Check if any of the exit codes are non-zero
+	for i, exitCode := range exitCodes {
+		if exitCode != 0 {
+			return fmt.Errorf("pre-commit hook %d failed with exit code %d", i, exitCode)
+		}
+	}
 
 	// Commit irrespective of failed verification. However, verification is
 	// important for debugging purposes. The user should be able to keep

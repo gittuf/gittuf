@@ -5,13 +5,11 @@
 // https://github.com/kikito/lua-sandbox/blob/master/sandbox.lua, and licensed
 // under the MIT License
 
-//nolint:unused
 package sandbox
 
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -23,17 +21,12 @@ import (
 	"strings"
 	"time"
 
+	sandbox "github.com/gittuf/gittuf/internal/lua-sandbox/util"
 	lua "github.com/yuin/gopher-lua"
 )
 
-var setupEnvironment = `
-repositoryInformation = {}
-repositoryInformation["user.name"] = "Jane Doe"
-repositoryInformation["user.email"] = "jane.doe@example.com"
-`
-
 // Lua sandbox helper functions and wrappers functions of provided Go APIs
-var helpers = `
+var luaHelpers = `
 function splitString(str, sep)
 	if sep == nil then
 		sep = "\n"
@@ -47,77 +40,53 @@ function splitString(str, sep)
 	return lines
 end
 
-function goLinter(path) return runFunc("goLinter", path, nil) end
+function set_instruction_quota(quota)
+    local count = 0
 
-function removeFile(path) return deleteFile(path) end
-
-function scanDir(path, recursive) return goScanDir(path, recursive) end
-
-function getRootDir() return allowedDir end
-
-function readFileAsString(fileName) return goReadFile(fileName) end
-
-function getDiff() return goGetDiff() end
-
-function getWorkTree() return goGetWorkTree() end
-
-function execute(command) 
-	output = goExecute(command)
-	print(output)
-	return output
+    debug.sethook(function()
+        count = count + 1
+        if count > quota then
+            error("Instruction quota exceeded (" .. quota .. " instructions).", 2)
+        end
+    end, "", 1)
 end
 
+function goLinter(path) return runFunc("goLinter", path, nil) end
+function removeFile(path) return deleteFile(path) end
+function scanDir(path, recursive) return goScanDir(path, recursive) end
+function getRootDir() return allowedDir end
+function readFileAsString(fileName) return goReadFile(fileName) end
+function getDiff() return goGetDiff() end
+function getWorkTree() return goGetWorkTree() end
 function regexMatch(text, patterns) return goRegexMatch(text, patterns) end
+function getGitObject(object) return goGetGitObject(object) end
+function getGitObjectSize(object) return goGetGitObjectSize(object) end
+function getGitObjectHash(object) return goGetGitObjectHash(object) end
+function getGitObjectPath(object) return goGetGitObjectPath(object) end
+function getGitDiff() return goGetDiff() end
+function getGitDiffFiles() return goGetWorkTree() end
+function getGitDiffOutput() return goGetDiff() end
 `
 
-var allowedDir = getGitRoot()
-
-// NewLuaEnvironment creates a new Lua sandbox with the specified environment
-func NewLuaEnvironment(allowedModules []string) (*lua.LState, error) {
-	// Create a new Lua state
-	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
-
-	// Load default safe libraries
-	modules := []struct {
-		n string
-		f lua.LGFunction
-	}{
-		{lua.LoadLibName, lua.OpenPackage}, // Must be first
-		{lua.BaseLibName, lua.OpenBase},
-		{lua.TabLibName, lua.OpenTable},
-		{lua.StringLibName, lua.OpenString},
-		{lua.MathLibName, lua.OpenMath},
-		{lua.CoroutineLibName, lua.OpenCoroutine},
-	}
-
-	// Load the modules to the Lua state
-	for _, pair := range modules {
-		if err := lState.CallByParam(lua.P{
-			Fn:      lState.NewFunction(pair.f),
-			NRet:    0,
-			Protect: true,
-		}, lua.LString(pair.n)); err != nil {
-			panic(err)
-		}
-	}
-
-	// Load configuration into the Lua state
-	if err := lState.DoString(setupEnvironment); err != nil {
-		return nil, err
-	}
-
-	// Register the Go functions with the Lua state
-	lState.SetGlobal("deleteFile", lState.NewFunction(deleteFile))
+func RegisterAPIFunctions(lState *lua.LState, allowedModules []string) (*lua.LState, error) {
 	lState.SetGlobal("goExecute", lState.NewFunction(goExecute))
 	lState.SetGlobal("goScanDir", lState.NewFunction(goScanDir))
-	lState.SetGlobal("allowedDir", lua.LString(allowedDir))
+	lState.SetGlobal("allowedDir", lua.LString(sandbox.AllowedDir))
 	lState.SetGlobal("goReadFile", lState.NewFunction(goReadFile))
 	lState.SetGlobal("goRegexMatch", lState.NewFunction(goRegexMatch))
 	lState.SetGlobal("goGetDiff", lState.NewFunction(goGetDiff))
 	lState.SetGlobal("goGetWorkTree", lState.NewFunction(goGetWorkTree))
+	lState.SetGlobal("goProcessGitDiff", lState.NewFunction(goProcessGitDiff))
+	lState.SetGlobal("goCheckAddedLargeFile", lState.NewFunction(goCheckAddedLargeFile))
+	lState.SetGlobal("goCheckMergeConflict", lState.NewFunction(goCheckMergeConflict))
+	lState.SetGlobal("goCheckJSON", lState.NewFunction(goCheckJSON))
+	lState.SetGlobal("goCheckNoCommitOnBranch", lState.NewFunction(goCheckNoCommitOnBranch))
+	lState.SetGlobal("goGetGitObject", lState.NewFunction(goGetGitObject))
+	lState.SetGlobal("goGetGitObjectSize", lState.NewFunction(goGetGitObjectSize))
+	lState.SetGlobal("goGetGitObjectHash", lState.NewFunction(goGetGitObjectHash))
+	lState.SetGlobal("goGetGitObjectPath", lState.NewFunction(goGetGitObjectPath))
 
-	// Load the pre-written pure Lua helper functions into the Lua state
-	if err := lState.DoString(helpers); err != nil {
+	if err := lState.DoString(luaHelpers); err != nil {
 		return nil, err
 	}
 
@@ -128,214 +97,12 @@ func NewLuaEnvironment(allowedModules []string) (*lua.LState, error) {
 	return lState, nil
 }
 
-// Disable all functions in the specified list that are not safe
-func enableOnlySafeFunctions(l *lua.LState) {
-	//-- List of unsafe packages/functions:
-	// -- * string.rep: can be used to allocate millions of bytes in 1 operation
-	// -- * {set|get}metatable: can be used to modify the metatable of global objects (strings, integers)
-	// -- * collectgarbage: can affect performance of other systems
-	// -- * dofile: can access the server filesystem
-	// -- * _G: It has access to everything. It can be mocked to other things though.
-	// -- * load{file|string}: All unsafe because they can grant acces to global env
-	// -- * raw{get|set|equal}: Potentially unsafe
-	// -- * module|require|module: Can modify the host settings
-	// -- * string.dump: Can display confidential server info (implementation of functions)
-	// -- * math.randomseed: Can affect the host system
-	// -- * io.*, os.*: Most stuff there is unsafe, see below for exceptions
-
-	// Disable all unsafe functions
-	l.SetGlobal("dofile", lua.LNil)
-	l.SetGlobal("load", lua.LNil)
-	l.SetGlobal("loadfile", lua.LNil)
-	l.SetGlobal("loadstring", lua.LNil)
-	l.SetGlobal("require", lua.LNil)
-	l.SetGlobal("module", lua.LNil)
-	l.SetGlobal("collectgarbage", lua.LNil)
-	l.SetGlobal("rawget", lua.LNil)
-	l.SetGlobal("rawset", lua.LNil)
-	l.SetGlobal("rawequal", lua.LNil)
-	l.SetGlobal("setmetatable", lua.LNil)
-	l.SetGlobal("getmetatable", lua.LNil)
-	l.SetGlobal("_G", lua.LNil)
-	l.SetGlobal("os", lua.LNil)
-	l.SetGlobal("io", lua.LNil)
-	l.SetGlobal("debug", lua.LNil)
-	l.SetGlobal("package", lua.LNil)
-
-	if strMod, ok := l.GetGlobal(lua.StringLibName).(*lua.LTable); ok {
-		strMod.RawSetString("rep", lua.LNil)
-		strMod.RawSetString("dump", lua.LNil)
-		protectModule(l, strMod, lua.StringLibName)
-	}
-
-	// Load protected modules with only safe functions
-	if mathMod, ok := l.GetGlobal(lua.MathLibName).(*lua.LTable); ok {
-		mathMod.RawSetString("randomseed", lua.LNil)
-		protectModule(l, mathMod, lua.MathLibName)
-	}
-
-	if coroMod, ok := l.GetGlobal(lua.CoroutineLibName).(*lua.LTable); ok {
-		protectModule(l, coroMod, lua.CoroutineLibName)
-	}
-
-	if tabMod, ok := l.GetGlobal(lua.TabLibName).(*lua.LTable); ok {
-		protectModule(l, tabMod, lua.TabLibName)
-	}
-
-	if baseMod, ok := l.GetGlobal(lua.BaseLibName).(*lua.LTable); ok {
-		protectModule(l, baseMod, lua.BaseLibName)
-	}
-}
-
-// Protect the specified module from being modified by setting a protected
-// metatable with __newindex and __metatable fields
-func protectModule(l *lua.LState, tbl *lua.LTable, moduleName string) {
-	mt := l.NewTable()
-	l.SetMetatable(tbl, mt)
-	l.SetField(mt, "__newindex", l.NewFunction(func(l *lua.LState) int {
-		varName := l.ToString(2)
-		l.RaiseError("attempt to modify read-only table '%s.%s'", moduleName, varName)
-		return 0
-	}))
-	l.SetField(mt, "__metatable", lua.LString("protected"))
-}
-
-// Set the instruction quota for the Lua state
-func setInstructionQuota(l *lua.LState, quota int64) {
-	// TODO: Write pure lua function and call it from here
-	if err := l.DoString(fmt.Sprintf("setInstructionQuota(%d)", quota)); err != nil {
-		panic(err)
-	}
-}
-
-// Set the timeout for the Lua state
-func setTimeOut(ctx context.Context, lState *lua.LState, timeOut int) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeOut)*time.Second)
-	defer cancel()
-
-	lState.SetContext(ctx)
-}
-
-// runCommand parse the function and run only supported functions
-func goExecute(l *lua.LState) int {
-	command := l.ToString(1)
-	commands := strings.Split(command, " ")
-
-	// TODO: Verify the integrity of the executable
-	var executable string
-	var args []string
-
-	// TODO: Make the args parsing more robust
-	executable = commands[0]
-	args = commands[1:]
-
-	if !strings.Contains(l.GetGlobal("allowedExecutables").String(), executable) {
-		l.Push(lua.LString("Error: Executable not allowed"))
-		return 1
-	}
-
-	// execute command and capture output
-	cmd := exec.Command(executable, args...)
-	output, err := cmd.CombinedOutput()
-
-	if err != nil {
-		l.Push(lua.LString(err.Error()))
-		return 1
-	}
-
-	// Return output to Lua
-	l.Push(lua.LString(string(output)))
-	return 1
-}
-
-// getGitRoot returns the root directory of the git repository
-func getGitRoot() string {
-	// Check if the current directory is a git repository
-	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
-	output, err := cmd.CombinedOutput()
-	if err != nil || strings.TrimSpace(string(output)) != "true" {
-		// Get the path to the .git directory
-		cmd = exec.Command("git", "rev-parse", "--git-dir")
-		output, err = cmd.CombinedOutput()
-		if err != nil {
-			return ""
-		}
-		gitDir := strings.TrimSpace(string(output))
-		if gitDir == "." || gitDir == ".git" {
-			// If the .git directory is the current directory
-			// then the root directory is the parent directory
-			cmd = exec.Command("git", "rev-parse", "--show-cdup")
-			output, err = cmd.CombinedOutput()
-			if err != nil {
-				return ""
-			}
-			relativeRootDir := strings.TrimSpace(string(output))
-			if relativeRootDir == "" {
-				relativeRootDir = "."
-			}
-			absoluteRootDir, err := filepath.Abs(relativeRootDir)
-			if err != nil {
-				return ""
-			}
-			return absoluteRootDir
-		}
-		absoluteGitDir, err := filepath.Abs(gitDir)
-		if err != nil {
-			return ""
-		}
-		return absoluteGitDir
-	}
-
-	// Get the root directory of the git repository if the current directory
-	// is already inside the working tree
-	cmd = exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return ""
-	}
-	rootDir := strings.TrimSpace(string(output))
-	absoluteRootDir, err := filepath.Abs(rootDir)
-	if err != nil {
-		return ""
-	}
-	return absoluteRootDir
-}
-
-// Check if the path is allowed to access
-func isPathAllowed(path string) bool {
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return false
-	}
-	absAllowedDir, _ := filepath.Abs(allowedDir)
-	return strings.HasPrefix(absPath, absAllowedDir)
-}
-
-// A wrapper for lua environment to run protected os.Remove function
-func deleteFile(l *lua.LState) int {
-	filePath := l.ToString(1)
-
-	if !isPathAllowed(filePath) {
-		l.Push(lua.LString("Error: Access to this file is not allowed"))
-		return 1
-	}
-
-	err := os.Remove(filePath)
-	if err != nil {
-		l.Push(lua.LString(fmt.Sprintf("Error deleting file: %s", err.Error())))
-		return 1
-	}
-
-	l.Push(lua.LString("File deleted successfully"))
-	return 1
-}
-
 // Return all filenames in the specified directory, take a second argument to
 // specify if the scan should be recursive
 func goScanDir(l *lua.LState) int {
 	dirPath := l.ToString(1)
 	recursive := l.ToBool(2)
-	if !isPathAllowed(dirPath) {
+	if !sandbox.IsPathAllowed(dirPath) {
 		l.Push(lua.LString("Error: Access to this directory is not allowed"))
 		return 1
 	}
@@ -371,9 +138,10 @@ func goScanDir(l *lua.LState) int {
 	return 1
 }
 
+// goReadFile reads the content of a file and returns it as a string
 func goReadFile(l *lua.LState) int {
 	filePath := l.ToString(1)
-	if !isPathAllowed(filePath) {
+	if !sandbox.IsPathAllowed(filePath) {
 		l.Push(lua.LString("Error: Access to this file is not allowed"))
 		return 1
 	}
@@ -388,6 +156,7 @@ func goReadFile(l *lua.LState) int {
 	return 1
 }
 
+// goGetDiff retrieves the git diff output
 func goGetDiff(l *lua.LState) int {
 	cmd := exec.Command("git", "diff", "HEAD", "--no-ext-diff", "--unified=0", "-a", "--no-prefix")
 	output, err := cmd.CombinedOutput()
@@ -400,6 +169,7 @@ func goGetDiff(l *lua.LState) int {
 	return 1
 }
 
+// goGetWorkTree retrieves the list of files in the git work tree
 func goGetWorkTree(l *lua.LState) int {
 	cmd := exec.Command("git", "ls-files")
 	output, err := cmd.CombinedOutput()
@@ -449,7 +219,7 @@ func goRegexMatch(l *lua.LState) int {
 		case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
 			// For each added line, check against regex patterns
 			lineNumber++
-			for _, pattern := range patternsToMap(patterns) {
+			for _, pattern := range goPatternsToMap(patterns) {
 				if match, _ := regexp.MatchString(pattern.Value, line); match {
 					// Initialize results array for file
 					if _, ok := results[currentFile]; !ok {
@@ -490,7 +260,40 @@ func goRegexMatch(l *lua.LState) int {
 	return 1
 }
 
-func patternsToMap(patterns *lua.LTable) []struct{ Key, Value string } {
+// goExecute parse the function and run only supported functions
+func goExecute(l *lua.LState) int {
+	command := l.ToString(1)
+	commands := strings.Split(command, " ")
+
+	// TODO: Verify the integrity of the executable
+	var executable string
+	var args []string
+
+	// TODO: Make the args parsing more robust
+	executable = commands[0]
+	args = commands[1:]
+
+	if !strings.Contains(l.GetGlobal("allowedExecutables").String(), executable) {
+		l.Push(lua.LString("Error: Executable not allowed"))
+		return 1
+	}
+
+	// execute command and capture output
+	cmd := exec.Command(executable, args...)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		l.Push(lua.LString(err.Error()))
+		return 1
+	}
+
+	// Return output to Lua
+	l.Push(lua.LString(string(output)))
+	return 1
+}
+
+// goPatternsToMap converts Lua table of patterns to Go struct
+func goPatternsToMap(patterns *lua.LTable) []struct{ Key, Value string } {
 	result := []struct{ Key, Value string }{}
 	patterns.ForEach(func(key lua.LValue, value lua.LValue) {
 		result = append(result, struct{ Key, Value string }{
@@ -501,39 +304,13 @@ func patternsToMap(patterns *lua.LTable) []struct{ Key, Value string } {
 	return result
 }
 
-func getGitDiffOutput() (string, error) {
-	cmd := exec.Command("git", "diff", "HEAD", "--no-ext-diff", "--unified=0", "-a", "--no-prefix")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
-}
-
-func getGitDiffFiles() ([]string, error) {
-	cmd := exec.Command("git", "diff", "--staged", "--name-only", "--diff-filter=A")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
-}
-
-func getWorkTreeFiles() ([]string, error) {
-	cmd := exec.Command("git", "ls-files")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
-}
-
 type RegexPattern struct {
 	Key   string
 	Regex *regexp.Regexp
 }
 
-func patternsToList(patterns *lua.LTable) []RegexPattern {
+// goPatternsToList converts Lua table of patterns to Go struct
+func goPatternsToList(patterns *lua.LTable) []RegexPattern {
 	var patternsList []RegexPattern
 	patterns.ForEach(func(key, value lua.LValue) {
 		patternsList = append(patternsList, RegexPattern{
@@ -544,17 +321,18 @@ func patternsToList(patterns *lua.LTable) []RegexPattern {
 	return patternsList
 }
 
+// goProcessGitDiff processes the git diff output and matches against patterns
 func goProcessGitDiff(l *lua.LState) int {
 	start := time.Now()
 
-	output, err := getGitDiffOutput()
+	output, err := sandbox.GetGitDiffOutput()
 	if err != nil {
 		l.Push(lua.LString(err.Error()))
 		return 1
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(output))
-	patterns := patternsToList(l.ToTable(1))
+	patterns := goPatternsToList(l.ToTable(1))
 	results := map[string][]map[string]interface{}{}
 
 	currentFile := ""
@@ -611,7 +389,8 @@ func goProcessGitDiff(l *lua.LState) int {
 	return 0
 }
 
-func checkAddedLargeFile(l *lua.LState) int {
+// goCheckAddedLargeFile checks for large files in the git diff output
+func goCheckAddedLargeFile(l *lua.LState) int {
 	maxSizeKB := l.ToInt(1)
 	enforceAll := l.ToBool(2)
 
@@ -619,9 +398,9 @@ func checkAddedLargeFile(l *lua.LState) int {
 	var err error
 
 	if enforceAll {
-		files, err = getWorkTreeFiles()
+		files, err = sandbox.GetWorkTreeFiles()
 	} else {
-		files, err = getGitDiffFiles()
+		files, err = sandbox.GetGitDiffFiles()
 	}
 
 	if err != nil {
@@ -644,11 +423,12 @@ func checkAddedLargeFile(l *lua.LState) int {
 	return 0
 }
 
-func checkMergeConflict(l *lua.LState) int {
+// goCheckMergeConflict checks for merge conflicts in the git diff output
+func goCheckMergeConflict(l *lua.LState) int {
 	var files []string
 	var err error
 
-	files, err = getGitDiffFiles()
+	files, err = sandbox.GetGitDiffFiles()
 
 	if err != nil {
 		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
@@ -672,11 +452,12 @@ func checkMergeConflict(l *lua.LState) int {
 	return 0
 }
 
-func checkJSON(l *lua.LState) int {
+// goCheckJSON checks for valid JSON files in the git diff output
+func goCheckJSON(l *lua.LState) int {
 	var files []string
 	var err error
 
-	files, err = getWorkTreeFiles()
+	files, err = sandbox.GetWorkTreeFiles()
 
 	if err != nil {
 		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
@@ -698,11 +479,12 @@ func checkJSON(l *lua.LState) int {
 	return 0
 }
 
-func checkNoCommitOnBranch(l *lua.LState) int {
+// goCheckNoCommitOnBranch checks if the current branch is protected
+func goCheckNoCommitOnBranch(l *lua.LState) int {
 	protectedBranches := l.ToTable(1)
 	patterns := l.ToTable(2)
 
-	branchName, err := getCurrentBranchName()
+	branchName, err := sandbox.GetCurrentBranchName()
 	if err != nil {
 		l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
 		return 1
@@ -732,26 +514,8 @@ func checkNoCommitOnBranch(l *lua.LState) int {
 	return 0
 }
 
-func getCurrentBranchName() (string, error) {
-	cmd := exec.Command("git", "symbolic-ref", "--short", "HEAD")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-func getGitArchive() (string, error) {
-	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
-}
-
-// git plumbing wrapper
-func getGitObject(l *lua.LState) int {
+// goGetGitObject retrieves the content of a git object
+func goGetGitObject(l *lua.LState) int {
 	object := l.ToString(1)
 
 	cmd := exec.Command("git", "cat-file", "-p", object)
@@ -765,7 +529,8 @@ func getGitObject(l *lua.LState) int {
 	return 0
 }
 
-func getGitObjectSize(l *lua.LState) int {
+// goGetGitObject retrieves the content of a git object
+func goGetGitObjectSize(l *lua.LState) int {
 	object := l.ToString(1)
 
 	cmd := exec.Command("git", "cat-file", "-s", object)
@@ -779,7 +544,8 @@ func getGitObjectSize(l *lua.LState) int {
 	return 0
 }
 
-func getGitObjectHash(l *lua.LState) int {
+// goGetGitObjectHash retrieves the hash of a git object
+func goGetGitObjectHash(l *lua.LState) int {
 	object := l.ToString(1)
 
 	cmd := exec.Command("git", "hash-object", "-w", object)
@@ -793,7 +559,8 @@ func getGitObjectHash(l *lua.LState) int {
 	return 0
 }
 
-func getGitObjectPath(l *lua.LState) int {
+// goGetGitObjectPath retrieves the path of a git object
+func goGetGitObjectPath(l *lua.LState) int {
 	object := l.ToString(1)
 
 	cmd := exec.Command("git", "rev-parse", object)
