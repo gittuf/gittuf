@@ -17,7 +17,7 @@ linters:
   - unparam
   - unused
   - whitespace
-output:
+issues:
   uniq-by-line: false
 run:
   issues-exit-code: 1
