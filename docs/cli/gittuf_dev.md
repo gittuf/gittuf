@@ -25,9 +25,6 @@ These commands are meant to be used to aid gittuf development, and are not expec
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf dev add-github-approval](gittuf_dev_add-github-approval.md)	 - Record GitHub pull request approval as an attestation (developer mode only, set GITTUF_DEV=1)
-* [gittuf dev attest-github](gittuf_dev_attest-github.md)	 - Record GitHub pull request information as an attestation (developer mode only, set GITTUF_DEV=1)
-* [gittuf dev dismiss-github-approval](gittuf_dev_dismiss-github-approval.md)	 - Dismiss GitHub pull request approval as an attestation (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev populate-cache](gittuf_dev_populate-cache.md)	 - Populate persistent cache (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev rsl-record](gittuf_dev_rsl-record.md)	 - Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
 
