@@ -277,29 +277,6 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository, opts ...
 	return LoadState(ctx, repo, firstEntry, opts...)
 }
 
-// GetStateForCommit scans the RSL to identify the first time a commit was seen
-// in the repository. The policy preceding that RSL entry is returned as the
-// State to be used for verifying the commit's signature. If the commit hasn't
-// been seen in the repository previously, no policy state is returned. Also, no
-// error is returned. Identifying the policy in this case is left to the calling
-// workflow.
-func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
-	firstSeenEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForCommit(repo, commitID)
-	if err != nil {
-		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	commitPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstSeenEntry.GetID()))
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadState(ctx, repo, commitPolicyEntry)
-}
-
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
 // for delegated metadata files are verified using the verifier context.

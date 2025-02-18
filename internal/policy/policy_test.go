@@ -14,7 +14,6 @@ import (
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
@@ -666,107 +665,6 @@ func TestStateFindVerifiersForPath(t *testing.T) {
 		assert.Nil(t, verifiers)
 		assert.ErrorIs(t, err, ErrMetadataNotFound)
 	})
-}
-
-func TestGetStateForCommit(t *testing.T) {
-	t.Parallel()
-	repo, firstState := createTestRepository(t, createTestStateWithPolicy)
-
-	// Create some commits
-	refName := "refs/heads/main"
-	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	commitID, err := repo.Commit(emptyTreeHash, refName, "Initial commit", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// No RSL entry for commit => no state yet
-	state, err := GetStateForCommit(context.Background(), repo, commitID)
-	assert.Nil(t, err)
-	assert.Nil(t, state)
-
-	// Record RSL entry for commit
-	if err := rsl.NewReferenceEntry(refName, commitID).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	state, err = GetStateForCommit(context.Background(), repo, commitID)
-	assert.Nil(t, err)
-	assertStatesEqual(t, firstState, state)
-
-	// Create new branch, record new commit there
-	anotherRefName := "refs/heads/feature"
-	if err := repo.SetReference(anotherRefName, commitID); err != nil {
-		t.Fatal(err)
-	}
-	newCommitID, err := repo.Commit(emptyTreeHash, anotherRefName, "Second commit", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := rsl.NewReferenceEntry(anotherRefName, newCommitID).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
-	assert.Nil(t, err)
-	assertStatesEqual(t, firstState, state)
-
-	// Update policy, record in RSL
-	secondState, err := LoadCurrentState(context.Background(), repo, PolicyRef) // secondState := firstState will modify firstState as well
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsMetadata, err := secondState.GetTargetsMetadata(TargetsRoleName, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := tufv01.NewKeyFromSSLibKey(keyR)
-	if err := targetsMetadata.AddRule("new-rule", []string{key.KeyID}, []string{"*"}, 1); err != nil { // just a dummy rule
-		t.Fatal(err)
-	}
-
-	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
-	if err != nil {
-		t.Fatal(err)
-	}
-	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
-	if err != nil {
-		t.Fatal(err)
-	}
-	secondState.Metadata.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(repo, "Second state", false); err != nil {
-		t.Fatal(err)
-	}
-	if err := Apply(context.Background(), repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Merge feature branch commit into main
-	if err := repo.CheckAndSetReference(refName, newCommitID, commitID); err != nil {
-		t.Fatal(err)
-	}
-
-	// Record in RSL
-	if err := rsl.NewReferenceEntry(refName, newCommitID).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
-
-	// Check that for this commit ID, the first state is returned and not the
-	// second
-	state, err = GetStateForCommit(context.Background(), repo, newCommitID)
-	assert.Nil(t, err)
-	assertStatesEqual(t, firstState, state)
 }
 
 func TestStateHasFileRule(t *testing.T) {

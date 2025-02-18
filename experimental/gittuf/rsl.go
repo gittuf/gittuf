@@ -18,7 +18,6 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
 const gittufTransportPrefix = "gittuf::"
@@ -383,94 +382,6 @@ func getRSLEntriesUntil(repo *gitinterface.Repository, start, until gitinterface
 	}
 
 	return entries, nil
-}
-
-// CheckRemoteRSLForUpdates checks if the RSL at the specified remote
-// repository has updated in comparison with the local repository's RSL. This is
-// done by fetching the remote RSL to the local repository's remote RSL tracker.
-// If the remote RSL has been updated, this method also checks if the local and
-// remote RSLs have diverged. In summary, the first return value indicates if
-// there is an update and the second return value indicates if the two RSLs have
-// diverged and need to be reconciled.
-//
-// Deprecated: this was a precursor to ReconcileLocalRSLWithRemote, we probably
-// don't need both of them.
-func (r *Repository) CheckRemoteRSLForUpdates(_ context.Context, remoteName string) (bool, bool, error) {
-	remoteURL, err := r.r.GetRemoteURL(remoteName)
-	if err != nil {
-		return false, false, err
-	}
-	if strings.HasPrefix(remoteURL, gittufTransportPrefix) {
-		slog.Debug("Creating new remote to avoid using gittuf transport...")
-		remoteName = fmt.Sprintf("check-remote-%s", remoteName)
-		if err := r.r.AddRemote(remoteName, strings.TrimPrefix(remoteURL, gittufTransportPrefix)); err != nil {
-			return false, false, err
-		}
-		defer r.r.RemoveRemote(remoteName) //nolint:errcheck
-	}
-
-	trackerRef := rsl.RemoteTrackerRef(remoteName)
-	rslRemoteRefSpec := []string{fmt.Sprintf("%s:%s", rsl.Ref, trackerRef)}
-
-	slog.Debug(fmt.Sprintf("Updating remote RSL tracker (%s)...", rslRemoteRefSpec))
-	if err := r.r.FetchRefSpec(remoteName, rslRemoteRefSpec); err != nil {
-		if errors.Is(err, transport.ErrEmptyRemoteRepository) {
-			// Check if remote is empty and exit appropriately
-			return false, false, nil
-		}
-		return false, false, err
-	}
-
-	remoteRefState, err := r.r.GetReference(trackerRef)
-	if err != nil {
-		return false, false, err
-	}
-	slog.Debug(fmt.Sprintf("Remote RSL is at '%s'", remoteRefState.String()))
-
-	localRefState, err := r.r.GetReference(rsl.Ref)
-	if err != nil {
-		return false, false, err
-	}
-	slog.Debug(fmt.Sprintf("Local RSL is at '%s'", localRefState.String()))
-
-	// Check if local is nil and exit appropriately
-	if localRefState.IsZero() {
-		// Local RSL has not been populated but remote is not zero
-		// So there are updates the local can pull
-		slog.Debug("Local RSL has not been initialized but remote RSL exists")
-		return true, false, nil
-	}
-
-	// Check if equal and exit early if true
-	if remoteRefState.Equal(localRefState) {
-		slog.Debug("Local and remote RSLs have same state")
-		return false, false, nil
-	}
-
-	// Next, check if remote is ahead of local
-	knows, err := r.r.KnowsCommit(remoteRefState, localRefState)
-	if err != nil {
-		return false, false, err
-	}
-	if knows {
-		slog.Debug("Remote RSL is ahead of local RSL")
-		return true, false, nil
-	}
-
-	// If not ancestor, local may be ahead or they may have diverged
-	// If remote is ancestor, only local is ahead, no updates
-	// If remote is not ancestor, the two have diverged, local needs to pull updates
-	knows, err = r.r.KnowsCommit(localRefState, remoteRefState)
-	if err != nil {
-		return false, false, err
-	}
-	if knows {
-		slog.Debug("Local RSL is ahead of remote RSL")
-		return false, false, nil
-	}
-
-	slog.Debug("Local and remote RSLs have diverged")
-	return true, true, nil
 }
 
 // PushRSL pushes the local RSL to the specified remote. As this push defaults
