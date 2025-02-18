@@ -64,7 +64,7 @@ func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly boo
 }
 
 func (r *Repository) FetchObject(remoteName string, objectID Hash) error {
-	args := []string{"fetch", "--depth=1", remoteName, objectID.String()}
+	args := []string{"fetch", remoteName, objectID.String()}
 	_, err := r.executor(args...).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to fetch object: %w", err)
