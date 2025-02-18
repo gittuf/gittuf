@@ -1,9 +1,9 @@
-## gittuf dev dismiss-github-approval
+## gittuf attest github dismiss-approval
 
-Dismiss GitHub pull request approval as an attestation (developer mode only, set GITTUF_DEV=1)
+Record dismissal of GitHub pull request approval
 
 ```
-gittuf dev dismiss-github-approval [flags]
+gittuf attest github dismiss-approval [flags]
 ```
 
 ### Options
@@ -11,7 +11,7 @@ gittuf dev dismiss-github-approval [flags]
 ```
       --base-URL string           location of GitHub instance (default "https://github.com")
       --dismiss-approver string   identity of the reviewer whose review was dismissed
-  -h, --help                      help for dismiss-github-approval
+  -h, --help                      help for dismiss-approval
       --review-ID int             pull request review ID (default -1)
   -k, --signing-key string        signing key to use for signing attestation
 ```
@@ -28,5 +28,5 @@ gittuf dev dismiss-github-approval [flags]
 
 ### SEE ALSO
 
-* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
+* [gittuf attest github](gittuf_attest_github.md)	 - Tools to attest about GitHub actions and entities
 

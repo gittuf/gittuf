@@ -5,6 +5,7 @@ package attest
 
 import (
 	"github.com/gittuf/gittuf/internal/cmd/attest/authorize"
+	"github.com/gittuf/gittuf/internal/cmd/attest/github"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +17,7 @@ func New() *cobra.Command {
 	}
 
 	cmd.AddCommand(authorize.New())
+	cmd.AddCommand(github.New())
 
 	return cmd
 }

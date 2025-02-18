@@ -17,7 +17,6 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -249,10 +248,6 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 // in as an option. If it is not, it is read from the GITHUB_TOKEN environment
 // variable. A custom GitHub instance can be specified via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -311,10 +306,6 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 // GITHUB_TOKEN environment variable. A custom GitHub instance can be specified
 // via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -358,13 +349,8 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 // and stored in the repository. To find the review information, the GitHub API
 // is used and the authentication token for the API is passed in as an option.
 // If the token is not passed in, it's read from the GITHUB_TOKEN environment
-// variable. A custom GitHub instance can be specified via opts. Currently, this
-// is limited to developer mode.
+// variable. A custom GitHub instance can be specified via opts.
 func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, reviewID int64, approver string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -460,10 +446,6 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 // request approval attestation for the specified parameters. A custom GitHub
 // instance can be specified via opts.
 func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()

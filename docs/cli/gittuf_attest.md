@@ -22,4 +22,5 @@ Tools for attesting to code contributions
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 * [gittuf attest authorize](gittuf_attest_authorize.md)	 - Add or revoke reference authorization
+* [gittuf attest github](gittuf_attest_github.md)	 - Tools to attest about GitHub actions and entities
 
