@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +23,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	rules, err := repo.ListGlobalRules(cmd.Context(), policy.PolicyRef)
+	rules, err := repo.ListGlobalRules(cmd.Context())
 	if len(rules) == 0 {
 		fmt.Println("The rules slice is empty")
 	}

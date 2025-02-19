@@ -792,7 +792,7 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 }
 
 // ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
-func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
+func (r *Repository) ListGlobalRules(ctx context.Context) ([]tuf.GlobalRule, error) {
 	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
 	if err != nil {
