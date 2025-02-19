@@ -14,18 +14,9 @@ import (
 
 const indentString = "    "
 
-type options struct {
-	targetRef string
-}
+type options struct{}
 
-func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&o.targetRef,
-		"target-ref",
-		"policy",
-		"specify which policy ref should be inspected",
-	)
-}
+func (o *options) AddFlags(cmd *cobra.Command) {}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository()
