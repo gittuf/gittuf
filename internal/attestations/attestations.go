@@ -189,6 +189,9 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 	for name, blobID := range a.codeReviewApprovalAttestations {
 		allAttestations[path.Join(codeReviewApprovalAttestationsTreeEntryName, name)] = blobID
 	}
+	for name, blobID := range a.hooksAttestations {
+		allAttestations[path.Join(hooksAttestationTreeEntryName, name)] = blobID
+	}
 
 	attestationsTreeID, err := treeBuilder.WriteRootTreeFromBlobIDs(allAttestations)
 	if err != nil {
