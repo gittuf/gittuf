@@ -593,6 +593,32 @@ func TestFetchRepository(t *testing.T) {
 	})
 }
 
+func TestFetchObject(t *testing.T) {
+	tmpDir1 := t.TempDir()
+	upstreamRepo := CreateTestGitRepository(t, tmpDir1, true)
+	err := upstreamRepo.SetGitConfig("uploadpack.allowReachableSHA1InWant", "true")
+	require.Nil(t, err)
+	treeBuilder := NewTreeBuilder(upstreamRepo)
+	treeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+	commitID, err := upstreamRepo.Commit(treeID, "refs/heads/main", "Initial commit\n", false)
+	require.Nil(t, err)
+
+	tmpDir2 := t.TempDir()
+	downstreamRepo := CreateTestGitRepository(t, tmpDir2, false)
+	err = downstreamRepo.AddRemote("origin", tmpDir1)
+	require.Nil(t, err)
+
+	has := downstreamRepo.HasObject(commitID)
+	assert.False(t, has)
+
+	err = downstreamRepo.FetchObject("origin", commitID)
+	assert.Nil(t, err)
+
+	has = downstreamRepo.HasObject(commitID)
+	assert.True(t, has)
+}
+
 func TestCloneAndFetchRepository(t *testing.T) {
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
