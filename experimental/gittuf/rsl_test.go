@@ -609,6 +609,382 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	})
 }
 
+func TestSync(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	t.Run("local and remote are identical", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		divergedRefs, err := localRepo.Sync(remoteName, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+	})
+
+	t.Run("local is strictly ahead of remote", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		currentRSLTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Remote RSL must now be updated to match local
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("local is strictly behind remote", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		currentRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Local RSL must now be updated to match remote
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("local RSL has diverged, not allowed to overwrite", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, false)
+		assert.ErrorIs(t, err, ErrDivergedRefs)
+		assert.Contains(t, divergedRefs, rsl.Ref)
+	})
+
+	t.Run("local ref (not RSL) has diverged, not allowed to overwrite", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, false)
+		assert.ErrorIs(t, err, ErrDivergedRefs)
+		assert.Contains(t, divergedRefs, refName)
+	})
+
+	t.Run("local RSL has diverged, allowed to overwrite", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, true)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Local RSL must now be updated to match remote
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+	})
+
+	t.Run("local ref (not RSL) has diverged, allowed to overwrite", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions
+		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(remoteName, true)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Local RSL must now be updated to match remote
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+	})
+}
+
 func TestPushRSL(t *testing.T) {
 	remoteName := "origin"
 
