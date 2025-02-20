@@ -19,8 +19,8 @@ linters:
   - whitespace
 issues:
   uniq-by-line: false
+  exclude-dirs:
+    - internal/third_party
 run:
   issues-exit-code: 1
   timeout: 10m
-  exclude-dirs:
-    - internal/third_party
