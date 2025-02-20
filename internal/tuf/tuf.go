@@ -382,7 +382,7 @@ func (h HookStage) String() string {
 }
 
 // MarshalJSON is used to serialize the instance of HookStage into JSON.
-func (h HookStage) MarshalJSON() ([]byte, error) {
+func (h *HookStage) MarshalJSON() ([]byte, error) {
 	if h.String() == "" {
 		return nil, ErrInvalidHookStage
 	}
@@ -392,7 +392,7 @@ func (h HookStage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON is used to load an instance of HookStage from the JSON
 // representation.
-func (h HookStage) UnmarshalJSON(jsonBytes []byte) error {
+func (h *HookStage) UnmarshalJSON(jsonBytes []byte) error {
 	var stage string
 	if err := json.Unmarshal(jsonBytes, &stage); err != nil {
 		return err
@@ -400,9 +400,9 @@ func (h HookStage) UnmarshalJSON(jsonBytes []byte) error {
 
 	switch stage {
 	case HookStagePreCommitString:
-		h = HookStagePreCommit
+		*h = HookStagePreCommit
 	case HookStagePrePushString:
-		h = HookStagePrePush
+		*h = HookStagePrePush
 	default:
 		return ErrInvalidHookStage
 	}
@@ -427,7 +427,7 @@ func (h HookEnvironment) String() string {
 }
 
 // MarshalJSON is used to serialize the instance of HookEnvironment into JSON.
-func (h HookEnvironment) MarshalJSON() ([]byte, error) {
+func (h *HookEnvironment) MarshalJSON() ([]byte, error) {
 	if h.String() == "" {
 		return nil, ErrInvalidHookEnvironment
 	}
@@ -437,7 +437,7 @@ func (h HookEnvironment) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON is used to load an instance of HookEnvironment from the JSON
 // representation.
-func (h HookEnvironment) UnmarshalJSON(jsonBytes []byte) error {
+func (h *HookEnvironment) UnmarshalJSON(jsonBytes []byte) error {
 	var env string
 	if err := json.Unmarshal(jsonBytes, &env); err != nil {
 		return err
@@ -445,7 +445,7 @@ func (h HookEnvironment) UnmarshalJSON(jsonBytes []byte) error {
 
 	switch env {
 	case HookEnvironmentLuaString:
-		h = HookEnvironmentLua
+		*h = HookEnvironmentLua
 	default:
 		return ErrInvalidHookEnvironment
 	}
