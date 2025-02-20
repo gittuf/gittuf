@@ -82,11 +82,16 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if o.commitID != "" {
-		return repo.AddGitHubPullRequestAttestationForCommit(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.commitID, o.baseBranch, true, githubopts.WithGitHubBaseURL(o.baseURL))
+	opts := []githubopts.Option{githubopts.WithGitHubBaseURL(o.baseBranch)}
+	if o.p.WithRSLEntry {
+		opts = append(opts, githubopts.WithRSLEntry())
 	}
 
-	return repo.AddGitHubPullRequestAttestationForNumber(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, true, githubopts.WithGitHubBaseURL(o.baseURL))
+	if o.commitID != "" {
+		return repo.AddGitHubPullRequestAttestationForCommit(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.commitID, o.baseBranch, true, opts...)
+	}
+
+	return repo.AddGitHubPullRequestAttestationForNumber(cmd.Context(), signer, repositoryParts[0], repositoryParts[1], o.pullRequestNumber, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

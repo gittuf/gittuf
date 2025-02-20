@@ -26,7 +26,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 func New() *cobra.Command {
 	o := &options{}
-	cmd := recordapproval.New(&persistent.Options{SigningKey: o.signingKey})
+	cmd := recordapproval.New(&persistent.Options{SigningKey: o.signingKey, WithRSLEntry: true})
 	o.AddFlags(cmd)
 	cmd.Deprecated = "switch to \"gittuf attest github record-approval\""
 	return cmd

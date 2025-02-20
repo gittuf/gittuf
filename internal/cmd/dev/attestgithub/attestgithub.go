@@ -26,7 +26,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 func New() *cobra.Command {
 	o := &options{}
-	cmd := pullrequest.New(&persistent.Options{SigningKey: o.signingKey})
+	cmd := pullrequest.New(&persistent.Options{SigningKey: o.signingKey, WithRSLEntry: true})
 	o.AddFlags(cmd)
 	cmd.Deprecated = "switch to \"gittuf attest github pull-request\""
 	return cmd
