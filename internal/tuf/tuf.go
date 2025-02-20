@@ -63,6 +63,7 @@ var (
 	ErrInvalidHookEnvironment                          = errors.New("invalid environment for hook")
 	ErrHookNotFound                                    = errors.New("cannot find hook entry")
 	ErrNoHooksDefined                                  = errors.New("no hooks defined")
+	ErrSigstoreTrustedRootNotSet                       = errors.New("sigstore trusted-root.json not set")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
