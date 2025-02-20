@@ -29,6 +29,7 @@ type RootMetadata struct {
 	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
 	MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
+	Hooks                  map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -528,15 +529,16 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage for tuf interfaces
 	type tempType struct {
-		Type                   string            `json:"type"`
-		Expires                string            `json:"expires"`
-		RepositoryLocation     string            `json:"repositoryLocation,omitempty"`
-		Keys                   map[string]*Key   `json:"keys"`
-		Roles                  map[string]Role   `json:"roles"`
-		GitHubApprovalsTrusted bool              `json:"githubApprovalsTrusted"`
-		GlobalRules            []json.RawMessage `json:"globalRules,omitempty"`
-		Propagations           []json.RawMessage `json:"propagations,omitempty"`
-		MultiRepository        *MultiRepository  `json:"multiRepository,omitempty"`
+		Type                   string                    `json:"type"`
+		Expires                string                    `json:"expires"`
+		RepositoryLocation     string                    `json:"repositoryLocation,omitempty"`
+		Keys                   map[string]*Key           `json:"keys"`
+		Roles                  map[string]Role           `json:"roles"`
+		GitHubApprovalsTrusted bool                      `json:"githubApprovalsTrusted"`
+		GlobalRules            []json.RawMessage         `json:"globalRules,omitempty"`
+		Propagations           []json.RawMessage         `json:"propagations,omitempty"`
+		MultiRepository        *MultiRepository          `json:"multiRepository,omitempty"`
+		Hooks                  map[tuf.HookStage][]*Hook `json:"hooks,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -591,6 +593,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.MultiRepository = temp.MultiRepository
+
+	r.Hooks = temp.Hooks
 
 	return nil
 }
@@ -783,4 +787,92 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 		initialRootPrincipals = append(initialRootPrincipals, key)
 	}
 	return initialRootPrincipals
+}
+
+// AddHook adds the specified hook to the metadata.
+func (r *RootMetadata) AddHook(stage tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) error {
+	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
+
+	if stage != tuf.HookStagePreCommit && stage != tuf.HookStagePrePush {
+		return tuf.ErrInvalidHookStage
+	}
+
+	newHook := &Hook{
+		Name:         hookName,
+		PrincipalIDs: set.NewSetFromItems(principalIDs...),
+		Hashes:       hashes,
+		Environment:  environment,
+		Modules:      modules,
+	}
+
+	if r.Hooks == nil {
+		r.Hooks = make(map[tuf.HookStage][]*Hook, 2)
+	}
+
+	if r.Hooks[stage] == nil {
+		r.Hooks[stage] = []*Hook{}
+	}
+
+	r.Hooks[stage] = append(r.Hooks[stage], newHook)
+
+	return nil
+}
+
+// RemoveHook removes the hook specified by stage and hookName.
+func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) {
+	hooks := []*Hook{}
+	for _, hook := range r.Hooks[stage] {
+		if hook.Name != hookName {
+			hooks = append(hooks, hook)
+		}
+	}
+
+	r.Hooks[stage] = hooks
+}
+
+// GetHooks returns the hooks for the specified stage.
+func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
+	if r.Hooks == nil {
+		return nil, tuf.ErrNoHooksDefined
+	}
+
+	hooks := []tuf.Hook{}
+	for _, hook := range r.Hooks[stage] {
+		hooks = append(hooks, hook)
+	}
+	return hooks, nil
+}
+
+// Hook defines the schema for a hook.
+type Hook struct {
+	Name         string              `json:"name"`
+	PrincipalIDs *set.Set[string]    `json:"principals"`
+	Hashes       map[string]string   `json:"hashes"`
+	Environment  tuf.HookEnvironment `json:"environment"`
+	Modules      []string            `json:"modules"`
+}
+
+// ID returns the identifier of the hook, its name.
+func (h *Hook) ID() string {
+	return h.Name
+}
+
+// GetPrincipalIDs returns the principals that must run this hook.
+func (h *Hook) GetPrincipalIDs() *set.Set[string] {
+	return h.PrincipalIDs
+}
+
+// GetHashes returns the hashes of the hook file.
+func (h *Hook) GetHashes() map[string]string {
+	return h.Hashes
+}
+
+// GetEnvironment returns the environment that the hook is to run in.
+func (h *Hook) GetEnvironment() tuf.HookEnvironment {
+	return h.Environment
+}
+
+// GetModules returns the Lua modules that the hook will have access to.
+func (h *Hook) GetModules() []string {
+	return h.Modules
 }
