@@ -17,6 +17,7 @@ gittuf attest authorize [flags]
 ### Options inherited from parent commands
 
 ```
+      --create-rsl-entry             create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
       --no-color                     turn off colored output
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")

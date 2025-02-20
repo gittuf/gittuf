@@ -793,7 +793,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -878,7 +878,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -940,7 +940,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1003,7 +1003,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1080,7 +1080,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1180,7 +1180,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1257,7 +1257,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1335,7 +1335,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1430,7 +1430,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1513,7 +1513,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1573,7 +1573,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1634,7 +1634,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1709,7 +1709,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1807,7 +1807,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval and reference authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1882,7 +1882,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1958,7 +1958,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2721,7 +2721,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2774,7 +2774,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2832,7 +2832,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2890,7 +2890,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2945,7 +2945,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -2969,7 +2969,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3024,7 +3024,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3048,7 +3048,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3102,7 +3102,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3156,7 +3156,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3185,7 +3185,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3241,7 +3241,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3294,7 +3294,7 @@ func TestVerifyEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3486,7 +3486,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3566,7 +3566,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
 			t.Fatal(err)
 		}
-		if err := currentAttestations.Commit(repo, "Add authorization", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
 			t.Fatal(err)
 		}
 

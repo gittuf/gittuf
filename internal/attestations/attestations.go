@@ -149,7 +149,7 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.Reference
 // Commit writes the state of the attestations to the repository, creating a new
 // commit with the changes made. An RSL entry is also recorded for the
 // namespace.
-func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
+func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = defaultCommitMessage
 	}
@@ -197,14 +197,15 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 		return err
 	}
 
-	// We must reset to original attestation commit if err != nil from here onwards.
+	if createRSLEntry {
+		// We must reset to original attestation commit if err != nil from here onwards.
+		if err := rsl.NewReferenceEntry(Ref, newCommitID).Commit(repo, signCommit); err != nil {
+			if !priorCommitID.IsZero() {
+				return repo.ResetDueToError(err, Ref, priorCommitID)
+			}
 
-	if err := rsl.NewReferenceEntry(Ref, newCommitID).Commit(repo, signCommit); err != nil {
-		if !priorCommitID.IsZero() {
-			return repo.ResetDueToError(err, Ref, priorCommitID)
+			return err
 		}
-
-		return err
 	}
 
 	return nil

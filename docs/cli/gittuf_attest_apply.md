@@ -1,11 +1,16 @@
-## gittuf attest github
+## gittuf attest apply
 
-Tools to attest about GitHub actions and entities
+Apply and push local attestations changes to remote repository
+
+```
+gittuf attest apply [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for github
+  -h, --help         help for apply
+      --local-only   indicate that the attestation must be committed into the RSL only locally
 ```
 
 ### Options inherited from parent commands
@@ -23,7 +28,4 @@ Tools to attest about GitHub actions and entities
 ### SEE ALSO
 
 * [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
-* [gittuf attest github dismiss-approval](gittuf_attest_github_dismiss-approval.md)	 - Record dismissal of GitHub pull request approval
-* [gittuf attest github pull-request](gittuf_attest_github_pull-request.md)	 - Record GitHub pull request information as an attestation
-* [gittuf attest github record-approval](gittuf_attest_github_record-approval.md)	 - Record GitHub pull request approval
 

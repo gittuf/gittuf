@@ -4,6 +4,7 @@
 package attest
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/attest/apply"
 	"github.com/gittuf/gittuf/internal/cmd/attest/authorize"
 	"github.com/gittuf/gittuf/internal/cmd/attest/github"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
@@ -19,6 +20,7 @@ func New() *cobra.Command {
 	}
 	o.AddPersistentFlags(cmd)
 
+	cmd.AddCommand(apply.New())
 	cmd.AddCommand(authorize.New(o))
 	cmd.AddCommand(github.New(o))
 
