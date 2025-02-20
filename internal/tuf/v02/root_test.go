@@ -687,8 +687,6 @@ func TestAddHookAndGetHooks(t *testing.T) {
 }
 
 func TestRemoveHook(t *testing.T) {
-	const invalidStage = 9999
-
 	rootMetadata := initialTestRootMetadata(t)
 
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
