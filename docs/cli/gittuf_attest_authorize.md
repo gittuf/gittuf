@@ -9,10 +9,9 @@ gittuf attest authorize [flags]
 ### Options
 
 ```
-  -f, --from-ref string      ref to authorize merging changes from
-  -h, --help                 help for authorize
-  -r, --revoke               revoke existing authorization
-  -k, --signing-key string   signing key to use for creating or revoking an authorization
+  -f, --from-ref string   ref to authorize merging changes from
+  -h, --help              help for authorize
+  -r, --revoke            revoke existing authorization
 ```
 
 ### Options inherited from parent commands
@@ -22,6 +21,7 @@ gittuf attest authorize [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+  -k, --signing-key string           signing key to use to sign attestation
       --verbose                      enable verbose logging
 ```
 

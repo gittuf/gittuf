@@ -5,7 +5,8 @@ Tools for attesting to code contributions
 ### Options
 
 ```
-  -h, --help   help for attest
+  -h, --help                 help for attest
+  -k, --signing-key string   signing key to use to sign attestation
 ```
 
 ### Options inherited from parent commands
