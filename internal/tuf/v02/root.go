@@ -29,6 +29,7 @@ type RootMetadata struct {
 	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
 	MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
+	Hooks                  map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -327,6 +328,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
 		Propagations           []json.RawMessage          `json:"propagations,omitempty"`
 		MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
+		Hooks                  map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -414,6 +416,8 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.MultiRepository = temp.MultiRepository
+
+	r.Hooks = temp.Hooks
 
 	return nil
 }
@@ -756,4 +760,60 @@ func (o *OtherRepository) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+type Hook = tufv01.Hook
+
+// AddHook adds the specified hook to the metadata.
+func (r *RootMetadata) AddHook(stage tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) error {
+	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
+
+	if stage != tuf.HookStagePreCommit && stage != tuf.HookStagePrePush {
+		return tuf.ErrInvalidHookStage
+	}
+
+	newHook := &Hook{
+		Name:         hookName,
+		PrincipalIDs: set.NewSetFromItems(principalIDs...),
+		Hashes:       hashes,
+		Environment:  environment,
+		Modules:      modules,
+	}
+
+	if r.Hooks == nil {
+		r.Hooks = make(map[tuf.HookStage][]*Hook, 2)
+	}
+
+	if r.Hooks[stage] == nil {
+		r.Hooks[stage] = []*Hook{}
+	}
+
+	r.Hooks[stage] = append(r.Hooks[stage], newHook)
+
+	return nil
+}
+
+// RemoveHook removes the hook specified by stage and hookName.
+func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) {
+	hooks := []*Hook{}
+	for _, hook := range r.Hooks[stage] {
+		if hook.Name != hookName {
+			hooks = append(hooks, hook)
+		}
+	}
+
+	r.Hooks[stage] = hooks
+}
+
+// GetHooks returns the hooks for the specified stage.
+func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
+	if r.Hooks == nil {
+		return nil, tuf.ErrNoHooksDefined
+	}
+
+	hooks := []tuf.Hook{}
+	for _, hook := range r.Hooks[stage] {
+		hooks = append(hooks, hook)
+	}
+	return hooks, nil
 }
