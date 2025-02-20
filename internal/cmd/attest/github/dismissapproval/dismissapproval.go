@@ -6,26 +6,18 @@ package dismissapproval
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
+	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	signingKey        string
+	p                 *persistent.Options
 	baseURL           string
 	reviewID          int64
 	dismissedApprover string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(
-		&o.signingKey,
-		"signing-key",
-		"k",
-		"",
-		"signing key to use for signing attestation",
-	)
-	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
-
 	cmd.Flags().StringVar(
 		&o.baseURL,
 		"base-URL",
@@ -56,7 +48,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	signer, err := gittuf.LoadSigner(repo, o.signingKey)
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
@@ -64,8 +56,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.reviewID, o.dismissedApprover, true, githubopts.WithGitHubBaseURL(o.baseURL))
 }
 
-func New() *cobra.Command {
-	o := &options{}
+func New(persistent *persistent.Options) *cobra.Command {
+	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:   "dismiss-approval",
 		Short: "Record dismissal of GitHub pull request approval",

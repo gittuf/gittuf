@@ -7,25 +7,17 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	signingKey string
-	fromRef    string
-	revoke     bool
+	p       *persistent.Options
+	fromRef string
+	revoke  bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(
-		&o.signingKey,
-		"signing-key",
-		"k",
-		"",
-		"signing key to use for creating or revoking an authorization",
-	)
-	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
-
 	cmd.Flags().StringVarP(
 		&o.fromRef,
 		"from-ref",
@@ -50,7 +42,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	signer, err := gittuf.LoadSigner(repo, o.signingKey)
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
 	if err != nil {
 		return err
 	}
@@ -66,8 +58,8 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true)
 }
 
-func New() *cobra.Command {
-	o := &options{}
+func New(persistent *persistent.Options) *cobra.Command {
+	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "authorize",
 		Short:             "Add or revoke reference authorization",

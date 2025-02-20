@@ -15,7 +15,6 @@ gittuf attest github pull-request [flags]
   -h, --help                      help for pull-request
       --pull-request-number int   pull request number to record in attestation (default -1)
       --repository string         path to base GitHub repository the pull request is opened against, of form {owner}/{repo}
-  -k, --signing-key string        signing key to use for signing attestation
 ```
 
 ### Options inherited from parent commands
@@ -25,6 +24,7 @@ gittuf attest github pull-request [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+  -k, --signing-key string           signing key to use to sign attestation
       --verbose                      enable verbose logging
 ```
 

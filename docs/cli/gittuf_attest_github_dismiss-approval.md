@@ -13,7 +13,6 @@ gittuf attest github dismiss-approval [flags]
       --dismiss-approver string   identity of the reviewer whose review was dismissed
   -h, --help                      help for dismiss-approval
       --review-ID int             pull request review ID (default -1)
-  -k, --signing-key string        signing key to use for signing attestation
 ```
 
 ### Options inherited from parent commands
@@ -23,6 +22,7 @@ gittuf attest github dismiss-approval [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+  -k, --signing-key string           signing key to use to sign attestation
       --verbose                      enable verbose logging
 ```
 
