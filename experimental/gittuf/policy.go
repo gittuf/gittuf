@@ -66,3 +66,7 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	}
 	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
 }
+
+func (r *Repository) ListHooks(ctx context.Context) (map[tuf.HookStage][]tuf.Hook, error) {
+	return policy.ListHooks(ctx, r.r)
+}
