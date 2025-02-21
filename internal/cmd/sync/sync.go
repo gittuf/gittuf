@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +31,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	remoteName := "origin"
+	remoteName := gitinterface.DefaultRemoteName
 	if len(args) > 0 {
 		remoteName = args[0]
 	}

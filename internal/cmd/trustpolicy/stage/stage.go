@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package apply
+package stage
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -32,14 +32,14 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		remoteName = args[0]
 	}
 
-	return repo.ApplyPolicy(cmd.Context(), remoteName, o.localOnly, true)
+	return repo.StagePolicy(cmd.Context(), remoteName, o.localOnly, true)
 }
 
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "apply",
-		Short: "Validate and apply changes from policy-staging to policy",
+		Use:   "stage",
+		Short: "Stage and push local policy-staging changes to remote repository",
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

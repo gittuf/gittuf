@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -71,20 +72,25 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
 	switch o.ruleType {
 	case tuf.GlobalRuleThresholdType:
 		if len(o.rulePatterns) == 0 {
 			return fmt.Errorf("required flag --rule-pattern not set for global rule type '%s'", tuf.GlobalRuleThresholdType)
 		}
 
-		return repo.AddGlobalRuleThreshold(cmd.Context(), signer, o.ruleName, o.rulePatterns, o.threshold, true)
+		return repo.AddGlobalRuleThreshold(cmd.Context(), signer, o.ruleName, o.rulePatterns, o.threshold, true, opts...)
 
 	case tuf.GlobalRuleBlockForcePushesType:
 		if len(o.rulePatterns) == 0 {
 			return fmt.Errorf("required flag --rule-pattern not set for global rule type '%s'", tuf.GlobalRuleBlockForcePushesType)
 		}
 
-		return repo.AddGlobalRuleBlockForcePushes(cmd.Context(), signer, o.ruleName, o.rulePatterns, true)
+		return repo.AddGlobalRuleBlockForcePushes(cmd.Context(), signer, o.ruleName, o.rulePatterns, true, opts...)
 
 	default:
 		return tuf.ErrUnknownGlobalRuleType

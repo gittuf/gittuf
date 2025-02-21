@@ -53,9 +53,10 @@ DEBUG:   14+  >>>> gittuf policy init -k ../keys/policy --policy-name targets
 DEBUG:   15+  >>>> gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
 DEBUG:   16+  >>>> gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
 Flag --authorize-key has been deprecated, use --authorize instead
-DEBUG:   17+  >>>> gittuf policy apply
-DEBUG:   18+  >>>> echo "Hello, world!" > README.md
-DEBUG:   19+  >>>> git add . ; git commit -q -S -m "Initial commit"
-DEBUG:   19+ git add . ;  >>>> git commit -q -S -m "Initial commit"
-DEBUG:   20+  >>>> gittuf rsl record main --local-only
-DEBUG:   21+  >>>> gittuf verify-ref main
+DEBUG:   17+  >>>> gittuf policy stage --local-only
+DEBUG:   18+  >>>> gittuf policy apply --local-only
+DEBUG:   19+  >>>> echo "Hello, world!" > README.md
+DEBUG:   20+  >>>> git add . ; git commit -q -S -m "Initial commit"
+DEBUG:   20+ git add . ;  >>>> git commit -q -S -m "Initial commit"
+DEBUG:   21+  >>>> gittuf rsl record main --local-only
+DEBUG:   22+  >>>> gittuf verify-ref main

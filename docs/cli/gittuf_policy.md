@@ -5,6 +5,7 @@ Tools to manage gittuf policies
 ### Options
 
 ```
+      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for policy
   -k, --signing-key string   signing key to use to sign policy file
 ```
@@ -36,6 +37,7 @@ Tools to manage gittuf policies
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
+* [gittuf policy stage](gittuf_policy_stage.md)	 - Stage and push local policy-staging changes to remote repository
 * [gittuf policy tui](gittuf_policy_tui.md)	 - Start the TUI for managing policies
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
 

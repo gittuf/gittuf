@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitializeTargets(t *testing.T) {
@@ -31,6 +32,9 @@ func TestInitializeTargets(t *testing.T) {
 		if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false); err != nil {
 			t.Fatal(err)
 		}
+
+		err := r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -89,6 +93,9 @@ func TestAddDelegation(t *testing.T) {
 		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
@@ -136,6 +143,9 @@ func TestUpdateDelegation(t *testing.T) {
 	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +190,9 @@ func TestReorderDelegations(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -215,6 +228,9 @@ func TestRemoveDelegation(t *testing.T) {
 	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -234,6 +250,9 @@ func TestRemoveDelegation(t *testing.T) {
 
 	err = r.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, false)
 	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -274,6 +293,9 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -301,6 +323,9 @@ func TestRemovePrincicpalFromTargets(t *testing.T) {
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -312,6 +337,9 @@ func TestRemovePrincicpalFromTargets(t *testing.T) {
 
 	err = r.RemovePrincipalFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, targetsPubKey.ID(), false)
 	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -338,6 +366,9 @@ func TestSignTargets(t *testing.T) {
 	// Add signature to targets
 	err := r.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, false)
 	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {

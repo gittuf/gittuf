@@ -1,15 +1,16 @@
-## gittuf trust disable-github-app-approvals
+## gittuf policy stage
 
-Mark GitHub app approvals as untrusted henceforth
+Stage and push local policy-staging changes to remote repository
 
 ```
-gittuf trust disable-github-app-approvals [flags]
+gittuf policy stage [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for disable-github-app-approvals
+  -h, --help         help for stage
+      --local-only   indicate that the policy must be committed into the RSL locally
 ```
 
 ### Options inherited from parent commands
@@ -20,11 +21,11 @@ gittuf trust disable-github-app-approvals [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust
+  -k, --signing-key string           signing key to use to sign policy file
       --verbose                      enable verbose logging
 ```
 
 ### SEE ALSO
 
-* [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
+* [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 

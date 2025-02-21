@@ -1,15 +1,16 @@
-## gittuf trust disable-github-app-approvals
+## gittuf trust stage
 
-Mark GitHub app approvals as untrusted henceforth
+Stage and push local policy-staging changes to remote repository
 
 ```
-gittuf trust disable-github-app-approvals [flags]
+gittuf trust stage [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for disable-github-app-approvals
+  -h, --help         help for stage
+      --local-only   indicate that the policy must be committed into the RSL locally
 ```
 
 ### Options inherited from parent commands
