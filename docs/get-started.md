@@ -154,8 +154,15 @@ this guide, as gittuf policy metadata currently cannot be signed using GPG (see
 deprecation warning. This guide will be updated with the new `--authorize` flag
 in its place.
 
-After adding the required policies, _apply_ them from the policy-staging area.
-This means the policy will be applicable henceforth.
+Next, _commit_ the policies into the policy-staging area. The policy-staging
+area is useful for sharing changes to policies that must not be used yet.
+
+```bash
+gittuf policy commit --local-only
+```
+
+After committing the policies, _apply_ them from the policy-staging area.  This
+means the policy will be applicable henceforth.
 
 ```bash
 gittuf policy apply

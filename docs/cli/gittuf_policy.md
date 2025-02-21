@@ -5,6 +5,7 @@ Tools to manage gittuf policies
 ### Options
 
 ```
+      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for policy
   -k, --signing-key string   signing key to use to sign policy file
 ```
@@ -26,6 +27,7 @@ Tools to manage gittuf policies
 * [gittuf policy add-person](gittuf_policy_add-person.md)	 - Add a trusted person to a policy file (requires developer mode and v0.2 policy metadata to be enabled, set GITTUF_DEV=1 and GITTUF_ALLOW_V02_POLICY=1)
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
+* [gittuf policy commit](gittuf_policy_commit.md)	 - Commit and push local policy-staging changes to remote repository
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file

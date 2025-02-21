@@ -5,6 +5,7 @@ package reorderrules
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/spf13/cobra"
@@ -38,7 +39,11 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = repo.ReorderDelegations(cmd.Context(), signer, o.policyName, o.ruleNames, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	err = repo.ReorderDelegations(cmd.Context(), signer, o.policyName, o.ruleNames, true, opts...)
 	return err
 }
 
