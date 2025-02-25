@@ -6,3 +6,6 @@ import _ "embed"
 
 //go:embed testdata/scripts/askpass.sh
 var AskpassScript []byte
+
+//go:embed testdata/scripts/hello.lua
+var SampleHookScript []byte
