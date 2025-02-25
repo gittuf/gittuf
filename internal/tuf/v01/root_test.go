@@ -137,6 +137,78 @@ func TestRootMetadata(t *testing.T) {
 		networkRepositories = rootMetadata.GetNetworkRepositories()
 		assert.Nil(t, networkRepositories)
 	})
+
+	t.Run("test duplicate controller repository", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+		isController := rootMetadata.IsController()
+		assert.False(t, isController)
+
+		name := "test"
+		location := "http://git.example.com/repository"
+		initialRootPrincipals := []tuf.Principal{key}
+
+		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		assert.Nil(t, err)
+
+		err = rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateKey)
+
+		controllerRepositories := rootMetadata.GetControllerRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: []*Key{key}}}, controllerRepositories)
+	})
+
+	t.Run("test AddNetworkRepository with duplicates", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+		key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+		err := rootMetadata.EnableController()
+		assert.Nil(t, err)
+
+		name := "test-duplicate"
+		location := "http://git.example.com/repository-duplicate"
+		initialRootPrincipals := []tuf.Principal{key}
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.Nil(t, err)
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateKey)
+		assert.Equal(t, 1, len(rootMetadata.MultiRepository.NetworkRepositories))
+	})
+}
+
+func TestIsDuplicate(t *testing.T) {
+	rootMetadata := NewRootMetadata()
+
+	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, artifacts.SSHRSAPublicSSH))
+	assert.False(t, rootMetadata.isDuplicate(key1, "network"))
+
+	rootMetadata.MultiRepository = &MultiRepository{
+		NetworkRepositories:    []*OtherRepository{},
+		ControllerRepositories: []*OtherRepository{},
+	}
+	assert.False(t, rootMetadata.isDuplicate(key1, "network"))
+	assert.False(t, rootMetadata.isDuplicate(key1, "controller"))
+
+	repoNetwork := &OtherRepository{
+		Name:                  "test-repo-network",
+		Location:              "http://example.com/repo",
+		InitialRootPrincipals: []*Key{key1},
+	}
+	rootMetadata.MultiRepository.NetworkRepositories = append(rootMetadata.MultiRepository.NetworkRepositories, repoNetwork)
+	assert.True(t, rootMetadata.isDuplicate(key1, "network"))
+	assert.False(t, rootMetadata.isDuplicate(key1, "controller"))
+
+	repoController := &OtherRepository{
+		Name:                  "test-repo-controller",
+		Location:              "http://example.com/repo-controller",
+		InitialRootPrincipals: []*Key{key1},
+	}
+	rootMetadata.MultiRepository.ControllerRepositories = append(rootMetadata.MultiRepository.ControllerRepositories, repoController)
+	assert.True(t, rootMetadata.isDuplicate(key1, "controller"))
+
+	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	assert.False(t, rootMetadata.isDuplicate(key2, "network"))
+	assert.False(t, rootMetadata.isDuplicate(key2, "controller"))
 }
 
 func TestRootMetadataWithSSHKey(t *testing.T) {
