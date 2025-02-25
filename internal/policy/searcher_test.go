@@ -145,7 +145,7 @@ func TestRegularSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		currentAttestations := &attestations.Attestations{}
-		if err := currentAttestations.Commit(repo, "Initial attestations\n", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Initial attestations\n", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -380,7 +380,7 @@ func TestCacheSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		currentAttestations := &attestations.Attestations{}
-		if err := currentAttestations.Commit(repo, "Initial attestations\n", false); err != nil {
+		if err := currentAttestations.Commit(repo, "Initial attestations\n", true, false); err != nil {
 			t.Fatal(err)
 		}
 

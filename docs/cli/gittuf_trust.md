@@ -5,6 +5,7 @@ Tools for gittuf's root of trust
 ### Options
 
 ```
+      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for trust
   -k, --signing-key string   signing key to use to sign root of trust
 ```
@@ -28,6 +29,7 @@ Tools for gittuf's root of trust
 * [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
+* [gittuf trust commit](gittuf_trust_commit.md)	 - Commit and push local policy-staging changes to remote repository
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository

@@ -53,7 +53,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.reviewID, o.dismissedApprover, true, githubopts.WithGitHubBaseURL(o.baseURL))
+	opts := []githubopts.Option{githubopts.WithGitHubBaseURL(o.baseURL)}
+	if o.p.WithRSLEntry {
+		opts = append(opts, githubopts.WithRSLEntry())
+	}
+
+	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.reviewID, o.dismissedApprover, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

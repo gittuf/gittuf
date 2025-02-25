@@ -5,6 +5,7 @@ Tools for attesting to code contributions
 ### Options
 
 ```
+      --create-rsl-entry     create RSL entry for attestation change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for attest
   -k, --signing-key string   signing key to use to sign attestation
 ```
