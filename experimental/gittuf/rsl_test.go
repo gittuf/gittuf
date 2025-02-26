@@ -289,7 +289,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -309,7 +309,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -346,7 +346,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -391,7 +391,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -411,7 +411,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := localR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -456,7 +456,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -476,7 +476,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -484,7 +484,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -550,7 +550,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -570,7 +570,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -578,7 +578,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -628,7 +628,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -665,7 +665,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -686,7 +686,7 @@ func TestSync(t *testing.T) {
 		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -725,7 +725,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -746,7 +746,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -785,7 +785,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -806,7 +806,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -814,7 +814,7 @@ func TestSync(t *testing.T) {
 		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -838,7 +838,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -859,7 +859,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -888,7 +888,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -909,7 +909,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -917,7 +917,7 @@ func TestSync(t *testing.T) {
 		if _, err := localRepo.r.Commit(emptyTreeHash, refName, "Local test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -945,7 +945,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -966,7 +966,7 @@ func TestSync(t *testing.T) {
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1252,13 +1252,13 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false); err != nil {
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false); err != nil {
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		upstreamEntry2, err := rsl.GetLatestEntry(upstreamRepo.r)
@@ -1414,13 +1414,13 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false); err != nil {
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false); err != nil {
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		upstreamEntry2, err := rsl.GetLatestEntry(upstreamRepo.r)
@@ -1596,7 +1596,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := upstreamRepo1.r.Commit(upstreamRootTree1ID, refName, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo1.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := upstreamRepo1.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		upstreamEntry1, err := rsl.GetLatestEntry(upstreamRepo1.r)
@@ -1626,7 +1626,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := upstreamRepo2.r.Commit(upstreamRootTree2ID, refName, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo2.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := upstreamRepo2.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
