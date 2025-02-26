@@ -446,7 +446,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 						// pushed by the user
 
 						// TODO: skipping propagation; invoke it once total instead of per ref
-						if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithSkipPropagation()); err != nil {
+						if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
 							return nil, false, err
 						}
 					}

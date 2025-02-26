@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -57,13 +58,13 @@ func TestClone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+	if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 		t.Fatal(err)
 	}
 	if err := remoteRepo.r.SetReference(anotherRefName, commitID); err != nil {
 		t.Fatal(err)
 	}
-	if err := remoteRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false); err != nil {
+	if err := remoteRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
 		t.Fatal(err)
 	}
 
