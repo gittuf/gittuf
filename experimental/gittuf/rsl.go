@@ -32,7 +32,7 @@ var (
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
-func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName string, signCommit bool, opts ...rslopts.RecordOption) error {
+func (r *Repository) RecordRSLEntryForReference(_ context.Context, refName string, signCommit bool, opts ...rslopts.RecordOption) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -47,7 +47,7 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
-		return ErrRemoteNotSpecified //todo
+		return ErrRemoteNotSpecified // todo
 	}
 
 	if !options.LocalOnly {
@@ -163,7 +163,7 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
-func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool, opts ...rslopts.AnnotateOption) error {
+func (r *Repository) RecordRSLAnnotation(_ context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool, opts ...rslopts.AnnotateOption) error {
 	// TODO: local only?
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -179,7 +179,7 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
-		return ErrRemoteNotSpecified //todo
+		return ErrRemoteNotSpecified // todo
 	}
 
 	if !options.LocalOnly {
