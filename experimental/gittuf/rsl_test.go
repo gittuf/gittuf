@@ -35,7 +35,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false); err != nil {
+	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := repo.RecordRSLEntryForReference(testCtx, "main", false); err != nil {
+	if err := repo.RecordRSLEntryForReference(testCtx, "main", false, rslopts.WithRecordLocalOnly()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,7 +77,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.Equal(t, "refs/heads/main", entry.RefName)
 	assert.Equal(t, newCommitID, entry.TargetID)
 
-	err = repo.RecordRSLEntryForReference(testCtx, "main", false)
+	err = repo.RecordRSLEntryForReference(testCtx, "main", false, rslopts.WithRecordLocalOnly())
 	assert.Nil(t, err)
 
 	entryT, err = rsl.GetLatestEntry(repo.r)
@@ -88,7 +88,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.Equal(t, entry.GetID(), entryT.GetID())
 
 	// Record entry for a different dst ref
-	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"))
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"), rslopts.WithRecordLocalOnly())
 	assert.Nil(t, err)
 
 	entryT, err = rsl.GetLatestEntry(repo.r)
@@ -105,7 +105,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 
 	// Record entry for a different dst ref and skip check for duplicate
 	currentEntryID := entry.GetID()
-	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"), rslopts.WithSkipCheckForDuplicateEntry())
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithOverrideRefName("refs/heads/not-main"), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly())
 	assert.Nil(t, err)
 
 	entryT, err = rsl.GetLatestEntry(repo.r)
@@ -218,7 +218,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 
 	repo := &Repository{r: r}
 
-	err := repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false)
+	err := repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
@@ -230,7 +230,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false); err != nil {
+	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -240,7 +240,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	}
 	entryID := latestEntry.GetID()
 
-	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, false, "test annotation", false)
+	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.Nil(t, err)
 
 	latestEntry, err = rsl.GetLatestEntry(repo.r)
@@ -254,7 +254,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.False(t, annotation.Skip)
 
-	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", false)
+	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.Nil(t, err)
 
 	latestEntry, err = rsl.GetLatestEntry(repo.r)
@@ -1116,7 +1116,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName, false); err != nil {
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		upstreamEntry, err := rsl.GetLatestEntry(upstreamRepo.r)
@@ -1150,7 +1150,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithSkipPropagation()); err != nil {
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1296,7 +1296,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithSkipPropagation()); err != nil {
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1458,13 +1458,13 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName1, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithSkipPropagation()); err != nil {
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName1, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName2, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false, rslopts.WithSkipPropagation()); err != nil {
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName2, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1661,7 +1661,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName, "Initial commit\n", false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithSkipPropagation()); err != nil {
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
