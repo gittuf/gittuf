@@ -3,31 +3,56 @@
 
 package rsl
 
-type Options struct {
+type RecordOptions struct {
 	RefNameOverride       string
+	RemoteName            string
+	LocalOnly             bool
 	SkipCheckForDuplicate bool
-	SkipPropagation       bool
 }
 
-type Option func(o *Options)
+type RecordOption func(o *RecordOptions)
 
-func WithOverrideRefName(refNameOverride string) Option {
-	return func(o *Options) {
+func WithOverrideRefName(refNameOverride string) RecordOption {
+	return func(o *RecordOptions) {
 		o.RefNameOverride = refNameOverride
 	}
 }
 
 // WithSkipCheckForDuplicateEntry indicates that the RSL entry creation must not
 // check if the latest entry for the reference has the same target ID.
-func WithSkipCheckForDuplicateEntry() Option {
-	return func(o *Options) {
+func WithSkipCheckForDuplicateEntry() RecordOption {
+	return func(o *RecordOptions) {
 		o.SkipCheckForDuplicate = true
 	}
 }
 
-// WithSkipPropagation disables execution of the propagation workflow.
-func WithSkipPropagation() Option {
-	return func(o *Options) {
-		o.SkipPropagation = true
+func WithRecordRemote(remoteName string) RecordOption {
+	return func(o *RecordOptions) {
+		o.RemoteName = remoteName
+	}
+}
+
+func WithRecordLocalOnly() RecordOption {
+	return func(o *RecordOptions) {
+		o.LocalOnly = true
+	}
+}
+
+type AnnotateOptions struct {
+	RemoteName string
+	LocalOnly  bool
+}
+
+type AnnotateOption func(o *AnnotateOptions)
+
+func WithAnnotateRemote(remoteName string) AnnotateOption {
+	return func(o *AnnotateOptions) {
+		o.RemoteName = remoteName
+	}
+}
+
+func WithAnnotateLocalOnly() AnnotateOption {
+	return func(o *AnnotateOptions) {
+		o.LocalOnly = true
 	}
 }

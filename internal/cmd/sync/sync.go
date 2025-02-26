@@ -24,7 +24,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (o *options) Run(_ *cobra.Command, args []string) error {
+func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 		remoteName = args[0]
 	}
 
-	divergedRefs, err := repo.Sync(remoteName, o.overwriteLocalRefs)
+	divergedRefs, err := repo.Sync(cmd.Context(), remoteName, o.overwriteLocalRefs, true)
 	switch {
 	case errors.Is(err, gittuf.ErrDivergedRefs):
 		fmt.Println("References have diverged:")

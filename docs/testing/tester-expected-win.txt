@@ -57,5 +57,5 @@ DEBUG:   17+  >>>> gittuf policy apply
 DEBUG:   18+  >>>> echo "Hello, world!" > README.md
 DEBUG:   19+  >>>> git add . ; git commit -q -S -m "Initial commit"
 DEBUG:   19+ git add . ;  >>>> git commit -q -S -m "Initial commit"
-DEBUG:   20+  >>>> gittuf rsl record main
+DEBUG:   20+  >>>> gittuf rsl record main --local-only
 DEBUG:   21+  >>>> gittuf verify-ref main
