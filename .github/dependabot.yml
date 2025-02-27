@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "14:00"
+      interval: "weekly"
     # Bundle updates into one PR
     groups:
       all:
@@ -20,8 +19,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "14:00"
+      interval: "weekly"
     # Bundle updates into one PR
     groups:
       all:
