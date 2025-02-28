@@ -5,6 +5,7 @@ package listglobalrules
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -25,24 +26,72 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	rules, err := repo.ListGlobalRules(cmd.Context())
 	if len(rules) == 0 {
-		fmt.Println("The rules slice is empty")
+		fmt.Println("No global rules are currently defined.")
 	}
 	if err != nil {
 		return err
 	}
 
+	thresholdRules := []tuf.GlobalRule{}
+	blockForcePushesRules := []tuf.GlobalRule{}
 	for _, curRule := range rules {
-		fmt.Printf("GlobalRule: %v\n", curRule.GetName())
+		switch globalRule := curRule.(type) {
+		case tuf.GlobalRuleThreshold:
+			thresholdRules = append(thresholdRules, globalRule)
+		case tuf.GlobalRuleBlockForcePushes:
+			blockForcePushesRules = append(blockForcePushesRules, globalRule)
+		}
+	}
+	rules = append(thresholdRules, blockForcePushesRules...)
 
+	for _, curRule := range rules {
+		fmt.Printf("Global Rule: %v\n", curRule.GetName())
 		switch rule := curRule.(type) {
 		case tuf.GlobalRuleThreshold:
-			fmt.Println(indentString + "GlobalRule Type: GlobalRuleThreshold")
-			fmt.Printf(indentString+"Refs affected: %v\n", rule.GetProtectedNamespaces())
+			fmt.Println(indentString + "Type: " + tuf.GlobalRuleThresholdType)
+			gitpaths, filepaths := []string{}, []string{}
+			for _, path := range rule.GetProtectedNamespaces() {
+				if strings.HasPrefix(path, "git:") {
+					gitpaths = append(gitpaths, path)
+				} else {
+					filepaths = append(filepaths, path)
+				}
+			}
+			if len(filepaths) > 0 {
+				fmt.Println(indentString + "Paths affected:")
+				for _, path := range filepaths {
+					fmt.Println(strings.Repeat(indentString, 2) + path)
+				}
+			}
+			if len(gitpaths) > 0 {
+				fmt.Println(indentString + "Refs affected:")
+				for _, path := range gitpaths {
+					fmt.Println(strings.Repeat(indentString, 2) + path)
+				}
+			}
 			fmt.Printf(indentString+"Threshold: %d\n", rule.GetThreshold())
-
 		case tuf.GlobalRuleBlockForcePushes:
-			fmt.Println(indentString + "GlobalRule Type: GlobalRuleBlockForcePushes")
-			fmt.Printf(indentString+"Refs affected: %v\n", rule.GetProtectedNamespaces())
+			fmt.Println(indentString + "Type: " + tuf.GlobalRuleBlockForcePushesType)
+			gitpaths, filepaths := []string{}, []string{}
+			for _, path := range rule.GetProtectedNamespaces() {
+				if strings.HasPrefix(path, "git:") {
+					gitpaths = append(gitpaths, path)
+				} else {
+					filepaths = append(filepaths, path)
+				}
+			}
+			if len(filepaths) > 0 {
+				fmt.Println(indentString + "Paths affected:")
+				for _, path := range filepaths {
+					fmt.Println(strings.Repeat(indentString, 2) + path)
+				}
+			}
+			if len(gitpaths) > 0 {
+				fmt.Println(indentString + "Refs affected:")
+				for _, path := range gitpaths {
+					fmt.Println(strings.Repeat(indentString, 2) + path)
+				}
+			}
 
 		default:
 			return tuf.ErrUnknownGlobalRuleType
@@ -55,7 +104,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "list-globalrules",
+		Use:               "list-global-rules",
 		Short:             "List global rules for the current state",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
