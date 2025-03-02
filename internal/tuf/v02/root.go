@@ -535,8 +535,6 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
 
-	// TODO: check for duplicates
-
 	otherRepository := &OtherRepository{
 		Name:                  name,
 		Location:              location,
@@ -544,11 +542,27 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	}
 
 	for _, principal := range initialRootPrincipals {
-		switch principal := principal.(type) {
+		switch p := principal.(type) {
 		case *Key:
-			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+			isDuplicate := false
+			for _, repo := range r.MultiRepository.ControllerRepositories {
+				for _, existingPrincipal := range repo.InitialRootPrincipals {
+					if existingPrincipal.ID() == p.KeyID {
+						isDuplicate = true
+						break
+					}
+				}
+				if isDuplicate {
+					break
+				}
+			}
+			if !isDuplicate {
+				otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, p)
+			} else {
+				return tuf.ErrDuplicateControllerRepository
+			}
 		case *Person:
-			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, p)
 		default:
 			return tuf.ErrInvalidPrincipalType
 		}
@@ -576,8 +590,6 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
 	}
 
-	// TODO: check for duplicates
-
 	otherRepository := &OtherRepository{
 		Name:                  name,
 		Location:              location,
@@ -585,11 +597,26 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 	}
 
 	for _, principal := range initialRootPrincipals {
-		switch principal := principal.(type) {
+		switch p := principal.(type) {
 		case *Key:
-			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+			isDuplicate := false
+			for _, repo := range r.MultiRepository.NetworkRepositories {
+				for _, existingPrincipal := range repo.InitialRootPrincipals {
+					if existingPrincipal.ID() == p.KeyID {
+						isDuplicate = true
+						break
+					}
+				}
+				if isDuplicate {
+					break
+				}
+			}
+			if isDuplicate {
+				return tuf.ErrDuplicateNetworkRepository
+			}
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, p)
 		case *Person:
-			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, principal)
+			otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, p)
 		default:
 			return tuf.ErrInvalidPrincipalType
 		}
