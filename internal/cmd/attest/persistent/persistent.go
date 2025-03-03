@@ -6,7 +6,8 @@ package persistent
 import "github.com/spf13/cobra"
 
 type Options struct {
-	SigningKey string
+	SigningKey   string
+	WithRSLEntry bool
 }
 
 func (o *Options) AddPersistentFlags(cmd *cobra.Command) {
@@ -18,4 +19,11 @@ func (o *Options) AddPersistentFlags(cmd *cobra.Command) {
 		"signing key to use to sign attestation",
 	)
 	cmd.MarkPersistentFlagRequired("signing-key") //nolint:errcheck
+
+	cmd.PersistentFlags().BoolVar(
+		&o.WithRSLEntry,
+		"create-rsl-entry",
+		false,
+		"create RSL entry for attestation change immediately (note: the RSL will not be synced with the remote)",
+	)
 }

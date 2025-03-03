@@ -65,7 +65,7 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", false); err != nil {
+		if err := state.Commit(repo, "", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -90,7 +90,7 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", false); err != nil {
+		if err := state.Commit(repo, "", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -154,7 +154,7 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", false); err != nil {
+		if err := state.Commit(repo, "", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -181,7 +181,7 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", false); err != nil {
+		if err := state.Commit(repo, "", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -294,7 +294,7 @@ func TestLoadFirstState(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondState.Metadata.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(repo, "Second state", false); err != nil {
+	if err := secondState.Commit(repo, "Second state", true, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -336,7 +336,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -367,7 +367,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -398,7 +398,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -470,7 +470,7 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -516,7 +516,7 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -566,7 +566,7 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", false)
+		err := state.Commit(repo, "Create test state", true, false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -713,7 +713,7 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -780,7 +780,7 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -813,7 +813,7 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -851,7 +851,7 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -898,7 +898,7 @@ func TestDiscard(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", false); err != nil {
+		if err := state.Commit(repo, "", true, false); err != nil {
 			t.Fatal(err)
 		}
 

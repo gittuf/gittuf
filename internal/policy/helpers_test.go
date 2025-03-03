@@ -44,7 +44,7 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 	state.repository = repo
 
-	if err := state.Commit(repo, "Create test state", false); err != nil {
+	if err := state.Commit(repo, "Create test state", true, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := Apply(testCtx, repo, false); err != nil {

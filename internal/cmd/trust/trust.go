@@ -23,6 +23,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepolicythreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updaterootthreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/commit"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/spf13/cobra"
 )
@@ -43,6 +44,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addpropagationdirective.New(o))
 	cmd.AddCommand(addrootkey.New(o))
 	cmd.AddCommand(apply.New())
+	cmd.AddCommand(commit.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(remote.New())

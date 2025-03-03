@@ -17,6 +17,7 @@
 + gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
 + gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
 Flag --authorize-key has been deprecated, use --authorize instead
++ gittuf policy commit --local-only
 + gittuf policy apply
 + echo 'Hello, world!'
 + git add .

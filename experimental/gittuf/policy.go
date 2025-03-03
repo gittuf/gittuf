@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	ErrPushingPolicy = errors.New("unable to push policy")
-	ErrPullingPolicy = errors.New("unable to pull policy")
+	ErrPushingPolicy     = errors.New("unable to push policy")
+	ErrPullingPolicy     = errors.New("unable to pull policy")
+	ErrNoRemoteSpecified = errors.New("no remote specified to commit policy")
 )
 
 // PushPolicy pushes the local gittuf policy to the specified remote. As this
@@ -46,6 +47,7 @@ func (r *Repository) PullPolicy(remoteName string) error {
 }
 
 func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
+	// TODO: accept remote name and sync
 	return policy.Apply(ctx, r.r, signRSLEntry)
 }
 
@@ -65,4 +67,36 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 		return policy.ListPrincipals(ctx, r.r, targetRef, policyName)
 	}
 	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
+}
+
+func (r *Repository) CommitPolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	if remoteName == "" && !localOnly {
+		return ErrNoRemoteSpecified
+	}
+
+	if !localOnly {
+		_, err := r.Sync(remoteName, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := r.RecordRSLEntryForReference(ctx, policy.PolicyStagingRef, signCommit); err != nil {
+		return err
+	}
+
+	if localOnly {
+		return nil
+	}
+
+	_, err := r.Sync(remoteName, false)
+	return err
 }
