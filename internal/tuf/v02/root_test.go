@@ -117,6 +117,10 @@ func TestRootMetadata(t *testing.T) {
 		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
 		assert.Nil(t, err)
 
+		// Testing duplicate controller repository detection
+		err = rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+
 		controllerRepositories := rootMetadata.GetControllerRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, controllerRepositories)
 
@@ -138,6 +142,11 @@ func TestRootMetadata(t *testing.T) {
 
 		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
 		assert.Nil(t, err)
+
+		// Testing duplicate network repository detection
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+		assert.Equal(t, 1, len(rootMetadata.MultiRepository.NetworkRepositories))
 
 		networkRepositories := rootMetadata.GetNetworkRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, networkRepositories)

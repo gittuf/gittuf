@@ -136,6 +136,30 @@ func TestRootMetadata(t *testing.T) {
 
 		networkRepositories = rootMetadata.GetNetworkRepositories()
 		assert.Nil(t, networkRepositories)
+
+		// Testing controller  repositories duplicates
+		err = rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+
+		controllerRepositories = rootMetadata.GetControllerRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: []*Key{key}}}, controllerRepositories)
+
+		// Test network repositories duplicates
+		rootMetadata = NewRootMetadata()
+		key = NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+		err = rootMetadata.EnableController()
+		assert.Nil(t, err)
+
+		name = "test-duplicate"
+		location = "http://git.example.com/repository-duplicate"
+		initialRootPrincipals = []tuf.Principal{key}
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.Nil(t, err)
+
+		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+		assert.Equal(t, 1, len(rootMetadata.MultiRepository.NetworkRepositories))
 	})
 }
 
