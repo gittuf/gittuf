@@ -23,15 +23,16 @@ import (
 const gittufTransportPrefix = "gittuf::"
 
 var (
-	ErrCommitNotInRef = errors.New("specified commit is not in ref")
-	ErrPushingRSL     = errors.New("unable to push RSL")
-	ErrPullingRSL     = errors.New("unable to pull RSL")
-	ErrDivergedRefs   = errors.New("references in local repository have diverged from upstream")
+	ErrCommitNotInRef     = errors.New("specified commit is not in ref")
+	ErrPushingRSL         = errors.New("unable to push RSL")
+	ErrPullingRSL         = errors.New("unable to pull RSL")
+	ErrDivergedRefs       = errors.New("references in local repository have diverged from upstream")
+	ErrRemoteNotSpecified = errors.New("remote not specified")
 )
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
-func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName string, signCommit bool, opts ...rslopts.Option) error {
+func (r *Repository) RecordRSLEntryForReference(_ context.Context, refName string, signCommit bool, opts ...rslopts.RecordOption) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -40,14 +41,19 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 		}
 	}
 
-	options := &rslopts.Options{}
+	options := &rslopts.RecordOptions{}
 	for _, fn := range opts {
 		fn(options)
 	}
 
-	if !options.SkipPropagation {
-		if err := r.PropagateChangesFromUpstreamRepositories(ctx, signCommit); err != nil {
-			return fmt.Errorf("unable to execute propagation directives: %w", err)
+	if options.RemoteName == "" && !options.LocalOnly {
+		return ErrRemoteNotSpecified // todo
+	}
+
+	if !options.LocalOnly {
+		_, err := r.Sync(options.RemoteName, false)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -97,19 +103,28 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	return rsl.NewReferenceEntry(refName, refTip).Commit(r.r, signCommit)
+	if err := rsl.NewReferenceEntry(refName, refTip).Commit(r.r, signCommit); err != nil {
+		return err
+	}
+
+	if options.LocalOnly {
+		return nil
+	}
+
+	_, err = r.Sync(options.RemoteName, false)
+	return err
 }
 
 // RecordRSLEntryForReferenceAtTarget is a special version of
 // RecordRSLEntryForReference used for evaluation. It is only invoked when
 // gittuf is explicitly set in developer mode.
-func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string, signingKeyBytes []byte, opts ...rslopts.Option) error {
+func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string, signingKeyBytes []byte, opts ...rslopts.RecordOption) error {
 	// Double check that gittuf is in developer mode
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
 
-	options := &rslopts.Options{}
+	options := &rslopts.RecordOptions{}
 	for _, fn := range opts {
 		fn(options)
 	}
@@ -148,7 +163,8 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
-func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool) error {
+func (r *Repository) RecordRSLAnnotation(_ context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool, opts ...rslopts.AnnotateOption) error {
+	// TODO: local only?
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -157,8 +173,20 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 		}
 	}
 
-	if err := r.PropagateChangesFromUpstreamRepositories(ctx, signCommit); err != nil {
-		return fmt.Errorf("unable to execute propagation directives: %w", err)
+	options := &rslopts.AnnotateOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if options.RemoteName == "" && !options.LocalOnly {
+		return ErrRemoteNotSpecified // todo
+	}
+
+	if !options.LocalOnly {
+		_, err := r.Sync(options.RemoteName, false)
+		if err != nil {
+			return err
+		}
 	}
 
 	rslEntryHashes := []gitinterface.Hash{}
@@ -174,7 +202,16 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 	// signCommit must be verified for the refNames of the rslEntryIDs.
 
 	slog.Debug("Creating RSL annotation entry...")
-	return rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit)
+	if err := rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit); err != nil {
+		return err
+	}
+
+	if options.LocalOnly {
+		return nil
+	}
+
+	_, err := r.Sync(options.RemoteName, false)
+	return err
 }
 
 // ReconcileLocalRSLWithRemote checks the local RSL against the specified remote
@@ -401,6 +438,7 @@ func (r *Repository) Sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	// Check if equal and exit early if true
 	if remoteRefState.Equal(localRefState) {
 		slog.Debug("Local and remote RSLs have same state, nothing to do")
+		// non error exit
 		return nil, nil
 	}
 
@@ -429,6 +467,7 @@ func (r *Repository) Sync(remoteName string, overwriteLocalRefs bool) ([]string,
 		}
 
 		slog.Debug("Pushed local changes to remote successfully!")
+		// non error exit
 		return nil, nil
 	}
 
@@ -521,6 +560,7 @@ func (r *Repository) Sync(remoteName string, overwriteLocalRefs bool) ([]string,
 			}
 		}
 
+		// non error exit
 		// TODO: restore worktree if checked out HEAD is in divergedRefs
 		return nil, nil
 	}
@@ -609,6 +649,7 @@ func (r *Repository) Sync(remoteName string, overwriteLocalRefs bool) ([]string,
 		}
 	}
 
+	// non error exit
 	slog.Debug("Updated local RSL!")
 	return nil, nil
 }
@@ -655,7 +696,10 @@ func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]gitinterface
 			}
 
 			refTips[entry.GetRefName()] = entry.GetTargetID()
-			// TODO: propagation entry?
+		case *rsl.PropagationEntry:
+			if _, has := refTips[entry.GetRefName()]; has {
+				continue
+			}
 		case *rsl.AnnotationEntry:
 			for _, referencedEntryID := range entry.RSLEntryIDs {
 				if _, has := annotationsMap[referencedEntryID.String()]; !has {
