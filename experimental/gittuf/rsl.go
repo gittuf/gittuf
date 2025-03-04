@@ -23,11 +23,12 @@ import (
 const gittufTransportPrefix = "gittuf::"
 
 var (
-	ErrCommitNotInRef     = errors.New("specified commit is not in ref")
-	ErrPushingRSL         = errors.New("unable to push RSL")
-	ErrPullingRSL         = errors.New("unable to pull RSL")
-	ErrDivergedRefs       = errors.New("references in local repository have diverged from upstream")
-	ErrRemoteNotSpecified = errors.New("remote not specified")
+	ErrCommitNotInRef              = errors.New("specified commit is not in ref")
+	ErrPushingRSL                  = errors.New("unable to push RSL")
+	ErrPullingRSL                  = errors.New("unable to pull RSL")
+	ErrDivergedRefs                = errors.New("references in local repository have diverged from upstream")
+	ErrRemoteNotSpecified          = errors.New("remote not specified")
+	ErrCannotUseRemoteAndLocalOnly = errors.New("cannot indicate local-only and push to specified remote")
 )
 
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
@@ -47,7 +48,9 @@ func (r *Repository) RecordRSLEntryForReference(_ context.Context, refName strin
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
-		return ErrRemoteNotSpecified // todo
+		return ErrRemoteNotSpecified
+	} else if options.RemoteName != "" && options.LocalOnly {
+		return ErrCannotUseRemoteAndLocalOnly
 	}
 
 	if !options.LocalOnly {
@@ -179,7 +182,9 @@ func (r *Repository) RecordRSLAnnotation(_ context.Context, rslEntryIDs []string
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
-		return ErrRemoteNotSpecified // todo
+		return ErrRemoteNotSpecified
+	} else if options.RemoteName != "" && options.LocalOnly {
+		return ErrCannotUseRemoteAndLocalOnly
 	}
 
 	if !options.LocalOnly {
