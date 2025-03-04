@@ -172,7 +172,7 @@ hook and [#220] for planned gittuf and Git command compatibility).
 ```bash
 echo "Hello, world!" > README.md
 git add . && git commit -q -S -m "Initial commit"
-gittuf rsl record main
+gittuf rsl record main --local-only
 ```
 
 ## Verifying policy
