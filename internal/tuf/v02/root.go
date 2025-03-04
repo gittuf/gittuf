@@ -471,6 +471,35 @@ func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirectiv
 	return nil
 }
 
+// Updatepropagation checks if there is a duplicate or update and deal with that
+func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
+	// find if there is a duplicate(exact same) or update(same name, different in other)
+	// in the slice in linear search, then update the found propagation
+	for i := range r.Propagations {
+		if r.Propagations[i].GetName() == directive.GetName() {
+			if r.Propagations[i].GetUpstreamRepository() != directive.GetUpstreamRepository() {
+				r.Propagations[i].SetUpstreamRepository(directive.GetUpstreamRepository())
+			}
+			if r.Propagations[i].GetUpstreamReference() != directive.GetUpstreamReference() {
+				r.Propagations[i].SetUpstreamReference(directive.GetUpstreamReference())
+			}
+			if r.Propagations[i].GetDownstreamReference() != directive.GetDownstreamReference() {
+				r.Propagations[i].SetDownstreamReference(directive.GetDownstreamReference())
+			}
+			if r.Propagations[i].GetDownstreamPath() != directive.GetDownstreamPath() {
+				r.Propagations[i].SetDownstreamPath(directive.GetDownstreamPath())
+			}
+			return nil
+		}
+	}
+
+	// if the directive is new, call AddPropagationDirective to deal with it
+	if err := r.AddPropagationDirective(directive); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetPropagationDirectives returns the propagation directives found in the root
 // metadata.
 func (r *RootMetadata) GetPropagationDirectives() []tuf.PropagationDirective {

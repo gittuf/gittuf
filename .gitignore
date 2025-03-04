@@ -1,3 +1,6 @@
 dist/*
 *.prof
 vendor*
+.DS_Store
+.vscode
+launch.json
