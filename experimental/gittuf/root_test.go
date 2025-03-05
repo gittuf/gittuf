@@ -774,6 +774,30 @@ func TestRemoveGlobalRule(t *testing.T) {
 	})
 }
 
+func TestListGlobalRules(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	t.Run("list global rules after add and remove", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
+		assert.Nil(t, err)
+
+		globalRules, err := r.ListGlobalRules(testCtx)
+		assert.Nil(t, err)
+		assert.Len(t, globalRules, 1)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false)
+		assert.Nil(t, err)
+
+		globalRules, err = r.ListGlobalRules(testCtx)
+		assert.Nil(t, err)
+		assert.Empty(t, globalRules)
+	})
+}
+
 func TestAddPropagationDirective(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 

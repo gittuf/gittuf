@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
+	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
@@ -55,6 +56,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(updatepolicythreshold.New(o))
 	cmd.AddCommand(updaterootthreshold.New(o))
+	cmd.AddCommand(listglobalrules.New())
 
 	return cmd
 }
