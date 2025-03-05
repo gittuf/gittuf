@@ -31,6 +31,7 @@ Tools for gittuf's root of trust
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
+* [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
