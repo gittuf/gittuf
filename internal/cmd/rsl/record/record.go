@@ -12,7 +12,8 @@ import (
 type options struct {
 	dstRef             string
 	skipDuplicateCheck bool
-	skipPropagation    bool
+	remoteName         string
+	localOnly          bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -30,12 +31,22 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"skip check to see if latest entry for reference has same target",
 	)
 
-	cmd.Flags().BoolVar(
-		&o.skipPropagation,
-		"skip-propagation",
-		false,
-		"skip propagation workflow",
+	cmd.Flags().StringVar(
+		&o.remoteName,
+		"remote-name",
+		"",
+		"remote name",
 	)
+
+	cmd.Flags().BoolVar(
+		&o.localOnly,
+		"local-only",
+		false,
+		"local only",
+	)
+
+	cmd.MarkFlagsOneRequired("remote-name", "local-only")
+	cmd.MarkFlagsMutuallyExclusive("remote-name", "local-only")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -44,12 +55,15 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	opts := []rslopts.Option{rslopts.WithOverrideRefName(o.dstRef)}
+	opts := []rslopts.RecordOption{
+		rslopts.WithOverrideRefName(o.dstRef),
+		rslopts.WithRecordRemote(o.remoteName),
+	}
 	if o.skipDuplicateCheck {
 		opts = append(opts, rslopts.WithSkipCheckForDuplicateEntry())
 	}
-	if o.skipPropagation {
-		opts = append(opts, rslopts.WithSkipPropagation())
+	if o.localOnly {
+		opts = append(opts, rslopts.WithRecordLocalOnly())
 	}
 
 	return repo.RecordRSLEntryForReference(cmd.Context(), args[0], true, opts...)

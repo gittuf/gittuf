@@ -9,9 +9,11 @@ gittuf rsl annotate [flags]
 ### Options
 
 ```
-  -h, --help             help for annotate
-  -m, --message string   annotation message
-  -s, --skip             mark annotated entries as to be skipped
+  -h, --help                 help for annotate
+      --local-only           local only
+  -m, --message string       annotation message
+      --remote-name string   remote name
+  -s, --skip                 mark annotated entries as to be skipped
 ```
 
 ### Options inherited from parent commands
