@@ -50,6 +50,8 @@ var (
 	ErrPrimaryRuleFileInformationNotFoundInRoot        = errors.New("root metadata does not contain primary rule file information")
 	ErrGitHubAppInformationNotFoundInRoot              = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
 	ErrDuplicatedRuleName                              = errors.New("two rules with same name found in policy")
+	ErrDuplicateControllerRepository                   = errors.New("controller repository already exists")
+	ErrDuplicateNetworkRepository                      = errors.New("network repository already exists")
 	ErrInvalidPrincipalID                              = errors.New("principal ID is invalid")
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
