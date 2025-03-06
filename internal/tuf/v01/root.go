@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/danwakefield/fnmatch"
@@ -444,7 +445,30 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		existingKeyIDs := make(map[string]struct{}, len(repo.InitialRootPrincipals))
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs[existingPrincipal.KeyID] = struct{}{}
+		}
+		if !reflect.DeepEqual(newKeyIDs, existingKeyIDs) {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -453,18 +477,12 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
 	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
 
-	// Add the controller as a repository whose policy contents must be
-	// propagated into this repository
 	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
 	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
 	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationLocation))
@@ -483,7 +501,30 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		existingKeyIDs := make(map[string]struct{}, len(repo.InitialRootPrincipals))
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs[existingPrincipal.KeyID] = struct{}{}
+		}
+		if !reflect.DeepEqual(newKeyIDs, existingKeyIDs) {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -492,11 +533,7 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
