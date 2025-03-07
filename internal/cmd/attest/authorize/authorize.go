@@ -7,7 +7,9 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +57,12 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true)
 	}
 
-	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true)
+	opts := []attestopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, attestopts.WithRSLEntry())
+	}
+
+	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
@@ -64,6 +71,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "authorize",
 		Short:             "Add or revoke reference authorization",
 		Args:              cobra.MinimumNArgs(1),
+		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

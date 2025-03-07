@@ -5,6 +5,7 @@ package root
 
 type Options struct {
 	RepositoryLocation string
+	CreateRSLEntry     bool
 }
 
 type Option func(o *Options)
@@ -12,5 +13,11 @@ type Option func(o *Options)
 func WithRepositoryLocation(location string) Option {
 	return func(o *Options) {
 		o.RepositoryLocation = location
+	}
+}
+
+func WithRSLEntry() Option {
+	return func(o *Options) {
+		o.CreateRSLEntry = true
 	}
 }

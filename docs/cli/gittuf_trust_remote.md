@@ -11,6 +11,7 @@ Tools for managing remote policies
 ### Options inherited from parent commands
 
 ```
+      --create-rsl-entry             create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
       --no-color                     turn off colored output
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")

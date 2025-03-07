@@ -11,8 +11,10 @@ import (
 	"log/slog"
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
@@ -89,10 +91,10 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 	commitMessage := "Initialize root of trust"
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse.SignerVerifier, location string, signCommit bool) error {
+func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse.SignerVerifier, location string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -101,13 +103,18 @@ func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -120,12 +127,12 @@ func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse
 	rootMetadata.SetRepositoryLocation(location)
 
 	commitMessage := fmt.Sprintf("Set repository location to '%s' in root", location)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
-func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool) error {
+func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -134,13 +141,18 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -156,12 +168,12 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.ID())
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveRootKey is the interface for the user to de-authorize a key
 // trusted to sign the Root role.
-func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool) error {
+func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -170,13 +182,18 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -192,12 +209,12 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	commitMessage := fmt.Sprintf("Remove root key '%s' from root", keyID)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
-func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool) error {
+func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -206,13 +223,18 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -228,12 +250,12 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	commitMessage := fmt.Sprintf("Add policy key '%s' to root", targetsKey.ID())
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveTopLevelTargetsKey is the interface for the user to de-authorize a key
 // trusted to sign the top level Targets role / policy file.
-func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKeyID string, signCommit bool) error {
+func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKeyID string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -242,13 +264,18 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -264,13 +291,13 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	commitMessage := fmt.Sprintf("Remove policy key '%s' from root", targetsKeyID)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddGitHubApp is the interface for the user to add the authorized key for the
 // trusted GitHub app. This key is used to verify GitHub pull request approval
 // attestation signatures recorded by the app.
-func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool) error {
+func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -279,13 +306,18 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -301,12 +333,12 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 	}
 
 	commitMessage := fmt.Sprintf("Add GitHub app key '%s' to root", appKey.ID())
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveGitHubApp is the interface for the user to de-authorize the key for the
 // special GitHub app role.
-func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -315,13 +347,18 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -335,12 +372,12 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
 
 	commitMessage := "Remove GitHub app key from root"
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // TrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as trusted.
-func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -349,13 +386,18 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -374,12 +416,12 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	rootMetadata.EnableGitHubAppApprovals()
 
 	commitMessage := "Mark GitHub app approvals as trusted"
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // UntrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as untrusted.
-func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -388,13 +430,18 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -413,12 +460,12 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 	rootMetadata.DisableGitHubAppApprovals()
 
 	commitMessage := "Mark GitHub app approvals as untrusted"
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // UpdateRootThreshold sets the threshold of valid signatures required for the
 // Root role.
-func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -427,13 +474,18 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -449,12 +501,12 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 	}
 
 	commitMessage := fmt.Sprintf("Update root threshold to %d", threshold)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
 // required for the top level Targets role.
-func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool) error {
+func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -463,13 +515,18 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -485,13 +542,18 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	commitMessage := fmt.Sprintf("Update policy threshold to %d", threshold)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddGlobalRuleThreshold adds a threshold global rule to the root metadata.
-func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
+func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	if signCommit {
@@ -508,7 +570,7 @@ func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdss
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -524,13 +586,18 @@ func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdss
 	}
 
 	commitMessage := fmt.Sprintf("Add global rule (%s) '%s' to root metadata", tuf.GlobalRuleThresholdType, name)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddGlobalRuleBlockForcePushes adds a global rule that blocks force pushes to the root metadata.
-func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool) error {
+func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	if signCommit {
@@ -547,7 +614,7 @@ func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer s
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -568,11 +635,11 @@ func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer s
 	}
 
 	commitMessage := fmt.Sprintf("Add global rule (%s) '%s' to root metadata", tuf.GlobalRuleBlockForcePushesType, name)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveGlobalRule removes a global rule from the root metadata.
-func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool) error {
+func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -585,13 +652,18 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -607,10 +679,10 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	commitMessage := fmt.Sprintf("Remove global rule '%s' from root metadata", name)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool) error {
+func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -623,13 +695,18 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -653,10 +730,10 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 	}
 
 	commitMessage := fmt.Sprintf("Add propagation directive '%s' to root metadata", directiveName)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool) error {
+func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -669,13 +746,18 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	rootKeyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -691,12 +773,12 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	commitMessage := fmt.Sprintf("Remove propagation directive '%s' from root metadata", name)
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
 // is not modified, so its version remains the same.
-func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) error {
+func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -705,13 +787,18 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -729,7 +816,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to root metadata", keyID)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.RootMetadata, error) {
@@ -751,7 +838,7 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.Ro
 	return rootMetadata, nil
 }
 
-func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, signCommit bool) error {
+func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, createRSLEntry, signCommit bool) error {
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err
@@ -770,7 +857,7 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	state.Metadata.RootEnvelope = env
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
 }
 
 // ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.

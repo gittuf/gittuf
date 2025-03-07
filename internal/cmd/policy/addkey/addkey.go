@@ -5,6 +5,7 @@ package addkey
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -56,7 +57,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		authorizedKeys = append(authorizedKeys, key)
 	}
 
-	return repo.AddPrincipalToTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.AddPrincipalToTargets(cmd.Context(), signer, o.policyName, authorizedKeys, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

@@ -258,6 +258,20 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
 func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string, opts ...policyopts.LoadStateOption) (*State, error) {
+	options := &policyopts.LoadStateOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if options.BypassRSL {
+		commitID, err := repo.GetReference(ref)
+		if err != nil {
+			return nil, err
+		}
+
+		return loadStateFromCommit(repo, commitID)
+	}
+
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(ref))
 	if err != nil {
 		return nil, err
@@ -538,9 +552,8 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy-staging namespace. It also creates
-// an RSL entry recording the new tip of the policy-staging namespace.
-func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
+// Commit verifies and writes the State to the policy-staging namespace.
+func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
@@ -591,13 +604,14 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 	}
 
 	// We must reset to original policy commit if err != nil from here onwards.
+	if createRSLEntry {
+		if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
+			if !originalCommitID.IsZero() {
+				return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
+			}
 
-	if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
-		if !originalCommitID.IsZero() {
-			return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
+			return err
 		}
-
-		return err
 	}
 
 	return nil
@@ -998,7 +1012,11 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	commitTreeID, err := repo.GetCommitTreeID(entry.GetTargetID())
+	return loadStateFromCommit(repo, entry.GetTargetID())
+}
+
+func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
+	commitTreeID, err := repo.GetCommitTreeID(commitID)
 	if err != nil {
 		return nil, err
 	}

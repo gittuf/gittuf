@@ -48,6 +48,9 @@ func TestClone(t *testing.T) {
 	if err := remoteRepo.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false); err != nil {
 		t.Fatal(err)
 	}
+	if err := remoteRepo.StagePolicy(testCtx, "", true, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := policy.Apply(testCtx, remoteRepo.r, false); err != nil {
 		t.Fatal(err)
 	}

@@ -51,7 +51,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
-		if err := attestations.Commit(repo, "Test commit", false); err != nil {
+		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -84,7 +84,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 		authorizations := map[string]gitinterface.Hash{}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
-		if err := attestations.Commit(repo, "Test commit", false); err != nil {
+		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -110,7 +110,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
-		if err := attestations.Commit(repo, "Test commit", false); err != nil {
+		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -158,7 +158,7 @@ func TestAttestationsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := attestations.Commit(repo, "Test commit", false); err != nil {
+	if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
 		t.Error(err)
 	}
 
