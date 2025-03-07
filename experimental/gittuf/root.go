@@ -5,13 +5,19 @@ package gittuf
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
@@ -774,6 +780,166 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 
 	commitMessage := fmt.Sprintf("Remove propagation directive '%s' from root metadata", name)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// AddHook defines the workflow for adding a file to be executed as a hook. It
+// writes the hook file, populates all fields in the hooks metadata associated
+// with this file and commits it to the root of trust metadata.
+func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stage tuf.HookStage, hookName, filePath string, environment tuf.HookEnvironment, modules, principalIDs []string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	if hookName == "" {
+		hookName = filepath.Base(filePath)
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Checking if hook with specified name already exists...")
+	found := false
+	for _, hook := range state.Hooks[stage] {
+		if hook.ID() == hookName {
+			found = true
+		}
+	}
+
+	if found {
+		return tuf.ErrDuplicatedHookName
+	}
+
+	slog.Debug("Reading hook from filesystem...")
+	hookFile, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer hookFile.Close() // nolint:errcheck
+
+	hookFileContents, err := io.ReadAll(hookFile)
+	if err != nil {
+		return err
+	}
+
+	var hashes = make(map[string]string, 2)
+	blobID, err := r.r.WriteBlob(hookFileContents)
+	if err != nil {
+		return err
+	}
+	//TODO: hash agility
+	hashes["sha1"] = blobID.String()
+
+	sha256Hash := sha256.New()
+	sha256Hash.Write(hookFileContents)
+	hashes["sha256"] = hex.EncodeToString(sha256Hash.Sum(nil))
+
+	slog.Debug("Adding hook to rule file...")
+	if err := rootMetadata.AddHook(stage, hookName, principalIDs, hashes, environment, modules); err != nil {
+		return err
+	}
+
+	hook := &tufv01.Hook{
+		Name:         hookName,
+		PrincipalIDs: set.NewSetFromItems(principalIDs...),
+		Hashes:       hashes,
+		Environment:  environment,
+		Modules:      modules,
+	}
+
+	state.Hooks[stage] = append(state.Hooks[stage], hook)
+
+	commitMessage := fmt.Sprintf("Add hook '%s' to root metadata", hookName)
+
+	slog.Debug("Committing policy...")
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// RemoveHook defines the workflow for removing a hook defined in gittuf policy.
+func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVerifier, stage tuf.HookStage, hookName string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Checking if hook with specified name exists...")
+	hooks := []tuf.Hook{}
+	found := false
+	for _, hook := range state.Hooks[stage] {
+		if hook.ID() != hookName {
+			hooks = append(hooks, hook)
+		}
+		if hook.ID() == hookName {
+			found = true
+		}
+	}
+
+	if !found {
+		return tuf.ErrHookNotFound
+	}
+
+	state.Hooks[stage] = hooks
+
+	slog.Debug("Removing hook...")
+	rootMetadata.RemoveHook(stage, hookName)
+
+	commitMessage := fmt.Sprintf("Remove hook '%s' from root metadata", hookName)
+
+	slog.Debug("Committing policy...")
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, true, signCommit)
 }
 
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself
