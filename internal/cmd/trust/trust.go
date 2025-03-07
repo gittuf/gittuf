@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
+	"github.com/gittuf/gittuf/internal/cmd/trust/hooks"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
@@ -47,6 +48,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
+	cmd.AddCommand(hooks.New(o))
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubapp.New(o))
 	cmd.AddCommand(removeglobalrule.New(o))
