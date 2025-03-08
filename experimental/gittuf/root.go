@@ -703,7 +703,7 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 		return err
 	}
 
-	slog.Debug("Adding propagation directive...")
+	slog.Debug("Updating propagation directive...")
 	var directive tuf.PropagationDirective
 	switch rootMetadata.(type) {
 	case *tufv01.RootMetadata:
@@ -716,7 +716,7 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add propagation directive '%s' to root metadata", directiveName)
+	commitMessage := fmt.Sprintf("Update propagation directive '%s' in root metadata", directiveName)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
