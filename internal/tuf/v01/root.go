@@ -727,7 +727,43 @@ func (p *PropagationDirective) GetDownstreamPath() string {
 	return p.DownstreamPath
 }
 
-func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
+// setter added to update exsisting directive
+func (p *PropagationDirective) SetUpstreamRepository(upstreamRepository string) {
+	p.UpstreamRepository = upstreamRepository
+}
+
+func (p *PropagationDirective) SetUpstreamReference(upstreamReference string) {
+	p.UpstreamReference = upstreamReference
+}
+
+func (p *PropagationDirective) SetDownstreamReference(downstreamReference string) {
+	p.DownstreamReference = downstreamReference
+}
+
+func (p *PropagationDirective) SetDownstreamPath(downstreamPath string) {
+	p.DownstreamPath = downstreamPath
+}
+
+// Updatepropagation checks if there is a duplicate or update and deal with that
+func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
+	// find if there is a duplicate(exact same) or update(same name, different in other)
+	// in the slice in linear search, then update the found propagation
+	for i := range r.Propagations {
+		if r.Propagations[i].Name == directive.Name {
+			r.Propagations[i] = directive
+			return nil
+		}
+	}
+
+	//if the directive is new, call add propagation directive to deal with it
+	if err := r.AddPropagationDirective(directive); err != nil{
+		return err
+	}
+	return nil
+}
+
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) 
+tuf.PropagationDirective {
 	return &PropagationDirective{
 		Name:                name,
 		UpstreamRepository:  upstreamRepository,
