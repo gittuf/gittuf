@@ -148,7 +148,7 @@ type RootMetadata interface {
 	// AddPropagationDirective adds a propagation directive to the root
 	// metadata.
 	AddPropagationDirective(directive PropagationDirective) error
-	//
+	// UpdatePropagationDirective updates a propagation directive in the root metadata
 	UpdatePropagationDirective(directive PropagationDirective) error
 	// GetPropagationDirectives returns the propagation directives found in the
 	// root metadata.
@@ -302,15 +302,6 @@ type PropagationDirective interface {
 	// reference where the upstream repository's contents must be stored by the
 	// propagation workflow.
 	GetDownstreamPath() string
-
-	// update the setter into the interface
-	SetUpstreamRepository(upstreamRepository string)
-
-	SetUpstreamReference(upstreamReference string)
-
-	SetDownstreamReference(downstreamReference string)
-
-	SetDownstreamPath(downstreamPath string)
 }
 
 // MultiRepository is used to configure gittuf to act in multi-repository

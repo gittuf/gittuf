@@ -80,7 +80,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	// use  UpdatePropagationDirective to do it
-	// it is in gittuf/internal/tuf/v02/root.go
+	// it is in experimental/gittuf/root.go
 	return repo.UpdatePropagationDirective(cmd.Context(), signer, o.name, o.upstreamRepository, o.upstreamReference, o.downstreamReference, o.downstreamPath, true)
 }
 
@@ -88,7 +88,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "update-propagation-directive",
-		Short:             fmt.Sprintf("Update propagation directive into gittuf root of trust (developer mode only, set %s=1)", dev.DevModeKey),
+		Short:             fmt.Sprintf("Update propagation directive in gittuf root of trust (developer mode only, set %s=1)", dev.DevModeKey),
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
