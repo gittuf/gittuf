@@ -12,12 +12,13 @@ import (
 	"os"
 	"strings"
 
+	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
 	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -37,18 +38,43 @@ var (
 
 var githubClient *gogithub.Client
 
+// ApplyAttestations records the state of the attestations reference and syncs
+// it with the specified remote, making the attestation available at the
+// synchronization point.
+func (r *Repository) ApplyAttestations(ctx context.Context, remoteName string, localOnly, signRSLEntry bool) error {
+	if signRSLEntry {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	opts := []rslopts.RecordOption{rslopts.WithRecordRemote(remoteName)}
+	if localOnly {
+		opts = append(opts, rslopts.WithRecordLocalOnly())
+	}
+
+	return r.RecordRSLEntryForReference(ctx, attestations.Ref, signRSLEntry, opts...)
+}
+
 // AddReferenceAuthorization adds a reference authorization attestation to the
 // repository for the specified target ref. The from ID is identified using the
 // last RSL entry for the target ref. The to ID is that of the expected Git tree
 // created by merging the feature ref into the target ref. The commit used to
 // calculate the merge tree ID is identified using the RSL for the feature ref.
-func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, signCommit bool) error {
+func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, signCommit bool, opts ...attestopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
+	}
+
+	options := &attestopts.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	var err error
@@ -166,19 +192,24 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Committing attestations...")
-	return allAttestations.Commit(r.r, commitMessage, signCommit)
+	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
 // their key.
-func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, fromID, toID string, signCommit bool) error {
+func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, fromID, toID string, signCommit bool, opts ...attestopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
+	}
+
+	options := &attestopts.Options{}
+	for _, fn := range opts {
+		fn(options)
 	}
 
 	// Ensure only the key that created a reference authorization can remove it
@@ -240,7 +271,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 	commitMessage := fmt.Sprintf("Remove reference authorization for '%s' from '%s' to '%s' by '%s'", targetRef, fromID, toID, keyID)
 
 	slog.Debug("Committing attestations...")
-	return allAttestations.Commit(r.r, commitMessage, signCommit)
+	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddGitHubPullRequestAttestationForCommit identifies the pull request for a
@@ -249,10 +280,6 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 // in as an option. If it is not, it is read from the GITHUB_TOKEN environment
 // variable. A custom GitHub instance can be specified via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -297,7 +324,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 
 		// pullRequest.Merged is not set on this endpoint for some reason
 		if pullRequest.MergedAt != nil && pullRequestBranch == baseBranch {
-			return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, signCommit)
+			return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, options.CreateRSLEntry, signCommit)
 		}
 	}
 
@@ -311,10 +338,6 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 // GITHUB_TOKEN environment variable. A custom GitHub instance can be specified
 // via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -349,7 +372,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return err
 	}
 
-	return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, signCommit)
+	return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, options.CreateRSLEntry, signCommit)
 }
 
 // AddGitHubPullRequestApprover adds a GitHub pull request approval attestation
@@ -358,13 +381,8 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 // and stored in the repository. To find the review information, the GitHub API
 // is used and the authentication token for the API is passed in as an option.
 // If the token is not passed in, it's read from the GITHUB_TOKEN environment
-// variable. A custom GitHub instance can be specified via opts. Currently, this
-// is limited to developer mode.
+// variable. A custom GitHub instance can be specified via opts.
 func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, reviewID int64, approver string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -453,17 +471,13 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	commitMessage := fmt.Sprintf("Add GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, approver)
 
 	slog.Debug("Committing attestations...")
-	return currentAttestations.Commit(r.r, commitMessage, signCommit)
+	return currentAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // DismissGitHubPullRequestApprover removes an approver from the GitHub pull
 // request approval attestation for the specified parameters. A custom GitHub
 // instance can be specified via opts.
 func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, reviewID int64, dismissedApprover string, signCommit bool, opts ...githubopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -542,10 +556,10 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 	commitMessage := fmt.Sprintf("Dismiss GitHub pull request approval for '%s' from '%s' to '%s' (review ID %d) for approval by '%s'", baseRef, fromID, toID, reviewID, dismissedApprover)
 
 	slog.Debug("Committing attestations...")
-	return currentAttestations.Commit(r.r, commitMessage, signCommit)
+	return currentAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *gogithub.PullRequest, signCommit bool) error {
+func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *gogithub.PullRequest, createRSLEntry, signCommit bool) error {
 	var (
 		targetRef      string
 		targetCommitID string
@@ -595,7 +609,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 	commitMessage := fmt.Sprintf("Add GitHub pull request attestation for '%s' at '%s'\n\nSource: %s/%s/%s/pull/%d\n", targetRef, targetCommitID, strings.TrimSuffix(githubBaseURL, "/"), owner, repository, *pullRequest.Number)
 
 	slog.Debug("Committing attestations...")
-	return allAttestations.Commit(r.r, commitMessage, signCommit)
+	return allAttestations.Commit(r.r, commitMessage, createRSLEntry, signCommit)
 }
 
 func getGitHubPullRequestApprovalPredicateFromEnvelope(env *sslibdsse.Envelope) (github.PullRequestApprovalAttestation, error) {

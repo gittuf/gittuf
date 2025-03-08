@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
@@ -63,7 +65,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// Add a single commit
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
 		fromCommitID := commitIDs[0]
-		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -71,7 +73,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// Add two commits
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
 		featureCommitID := commitIDs[1]
-		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -94,7 +96,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		}
 
 		// First authorization attestation signature
-		err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false)
+		err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false, attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err := attestations.LoadCurrentAttestations(r)
@@ -110,7 +112,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		assert.Equal(t, firstKeyID, env.Signatures[0].KeyID)
 
 		// Second authorization attestation signature
-		err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false)
+		err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false, attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
@@ -127,7 +129,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		assert.Equal(t, secondKeyID, env.Signatures[1].KeyID)
 
 		// Remove second authorization attestation signature
-		err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false)
+		err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false, attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
@@ -174,7 +176,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.RecordRSLEntryForReference(testCtx, fromRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, fromRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -185,7 +187,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false)
+		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry(), attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err := attestations.LoadCurrentAttestations(r)
@@ -204,15 +206,15 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Add it to RSL
-		if err := repo.RecordRSLEntryForReference(testCtx, targetTagRef, false); err != nil {
+		if err := repo.RecordRSLEntryForReference(testCtx, targetTagRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
 
 		// Trying to approve it now fails as we're approving a tag already seen in the RSL
-		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false)
+		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry())
 		assert.ErrorIs(t, err, gitinterface.ErrTagAlreadyExists)
 
-		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String(), false)
+		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String(), false, attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)

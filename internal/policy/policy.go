@@ -9,9 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path"
-	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -51,17 +48,15 @@ var (
 	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
 	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
 	ErrPolicyNotFound             = errors.New("cannot find policy")
-	ErrUnableToMatchRootKeys      = errors.New("unable to match root public keys, gittuf policy is in a broken state")
+	ErrInvalidPolicy              = errors.New("invalid policy state (is policy reference out of sync with corresponding RSL entry?)")
 	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 )
 
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	RootEnvelope        *sslibdsse.Envelope
-	TargetsEnvelope     *sslibdsse.Envelope
-	DelegationEnvelopes map[string]*sslibdsse.Envelope
-	RootPublicKeys      []tuf.Principal
+	Metadata           *StateMetadata
+	ControllerMetadata map[string]*StateMetadata
 
 	githubAppApprovalsTrusted bool
 	githubAppKeys             []tuf.Principal
@@ -73,6 +68,45 @@ type State struct {
 	allPrincipals  map[string]tuf.Principal
 	hasFileRule    bool
 	globalRules    []tuf.GlobalRule
+}
+
+type StateMetadata struct {
+	RootEnvelope        *sslibdsse.Envelope
+	TargetsEnvelope     *sslibdsse.Envelope
+	DelegationEnvelopes map[string]*sslibdsse.Envelope
+}
+
+func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
+	metadata := map[string]*sslibdsse.Envelope{}
+	metadata[RootRoleName] = s.RootEnvelope
+	if s.TargetsEnvelope != nil {
+		metadata[TargetsRoleName] = s.TargetsEnvelope
+	}
+
+	if s.DelegationEnvelopes != nil {
+		for k, v := range s.DelegationEnvelopes {
+			metadata[k] = v
+		}
+	}
+
+	allTreeEntries := []gitinterface.TreeEntry{}
+
+	for name, env := range metadata {
+		envContents, err := json.Marshal(env)
+		if err != nil {
+			return nil, err
+		}
+
+		blobID, err := repo.WriteBlob(envContents)
+		if err != nil {
+			return nil, err
+		}
+
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(name+".json", blobID))
+	}
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	return treeBuilder.WriteTreeFromEntries(allTreeEntries)
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
@@ -127,7 +161,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 			threshold:  len(options.InitialRootPrincipals),
 		}
 
-		_, err = verifier.Verify(ctx, nil, state.RootEnvelope)
+		_, err = verifier.Verify(ctx, nil, state.Metadata.RootEnvelope)
 		return state, err
 	}
 
@@ -172,7 +206,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 			threshold:  len(options.InitialRootPrincipals),
 		}
 
-		_, err = verifier.Verify(ctx, nil, initialPolicyState.RootEnvelope)
+		_, err = verifier.Verify(ctx, nil, initialPolicyState.Metadata.RootEnvelope)
 		if err != nil {
 			return nil, err
 		}
@@ -224,6 +258,20 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
 func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string, opts ...policyopts.LoadStateOption) (*State, error) {
+	options := &policyopts.LoadStateOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if options.BypassRSL {
+		commitID, err := repo.GetReference(ref)
+		if err != nil {
+			return nil, err
+		}
+
+		return loadStateFromCommit(repo, commitID)
+	}
+
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(ref))
 	if err != nil {
 		return nil, err
@@ -241,29 +289,6 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository, opts ...
 	}
 
 	return LoadState(ctx, repo, firstEntry, opts...)
-}
-
-// GetStateForCommit scans the RSL to identify the first time a commit was seen
-// in the repository. The policy preceding that RSL entry is returned as the
-// State to be used for verifying the commit's signature. If the commit hasn't
-// been seen in the repository previously, no policy state is returned. Also, no
-// error is returned. Identifying the policy in this case is left to the calling
-// workflow.
-func GetStateForCommit(ctx context.Context, repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
-	firstSeenEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForCommit(repo, commitID)
-	if err != nil {
-		if errors.Is(err, rsl.ErrNoRecordOfCommit) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	commitPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(firstSeenEntry.GetID()))
-	if err != nil {
-		return nil, err
-	}
-
-	return LoadState(ctx, repo, commitPolicyEntry)
 }
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
@@ -426,22 +451,12 @@ func (s *State) GetAllPrincipals() map[string]tuf.Principal {
 // top level Targets role and all reachable delegated Targets roles. Any
 // unreachable role returns an error.
 func (s *State) Verify(ctx context.Context) error {
-	// Check consistency of root keys
-	rootKeys, err := s.GetRootKeys()
-	if err != nil {
-		return err
-	}
-	// TODO: do we need this?
-	if !verifyRootKeysMatch(rootKeys, s.RootPublicKeys) {
-		return ErrUnableToMatchRootKeys
-	}
-
 	rootVerifier, err := s.getRootVerifier()
 	if err != nil {
 		return err
 	}
 
-	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.RootEnvelope); err != nil {
+	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -459,7 +474,7 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check top-level targets
-	if s.TargetsEnvelope == nil {
+	if s.Metadata.TargetsEnvelope == nil {
 		return nil
 	}
 
@@ -468,7 +483,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.TargetsEnvelope); err != nil {
+	if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.TargetsEnvelope); err != nil {
 		return err
 	}
 
@@ -479,7 +494,7 @@ func (s *State) Verify(ctx context.Context) error {
 
 	// Check reachable delegations
 	reachedDelegations := map[string]bool{}
-	for delegatedRoleName := range s.DelegationEnvelopes {
+	for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
 		reachedDelegations[delegatedRoleName] = false
 	}
 
@@ -498,7 +513,7 @@ func (s *State) Verify(ctx context.Context) error {
 		if s.HasTargetsRole(delegation.ID()) {
 			reachedDelegations[delegation.ID()] = true
 
-			env := s.DelegationEnvelopes[delegation.ID()]
+			env := s.Metadata.DelegationEnvelopes[delegation.ID()]
 
 			principals := []tuf.Principal{}
 			for _, principalID := range delegation.GetPrincipalIDs().Contents() {
@@ -537,43 +552,40 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy-staging namespace. It also creates
-// an RSL entry recording the new tip of the policy-staging namespace.
-func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
+// Commit verifies and writes the State to the policy-staging namespace.
+func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
 
-	metadata := map[string]*sslibdsse.Envelope{}
-	metadata[RootRoleName] = s.RootEnvelope
-	if s.TargetsEnvelope != nil {
-		metadata[TargetsRoleName] = s.TargetsEnvelope
-	}
-
-	if s.DelegationEnvelopes != nil {
-		for k, v := range s.DelegationEnvelopes {
-			metadata[k] = v
-		}
-	}
-
+	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
 	allTreeEntries := []gitinterface.TreeEntry{}
 
-	for name, env := range metadata {
-		envContents, err := json.Marshal(env)
-		if err != nil {
-			return err
-		}
+	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
+	if err != nil {
+		return nil
+	}
+	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
 
-		blobID, err := repo.WriteBlob(envContents)
-		if err != nil {
-			return err
-		}
+	for absoluteControllerPath, metadata := range s.ControllerMetadata {
+		// If path is "1", it should become gittuf-controller/1/metadata
+		// If path is "1/2", it should become gittuf-controller/1/gittuf-controller/2/metadata
+		// If path is "1/2/3", it should become gittuf-controller/1/gittuf-controller/2/gittuf-controller/3/metadata
 
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(path.Join(metadataTreeEntryName, name+".json"), blobID))
+		pathComponents := strings.Split(absoluteControllerPath, "/")
+		newPath := strings.Join(pathComponents, "/"+tuf.GittufControllerPrefix+"/")
+		// For "1/2/3", newPath is now "1/gittuf-controller/2/gittuf-controller/3"
+		// Add the controller prefix and metadata tree suffix
+		newPath = fmt.Sprintf("%s/%s/%s", tuf.GittufControllerPrefix, newPath, metadataTreeEntryName)
+
+		stateMetadataTreeID, err := metadata.WriteTree(repo)
+		if err != nil {
+			return nil
+		}
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(newPath, stateMetadataTreeID))
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-
 	policyRootTreeID, err := treeBuilder.WriteTreeFromEntries(allTreeEntries)
 	if err != nil {
 		return err
@@ -592,13 +604,14 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 	}
 
 	// We must reset to original policy commit if err != nil from here onwards.
+	if createRSLEntry {
+		if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
+			if !originalCommitID.IsZero() {
+				return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
+			}
 
-	if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
-		if !originalCommitID.IsZero() {
-			return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
+			return err
 		}
-
-		return err
 	}
 
 	return nil
@@ -611,11 +624,38 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, sign
 // would be invalid to be made, by utilizing the policy staging ref.
 func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool) error {
 	// Get the reference for the PolicyRef
+	referenceFound := true
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
 		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
 			return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
 		}
+		referenceFound = false
+	}
+
+	entryFound := true
+	policyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return fmt.Errorf("failed to get policy RSL entry: %w", err)
+		}
+
+		entryFound = false
+	}
+
+	// case 1: both found -> verify tip matches entry
+	// case 2: only one found -> return error
+	// case 3: neither found -> nothing to verify
+	switch {
+	case referenceFound && entryFound:
+		if !policyEntry.GetTargetID().Equal(policyTip) {
+			return ErrInvalidPolicy
+		}
+	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
+		return ErrInvalidPolicy
+	default:
+		slog.Debug("No prior applied policy found")
+		// Nothing to check or return here
 	}
 
 	// Get the reference for the PolicyStagingRef
@@ -702,7 +742,7 @@ func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 // The `migrate` parameter determines if the schema must be converted to a newer
 // version.
 func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
-	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
+	payloadBytes, err := s.Metadata.RootEnvelope.DecodeB64Payload()
 	if err != nil {
 		return nil, err
 	}
@@ -750,9 +790,9 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 // TargetsEnvelope for the specified `roleName`.  The `migrate` parameter
 // determines if the schema must be converted to a newer version.
 func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMetadata, error) {
-	e := s.TargetsEnvelope
+	e := s.Metadata.TargetsEnvelope
 	if roleName != TargetsRoleName {
-		env, ok := s.DelegationEnvelopes[roleName]
+		env, ok := s.Metadata.DelegationEnvelopes[roleName]
 		if !ok {
 			return nil, ErrMetadataNotFound
 		}
@@ -809,10 +849,10 @@ func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMe
 
 func (s *State) HasTargetsRole(roleName string) bool {
 	if roleName == TargetsRoleName {
-		return s.TargetsEnvelope != nil
+		return s.Metadata.TargetsEnvelope != nil
 	}
 
-	_, ok := s.DelegationEnvelopes[roleName]
+	_, ok := s.Metadata.DelegationEnvelopes[roleName]
 	return ok
 }
 
@@ -839,7 +879,7 @@ func (s *State) preprocess() error {
 		s.allPrincipals[principalID] = principal
 	}
 
-	if s.TargetsEnvelope == nil {
+	if s.Metadata.TargetsEnvelope == nil {
 		return nil
 	}
 
@@ -876,11 +916,11 @@ func (s *State) preprocess() error {
 		}
 	}
 
-	if len(s.DelegationEnvelopes) == 0 {
+	if len(s.Metadata.DelegationEnvelopes) == 0 {
 		return nil
 	}
 
-	for delegatedRoleName := range s.DelegationEnvelopes {
+	for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
 		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName, false)
 		if err != nil {
 			return err
@@ -972,48 +1012,111 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	commitTreeID, err := repo.GetCommitTreeID(entry.GetTargetID())
+	return loadStateFromCommit(repo, entry.GetTargetID())
+}
+
+func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
+	commitTreeID, err := repo.GetCommitTreeID(commitID)
 	if err != nil {
 		return nil, err
 	}
 
-	allTreeEntries, err := repo.GetAllFilesInTree(commitTreeID)
+	treeItems, err := repo.GetTreeItems(commitTreeID)
 	if err != nil {
 		return nil, err
 	}
 
-	state := &State{repository: repo}
+	// metadataQueue is populated with metadata/ subtrees we want to load for
+	// either the current repository or its controllers.
+	metadataQueue := []*policyTreeItem{{name: "", treeID: treeItems[metadataTreeEntryName]}}
+	// controllerQueue is populated with gittuf-controller/ subtrees as we need
+	// to unwrap them to identify the applicable metadata/ tree entries.
+	// Here, the `name` parameter identifies the set of parents. If the
+	// controller subtree is directly declared in the current repository, then
+	// its name is empty.
+	controllerQueue := []*policyTreeItem{}
+	if controllerTreeID, hasController := treeItems[tuf.GittufControllerPrefix]; hasController {
+		controllerQueue = append(controllerQueue, &policyTreeItem{name: "", treeID: controllerTreeID})
+	}
 
-	for name, blobID := range allTreeEntries {
-		contents, err := repo.ReadBlob(blobID)
+	for len(controllerQueue) != 0 {
+		currentControllerEntry := controllerQueue[0]
+		controllerQueue = controllerQueue[1:]
+
+		controllerTreeItems, err := repo.GetTreeItems(currentControllerEntry.treeID)
 		if err != nil {
 			return nil, err
 		}
 
-		// We have this conditional because once upon a time we used to store
-		// the root keys on disk as well; now we just get them from the root
-		// metadata file. We ignore the keys on disk in the old policy states.
-		if strings.HasPrefix(name, metadataTreeEntryName+"/") {
+		// controllerTreeItems should be 1+ subtrees that have the name of the controller in question.
+		// Each subtree in turn has a metadata subtree and optionally more controller subtrees.
+
+		for controllerName, subtreeID := range controllerTreeItems {
+			subtreeItems, err := repo.GetTreeItems(subtreeID)
+			if err != nil {
+				return nil, err
+			}
+
+			absoluteControllerName := currentControllerEntry.name + "/" + controllerName
+			absoluteControllerName = strings.Trim(absoluteControllerName, "/")
+
+			for treeName, treeID := range subtreeItems {
+				if treeName == metadataTreeEntryName {
+					metadataQueue = append(metadataQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
+				} else if treeName == tuf.GittufControllerPrefix {
+					controllerQueue = append(controllerQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
+				}
+			}
+		}
+	}
+
+	state := &State{repository: repo}
+
+	for len(metadataQueue) != 0 {
+		currentMetadataEntry := metadataQueue[0]
+		metadataQueue = metadataQueue[1:]
+
+		metadataItems, err := repo.GetTreeItems(currentMetadataEntry.treeID)
+		if err != nil {
+			return nil, err
+		}
+
+		stateMetadata := &StateMetadata{}
+		for name, blobID := range metadataItems {
+			contents, err := repo.ReadBlob(blobID)
+			if err != nil {
+				return nil, err
+			}
+
 			env := &sslibdsse.Envelope{}
 			if err := json.Unmarshal(contents, env); err != nil {
 				return nil, err
 			}
 
-			metadataName := strings.TrimPrefix(name, metadataTreeEntryName+"/")
-			switch metadataName {
+			switch name {
 			case fmt.Sprintf("%s.json", RootRoleName):
-				state.RootEnvelope = env
+				stateMetadata.RootEnvelope = env
 
 			case fmt.Sprintf("%s.json", TargetsRoleName):
-				state.TargetsEnvelope = env
+				stateMetadata.TargetsEnvelope = env
 
 			default:
-				if state.DelegationEnvelopes == nil {
-					state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+				if stateMetadata.DelegationEnvelopes == nil {
+					stateMetadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
 				}
 
-				state.DelegationEnvelopes[strings.TrimSuffix(metadataName, ".json")] = env
+				stateMetadata.DelegationEnvelopes[strings.TrimSuffix(name, ".json")] = env
 			}
+		}
+
+		if currentMetadataEntry.name == "" {
+			state.Metadata = stateMetadata
+		} else {
+			if state.ControllerMetadata == nil {
+				state.ControllerMetadata = map[string]*StateMetadata{}
+			}
+
+			state.ControllerMetadata[currentMetadataEntry.name] = stateMetadata
 		}
 	}
 
@@ -1025,12 +1128,6 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 	if err != nil {
 		return nil, err
 	}
-
-	rootPrincipals, err := rootMetadata.GetRootPrincipals()
-	if err != nil {
-		return nil, err
-	}
-	state.RootPublicKeys = rootPrincipals
 
 	state.githubAppApprovalsTrusted = rootMetadata.IsGitHubAppApprovalTrusted()
 
@@ -1045,18 +1142,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 	return state, nil
 }
 
-func verifyRootKeysMatch(keys1, keys2 []tuf.Principal) bool {
-	if len(keys1) != len(keys2) {
-		return false
-	}
-
-	sort.Slice(keys1, func(i, j int) bool {
-		return keys1[i].ID() < keys1[j].ID()
-	})
-
-	sort.Slice(keys2, func(i, j int) bool {
-		return keys2[i].ID() < keys2[j].ID()
-	})
-
-	return reflect.DeepEqual(keys1, keys2)
+type policyTreeItem struct {
+	name   string
+	treeID gitinterface.Hash
 }

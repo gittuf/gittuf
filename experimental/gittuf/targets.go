@@ -10,7 +10,9 @@ import (
 	"log/slog"
 	"strings"
 
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -20,7 +22,7 @@ var ErrInvalidPolicyName = errors.New("invalid rule or policy file name, cannot 
 
 // InitializeTargets is the interface for the user to create the specified
 // policy file.
-func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if targetsRoleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -33,13 +35,18 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -67,23 +74,23 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		if state.DelegationEnvelopes == nil {
-			state.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+		if state.Metadata.DelegationEnvelopes == nil {
+			state.Metadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
 		}
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Initialize policy '%s'", targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddDelegation is the interface for the user to add a new rule to gittuf
 // policy.
-func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -96,13 +103,18 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -144,20 +156,20 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add rule '%s' to policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // UpdateDelegation is the interface for the user to update a rule to gittuf
 // policy.
-func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool) error {
+func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if ruleName == policy.RootRoleName {
 		return ErrInvalidPolicyName
 	}
@@ -170,13 +182,18 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -213,20 +230,20 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Update rule '%s' in policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // ReorderDelegations is the interface for the user to reorder rules in gittuf
 // policy.
-func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleNames []string, signCommit bool) error {
+func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleNames []string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -235,13 +252,18 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return nil
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -273,20 +295,20 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Reorder rules in policy '%s'", targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveDelegation is the interface for a user to remove a rule from gittuf
 // policy.
-func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool) error {
+func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, ruleName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -295,13 +317,18 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -338,20 +365,20 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddPrincipalToTargets is the interface for a user to add a trusted principal
 // to gittuf rule file metadata.
-func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipals []tuf.Principal, signCommit bool) error {
+func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, authorizedPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -360,13 +387,18 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -409,20 +441,20 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add principals to policy '%s'\n%s", targetsRoleName, principalIDs)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemovePrincipalFromTargets is the interface for a user to remove a principal
 // from gittuf rule file metadata.
-func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, principalID string, signCommit bool) error {
+func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, principalID string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -431,13 +463,18 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -468,20 +505,20 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Remove principal from policy '%s'\n%s", targetsRoleName, principalID)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
-func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool) error {
+func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -490,13 +527,18 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 		}
 	}
 
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return err
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -506,9 +548,9 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 
 	var env *sslibdsse.Envelope
 	if targetsRoleName == policy.TargetsRoleName {
-		env = state.TargetsEnvelope
+		env = state.Metadata.TargetsEnvelope
 	} else {
-		env = state.DelegationEnvelopes[targetsRoleName]
+		env = state.Metadata.DelegationEnvelopes[targetsRoleName]
 	}
 
 	slog.Debug(fmt.Sprintf("Signing rule file using '%s'...", keyID))
@@ -518,13 +560,13 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 	}
 
 	if targetsRoleName == policy.TargetsRoleName {
-		state.TargetsEnvelope = env
+		state.Metadata.TargetsEnvelope = env
 	} else {
-		state.DelegationEnvelopes[targetsRoleName] = env
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
 	}
 
 	commitMessage := fmt.Sprintf("Add signature from key '%s' to policy '%s'", keyID, targetsRoleName)
 
 	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, signCommit)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }

@@ -4,19 +4,13 @@
 package dismissgithubapproval
 
 import (
-	"fmt"
-
-	"github.com/gittuf/gittuf/experimental/gittuf"
-	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
-	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/cmd/attest/github/dismissapproval"
+	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	signingKey        string
-	baseURL           string
-	reviewID          int64
-	dismissedApprover string
+	signingKey string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -25,56 +19,15 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"signing-key",
 		"k",
 		"",
-		"signing key to use for signing attestation",
+		"specify key to sign attestation with",
 	)
 	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
-
-	cmd.Flags().StringVar(
-		&o.baseURL,
-		"base-URL",
-		githubopts.DefaultGitHubBaseURL,
-		"location of GitHub instance",
-	)
-
-	cmd.Flags().StringVar(
-		&o.dismissedApprover,
-		"dismiss-approver",
-		"",
-		"identity of the reviewer whose review was dismissed",
-	)
-	cmd.MarkFlagRequired("dismiss-approver") //nolint:errcheck
-
-	cmd.Flags().Int64Var(
-		&o.reviewID,
-		"review-ID",
-		-1,
-		"pull request review ID",
-	)
-	cmd.MarkFlagRequired("review-ID") //nolint:errcheck
-}
-
-func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := gittuf.LoadRepository()
-	if err != nil {
-		return err
-	}
-
-	signer, err := gittuf.LoadSigner(repo, o.signingKey)
-	if err != nil {
-		return err
-	}
-
-	return repo.DismissGitHubPullRequestApprover(cmd.Context(), signer, o.reviewID, o.dismissedApprover, true, githubopts.WithGitHubBaseURL(o.baseURL))
 }
 
 func New() *cobra.Command {
 	o := &options{}
-	cmd := &cobra.Command{
-		Use:   "dismiss-github-approval",
-		Short: fmt.Sprintf("Dismiss GitHub pull request approval as an attestation (developer mode only, set %s=1)", dev.DevModeKey),
-		RunE:  o.Run,
-	}
+	cmd := dismissapproval.New(&persistent.Options{SigningKey: o.signingKey, WithRSLEntry: true})
 	o.AddFlags(cmd)
-
+	cmd.Deprecated = "switch to \"gittuf attest github dismiss-approval\""
 	return cmd
 }

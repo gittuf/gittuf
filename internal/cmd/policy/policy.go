@@ -16,11 +16,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
-	tui "github.com/gittuf/gittuf/internal/cmd/policy/tui"
+	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
+	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/stage"
 	"github.com/spf13/cobra"
 )
 
@@ -33,22 +34,23 @@ func New() *cobra.Command {
 	}
 	o.AddPersistentFlags(cmd)
 
-	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addkey.New(o))
-	cmd.AddCommand(removekey.New(o))
 	cmd.AddCommand(addperson.New(o))
-	cmd.AddCommand(removeperson.New(o))
+	cmd.AddCommand(addrule.New(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(discard.New())
-	cmd.AddCommand(addrule.New(o))
+	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(listprincipals.New())
 	cmd.AddCommand(listrules.New())
 	cmd.AddCommand(remote.New())
+	cmd.AddCommand(removekey.New(o))
+	cmd.AddCommand(removeperson.New(o))
 	cmd.AddCommand(removerule.New(o))
 	cmd.AddCommand(reorderrules.New(o))
 	cmd.AddCommand(sign.New(o))
-	cmd.AddCommand(updaterule.New(o))
+	cmd.AddCommand(stage.New())
 	cmd.AddCommand(tui.New(o))
+	cmd.AddCommand(updaterule.New(o))
 
 	return cmd
 }

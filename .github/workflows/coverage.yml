@@ -19,7 +19,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34
       with:
-        go-version: 1.23
+        go-version: 1.24
         cache: true
     - name: Check Coverage
       run: go test -covermode=atomic -coverprofile='coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`

@@ -5,6 +5,7 @@ Tools for gittuf's root of trust
 ### Options
 
 ```
+      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for trust
   -k, --signing-key string   signing key to use to sign root of trust
 ```
@@ -31,6 +32,7 @@ Tools for gittuf's root of trust
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
+* [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
@@ -39,6 +41,7 @@ Tools for gittuf's root of trust
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
 * [gittuf trust set-repository-location](gittuf_trust_set-repository-location.md)	 - Set repository location
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust
+* [gittuf trust stage](gittuf_trust_stage.md)	 - Stage and push local policy-staging changes to remote repository
 * [gittuf trust update-policy-threshold](gittuf_trust_update-policy-threshold.md)	 - Update Policy threshold in the gittuf root of trust
 * [gittuf trust update-root-threshold](gittuf_trust_update-root-threshold.md)	 - Update Root threshold in the gittuf root of trust
 

@@ -10,14 +10,16 @@ import (
 	"log/slog"
 	"strings"
 
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 var (
-	ErrPushingPolicy = errors.New("unable to push policy")
-	ErrPullingPolicy = errors.New("unable to pull policy")
+	ErrPushingPolicy     = errors.New("unable to push policy")
+	ErrPullingPolicy     = errors.New("unable to pull policy")
+	ErrNoRemoteSpecified = errors.New("no remote specified to push policy")
 )
 
 // PushPolicy pushes the local gittuf policy to the specified remote. As this
@@ -45,8 +47,40 @@ func (r *Repository) PullPolicy(remoteName string) error {
 	return nil
 }
 
-func (r *Repository) ApplyPolicy(ctx context.Context, signRSLEntry bool) error {
-	return policy.Apply(ctx, r.r, signRSLEntry)
+func (r *Repository) ApplyPolicy(ctx context.Context, remoteName string, localOnly, signRSLEntry bool) error {
+	if signRSLEntry {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	if remoteName == "" && !localOnly {
+		return ErrNoRemoteSpecified
+	}
+
+	if !localOnly {
+		_, err := r.Sync(ctx, remoteName, false, signRSLEntry)
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := policy.Apply(ctx, r.r, signRSLEntry); err != nil {
+		return err
+	}
+
+	if err := r.RecordRSLEntryForReference(ctx, policy.PolicyRef, signRSLEntry, rslopts.WithRecordLocalOnly()); err != nil {
+		return err
+	}
+
+	if localOnly {
+		return nil
+	}
+
+	_, err := r.Sync(ctx, remoteName, false, signRSLEntry)
+	return err
 }
 
 func (r *Repository) DiscardPolicy() error {
@@ -65,4 +99,21 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 		return policy.ListPrincipals(ctx, r.r, targetRef, policyName)
 	}
 	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
+}
+
+func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	opts := []rslopts.RecordOption{rslopts.WithRecordRemote(remoteName)}
+	if localOnly {
+		opts = append(opts, rslopts.WithRecordLocalOnly())
+	}
+
+	return r.RecordRSLEntryForReference(ctx, policy.PolicyStagingRef, signCommit, opts...)
 }

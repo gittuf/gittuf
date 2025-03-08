@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -16,6 +17,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -51,6 +53,9 @@ func createTestRepositoryWithRoot(t *testing.T, location string) *Repository {
 		t.Fatal(err)
 	}
 
+	err := r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	if err := policy.Apply(testCtx, repo, false); err != nil {
 		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
 	}
@@ -68,11 +73,11 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
-	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false); err != nil {
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false); err != nil {
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,11 +87,11 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	}
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false); err != nil {
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false); err != nil {
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
 		t.Fatal(err)
 	}
 

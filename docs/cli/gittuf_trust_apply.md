@@ -9,12 +9,14 @@ gittuf trust apply [flags]
 ### Options
 
 ```
-  -h, --help   help for apply
+  -h, --help         help for apply
+      --local-only   indicate that the policy must be committed into the RSL locally
 ```
 
 ### Options inherited from parent commands
 
 ```
+      --create-rsl-entry             create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
       --no-color                     turn off colored output
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")

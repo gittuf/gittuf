@@ -8,17 +8,31 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct{}
+type options struct {
+	localOnly bool
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(
+		&o.localOnly,
+		"local-only",
+		false,
+		"indicate that the policy must be committed into the RSL locally",
+	)
+}
 
-func (o *options) Run(cmd *cobra.Command, _ []string) error {
+func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
 	}
 
-	return repo.ApplyPolicy(cmd.Context(), true)
+	remoteName := ""
+	if len(args) > 0 {
+		remoteName = args[0]
+	}
+
+	return repo.ApplyPolicy(cmd.Context(), remoteName, o.localOnly, true)
 }
 
 func New() *cobra.Command {

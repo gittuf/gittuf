@@ -63,6 +63,16 @@ func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly boo
 	return r.FetchRefSpec(remoteName, refSpecs)
 }
 
+func (r *Repository) FetchObject(remoteName string, objectID Hash) error {
+	args := []string{"fetch", remoteName, objectID.String()}
+	_, err := r.executor(args...).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to fetch object: %w", err)
+	}
+
+	return nil
+}
+
 func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string, bare bool) (*Repository, error) {
 	if dir == "" {
 		return nil, fmt.Errorf("target directory must be specified")

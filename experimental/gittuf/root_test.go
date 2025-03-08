@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -41,11 +42,11 @@ func TestInitializeRoot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+		assert.Equal(t, key.KeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 
 		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
-		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
+		_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{verifier}, 1)
 		assert.Nil(t, err)
 	})
 
@@ -60,6 +61,8 @@ func TestInitializeRoot(t *testing.T) {
 		location := "https://example.com/repository/location"
 		err := r.InitializeRoot(testCtx, signer, false, rootopts.WithRepositoryLocation(location))
 		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		if err := policy.Apply(testCtx, repo, false); err != nil {
 			t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
@@ -87,6 +90,8 @@ func TestSetRepositoryLocation(t *testing.T) {
 	location := "https://example.com/repository/location"
 	err := r.SetRepositoryLocation(testCtx, sv, location, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -111,6 +116,8 @@ func TestAddRootKey(t *testing.T) {
 
 	err = r.AddRootKey(testCtx, sv, newRootKey, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -120,12 +127,10 @@ func TestAddRootKey(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	assert.Equal(t, originalKeyID, state.RootEnvelope.Signatures[0].KeyID)
-	assert.Equal(t, 2, len(state.RootPublicKeys))
-
+	assert.Equal(t, originalKeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 	assert.Equal(t, set.NewSetFromItems(originalKeyID, newRootKey.KeyID), getRootPrincipalIDs(t, rootMetadata))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -139,6 +144,8 @@ func TestRemoveRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -150,8 +157,6 @@ func TestRemoveRootKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// We should have no additions as we tried to add the same key
-	assert.Equal(t, 1, len(state.RootPublicKeys))
 	rootPrincipals, err := rootMetadata.GetRootPrincipals()
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(rootPrincipals))
@@ -162,6 +167,8 @@ func TestRemoveRootKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -175,9 +182,8 @@ func TestRemoveRootKey(t *testing.T) {
 	rootPrincipalIDs := getRootPrincipalIDs(t, rootMetadata)
 	assert.True(t, rootPrincipalIDs.Has(rootKey.KeyID))
 	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
-	assert.Equal(t, 2, len(state.RootPublicKeys))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{originalSigner}, 1)
 	assert.Nil(t, err)
 
 	newSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
@@ -185,6 +191,8 @@ func TestRemoveRootKey(t *testing.T) {
 	// We can use the newly added root key to revoke the old one
 	err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -199,9 +207,8 @@ func TestRemoveRootKey(t *testing.T) {
 	rootPrincipalIDs = getRootPrincipalIDs(t, rootMetadata)
 	assert.True(t, rootPrincipalIDs.Has(newRootKey.KeyID))
 	assert.Equal(t, 1, rootPrincipalIDs.Len())
-	assert.Equal(t, 1, len(state.RootPublicKeys))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
 	assert.Nil(t, err)
 }
 
@@ -213,6 +220,8 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 
 	err := r.AddTopLevelTargetsKey(testCtx, sv, key, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -221,11 +230,11 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
-	assert.Equal(t, key.KeyID, state.RootEnvelope.Signatures[0].KeyID)
+	assert.Equal(t, key.KeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
 	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(key.KeyID))
 	assert.True(t, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Has(key.KeyID))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -239,6 +248,8 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	targetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
 
@@ -246,6 +257,8 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -261,11 +274,13 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.True(t, targetsPrincipalIDs.Has(rootKey.KeyID))
 	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -279,7 +294,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 
 	targetsPrincipalIDs = getPrimaryRuleFilePrincipalIDs(t, rootMetadata)
 	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -291,6 +306,8 @@ func TestAddGitHubApp(t *testing.T) {
 
 	err := r.AddGitHubApp(testCtx, sv, key, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -306,7 +323,7 @@ func TestAddGitHubApp(t *testing.T) {
 	}
 	assert.Equal(t, key, appPrincipals[0])
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -320,6 +337,8 @@ func TestRemoveGitHubApp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -337,11 +356,13 @@ func TestRemoveGitHubApp(t *testing.T) {
 	}
 	assert.Equal(t, key, appPrincipals[0])
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.RemoveGitHubApp(testCtx, sv, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -358,7 +379,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 	assert.Empty(t, appPrincipals)
 
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -370,6 +391,8 @@ func TestTrustGitHubApp(t *testing.T) {
 
 		err := r.TrustGitHubApp(testCtx, sv, false)
 		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		_, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
@@ -397,6 +420,9 @@ func TestTrustGitHubApp(t *testing.T) {
 		err = r.TrustGitHubApp(testCtx, sv, false)
 		assert.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
@@ -406,7 +432,7 @@ func TestTrustGitHubApp(t *testing.T) {
 		assert.Nil(t, err)
 
 		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
-		_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+		_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 		assert.Nil(t, err)
 
 		// Test if we can trust again if already trusted
@@ -437,6 +463,9 @@ func TestUntrustGitHubApp(t *testing.T) {
 	err = r.TrustGitHubApp(testCtx, sv, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -446,11 +475,13 @@ func TestUntrustGitHubApp(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
 	err = r.UntrustGitHubApp(testCtx, sv, false)
 	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -461,7 +492,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
-	_, err = dsse.VerifyEnvelope(testCtx, state.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }
 
@@ -497,6 +528,9 @@ func TestUpdateRootThreshold(t *testing.T) {
 	err = r.UpdateRootThreshold(testCtx, signer, 2, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -526,6 +560,9 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err := r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
@@ -552,6 +589,9 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 
 	err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 2, false)
 	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -589,12 +629,15 @@ func TestSignRoot(t *testing.T) {
 	err := r.SignRoot(testCtx, secondSigner, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, 2, len(state.RootEnvelope.Signatures))
+	assert.Equal(t, 2, len(state.Metadata.RootEnvelope.Signatures))
 }
 
 func TestAddGlobalRuleThreshold(t *testing.T) {
@@ -619,6 +662,9 @@ func TestAddGlobalRuleThreshold(t *testing.T) {
 
 	err = r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 	if err != nil {
@@ -663,6 +709,9 @@ func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
 	err = r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
 	assert.Nil(t, err)
 
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 	if err != nil {
 		t.Fatal(err)
@@ -689,6 +738,9 @@ func TestRemoveGlobalRule(t *testing.T) {
 		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
 		assert.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
@@ -704,6 +756,9 @@ func TestRemoveGlobalRule(t *testing.T) {
 
 		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -727,6 +782,9 @@ func TestRemoveGlobalRule(t *testing.T) {
 		err := r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
 		assert.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
 			t.Fatal(err)
@@ -742,6 +800,9 @@ func TestRemoveGlobalRule(t *testing.T) {
 
 		err = r.RemoveGlobalRule(testCtx, rootSigner, "block-force-pushes-for-main", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 		if err != nil {
@@ -780,6 +841,30 @@ func TestRemoveGlobalRule(t *testing.T) {
 	})
 }
 
+func TestListGlobalRules(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	t.Run("list global rules after add and remove", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+
+		globalRules, err := r.ListGlobalRules(testCtx)
+		assert.Nil(t, err)
+		assert.Len(t, globalRules, 1)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+
+		globalRules, err = r.ListGlobalRules(testCtx)
+		assert.Nil(t, err)
+		assert.Empty(t, globalRules)
+	})
+}
+
 func TestAddPropagationDirective(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
@@ -803,6 +888,9 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {
@@ -841,6 +929,9 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {
@@ -882,6 +973,9 @@ func TestRemovePropagationDirective(t *testing.T) {
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
 		require.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {
 			t.Fatal(err)
@@ -898,6 +992,9 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		err = r.RemovePropagationDirective(testCtx, rootSigner, "test", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {
@@ -939,6 +1036,9 @@ func TestRemovePropagationDirective(t *testing.T) {
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
 		require.Nil(t, err)
 
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {
 			t.Fatal(err)
@@ -955,6 +1055,9 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		err = r.RemovePropagationDirective(testCtx, rootSigner, "test", false)
 		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
 
 		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
 		if err != nil {

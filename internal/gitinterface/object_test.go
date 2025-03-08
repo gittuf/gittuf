@@ -6,7 +6,9 @@ package gitinterface
 import (
 	"testing"
 
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHasObject(t *testing.T) {
@@ -62,4 +64,38 @@ func TestHasObject(t *testing.T) {
 	// Note: This test passes because we control timestamps in
 	// CreateTestGitRepository. So, commit ID in both repos is the same.
 	assert.True(t, repo.HasObject(commitID)) // now repo has it too
+}
+
+func TestGetObjectType(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	blobID, err := repo.WriteBlob([]byte("gittuf"))
+	require.Nil(t, err)
+
+	objType, err := repo.GetObjectType(blobID)
+	assert.Nil(t, err)
+	assert.Equal(t, BlobObjectType, objType)
+
+	treeBuilder := NewTreeBuilder(repo)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("foo", blobID)})
+	require.Nil(t, err)
+
+	objType, err = repo.GetObjectType(treeID)
+	assert.Nil(t, err)
+	assert.Equal(t, TreeObjectType, objType)
+
+	commitID, err := repo.Commit(treeID, "refs/heads/main", "Test commit\n", false)
+	require.Nil(t, err)
+
+	objType, err = repo.GetObjectType(commitID)
+	assert.Nil(t, err)
+	assert.Equal(t, CommitObjectType, objType)
+
+	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "Test tag\n", artifacts.GPGKey1Private)
+	require.Nil(t, err)
+
+	objType, err = repo.GetObjectType(tagID)
+	assert.Nil(t, err)
+	assert.Equal(t, TagObjectType, objType)
 }

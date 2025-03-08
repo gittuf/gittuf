@@ -6,8 +6,9 @@ package github
 const DefaultGitHubBaseURL = "https://github.com"
 
 type Options struct {
-	GitHubToken   string
-	GitHubBaseURL string
+	GitHubToken    string
+	GitHubBaseURL  string
+	CreateRSLEntry bool
 }
 
 var DefaultOptions = &Options{
@@ -29,5 +30,11 @@ func WithGitHubToken(token string) Option {
 func WithGitHubBaseURL(baseURL string) Option {
 	return func(o *Options) {
 		o.GitHubBaseURL = baseURL
+	}
+}
+
+func WithRSLEntry() Option {
+	return func(o *Options) {
+		o.CreateRSLEntry = true
 	}
 }
