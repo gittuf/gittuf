@@ -102,3 +102,14 @@ func ListPrincipals(ctx context.Context, repo *gitinterface.Repository, targetRe
 
 	return metadata.GetPrincipals(), nil
 }
+
+// ListHooks returns the hooks present in the specified rule file.
+// `targetRef` can be used to control which policy reference is used.
+func ListHooks(ctx context.Context, repo *gitinterface.Repository) (map[tuf.HookStage][]tuf.Hook, error) {
+	state, err := LoadCurrentState(ctx, repo, PolicyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	return state.Hooks, nil
+}

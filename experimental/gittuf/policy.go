@@ -101,6 +101,10 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
 }
 
+func (r *Repository) ListHooks(ctx context.Context) (map[tuf.HookStage][]tuf.Hook, error) {
+	return policy.ListHooks(ctx, r.r)
+}
+
 func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
