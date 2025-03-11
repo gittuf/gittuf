@@ -102,6 +102,115 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	return r
 }
 
+func createTestRepositoryWithPolicyWithFileRule(t *testing.T, location string) *Repository {
+	t.Helper()
+
+	r := createTestRepositoryWithRoot(t, location)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-files-1-and-2", []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := policy.Apply(testCtx, r.r, false); err != nil {
+		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+	}
+
+	return r
+}
+
+func createTestRepositoryWithDelegatedPolicies(t *testing.T, location string) *Repository {
+	t.Helper()
+
+	r := createTestRepositoryWithRoot(t, location)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{rootKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-file-1", []string{rootKey.KeyID}, []string{"file:1"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "1", []string{rootKey.KeyID}, []string{"file:1/*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "2", []string{rootKey.KeyID}, []string{"file:2/*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize the delegated policy file
+	if err := r.InitializeTargets(testCtx, rootSigner, "protect-file-1", false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddPrincipalToTargets(testCtx, rootSigner, "protect-file-1", []tuf.Principal{gpgKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, rootSigner, "protect-file-1", "3", []string{gpgKey.KeyID}, []string{"file:1/subpath1/*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, rootSigner, "protect-file-1", "4", []string{gpgKey.KeyID}, []string{"file:1/subpath2/*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := policy.Apply(testCtx, r.r, false); err != nil {
+		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+	}
+
+	return r
+}
+
 func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh.Signer {
 	t.Helper()
 

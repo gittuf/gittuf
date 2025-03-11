@@ -4,11 +4,16 @@
 package gittuf
 
 import (
+	"context"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -161,5 +166,143 @@ func TestDiscardPolicy(t *testing.T) {
 		stagingRef, err := repo.r.GetReference(policy.PolicyStagingRef)
 		assert.Nil(t, err)
 		assert.Equal(t, initialRef, stagingRef)
+	})
+}
+
+func TestListRules(t *testing.T) {
+	t.Run("no delegations", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicyWithFileRule(t, "")
+
+		rules, err := repo.ListRules(context.Background(), policy.PolicyRef)
+		assert.Nil(t, err)
+
+		expectedRules := []*DelegationWithDepth{
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "protect-main",
+					Paths:       []string{"git:refs/heads/main"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
+					},
+				},
+				Depth: 0,
+			},
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "protect-files-1-and-2",
+					Paths:       []string{"file:1", "file:2"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
+					},
+				},
+				Depth: 0,
+			},
+		}
+		assert.Equal(t, expectedRules, rules)
+	})
+
+	t.Run("with delegations", func(t *testing.T) {
+		repo := createTestRepositoryWithDelegatedPolicies(t, "")
+
+		rules, err := repo.ListRules(context.Background(), policy.PolicyRef)
+		assert.Nil(t, err)
+
+		expectedRules := []*DelegationWithDepth{
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "protect-file-1",
+					Paths:       []string{"file:1"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
+						Threshold:    1,
+					},
+				},
+				Depth: 0,
+			},
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "3",
+					Paths:       []string{"file:1/subpath1/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
+					},
+				},
+				Depth: 1,
+			},
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "4",
+					Paths:       []string{"file:1/subpath2/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("157507bbe151e378ce8126c1dcfe043cdd2db96e"),
+						Threshold:    1,
+					},
+				},
+				Depth: 1,
+			},
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "1",
+					Paths:       []string{"file:1/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
+						Threshold:    1,
+					},
+				},
+				Depth: 0,
+			},
+			{
+				Delegation: &tufv02.Delegation{
+					Name:        "2",
+					Paths:       []string{"file:2/*"},
+					Terminating: false,
+					Custom:      nil,
+					Role: tufv02.Role{
+						PrincipalIDs: set.NewSetFromItems("SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo"),
+						Threshold:    1,
+					},
+				},
+				Depth: 0,
+			},
+		}
+		assert.Equal(t, expectedRules, rules)
+	})
+}
+
+func TestListPrincipals(t *testing.T) {
+	repo := createTestRepositoryWithPolicyWithFileRule(t, "")
+
+	t.Run("policy exists", func(t *testing.T) {
+		pubKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pubKey := tufv02.NewKeyFromSSLibKey(pubKeyR)
+		expectedPrincipals := map[string]tuf.Principal{pubKey.KeyID: pubKey}
+
+		principals, err := repo.ListPrincipals(context.Background(), policy.PolicyRef, tuf.TargetsRoleName)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPrincipals, principals)
+	})
+
+	t.Run("policy does not exist", func(t *testing.T) {
+		principals, err := repo.ListPrincipals(testCtx, policy.PolicyRef, "does-not-exist")
+		assert.ErrorIs(t, err, policy.ErrPolicyNotFound)
+		assert.Nil(t, principals)
 	})
 }

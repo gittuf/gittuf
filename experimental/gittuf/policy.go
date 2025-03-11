@@ -87,18 +87,100 @@ func (r *Repository) DiscardPolicy() error {
 	return policy.Discard(r.r)
 }
 
-func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*policy.DelegationWithDepth, error) {
-	if strings.HasPrefix(targetRef, "refs/gittuf/") {
-		return policy.ListRules(ctx, r.r, targetRef)
+type DelegationWithDepth struct {
+	Delegation tuf.Rule
+	Depth      int
+}
+
+func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*DelegationWithDepth, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
 	}
-	return policy.ListRules(ctx, r.r, "refs/gittuf/"+targetRef)
+
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	if !state.HasTargetsRole(policy.TargetsRoleName) {
+		return nil, nil
+	}
+
+	topLevelTargetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, true)
+	if err != nil {
+		return nil, err
+	}
+
+	delegationsToSearch := []*DelegationWithDepth{}
+	allDelegations := []*DelegationWithDepth{}
+
+	for _, topLevelDelegation := range topLevelTargetsMetadata.GetRules() {
+		if topLevelDelegation.ID() == tuf.AllowRuleName {
+			continue
+		}
+		delegationsToSearch = append(delegationsToSearch, &DelegationWithDepth{Delegation: topLevelDelegation, Depth: 0})
+	}
+
+	seenRoles := map[string]bool{policy.TargetsRoleName: true}
+
+	for len(delegationsToSearch) > 0 {
+		currentDelegation := delegationsToSearch[0]
+		delegationsToSearch = delegationsToSearch[1:]
+
+		// allDelegations will be the returned list of all the delegations in pre-order traversal, no delegations will be popped off
+		allDelegations = append(allDelegations, currentDelegation)
+
+		if _, seen := seenRoles[currentDelegation.Delegation.ID()]; seen {
+			continue
+		}
+
+		if state.HasTargetsRole(currentDelegation.Delegation.ID()) {
+			currentMetadata, err := state.GetTargetsMetadata(currentDelegation.Delegation.ID(), true)
+			if err != nil {
+				return nil, err
+			}
+
+			seenRoles[currentDelegation.Delegation.ID()] = true
+
+			// We construct localDelegations first so that we preserve the order
+			// of delegations in currentMetadata in delegationsToSearch
+			localDelegations := []*DelegationWithDepth{}
+			for _, delegation := range currentMetadata.GetRules() {
+				if delegation.ID() == tuf.AllowRuleName {
+					continue
+				}
+				localDelegations = append(localDelegations, &DelegationWithDepth{Delegation: delegation, Depth: currentDelegation.Depth + 1})
+			}
+
+			if len(localDelegations) > 0 {
+				delegationsToSearch = append(localDelegations, delegationsToSearch...)
+			}
+		}
+	}
+
+	return allDelegations, nil
 }
 
 func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName string) (map[string]tuf.Principal, error) {
-	if strings.HasPrefix(targetRef, "refs/gittuf/") {
-		return policy.ListPrincipals(ctx, r.r, targetRef, policyName)
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
 	}
-	return policy.ListPrincipals(ctx, r.r, "refs/gittuf/"+targetRef, policyName)
+
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	if !state.HasTargetsRole(policyName) {
+		return nil, policy.ErrPolicyNotFound
+	}
+
+	metadata, err := state.GetTargetsMetadata(policyName, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return metadata.GetPrincipals(), nil
 }
 
 func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
