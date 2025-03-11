@@ -31,8 +31,14 @@ const (
 	GlobalRuleBlockForcePushesType = "block-force-pushes"
 	RemoveGlobalRuleType           = "remove"
 
-	HookStagePreCommitString = "preCommit"
-	HookStagePrePushString   = "prePush"
+	HookStagePreCommitString        = "preCommit"
+	HookStagePrePushString          = "prePush"
+	HookStageCommitMsgString        = "commitMsg"
+	HookStagePrepareCommitMsgString = "prepareCommitMsg"
+	HookStagePostReceiveString      = "postReceive"
+	HookStagePreReceiveString       = "preReceive"
+	HookStageUpdateString           = "update"
+	HookStagePostMergeString        = "postMerge"
 
 	HookStagePreCommitGitString = "pre-commit"
 	HookStagePrePushGitString   = "pre-push"
@@ -373,6 +379,12 @@ type HookStage uint
 const (
 	HookStagePreCommit HookStage = iota
 	HookStagePrePush
+	HookStageCommitMsg
+	HookStagePrepareCommitMsg
+	HookStagePostReceive
+	HookStagePreReceive
+	HookStageUpdate
+	HookStagePostMerge
 )
 
 func (h HookStage) String() string {
