@@ -745,21 +745,20 @@ func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirec
 	// find if there is a duplicate(exact same) or update(same name, different in other)
 	// in the slice in linear search, then update the found propagation
 	for i := range r.Propagations {
-		if r.Propagations[i].Name == directive.Name {
+		if r.Propagations[i].GetName() == directive.GetName() {
 			r.Propagations[i] = directive
 			return nil
 		}
 	}
 
 	//if the directive is new, call add propagation directive to deal with it
-	if err := r.AddPropagationDirective(directive); err != nil{
+	if err := r.AddPropagationDirective(directive); err != nil {
 		return err
 	}
 	return nil
 }
 
-func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) 
-tuf.PropagationDirective {
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
 	return &PropagationDirective{
 		Name:                name,
 		UpstreamRepository:  upstreamRepository,
