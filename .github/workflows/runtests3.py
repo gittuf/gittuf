@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory() as server_dir, tempfile.TemporaryDirectory() 
     server_thread.start()
     
     try:
-        TEST_REPO_URL_HTTPS = f"https://localhost:{port}/repo.git"
+        TEST_REPO_URL_HTTPS = f"gittuf::https://localhost:{port}/repo.git"
         TEST_REMOTE_NAME = "origin"
         GITTUF_TEST_BRANCH = "test-branch"
 
