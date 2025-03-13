@@ -183,6 +183,15 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
+func (r *Repository) ListHooks(ctx context.Context) (map[tuf.HookStage][]tuf.Hook, error) {
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.TargetsRoleName)
+	if err != nil {
+		return nil, err
+	}
+
+	return state.Hooks, nil
+}
+
 func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")

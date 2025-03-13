@@ -34,7 +34,12 @@ const (
 	HookStagePreCommitString = "preCommit"
 	HookStagePrePushString   = "prePush"
 
+	HookStagePreCommitGitString = "pre-commit"
+	HookStagePrePushGitString   = "pre-push"
+
 	HookEnvironmentLuaString = "lua"
+
+	HooksPrefix = "hooks"
 )
 
 var (
@@ -381,8 +386,32 @@ func (h HookStage) String() string {
 	}
 }
 
+// MarshalText is used to convert the instance of HookStage into text. Needed
+// for proper marshalling into JSON as HookStage is a key in a map.
+func (h HookStage) MarshalText() (text []byte, err error) {
+	if h.String() == "" {
+		return nil, ErrInvalidHookStage
+	}
+	return []byte(h.String()), nil
+}
+
+// UnmarshalText is used to convert the instance of HookStage from text. Needed
+// for proper marshalling into JSON as HookStage is a key in a map.
+func (h *HookStage) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case HookStagePreCommitString:
+		*h = HookStagePreCommit
+	case HookStagePrePushString:
+		*h = HookStagePrePush
+	default:
+		return ErrInvalidHookStage
+	}
+
+	return nil
+}
+
 // MarshalJSON is used to serialize the instance of HookStage into JSON.
-func (h *HookStage) MarshalJSON() ([]byte, error) {
+func (h HookStage) MarshalJSON() ([]byte, error) {
 	if h.String() == "" {
 		return nil, ErrInvalidHookStage
 	}
