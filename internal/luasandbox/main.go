@@ -60,7 +60,11 @@ func NewLuaEnvironment(ctx context.Context) (*lua.LState, error) {
 		return nil, fmt.Errorf("error setting instruction quota: %w", err)
 	}
 
-	// TODO: Register API functions
+	// Register the Go functions with the Lua state
+	lState, err := registerAPIFunctions(lState)
+	if err != nil {
+		return nil, err
+	}
 
 	return lState, nil
 }
