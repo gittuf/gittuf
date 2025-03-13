@@ -25,6 +25,7 @@ Tools for gittuf's root of trust
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
 * [gittuf trust add-github-app](gittuf_trust_add-github-app.md)	 - Add GitHub app to gittuf root of trust
 * [gittuf trust add-global-rule](gittuf_trust_add-global-rule.md)	 - Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
+* [gittuf trust add-hook](gittuf_trust_add-hook.md)	 - Add a script to be run as a gittuf hook, specify when and where to run it (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
 * [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
@@ -33,9 +34,11 @@ Tools for gittuf's root of trust
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
+* [gittuf trust list-hooks](gittuf_trust_list-hooks.md)	 - List gittuf hooks for the current policy state
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
+* [gittuf trust remove-hook](gittuf_trust_remove-hook.md)	 - Remove a gittuf hook specified in the policy (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
 * [gittuf trust remove-propagation-directive](gittuf_trust_remove-propagation-directive.md)	 - Remove propagation directive from gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust

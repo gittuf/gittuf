@@ -6,6 +6,7 @@ package trust
 import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addhook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
@@ -13,9 +14,11 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
+	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
+	"github.com/gittuf/gittuf/internal/cmd/trust/removehook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
@@ -41,15 +44,18 @@ func New() *cobra.Command {
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(addgithubapp.New(o))
 	cmd.AddCommand(addglobalrule.New(o))
+	cmd.AddCommand(addhook.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addpropagationdirective.New(o))
 	cmd.AddCommand(addrootkey.New(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
+	cmd.AddCommand(listhooks.New())
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubapp.New(o))
 	cmd.AddCommand(removeglobalrule.New(o))
+	cmd.AddCommand(removehook.New(o))
 	cmd.AddCommand(removepolicykey.New(o))
 	cmd.AddCommand(removepropagationdirective.New(o))
 	cmd.AddCommand(removerootkey.New(o))
