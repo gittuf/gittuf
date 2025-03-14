@@ -376,8 +376,8 @@ const (
 	HookStagePrePush
 )
 
-func (h HookStage) IsValid() error {
-	switch h {
+func (h *HookStage) IsValid() error {
+	switch *h {
 	case HookStagePreCommit, HookStagePrePush:
 		return nil
 	default:
@@ -385,8 +385,8 @@ func (h HookStage) IsValid() error {
 	}
 }
 
-func (h HookStage) String() string {
-	switch h {
+func (h *HookStage) String() string {
+	switch *h {
 	case HookStagePreCommit:
 		return HookStagePreCommitString
 	case HookStagePrePush:
