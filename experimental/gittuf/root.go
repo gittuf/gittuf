@@ -5,14 +5,18 @@ package gittuf
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
@@ -24,6 +28,10 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+)
+
+var (
+	ErrNoHookName = errors.New("hook name not provided")
 )
 
 // InitializeRoot is the interface for the user to create the repository's root
@@ -773,6 +781,127 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	commitMessage := fmt.Sprintf("Remove propagation directive '%s' from root metadata", name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// AddHook defines the workflow for adding a file to be executed as a hook. It
+// writes the hook file, populates all fields in the hooks metadata associated
+// with this file and commits it to the root of trust metadata.
+func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, modules, principalIDs []string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	if hookName == "" {
+		return ErrNoHookName
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	var hashes = make(map[string]string, 2)
+	blobID, err := r.r.WriteBlob(hookBytes)
+	if err != nil {
+		return err
+	}
+	// TODO: hash agility
+	hashes[gitinterface.GitBlobHashName] = blobID.String()
+
+	sha256Hash := sha256.New()
+	sha256Hash.Write(hookBytes)
+	hashes[gitinterface.SHA256HashName] = hex.EncodeToString(sha256Hash.Sum(nil))
+
+	slog.Debug("Adding hook to rule file...")
+	hook, err := rootMetadata.AddHook(stages, hookName, principalIDs, hashes, environment, modules)
+	if err != nil {
+		return err
+	}
+
+	for _, stage := range stages {
+		state.Hooks[stage] = append(state.Hooks[stage], hook)
+	}
+
+	commitMessage := fmt.Sprintf("Add hook '%s' to root metadata", hookName)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// RemoveHook defines the workflow for removing a hook defined in gittuf policy.
+func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Removing hook...")
+	err = rootMetadata.RemoveHook(stages, hookName)
+	if err != nil {
+		return err
+	}
+
+	for _, stage := range stages {
+		updatedHooks, err := rootMetadata.GetHooks(stage)
+		if err != nil {
+			return err
+		}
+
+		state.Hooks[stage] = updatedHooks
+	}
+
+	commitMessage := fmt.Sprintf("Remove hook '%s' from root metadata", hookName)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 

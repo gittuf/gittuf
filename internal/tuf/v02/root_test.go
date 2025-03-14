@@ -20,6 +20,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootMetadata(t *testing.T) {
@@ -650,13 +651,16 @@ func TestAddHookAndGetHooks(t *testing.T) {
 	_, err := rootMetadata.GetHooks(tuf.HookStagePreCommit)
 	assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
-	err = rootMetadata.AddHook(tuf.HookStagePreCommit, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
 	assert.Nil(t, err)
 
-	err = rootMetadata.AddHook(tuf.HookStagePrePush, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
 	assert.Nil(t, err)
 
-	err = rootMetadata.AddHook(invalidStage, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	assert.ErrorIs(t, err, tuf.ErrDuplicatedHookName)
+
+	_, err = rootMetadata.AddHook([]tuf.HookStage{invalidStage}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
 	assert.ErrorIs(t, err, tuf.ErrInvalidHookStage)
 
 	preCommitHook := []*Hook{{
@@ -691,18 +695,19 @@ func TestRemoveHook(t *testing.T) {
 
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	err := rootMetadata.AddHook(tuf.HookStagePreCommit, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err := rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	require.Nil(t, err)
 	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
 
-	err = rootMetadata.AddHook(tuf.HookStagePrePush, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	require.Nil(t, err)
 	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 
-	rootMetadata.RemoveHook(tuf.HookStagePreCommit, "test-hook")
+	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook")
+	assert.Nil(t, err)
 	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook")
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 }
