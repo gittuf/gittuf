@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/common/set"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -53,33 +52,6 @@ var luaGoHelpers = map[string]lua.LGFunction{
 	"getGitObjectHash":      goGetGitObjectHash,
 	"getGitObjectPath":      goGetGitObjectPath,
 	"regexMatchGitDiff":     goRegexMatchGitDiff,
-}
-
-func (l *LuaEnvironment) registerAPIFunctions() error {
-	// Set global variables for the Lua state
-	l.lState.SetGlobal("hookParameters", lua.LString(""))
-	l.lState.SetGlobal("hookExitCode", lua.LNumber(0))
-
-	helperNames := set.NewSet[string]()
-
-	// Register the pure Lua helper functions
-	for name, helper := range luaHelpers {
-		helperNames.Add(name)
-		if err := l.lState.DoString(helper); err != nil {
-			return err
-		}
-	}
-
-	// Register the Go functions
-	for name, fn := range luaGoHelpers {
-		if helperNames.Has(name) {
-			return fmt.Errorf("%w: '%s'", ErrDuplicateHelperName, name)
-		}
-
-		l.lState.SetGlobal(name, l.lState.NewFunction(fn))
-	}
-
-	return nil
 }
 
 var strSplitImplementation = `

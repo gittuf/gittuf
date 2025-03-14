@@ -125,16 +125,6 @@ func getCurrentBranchName() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// getGitArchive returns the output of the git archive command
-func getGitArchive() (string, error) {
-	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
-}
-
 // goPatternsToMap converts Lua table of patterns to Go struct
 func goPatternsToMap(patterns *lua.LTable) []struct{ Key, Value string } {
 	result := []struct{ Key, Value string }{}
