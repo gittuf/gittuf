@@ -46,7 +46,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of hook",
 	)
-	cmd.MarkFlagRequired("rule-name") //nolint:errcheck
+	cmd.MarkFlagRequired("hook-name") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {

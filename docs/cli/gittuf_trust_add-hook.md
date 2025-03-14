@@ -14,13 +14,13 @@ gittuf trust add-hook [flags]
 
 ```
   -e, --env string                 environment which the hook must run in (default "lua")
-  -f, --file string                filepath of the script to be run as a hook
+  -f, --file-path string           path of the script to be run as a hook
   -h, --help                       help for add-hook
-  -n, --hookname string            Name of the hook
+  -n, --hook-name string           Name of the hook
       --is-pre-commit              add the hook to the pre-commit stage
       --is-pre-push                add the hook to the pre-push stage
       --modules stringArray        modules which the Lua hook must run
-      --principalIDs stringArray   principal IDs which must run this hook
+      --principal-ID stringArray   principal IDs which must run this hook
 ```
 
 ### Options inherited from parent commands

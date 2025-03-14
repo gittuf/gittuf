@@ -22,7 +22,7 @@ var ErrLuaNoModules = errors.New("must specify modules using --modules flag for 
 
 type options struct {
 	p            *persistent.Options
-	filepath     string
+	filePath     string
 	hookName     string
 	env          string
 	modules      []string
@@ -34,13 +34,13 @@ type options struct {
 
 func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(
-		&o.filepath,
-		"file",
+		&o.filePath,
+		"file-path",
 		"f",
 		"",
-		"filepath of the script to be run as a hook",
+		"path of the script to be run as a hook",
 	)
-	cmd.MarkFlagRequired("file") //nolint:errcheck
+	cmd.MarkFlagRequired("file-path") //nolint:errcheck
 
 	cmd.Flags().BoolVarP(
 		&o.isPreCommit,
@@ -60,11 +60,12 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVarP(
 		&o.hookName,
-		"hookname",
+		"hook-name",
 		"n",
 		"",
 		"Name of the hook",
 	)
+	cmd.MarkFlagRequired("hook-name") //nolint:errcheck
 
 	cmd.Flags().StringVarP(
 		&o.env,
@@ -77,15 +78,17 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringArrayVar(
 		&o.modules,
 		"modules",
-		[]string{},
+		nil,
 		"modules which the Lua hook must run",
 	)
+
 	cmd.Flags().StringArrayVar(
 		&o.principalIDs,
-		"principalIDs",
-		[]string{},
+		"principal-ID",
+		nil,
 		"principal IDs which must run this hook",
 	)
+	cmd.MarkFlagRequired("principal-ID") //nolint:errcheck
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -123,7 +126,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	hookBytes, err := os.ReadFile(o.filepath)
+	hookBytes, err := os.ReadFile(o.filePath)
 	if err != nil {
 		return err
 	}
