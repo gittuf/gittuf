@@ -794,7 +794,11 @@ func (r *RootMetadata) AddHook(stage tuf.HookStage, hookName string, principalID
 }
 
 // RemoveHook removes the hook specified by stage and hookName.
-func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) {
+func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) error {
+	if r.Hooks == nil {
+		return tuf.ErrNoHooksDefined
+	}
+
 	hooks := []*Hook{}
 	for _, hook := range r.Hooks[stage] {
 		if hook.Name != hookName {
@@ -803,6 +807,8 @@ func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) {
 	}
 
 	r.Hooks[stage] = hooks
+
+	return nil
 }
 
 // GetHooks returns the hooks for the specified stage.

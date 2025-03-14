@@ -682,9 +682,11 @@ func TestRemoveHook(t *testing.T) {
 	}
 	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 
-	rootMetadata.RemoveHook(tuf.HookStagePreCommit, "test-hook")
+	err = rootMetadata.RemoveHook(tuf.HookStagePreCommit, "test-hook")
+	assert.Nil(t, err)
 	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
 
-	rootMetadata.RemoveHook(tuf.HookStagePrePush, "test-hook")
+	err = rootMetadata.RemoveHook(tuf.HookStagePrePush, "test-hook")
+	assert.Nil(t, err)
 	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 }
