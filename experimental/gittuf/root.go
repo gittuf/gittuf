@@ -815,7 +815,7 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -876,7 +876,7 @@ func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
