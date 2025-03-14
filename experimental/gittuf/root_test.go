@@ -1116,7 +1116,7 @@ func TestAddHook(t *testing.T) {
 		_, err = rootMetadata.GetHooks(tuf.HookStagePreCommit)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
-		err = r.AddHook(testCtx, rootSigner, hookStage, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1171,7 +1171,7 @@ func TestAddHook(t *testing.T) {
 		_, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
-		err = r.AddHook(testCtx, rootSigner, hookStage, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1225,11 +1225,11 @@ func TestRemoveHook(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Attempt to remove without any hooks defined
-		err = r.RemoveHook(testCtx, rootSigner, hookStage, hookName, false)
+		err = r.RemoveHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, false)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Add hook
-		if err := r.AddHook(testCtx, rootSigner, hookStage, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
 			t.Fatal(err)
 		}
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1247,7 +1247,7 @@ func TestRemoveHook(t *testing.T) {
 		assert.Equal(t, 1, len(hooks))
 
 		// Remove hook
-		err = r.RemoveHook(testCtx, rootSigner, hookStage, hookName, false, trustpolicyopts.WithRSLEntry())
+		err = r.RemoveHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, false, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1286,11 +1286,11 @@ func TestRemoveHook(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Attempt to remove without any hooks defined
-		err = r.RemoveHook(testCtx, rootSigner, hookStage, hookName, false)
+		err = r.RemoveHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, false)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Add hook
-		if err := r.AddHook(testCtx, rootSigner, hookStage, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
 			t.Fatal(err)
 		}
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1308,7 +1308,7 @@ func TestRemoveHook(t *testing.T) {
 		assert.Equal(t, 1, len(hooks))
 
 		// Remove hook
-		err = r.RemoveHook(testCtx, rootSigner, hookStage, hookName, false, trustpolicyopts.WithRSLEntry())
+		err = r.RemoveHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, false, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)

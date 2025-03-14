@@ -590,13 +590,7 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 	for stage, hookSet := range s.Hooks {
 		for _, hook := range hookSet {
 			hookPath := fmt.Sprintf("%s/%s/%s", tuf.HooksPrefix, stage.String(), hook.ID())
-
-			hash, err := gitinterface.NewHash(hook.GetHashes()[gitinterface.GitBlobHashName])
-			if err != nil {
-				return err
-			}
-
-			allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(hookPath, hash))
+			allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(hookPath, hook.GetBlobID()))
 		}
 	}
 

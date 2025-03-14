@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -199,10 +200,10 @@ type RootMetadata interface {
 	// one hashing algorithm, providing multiple hashes is supported. The hook's
 	// environment (e.g. lua) and modules to expose to the hook (if using Lua)
 	// are also required.
-	AddHook(stage HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, modules []string) error
+	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, modules []string) (Hook, error)
 	// RemoveHook removes the hook identified by hookName in the specified Git
 	// stage.
-	RemoveHook(stage HookStage, hookName string) error
+	RemoveHook(stages []HookStage, hookName string) error
 	// GetHooks returns all hooks in the metadata for the specified Git stage.
 	GetHooks(stage HookStage) ([]Hook, error)
 }
@@ -375,6 +376,15 @@ const (
 	HookStagePrePush
 )
 
+func (h HookStage) IsValid() error {
+	switch h {
+	case HookStagePreCommit, HookStagePrePush:
+		return nil
+	default:
+		return ErrInvalidHookStage
+	}
+}
+
 func (h HookStage) String() string {
 	switch h {
 	case HookStagePreCommit:
@@ -494,6 +504,9 @@ type Hook interface {
 
 	// GetHashes returns the hashes identifying the hook file itself.
 	GetHashes() map[string]string
+
+	// GetBlobID returns the Git blob ID for the hook on disk.
+	GetBlobID() gitinterface.Hash
 
 	// GetEnvironment returns the environment that the hook is to run in.
 	GetEnvironment() HookEnvironment

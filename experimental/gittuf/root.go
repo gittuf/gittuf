@@ -15,7 +15,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -788,7 +787,7 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 // AddHook defines the workflow for adding a file to be executed as a hook. It
 // writes the hook file, populates all fields in the hooks metadata associated
 // with this file and commits it to the root of trust metadata.
-func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stage tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, modules, principalIDs []string, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, modules, principalIDs []string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -826,23 +825,12 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 		return err
 	}
 
-	slog.Debug("Checking if hook with specified name already exists...")
-	hooks, exists := state.Hooks[stage]
-
-	if exists {
-		for _, hook := range hooks {
-			if hook.ID() == hookName {
-				return tuf.ErrDuplicatedHookName
-			}
-		}
-	}
-
 	var hashes = make(map[string]string, 2)
 	blobID, err := r.r.WriteBlob(hookBytes)
 	if err != nil {
 		return err
 	}
-	//TODO: hash agility
+	// TODO: hash agility
 	hashes[gitinterface.GitBlobHashName] = blobID.String()
 
 	sha256Hash := sha256.New()
@@ -850,28 +838,21 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 	hashes[gitinterface.SHA256HashName] = hex.EncodeToString(sha256Hash.Sum(nil))
 
 	slog.Debug("Adding hook to rule file...")
-	if err := rootMetadata.AddHook(stage, hookName, principalIDs, hashes, environment, modules); err != nil {
+	hook, err := rootMetadata.AddHook(stages, hookName, principalIDs, hashes, environment, modules)
+	if err != nil {
 		return err
 	}
 
-	hook := &tufv01.Hook{
-		Name:         hookName,
-		PrincipalIDs: set.NewSetFromItems(principalIDs...),
-		Hashes:       hashes,
-		Environment:  environment,
-		Modules:      modules,
+	for _, stage := range stages {
+		state.Hooks[stage] = append(state.Hooks[stage], hook)
 	}
 
-	state.Hooks[stage] = append(state.Hooks[stage], hook)
-
 	commitMessage := fmt.Sprintf("Add hook '%s' to root metadata", hookName)
-
-	slog.Debug("Committing policy...")
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // RemoveHook defines the workflow for removing a hook defined in gittuf policy.
-func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVerifier, stage tuf.HookStage, hookName string, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -906,22 +887,22 @@ func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Removing hook...")
-	err = rootMetadata.RemoveHook(stage, hookName)
+	err = rootMetadata.RemoveHook(stages, hookName)
 	if err != nil {
 		return err
 	}
 
-	updatedHooks, err := rootMetadata.GetHooks(stage)
-	if err != nil {
-		return err
-	}
+	for _, stage := range stages {
+		updatedHooks, err := rootMetadata.GetHooks(stage)
+		if err != nil {
+			return err
+		}
 
-	state.Hooks[stage] = updatedHooks
+		state.Hooks[stage] = updatedHooks
+	}
 
 	commitMessage := fmt.Sprintf("Remove hook '%s' from root metadata", hookName)
-
-	slog.Debug("Committing policy...")
-	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, true, signCommit)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // SignRoot adds a signature to the Root envelope. Note that the metadata itself

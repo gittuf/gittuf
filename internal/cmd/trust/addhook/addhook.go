@@ -56,7 +56,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		false,
 		"add the hook to the pre-push stage",
 	)
-	cmd.MarkFlagsMutuallyExclusive("is-pre-commit", "is-pre-push")
 	cmd.MarkFlagsOneRequired("is-pre-commit", "is-pre-push")
 
 	cmd.Flags().StringVarP(
@@ -106,14 +105,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return ErrLuaNoModules
 	}
 
-	var stage tuf.HookStage
-	switch {
-	case o.isPreCommit:
-		stage = tuf.HookStagePreCommit
-	case o.isPrePush:
-		stage = tuf.HookStagePrePush
-	default:
-		return tuf.ErrInvalidHookStage
+	stages := []tuf.HookStage{}
+	if o.isPreCommit {
+		stages = append(stages, tuf.HookStagePreCommit)
+	}
+	if o.isPrePush {
+		stages = append(stages, tuf.HookStagePrePush)
 	}
 
 	repo, err := gittuf.LoadRepository()
@@ -136,7 +133,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.AddHook(cmd.Context(), signer, stage, o.hookName, hookBytes, environment, o.modules, o.principalIDs, true, opts...)
+	return repo.AddHook(cmd.Context(), signer, stages, o.hookName, hookBytes, environment, o.modules, o.principalIDs, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
