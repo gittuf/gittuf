@@ -636,6 +636,9 @@ func TestAddHookAndGetHooks(t *testing.T) {
 	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
 	assert.Nil(t, err)
 
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
+	assert.ErrorIs(t, err, tuf.ErrDuplicatedHookName)
+
 	_, err = rootMetadata.AddHook([]tuf.HookStage{invalidStage}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, []string{})
 	assert.ErrorIs(t, err, tuf.ErrInvalidHookStage)
 
