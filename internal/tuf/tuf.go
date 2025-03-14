@@ -398,7 +398,7 @@ func (h HookStage) String() string {
 
 // MarshalText is used to convert the instance of HookStage into text. Needed
 // for proper marshalling into JSON as HookStage is a key in a map.
-func (h HookStage) MarshalText() (text []byte, err error) {
+func (h *HookStage) MarshalText() ([]byte, error) {
 	if h.String() == "" {
 		return nil, ErrInvalidHookStage
 	}
@@ -421,7 +421,7 @@ func (h *HookStage) UnmarshalText(text []byte) error {
 }
 
 // MarshalJSON is used to serialize the instance of HookStage into JSON.
-func (h HookStage) MarshalJSON() ([]byte, error) {
+func (h *HookStage) MarshalJSON() ([]byte, error) {
 	if h.String() == "" {
 		return nil, ErrInvalidHookStage
 	}
