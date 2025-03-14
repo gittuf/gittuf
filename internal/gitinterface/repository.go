@@ -9,9 +9,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	commitgraph "github.com/go-git/go-git/v5/plumbing/format/commitgraph/v2"
 	"github.com/jonboulle/clockwork"
 )
 
@@ -24,8 +26,9 @@ const (
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath string
-	clock      clockwork.Clock
+	gitDirPath       string
+	clock            clockwork.Clock
+	commitGraphIndex commitgraph.Index
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
@@ -44,6 +47,30 @@ func (r *Repository) IsBare() bool {
 	// TODO: this may not work when the repo is cloned with GIT_DIR set
 	// elsewhere. We don't support this at the moment, so it's probably okay?
 	return !strings.HasSuffix(r.gitDirPath, ".git")
+}
+
+func (r *Repository) loadCommitGraph() {
+	objectsPath := filepath.Join(r.gitDirPath, "objects", "info")
+	items, err := os.ReadDir(objectsPath)
+	if err != nil {
+		return
+	}
+	for _, item := range items {
+		if item.Name() == "commit-graph" {
+			commitGraphIndexFile, err := os.Open(filepath.Join(r.gitDirPath, "objects", "info", "commit-graph"))
+			if err != nil {
+				return
+			}
+
+			index, err := commitgraph.OpenFileIndex(commitGraphIndexFile)
+			if err != nil {
+				return
+			}
+
+			r.commitGraphIndex = index
+			return
+		}
+	}
 }
 
 // LoadRepository returns a Repository instance using the current working
@@ -76,6 +103,7 @@ func LoadRepository() (*Repository, error) {
 	}
 	repo.gitDirPath = strings.TrimSpace(string(stdOutContents))
 
+	repo.loadCommitGraph()
 	return repo, nil
 }
 
