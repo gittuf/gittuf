@@ -11,6 +11,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -20,29 +21,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	lua "github.com/yuin/gopher-lua"
 )
 
-// This file (api.go) contains functions that are exposed to lua programs.
+/*
+	This file (api.go) contains functions that are exposed to lua programs. We
+	must ensure that the API names and signatures are coherent. Let's keep in
+	mind some level of namespacing, like you would see with a package. For
+	example, all string manipulations could have a str prefix. strSplit,
+	strJoin, etc.
+*/
 
-// Lua sandbox helper functions in pure Lua
-var pureLuaHelpers = `
-	function splitString(str, sep)
-		if sep == nil then
-			sep = "\n"
-		end
+var ErrDuplicateHelperName = errors.New("duplicated helper name")
 
-		local lines = {}
-		for line in string.gmatch(str, "([^"..sep.."]+)") do
-			table.insert(lines, line)
-		end
+var luaHelpers = map[string]string{
+	"strSplit": strSplitImplementation,
+}
 
-		return lines
-	end
-`
-
-// Lua helpers map, mapping Lua function names to Go functions
-var luaHelpersMap = map[string]lua.LGFunction{
+var luaGoHelpers = map[string]lua.LGFunction{
 	"regexMatch":            goRegexMatch,
 	"readFile":              goReadFile,
 	"getDiff":               goGetDiff,
@@ -58,24 +55,47 @@ var luaHelpersMap = map[string]lua.LGFunction{
 	"regexMatchGitDiff":     goRegexMatchGitDiff,
 }
 
-func registerAPIFunctions(lState *lua.LState) (*lua.LState, error) {
+func (l *LuaEnvironment) registerAPIFunctions() error {
 	// Set global variables for the Lua state
-	lState.SetGlobal("hookParameters", lua.LString(""))
-	lState.SetGlobal("hookExitCode", lua.LNumber(0))
-	// lState.SetGlobal("allowedExecutables", lua.LString(strings.Join(allowedModules, ",")))
+	l.lState.SetGlobal("hookParameters", lua.LString(""))
+	l.lState.SetGlobal("hookExitCode", lua.LNumber(0))
+
+	helperNames := set.NewSet[string]()
 
 	// Register the pure Lua helper functions
-	if err := lState.DoString(pureLuaHelpers); err != nil {
-		return nil, err
+	for name, helper := range luaHelpers {
+		helperNames.Add(name)
+		if err := l.lState.DoString(helper); err != nil {
+			return err
+		}
 	}
 
 	// Register the Go functions
-	for name, fn := range luaHelpersMap {
-		lState.SetGlobal(name, lState.NewFunction(fn))
+	for name, fn := range luaGoHelpers {
+		if helperNames.Has(name) {
+			return fmt.Errorf("%w: '%s'", ErrDuplicateHelperName, name)
+		}
+
+		l.lState.SetGlobal(name, l.lState.NewFunction(fn))
 	}
 
-	return lState, nil
+	return nil
 }
+
+var strSplitImplementation = `
+	function strSplit(str, sep)
+		if sep == nil then
+			sep = "\n"
+		end
+
+		local lines = {}
+		for line in string.gmatch(str, "([^"..sep.."]+)") do
+			table.insert(lines, line)
+		end
+
+		return lines
+	end
+`
 
 // goReadFile reads the content of a file and returns it as a string
 func goReadFile(l *lua.LState) int {

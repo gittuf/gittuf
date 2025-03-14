@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -21,11 +22,17 @@ const (
 	luaTimeOut          = 100
 )
 
+type LuaEnvironment struct {
+	lState     *lua.LState
+	repository *gitinterface.Repository
+}
+
 // NewLuaEnvironment creates a new Lua state with the specified modules
 // enabled.
-func NewLuaEnvironment(ctx context.Context) (*lua.LState, error) {
+func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository) (*LuaEnvironment, error) {
 	// Create a new Lua state
 	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
+	environment := &LuaEnvironment{lState: lState}
 
 	// Load default safe libraries
 	modules := []struct {
@@ -52,25 +59,24 @@ func NewLuaEnvironment(ctx context.Context) (*lua.LState, error) {
 	}
 
 	// Enable only safe functions
-	enableOnlySafeFunctions(lState)
+	environment.enableOnlySafeFunctions()
 
 	// Set the instruction quota and timeout
-	setTimeOut(ctx, lState, luaTimeOut)
-	if err := setInstructionQuota(lState, luaInstructionQuota); err != nil {
+	environment.setTimeOut(ctx, luaTimeOut)
+	if err := environment.setInstructionQuota(luaInstructionQuota); err != nil {
 		return nil, fmt.Errorf("error setting instruction quota: %w", err)
 	}
 
 	// Register the Go functions with the Lua state
-	lState, err := registerAPIFunctions(lState)
-	if err != nil {
+	if err := environment.registerAPIFunctions(); err != nil {
 		return nil, err
 	}
 
-	return lState, nil
+	return environment, nil
 }
 
 // enableOnlySafeFunctions disables all functions that are deemed to be unsafe.
-func enableOnlySafeFunctions(l *lua.LState) {
+func (l *LuaEnvironment) enableOnlySafeFunctions() {
 	//-- List of unsafe packages/functions:
 	// -- * string.rep: can be used to allocate millions of bytes in 1 operation
 	// -- * {set|get}metatable: can be used to modify the metatable of global objects (strings, integers)
@@ -87,66 +93,66 @@ func enableOnlySafeFunctions(l *lua.LState) {
 	// -- * package.*: Allows arbitrary module loading, see https://www.lua.org/manual/5.3/manual.html#pdf-package
 
 	// Disable all unsafe functions
-	l.SetGlobal("dofile", lua.LNil)
-	l.SetGlobal("load", lua.LNil)
-	l.SetGlobal("loadfile", lua.LNil)
-	l.SetGlobal("loadstring", lua.LNil)
-	l.SetGlobal("require", lua.LNil)
-	l.SetGlobal("module", lua.LNil)
-	l.SetGlobal("collectgarbage", lua.LNil)
-	l.SetGlobal("rawget", lua.LNil)
-	l.SetGlobal("rawset", lua.LNil)
-	l.SetGlobal("rawequal", lua.LNil)
-	l.SetGlobal("setmetatable", lua.LNil)
-	l.SetGlobal("getmetatable", lua.LNil)
-	l.SetGlobal("_G", lua.LNil)
-	l.SetGlobal("os", lua.LNil)
-	l.SetGlobal("io", lua.LNil)
-	l.SetGlobal("debug", lua.LNil)
-	l.SetGlobal("package", lua.LNil)
+	l.lState.SetGlobal("dofile", lua.LNil)
+	l.lState.SetGlobal("load", lua.LNil)
+	l.lState.SetGlobal("loadfile", lua.LNil)
+	l.lState.SetGlobal("loadstring", lua.LNil)
+	l.lState.SetGlobal("require", lua.LNil)
+	l.lState.SetGlobal("module", lua.LNil)
+	l.lState.SetGlobal("collectgarbage", lua.LNil)
+	l.lState.SetGlobal("rawget", lua.LNil)
+	l.lState.SetGlobal("rawset", lua.LNil)
+	l.lState.SetGlobal("rawequal", lua.LNil)
+	l.lState.SetGlobal("setmetatable", lua.LNil)
+	l.lState.SetGlobal("getmetatable", lua.LNil)
+	l.lState.SetGlobal("_G", lua.LNil)
+	l.lState.SetGlobal("os", lua.LNil)
+	l.lState.SetGlobal("io", lua.LNil)
+	l.lState.SetGlobal("debug", lua.LNil)
+	l.lState.SetGlobal("package", lua.LNil)
 
-	if strMod, ok := l.GetGlobal(lua.StringLibName).(*lua.LTable); ok {
+	if strMod, ok := l.lState.GetGlobal(lua.StringLibName).(*lua.LTable); ok {
 		strMod.RawSetString("rep", lua.LNil)
 		strMod.RawSetString("dump", lua.LNil)
-		protectModule(l, strMod, lua.StringLibName)
+		l.protectModule(strMod, lua.StringLibName)
 	}
 
 	// Load protected modules with only safe functions
-	if mathMod, ok := l.GetGlobal(lua.MathLibName).(*lua.LTable); ok {
+	if mathMod, ok := l.lState.GetGlobal(lua.MathLibName).(*lua.LTable); ok {
 		mathMod.RawSetString("randomseed", lua.LNil)
-		protectModule(l, mathMod, lua.MathLibName)
+		l.protectModule(mathMod, lua.MathLibName)
 	}
 
-	if coroMod, ok := l.GetGlobal(lua.CoroutineLibName).(*lua.LTable); ok {
-		protectModule(l, coroMod, lua.CoroutineLibName)
+	if coroMod, ok := l.lState.GetGlobal(lua.CoroutineLibName).(*lua.LTable); ok {
+		l.protectModule(coroMod, lua.CoroutineLibName)
 	}
 
-	if tabMod, ok := l.GetGlobal(lua.TabLibName).(*lua.LTable); ok {
-		protectModule(l, tabMod, lua.TabLibName)
+	if tabMod, ok := l.lState.GetGlobal(lua.TabLibName).(*lua.LTable); ok {
+		l.protectModule(tabMod, lua.TabLibName)
 	}
 
-	if baseMod, ok := l.GetGlobal(lua.BaseLibName).(*lua.LTable); ok {
-		protectModule(l, baseMod, lua.BaseLibName)
+	if baseMod, ok := l.lState.GetGlobal(lua.BaseLibName).(*lua.LTable); ok {
+		l.protectModule(baseMod, lua.BaseLibName)
 	}
 }
 
 // protectModule protects the specified module from being modified by setting a
 // protected metatable with __newindex and __metatable fields
-func protectModule(l *lua.LState, tbl *lua.LTable, moduleName string) {
-	mt := l.NewTable()
-	l.SetMetatable(tbl, mt)
-	l.SetField(mt, "__newindex", l.NewFunction(func(l *lua.LState) int {
+func (l *LuaEnvironment) protectModule(tbl *lua.LTable, moduleName string) {
+	mt := l.lState.NewTable()
+	l.lState.SetMetatable(tbl, mt)
+	l.lState.SetField(mt, "__newindex", l.lState.NewFunction(func(l *lua.LState) int {
 		varName := l.ToString(2)
 		l.RaiseError("attempt to modify read-only table '%s.%s'", moduleName, varName)
 		return 0
 	}))
-	l.SetField(mt, "__metatable", lua.LString("protected"))
+	l.lState.SetField(mt, "__metatable", lua.LString("protected"))
 }
 
 // setInstructionQuota sets the instruction quota for the Lua state
-func setInstructionQuota(l *lua.LState, quota int64) error {
+func (l *LuaEnvironment) setInstructionQuota(quota int64) error {
 	// Run the instruction quota setting code directly
-	err := l.DoString(fmt.Sprintf(`
+	err := l.lState.DoString(fmt.Sprintf(`
 	local count = 0
 	debug.sethook(function()
 		count = count + 1
@@ -162,9 +168,9 @@ func setInstructionQuota(l *lua.LState, quota int64) error {
 }
 
 // setTimeOut sets the timeout for the Lua state
-func setTimeOut(ctx context.Context, lState *lua.LState, timeOut int) {
+func (l *LuaEnvironment) setTimeOut(ctx context.Context, timeOut int) {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeOut)*time.Second)
 	defer cancel()
 
-	lState.SetContext(ctx)
+	l.lState.SetContext(ctx)
 }

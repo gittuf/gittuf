@@ -5,14 +5,19 @@ The `luasandbox` package provides a Lua sandbox environment for executing Lua
 scripts with controlled access to the file system and Git repository. 
 
 ## Structure
-- **main.go**: Entry point for the Lua sandbox, initializes the environment and
-  configures security settings.
+- **luasandbox.go**: Entry point for the Lua sandbox, initializes the
+  environment and configures security settings.
 - **api.go**: Defines and registers all API functions exposed to Lua, including
   predefined Lua functions and those mapped to Go functions.
-- **util.go**: Utility functions and helpers for api functions and sandbox
+- **util.go**: Utility functions and helpers for API functions and sandbox
   settings.
   
-## API Functions
+## API Guide
+
+| **API** | **Signature** | **Description** |
+|---------|---------------|-----------------|
+| readFile | readFile(filePath: string) -> string | Reads the content of a file and returns it as a string. If the file path is not permitted or there is an error reading the file, returns an error message. |
+
 ### 1. `readFile`
 
 #### Signature
