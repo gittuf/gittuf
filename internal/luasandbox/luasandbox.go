@@ -9,6 +9,7 @@ package luasandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,9 +17,14 @@ import (
 )
 
 const (
-	// Quota from https://mozilla-services.github.io/lua_sandbox/sandbox.html
+	// luaInstructionQuota is from
+	// https://mozilla-services.github.io/lua_sandbox/sandbox.html
 	luaInstructionQuota = 1000000
 	luaTimeOut          = 100
+)
+
+var (
+	ErrMismatchedAPINames = errors.New("name of API to be registered does not match API implementation")
 )
 
 type LuaEnvironment struct {
@@ -173,12 +179,25 @@ func (l *LuaEnvironment) setTimeOut(ctx context.Context, timeOut int) {
 }
 
 // registerAPIFunctions makes the sandbox's standard APIs available.
-func (l *LuaEnvironment) registerAPIFunctions() error { //nolint:unparam
+func (l *LuaEnvironment) registerAPIFunctions() error {
 	// Set global variables for the Lua state
 	l.lState.SetGlobal("hookParameters", lua.LString(""))
 	l.lState.SetGlobal("hookExitCode", lua.LNumber(0))
 
-	// TODO: register APIs when we're adding them
+	for name, availableAPI := range RegisterAPIs {
+		if name != availableAPI.GetName() {
+			return fmt.Errorf("%w: '%s' does not match '%s'", ErrMismatchedAPINames, name, availableAPI.GetName())
+		}
+
+		switch availableAPI := availableAPI.(type) {
+		case *LuaAPI:
+			if err := l.lState.DoString(availableAPI.Implementation); err != nil {
+				return fmt.Errorf("unable to register API '%s': %w", name, err)
+			}
+		case *GoAPI:
+			l.lState.SetGlobal(name, l.lState.NewFunction(availableAPI.Implementation))
+		}
+	}
 
 	return nil
 }
