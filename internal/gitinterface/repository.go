@@ -139,6 +139,7 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	}
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
+	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
 
 	var (
 		stdOut bytes.Buffer
