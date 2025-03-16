@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -28,15 +29,21 @@ var (
 )
 
 type LuaEnvironment struct {
-	lState *lua.LState
+	lState     *lua.LState
+	repository *gitinterface.Repository
+	allAPIs    []API
 }
 
 // NewLuaEnvironment creates a new Lua state with the specified modules
 // enabled.
-func NewLuaEnvironment(ctx context.Context) (*LuaEnvironment, error) {
+func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository) (*LuaEnvironment, error) {
 	// Create a new Lua state
 	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
-	environment := &LuaEnvironment{lState: lState}
+	environment := &LuaEnvironment{
+		lState:     lState,
+		repository: repository,
+		allAPIs:    []API{},
+	}
 
 	// Load default safe libraries
 	modules := []struct {
@@ -76,6 +83,10 @@ func NewLuaEnvironment(ctx context.Context) (*LuaEnvironment, error) {
 	}
 
 	return environment, nil
+}
+
+func (l *LuaEnvironment) GetAPIs() []API {
+	return l.allAPIs
 }
 
 // enableOnlySafeFunctions disables all functions that are deemed to be unsafe.
@@ -165,7 +176,7 @@ func (l *LuaEnvironment) setInstructionQuota(quota int64) error {
 	end, "", 1)
 	`, quota, quota))
 	if err != nil {
-		return fmt.Errorf("error setting instruction quota: %w", err)
+		return err
 	}
 	return nil
 }
@@ -184,10 +195,17 @@ func (l *LuaEnvironment) registerAPIFunctions() error {
 	l.lState.SetGlobal("hookParameters", lua.LString(""))
 	l.lState.SetGlobal("hookExitCode", lua.LNumber(0))
 
-	for name, availableAPI := range RegisterAPIs {
+	registerAPIs := map[string]API{
+		"matchRegex": l.apiMatchRegex(),
+		"strSplit":   l.apiStrSplit(),
+	}
+
+	for name, availableAPI := range registerAPIs {
 		if name != availableAPI.GetName() {
 			return fmt.Errorf("%w: '%s' does not match '%s'", ErrMismatchedAPINames, name, availableAPI.GetName())
 		}
+
+		l.allAPIs = append(l.allAPIs, availableAPI)
 
 		switch availableAPI := availableAPI.(type) {
 		case *LuaAPI:
