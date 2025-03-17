@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -34,7 +35,12 @@ const (
 	HookStagePreCommitString = "preCommit"
 	HookStagePrePushString   = "prePush"
 
+	HookStagePreCommitGitString = "pre-commit"
+	HookStagePrePushGitString   = "pre-push"
+
 	HookEnvironmentLuaString = "lua"
+
+	HooksPrefix = "hooks"
 )
 
 var (
@@ -194,10 +200,10 @@ type RootMetadata interface {
 	// one hashing algorithm, providing multiple hashes is supported. The hook's
 	// environment (e.g. lua) and modules to expose to the hook (if using Lua)
 	// are also required.
-	AddHook(stage HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, modules []string) error
+	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, modules []string) (Hook, error)
 	// RemoveHook removes the hook identified by hookName in the specified Git
 	// stage.
-	RemoveHook(stage HookStage, hookName string)
+	RemoveHook(stages []HookStage, hookName string) error
 	// GetHooks returns all hooks in the metadata for the specified Git stage.
 	GetHooks(stage HookStage) ([]Hook, error)
 }
@@ -370,8 +376,17 @@ const (
 	HookStagePrePush
 )
 
-func (h HookStage) String() string {
-	switch h {
+func (h *HookStage) IsValid() error {
+	switch *h {
+	case HookStagePreCommit, HookStagePrePush:
+		return nil
+	default:
+		return ErrInvalidHookStage
+	}
+}
+
+func (h *HookStage) String() string {
+	switch *h {
 	case HookStagePreCommit:
 		return HookStagePreCommitString
 	case HookStagePrePush:
@@ -381,13 +396,39 @@ func (h HookStage) String() string {
 	}
 }
 
+// MarshalText is used to convert the instance of HookStage into text. Needed
+// for proper marshalling into JSON as HookStage is a key in a map.
+func (h HookStage) MarshalText() ([]byte, error) {
+	str := h.String()
+	if str == "" {
+		return nil, ErrInvalidHookStage
+	}
+	return []byte(str), nil
+}
+
+// UnmarshalText is used to convert the instance of HookStage from text. Needed
+// for proper marshalling into JSON as HookStage is a key in a map.
+func (h *HookStage) UnmarshalText(text []byte) error {
+	switch string(text) {
+	case HookStagePreCommitString:
+		*h = HookStagePreCommit
+	case HookStagePrePushString:
+		*h = HookStagePrePush
+	default:
+		return ErrInvalidHookStage
+	}
+
+	return nil
+}
+
 // MarshalJSON is used to serialize the instance of HookStage into JSON.
-func (h *HookStage) MarshalJSON() ([]byte, error) {
-	if h.String() == "" {
+func (h HookStage) MarshalJSON() ([]byte, error) {
+	str := h.String()
+	if str == "" {
 		return nil, ErrInvalidHookStage
 	}
 
-	return json.Marshal(h.String())
+	return json.Marshal(str)
 }
 
 // UnmarshalJSON is used to load an instance of HookStage from the JSON
@@ -465,6 +506,9 @@ type Hook interface {
 
 	// GetHashes returns the hashes identifying the hook file itself.
 	GetHashes() map[string]string
+
+	// GetBlobID returns the Git blob ID for the hook on disk.
+	GetBlobID() gitinterface.Hash
 
 	// GetEnvironment returns the environment that the hook is to run in.
 	GetEnvironment() HookEnvironment

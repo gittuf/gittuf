@@ -11,6 +11,11 @@ import (
 	"errors"
 )
 
+const (
+	GitBlobHashName = "gitBlob"
+	SHA256HashName  = "sha256"
+)
+
 var (
 	zeroSHA1HashBytes   = [sha1.Size]byte{}
 	zeroSHA256HashBytes = [sha256.Size]byte{}
