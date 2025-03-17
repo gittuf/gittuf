@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 type ObjectType uint
@@ -44,4 +45,18 @@ func (r *Repository) GetObjectType(objectID Hash) (ObjectType, error) {
 	default:
 		return 0, ErrInvalidObjectType
 	}
+}
+
+// GetObjectSize returns the size of the object with the specified Git ID.
+func (r *Repository) GetObjectSize(objectID Hash) (uint64, error) {
+	stdOut, err := r.executor("cat-file", "-s", objectID.String()).executeString()
+	if err != nil {
+		return 0, fmt.Errorf("unable to inspect object size: %w", err)
+	}
+
+	objSize, err := strconv.ParseUint(stdOut, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("unable to convert output to integer: %w", err)
+	}
+	return objSize, nil
 }
