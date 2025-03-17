@@ -18,10 +18,7 @@ import (
 )
 
 const (
-	// luaInstructionQuota is from
-	// https://mozilla-services.github.io/lua_sandbox/sandbox.html
-	luaInstructionQuota = 1000000
-	luaTimeOut          = 100
+	luaTimeOut = 100
 )
 
 var (
@@ -29,9 +26,10 @@ var (
 )
 
 type LuaEnvironment struct {
-	lState     *lua.LState
-	repository *gitinterface.Repository
-	allAPIs    []API
+	lState        *lua.LState
+	contextCancel context.CancelFunc
+	repository    *gitinterface.Repository
+	allAPIs       []API
 }
 
 // NewLuaEnvironment creates a new Lua state with the specified modules
@@ -68,14 +66,12 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository)
 			panic(err)
 		}
 	}
+
 	// Enable only safe functions
 	environment.enableOnlySafeFunctions()
 
 	// Set the instruction quota and timeout
 	environment.setTimeOut(ctx, luaTimeOut)
-	if err := environment.setInstructionQuota(luaInstructionQuota); err != nil {
-		return nil, fmt.Errorf("error setting instruction quota: %w", err)
-	}
 
 	// Register the Go functions with the Lua state
 	if err := environment.registerAPIFunctions(); err != nil {
@@ -87,6 +83,10 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository)
 
 func (l *LuaEnvironment) GetAPIs() []API {
 	return l.allAPIs
+}
+
+func (l *LuaEnvironment) Cleanup() {
+	l.contextCancel()
 }
 
 // enableOnlySafeFunctions disables all functions that are deemed to be unsafe.
@@ -163,29 +163,9 @@ func (l *LuaEnvironment) protectModule(tbl *lua.LTable, moduleName string) {
 	l.lState.SetField(mt, "__metatable", lua.LString("protected"))
 }
 
-// setInstructionQuota sets the instruction quota for the Lua state.
-func (l *LuaEnvironment) setInstructionQuota(quota int64) error {
-	// Run the instruction quota setting code directly
-	err := l.lState.DoString(fmt.Sprintf(`
-	local count = 0
-	debug.sethook(function()
-		count = count + 1
-		if count > %d then
-			error("Instruction quota exceeded (%d instructions).", 2)
-		end
-	end, "", 1)
-	`, quota, quota))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // setTimeOut sets the timeout for the Lua state.
 func (l *LuaEnvironment) setTimeOut(ctx context.Context, timeOut int) {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeOut)*time.Second)
-	defer cancel()
-
+	ctx, l.contextCancel = context.WithTimeout(ctx, time.Duration(timeOut)*time.Second)
 	l.lState.SetContext(ctx)
 }
 
