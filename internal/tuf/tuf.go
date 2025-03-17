@@ -133,6 +133,9 @@ type RootMetadata interface {
 	GetGlobalRules() []GlobalRule
 	// DeleteGlobalRule removes the global rule from the root metadata.
 	DeleteGlobalRule(ruleName string) error
+	// UpdateGlobalRule updates an existing global rule identified by ruleName
+	// with the provided parameters.
+	UpdateGlobalRule(ruleName string, paths []string, threshold int) error
 
 	// AddGitHubAppPrincipal adds the corresponding principal to the root
 	// metadata and is trusted for GitHub app attestations.
