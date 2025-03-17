@@ -99,3 +99,15 @@ func TestGetObjectType(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, TagObjectType, objType)
 }
+
+func TestGetObjectSize(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	blobID, err := repo.WriteBlob([]byte("gittuf"))
+	require.Nil(t, err)
+
+	objSize, err := repo.GetObjectSize(blobID)
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(6), objSize)
+}
