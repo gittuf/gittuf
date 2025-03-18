@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/luasandbox"
 	"github.com/spf13/cobra"
 )
@@ -22,32 +23,34 @@ var (
 		Use:   "gendoc",
 		Short: "Generate sandbox docs",
 		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			type apiRecord struct {
-				name string
-				api  luasandbox.API
-			}
-			allAPIs := []*apiRecord{}
-			for name, API := range luasandbox.RegisterAPIs {
-				allAPIs = append(allAPIs, &apiRecord{name: name, api: API})
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			repository, err := gitinterface.LoadRepository()
+			if err != nil {
+				return err
 			}
 
+			environment, err := luasandbox.NewLuaEnvironment(cmd.Context(), repository)
+			if err != nil {
+				return err
+			}
+
+			allAPIs := environment.GetAPIs()
 			sort.Slice(allAPIs, func(i, j int) bool {
-				return allAPIs[i].name < allAPIs[j].name
+				return allAPIs[i].GetName() < allAPIs[j].GetName()
 			})
 
 			allLines := []string{
 				"# Lua Sandbox APIs",
 				"",
 			}
-			for _, record := range allAPIs {
-				allLines = append(allLines, fmt.Sprintf("## %s", record.name))
+			for _, api := range allAPIs {
+				allLines = append(allLines, fmt.Sprintf("## %s", api.GetName()))
 				allLines = append(allLines, "")
-				allLines = append(allLines, fmt.Sprintf("**Signature:** `%s`", record.api.GetSignature()))
+				allLines = append(allLines, fmt.Sprintf("**Signature:** `%s`", api.GetSignature()))
 				allLines = append(allLines, "")
-				allLines = append(allLines, record.api.GetHelp())
+				allLines = append(allLines, api.GetHelp())
 
-				for index, example := range record.api.GetExamples() {
+				for index, example := range api.GetExamples() {
 					allLines = append(allLines, "") // we don't have a new line after help, this also adds spacing between examples
 					allLines = append(allLines, fmt.Sprintf("### Example %d", index+1))
 					allLines = append(allLines, "")

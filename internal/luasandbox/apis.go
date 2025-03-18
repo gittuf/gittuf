@@ -18,11 +18,6 @@ type API interface {
 	GetExamples() []string
 }
 
-var RegisterAPIs = map[string]API{
-	"matchRegex": matchRegex(),
-	"strSplit":   strSplit(),
-}
-
 // LuaAPI implements the API interface. This is used when the API is implemented
 // as a Lua function.
 type LuaAPI struct {
@@ -75,7 +70,7 @@ func (g *GoAPI) GetExamples() []string {
 	return g.Examples
 }
 
-func matchRegex() API {
+func (l *LuaEnvironment) apiMatchRegex() API {
 	return &GoAPI{
 		Name:      "matchRegex",
 		Signature: "matchRegex(pattern, text) -> matched",
@@ -95,7 +90,7 @@ func matchRegex() API {
 	}
 }
 
-func strSplit() API {
+func (l *LuaEnvironment) apiStrSplit() API {
 	return &LuaAPI{
 		Name:      "strSplit",
 		Signature: "strSplit(str, sep) -> components",
