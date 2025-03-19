@@ -763,6 +763,7 @@ func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
 	default:
 		slog.Debug("No prior applied policy found")
 		// Nothing to check or return here
+		return nil
 	}
 
 	// Get the reference for the PolicyStagingRef
