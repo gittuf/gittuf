@@ -67,7 +67,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-global-rule",
 		Short:             fmt.Sprintf("Update an existing global rule in the root of trust (developer mode only, set %s=1)", dev.DevModeKey),
-		Long:              "This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified.",
+		Long:              "This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified. Note that a global rule may only be updated with the same type of global rule, and changes to the type require removing and adding it again.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

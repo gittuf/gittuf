@@ -645,7 +645,7 @@ func (r *Repository) UpdateGlobalRule(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Update global rule '%s' from root metadata", name)
+	commitMessage := fmt.Sprintf("Update global rule '%s' in root metadata", name)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 

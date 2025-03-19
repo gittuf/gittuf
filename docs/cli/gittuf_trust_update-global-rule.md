@@ -4,7 +4,7 @@ Update an existing global rule in the root of trust (developer mode only, set GI
 
 ### Synopsis
 
-This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified.
+This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified. Note that a global rule may only be updated with the same type of global rule, and changes to the type require removing and adding it again.
 
 ```
 gittuf trust update-global-rule [flags]
@@ -17,6 +17,7 @@ gittuf trust update-global-rule [flags]
       --rule-name string           name of rule
       --rule-pattern stringArray   patterns used to identify namespaces rule applies to
       --threshold int              threshold of required valid signatures (default 1)
+      --type string                type of rule (threshold|block-force-pushes)
 ```
 
 ### Options inherited from parent commands
