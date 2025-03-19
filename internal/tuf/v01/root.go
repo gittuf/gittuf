@@ -384,9 +384,6 @@ func (r *RootMetadata) UpdateGlobalRule(ruleName string, paths []string, thresho
 	}
 
 	for _, rule := range allGlobalRules {
-		if rule.GetName() != ruleName {
-			updatedGlobalRules = append(updatedGlobalRules, rule)
-		}
 		if rule.GetName() == ruleName {
 			found = true
 			switch rule.(type) {
@@ -401,8 +398,11 @@ func (r *RootMetadata) UpdateGlobalRule(ruleName string, paths []string, thresho
 				}
 				updatedGlobalRules = append(updatedGlobalRules, updatedRule)
 			}
+		} else {
+			updatedGlobalRules = append(updatedGlobalRules, rule)
 		}
 	}
+
 	r.GlobalRules = updatedGlobalRules
 	if !found {
 		return tuf.ErrGlobalRuleNotFound
