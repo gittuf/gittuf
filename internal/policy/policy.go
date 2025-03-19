@@ -623,6 +623,11 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 // taking affect, and allowing new changes, that until signed by multiple users
 // would be invalid to be made, by utilizing the policy staging ref.
 func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool) error {
+	// First, reconcile staging before we do anything here.
+	if err := ReconcileStaging(repo, true); err != nil {
+		return err
+	}
+
 	// Get the reference for the PolicyRef
 	referenceFound := true
 	policyTip, err := repo.GetReference(PolicyRef)
@@ -727,6 +732,168 @@ func Discard(repo *gitinterface.Repository) error {
 	}
 
 	return nil
+}
+
+func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
+	// Get the reference for the PolicyRef
+	referenceFound := true
+	policyTip, err := repo.GetReference(PolicyRef)
+	if err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
+		}
+		referenceFound = false
+	}
+
+	entryFound := true
+	policyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return fmt.Errorf("failed to get policy RSL entry: %w", err)
+		}
+
+		entryFound = false
+	}
+
+	// case 1: both found -> verify tip matches entry
+	// case 2: only one found -> return error
+	// case 3: neither found -> nothing to verify
+	switch {
+	case referenceFound && entryFound:
+		if !policyEntry.GetTargetID().Equal(policyTip) {
+			return ErrInvalidPolicy
+		}
+	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
+		return ErrInvalidPolicy
+	default:
+		slog.Debug("No prior applied policy found")
+		// Nothing to check or return here
+		return nil
+	}
+
+	// Get the reference for the PolicyStagingRef
+	referenceFound = true
+	policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+	if err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyRef, err)
+		}
+		referenceFound = false
+	}
+
+	entryFound = true
+	policyStagingEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyStagingRef))
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return fmt.Errorf("failed to get policy staging RSL entry: %w", err)
+		}
+
+		entryFound = false
+	}
+
+	// case 1: both found -> verify tip matches entry
+	// case 2: only one found -> return error
+	// case 3: neither found -> nothing to verify
+	switch {
+	case referenceFound && entryFound:
+		if !policyStagingEntry.GetTargetID().Equal(policyStagingTip) {
+			return ErrInvalidPolicy
+		}
+	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
+		return ErrInvalidPolicy
+	default:
+		slog.Debug("No prior policy-staging entry found")
+		// Nothing to check or return here
+		return nil
+	}
+
+	// There are a few possible scenarios here.
+	// A) policy = policy-staging -> nothing to do; this is the case when the
+	// last update to the policy related refs were applied
+	// B) policy is behind policy-staging -> nothing to do
+	// C) policy is strictly ahead of policy-staging -> reconciliation is
+	// necessary, and HAS to be because a change landed directly in policy
+	// without going through policy-staging, ff update policy-staging as well
+	// D) policy and policy-staging have diverged -> reconciliation is
+	// necessary, and HAS to be because policy-staging was updated AND policy
+	// was propagated into, meaning they have divergent (but non conflicting
+	// changes), ff update does not suffice
+	// Reconciliation goal: policy-staging must be ff-ahead of policy so Apply()
+	// is not affected by controller propagations
+
+	// Reconciliation overview:
+	// In case C, ff-update policy-staging to include the propagated changes and
+	// record RSL reference entry (not propagation entry).
+	// In case D, "stash" changes in staging, apply policy ref changes over
+	// common ancestor, re-apply stashed changes into policy-staging.
+	// This requires rewriting policy-staging's history on clients, but luckily,
+	// this cannot result in a conflict in the current workflows.
+	// This is because the unapplied changes to policy-staging are necessarily
+	// in the state's metadata (and not in the controller metadata). The changes
+	// in policy that don't exist in policy-staging MUST be due to controller
+	// propagation, i.e., completely different files are updated. We know this
+	// to be true because an update to policy's local repository metadata MUST
+	// have gone through policy-staging and been applied, so propagation is the
+	// only legitimate reason for policy to have a change not seen in
+	// policy-staging.
+
+	if policyTip.Equal(policyStagingTip) {
+		// nothing to do
+		return nil
+	}
+
+	stagingAheadOfPolicy, err := repo.KnowsCommit(policyStagingTip, policyTip)
+	if err != nil {
+		return err
+	}
+	if stagingAheadOfPolicy {
+		// nothing to do
+		return nil
+	}
+
+	policyAheadOfStaging, err := repo.KnowsCommit(policyTip, policyStagingTip)
+	if err != nil {
+		return err
+	}
+	if policyAheadOfStaging {
+		// update staging to match policy
+		if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+			return err
+		}
+
+		return rsl.NewReferenceEntry(PolicyStagingRef, policyTip).Commit(repo, signCommit)
+	}
+
+	// Diverged
+	// Create new policy-staging that is "rebased"
+	policyState, err := loadStateForEntry(repo, policyEntry)
+	if err != nil {
+		return err
+	}
+
+	policyStagingState, err := loadStateForEntry(repo, policyStagingEntry)
+	if err != nil {
+		return err
+	}
+
+	if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+		return err
+	}
+	if err := rsl.NewReferenceEntry(PolicyStagingRef, policyTip).Commit(repo, signCommit); err != nil {
+		return err
+	}
+
+	// TODO: fix RSL entries for staging that are now orphaned
+
+	// This includes the changes made in staging + the controller changes
+	// propagated into policy
+	newStagingState := &State{
+		Metadata:           policyStagingState.Metadata,
+		ControllerMetadata: policyState.ControllerMetadata,
+		repository:         repo,
+	}
+
+	return newStagingState.Commit(repo, "Rebase policy staging\n", true, signCommit)
 }
 
 func (s *State) GetRootKeys() ([]tuf.Principal, error) {
