@@ -11,6 +11,7 @@ import (
 
 	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -797,12 +798,8 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 }
 
 // AddHook adds the specified hook to the metadata.
-func (r *RootMetadata) AddHook(stage tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) error {
+func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) (tuf.Hook, error) {
 	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
-
-	if stage != tuf.HookStagePreCommit && stage != tuf.HookStagePrePush {
-		return tuf.ErrInvalidHookStage
-	}
 
 	newHook := &Hook{
 		Name:         hookName,
@@ -813,28 +810,48 @@ func (r *RootMetadata) AddHook(stage tuf.HookStage, hookName string, principalID
 	}
 
 	if r.Hooks == nil {
-		r.Hooks = make(map[tuf.HookStage][]*Hook, 2)
+		r.Hooks = map[tuf.HookStage][]*Hook{}
 	}
 
-	if r.Hooks[stage] == nil {
-		r.Hooks[stage] = []*Hook{}
+	for _, stage := range stages {
+		if err := stage.IsValid(); err != nil {
+			return nil, err
+		}
+
+		if r.Hooks[stage] == nil {
+			r.Hooks[stage] = []*Hook{}
+		} else {
+			for _, existingHook := range r.Hooks[stage] {
+				if existingHook.Name == hookName {
+					return nil, tuf.ErrDuplicatedHookName
+				}
+			}
+		}
+
+		r.Hooks[stage] = append(r.Hooks[stage], newHook)
 	}
 
-	r.Hooks[stage] = append(r.Hooks[stage], newHook)
-
-	return nil
+	return tuf.Hook(newHook), nil
 }
 
 // RemoveHook removes the hook specified by stage and hookName.
-func (r *RootMetadata) RemoveHook(stage tuf.HookStage, hookName string) {
-	hooks := []*Hook{}
-	for _, hook := range r.Hooks[stage] {
-		if hook.Name != hookName {
-			hooks = append(hooks, hook)
-		}
+func (r *RootMetadata) RemoveHook(stages []tuf.HookStage, hookName string) error {
+	if r.Hooks == nil {
+		return tuf.ErrNoHooksDefined
 	}
 
-	r.Hooks[stage] = hooks
+	for _, stage := range stages {
+		hooks := []*Hook{}
+		for _, hook := range r.Hooks[stage] {
+			if hook.Name != hookName {
+				hooks = append(hooks, hook)
+			}
+		}
+
+		r.Hooks[stage] = hooks
+	}
+
+	return nil
 }
 
 // GetHooks returns the hooks for the specified stage.
@@ -872,6 +889,11 @@ func (h *Hook) GetPrincipalIDs() *set.Set[string] {
 // GetHashes returns the hashes of the hook file.
 func (h *Hook) GetHashes() map[string]string {
 	return h.Hashes
+}
+
+func (h *Hook) GetBlobID() gitinterface.Hash {
+	hash, _ := gitinterface.NewHash(h.Hashes[gitinterface.GitBlobHashName])
+	return hash
 }
 
 // GetEnvironment returns the environment that the hook is to run in.
