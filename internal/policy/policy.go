@@ -65,6 +65,7 @@ type State struct {
 	githubAppRoleName         string
 
 	repository     *gitinterface.Repository
+	loadedEntry    rsl.ReferenceUpdaterEntry
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
 	allPrincipals  map[string]tuf.Principal
@@ -271,6 +272,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 			return nil, err
 		}
 
+		// Note: this will not set the loadedEntry field in the policy state
 		return loadStateFromCommit(repo, commitID)
 	}
 
@@ -1047,7 +1049,12 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	return loadStateFromCommit(repo, entry.GetTargetID())
+	state, err := loadStateFromCommit(repo, entry.GetTargetID())
+	if err != nil {
+		return nil, err
+	}
+	state.loadedEntry = entry
+	return state, nil
 }
 
 func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
