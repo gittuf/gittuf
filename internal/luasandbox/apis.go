@@ -6,7 +6,9 @@ package luasandbox
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -75,16 +77,16 @@ func (l *LuaEnvironment) apiMatchRegex() API {
 		Name:      "matchRegex",
 		Signature: "matchRegex(pattern, text) -> matched",
 		Help:      "Check if the regular expression pattern matches the provided text.",
-		Implementation: func(l *lua.LState) int {
-			pattern := l.ToString(1)
-			text := l.ToString(2)
+		Implementation: func(s *lua.LState) int {
+			pattern := s.ToString(1)
+			text := s.ToString(2)
 			regex, err := regexp.Compile(pattern)
 			if err != nil {
-				l.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
+				s.Push(lua.LString(fmt.Sprintf("Error: %s", err.Error())))
 				return 1
 			}
 			matched := regex.MatchString(text)
-			l.Push(lua.LBool(matched))
+			s.Push(lua.LBool(matched))
 			return 1
 		},
 	}
@@ -112,5 +114,239 @@ func (l *LuaEnvironment) apiStrSplit() API {
 			return components
 		end	
 		`,
+	}
+}
+
+func (l *LuaEnvironment) apiGitReadBlob() API {
+	return &GoAPI{
+		Name:      "gitReadBlob",
+		Signature: "gitReadBlob(blobID) -> blob",
+		Help:      "Retrieve the bytes of the Git blob specified using its ID from the repository.",
+		Examples: []string{
+			"gitReadBlob(\"e7fca95377c9bad2418c5df7ab3bab5d652a5309\") -> \"Hello, world!\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			blobID := s.ToString(1)
+			hash, err := gitinterface.NewHash(blobID)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			blob, err := l.repository.ReadBlob(hash)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(blob))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetObjectSize() API {
+	return &GoAPI{
+		Name:      "gitGetObjectSize",
+		Signature: "gitGetObjectSize(objectID) -> size",
+		Help:      "Retrieve the size of the Git object specified using its ID from the repository.",
+		Examples: []string{
+			"gitGetObjectSize(\"e7fca95377c9bad2418c5df7ab3bab5d652a5309\") -> 13",
+		},
+		Implementation: func(s *lua.LState) int {
+			objectID := s.ToString(1)
+			hash, err := gitinterface.NewHash(objectID)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			size, err := l.repository.GetObjectSize(hash)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(strconv.FormatUint(size, 10)))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetTagTarget() API {
+	return &GoAPI{
+		Name:      "gitGetTagTarget",
+		Signature: "gitGetTagTarget(tagID) -> targetID",
+		Help:      "Retrieve the ID of the Git object that the tag with the specified ID points to.",
+		Examples: []string{
+			"gitGetTagTarget(\"f38f261f5df1d393a97aec3a5463017da6c22934\") ->  \"e7fca95377c9bad2418c5df7ab3bab5d652a5309\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			tagID := s.ToString(1)
+			hash, err := gitinterface.NewHash(tagID)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			targetID, err := l.repository.GetTagTarget(hash)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(targetID.String()))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetReference() API {
+	return &GoAPI{
+		Name:      "gitGetReference",
+		Signature: "gitGetReference(ref) -> hash",
+		Help:      "Retrieve the tip of the specified Git reference.",
+		Examples: []string{
+			"gitGetReference(\"main\") -> \"e7fca95377c9bad2418c5df7ab3bab5d652a5309\"",
+			"gitGetReference(\"refs/heads/main\") -> \"e7fca95377c9bad2418c5df7ab3bab5d652a5309\"",
+			"gitGetReference(\"refs/gittuf/reference-state-log\") -> \"c70885ffc33866dbdfe95d0e10efa6d77c77a43b\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			ref := s.ToString(1)
+
+			hash, err := l.repository.GetReference(ref)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(hash.String()))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetAbsoluteReference() API {
+	return &GoAPI{
+		Name:      "gitGetAbsoluteReference",
+		Signature: "gitGetAbsoluteReference(ref) -> absoluteRef",
+		Help:      "Retried the fully qualified reference path for the specified Git reference.",
+		Examples: []string{
+			"gitGetAbsoluteReference(\"main\") -> \"refs/heads/main\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			ref := s.ToString(1)
+
+			absoluteRef, err := l.repository.AbsoluteReference(ref)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			s.Push(lua.LString(absoluteRef))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetSymbolicReferenceTarget() API {
+	return &GoAPI{
+		Name:      "gitGetSymbolicReferenceTarget",
+		Signature: "gitGetSymbolicReferenceTarget(ref) -> ref",
+		Help:      "Retrieve the name of the Git reference the specified symbolic Git reference is pointing to.",
+		Examples: []string{
+			"gitGetSymbolicReferenceTarget(\"HEAD\") -> \"refs/heads/main\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			symbolicRef := s.ToString(1)
+
+			ref, err := l.repository.GetSymbolicReferenceTarget(symbolicRef)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			s.Push(lua.LString(ref))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetCommitMessage() API {
+	return &GoAPI{
+		Name:      "gitGetCommitMessage",
+		Signature: "gitGetCommitMessage(commitID) -> message",
+		Help:      "Retrieve the message for the specified Git commit.",
+		Examples: []string{
+			"gitGetCommitMessage(\"e7fca95377c9bad2418c5df7ab3bab5d652a5309\") -> \"Commit message.\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			id := s.ToString(1)
+			hash, err := gitinterface.NewHash(id)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			message, err := l.repository.GetCommitMessage(hash)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(message))
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetFilePathsChangedByCommit() API {
+	return &GoAPI{
+		Name:      "gitGetFilePathsChangedByCommit",
+		Signature: "gitGetFilePathsChangedByCommit(commitID) -> paths",
+		Help:      "Retrieve a Lua table of file paths changed by the specified Git commit.",
+		Examples: []string{
+			"gitGetFilePathsChangedByCommit(\"e7fca95377c9bad2418c5df7ab3bab5d652a5309\") -> 2, \"foo/bar\", \"foo/baz\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			commitID := s.ToString(1)
+			hash, err := gitinterface.NewHash(commitID)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			paths, err := l.repository.GetFilePathsChangedByCommit(hash)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			resultTable := lua.LTable{}
+
+			for _, path := range paths {
+				resultTable.Append(lua.LString(path))
+			}
+			s.Push(&resultTable)
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetRemoteURL() API {
+	return &GoAPI{
+		Name:      "gitGetRemoteURL",
+		Signature: "gitGetRemoteURL(remote) -> remoteURL",
+		Help:      "Retrieve the remote URL for the specified Git remote.",
+		Examples: []string{
+			"gitGetRemoteURL(\"origin\") -> \"example.com/example/example\"",
+		},
+		Implementation: func(s *lua.LState) int {
+			remote := s.ToString(1)
+
+			url, err := l.repository.GetRemoteURL(remote)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			s.Push(lua.LString(url))
+			return 1
+		},
 	}
 }
