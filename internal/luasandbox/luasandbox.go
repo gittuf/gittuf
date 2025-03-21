@@ -176,8 +176,17 @@ func (l *LuaEnvironment) registerAPIFunctions() error {
 	l.lState.SetGlobal("hookExitCode", lua.LNumber(0))
 
 	registerAPIs := map[string]API{
-		"matchRegex": l.apiMatchRegex(),
-		"strSplit":   l.apiStrSplit(),
+		"matchRegex":                     l.apiMatchRegex(),
+		"strSplit":                       l.apiStrSplit(),
+		"gitReadBlob":                    l.apiGitReadBlob(),
+		"gitGetObjectSize":               l.apiGitGetObjectSize(),
+		"gitGetTagTarget":                l.apiGitGetTagTarget(),
+		"gitGetReference":                l.apiGitGetReference(),
+		"gitGetAbsoluteReference":        l.apiGitGetAbsoluteReference(),
+		"gitGetSymbolicReferenceTarget":  l.apiGitGetSymbolicReferenceTarget(),
+		"gitGetCommitMessage":            l.apiGitGetCommitMessage(),
+		"gitGetFilePathsChangedByCommit": l.apiGitGetFilePathsChangedByCommit(),
+		"gitGetRemoteURL":                l.apiGitGetRemoteURL(),
 	}
 
 	for name, availableAPI := range registerAPIs {
