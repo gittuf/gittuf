@@ -51,6 +51,7 @@ var (
 	ErrPolicyNotFound                = errors.New("cannot find policy")
 	ErrInvalidPolicy                 = errors.New("invalid policy state (is policy reference out of sync with corresponding RSL entry?)")
 	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
+	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
 	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
 )
 
@@ -72,7 +73,7 @@ type State struct {
 	ruleNames      *set.Set[string]
 	allPrincipals  map[string]tuf.Principal
 	hasFileRule    bool
-	globalRules    []tuf.GlobalRule
+	globalRules    map[string][]tuf.GlobalRule
 }
 
 type StateMetadata struct {
@@ -813,9 +814,25 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
+	return s.getRootMetadataFromBytes(payloadBytes, migrate)
+}
 
+func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetadata, error) {
+	metadata, has := s.ControllerMetadata[controllerName]
+	if !has {
+		return nil, fmt.Errorf("%w: '%s'", ErrControllerMetadataNotFound, controllerName)
+	}
+
+	payloadBytes, err := metadata.RootEnvelope.DecodeB64Payload()
+	if err != nil {
+		return nil, err
+	}
+	return s.getRootMetadataFromBytes(payloadBytes, false) // never migrate
+}
+
+func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tuf.RootMetadata, error) {
 	inspectRootMetadata := map[string]any{}
-	if err := json.Unmarshal(payloadBytes, &inspectRootMetadata); err != nil {
+	if err := json.Unmarshal(metadataBytes, &inspectRootMetadata); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 	}
 
@@ -830,7 +847,7 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 		// incorrect metadata / trigger a version rollback, which we do want to
 		// be aware of.
 		rootMetadata := &tufv01.RootMetadata{}
-		if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
+		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 		}
 
@@ -842,7 +859,7 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 
 	case schemaVersion == tufv02.RootVersion:
 		rootMetadata := &tufv02.RootMetadata{}
-		if err := json.Unmarshal(payloadBytes, rootMetadata); err != nil {
+		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 		}
 
@@ -964,7 +981,12 @@ func (s *State) preprocess() error {
 
 	s.Hooks[tuf.HookStagePrePush] = append(s.Hooks[tuf.HookStagePrePush], hooks...)
 
-	s.globalRules = rootMetadata.GetGlobalRules()
+	globalRules := rootMetadata.GetGlobalRules()
+	if len(globalRules) > 0 {
+		s.globalRules = map[string][]tuf.GlobalRule{
+			"": rootMetadata.GetGlobalRules(),
+		}
+	}
 
 	if s.allPrincipals == nil {
 		s.allPrincipals = map[string]tuf.Principal{}
@@ -1045,6 +1067,22 @@ func (s *State) preprocess() error {
 					}
 				}
 			}
+		}
+	}
+
+	for controllerName := range s.ControllerMetadata {
+		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName)
+		if err != nil {
+			return err
+		}
+
+		globalRules := controllerRootMetadata.GetGlobalRules()
+		if len(globalRules) > 0 {
+			if s.globalRules == nil {
+				s.globalRules = map[string][]tuf.GlobalRule{}
+			}
+
+			s.globalRules[controllerName] = globalRules
 		}
 	}
 

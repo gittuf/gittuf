@@ -946,94 +946,100 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		verifiedPrincipalIDs = acceptedPrincipalIDs.Len()
 	}
 
-	globalRules := policy.globalRules
-	for _, rule := range globalRules {
-		// We check every global rule
-		slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))
-		switch rule := rule.(type) {
-		case tuf.GlobalRuleThreshold:
-			if !rule.Matches(target) {
-				break
-			}
-
-			// The global rule applies to the namespace under verification
-			slog.Debug(fmt.Sprintf("Verifying threshold global rule '%s'...", rule.GetName()))
-			requiredThreshold := rule.GetThreshold()
-			if rslSignatureNeededForThreshold && options.verifyMergeable {
-				// Since we're verifying if it's mergeable and we already know
-				// that the RSL signature is needed to meet threshold, we can
-				// reduce the global constraint threshold as well
-				slog.Debug("Reducing required global threshold by 1 (verifying if change is mergeable and RSL signature is required)...")
-				requiredThreshold--
-			}
-			if verifiedPrincipalIDs < requiredThreshold {
-				// Check if the verifiedPrincipalIDs meets the required global
-				// threshold
-				slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedPrincipalIDs))
-				return "", false, ErrVerifierConditionsUnmet
-			}
-
-			slog.Debug(fmt.Sprintf("Successfully verified global rule '%s'", rule.GetName()))
-
-		case tuf.GlobalRuleBlockForcePushes:
-			// TODO: we use policy.repository, not ideal...
-			if !rule.Matches(target) {
-				break
-			}
-
-			// The global rule applies to the namespace under verification
-			slog.Debug(fmt.Sprintf("Verifying block force pushes global rule '%s'...", rule.GetName()))
-
-			if options.verifyMergeable {
-				// Cannot check for force pushes for a proposed change
-				slog.Debug("Cannot verify block force pushes global rule when verifying if a change is mergeable")
-				break
-			}
-
-			// TODO: should we not look up the entry's afresh in the RSL here?
-			// the in-memory cache _should_ make this okay, but something to
-			// consider...
-
-			// gitID _must_ be for an RSL reference entry, and we must find
-			// its predecessor entry.
-			// Why? Because the rule type only accepts git:<> as patterns.
-			// If we have another object here, we've gone wrong somewhere.
-			currentEntry, err := rsl.GetEntry(policy.repository, gitID)
-			if err != nil {
-				slog.Debug(fmt.Sprintf("unable to load RSL entry for '%s': %v", gitID.String(), err))
-				return "", false, err
-			}
-
-			currentEntryRef, isReferenceEntry := currentEntry.(*rsl.ReferenceEntry)
-			if !isReferenceEntry {
-				slog.Debug(fmt.Sprintf("Expected '%s' to be RSL reference entry, aborting verification of block force pushes global rule...", gitID.String()))
-				return "", false, rsl.ErrInvalidRSLEntry
-			}
-
-			previousEntryRef, _, err := rsl.GetLatestReferenceUpdaterEntry(policy.repository, rsl.BeforeEntryID(currentEntry.GetID()), rsl.ForReference(currentEntryRef.RefName), rsl.IsUnskipped())
-			if err != nil {
-				if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-					slog.Debug(fmt.Sprintf("Entry '%s' is the first one for reference '%s', cannot check if it's a force push", currentEntryRef.GetID().String(), currentEntryRef.RefName))
+	for controllerName, globalRules := range policy.globalRules {
+		if controllerName == "" { // this is the special case
+			slog.Debug("Checking global rules declared in current repository...")
+		} else {
+			slog.Debug(fmt.Sprintf("Checking global rules declared in controller repository '%s'...", controllerName))
+		}
+		for _, rule := range globalRules {
+			// We check every global rule
+			slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))
+			switch rule := rule.(type) {
+			case tuf.GlobalRuleThreshold:
+				if !rule.Matches(target) {
 					break
 				}
 
-				return "", false, err
-			}
+				// The global rule applies to the namespace under verification
+				slog.Debug(fmt.Sprintf("Verifying threshold global rule '%s'...", rule.GetName()))
+				requiredThreshold := rule.GetThreshold()
+				if rslSignatureNeededForThreshold && options.verifyMergeable {
+					// Since we're verifying if it's mergeable and we already know
+					// that the RSL signature is needed to meet threshold, we can
+					// reduce the global constraint threshold as well
+					slog.Debug("Reducing required global threshold by 1 (verifying if change is mergeable and RSL signature is required)...")
+					requiredThreshold--
+				}
+				if verifiedPrincipalIDs < requiredThreshold {
+					// Check if the verifiedPrincipalIDs meets the required global
+					// threshold
+					slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedPrincipalIDs))
+					return "", false, ErrVerifierConditionsUnmet
+				}
 
-			knows, err := policy.repository.KnowsCommit(currentEntryRef.TargetID, previousEntryRef.GetTargetID())
-			if err != nil {
-				return "", false, err
-			}
-			if !knows {
-				slog.Debug(fmt.Sprintf("Current entry's commit '%s' is not a descendant of prior entry's commit '%s'", currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
-				return "", false, ErrVerifierConditionsUnmet
-			}
+				slog.Debug(fmt.Sprintf("Successfully verified global rule '%s'", rule.GetName()))
 
-			slog.Debug(fmt.Sprintf("Successfully verified global rule '%s' as '%s' is a descendant of '%s'", rule.GetName(), currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
+			case tuf.GlobalRuleBlockForcePushes:
+				// TODO: we use policy.repository, not ideal...
+				if !rule.Matches(target) {
+					break
+				}
 
-		default:
-			slog.Debug("Unknown global rule type, aborting verification...")
-			return "", false, tuf.ErrUnknownGlobalRuleType
+				// The global rule applies to the namespace under verification
+				slog.Debug(fmt.Sprintf("Verifying block force pushes global rule '%s'...", rule.GetName()))
+
+				if options.verifyMergeable {
+					// Cannot check for force pushes for a proposed change
+					slog.Debug("Cannot verify block force pushes global rule when verifying if a change is mergeable")
+					break
+				}
+
+				// TODO: should we not look up the entry's afresh in the RSL here?
+				// the in-memory cache _should_ make this okay, but something to
+				// consider...
+
+				// gitID _must_ be for an RSL reference entry, and we must find
+				// its predecessor entry.
+				// Why? Because the rule type only accepts git:<> as patterns.
+				// If we have another object here, we've gone wrong somewhere.
+				currentEntry, err := rsl.GetEntry(policy.repository, gitID)
+				if err != nil {
+					slog.Debug(fmt.Sprintf("unable to load RSL entry for '%s': %v", gitID.String(), err))
+					return "", false, err
+				}
+
+				currentEntryRef, isReferenceEntry := currentEntry.(*rsl.ReferenceEntry)
+				if !isReferenceEntry {
+					slog.Debug(fmt.Sprintf("Expected '%s' to be RSL reference entry, aborting verification of block force pushes global rule...", gitID.String()))
+					return "", false, rsl.ErrInvalidRSLEntry
+				}
+
+				previousEntryRef, _, err := rsl.GetLatestReferenceUpdaterEntry(policy.repository, rsl.BeforeEntryID(currentEntry.GetID()), rsl.ForReference(currentEntryRef.RefName), rsl.IsUnskipped())
+				if err != nil {
+					if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+						slog.Debug(fmt.Sprintf("Entry '%s' is the first one for reference '%s', cannot check if it's a force push", currentEntryRef.GetID().String(), currentEntryRef.RefName))
+						break
+					}
+
+					return "", false, err
+				}
+
+				knows, err := policy.repository.KnowsCommit(currentEntryRef.TargetID, previousEntryRef.GetTargetID())
+				if err != nil {
+					return "", false, err
+				}
+				if !knows {
+					slog.Debug(fmt.Sprintf("Current entry's commit '%s' is not a descendant of prior entry's commit '%s'", currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
+					return "", false, ErrVerifierConditionsUnmet
+				}
+
+				slog.Debug(fmt.Sprintf("Successfully verified global rule '%s' as '%s' is a descendant of '%s'", rule.GetName(), currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
+
+			default:
+				slog.Debug("Unknown global rule type, aborting verification...")
+				return "", false, tuf.ErrUnknownGlobalRuleType
+			}
 		}
 	}
 
