@@ -120,7 +120,7 @@ func NewKeyFromBytes(t *testing.T, keyB []byte) *signerverifier.SSLibKey {
 	testName = strings.ReplaceAll(testName, "\\", "__")
 	hash := sha256.Sum256(keyB)
 	keyName := fmt.Sprintf("%s-%s", testName, hex.EncodeToString(hash[:]))
-	keyPath := filepath.Join(os.TempDir(), keyName)
+	keyPath := filepath.Join(t.TempDir(), keyName)
 
 	if err := os.WriteFile(keyPath, keyB, 0o600); err != nil {
 		t.Fatal(err)
