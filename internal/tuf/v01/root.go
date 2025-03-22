@@ -445,7 +445,35 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	newKeyIDsSet := set.NewSet[string]()
+	for _, principal := range newKeyIDs {
+		newKeyIDsSet.Add(principal.ID())
+	}
+
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		existingKeyIDs := set.NewSet[string]()
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs.Add(existingPrincipal.KeyID)
+		}
+		if existingKeyIDs.Equal(newKeyIDsSet) {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -454,28 +482,15 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
 	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
 
-	// Add the controller as a repository whose policy contents must be
-	// propagated into this repository
-	policyPropagationName := fmt.Sprintf("%s-%s-policy", tuf.GittufControllerPrefix, name)
-	policyPropagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-
-	policyStagingPropagationName := fmt.Sprintf("%s-%s-policy-staging", tuf.GittufControllerPrefix, name)
-	policyStagingPropagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-
-	if err := r.AddPropagationDirective(NewPropagationDirective(policyStagingPropagationName, location, "refs/gittuf/policy-staging", "refs/gittuf/policy-staging", policyStagingPropagationLocation)); err != nil {
-		return err
-	}
-	return r.AddPropagationDirective(NewPropagationDirective(policyPropagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", policyPropagationLocation))
+	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
+	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
+	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationLocation))
 }
 
 // AddNetworkRepository adds the specified repository as part of the network for
@@ -491,7 +506,36 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	newKeyIDsSet := set.NewSet[string]()
+	for _, principal := range newKeyIDs {
+		newKeyIDsSet.Add(principal.ID())
+	}
+
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		existingKeyIDs := set.NewSet[string]()
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs.Add(existingPrincipal.KeyID)
+		}
+
+		if existingKeyIDs.Equal(newKeyIDsSet) {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -500,11 +544,7 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
