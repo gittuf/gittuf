@@ -610,8 +610,8 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
 }
 
-// UpdateGlobalRule updates a global rule from the root metadata.
-func (r *Repository) UpdateGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
+// UpdateGlobalRuleThreshold updates an existing threshold global rule in the root metadata.
+func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -640,8 +640,53 @@ func (r *Repository) UpdateGlobalRule(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
-	slog.Debug("Updating global rule...")
-	if err := rootMetadata.UpdateGlobalRule(name, patterns, threshold); err != nil {
+	slog.Debug("Updating threshold global rule...")
+
+	if err := rootMetadata.UpdateGlobalRule(tufv01.NewGlobalRuleThreshold(name, patterns, threshold)); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Update global rule '%s' in root metadata", name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, signCommit)
+}
+
+// UpdateGlobalRuleBlockForcePushes updates an existing block-force-pushes global rule in the root metadata.
+func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	globalRule, err := tufv01.NewGlobalRuleBlockForcePushes(name, patterns)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating block-force-pushes global rule...")
+	if err := rootMetadata.UpdateGlobalRule(globalRule); err != nil {
 		return err
 	}
 
