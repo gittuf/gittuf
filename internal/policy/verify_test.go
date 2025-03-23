@@ -17,9 +17,11 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // FIXME: the verification tests do not check for expected failures. More
@@ -3402,6 +3404,116 @@ func TestVerifyEntry(t *testing.T) {
 		// Still fine; this ref is not protected
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+	})
+
+	t.Run("verify global rules applied from controller repository", func(t *testing.T) {
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithPolicy(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		networkTargetsMetadata, err := networkState.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+		err = networkTargetsMetadata.AddPrincipal(tufv01.NewKeyFromSSLibKey(signer.MetadataKey()))
+		require.Nil(t, err)
+		networkTargetsEnv, err := dsse.CreateEnvelope(networkTargetsMetadata)
+		require.Nil(t, err)
+		networkTargetsEnv, err = dsse.SignEnvelope(testCtx, networkTargetsEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.TargetsEnvelope = networkTargetsEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		refName := "refs/heads/main" // this has threshold 1 in network repo but threshold 2 in controller repo
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := networkRepository.GetCommitTreeID(commitIDs[0])
+		require.Nil(t, err)
+
+		// Create authorization for this change
+		// This uses the latest reference authorization version
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		require.Nil(t, err)
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		require.Nil(t, err)
+
+		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
+		require.Nil(t, err)
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// We meet the threshold of with the reference authorization, so this should be successful
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.Nil(t, err)
+
+		// Make another change without reference authorization
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 2, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
 
