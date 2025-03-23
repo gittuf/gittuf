@@ -311,44 +311,34 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 		return verifiers, nil
 	}
 
-	verifiers, err := s.findVerifiersForPathIfProtected(path)
+	allVerifiers := []*SignatureVerifier{}
+
+	if len(s.globalRules) != 0 {
+		slog.Debug("Global constraints found, including exhaustive verifier...")
+		// This has to go first so it's prioritized during verification
+		// At least one global rule exists, return an exhaustive verifier
+		verifier := &SignatureVerifier{
+			repository: s.repository,
+			name:       tuf.ExhaustiveVerifierName,
+			principals: []tuf.Principal{}, // we'll add all principals below
+
+			// threshold doesn't matter since we set verifyExhaustively to true
+			threshold:          1,
+			verifyExhaustively: true, // very important!
+		}
+
+		for _, principal := range s.allPrincipals {
+			verifier.principals = append(verifier.principals, principal)
+		}
+
+		allVerifiers = append(allVerifiers, verifier)
+	}
+
+	specificVerifiers, err := s.findVerifiersForPathIfProtected(path)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(verifiers) > 0 {
-		// protected, we have specific set of verifiers to return
-		slog.Debug(fmt.Sprintf("Path '%s' is explicitly protected, returning corresponding verifiers...", path))
-		// add to cache
-		s.verifiersCache[path] = verifiers
-		// return verifiers
-		return verifiers, nil
-	}
-
-	slog.Debug("Checking if any global constraints exist")
-	if len(s.globalRules) == 0 {
-		slog.Debug("No global constraints found")
-		s.verifiersCache[path] = verifiers
-		return verifiers, nil
-	}
-
-	slog.Debug("Global constraints found, returning exhaustive verifier...")
-	// At least one global rule exists, return an exhaustive verifier
-	verifier := &SignatureVerifier{
-		repository: s.repository,
-		name:       tuf.ExhaustiveVerifierName,
-		principals: []tuf.Principal{}, // we'll add all principals below
-
-		// threshold doesn't matter since we set verifyExhaustively to true
-		threshold:          1,
-		verifyExhaustively: true, // very important!
-	}
-
-	for _, principal := range s.allPrincipals {
-		verifier.principals = append(verifier.principals, principal)
-	}
-
-	verifiers = []*SignatureVerifier{verifier}
+	allVerifiers = append(allVerifiers, specificVerifiers...)
 
 	// Note: we could loop through all global constraints and create a
 	// verifier with all principals but targeting a specific constraint (or
@@ -360,9 +350,9 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 	// safety, so we would be doing extra work for no reason.
 
 	// add to cache
-	s.verifiersCache[path] = verifiers
+	s.verifiersCache[path] = allVerifiers
 	// return verifiers
-	return verifiers, nil
+	return allVerifiers, nil
 }
 
 func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifier, error) {
@@ -1033,37 +1023,35 @@ func (s *State) preprocess() error {
 		}
 	}
 
-	if len(s.Metadata.DelegationEnvelopes) == 0 {
-		return nil
-	}
-
-	for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
-		delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName, false)
-		if err != nil {
-			return err
-		}
-
-		for principalID, principal := range delegatedMetadata.GetPrincipals() {
-			s.allPrincipals[principalID] = principal
-		}
-
-		for _, rule := range delegatedMetadata.GetRules() {
-			if rule.ID() == tuf.AllowRuleName {
-				continue
+	if len(s.Metadata.DelegationEnvelopes) != 0 {
+		for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
+			delegatedMetadata, err := s.GetTargetsMetadata(delegatedRoleName, false)
+			if err != nil {
+				return err
 			}
 
-			if s.ruleNames.Has(rule.ID()) {
-				return tuf.ErrDuplicatedRuleName
+			for principalID, principal := range delegatedMetadata.GetPrincipals() {
+				s.allPrincipals[principalID] = principal
 			}
 
-			s.ruleNames.Add(rule.ID())
+			for _, rule := range delegatedMetadata.GetRules() {
+				if rule.ID() == tuf.AllowRuleName {
+					continue
+				}
 
-			if !s.hasFileRule {
-				patterns := rule.GetProtectedNamespaces()
-				for _, pattern := range patterns {
-					if strings.HasPrefix(pattern, fileRuleScheme) {
-						s.hasFileRule = true
-						break
+				if s.ruleNames.Has(rule.ID()) {
+					return tuf.ErrDuplicatedRuleName
+				}
+
+				s.ruleNames.Add(rule.ID())
+
+				if !s.hasFileRule {
+					patterns := rule.GetProtectedNamespaces()
+					for _, pattern := range patterns {
+						if strings.HasPrefix(pattern, fileRuleScheme) {
+							s.hasFileRule = true
+							break
+						}
 					}
 				}
 			}
