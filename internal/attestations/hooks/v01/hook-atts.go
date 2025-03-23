@@ -18,11 +18,11 @@ const (
 // hash of the commit?
 // name of the hooks?
 
-//type HooksExecutionReport struct {
+// type HooksExecutionReport struct {
 //	StageAttestationReferences                map[string]gitinterface.Hash `json:"stage_attestation_references"` // reference the attestation for that stage
 //	HooksExecutor                             string                       `json:"hooks_executor"`               // should this be a key_id?
 //	*authorizationsv01.ReferenceAuthorization                              // do we need this?
-//}
+// }
 
 type HooksAttestationForStage struct {
 	Stage               string                       `json:"stage"`
@@ -30,9 +30,9 @@ type HooksAttestationForStage struct {
 	Executor            string
 }
 
-//func (h *HooksExecutionReport) ReturnHooksExecutionStatuses() map[string]gitinterface.Hash {
+// func (h *HooksExecutionReport) ReturnHooksExecutionStatuses() map[string]gitinterface.Hash {
 //	return h.StageAttestationReferences
-//}
+// }
 
 func NewHooksAttestationForStage(stage, executor string, hookNameCommitIDMap map[string]gitinterface.Hash) (*ita.Statement, error) {
 	predicate := &HooksAttestationForStage{
@@ -62,7 +62,7 @@ func NewHooksAttestationForStage(stage, executor string, hookNameCommitIDMap map
 // NewHooksAttestationReport will create and return a new HooksExecutionReport object.
 // Arguments should be hooks execution status for each type of hook and some
 // identifier for the id which executed the hook
-//func NewHooksAttestationReport(executor, targetTreeID string, hooksExecutionStatuses map[string]gitinterface.Hash) (*ita.Statement, error) {
+// func NewHooksAttestationReport(executor, targetTreeID string, hooksExecutionStatuses map[string]gitinterface.Hash) (*ita.Statement, error) {
 //
 //	predicate := &HooksExecutionReport{
 //		StageAttestationReferences: hooksExecutionStatuses,
@@ -85,4 +85,4 @@ func NewHooksAttestationForStage(stage, executor string, hookNameCommitIDMap map
 //		PredicateType: HooksExecutionReportPredicateType, // what to do about this?
 //		Predicate:     predicateStruct,
 //	}, nil
-//}
+// }

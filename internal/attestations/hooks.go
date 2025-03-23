@@ -2,6 +2,7 @@ package attestations
 
 import (
 	"encoding/json"
+
 	hooksv01 "github.com/gittuf/gittuf/internal/attestations/hooks/v01"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
