@@ -95,10 +95,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		toID            gitinterface.Hash
 	)
 
-	isTag := false
-	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
-		isTag = true
-	}
+	isTag := strings.HasPrefix(targetRef, gitinterface.TagRefPrefix)
 
 	slog.Debug("Identifying current status of target Git reference...")
 	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))

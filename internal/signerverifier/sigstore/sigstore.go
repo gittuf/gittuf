@@ -351,8 +351,8 @@ func (s *Signer) MetadataKey() (*signerverifier.SSLibKey, error) {
 		KeyType: KeyType,
 		Scheme:  KeyScheme,
 		KeyVal: signerverifier.KeyVal{
-			Identity: s.Verifier.identity,
-			Issuer:   s.Verifier.issuer,
+			Identity: s.identity,
+			Issuer:   s.issuer,
 		},
 	}, nil
 }
@@ -373,8 +373,8 @@ func (s *Signer) getIDToken() (string, error) {
 			return "", err
 		}
 
-		s.Verifier.identity = identity
-		s.Verifier.issuer = issuer
+		s.identity = identity
+		s.issuer = issuer
 	}
 
 	return s.token, nil

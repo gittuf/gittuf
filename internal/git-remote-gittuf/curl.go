@@ -396,11 +396,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 			isPush = true
 
 			pushCommands := [][]byte{}
-			for {
-				if bytes.Equal(input, []byte("\n")) {
-					break
-				}
-
+			for !bytes.Equal(input, []byte("\n")) {
 				pushCommands = append(pushCommands, input)
 
 				if !stdInScanner.Scan() {

@@ -311,13 +311,13 @@ func (d *Delegation) Matches(target string) bool {
 // GetPrincipalIDs returns the identifiers of the principals that are listed as
 // trusted by the rule.
 func (d *Delegation) GetPrincipalIDs() *set.Set[string] {
-	return d.Role.KeyIDs
+	return d.KeyIDs
 }
 
 // GetThreshold returns the threshold of principals that must approve to meet
 // the rule.
 func (d *Delegation) GetThreshold() int {
-	return d.Role.Threshold
+	return d.Threshold
 }
 
 // IsLastTrustedInRuleFile indicates that subsequent rules in the rule file are
