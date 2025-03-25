@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: January 20, 2025
+Last Modified: March 25, 2025
 
 ## Introduction
 
@@ -300,7 +300,7 @@ the reference they apply to and a target ID. As such, they have the following
 structure.
 
 ```
-RSL Entry
+RSL Reference Entry
 
 ref: <ref name>
 targetID: <target ID>
@@ -322,7 +322,7 @@ entry must be used to communicate to gittuf clients to skip the corresponding
 entries. Annotations have the following schema.
 
 ```
-RSL Annotation
+RSL Annotation Entry
 
 entryID: <RSL entry ID 1>
 entryID: <RSL entry ID 2>
