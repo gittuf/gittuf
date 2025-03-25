@@ -486,7 +486,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// We don't use ref, instead we use refAdSplit[1]. This
 					// allows us to propagate remote capabilities to the parent
 					// process
-					if _, err := stdOutWriter.Write([]byte(fmt.Sprintf("%s %s\n", tip, refAdSplit[1]))); err != nil {
+					if _, err := fmt.Fprintf(stdOutWriter, "%s %s\n", tip, refAdSplit[1]); err != nil {
 						return nil, false, err
 					}
 				}
@@ -505,11 +505,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			log("cmd: push")
 
 			pushRefSpecs := []string{}
-			for {
-				if bytes.Equal(input, []byte("\n")) {
-					break
-				}
-
+			for !bytes.Equal(input, []byte("\n")) {
 				line := string(input)
 				line = strings.TrimSpace(line)
 				line = strings.TrimPrefix(line, "push ")

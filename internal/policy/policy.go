@@ -386,11 +386,9 @@ func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifi
 		currentDelegationGroup = groupedDelegations[0]
 		groupedDelegations = groupedDelegations[1:]
 
-		for {
-			if len(currentDelegationGroup) <= 1 {
-				// Only allow rule found in the current group
-				break
-			}
+		for len(currentDelegationGroup) > 1 {
+			// Exit condition: Only allow rule found in the current group
+			// => len(currentDelegationGroup) <= 1
 
 			delegation := currentDelegationGroup[0]
 			currentDelegationGroup = currentDelegationGroup[1:]
@@ -494,12 +492,9 @@ func (s *State) Verify(ctx context.Context) error {
 
 		delegationsQueue := targetsMetadata.GetRules()
 		delegationKeys := targetsMetadata.GetPrincipals()
-		for {
-			// The last entry in the queue is always the allow rule, which we don't
-			// process during DFS
-			if len(delegationsQueue) <= 1 {
-				break
-			}
+		for len(delegationsQueue) > 1 {
+			// Exit condition: The last entry in the queue is always the allow
+			// rule, which we don't process during DFS
 
 			delegation := delegationsQueue[0]
 			delegationsQueue = delegationsQueue[1:]
@@ -1187,9 +1182,10 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 			absoluteControllerName = strings.Trim(absoluteControllerName, "/")
 
 			for treeName, treeID := range subtreeItems {
-				if treeName == metadataTreeEntryName {
+				switch treeName {
+				case metadataTreeEntryName:
 					metadataQueue = append(metadataQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
-				} else if treeName == tuf.GittufControllerPrefix {
+				case tuf.GittufControllerPrefix:
 					controllerQueue = append(controllerQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
 				}
 			}
