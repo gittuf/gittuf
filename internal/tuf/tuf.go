@@ -62,6 +62,7 @@ var (
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 	ErrGlobalRuleNotFound                              = errors.New("global rule not found")
 	ErrGlobalRuleAlreadyExists                         = errors.New("global rule already exists")
+	ErrCannotUpdateGlobalRuleType                      = errors.New("cannot change type of global rule")
 	ErrPropagationDirectiveNotFound                    = errors.New("specified propagation directive not found")
 	ErrNotAControllerRepository                        = errors.New("current repository is not marked as a controller repository")
 	ErrDuplicatedHookName                              = errors.New("two hooks with same name found in policy")
@@ -137,6 +138,9 @@ type RootMetadata interface {
 	AddGlobalRule(globalRule GlobalRule) error
 	// GetGlobalRules returns the global rules declared in the root metadata.
 	GetGlobalRules() []GlobalRule
+	// UpdateGlobalRule updates an existing global rule identified by its name
+	// to the provided global rule.
+	UpdateGlobalRule(globalRule GlobalRule) error
 	// DeleteGlobalRule removes the global rule from the root metadata.
 	DeleteGlobalRule(ruleName string) error
 

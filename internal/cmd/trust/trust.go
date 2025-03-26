@@ -27,6 +27,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/setrepositorylocation"
 	"github.com/gittuf/gittuf/internal/cmd/trust/sign"
+	"github.com/gittuf/gittuf/internal/cmd/trust/updateglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepolicythreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updaterootthreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
@@ -68,6 +69,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(setrepositorylocation.New(o))
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
+	cmd.AddCommand(updateglobalrule.New(o))
 	cmd.AddCommand(updatepolicythreshold.New(o))
 	cmd.AddCommand(updaterootthreshold.New(o))
 	cmd.AddCommand(listglobalrules.New())

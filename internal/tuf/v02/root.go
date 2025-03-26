@@ -459,6 +459,44 @@ func (r *RootMetadata) DeleteGlobalRule(ruleName string) error {
 	return nil
 }
 
+// UpdateGlobalRule updates the specified global rule from the RootMetadata.
+func (r *RootMetadata) UpdateGlobalRule(globalRule tuf.GlobalRule) error {
+	allGlobalRules := r.GlobalRules
+	updatedGlobalRules := []tuf.GlobalRule{}
+	found := false
+
+	if len(allGlobalRules) == 0 {
+		return tuf.ErrGlobalRuleNotFound
+	}
+
+	for _, oldGlobalRule := range allGlobalRules {
+		if oldGlobalRule.GetName() == globalRule.GetName() {
+			switch oldGlobalRule.(type) {
+			case *GlobalRuleThreshold:
+				if _, ok := globalRule.(*GlobalRuleThreshold); !ok {
+					return tuf.ErrCannotUpdateGlobalRuleType
+				}
+			case *GlobalRuleBlockForcePushes:
+				if _, ok := globalRule.(*GlobalRuleBlockForcePushes); !ok {
+					return tuf.ErrCannotUpdateGlobalRuleType
+				}
+			}
+			found = true
+			updatedGlobalRules = append(updatedGlobalRules, globalRule)
+		} else {
+			updatedGlobalRules = append(updatedGlobalRules, oldGlobalRule)
+		}
+	}
+
+	if !found {
+		return tuf.ErrGlobalRuleNotFound
+	}
+
+	r.GlobalRules = updatedGlobalRules
+
+	return nil
+}
+
 // GetGlobalRules returns all the global rules in the root metadata.
 func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 	return r.GlobalRules
