@@ -527,6 +527,40 @@ func TestGlobalRules(t *testing.T) {
 	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
 
+	updatedThresholdGlobalRule := &GlobalRuleThreshold{
+		Name:      "threshold-2-main",
+		Paths:     []string{"git:refs/heads/main"},
+		Threshold: 3,
+	}
+	err = rootMetadata.UpdateGlobalRule(updatedThresholdGlobalRule)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
+	updatedForcePushesGlobalRule, err := NewGlobalRuleBlockForcePushes("block-force-pushes", []string{"git:refs/heads/*"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = rootMetadata.UpdateGlobalRule(updatedForcePushesGlobalRule)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
+	differentNameGlobalRule := &GlobalRuleThreshold{
+		Name:      "threshold-4-main",
+		Paths:     []string{"git:refs/heads/main"},
+		Threshold: 4,
+	}
+	err = rootMetadata.UpdateGlobalRule(differentNameGlobalRule)
+	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
 	err = rootMetadata.DeleteGlobalRule("threshold-2-main")
 	assert.Nil(t, err)
 	err = rootMetadata.DeleteGlobalRule("block-force-pushes")

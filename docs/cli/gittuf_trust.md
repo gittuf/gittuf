@@ -48,6 +48,7 @@ Tools for gittuf's root of trust
 * [gittuf trust set-repository-location](gittuf_trust_set-repository-location.md)	 - Set repository location
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust
 * [gittuf trust stage](gittuf_trust_stage.md)	 - Stage and push local policy-staging changes to remote repository
+* [gittuf trust update-global-rule](gittuf_trust_update-global-rule.md)	 - Update an existing global rule in the root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust update-policy-threshold](gittuf_trust_update-policy-threshold.md)	 - Update Policy threshold in the gittuf root of trust
 * [gittuf trust update-root-threshold](gittuf_trust_update-root-threshold.md)	 - Update Root threshold in the gittuf root of trust
 
