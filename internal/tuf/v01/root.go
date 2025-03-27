@@ -483,7 +483,35 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	newKeyIDsSet := set.NewSet[string]()
+	for _, principal := range newKeyIDs {
+		newKeyIDsSet.Add(principal.ID())
+	}
+
+	for _, repo := range r.MultiRepository.ControllerRepositories {
+		existingKeyIDs := set.NewSet[string]()
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs.Add(existingPrincipal.KeyID)
+		}
+		if existingKeyIDs.Equal(newKeyIDsSet) {
+			return tuf.ErrDuplicateControllerRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -492,11 +520,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
@@ -529,7 +553,36 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
 	}
 
-	// TODO: check for duplicates
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		if repo.Name == name || repo.Location == location {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
+
+	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	for _, principal := range initialRootPrincipals {
+		key, isKey := principal.(*Key)
+		if !isKey {
+			return tuf.ErrInvalidPrincipalType
+		}
+		newKeyIDs = append(newKeyIDs, key)
+	}
+
+	newKeyIDsSet := set.NewSet[string]()
+	for _, principal := range newKeyIDs {
+		newKeyIDsSet.Add(principal.ID())
+	}
+
+	for _, repo := range r.MultiRepository.NetworkRepositories {
+		existingKeyIDs := set.NewSet[string]()
+		for _, existingPrincipal := range repo.InitialRootPrincipals {
+			existingKeyIDs.Add(existingPrincipal.KeyID)
+		}
+
+		if existingKeyIDs.Equal(newKeyIDsSet) {
+			return tuf.ErrDuplicateNetworkRepository
+		}
+	}
 
 	otherRepository := &OtherRepository{
 		Name:                  name,
@@ -538,11 +591,7 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 	}
 
 	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-
+		key := principal.(*Key)
 		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
 	}
 
