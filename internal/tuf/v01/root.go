@@ -528,16 +528,9 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 
 	// Add the controller as a repository whose policy contents must be
 	// propagated into this repository
-	policyPropagationName := fmt.Sprintf("%s-%s-policy", tuf.GittufControllerPrefix, name)
-	policyPropagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-
-	policyStagingPropagationName := fmt.Sprintf("%s-%s-policy-staging", tuf.GittufControllerPrefix, name)
-	policyStagingPropagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-
-	if err := r.AddPropagationDirective(NewPropagationDirective(policyStagingPropagationName, location, "refs/gittuf/policy-staging", "refs/gittuf/policy-staging", policyStagingPropagationLocation)); err != nil {
-		return err
-	}
-	return r.AddPropagationDirective(NewPropagationDirective(policyPropagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", policyPropagationLocation))
+	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
+	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
+	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationLocation))
 }
 
 // AddNetworkRepository adds the specified repository as part of the network for
