@@ -32,6 +32,47 @@ func TestGetReference(t *testing.T) {
 	assert.Equal(t, commitID, refTip)
 }
 
+func TestGetRemoteReference(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	localTmpDir := t.TempDir()
+	remoteTmpDir := t.TempDir()
+
+	localRepo := CreateTestGitRepository(t, localTmpDir, false)
+	remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true)
+
+	remoteTreeBuilder := NewTreeBuilder(remoteRepo)
+
+	// Create the remote on the local repository
+	if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check for the not-yet-existing ref on the remote repository
+	_, err := localRepo.GetRemoteReference(remoteName, refName)
+	assert.ErrorIs(t, err, ErrReferenceNotFound)
+
+	// Create a tree in the remote repository
+	emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+	require.Nil(t, err)
+	entries := []TreeEntry{NewEntryBlob("foo", emptyBlobHash)}
+
+	tree, err := remoteTreeBuilder.WriteTreeFromEntries(entries)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	commitID, err := remoteRepo.Commit(tree, refName, "Test commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	objectID, err := localRepo.GetRemoteReference(remoteName, refName)
+	assert.Nil(t, err)
+	assert.Equal(t, commitID, objectID)
+}
+
 func TestSetReference(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)

@@ -40,6 +40,27 @@ func (r *Repository) GetReference(refName string) (Hash, error) {
 	return hash, nil
 }
 
+// GetRemoteReference returns the tip of the specified Git reference on the
+// remote.
+func (r *Repository) GetRemoteReference(remote, refName string) (Hash, error) {
+	remoteData, err := r.executor("ls-remote", remote, refName).executeString()
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to query remote references for remote '%s': %w", remote, err)
+	}
+
+	if remoteData == "" {
+		return ZeroHash, ErrReferenceNotFound
+	}
+
+	remoteTipID := strings.Split(remoteData, "\t")
+	hash, err := NewHash(remoteTipID[0])
+	if err != nil {
+		return ZeroHash, fmt.Errorf("invalid Git ID for reference '%s': %w", refName, err)
+	}
+
+	return hash, nil
+}
+
 // SetReference sets the specified reference to the provided Git ID.
 func (r *Repository) SetReference(refName string, gitID Hash) error {
 	_, err := r.executor("update-ref", "--create-reflog", refName, gitID.String()).executeString()
