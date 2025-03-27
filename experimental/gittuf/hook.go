@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	lua "github.com/yuin/gopher-lua"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -30,15 +32,21 @@ type HookType string
 
 var (
 	ErrNoHooksFoundForPrincipal = errors.New("no hooks found for the specified principal")
+	ErrIncorrectParameterCount  = errors.New("incorrect number of hook parameters for hook stage")
 )
 
 var HookPrePush = HookType("pre-push")
 
-// InvokeHook runs the hooks defined in the specified stage for the user defined
-// by principalID. Upon successful completion of all hooks for the stage for the
-// user, the map of hook names to exit codes is returned.
+// InvokeHooksForStage runs the hooks defined in the specified stage for the
+// user defined by principalID. Upon successful completion of all hooks for the
+// stage for the user, the map of hook names to exit codes is returned.
 // TODO: Add attestations workflow
-func (r *Repository) InvokeHook(ctx context.Context, stage tuf.HookStage, principalID, targetsRoleName string, parameters ...string) (map[string]int, error) {
+func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStage, signer sslibdsse.Signer, parameters ...string) (map[string]int, error) {
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return nil, err
+	}
+
 	slog.Debug("Loading current policy...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
 	if err != nil {
@@ -46,10 +54,6 @@ func (r *Repository) InvokeHook(ctx context.Context, stage tuf.HookStage, princi
 	}
 
 	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, false)
 	if err != nil {
 		return nil, err
 	}
@@ -65,11 +69,13 @@ func (r *Repository) InvokeHook(ctx context.Context, stage tuf.HookStage, princi
 
 	// Read the principals from targetsMetadata and attempt to find a match for
 	// the specified principal to determine which hooks to run.
-	for _, principal := range targetsMetadata.GetPrincipals() {
-		if principal.ID() == principalID {
-			selectedPrincipal = principal
-			found = true
-			break
+	for _, principal := range state.GetAllPrincipals() {
+		for _, key := range principal.Keys() {
+			if key.KeyID == keyID {
+				selectedPrincipal = principal
+				found = true
+				break
+			}
 		}
 	}
 
@@ -87,9 +93,35 @@ func (r *Repository) InvokeHook(ctx context.Context, stage tuf.HookStage, princi
 		}
 	}
 
+	// Determine what parameters must be supplied based on the hook stage
+	var luaParameters lua.LTable
+	switch stage {
+	case tuf.HookStagePrePush:
+		// https://git-scm.com/docs/githooks#_pre_push
+		// For pre-push hooks, we supply the local and remote refs/object IDs
+		// We expect the ref
+		if len(parameters) != 2 {
+			return nil, ErrIncorrectParameterCount
+		}
+
+		localRef, remoteRef := parameters[0], parameters[1]
+
+		luaParameters.RawSet(lua.LString("local-ref"), lua.LString(localRef))
+
+		if localRef == "(delete)" {
+			luaParameters.RawSet(lua.LString("local-object-name"), lua.LString(gitinterface.ZeroHash.String()))
+		} else {
+
+			luaParameters.RawSet(lua.LString("local-object-name"), lua.LString())
+		}
+
+		luaParameters.RawSet(lua.LString("remote-ref"), lua.LString(remoteRef))
+		luaParameters.RawSet(lua.LString("remote-object-name"), lua.LString(TODO))
+	}
+
 	exitCodes := make(map[string]int, len(selectedHooks))
 	for _, hook := range selectedHooks {
-		exitCode, err := r.executeHook(ctx, hook, parameters...)
+		exitCode, err := r.executeHook(ctx, hook, luaParameters)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +178,7 @@ func doesFileExist(path string) (bool, error) {
 	return true, nil
 }
 
-func (r *Repository) executeHook(ctx context.Context, hook tuf.Hook, parameters ...string) (int, error) {
+func (r *Repository) executeHook(ctx context.Context, hook tuf.Hook, parameters lua.LTable) (int, error) {
 	var hookContents string
 	hookHashes := hook.GetHashes()
 
@@ -168,7 +200,7 @@ func (r *Repository) executeHook(ctx context.Context, hook tuf.Hook, parameters 
 
 	hookContents = string(hookFileContents)
 
-	exitCode, err := environment.RunScript(hookContents, parameters...)
+	exitCode, err := environment.RunScript(hookContents, parameters)
 	if err != nil {
 		return -1, err
 	}
