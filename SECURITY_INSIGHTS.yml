@@ -1,0 +1,104 @@
+header:
+  schema-version: 2.0.0
+  last-updated: '2025-01-21'
+  last-reviewed: '2025-01-21'
+  url: https://github.com/gittuf/gittuf
+
+project:
+  name: gittuf
+  administrators:
+    - name: Justin Cappos
+      affiliation: New York University
+      email: jcappos@nyu.edu
+      social: https://github.com/JustinCappos
+      primary: false
+    - name: Aditya Sirish A Yelgundhalli
+      affiliation: New York University
+      email: aditya.sirish@nyu.edu
+      social: https://github.com/adityasaky
+      primary: true
+    - name: Billy Lynch
+      affiliation: Chainguard
+      email: billy@chainguard.dev
+      social: https://github.com/wlynch
+      primary: false
+    - name: Reza Curtmola
+      affiliation: New Jersey Institute of Technology
+      email: reza.curtmola@njit.edu
+      social: https://github.com/reza-curtmola
+      primary: false
+    - name: Michael Lieberman
+      affiliation: Kusari
+      email: mike@kusari.dev
+      social: https://github.com/mlieberman85
+      primary: false
+  repositories:
+    - name: gittuf
+      url: https://github.com/gittuf/gittuf
+      comment: |
+        gittuf/gittuf is the main repository for gittuf.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+
+repository:
+  url: https://github.com/gittuf/gittuf
+  status: active
+  bug-fixes-only: false
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  no-third-party-packages: false
+  core-team:
+    - name:        Aditya Sirish A Yelgundhalli
+      affiliation: New York University
+      email:       aditya.sirish@nyu.edu
+      social:      https://github.com/adityasaky
+      primary:     true
+    - name:        Justin Cappos
+      affiliation: New York University
+      email:       jcappos@nyu.edu
+      social:      https://github.com/JustinCappos
+      primary:     false
+    - name:        Billy Lynch
+      affiliation: Chainguard
+      email:       billy@chainguard.dev
+      social:      https://github.com/wlynch
+      primary:     false
+    - name:        Reza Curtmola
+      affiliation: New Jersey Institute of Technology
+      email:       reza.curtmola@njit.edu
+      social:      https://github.com/reza-curtmola
+      primary:     false
+    - name:        Patrick Zielinski
+      affiliation: New York University
+      email:       patrick.z@nyu.edu
+      social:      https://github.com/patzielinski
+      primary:     false
+    - name:        Neil Naveen
+      affiliation: New York University
+      email:       naveen.neil@icloud.com
+      social:      https://github.com/neilnaveen
+      primary:     false
+  documentation:
+    contributing-guide: https://github.com/gittuf/gittuf/blob/main/CONTRIBUTING.md
+    review-policy: TODO?
+    security-policy: https://github.com/gittuf/gittuf/blob/main/SECURITY.md
+    governance: https://github.com/gittuf/community
+    dependency-management-policy: TODO
+  license:
+    url: https://github.com/gittuf/gittuf/blob/main/LICENSE
+    expression: Apache-2.0
+  release:
+    changelog: https://github.com/gittuf/gittuf/releases/tag/{version}#changelog
+    automated-pipeline: true
+    distribution-points:
+      - uri:  https://github.com/gittuf/gittuf/releases
+        comment: GitHub Release Page
+    license:
+      url: https://github.com/gittuf/gittuf/blob/main/LICENSE
+      expression: Apache-2.0
+  security:
+    assessments:
+      self:
+        comment: |
+          Self assessment has not yet been completed.\
