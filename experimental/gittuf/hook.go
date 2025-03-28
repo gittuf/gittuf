@@ -42,6 +42,7 @@ var HookPrePush = HookType("pre-push")
 // stage for the user, the map of hook names to exit codes is returned.
 // TODO: Add attestations workflow
 func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStage, signer sslibdsse.Signer, parameters ...string) (map[string]int, error) {
+	// TODO: Use signerverifier API to look at Git config if no signer specified
 	keyID, err := signer.KeyID()
 	if err != nil {
 		return nil, err
@@ -65,7 +66,6 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 
 	var selectedHooks []tuf.Hook
 	var selectedPrincipal tuf.Principal
-	var found = false
 
 	// Read the principals from targetsMetadata and attempt to find a match for
 	// the specified principal to determine which hooks to run.
@@ -73,14 +73,13 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 		for _, key := range principal.Keys() {
 			if key.KeyID == keyID {
 				selectedPrincipal = principal
-				found = true
 				break
 			}
 		}
 	}
 
 	// Couldn't match the key up to a principal, abort
-	if !found {
+	if selectedPrincipal == nil {
 		return nil, tuf.ErrPrincipalNotFound
 	}
 
@@ -98,25 +97,19 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 	switch stage {
 	case tuf.HookStagePrePush:
 		// https://git-scm.com/docs/githooks#_pre_push
-		// For pre-push hooks, we supply the local and remote refs/object IDs
-		// We expect the ref
+		// For pre-push hooks, we supply two things:
+		// 1. The remote name and destination
+		// 2. The local and remote refs/object IDs
 		if len(parameters) != 2 {
 			return nil, ErrIncorrectParameterCount
 		}
 
-		localRef, remoteRef := parameters[0], parameters[1]
+		remoteName, remote := parameters[0], parameters[1]
 
-		luaParameters.RawSet(lua.LString("local-ref"), lua.LString(localRef))
+		luaParameters.RawSet(lua.LString("remoteName"), lua.LString(remoteName))
+		luaParameters.RawSet(lua.LString("remote"), lua.LString(remote))
 
-		if localRef == "(delete)" {
-			luaParameters.RawSet(lua.LString("local-object-name"), lua.LString(gitinterface.ZeroHash.String()))
-		} else {
-
-			luaParameters.RawSet(lua.LString("local-object-name"), lua.LString())
-		}
-
-		luaParameters.RawSet(lua.LString("remote-ref"), lua.LString(remoteRef))
-		luaParameters.RawSet(lua.LString("remote-object-name"), lua.LString(TODO))
+		// TODO: Also pass in object information? (i.e. item 2 in above list)
 	}
 
 	exitCodes := make(map[string]int, len(selectedHooks))
