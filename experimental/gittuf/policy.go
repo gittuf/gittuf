@@ -184,7 +184,7 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 }
 
 func (r *Repository) ListHooks(ctx context.Context) (map[tuf.HookStage][]tuf.Hook, error) {
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.TargetsRoleName)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
 	if err != nil {
 		return nil, err
 	}
