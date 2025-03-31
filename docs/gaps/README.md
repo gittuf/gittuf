@@ -32,6 +32,7 @@ the gittuf/community repository.
 | 6 | [Code Review Tool Attestations](/docs/gaps/6/README.md) | No | No |
 | 7 | [gittuf Guarantees for Repository Subtrees](/docs/gaps/7/README.md) | No | No |
 | 8 | [Policy Inheritance across gittuf Repositories](/docs/gaps/8/README.md) | No | No |
+| 9 | [Enforcing Consistency in Policy Inheritance](/docs/gaps/9/README.md) | No | No |
 
 ## GAP Format
 

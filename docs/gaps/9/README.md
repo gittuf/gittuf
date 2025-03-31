@@ -1,93 +1,63 @@
-# Extending gittuf Policy to Multiple Grouped Repositories
+# Enforcing Consistency in Policy Inheritance
 
 ## Metadata
 
-* **Number:** 8
-* **Title:** Extending gittuf Policy to Multiple Grouped Repositories
+* **Number:** 9
+* **Title:** Enforcing Consistency in Policy Inheritance
 * **Implemented:** No
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Aditya Sirish A Yelgundhalli (adityasaky), Patrick Zielinski (patzielinski), Dennis Roellke (dns43)
-* **Related GAPs:** [GAP-4](/docs/gaps/4/README.md), [GAP-7](/docs/gaps/7/README.md)
+* **Related GAPs:** [GAP-4](/docs/gaps/4/README.md), [GAP-7](/docs/gaps/7/README.md), [GAP-8](/docs/gaps/8/README.md)
 * **Last Modified:** March 25, 2025
 
 ## Abstract
 
-gittuf is designed to operate within the boundaries of a single Git repository.
-This makes deploying gittuf across hundreds or thousands of repositories (e.g.,
-in an enterprise context) complex as configuring policies across all
-repositories can add significant management overhead. This GAP explores how
-multiple repositories can share some gittuf metadata, allowing for some aspects
-of repository policy to be declared in a single place but having it apply across
-multiple repositories.
+This GAP extends the notion of policy inheritance introduced in
+[GAP-8](/docs/gaps/8/README.md). While a repository may choose to inherit policy
+from some upstream gittuf-enabled repository, the policy inheritance feature
+does not enable the upstream repository to verify that some declared set of
+repositories have inherited its policies.
+
+## Motivation
+
+By default, gittuf policies must be enabled on a per-repository basis. To
+address the overhead introduced by this, [GAP-8](/docs/gaps/8/README.md) made it
+possible for a repository to inherit policies from some other upstream
+"controller" repository. This allows for gittuf to be used across hundreds or
+thousands of repositories. However, policy inheritance does not answer the
+question of whether a specific repository chose to inherit the policy.
+Organizations frequently have requirements such as ensuring all the repositories
+related to some software product meet minimum security baselines. These
+baselines can be declared in a controller repository and inherited by all the
+repositories where the baselines must be applied. But, there must also be a way
+to _verify_ that all the relevant repositories have in fact inherited the
+policies as expected.
 
 ## Specification
 
-To support multi-repository gittuf policies, this GAP proposes the following new
-concepts:
+Note: several concepts such as a "controller repository" are taken directly from
+[GAP-8](/docs/gaps/8/README.md).
 
-* **repository network:** a repository network (or just network) is the
-collective noun used to indicate a group of repositories that share some gittuf
-metadata, even if the other contents of the repository are entirely distinct
-* **controller repository:** a special repository that declares some gittuf
-policy that is propagated to other repositories
-* **network repository:** a repository that is part of a repository network
-subject to directives from the controller repository
+A repository that chooses to act as a "controller", i.e., its policies can be
+inherited by other repositories, can also declare specific repositories that
+must inherit its policies. Each of these repositories, known as a "network
+repository", is identified using the same attributes used by a repository to
+declare a controller repository (see [GAP-8](/docs/gaps/8/README.md)).
 
-The controller repository's policy reference is configured so that policy
-changes are propagated to a subdirectory in the policy reference of each
-network repository. Propagation does not mean these policy contents are
-actually used: the upstream policy's contents must be verified by the downstream
-repository.
+This allows the controller repository to _enforce_ the set of repositories that
+_must_ inherit its policies. A gittuf client operating over the controller
+repository can verify that each of the network repositories have declared the
+controller in their root of trust metadata. Further, the client can also
+identify network repositories that have not propagated the latest controller
+policy.
 
-### Controller Repository Structure
+TODO: is this attested to upstream? witness entry in the controller's RSL?
 
-The controller repository may be any Git repository that has had gittuf
-initialized. Its root metadata indicates whether the repository serves a
-controller for a network. If it serves as a controller for a repository network,
-the root metadata also declares the repositories that are part of the network. A
-controller repository can function as any other gittuf enabled repository with
-standard rules and delegations that apply only to that repository.
+TODO: does verification only check for policy propagation or does it also verify
+the network repository's RSL against policy? Full verification is complicated,
+we don't know the parameters, potentially...
 
-TODO: add schema for root metadata with the controller field and identification
-of network repositories
-
-TODO: can a controller in turn belong to a network with another controller? in
-other words, can this be nested?
-
-### Network Repository Structure
-
-A network repository belongs to one or more repository networks. Its root
-metadata indicates the controller repository for each network the repository
-belongs to.
-
-TODO: does a network repo also include global rules? Do we need to handle
-aggregation in the companion GAP about global constraints?
-
-TODO: add schema for root metadata of network repository with one or more
-controllers specified
-
-### Repository Identification and Trust Bootstrapping
-
-A controller repository must declare one or more repositories that are part of
-its network. Similarly, a network repository must identify its controller
-repositories. In both scenarios, each target repository (each network
-repository for a controller repository, each controller repository for a
-network repository) is achieved using the following pieces of information.
-
-* Repository Location: A URL that can be used to locate the canonical copy of
-the target repository.  The URL must include the scheme identifying the
-transport protocol, and it must be possible to use the URL to clone or fetch
-from the canonical copy of repository. For example, the canonical copy of the
-gittuf repository is located at `https://github.com/gittuf/gittuf` and this URL
-can be used to fetch the gittuf repository using standard Git tooling.
-* Initial Root Keys: The public keys used to verify the signatures of the target
-repository's initial root metadata, i.e., the very first _applied_ policy state.
-These root keys need not be updated when keys themselves change as standard
-gittuf semantics can be used to bootstrap trust for subsequent root metadata.
-* Initial Root Threshold: The number of initial root keys that must have signed
-the first applied root metadata in the target repository.
-
-### Workflows
+<!---### Workflows
 
 #### Create Network
 
@@ -198,9 +168,11 @@ TODO: tie it to internal policy badging
 The developer of some network repository must be able to contribute to the
 repository while abiding by both the local and controller's rules.
 
-TODO: tie it to external policy badging (we inherit policy from baseline X)
+TODO: tie it to external policy badging (we inherit policy from baseline X) -->
 
 ## Reasoning
+
+TODO
 
 ## Backwards Compatibility
 
@@ -208,26 +180,8 @@ This GAP has no impact on backwards compatibility.
 
 ## Security
 
-### Constraint Aggregation Concerns
-
-TODO: can we always aggregate global rules across a controller and network
-repository? Possibly not, seems like it runs into issues for affected
-namespaces.
-
-### Controller / Network Unavailability
-
-If a controller repository is unavailable, then verification in a network
-repository must fail. Note that it is expected that the synchronization point
-for the controller and network repositories are the same, so it is unlikely
-only one is unavailable.
-
-### Propagation Delay / Drift
-
-A malfunctioning gittuf client may incorrectly not search the controller
-repository for updates, meaning potential controller policy updates are not
-propagated to the network repository. This is protected by the same "at least
-one honest client" property of gittuf.
-
-### Impact of Root Key Exposure
+TODO
 
 ## References
+
+TODO

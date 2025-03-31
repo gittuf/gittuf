@@ -70,6 +70,8 @@ A controller repository is identified using the following attributes:
 
 TODO: enumerate set of attributes that can be inherited
 
+TODO: should this include initial root threshold?
+
 ### Allowing Policy Inheritance
 
 A repository cannot inherit policies from any upstream gittuf-enabled
