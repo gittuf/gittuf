@@ -1262,19 +1262,3 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
 }
-
-// ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
-func (r *Repository) ListGlobalRules(ctx context.Context) ([]tuf.GlobalRule, error) {
-	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
-	if err != nil {
-		return nil, err
-	}
-
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-
-	return rootMetadata.GetGlobalRules(), nil
-}

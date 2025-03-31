@@ -14,7 +14,18 @@ import (
 
 const indentString = "    "
 
-type options struct{}
+type options struct {
+	targetRef string
+}
+
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.targetRef,
+		"target-ref",
+		"policy",
+		"specify which policy ref should be inspected",
+	)
+}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository()
@@ -22,7 +33,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	hookStages, err := repo.ListHooks(cmd.Context())
+	hookStages, err := repo.ListHooks(cmd.Context(), o.targetRef)
 	if err != nil {
 		return err
 	}
@@ -66,6 +77,7 @@ func New() *cobra.Command {
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
+	o.AddFlags(cmd)
 
 	return cmd
 }

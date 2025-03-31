@@ -9,7 +9,8 @@ gittuf trust list-hooks [flags]
 ### Options
 
 ```
-  -h, --help   help for list-hooks
+  -h, --help                help for list-hooks
+      --target-ref string   specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands

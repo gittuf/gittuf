@@ -14,9 +14,18 @@ import (
 
 const indentString = "    "
 
-type options struct{}
+type options struct {
+	targetRef string
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.targetRef,
+		"target-ref",
+		"policy",
+		"specify which policy ref should be inspected",
+	)
+}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository()
@@ -24,7 +33,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	rules, err := repo.ListGlobalRules(cmd.Context())
+	rules, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
 	if len(rules) == 0 {
 		fmt.Println("No global rules are currently defined.")
 	}

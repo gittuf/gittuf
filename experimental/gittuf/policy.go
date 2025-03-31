@@ -183,8 +183,33 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
-func (r *Repository) ListHooks(ctx context.Context) (map[tuf.HookStage][]tuf.Hook, error) {
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+// ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
+func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootMetadata.GetGlobalRules(), nil
+}
+
+func (r *Repository) ListHooks(ctx context.Context, targetRef string) (map[tuf.HookStage][]tuf.Hook, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
 	if err != nil {
 		return nil, err
 	}

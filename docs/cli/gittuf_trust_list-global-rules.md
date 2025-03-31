@@ -9,7 +9,8 @@ gittuf trust list-global-rules [flags]
 ### Options
 
 ```
-  -h, --help   help for list-global-rules
+  -h, --help                help for list-global-rules
+      --target-ref string   specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands
