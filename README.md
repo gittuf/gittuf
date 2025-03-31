@@ -17,12 +17,12 @@ as part of the [Supply Chain Integrity Working Group].
 
 ## Current Status
 
-gittuf is currently in alpha. gittuf's metadata may have breaking changes,
-meaning a repository's gittuf policy may have to be reinitialized from time to
-time. As such, gittuf is currently not intended to be the primary mechanism for
-enforcing a repository's security.
+gittuf is currently in beta. gittuf's metadata is versioned and updates should
+not require reinitializing a repository's gittuf policy, but the project strives
+to avoid this. gittuf may be used as a repository's primary security mechanism,
+but beta-type bugs may be present (and reports are welcome!)
 
-That said, we're actively seeking feedback from users. Take a look at the [get
+We're actively seeking feedback from users. Take a look at the [get
 started guide] to learn how to install and try gittuf out! Additionally,
 contributions are welcome, please refer to the [contributing guide], our
 [roadmap], and the issue tracker for ways to get involved.
@@ -32,9 +32,15 @@ contributions are welcome, please refer to the [contributing guide], our
 See the [get started guide].
 
 [The Update Framework (TUF)]: https://theupdateframework.io/
+
 [other attacks]: https://ssl.engineering.nyu.edu/papers/torres_toto_usenixsec-2016.pdf
+
 [contributing guide]: /CONTRIBUTING.md
+
 [roadmap]: /docs/roadmap.md
+
 [Open Source Security Foundation (OpenSSF)]: https://openssf.org/
+
 [Supply Chain Integrity Working Group]: https://github.com/ossf/wg-supply-chain-integrity
+
 [get started guide]: /docs/get-started.md
