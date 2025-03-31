@@ -115,7 +115,7 @@ content stored in the repository. [GAP-7](/docs/gaps/7/README.md) introduces the
 propagation pattern that provides a content-agnostic gittuf-based mechanism for
 managing updates to content tracked in different repositories. The observation
 that policy management is a content tracking concern and the feature enabling
-content tracking scross the repository boundary can be combined to enable policy
+content tracking across the repository boundary can be combined to enable policy
 metadata itself to live in one repository but apply across multiple
 repositories.
 
@@ -129,7 +129,8 @@ metadata manipulation attacks by the upstream repository's maintainers.
 
 ## Backwards Compatibility
 
-This GAP has no impact on backwards compatibility.
+This GAP requires use of propagation. As such, if policy inheritance is
+configured, then clients that interact with the repository need to be updated.
 
 ## Security
 

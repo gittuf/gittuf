@@ -28,7 +28,9 @@ applies changes into the downstream repository when the upstream repository's
 RSL indicates there's an update to the tracked reference. The contents at the
 revision indicated by the upstream repository's RSL entry for the reference are
 copied into the specified path in the specified downstream reference in the
-downstream repository.
+downstream repository. For example, a downstream repository may track the `main`
+branch of the `libfoo` repository and have it propagated into the downstream
+repository's `main` branch at the location `third_party/libfoo`.
 
 ### Configuring Upstream Repositories for Propagation
 
@@ -221,7 +223,9 @@ uses.
 
 ## Backwards Compatibility
 
-This GAP has no impact on backwards compatibility.
+This GAP introduces a new RSL entry type to record propagations. Older clients
+that are unaware of the propagation type will mishandle such entries, and
+therefore clients will need to be updated to support this.
 
 ## Security
 
