@@ -1198,14 +1198,14 @@ func TestListGlobalRules(t *testing.T) {
 		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
-		globalRules, err := r.ListGlobalRules(testCtx)
+		globalRules, err := r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
 		assert.Nil(t, err)
 		assert.Len(t, globalRules, 1)
 
 		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
-		globalRules, err = r.ListGlobalRules(testCtx)
+		globalRules, err = r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
 		assert.Nil(t, err)
 		assert.Empty(t, globalRules)
 	})
