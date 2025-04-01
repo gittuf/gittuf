@@ -68,9 +68,12 @@ A controller repository is identified using the following attributes:
   upstream repository (e.g., [global rules](/docs/gaps/4/README.md), [code
   review tool attestations](/docs/gaps/6/README.md))
 
-TODO: enumerate set of attributes that can be inherited
-
 TODO: should this include initial root threshold?
+
+The following policy attributes can be specified for inheritance:
+* global constraints, introduced in [GAP-4](/docs/gaps/4/README.md)
+* code review tool signer, introduced in [GAP-6](/docs/gaps/6/README.md)
+* principals
 
 ### Allowing Policy Inheritance
 

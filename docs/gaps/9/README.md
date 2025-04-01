@@ -21,35 +21,64 @@ repositories have inherited its policies.
 ## Motivation
 
 By default, gittuf policies must be enabled on a per-repository basis. To
-address the overhead introduced by this, [GAP-8](/docs/gaps/8/README.md) made it
-possible for a repository to inherit policies from some other upstream
+address the overhead introduced by this, [GAP-8](/docs/gaps/8/README.md) makes
+it possible for a repository to inherit policies from some other upstream
 "controller" repository. This allows for gittuf to be used across hundreds or
-thousands of repositories. However, policy inheritance does not answer the
-question of whether a specific repository chose to inherit the policy.
-Organizations frequently have requirements such as ensuring all the repositories
-related to some software product meet minimum security baselines. These
-baselines can be declared in a controller repository and inherited by all the
-repositories where the baselines must be applied. But, there must also be a way
-to _verify_ that all the relevant repositories have in fact inherited the
-policies as expected.
+thousands of repositories.
+
+However, policy inheritance is insufficient to ensure that every repository that
+**must** use a particular policy actually did so. For example, an organization
+may require some set of repositories to apply the same baseline security
+controls. While each repository can inherit the same policy from a single
+controller, the organization cannot automatically validate that every repository
+has in fact inherited from the controller repository.
+
+### Validation Criteria
+
+The following validation criteria are considered for this GAP:
+* verify a network repository's active policy correctly inherits the
+  controller's policy
+* verify evolution of network repository's policies to identify periods where
+  inheritance was disabled, perhaps to bypass security controls
+* apply network repository's policies (including those inherited from the
+  controller) to verify changes in the network repository
+
+TODO: the last one is just gittuf verification on the repo
 
 ## Specification
 
 Note: several concepts such as a "controller repository" are taken directly from
 [GAP-8](/docs/gaps/8/README.md).
 
-A repository that chooses to act as a "controller", i.e., its policies can be
-inherited by other repositories, can also declare specific repositories that
-must inherit its policies. Each of these repositories, known as a "network
-repository", is identified using the same attributes used by a repository to
-declare a controller repository (see [GAP-8](/docs/gaps/8/README.md)).
+[GAP-8](/docs/gaps/8/README.md) allows a gittuf-enabled repository to specify
+whether its policies can be inherited by another repository (i.e., whether the
+repository can act as a controller). This GAP extends the controller-specific
+declaration to include the set of repositories that _must_ inherit its policies.
+Each repository declared in the controller is known as a "network repository",
+i.e., it's part of the gittuf network overseen by the controller repository.
 
-This allows the controller repository to _enforce_ the set of repositories that
-_must_ inherit its policies. A gittuf client operating over the controller
-repository can verify that each of the network repositories have declared the
-controller in their root of trust metadata. Further, the client can also
-identify network repositories that have not propagated the latest controller
-policy.
+Each network repository is identified using the same repository attributes used
+to declare a controller repository (see [GAP-8]). Here, the "inherited
+attributes" property of the declaration enforces the set of policy attributes
+the network repository must inherit from the controller repository.
+
+TODO: add "applyAfter" policy ID in network repository?
+
+### Verification by the Controller
+
+1. Load current controller policy `Pc`
+1. Identify list of network repositories
+1. For each network repository `N`:
+    1. Temporarily clone and fetch `N` including its RSL and policy reference
+    1. If `N` does not include an RSL or policy reference, abort with an error
+    1. Load current network repository policy `Pn`
+    1. Verify that the root of trust metadata in `Pn` declares the controller
+       with the expected attributes
+    1. If the controller declaration does not match, abort with an error
+    1. Verify that the propagated controller metadata matches the upstream
+       policy metadata
+    1. If the propagated metadata does not match the controller's metadata,
+       abort with an error
 
 TODO: is this attested to upstream? witness entry in the controller's RSL?
 
