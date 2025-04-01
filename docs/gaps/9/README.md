@@ -80,7 +80,22 @@ TODO: add "applyAfter" policy ID in network repository?
     1. If the propagated metadata does not match the controller's metadata,
        abort with an error
 
-TODO: is this attested to upstream? witness entry in the controller's RSL?
+TODO: is this attested to upstream? witness entry in the controller's RSL?  if
+we record in the controller RSL that the policy ref has ID `X` and the
+propagated metadata IDs match, we can ease UX with declaring network
+repositories. To enforce that controller declaration isn't turned off and on, we
+need to know at what point in the network repository's policy history the
+network constraint began. We have two options. One, list the current network
+repo policy entry in the controller repository, essentially saying all
+subsequent policy entries must inherit the controller's policies. Two, record
+result of "has network repo X inherited policies" in the controller's
+repository's RSL along with the network repo policy entry ID. Also record
+failures. These entries can be used to continuously verify that network repo
+continues to inherit controller policy, we have a natural starting point for the
+network repo's policy evolution. Also, since the network repo policy entry ID is
+recorded in the controller repo, this prevents the developers of the network
+repo from colluding to force push the policy ref and their RSL to hide policy
+inheritance misbehavior.
 
 TODO: does verification only check for policy propagation or does it also verify
 the network repository's RSL against policy? Full verification is complicated,
