@@ -50,6 +50,46 @@ archives:
   format: binary
   allow_different_binary_count: true
 
+# This section defines how gittuf releases are automatically sent to WinGet as
+# pull requests.
+# Configuration inspired from that of the Minder project:
+# https://github.com/mindersec/minder/blob/main/.goreleaser.yaml
+winget:
+  - name: gittuf
+    publisher: gittuf
+    license: Apache-2.0
+    license_url: "https://github.com/gittuf/gittuf/blob/main/LICENSE"
+    copyright: The gittuf Authors
+    homepage: https://gittuf.dev/
+    short_description: 'A security layer for Git repositories'
+    publisher_support_url: "https://github.com/gittuf/gittuf/issues"
+    package_identifier: "gittuf.gittuf"
+    url_template: "https://github.com/gittuf/gittuf/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    skip_upload: auto
+    release_notes: "https://github.com/gittuf/gittuf/blob/main/CHANGELOG.md#v{{ .Major }}{{ .Minor }}{{ .Patch }}"
+    tags:
+      - cli
+      - access-control
+      - git
+      - git-security
+      - gittuf
+    commit_author:
+      name: openssf-robot
+      email: openssf-robot@openssf.org
+    goamd64: v1
+    repository:
+      owner: gittuf
+      name: winget-pkgs
+      branch: "gittuf-{{.Version}}"
+      token: "{{ .Env.WINGET_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
 gomod:
   proxy: true
 
