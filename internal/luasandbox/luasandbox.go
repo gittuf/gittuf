@@ -81,6 +81,24 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository)
 	return environment, nil
 }
 
+// RunScript runs the specified script in the given Lua environment, and returns
+// the result of running the script. Parameters are provided as strings.
+func (l *LuaEnvironment) RunScript(script string, parameters ...string) (int, error) {
+	for _, parameter := range parameters {
+		l.lState.Push(lua.LString(parameter))
+	}
+
+	err := l.lState.DoString(script)
+	if err != nil {
+		return -1, err
+	}
+
+	exitCode := l.lState.Get(-1)
+	l.lState.Pop(1)
+
+	return int(exitCode.(lua.LNumber)), err
+}
+
 func (l *LuaEnvironment) GetAPIs() []API {
 	return l.allAPIs
 }
