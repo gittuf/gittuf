@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory() as server_dir, tempfile.TemporaryDirectory() 
             f.write("test content")
         run_command("git add testfile.txt")
         run_command(f"git commit -m 'Add test file'")
-        run_command(f"git push -u {TEST_REMOTE_NAME} {GITTUF_TEST_BRANCH}", 128)
+        run_command(f"git push -c http.sslVerify=false -u {TEST_REMOTE_NAME} {GITTUF_TEST_BRANCH}", 128)
         
         print("All tests passed!")
 
