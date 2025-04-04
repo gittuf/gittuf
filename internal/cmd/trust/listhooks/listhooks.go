@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
@@ -56,12 +55,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			fmt.Printf(strings.Repeat(indentString, 2) + "Environment:\n")
 			fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", hook.GetEnvironment().String())
 
-			if hook.GetEnvironment() == tuf.HookEnvironmentLua {
-				fmt.Printf(strings.Repeat(indentString, 2) + "Lua modules:\n")
-				for _, module := range hook.GetModules() {
-					fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", module)
-				}
-			}
+			fmt.Printf(strings.Repeat(indentString, 2) + "Timeout:\n")
+			fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", hook.GetTimeout())
 		}
 		fmt.Println()
 	}

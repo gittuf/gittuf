@@ -878,7 +878,7 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 }
 
 // AddHook adds the specified hook to the metadata.
-func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) (tuf.Hook, error) {
+func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) (tuf.Hook, error) {
 	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
 
 	newHook := &Hook{
@@ -886,7 +886,7 @@ func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principa
 		PrincipalIDs: set.NewSetFromItems(principalIDs...),
 		Hashes:       hashes,
 		Environment:  environment,
-		Modules:      modules,
+		Timeout:      timeout,
 	}
 
 	if r.Hooks == nil {
@@ -953,7 +953,7 @@ type Hook struct {
 	PrincipalIDs *set.Set[string]    `json:"principals"`
 	Hashes       map[string]string   `json:"hashes"`
 	Environment  tuf.HookEnvironment `json:"environment"`
-	Modules      []string            `json:"modules"`
+	Timeout      int                 `json:"timeout"`
 }
 
 // ID returns the identifier of the hook, its name.
@@ -981,7 +981,7 @@ func (h *Hook) GetEnvironment() tuf.HookEnvironment {
 	return h.Environment
 }
 
-// GetModules returns the Lua modules that the hook will have access to.
-func (h *Hook) GetModules() []string {
-	return h.Modules
+// GetTimeout returns the maximum duration the hook can run for, in seconds.
+func (h *Hook) GetTimeout() int {
+	return h.Timeout
 }

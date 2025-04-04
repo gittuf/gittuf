@@ -1435,7 +1435,7 @@ func TestAddHook(t *testing.T) {
 		hookStage := tuf.HookStagePreCommit
 		hookName := "test-hook"
 		environment := tuf.HookEnvironmentLua
-		modules := []string{}
+		timeout := 100
 		principals := []string{rootPubKey.KeyID}
 
 		hookHash, err := r.r.WriteBlob(hookBytes)
@@ -1457,7 +1457,7 @@ func TestAddHook(t *testing.T) {
 		_, err = rootMetadata.GetHooks(tuf.HookStagePreCommit)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
-		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1478,7 +1478,7 @@ func TestAddHook(t *testing.T) {
 			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
 			Hashes:       map[string]string{gitinterface.GitBlobHashName: hookHash.String(), gitinterface.SHA256HashName: sha256HashSum},
 			Environment:  tuf.HookEnvironmentLua,
-			Modules:      []string{},
+			Timeout:      100,
 		}
 		preCommitHooks := []tuf.Hook{&preCommitHook}
 		assert.Equal(t, preCommitHooks, hooks)
@@ -1490,7 +1490,7 @@ func TestAddHook(t *testing.T) {
 		hookStage := tuf.HookStagePrePush
 		hookName := "test-hook"
 		environment := tuf.HookEnvironmentLua
-		modules := []string{}
+		timeout := 100
 		principals := []string{rootPubKey.KeyID}
 
 		hookHash, err := r.r.WriteBlob(hookBytes)
@@ -1512,7 +1512,7 @@ func TestAddHook(t *testing.T) {
 		_, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
-		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry())
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1532,7 +1532,7 @@ func TestAddHook(t *testing.T) {
 			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
 			Hashes:       map[string]string{gitinterface.GitBlobHashName: hookHash.String(), gitinterface.SHA256HashName: sha256HashSum},
 			Environment:  tuf.HookEnvironmentLua,
-			Modules:      []string{},
+			Timeout:      100,
 		}
 		preCommitHooks := []tuf.Hook{&preCommitHook}
 		assert.Equal(t, preCommitHooks, hooks)
@@ -1551,7 +1551,7 @@ func TestRemoveHook(t *testing.T) {
 		hookStage := tuf.HookStagePreCommit
 		hookName := "test-hook"
 		environment := tuf.HookEnvironmentLua
-		modules := []string{}
+		timeout := 100
 		principals := []string{rootPubKey.KeyID}
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -1570,7 +1570,7 @@ func TestRemoveHook(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Add hook
-		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry()); err != nil {
 			t.Fatal(err)
 		}
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1612,7 +1612,7 @@ func TestRemoveHook(t *testing.T) {
 		hookStage := tuf.HookStagePrePush
 		hookName := "test-hook"
 		environment := tuf.HookEnvironmentLua
-		modules := []string{}
+		timeout := 100
 		principals := []string{rootPubKey.KeyID}
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
@@ -1631,7 +1631,7 @@ func TestRemoveHook(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
 
 		// Add hook
-		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, modules, principals, true, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry()); err != nil {
 			t.Fatal(err)
 		}
 		err = r.StagePolicy(testCtx, "", true, false)

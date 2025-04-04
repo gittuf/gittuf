@@ -29,7 +29,7 @@ var (
 				return err
 			}
 
-			environment, err := luasandbox.NewLuaEnvironment(cmd.Context(), repository)
+			environment, err := luasandbox.NewLuaEnvironment(cmd.Context(), repository, luasandbox.LuaTimeOut)
 			if err != nil {
 				return err
 			}
