@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	luaTimeOut = 100
+	LuaTimeOut = 100
 )
 
 var (
@@ -32,9 +32,8 @@ type LuaEnvironment struct {
 	allAPIs       []API
 }
 
-// NewLuaEnvironment creates a new Lua state with the specified modules
-// enabled.
-func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository) (*LuaEnvironment, error) {
+// NewLuaEnvironment creates a new Lua state with the specified timeout.
+func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository, timeout int) (*LuaEnvironment, error) {
 	// Create a new Lua state
 	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
 	environment := &LuaEnvironment{
@@ -71,7 +70,7 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository)
 	environment.enableOnlySafeFunctions()
 
 	// Set the instruction quota and timeout
-	environment.setTimeOut(ctx, luaTimeOut)
+	environment.setTimeOut(ctx, timeout)
 
 	// Register the Go functions with the Lua state
 	if err := environment.registerAPIFunctions(); err != nil {

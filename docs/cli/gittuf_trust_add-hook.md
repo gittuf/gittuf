@@ -19,7 +19,7 @@ gittuf trust add-hook [flags]
   -n, --hook-name string           Name of the hook
       --is-pre-commit              add the hook to the pre-commit stage
       --is-pre-push                add the hook to the pre-push stage
-      --modules stringArray        modules which the Lua hook must run
+      --modules int                modules which the Lua hook must run (default 100)
       --principal-ID stringArray   principal IDs which must run this hook
 ```
 

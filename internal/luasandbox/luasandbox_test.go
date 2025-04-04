@@ -23,7 +23,7 @@ func TestNewLuaEnvironment(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	defer environment.Cleanup()
 	assert.Nil(t, err)
 	assert.NotNil(t, environment)
@@ -33,7 +33,7 @@ func TestAPIMatchRegex(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestAPIMatchRegex(t *testing.T) {
 func TestAPIStrSplit(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestAPIGitReadBlob(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +221,7 @@ func TestAPIGitGetObjectSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestAPIGitGetTagTarget(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestAPIGitGetReference(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +353,7 @@ func TestAPIGitGetAbsoluteReference(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +416,7 @@ func TestAPIGitGetSymbolicReferenceTarget(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func TestAPIGitGetCommitMessage(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -530,7 +530,7 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -627,7 +627,7 @@ func TestAPIGitGetRemoteURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	environment, err := NewLuaEnvironment(testCtx, repo)
+	environment, err := NewLuaEnvironment(testCtx, repo, LuaTimeOut)
 	if err != nil {
 		t.Fatal(err)
 	}
