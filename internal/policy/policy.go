@@ -676,6 +676,11 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 // taking affect, and allowing new changes, that until signed by multiple users
 // would be invalid to be made, by utilizing the policy staging ref.
 func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool) error {
+	// First, reconcile staging with policy
+	if err := ReconcileStaging(repo, signRSLEntry); err != nil {
+		return err
+	}
+
 	// Get the reference for the PolicyRef
 	referenceFound := true
 	policyTip, err := repo.GetReference(PolicyRef)
@@ -783,6 +788,8 @@ func Discard(repo *gitinterface.Repository) error {
 }
 
 func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
+	policyFound, stagingFound := false, false
+
 	// Get the reference for the PolicyRef
 	referenceFound := true
 	policyTip, err := repo.GetReference(PolicyRef)
@@ -809,13 +816,17 @@ func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
 	switch {
 	case referenceFound && entryFound:
 		if !policyEntry.GetTargetID().Equal(policyTip) {
+			slog.Debug("policy entry at tip does not match targetID in RSL entry, aborting.")
 			return ErrInvalidPolicy
 		}
+		policyFound = true
 	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
+		slog.Debug("Only one of policy entry and RSL entry found, aborting.")
 		return ErrInvalidPolicy
 	default:
 		slog.Debug("No prior applied policy found")
 		// Nothing to check or return here
+		policyFound = false
 	}
 
 	// Get the reference for the PolicyStagingRef
@@ -844,13 +855,27 @@ func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
 	switch {
 	case referenceFound && entryFound:
 		if !policyStagingEntry.GetTargetID().Equal(policyStagingTip) {
+			slog.Debug("policy-staging entry at tip does not match targetID in RSL entry, aborting.")
 			return ErrInvalidPolicy
 		}
+		stagingFound = true
 	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
+		slog.Debug("Only one of policy-staging entry and RSL entry found, aborting.")
 		return ErrInvalidPolicy
 	default:
 		slog.Debug("No prior policy-staging entry found")
 		// Nothing to check or return here
+		stagingFound = false
+	}
+
+	switch {
+	case !policyFound && !stagingFound:
+		// If neither policy nor policy staging is found, then return nil, as
+		// there's nothing to reconcile.
+		return nil
+	case !policyFound && stagingFound:
+		// If policy isn't found but policy staging is, then return nil as well.
+		return nil
 	}
 
 	// There are a few possible scenarios here.
