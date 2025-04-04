@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/dev"
+	svgit "github.com/gittuf/gittuf/internal/signerverifier/git"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sigstoresigneropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
@@ -115,4 +116,10 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 	default:
 		return ssh.NewSignerFromFile(key)
 	}
+}
+
+// LoadSignerFromGitConfig loads a metadata signer for the signing key specified
+// in the Git configuration of the target repository.
+func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error) {
+	return svgit.LoadSignerFromGitConfig(repo.r)
 }
