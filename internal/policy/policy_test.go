@@ -1092,6 +1092,388 @@ func TestDiscard(t *testing.T) {
 	})
 }
 
+func TestReconcileStaging(t *testing.T) {
+	t.Parallel()
+
+	t.Run("single repository, no controller", func(t *testing.T) {
+		t.Parallel()
+
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		// Reconciling staging should return no error here
+		err := ReconcileStaging(repo, false)
+		assert.Nil(t, err)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+			t.Fatal(err)
+		}
+
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state.Metadata.RootEnvelope = rootEnv
+
+		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Currently the policy ref is behind the staging ref, since the staging
+		// ref currently has an extra target key
+		assertStatesNotEqual(t, staging, policy)
+
+		// Reconciling staging should return no error here
+		err = ReconcileStaging(repo, false)
+		assert.Nil(t, err)
+
+		// Load states again and check that ReconcileStaging hasn't changed
+		// anything
+		postReconciliationStaging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		postReconciliationPolicy, err := LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assertStatesNotEqual(t, postReconciliationStaging, postReconciliationPolicy)
+
+		// Check that pre-reconciliation staging == post-reconciliation staging
+		// and pre-reconciliation policy == post-reconciliation policy
+		assertStatesEqual(t, staging, postReconciliationStaging)
+		assertStatesEqual(t, policy, postReconciliationPolicy)
+
+		if err := Apply(testCtx, repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		policy, err = LoadCurrentState(testCtx, repo, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// After Apply, the policy ref was fast-forward merged with the staging
+		// ref
+		assertStatesEqual(t, staging, policy)
+
+		// Reconciling staging should return no error here
+		err = ReconcileStaging(repo, false)
+		assert.Nil(t, err)
+	})
+
+	controllerThresholdName := "test-controller-threshold-global-rule"
+	controllerThresholdPatterns := []string{"git:refs/heads/main"}
+	controllerThresholdAmount := 2
+
+	networkThresholdName := "test-network-threshold-global-rule"
+	networkThresholdPatterns := []string{"git:refs/heads/notmain"}
+	networkThresholdAmount := 2
+
+	// The next few tests stress test policy staging reconciliation with a
+	// controller and network repository in different cases. Each test has a
+	// timeline inside that describes what happens. Note that each test calls
+	// the same helper to initialize the repositories, so each test starts with
+	// the same configuration of controller and network repositories.
+
+	t.Run("controller and network repository, basic propagation", func(t *testing.T) {
+		t.Parallel()
+
+		// The test follows the following timeline:
+		// 0. Initialize both the controller and network repositories. The
+		// controller will have a global rule defined at the start, while the
+		// network repo will not.
+		// 1. Propagate changes from the controller repository into the network
+		// repository. Ensure that the reconciliation workflow is able to
+		// reconcile the policy and policy-staging refs.
+
+		// 0. Initialize both a controller and network repository
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository, networkRepository, _ := setupControllerAndNetworkRepositories(t, controllerRepositoryLocation, networkRepositoryLocation)
+		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		require.Nil(t, err)
+		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		networkRootEnv := networkState.Metadata.RootEnvelope
+
+		// 1. Now, propagate changes from the controller into the network
+		// repository
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		// These should not be equal, as policy has been updated, but *not*
+		// policy-staging
+		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
+
+		// Now, run the reconciliation workflow
+		err = ReconcileStaging(networkRepository, false)
+		assert.Nil(t, err)
+
+		// Check that the policy has not changed and that staging has been
+		// updated to match policy
+		postReconciliationNetworkPolicyTip, err := networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		assert.Equal(t, networkPolicyTip, postReconciliationNetworkPolicyTip)
+		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, postReconciliationNetworkPolicyTip, networkStagingTip)
+
+		// Load the updated network repository states
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		// Check that controller metadata has in fact been propagated...
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		// ...and that other metadata has remained the same.
+		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
+		assert.Nil(t, networkState.Metadata.TargetsEnvelope)
+	})
+
+	t.Run("controller and network repository, propagate with staged changes to network policy", func(t *testing.T) {
+		t.Parallel()
+		// 0. Initialize both the controller and network repositories. The
+		// controller will have a global rule defined at the start, while the
+		// network repo will not.
+		// 1. Stage (but do not apply) a new global rule in both the controller
+		// and network repositories.
+		// 2. Apply the changes in the controller repository, and propagate them
+		// into the network repository. Ensure that the reconciliation workflow
+		// is able to handle this and reconcile the policy-staging ref with the
+		// new changes coming from the controller with the staged local global
+		// rule.
+		// 3. Apply the changes in the network repository.
+
+		// 0. Initialize both a controller and network repository
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository, networkRepository, signer := setupControllerAndNetworkRepositories(t, controllerRepositoryLocation, networkRepositoryLocation)
+		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+		networkRootEnv := networkState.Metadata.RootEnvelope
+
+		// 1. Now, create a new global rule in both the controller and network
+		// repositories, but not staging or applying either yet
+		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		require.Nil(t, err)
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold(controllerThresholdName, controllerThresholdPatterns, controllerThresholdAmount))
+		require.Nil(t, err)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold(networkThresholdName, networkThresholdPatterns, networkThresholdAmount))
+		require.Nil(t, err)
+
+		// Stage both changes
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Add controller repo global rule\n", true, false)
+		require.Nil(t, err)
+
+		newNetworkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		newNetworkRootEnv, err = dsse.SignEnvelope(testCtx, newNetworkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = newNetworkRootEnv
+		err = networkState.preprocess()
+		require.Nil(t, err)
+		err = networkState.Commit(networkRepository, "Add network repo global rule\n", true, false)
+		require.Nil(t, err)
+		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		// 2. Apply the controller's changes and propagate
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		// The network repository's staging ref should not have changed since
+		// the last time, we have not staged any new changes locally
+		newNetworkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, networkStagingTip, newNetworkStagingTip)
+
+		// Load the updated repository states
+		controllerState, err = LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		require.Nil(t, err)
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		// Check that controller metadata has in fact been propagated...
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		// ...and that other metadata has remained the same.
+		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
+		assert.Nil(t, networkState.Metadata.TargetsEnvelope)
+
+		// These should not be equal, as policy has been updated, but *not*
+		// policy-staging
+		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
+
+		// Now, run the reconciliation workflow
+		err = ReconcileStaging(networkRepository, false)
+		assert.Nil(t, err)
+
+		// Check that the policy-staging tip is different due to reconciliation
+		postReconciliationNetworkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.NotEqual(t, networkStagingTip, postReconciliationNetworkStagingTip)
+
+		// Now, apply policy on the network repository
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		// These should be reconciled now
+		networkPolicyTip, err = networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, networkPolicyTip, networkStagingTip)
+	})
+
+	t.Run("controller and network repository, propagate after policy diverges", func(t *testing.T) {
+		t.Parallel()
+		// 0. Initialize both the controller and network repositories. The
+		// controller will have a global rule defined at the start, while the
+		// network repo will not.
+		// 1. Create a new global rule in the network repository. Stage and
+		// apply the change.
+		// 2. Create a new global rule in the controller repository. Stage and
+		// apply this change.
+		// 3. Propagate the changes from the controller repository into the
+		// network repository. Ensure that the reconciliation workflow can
+		// handle this as well.
+
+		// 0. Initialize both a controller and network repository
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository, networkRepository, signer := setupControllerAndNetworkRepositories(t, controllerRepositoryLocation, networkRepositoryLocation)
+		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		require.Nil(t, err)
+		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		// 1. Create a new global rule in the network repository
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold(networkThresholdName, networkThresholdPatterns, networkThresholdAmount))
+		require.Nil(t, err)
+
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.preprocess()
+		require.Nil(t, err)
+		err = networkState.Commit(networkRepository, "Add network repo global rule two\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		// 2. Create a new global rule in the controller repository
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold(controllerThresholdName, controllerThresholdPatterns, controllerThresholdAmount))
+		require.Nil(t, err)
+
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Add controller repo global rule two\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+
+		// 3. Propagate changes from the controller repository into the network
+		// repository
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		require.Nil(t, err)
+
+		// These should not be equal, as policy has been updated, but *not*
+		// policy-staging
+		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
+
+		// Reconcile the network repository's policy-staging ref with the new
+		// changes in the policy ref
+		err = ReconcileStaging(networkRepository, false)
+		assert.Nil(t, err)
+		networkPolicyTip, err = networkRepository.GetReference(PolicyRef)
+		require.Nil(t, err)
+		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, networkPolicyTip, networkStagingTip)
+
+		// Load the updated network repository state
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		// Check that controller metadata has in fact been propagated...
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		// ...and that other metadata has remained the same.
+		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
+		assert.Nil(t, networkState.Metadata.TargetsEnvelope)
+	})
+}
+
 func assertStatesEqual(t *testing.T, stateA, stateB *State) {
 	t.Helper()
 
@@ -1105,4 +1487,56 @@ func assertStatesNotEqual(t *testing.T, stateA, stateB *State) {
 	// at least one of these has to be different
 	assert.True(t, assert.NotEqual(t, stateA.Metadata, stateB.Metadata) ||
 		assert.NotEqual(t, stateA.ControllerMetadata, stateB.ControllerMetadata))
+}
+
+func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLocation, networkRepositoryLocation string) (*gitinterface.Repository, *gitinterface.Repository, *ssh.Signer) {
+	controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+	// The controller will start with a global threshold rule...
+	controllerState := createTestStateWithGlobalConstraintThreshold(t)
+	controllerState.repository = controllerRepository
+
+	// ...while the network repository will not.
+	networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+	networkState := createTestStateWithOnlyRoot(t)
+	networkState.repository = networkRepository
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	// Set up the controller repository and add a network repository to it
+	controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+	require.Nil(t, err)
+	err = controllerRootMetadata.EnableController()
+	require.Nil(t, err)
+	err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	require.Nil(t, err)
+	controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+	require.Nil(t, err)
+	controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+	require.Nil(t, err)
+	controllerState.Metadata.RootEnvelope = controllerRootEnv
+	err = controllerState.preprocess()
+	require.Nil(t, err)
+	err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+	require.Nil(t, err)
+	err = Apply(testCtx, controllerRepository, false)
+	require.Nil(t, err)
+
+	// Set up the network repository and add the controller to it
+	networkRootMetadata, err := networkState.GetRootMetadata(false)
+	require.Nil(t, err)
+	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	require.Nil(t, err)
+	networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+	require.Nil(t, err)
+	networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+	require.Nil(t, err)
+	networkState.Metadata.RootEnvelope = networkRootEnv
+	err = networkState.preprocess()
+	require.Nil(t, err)
+	err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+	require.Nil(t, err)
+	err = Apply(testCtx, networkRepository, false)
+	require.Nil(t, err)
+
+	return controllerRepository, networkRepository, signer
 }
