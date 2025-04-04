@@ -15,6 +15,7 @@ type options struct {
 	p                      *persistent.Options
 	policyName             string
 	ruleName               string
+	access                 string
 	authorizedKeys         []string
 	authorizedPrincipalIDs []string
 	rulePatterns           []string
@@ -91,7 +92,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 	authorizedPrincipalIDs = append(authorizedPrincipalIDs, o.authorizedPrincipalIDs...)
 
-	return repo.UpdateDelegation(cmd.Context(), signer, o.policyName, o.ruleName, authorizedPrincipalIDs, o.rulePatterns, o.threshold, true)
+	return repo.UpdateDelegation(cmd.Context(), signer, o.policyName, o.ruleName, o.access, authorizedPrincipalIDs, o.rulePatterns, o.threshold, true)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

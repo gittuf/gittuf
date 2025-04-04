@@ -240,7 +240,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						key:     m.inputs[2].Value(),
 					}
 					authorizedKeys := []string{m.inputs[2].Value()}
-					err := repoAddRule(m.options, newRule, authorizedKeys)
+					err := repoAddRule(m.options, newRule, "write", authorizedKeys)
 					if err != nil {
 						m.footer = fmt.Sprintf("Error adding rule: %v", err)
 						return m, nil
@@ -417,7 +417,7 @@ func getCurrRules(o *options) []rule {
 }
 
 // repoAddRule adds a rule to the policy file
-func repoAddRule(o *options, rule rule, keyPath []string) error {
+func repoAddRule(o *options, rule rule, access string, keyPath []string) error {
 	repo, err := gittuf.LoadRepository()
 	if err != nil {
 		return err
@@ -437,7 +437,7 @@ func repoAddRule(o *options, rule rule, keyPath []string) error {
 
 		authorizedPrincipalIDs = append(authorizedPrincipalIDs, key.ID())
 	}
-	res := repo.AddDelegation(context.Background(), signer, o.policyName, rule.name, authorizedPrincipalIDs, []string{rule.pattern}, 1, true)
+	res := repo.AddDelegation(context.Background(), signer, o.policyName, rule.name, access, authorizedPrincipalIDs, []string{rule.pattern}, 1, true)
 
 	return res
 }
