@@ -57,6 +57,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-global-rule",
 		Short:             fmt.Sprintf("Remove a global rule from root of trust (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:              "This command allows users to remove an existing global rule from the root of trust. The name of the global rule must be specified.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
