@@ -3,14 +3,14 @@
 
 package luasandbox
 
-type EnivronmentOptions struct {
+type EnvironmentOptions struct {
 	LuaTimeout int
 }
 
-type EnvironmentOption func(*EnivronmentOptions)
+type EnvironmentOption func(*EnvironmentOptions)
 
 func WithLuaTimeout(timeout int) EnvironmentOption {
-	return func(o *EnivronmentOptions) {
+	return func(o *EnvironmentOptions) {
 		o.LuaTimeout = timeout
 	}
 }
