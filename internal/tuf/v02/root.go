@@ -876,7 +876,7 @@ func (o *OtherRepository) UnmarshalJSON(data []byte) error {
 type Hook = tufv01.Hook
 
 // AddHook adds the specified hook to the metadata.
-func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, modules []string) (tuf.Hook, error) {
+func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) (tuf.Hook, error) {
 	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
 
 	newHook := &Hook{
@@ -884,7 +884,7 @@ func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principa
 		PrincipalIDs: set.NewSetFromItems(principalIDs...),
 		Hashes:       hashes,
 		Environment:  environment,
-		Modules:      modules,
+		Timeout:      timeout,
 	}
 
 	if r.Hooks == nil {

@@ -19,8 +19,8 @@ gittuf trust add-hook [flags]
   -n, --hook-name string           Name of the hook
       --is-pre-commit              add the hook to the pre-commit stage
       --is-pre-push                add the hook to the pre-push stage
-      --modules stringArray        modules which the Lua hook must run
       --principal-ID stringArray   principal IDs which must run this hook
+      --timeout int                timeout for hook execution (default 100)
 ```
 
 ### Options inherited from parent commands

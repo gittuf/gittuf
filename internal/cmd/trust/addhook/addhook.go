@@ -4,7 +4,6 @@
 package addhook
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -14,19 +13,18 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/gittuf/gittuf/internal/luasandbox"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
-
-var ErrLuaNoModules = errors.New("must specify modules using --modules flag for Lua sandbox environment")
 
 type options struct {
 	p            *persistent.Options
 	filePath     string
 	hookName     string
 	env          string
-	modules      []string
 	principalIDs []string
+	timeout      int
 
 	isPreCommit bool
 	isPrePush   bool
@@ -76,19 +74,19 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringArrayVar(
-		&o.modules,
-		"modules",
-		nil,
-		"modules which the Lua hook must run",
-	)
-
-	cmd.Flags().StringArrayVar(
 		&o.principalIDs,
 		"principal-ID",
 		nil,
 		"principal IDs which must run this hook",
 	)
 	cmd.MarkFlagRequired("principal-ID") //nolint:errcheck
+
+	cmd.Flags().IntVar(
+		&o.timeout,
+		"timeout",
+		luasandbox.LuaTimeOut,
+		"timeout for hook execution",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -104,16 +102,16 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return tuf.ErrInvalidHookEnvironment
 	}
 
-	if (strings.ToLower(o.env) == "lua") && (o.modules == nil) {
-		return ErrLuaNoModules
-	}
-
 	stages := []tuf.HookStage{}
 	if o.isPreCommit {
 		stages = append(stages, tuf.HookStagePreCommit)
 	}
 	if o.isPrePush {
 		stages = append(stages, tuf.HookStagePrePush)
+	}
+
+	if o.timeout < 1 {
+		return gittuf.ErrInvalidHookTimeout
 	}
 
 	repo, err := gittuf.LoadRepository()
@@ -136,7 +134,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.AddHook(cmd.Context(), signer, stages, o.hookName, hookBytes, environment, o.modules, o.principalIDs, true, opts...)
+	return repo.AddHook(cmd.Context(), signer, stages, o.hookName, hookBytes, environment, o.principalIDs, o.timeout, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

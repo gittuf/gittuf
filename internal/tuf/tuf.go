@@ -204,9 +204,9 @@ type RootMetadata interface {
 	// AddHook adds to the metadata for the specified Git stage a hook named
 	// hookName to be run by the specified principals. For support of more than
 	// one hashing algorithm, providing multiple hashes is supported. The hook's
-	// environment (e.g. lua) and modules to expose to the hook (if using Lua)
-	// are also required.
-	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, modules []string) (Hook, error)
+	// environment (e.g. lua) and maximum allowable running time in seconds are
+	// also required.
+	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) (Hook, error)
 	// RemoveHook removes the hook identified by hookName in the specified Git
 	// stage.
 	RemoveHook(stages []HookStage, hookName string) error
@@ -519,6 +519,6 @@ type Hook interface {
 	// GetEnvironment returns the environment that the hook is to run in.
 	GetEnvironment() HookEnvironment
 
-	// GetModules returns the lua modules to load in, only for lua-based hooks.
-	GetModules() []string
+	// GetTimeout returns the maximum duration the hook can run for, in seconds.
+	GetTimeout() int
 }

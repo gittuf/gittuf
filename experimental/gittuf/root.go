@@ -31,7 +31,8 @@ import (
 )
 
 var (
-	ErrNoHookName = errors.New("hook name not provided")
+	ErrNoHookName         = errors.New("hook name not provided")
+	ErrInvalidHookTimeout = errors.New("hook timeout must be greater than 1 second")
 )
 
 // InitializeRoot is the interface for the user to create the repository's root
@@ -880,7 +881,7 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 // AddHook defines the workflow for adding a file to be executed as a hook. It
 // writes the hook file, populates all fields in the hooks metadata associated
 // with this file and commits it to the root of trust metadata.
-func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, modules, principalIDs []string, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, principalIDs []string, timeout int, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -895,6 +896,10 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 
 	if hookName == "" {
 		return ErrNoHookName
+	}
+
+	if timeout < 1 {
+		return ErrInvalidHookTimeout
 	}
 
 	options := &trustpolicyopts.Options{}
@@ -931,7 +936,7 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 	hashes[gitinterface.SHA256HashName] = hex.EncodeToString(sha256Hash.Sum(nil))
 
 	slog.Debug("Adding hook to rule file...")
-	hook, err := rootMetadata.AddHook(stages, hookName, principalIDs, hashes, environment, modules)
+	hook, err := rootMetadata.AddHook(stages, hookName, principalIDs, hashes, environment, timeout)
 	if err != nil {
 		return err
 	}
