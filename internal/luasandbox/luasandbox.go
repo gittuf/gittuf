@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/luasandbox/options/luasandbox"
 	lua "github.com/yuin/gopher-lua"
 )
 
 const (
-	luaTimeOut = 100
+	LuaTimeOut = 100
 )
 
 var (
@@ -32,9 +33,13 @@ type LuaEnvironment struct {
 	allAPIs       []API
 }
 
-// NewLuaEnvironment creates a new Lua state with the specified modules
-// enabled.
-func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository) (*LuaEnvironment, error) {
+// NewLuaEnvironment creates a new Lua state with the specified timeout.
+func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository, opts ...luasandbox.EnvironmentOption) (*LuaEnvironment, error) {
+	options := &luasandbox.EnivronmentOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	// Create a new Lua state
 	lState := lua.NewState(lua.Options{SkipOpenLibs: true})
 	environment := &LuaEnvironment{
@@ -71,7 +76,11 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository)
 	environment.enableOnlySafeFunctions()
 
 	// Set the instruction quota and timeout
-	environment.setTimeOut(ctx, luaTimeOut)
+	if options.LuaTimeout != 0 {
+		environment.setTimeOut(ctx, options.LuaTimeout)
+	} else {
+		environment.setTimeOut(ctx, LuaTimeOut)
+	}
 
 	// Register the Go functions with the Lua state
 	if err := environment.registerAPIFunctions(); err != nil {
