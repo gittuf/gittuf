@@ -5,11 +5,14 @@ package gittuf
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
+	repositoryopts "github.com/gittuf/gittuf/experimental/gittuf/options/repository"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadRepository(t *testing.T) {
@@ -44,6 +47,43 @@ func TestLoadRepository(t *testing.T) {
 		repository, err := LoadRepository()
 		assert.Nil(t, err)
 		assert.NotNil(t, repository.r)
+	})
+
+	t.Run("load with incorrect path, unsuccessful", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		currentDir, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		_, err = LoadRepository(repositoryopts.WithRepositoryPath(tmpDir))
+		assert.ErrorContains(t, err, "unable to identify GIT_DIR")
+	})
+
+	t.Run("load with path, successful", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		currentDir, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		repository, err := LoadRepository(repositoryopts.WithRepositoryPath(tmpDir))
+		assert.Nil(t, err)
+
+		expectedPath, err := filepath.Abs(filepath.Join(tmpDir, ".git"))
+		require.Nil(t, err)
+		actualPath, err := filepath.Abs(repository.r.GetGitDir())
+		require.Nil(t, err)
+		assert.Equal(t, expectedPath, actualPath)
 	})
 }
 

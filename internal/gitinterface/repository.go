@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
+	gitinterfaceopts "github.com/gittuf/gittuf/internal/gitinterface/options/gitinterface"
 	"github.com/go-git/go-git/v5"
 	"github.com/jonboulle/clockwork"
 )
@@ -48,7 +49,12 @@ func (r *Repository) IsBare() bool {
 
 // LoadRepository returns a Repository instance using the current working
 // directory. It also inspects the PATH to ensure Git is installed.
-func LoadRepository() (*Repository, error) {
+func LoadRepository(opts ...gitinterfaceopts.RepositoryOption) (*Repository, error) {
+	options := &gitinterfaceopts.RepositoryOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
 	_, err := exec.LookPath(binary)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Git binary, is Git installed?")
@@ -59,6 +65,18 @@ func LoadRepository() (*Repository, error) {
 	if envVar != "" {
 		repo.gitDirPath = envVar
 		return repo, nil
+	}
+
+	if options.RepositoryPath != "" {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+
+		if err = os.Chdir(options.RepositoryPath); err != nil {
+			return nil, err
+		}
+		defer os.Chdir(currentDir) //nolint:errcheck
 	}
 
 	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").execute()
