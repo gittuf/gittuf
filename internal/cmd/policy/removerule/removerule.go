@@ -58,6 +58,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-rule",
 		Short:             "Remove rule from a policy file",
+		Long:              "This command allows users to remove and existing rule to the specified policy file. By default, the main policy file is selected.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
