@@ -35,7 +35,7 @@ type LuaEnvironment struct {
 
 // NewLuaEnvironment creates a new Lua state with the specified timeout.
 func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository, opts ...luasandbox.EnvironmentOption) (*LuaEnvironment, error) {
-	options := &luasandbox.EnivronmentOptions{}
+	options := &luasandbox.EnvironmentOptions{}
 	for _, fn := range opts {
 		fn(options)
 	}
@@ -88,6 +88,28 @@ func NewLuaEnvironment(ctx context.Context, repository *gitinterface.Repository,
 	}
 
 	return environment, nil
+}
+
+// RunScript runs the specified script in the given Lua environment, and returns
+// the result of running the script. Parameters are provided as strings.
+func (l *LuaEnvironment) RunScript(script string, parameters lua.LTable) (int, error) {
+	l.lState.Push(&parameters)
+
+	err := l.lState.DoString(script)
+	if err != nil {
+		return -1, err
+	}
+
+	returnValue := l.lState.Get(-1)
+	l.lState.Pop(1)
+
+	// If a table is returned, then this likely means that the hook didn't
+	// return an exit code. Return a 1 for safety.
+	_, ok := returnValue.(*lua.LNumber)
+	if !ok {
+		return 1, nil
+	}
+	return int(returnValue.(lua.LNumber)), err
 }
 
 func (l *LuaEnvironment) GetAPIs() []API {
