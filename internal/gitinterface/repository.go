@@ -5,10 +5,13 @@ package gitinterface
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -20,6 +23,8 @@ const (
 	committerTimeKey = "GIT_COMMITTER_DATE"
 	authorTimeKey    = "GIT_AUTHOR_DATE"
 )
+
+var ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
 
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
@@ -48,33 +53,50 @@ func (r *Repository) IsBare() bool {
 
 // LoadRepository returns a Repository instance using the current working
 // directory. It also inspects the PATH to ensure Git is installed.
-func LoadRepository() (*Repository, error) {
+func LoadRepository(repositoryPath string) (*Repository, error) {
+	slog.Debug("Looking for Git binary in PATH...")
 	_, err := exec.LookPath(binary)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find Git binary, is Git installed?")
 	}
-
-	repo := &Repository{clock: clockwork.NewRealClock()}
-	envVar := os.Getenv("GIT_DIR")
-	if envVar != "" {
-		repo.gitDirPath = envVar
-		return repo, nil
+	if repositoryPath == "" {
+		return nil, ErrRepositoryPathNotSpecified
 	}
 
-	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").execute()
+	repo := &Repository{clock: clockwork.NewRealClock()}
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	if err = os.Chdir(repositoryPath); err != nil {
+		return nil, err
+	}
+	defer os.Chdir(currentDir) //nolint:errcheck
+
+	slog.Debug("Identifying git directory for repository...")
+	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
 	if err != nil {
 		errContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
 			return nil, fmt.Errorf("unable to read original err '%w' when loading repository: %w", err, newErr)
 		}
-		return nil, fmt.Errorf("unable to identify GIT_DIR: %w: %s", err, strings.TrimSpace(string(errContents)))
+		return nil, fmt.Errorf("unable to identify git directory for repository: %w: %s", err, strings.TrimSpace(string(errContents)))
 	}
 
 	stdOutContents, err := io.ReadAll(stdOut)
 	if err != nil {
-		return nil, fmt.Errorf("unable to identify GIT_DIR: %w", err)
+		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
 	}
-	repo.gitDirPath = strings.TrimSpace(string(stdOutContents))
+
+	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
+	// the final path _including_ symlink follows.
+	absPath, err := filepath.Abs(strings.TrimSpace(string(stdOutContents)))
+	if err != nil {
+		return nil, err
+	}
+	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
+	repo.gitDirPath = absPath
 
 	return repo, nil
 }
@@ -83,10 +105,11 @@ func LoadRepository() (*Repository, error) {
 // accepts the arguments to the `git` binary, but the binary itself must not be
 // specified.
 type executor struct {
-	r     *Repository
-	args  []string
-	env   []string
-	stdIn io.Reader
+	r           *Repository
+	args        []string
+	env         []string
+	stdIn       io.Reader
+	unsetGitDir bool
 }
 
 // executor initializes a new executor instance to run a Git command with the
@@ -99,6 +122,13 @@ func (r *Repository) executor(args ...string) *executor {
 // must be specified in the form of `key=value`.
 func (e *executor) withEnv(env ...string) *executor {
 	e.env = append(e.env, env...)
+	return e
+}
+
+// withoutGitDir ensures the executor doesn't auto-set the --git-dir flag to the
+// executed command.
+func (e *executor) withoutGitDir() *executor {
+	e.unsetGitDir = true
 	return e
 }
 
@@ -134,7 +164,7 @@ func (e *executor) executeString() (string, error) {
 // stderr contents. It adds the `--git-dir` argument if the repository has a
 // path set.
 func (e *executor) execute() (io.Reader, io.Reader, error) {
-	if e.r.gitDirPath != "" {
+	if e.r.gitDirPath != "" && !e.unsetGitDir {
 		e.args = append([]string{"--git-dir", e.r.gitDirPath}, e.args...)
 	}
 	cmd := exec.Command(binary, e.args...) //nolint:gosec

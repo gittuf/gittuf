@@ -5,16 +5,27 @@ package gittuf
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"os"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/tuf"
+)
+
+const (
+	DebugModeKey = "GITTUF_DEBUG"
 )
 
 var (
 	ErrUnauthorizedKey    = errors.New("unauthorized key presented when updating gittuf metadata")
 	ErrCannotReinitialize = errors.New("cannot reinitialize metadata, it exists already")
 )
+
+// InDebugMode returns true if gittuf is currently in debug mode.
+func InDebugMode() bool {
+	return os.Getenv(DebugModeKey) == "1"
+}
 
 type Repository struct {
 	r *gitinterface.Repository
@@ -24,10 +35,22 @@ func (r *Repository) GetGitRepository() *gitinterface.Repository {
 	return r.r
 }
 
-func LoadRepository() (*Repository, error) {
-	slog.Debug("Loading Git repository...")
+func LoadRepository(repositoryPath string) (*Repository, error) {
+	level := slog.LevelInfo
+	if InDebugMode() {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	})))
 
-	repo, err := gitinterface.LoadRepository()
+	slog.Debug(fmt.Sprintf("Loading Git repository from '%s'...", repositoryPath))
+
+	if repositoryPath == "" {
+		return nil, gitinterface.ErrRepositoryPathNotSpecified
+	}
+
+	repo, err := gitinterface.LoadRepository(repositoryPath)
 	if err != nil {
 		return nil, err
 	}

@@ -5,11 +5,13 @@ package gittuf
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadRepository(t *testing.T) {
@@ -24,8 +26,8 @@ func TestLoadRepository(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		repository, err := LoadRepository()
-		assert.NotNil(t, err)
+		repository, err := LoadRepository(tmpDir)
+		assert.ErrorContains(t, err, "unable to identify git directory for repository")
 		assert.Nil(t, repository)
 	})
 
@@ -41,9 +43,15 @@ func TestLoadRepository(t *testing.T) {
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		repository, err := LoadRepository()
+		repository, err := LoadRepository(tmpDir)
 		assert.Nil(t, err)
 		assert.NotNil(t, repository.r)
+
+		expectedPath, err := filepath.EvalSymlinks(filepath.Join(tmpDir, ".git"))
+		require.Nil(t, err)
+		actualPath, err := filepath.EvalSymlinks(repository.r.GetGitDir())
+		require.Nil(t, err)
+		assert.Equal(t, expectedPath, actualPath)
 	})
 }
 

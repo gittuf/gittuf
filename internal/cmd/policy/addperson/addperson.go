@@ -71,7 +71,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("developer mode and v0.2 policy metadata must be enabled, set %s=1 and %s=1", dev.DevModeKey, tufv02.AllowV02MetadataKey)
 	}
 
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}

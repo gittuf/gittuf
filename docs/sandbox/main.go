@@ -24,7 +24,7 @@ var (
 		Short: "Generate sandbox docs",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			repository, err := gitinterface.LoadRepository()
+			repository, err := gitinterface.LoadRepository(".")
 			if err != nil {
 				return err
 			}

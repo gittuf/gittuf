@@ -88,7 +88,7 @@ type model struct {
 
 // initialModel returns the initial model for the Terminal UI
 func initialModel(o *options) model {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return model{}
 	}
@@ -395,7 +395,7 @@ func (m model) View() string {
 
 // getCurrRules returns the current rules from the policy file
 func getCurrRules(o *options) []rule {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return nil
 	}
@@ -418,7 +418,7 @@ func getCurrRules(o *options) []rule {
 
 // repoAddRule adds a rule to the policy file
 func repoAddRule(o *options, rule rule, keyPath []string) error {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func repoAddRule(o *options, rule rule, keyPath []string) error {
 
 // repoRemoveRule removes a rule from the policy file
 func repoRemoveRule(o *options, rule rule) error {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
@@ -458,7 +458,7 @@ func repoRemoveRule(o *options, rule rule) error {
 
 // repoReorderRules reorders the rules in the policy file
 func repoReorderRules(o *options, rules []rule) error {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
