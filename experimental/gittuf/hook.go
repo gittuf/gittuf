@@ -33,6 +33,13 @@ func (e *ErrHookExists) Error() string {
 
 type HookType string
 
+const (
+	pushedRefLocalRef   = lua.LString("localRef")
+	pushedRefRemoteRef  = lua.LString("remoteRef")
+	pushedRefLocalHash  = lua.LString("localHash")
+	pushedRefRemoteHash = lua.LString("remoteHash")
+)
+
 var (
 	ErrNoHooksFoundForPrincipal = errors.New("no hooks found for the specified principal")
 )
@@ -41,15 +48,14 @@ var HookPrePush = HookType("pre-push")
 
 // InvokeHooksForStage runs the hooks defined in the specified stage for the
 // user defined by principalID. Upon successful completion of all hooks for the
-// stage for the user, the map of hook names to exit codes is returned.
-// TODO: Add attestations workflow
-func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStage, signer sslibdsse.Signer, opts ...hookopts.Option) (map[string]int, error) {
+// stage for the user, the map of hook names to exit codes is returned.  TODO:
+// Add attestations workflow
+func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.Signer, stage tuf.HookStage, opts ...hookopts.Option) (map[string]int, error) {
 	options := &hookopts.Options{}
 	for _, fn := range opts {
 		fn(options)
 	}
 
-	// TODO: Use signerverifier API to look at Git config if no signer specified
 	if signer == nil {
 		return nil, sslibdsse.ErrNoSigners
 	}
@@ -75,11 +81,9 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 		return nil, err
 	}
 
-	var selectedHooks []tuf.Hook
-	var selectedPrincipal tuf.Principal
-
 	// Read the principals from targetsMetadata and attempt to find a match for
 	// the specified principal to determine which hooks to run.
+	var selectedPrincipal tuf.Principal
 	for _, principal := range state.GetAllPrincipals() {
 		for _, key := range principal.Keys() {
 			if key.KeyID == keyID {
@@ -96,6 +100,7 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 
 	// Now, read all hooks for the specified stage and find which ones we need
 	// to run
+	selectedHooks := []tuf.Hook{}
 	for _, hook := range allHooks {
 		principalIDs := hook.GetPrincipalIDs()
 		if principalIDs.Has(selectedPrincipal.ID()) {
@@ -114,31 +119,41 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 	// the pre-push stage.
 	if stage == tuf.HookStagePrePush {
 		// https://git-scm.com/docs/githooks#_pre_push
-		// For pre-push hooks, we supply two things:
-		// 1. The remote name and destination, e.g.
-		// origin git@github.com:gittuf/gittuf
-		// 2. The local and remote refs/object IDs in the form:
-		// <local ref> <local hash> <remote ref> <remote hash>
+		// For pre-push hooks, we supply:
+		// * remoteName
+		// * remoteURL
+		// * localRef
+		// * localHash
+		// * remoteRef
+		// * remoteHash
 
-		luaParameters.RawSet(lua.LString("remoteName"), lua.LString(options.RemoteName))
-		luaParameters.RawSet(lua.LString("remoteURL"), lua.LString(options.RemoteURL))
+		// TODO (adityasaky): I wonder if we want to move these into separate
+		// constructors / helpers as we add more stages...
 
-		remoteObjects := make(map[string][]gitinterface.Hash, len(options.RefSpecs))
+		// Validate that all the required values have been passed in
+		if err := options.PrePush.Validate(); err != nil {
+			return nil, err
+		}
 
-		for _, refSpec := range options.RefSpecs {
+		luaParameters.RawSet(lua.LString("remoteName"), lua.LString(options.PrePush.RemoteName))
+		luaParameters.RawSet(lua.LString("remoteURL"), lua.LString(options.PrePush.RemoteURL))
+
+		remoteObjects := make(map[string][]gitinterface.Hash, len(options.PrePush.RefSpecs))
+
+		for _, refSpec := range options.PrePush.RefSpecs {
 			splitRefSpec := strings.Split(refSpec, ":")
 			localRef, remoteRef := splitRefSpec[0], splitRefSpec[1]
+			remoteTrackerRef := gitinterface.RemoteRef(remoteRef, options.PrePush.RemoteName)
 
 			var remoteHash gitinterface.Hash
-
-			err = r.r.Fetch(options.RemoteName, []string{remoteRef}, true)
+			err = r.r.FetchRefSpec(options.PrePush.RemoteName, []string{fmt.Sprintf("%s:%s", remoteRef, remoteTrackerRef)})
 			if err != nil {
 				// This likely means the remote doesn't have the specified ref.
 				// In this case, provide a zero hash as per original Git
 				// behavior.
 				remoteHash = gitinterface.ZeroHash
 			} else {
-				remoteHash, err = r.r.GetReference("FETCH_HEAD")
+				remoteHash, err = r.r.GetReference(remoteTrackerRef)
 				if err != nil {
 					return nil, err
 				}
@@ -157,8 +172,17 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, stage tuf.HookStag
 			splitRefSpec := strings.Split(refSpec, ":")
 			localRef, remoteRef := splitRefSpec[0], splitRefSpec[1]
 
-			combinedString := fmt.Sprintf("%s %s %s %s", localRef, hashes[0], remoteRef, hashes[1])
-			luaParameters.Insert(i, lua.LString(combinedString))
+			// The best type for supplying information about pushed refs that
+			// gopher-lua supports without too much work is the LTable. We
+			// create a table for each ref that is being pushed, with an
+			// equivalent format in Go: []PushRef{{localRef: <>, remoteRef: <>,
+			// localHash: <>, remoteHash: <>}}
+			pushedRef := lua.LTable{}
+			pushedRef.RawSet(pushedRefLocalRef, lua.LString(localRef))
+			pushedRef.RawSet(pushedRefRemoteRef, lua.LString(remoteRef))
+			pushedRef.RawSet(pushedRefLocalHash, lua.LString(hashes[0]))
+			pushedRef.RawSet(pushedRefRemoteHash, lua.LString(hashes[1]))
+			luaParameters.Insert(i, &pushedRef)
 			i++
 		}
 	}

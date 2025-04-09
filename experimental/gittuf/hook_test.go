@@ -87,7 +87,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 
 		r := &Repository{r: repo}
 
-		_, err := r.InvokeHooksForStage(testCtx, tuf.HookStagePreCommit, nil)
+		_, err := r.InvokeHooksForStage(testCtx, nil, tuf.HookStagePreCommit)
 		assert.ErrorIs(t, err, sslibdsse.ErrNoSigners)
 	})
 
@@ -118,7 +118,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
-		_, err = r.InvokeHooksForStage(testCtx, hookStage, rootSigner)
+		_, err = r.InvokeHooksForStage(testCtx, rootSigner, hookStage)
 		assert.ErrorIs(t, err, ErrNoHooksFoundForPrincipal)
 	})
 
@@ -146,7 +146,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
-		codes, err := r.InvokeHooksForStage(testCtx, hookStage, rootSigner)
+		codes, err := r.InvokeHooksForStage(testCtx, rootSigner, hookStage)
 		assert.Nil(t, err)
 		assert.Len(t, codes, 1)
 	})
@@ -192,7 +192,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		assert.Nil(t, err)
 
-		codes, err := r.InvokeHooksForStage(testCtx, hookStage, rootSigner, hookopts.WithPrePush("origin", remoteTmpDir, []string{"refs/heads/main:refs/heads/main"}))
+		codes, err := r.InvokeHooksForStage(testCtx, rootSigner, hookStage, hookopts.WithPrePush("origin", remoteTmpDir, []string{"refs/heads/main:refs/heads/main"}))
 		assert.Nil(t, err)
 		assert.Len(t, codes, 1)
 	})
