@@ -29,7 +29,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 func (o *options) Run(cmd *cobra.Command, args []string) error {
 	o.ruleNames = append(o.ruleNames, args...)
 
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}

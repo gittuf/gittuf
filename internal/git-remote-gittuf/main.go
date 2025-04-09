@@ -106,7 +106,6 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("usage: %s <remote-name> <url>", os.Args[0])
 	}
 
-	gitDir := os.Getenv("GIT_DIR")
 	remoteName := os.Args[1]
 	url := os.Args[2]
 
@@ -123,10 +122,12 @@ func run(ctx context.Context) error {
 		handler = handleSSH
 	}
 
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
+		log("Unable to load repository")
 		return err
 	}
+	gitDir := repo.GetGitRepository().GetGitDir()
 
 	gittufRefsTips, isPush, err := handler(ctx, repo, remoteName, url)
 	if err != nil {

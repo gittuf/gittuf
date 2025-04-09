@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
 	"github.com/gittuf/gittuf/internal/cmd/attest"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
@@ -79,7 +80,7 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 
 	// Setup logging
 	level := slog.LevelInfo
-	if o.verbose {
+	if o.verbose || gittuf.InDebugMode() {
 		level = slog.LevelDebug
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{

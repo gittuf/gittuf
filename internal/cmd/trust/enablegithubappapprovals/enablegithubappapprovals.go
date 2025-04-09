@@ -18,7 +18,7 @@ type options struct {
 func (o *options) AddFlags(_ *cobra.Command) {}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}

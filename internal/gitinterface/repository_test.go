@@ -4,11 +4,9 @@
 package gitinterface
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
-	gitinterfaceopts "github.com/gittuf/gittuf/internal/gitinterface/options/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,24 +26,30 @@ func TestRepository(t *testing.T) {
 		})
 	})
 
-	t.Run("with specified path", func(t *testing.T) {
+	t.Run("with specified path, not bare", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
 
-		CreateTestGitRepository(t, tmpDir, false)
-		repo, err := LoadRepository(gitinterfaceopts.WithRepositoryPath(tmpDir))
+		_ = CreateTestGitRepository(t, tmpDir, false)
+		repo, err := LoadRepository(tmpDir)
 		assert.Nil(t, err)
 
-		expectedPath, err := filepath.Abs(filepath.Join(tmpDir, ".git"))
+		expectedPath, err := filepath.EvalSymlinks(filepath.Join(tmpDir, ".git"))
 		require.Nil(t, err)
-		actualPath, err := filepath.Abs(repo.GetGitDir())
+		actualPath, err := filepath.EvalSymlinks(repo.GetGitDir())
+		require.Nil(t, err)
+		assert.Equal(t, expectedPath, actualPath)
+	})
+
+	t.Run("with specified path, is bare", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		_ = CreateTestGitRepository(t, tmpDir, true)
+		repo, err := LoadRepository(tmpDir)
+		assert.Nil(t, err)
+
+		expectedPath, err := filepath.EvalSymlinks(tmpDir)
+		require.Nil(t, err)
+		actualPath, err := filepath.EvalSymlinks(repo.GetGitDir())
 		require.Nil(t, err)
 		assert.Equal(t, expectedPath, actualPath)
 	})

@@ -13,7 +13,7 @@ type options struct{}
 func (o *options) AddFlags(_ *cobra.Command) {}
 
 func (o *options) Run(_ *cobra.Command, args []string) error {
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}

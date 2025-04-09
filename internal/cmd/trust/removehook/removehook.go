@@ -62,7 +62,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		stages = append(stages, tuf.HookStagePrePush)
 	}
 
-	repo, err := gittuf.LoadRepository()
+	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
