@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -27,6 +28,21 @@ func TestNewLuaEnvironment(t *testing.T) {
 	defer environment.Cleanup()
 	assert.Nil(t, err)
 	assert.NotNil(t, environment)
+}
+
+func TestRunScript(t *testing.T) {
+	t.Run("basic script", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		environment, err := NewLuaEnvironment(testCtx, repo)
+		defer environment.Cleanup()
+		require.Nil(t, err)
+
+		exitCode, err := environment.RunScript(string(artifacts.SampleHookScript), lua.LTable{})
+		assert.Nil(t, err)
+		assert.Equal(t, 0, exitCode)
+	})
 }
 
 func TestAPIMatchRegex(t *testing.T) {
