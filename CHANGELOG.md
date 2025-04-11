@@ -2,6 +2,27 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.10.0
+
+### Added 
+
+- Added features and workflows to support deploying gittuf over multiple
+  repositories
+- Added gittuf hooks, which enable support for user-defined checks in gittuf
+  metadata that are run in a sandboxed lua environment
+- Added gittuf-git, a drop-in replacement for Git that enables automatic
+  management of gittuf metadata as well as support for gittuf hooks
+- Added a sync workflow that updates gittuf metadata as needed before making
+  policy changes
+- Added functionality to list and update global rules
+- Added support to the API for loading repositories in a specified directory
+
+### Updated
+
+- Updated the policy staging and apply workflows to now use the sync workflow
+- Updated gitinterface to now support systems with different locales than en_US
+- Updated various dependencies and CI workflows
+
 ## v0.9.0
 
 ### Added
