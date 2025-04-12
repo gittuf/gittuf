@@ -2,6 +2,10 @@
 
 List global rules for the current state
 
+### Synopsis
+
+This command allows users to list the currently defined global rules for the root of trust. The output is sorted by global rule type.
+
 ```
 gittuf trust list-global-rules [flags]
 ```

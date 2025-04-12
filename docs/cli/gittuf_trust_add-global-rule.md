@@ -2,6 +2,10 @@
 
 Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
 
+### Synopsis
+
+This command allows a user to add a new global rule to the root of trust. The user must specify the name, type, and rule pattern for the rule.
+
 ```
 gittuf trust add-global-rule [flags]
 ```

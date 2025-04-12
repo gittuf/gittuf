@@ -70,6 +70,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-principals",
 		Short:             "List principals for the current policy in the specified rule file",
+		Long:              "This command retrieves and lists the authorized principals for the specified policy and rule. The user must specify the policy ref they wish to inspect, and the name of the rule file to retrieve the principals for.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
