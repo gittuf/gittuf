@@ -25,6 +25,8 @@ const (
 	codeReviewApprovalAttestationsTreeEntryName = "code-review-approvals"
 	codeReviewApprovalIndexTreeEntryName        = "review-index.json"
 
+	hookExecutionAttestationsTreeEntryName = "hook-attestations"
+
 	initialCommitMessage = "Initial commit"
 	defaultCommitMessage = "Update attestations"
 )
@@ -70,6 +72,11 @@ type Attestations struct {
 	// attestations namespace as a special blob in the
 	// codeReviewApprovalAttestations tree.
 	codeReviewApprovalIndex map[string]string
+
+	// hookExecutionAttestations maps information about a set of hooks run for a
+	// certain stage to a principal ID. This allows users to verify whether
+	// programmable checks were run before a commit was made.
+	hookExecutionAttestations map[string]gitinterface.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -126,6 +133,8 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.Reference
 			attestations.githubPullRequestAttestations[strings.TrimPrefix(name, githubPullRequestAttestationsTreeEntryName+"/")] = blobID
 		case strings.HasPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/"):
 			attestations.codeReviewApprovalAttestations[strings.TrimPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/")] = blobID
+		case strings.HasPrefix(name, hookExecutionAttestationsTreeEntryName+"/"):
+			attestations.hookExecutionAttestations[strings.TrimPrefix(name, hookExecutionAttestationsTreeEntryName+"/")] = blobID
 		}
 	}
 
@@ -178,6 +187,9 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 	}
 	for name, blobID := range a.codeReviewApprovalAttestations {
 		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(codeReviewApprovalAttestationsTreeEntryName, name), blobID))
+	}
+	for name, blobID := range a.hookExecutionAttestations {
+		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(hookExecutionAttestationsTreeEntryName, name), blobID))
 	}
 
 	attestationsTreeID, err := treeBuilder.WriteTreeFromEntries(allAttestations)
