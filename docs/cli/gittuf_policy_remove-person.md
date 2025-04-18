@@ -1,6 +1,6 @@
 ## gittuf policy remove-person
 
-Remove a person from a policy file (requires developer mode and v0.2 policy metadata to be enabled, set GITTUF_DEV=1 and GITTUF_ALLOW_V02_POLICY=1)
+Remove a person from a policy file
 
 ### Synopsis
 

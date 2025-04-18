@@ -1254,8 +1254,6 @@ func TestAddPropagationDirective(t *testing.T) {
 	})
 
 	t.Run("with tuf v02 metadata", func(t *testing.T) {
-		t.Setenv(tufv02.AllowV02MetadataKey, "1")
-
 		r := createTestRepositoryWithRoot(t, "")
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
@@ -1360,8 +1358,6 @@ func TestRemovePropagationDirective(t *testing.T) {
 	})
 
 	t.Run("with tuf v02 metadata", func(t *testing.T) {
-		t.Setenv(tufv02.AllowV02MetadataKey, "1")
-
 		r := createTestRepositoryWithRoot(t, "")
 
 		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)

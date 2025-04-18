@@ -9,25 +9,15 @@ package v02
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/dev"
 	v01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 const (
-	AllowV02MetadataKey = "GITTUF_ALLOW_V02_POLICY"
-
 	associatedIdentityKey = "(associated identity)"
 )
-
-// AllowV02Metadata returns true if gittuf is in developer mode and
-// GITTUF_ALLOW_V02_POLICY=1.
-func AllowV02Metadata() bool {
-	return dev.InDevMode() && os.Getenv(AllowV02MetadataKey) == "1"
-}
 
 // Key defines the structure for how public keys are stored in TUF metadata. It
 // implements the tuf.Principal and is used for backwards compatibility where a

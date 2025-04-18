@@ -19,7 +19,6 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
-	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,9 +89,6 @@ func TestVerifyRefFromEntry(t *testing.T) {
 }
 
 func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
-	t.Setenv(tufv02.AllowV02MetadataKey, "1")
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("no recovery", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
 		refName := "refs/heads/main"
@@ -741,7 +737,6 @@ func TestVerifyMergeable(t *testing.T) {
 	featureRefName := "refs/heads/feature"
 
 	t.Setenv(dev.DevModeKey, "1")
-	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
@@ -2672,7 +2667,6 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification using persons", func(t *testing.T) {
-		t.Setenv(tufv02.AllowV02MetadataKey, "1")
 		t.Setenv(dev.DevModeKey, "1")
 
 		repo, state := createTestRepository(t, createTestStateWithPolicyUsingPersons)
@@ -2795,7 +2789,6 @@ func TestVerifyEntry(t *testing.T) {
 
 	t.Run("successful verification with higher threshold but using GitHub approval", func(t *testing.T) {
 		t.Setenv(dev.DevModeKey, "1")
-		t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
@@ -2853,7 +2846,6 @@ func TestVerifyEntry(t *testing.T) {
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval due to invalid app key", func(t *testing.T) {
 		t.Setenv(dev.DevModeKey, "1")
-		t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 

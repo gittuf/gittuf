@@ -11,7 +11,6 @@ import (
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
@@ -67,10 +66,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	if !tufv02.AllowV02Metadata() {
-		return fmt.Errorf("developer mode and v0.2 policy metadata must be enabled, set %s=1 and %s=1", dev.DevModeKey, tufv02.AllowV02MetadataKey)
-	}
-
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -127,7 +122,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "add-person",
-		Short:             fmt.Sprintf("Add a trusted person to a policy file (requires developer mode and v0.2 policy metadata to be enabled, set %s=1 and %s=1)", dev.DevModeKey, tufv02.AllowV02MetadataKey),
+		Short:             "Add a trusted person to a policy file",
 		Long:              `This command allows users to add a trusted person to the specified policy file. By default, the main policy file is selected. Note that the person's keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,

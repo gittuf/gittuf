@@ -523,9 +523,6 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	t.Helper()
 
-	t.Setenv(dev.DevModeKey, "1")
-	t.Setenv(tufv02.AllowV02MetadataKey, "1")
-
 	state := createTestStateWithPolicyUsingPersons(t)
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
@@ -621,7 +618,6 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	t.Helper()
 
 	t.Setenv(dev.DevModeKey, "1")
-	t.Setenv(tufv02.AllowV02MetadataKey, "1")
 
 	state := createTestStateWithPolicyUsingPersons(t)
 
