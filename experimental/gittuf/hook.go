@@ -14,10 +14,12 @@ import (
 	"strings"
 
 	hookopts "github.com/gittuf/gittuf/experimental/gittuf/options/hooks"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/luasandbox"
 	luasandboxopts "github.com/gittuf/gittuf/internal/luasandbox/options/luasandbox"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	lua "github.com/yuin/gopher-lua"
@@ -51,13 +53,18 @@ var HookPrePush = HookType("pre-push")
 // stage for the user, the map of hook names to exit codes is returned.  TODO:
 // Add attestations workflow
 func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.Signer, stage tuf.HookStage, opts ...hookopts.Option) (map[string]int, error) {
+	var err error
+
 	options := &hookopts.Options{}
 	for _, fn := range opts {
 		fn(options)
 	}
 
 	if signer == nil {
-		return nil, sslibdsse.ErrNoSigners
+		signer, err = LoadSignerFromGitConfig(r)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	keyID, err := signer.KeyID()
@@ -196,7 +203,53 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.S
 		exitCodes[hook.ID()] = exitCode
 	}
 
-	return exitCodes, nil
+	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return nil, err
+	}
+
+	currentRef, err := r.r.GetSymbolicReferenceTarget("HEAD")
+	if err != nil {
+		return nil, err
+	}
+
+	currentRefID, err := r.r.GetReference(currentRef)
+	if err != nil {
+		return nil, err
+	}
+
+	policyEntry, err := r.r.GetReference("refs/gittuf/policy")
+	if err != nil {
+		return nil, err
+	}
+
+	runHooks := []string{}
+	for _, hook := range selectedHooks {
+		runHooks = append(runHooks, hook.ID())
+	}
+
+	statement, err := attestations.NewHookExecutionAttestation(currentRef, currentRefID.String(), policyEntry.String(), stage, runHooks, selectedPrincipal.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	env, err := dsse.CreateEnvelope(statement)
+	if err != nil {
+		return nil, err
+	}
+
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return nil, err
+	}
+
+	err = allAttestations.SetHookExecutionAttestation(r.r, env, stage.String())
+	if err != nil {
+		return nil, err
+	}
+
+	commitMessage := fmt.Sprintf("Add hook execution attestation for hooks ran by '%s' for stage '%s'", selectedPrincipal.ID(), stage.String())
+	return exitCodes, allAttestations.Commit(r.r, commitMessage, true, true)
 }
 
 // UpdateHook updates a git hook in the repository's .git/hooks folder.
