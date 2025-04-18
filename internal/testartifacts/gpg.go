@@ -15,3 +15,6 @@ var GPGKey2Public []byte
 
 //go:embed testdata/keys/gpg/2.asc
 var GPGKey2Private []byte
+
+//go:embed testdata/configurations/gpg-agent.conf
+var GPGAgentConf []byte

@@ -79,7 +79,8 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) {
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
-		return nil, fmt.Errorf("not implemented")
+		keyID := strings.TrimPrefix(key, GPGKeyPrefix)
+		return gpg.NewSignerFromKeyID(keyID)
 	case strings.HasPrefix(key, FulcioPrefix):
 		opts := []sigstoresigneropts.Option{}
 

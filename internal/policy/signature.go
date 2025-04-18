@@ -152,8 +152,11 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 						return nil, err
 					}
 				case gpg.KeyType:
-					slog.Debug(fmt.Sprintf("Found GPG key '%s', cannot use for DSSE signature verification yet...", key.KeyID))
-					continue
+					slog.Debug(fmt.Sprintf("Found GPG key '%s'...", key.KeyID))
+					dsseVerifier, err = gpg.NewVerifierFromKey(key)
+					if err != nil {
+						return nil, err
+					}
 				case sigstore.KeyType:
 					slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
 					opts := []sigstoreverifieropts.Option{}
