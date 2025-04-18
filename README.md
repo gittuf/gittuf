@@ -17,12 +17,12 @@ as part of the [Supply Chain Integrity Working Group].
 
 ## Current Status
 
-gittuf is currently in alpha. gittuf's metadata may have breaking changes,
-meaning a repository's gittuf policy may have to be reinitialized from time to
-time. As such, gittuf is currently not intended to be the primary mechanism for
-enforcing a repository's security.
+gittuf is currently in beta. gittuf's metadata is versioned, and updates should
+not require reinitializing a repository's gittuf policy. gittuf may be used as a
+repository's primary security mechanism, but beta-type bugs may be present (and
+reports are welcome!)
 
-That said, we're actively seeking feedback from users. Take a look at the [get
+We're actively seeking feedback from users. Take a look at the [get
 started guide] to learn how to install and try gittuf out! Additionally,
 contributions are welcome, please refer to the [contributing guide], our
 [roadmap], and the issue tracker for ways to get involved.
