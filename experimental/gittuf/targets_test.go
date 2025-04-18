@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,7 @@ func TestInitializeTargets(t *testing.T) {
 
 		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
-		assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
+		assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
 	})
 
 	t.Run("invalid role name", func(t *testing.T) {
@@ -84,7 +85,7 @@ func TestAddDelegation(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
 		assert.Equal(t, 2, len(targetsMetadata.GetRules()))
-		assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
+		assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
 
 		if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeys, false); err != nil {
 			t.Fatal(err)
@@ -107,13 +108,13 @@ func TestAddDelegation(t *testing.T) {
 		assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
 		assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
 		assert.Equal(t, 3, len(targetsMetadata.GetRules()))
-		assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
+		assert.Contains(t, targetsMetadata.GetRules(), &tufv02.Delegation{
 			Name:        ruleName,
 			Paths:       rulePatterns,
 			Terminating: false,
-			Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
+			Role:        tufv02.Role{PrincipalIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
 		})
-		assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
+		assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
 	})
 
 	t.Run("invalid rule name", func(t *testing.T) {
@@ -157,11 +158,11 @@ func TestUpdateDelegation(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
-	assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
+	assert.Contains(t, targetsMetadata.GetRules(), &tufv02.Delegation{
 		Name:        "protect-main",
 		Paths:       []string{"git:refs/heads/main"},
 		Terminating: false,
-		Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(gpgKey.KeyID, targetsKey.KeyID), Threshold: 1},
+		Role:        tufv02.Role{PrincipalIDs: set.NewSetFromItems(gpgKey.KeyID, targetsKey.KeyID), Threshold: 1},
 	})
 }
 
@@ -240,13 +241,13 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 3, len(targetsMetadata.GetRules()))
-	assert.Contains(t, targetsMetadata.GetRules(), &tufv01.Delegation{
+	assert.Contains(t, targetsMetadata.GetRules(), &tufv02.Delegation{
 		Name:        ruleName,
 		Paths:       rulePatterns,
 		Terminating: false,
-		Role:        tufv01.Role{KeyIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
+		Role:        tufv02.Role{PrincipalIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
 	})
-	assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
+	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
 
 	err = r.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, false)
 	assert.Nil(t, err)
@@ -263,7 +264,7 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
-	assert.Contains(t, targetsMetadata.GetRules(), tufv01.AllowRule())
+	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
 }
 
 func TestAddPrincipalToTargets(t *testing.T) {
