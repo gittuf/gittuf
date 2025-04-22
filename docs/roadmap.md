@@ -1,6 +1,6 @@
 # gittuf Roadmap
 
-Last Modified: April 24, 2024
+Last Modified: April 22, 2025
 
 This document details gittuf's ongoing roadmap. As gittuf is under active
 development, this document is not considered immutable, and some items may be
@@ -10,11 +10,19 @@ already completed.
 
 ## Partial / Work in Progress
 
-### Dogfood gittuf
+### Reach Beta Milestone
 
-Once gittuf achieves sufficient maturity, the gittuf source must be protected
-using gittuf. This will contribute significantly to the usability and further
-development of the tool, and will demonstrate its features and viability.
+After sufficient dogfooding and testing, gittuf should be released as a beta. As
+a rule of thumb, post reaching beta, repositories should not have to
+reinitialize gittuf due to breaking changes or incompatibility in metadata
+formats.
+
+### Support Multi-repository Policies
+
+If gittuf operates only within the boundary of a single Git repository, scaling
+gittuf across thousands of repositories becomes impractical. gittuf must
+include mechanisms to enable reuse of gittuf policies across repositories so
+that policy management overhead is minimized.
 
 ### Support Developer Teams
 
@@ -22,10 +30,11 @@ gittuf currently identifies each developer by their signing key or identity.
 Policies grant permissions to each individual developer. Eventually, gittuf must
 support declaring teams of developers, with policies granting permissions to
 those teams as a whole. Further, thresholds on required authorizations for
-policies must be granular enough to apply across team boundaries. For example, it
-must be possible to require two members of the development team and one member
-of the security team to sign off on a change. This is not the same as a total
-threshold of three across the members of the development and security teams.
+policies must be granular enough to apply across team boundaries. For example,
+it must be possible to require two members of the development team and one
+member of the security team to sign off on a change. This is not the same as a
+total threshold of three across the members of the development and security
+teams.
 
 ### Support For Different Hats (Roles)
 
@@ -38,8 +47,6 @@ reasonable that she may want to control how a statement of trust by her is used.
 These could naturally be linked to the teams for which a statement should be
 trusted.
 
-## Planned
-
 ### Integrate with Git Ecosystem
 
 Git forges like GitHub and GitLab allow repository owners to specify policies
@@ -48,11 +55,20 @@ approve changes to certain files, and more. These repository policies can be
 specified in gittuf, making conformance with repository policies publicly
 verifiable. In addition, as gittuf tracks historic policies, auditing
 repositories hosted on such forges at some older state can be made possible.
-
 Another Git-specific tool that gittuf could integrate with is Gerrit, the code
 review system. This integration, in combination with support for
 [in-toto attestations](#integrate-in-toto-attestations) would allow for
 transparent and auditable code review policy enforcement.
+
+This item is currently underway. The gittuf community has built a [GitHub
+app](https://github.com/gittuf/github-app) that can be installed on a
+repository. The app watches pull requests and records attestations for code
+review approvals and pull request merges. The app also verifies gittuf policy
+for the repository and adds a [status
+check](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks)
+to pull requests with the verification status.
+
+## Planned
 
 ### Read Permissions
 
@@ -101,3 +117,9 @@ As of April 2024, in-toto attestations can be used in gittuf for actions such as
 approving a change in the repository. We are actively working upstream with the
 SLSA project to enable using other predicate types that may be defined as part
 of the source track.
+
+### Dogfood gittuf
+
+Once gittuf achieves sufficient maturity, the gittuf source must be protected
+using gittuf. This will contribute significantly to the usability and further
+development of the tool, and will demonstrate its features and viability.
