@@ -527,7 +527,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-	appName := tuf.GitHubAppRoleName // TODO: this should be generalized more
+	appName := tuf.GitHubAppRoleName
 
 	rootMetadata, err := state.GetRootMetadata(false)
 	if err != nil {
@@ -538,10 +538,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
-	rootMetadata.EnableGitHubAppApprovals()
-	state.githubAppApprovalsTrusted = true
-	state.githubAppKeys = []tuf.Principal{appKey}
-	state.githubAppRoleName = appName
+	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -598,6 +595,10 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	}
 	state.Metadata.TargetsEnvelope = targetsEnv
 
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
 	return state
 }
 
@@ -634,10 +635,7 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
-	rootMetadata.EnableGitHubAppApprovals()
-	state.githubAppApprovalsTrusted = true
-	state.githubAppKeys = []tuf.Principal{appKey}
-	state.githubAppRoleName = appName
+	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -709,6 +707,10 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 		t.Fatal(err)
 	}
 	state.Metadata.TargetsEnvelope = targetsEnv
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
 
 	return state
 }

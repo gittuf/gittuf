@@ -20,7 +20,7 @@ const (
 	TargetsRoleName = "targets"
 
 	// GitHubAppRoleName defines the expected name for the GitHub app role in the root of trust metadata.
-	GitHubAppRoleName = "github-app"
+	GitHubAppRoleName = "https://gittuf.dev/github-app"
 
 	AllowRuleName          = "gittuf-allow-rule"
 	ExhaustiveVerifierName = "gittuf-exhaustive-verifier"
@@ -155,18 +155,21 @@ type RootMetadata interface {
 	// EnableGitHubAppApprovals indicates attestations from the GitHub app role
 	// must be trusted.
 	// TODO: this needs to be generalized across tools
-	EnableGitHubAppApprovals()
+	EnableGitHubAppApprovals(appName string)
 	// DisableGitHubAppApprovals indicates attestations from the GitHub app role
 	// must not be trusted thereafter.
 	// TODO: this needs to be generalized across tools
-	DisableGitHubAppApprovals()
+	DisableGitHubAppApprovals(appName string)
 	// IsGitHubAppApprovalTrusted indicates if the GitHub app is trusted.
 	// TODO: this needs to be generalized across tools
-	IsGitHubAppApprovalTrusted() bool
+	IsGitHubAppApprovalTrusted(appName string) bool
 	// GetGitHubAppPrincipals returns the principals trusted for the GitHub app
 	// attestations.
 	// TODO: this needs to be generalized across tools
-	GetGitHubAppPrincipals() ([]Principal, error)
+	// TODO: retire IsGitHubAppApprovalTrusted
+	GetGitHubAppPrincipals(appName string) ([]Principal, error)
+	// GetGitHubAppEntries returns the GitHub apps declared in the metadata.
+	GetGitHubAppEntries() (map[string]GitHubApp, error)
 
 	// AddPropagationDirective adds a propagation directive to the root
 	// metadata.
@@ -521,4 +524,10 @@ type Hook interface {
 
 	// GetTimeout returns the maximum duration the hook can run for, in seconds.
 	GetTimeout() int
+}
+
+type GitHubApp interface {
+	GetPrincipalIDs() []string
+	GetThreshold() int
+	IsTrusted() bool
 }

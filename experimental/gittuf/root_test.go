@@ -309,7 +309,7 @@ func TestAddGitHubApp(t *testing.T) {
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
-	err := r.AddGitHubApp(testCtx, sv, key, false)
+	err := r.AddGitHubApp(testCtx, sv, "github-app", key, false)
 	assert.Nil(t, err)
 	err = r.StagePolicy(testCtx, "", true, false)
 	require.Nil(t, err)
@@ -322,7 +322,7 @@ func TestAddGitHubApp(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals("github-app")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,7 +338,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
-	err := r.AddGitHubApp(testCtx, sv, key, false)
+	err := r.AddGitHubApp(testCtx, sv, "github-app", key, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +355,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+	appPrincipals, err := rootMetadata.GetGitHubAppPrincipals("github-app")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -364,7 +364,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	err = r.RemoveGitHubApp(testCtx, sv, false)
+	err = r.RemoveGitHubApp(testCtx, sv, "github-app", false)
 	assert.Nil(t, err)
 	err = r.StagePolicy(testCtx, "", true, false)
 	require.Nil(t, err)
@@ -379,7 +379,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	appPrincipals, err = rootMetadata.GetGitHubAppPrincipals()
+	appPrincipals, err = rootMetadata.GetGitHubAppPrincipals("github-app")
 	// We see an error (correctly that the app is trusted but no key is present)
 	assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 	assert.Empty(t, appPrincipals)
@@ -389,61 +389,45 @@ func TestRemoveGitHubApp(t *testing.T) {
 }
 
 func TestTrustGitHubApp(t *testing.T) {
-	t.Run("GitHub app role not defined", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
+	r := createTestRepositoryWithRoot(t, "")
 
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
 
-		err := r.TrustGitHubApp(testCtx, sv, false)
-		assert.Nil(t, err)
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		_, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
-	})
+	rootMetadata, err := state.GetRootMetadata(false)
+	assert.Nil(t, err)
 
-	t.Run("GitHub app role defined", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
 
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+	err = r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+	assert.Nil(t, err)
 
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = r.TrustGitHubApp(testCtx, sv, "github-app", false)
+	assert.Nil(t, err)
 
-		rootMetadata, err := state.GetRootMetadata(false)
-		assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
-		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		err = r.AddGitHubApp(testCtx, sv, key, false)
-		assert.Nil(t, err)
+	rootMetadata, err = state.GetRootMetadata(false)
+	assert.Nil(t, err)
 
-		err = r.TrustGitHubApp(testCtx, sv, false)
-		assert.Nil(t, err)
+	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
 
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		rootMetadata, err = state.GetRootMetadata(false)
-		assert.Nil(t, err)
-
-		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
-		_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
-		assert.Nil(t, err)
-
-		// Test if we can trust again if already trusted
-		err = r.TrustGitHubApp(testCtx, sv, false)
-		assert.Nil(t, err)
-	})
+	// Test if we can trust again if already trusted
+	err = r.TrustGitHubApp(testCtx, sv, "github-app", false)
+	assert.Nil(t, err)
 }
 
 func TestUntrustGitHubApp(t *testing.T) {
@@ -460,12 +444,12 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
 
-	err = r.AddGitHubApp(testCtx, sv, key, false)
+	err = r.AddGitHubApp(testCtx, sv, "github-app", key, false)
 	assert.Nil(t, err)
 
-	err = r.TrustGitHubApp(testCtx, sv, false)
+	err = r.TrustGitHubApp(testCtx, sv, "github-app", false)
 	assert.Nil(t, err)
 
 	err = r.StagePolicy(testCtx, "", true, false)
@@ -479,11 +463,11 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err = state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted())
+	assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	err = r.UntrustGitHubApp(testCtx, sv, false)
+	err = r.UntrustGitHubApp(testCtx, sv, "github-app", false)
 	assert.Nil(t, err)
 	err = r.StagePolicy(testCtx, "", true, false)
 	require.Nil(t, err)
@@ -496,7 +480,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	rootMetadata, err = state.GetRootMetadata(false)
 	assert.Nil(t, err)
 
-	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted())
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 }

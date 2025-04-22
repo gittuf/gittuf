@@ -762,49 +762,60 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 	// We only use this flow right now for non-tags as tags cannot be approved
 	// on currently supported systems
 	// TODO: support multiple apps / threshold per system
-	if !isTag && policy.githubAppApprovalsTrusted {
-		slog.Debug("GitHub pull request approvals are trusted, loading applicable attestations...")
-
-		githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, policy.githubAppRoleName, targetRef, fromID.String(), toID.String())
-		if err != nil {
-			if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
-				return nil, nil, err
+	if !isTag {
+		for appName, appEntry := range policy.GitHubApps {
+			if !appEntry.IsTrusted() {
+				continue
 			}
-		}
 
-		// if it exists
-		if githubApprovalAttestation != nil {
-			slog.Debug("GitHub pull request approval found, verifying attestation signature...")
-			approvalVerifier := &SignatureVerifier{
-				repository: policy.repository,
-				name:       tuf.GitHubAppRoleName,
-				principals: policy.githubAppKeys,
-				threshold:  1, // TODO: support higher threshold
-			}
-			_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
+			slog.Debug(fmt.Sprintf("GitHub pull request approvals are trusted from '%s', loading applicable attestations...", appName))
+
+			githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, targetRef, fromID.String(), toID.String())
 			if err != nil {
-				return nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
+				if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
+					return nil, nil, err
+				}
 			}
 
-			payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
-			if err != nil {
-				return nil, nil, err
+			appPrincipals := []tuf.Principal{}
+			for _, principalID := range appEntry.GetPrincipalIDs() {
+				appPrincipals = append(appPrincipals, policy.allPrincipals[principalID])
 			}
 
-			// TODO: support multiple versions
-			type tmpStatement struct {
-				Type          string                                    `json:"_type"`
-				Subject       []*ita.ResourceDescriptor                 `json:"subject"`
-				PredicateType string                                    `json:"predicateType"`
-				Predicate     *githubv01.PullRequestApprovalAttestation `json:"predicate"`
-			}
-			stmt := new(tmpStatement)
-			if err := json.Unmarshal(payloadBytes, stmt); err != nil {
-				return nil, nil, err
-			}
+			// if it exists
+			if githubApprovalAttestation != nil {
+				slog.Debug("GitHub pull request approval found, verifying attestation signature...")
+				approvalVerifier := &SignatureVerifier{
+					repository: policy.repository,
+					name:       appName,
+					principals: appPrincipals,
+					threshold:  appEntry.GetThreshold(),
+				}
+				_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
+				if err != nil {
+					return nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
+				}
 
-			for _, approver := range stmt.Predicate.GetApprovers() {
-				approverIdentities.Add(approver)
+				payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
+				if err != nil {
+					return nil, nil, err
+				}
+
+				// TODO: support multiple versions
+				type tmpStatement struct {
+					Type          string                                    `json:"_type"`
+					Subject       []*ita.ResourceDescriptor                 `json:"subject"`
+					PredicateType string                                    `json:"predicateType"`
+					Predicate     *githubv01.PullRequestApprovalAttestation `json:"predicate"`
+				}
+				stmt := new(tmpStatement)
+				if err := json.Unmarshal(payloadBytes, stmt); err != nil {
+					return nil, nil, err
+				}
+
+				for _, approver := range stmt.Predicate.GetApprovers() {
+					approverIdentities.Add(approver)
+				}
 			}
 		}
 	}
@@ -904,11 +915,13 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		}
 	}
 
-	appName := ""
-	if policy.githubAppApprovalsTrusted {
-		appName = policy.githubAppRoleName
+	appNames := []string{}
+	for appName, appEntry := range policy.GitHubApps {
+		if appEntry.IsTrusted() {
+			appNames = append(appNames, appName)
+		}
 	}
-	verifiedUsing, acceptedPrincipalIDs, rslSignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appName, options.approverPrincipalIDs, options.verifyMergeable)
+	verifiedUsing, acceptedPrincipalIDs, rslSignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
 	if err != nil {
 		return "", false, err
 	}
@@ -1046,7 +1059,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 	return verifiedUsing, rslSignatureNeededForThreshold, nil
 }
 
-func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appName string, approverIDs *set.Set[string], verifyMergeable bool) (string, *set.Set[string], bool, error) {
+func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appNames []string, approverIDs *set.Set[string], verifyMergeable bool) (string, *set.Set[string], bool, error) {
 	if len(verifiers) == 0 {
 		return "", nil, false, ErrNoVerifiers
 	}
@@ -1090,15 +1103,22 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 					// We can only match against a principal if it has a notion
 					// of associated identities
 					// Right now, this is just tufv02.Person
+					matchedAssociatedIdentity := false
 					if principal, isV02 := principal.(*tufv02.Person); isV02 {
-						if associatedIdentity, has := principal.AssociatedIdentities[appName]; has && associatedIdentity == approverID {
-							// The approver ID from the issuer (appName) matches
-							// the principal's associated identity for the same
-							// issuer!
-							slog.Debug(fmt.Sprintf("Principal '%s' has associated identity '%s', counting principal towards threshold...", principal.ID(), approverID))
-							usedPrincipalIDs.Add(principal.ID())
-							break
+						for _, appName := range appNames {
+							if associatedIdentity, has := principal.AssociatedIdentities[appName]; has && associatedIdentity == approverID {
+								// The approver ID from the issuer (appName) matches
+								// the principal's associated identity for the same
+								// issuer!
+								slog.Debug(fmt.Sprintf("Principal '%s' has associated identity '%s', counting principal towards threshold...", principal.ID(), approverID))
+								usedPrincipalIDs.Add(principal.ID())
+								matchedAssociatedIdentity = true
+								break
+							}
 						}
+					}
+					if matchedAssociatedIdentity {
+						break
 					}
 				}
 			}

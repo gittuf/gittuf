@@ -19,17 +19,17 @@ const (
 
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
-	Type                   string                     `json:"type"`
-	Version                string                     `json:"schemaVersion"`
-	Expires                string                     `json:"expires"`
-	RepositoryLocation     string                     `json:"repositoryLocation,omitempty"`
-	Principals             map[string]tuf.Principal   `json:"principals"`
-	Roles                  map[string]Role            `json:"roles"`
-	GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
-	GlobalRules            []tuf.GlobalRule           `json:"globalRules,omitempty"`
-	Propagations           []tuf.PropagationDirective `json:"propagations,omitempty"`
-	MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
-	Hooks                  map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
+	Type               string                     `json:"type"`
+	Version            string                     `json:"schemaVersion"`
+	Expires            string                     `json:"expires"`
+	RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
+	Principals         map[string]tuf.Principal   `json:"principals"`
+	Roles              map[string]Role            `json:"roles"`
+	GitHubApps         map[string]*GitHubApp      `json:"githubApps,omitempty"`
+	GlobalRules        []tuf.GlobalRule           `json:"globalRules,omitempty"`
+	Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
+	MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
+	Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -172,31 +172,54 @@ func (r *RootMetadata) AddGitHubAppPrincipal(name string, principal tuf.Principa
 	if err := r.addPrincipal(principal); err != nil {
 		return err
 	}
-	role := Role{
+	entry := &GitHubApp{
 		PrincipalIDs: set.NewSetFromItems(principal.ID()),
 		Threshold:    1,
 	}
-	r.addRole(name, role) // AddRole replaces the specified role if it already exists
+
+	if r.GitHubApps == nil {
+		r.GitHubApps = map[string]*GitHubApp{}
+	}
+	r.GitHubApps[name] = entry
 	return nil
 }
 
 // DeleteGitHubAppPrincipal removes the special GitHub app role from the root
 // metadata.
 func (r *RootMetadata) DeleteGitHubAppPrincipal(name string) {
-	// TODO: support multiple principals / threshold for app
-	delete(r.Roles, name)
+	if r.GitHubApps == nil {
+		return
+	}
+
+	delete(r.GitHubApps, name)
 }
 
 // EnableGitHubAppApprovals sets GitHubApprovalsTrusted to true in the
 // root metadata.
-func (r *RootMetadata) EnableGitHubAppApprovals() {
-	r.GitHubApprovalsTrusted = true
+func (r *RootMetadata) EnableGitHubAppApprovals(appName string) {
+	if appEntry, has := r.GitHubApps[appName]; has {
+		appEntry.Trusted = true
+	}
 }
 
 // DisableGitHubAppApprovals sets GitHubApprovalsTrusted to false in the root
 // metadata.
-func (r *RootMetadata) DisableGitHubAppApprovals() {
-	r.GitHubApprovalsTrusted = false
+func (r *RootMetadata) DisableGitHubAppApprovals(appName string) {
+	if appEntry, has := r.GitHubApps[appName]; has {
+		appEntry.Trusted = false
+	}
+}
+
+func (r *RootMetadata) GetGitHubAppEntries() (map[string]tuf.GitHubApp, error) {
+	if len(r.GitHubApps) == 0 {
+		return nil, nil
+	}
+
+	githubApps := map[string]tuf.GitHubApp{}
+	for name, app := range r.GitHubApps {
+		githubApps[name] = app
+	}
+	return githubApps, nil
 }
 
 // UpdateRootThreshold sets the threshold for the Root role.
@@ -292,22 +315,25 @@ func (r *RootMetadata) GetPrimaryRuleFilePrincipals() ([]tuf.Principal, error) {
 // IsGitHubAppApprovalTrusted indicates if the GitHub app is trusted.
 //
 // TODO: this needs to be generalized across tools
-func (r *RootMetadata) IsGitHubAppApprovalTrusted() bool {
-	return r.GitHubApprovalsTrusted
+func (r *RootMetadata) IsGitHubAppApprovalTrusted(appName string) bool {
+	if appEntry, has := r.GitHubApps[appName]; has {
+		return appEntry.Trusted
+	}
+	return false
 }
 
 // GetGitHubAppPrincipals returns the principals trusted for the GitHub app
 // attestations.
 //
 // TODO: this needs to be generalized across tools
-func (r *RootMetadata) GetGitHubAppPrincipals() ([]tuf.Principal, error) {
-	role, hasRole := r.Roles[tuf.GitHubAppRoleName]
-	if !hasRole {
+func (r *RootMetadata) GetGitHubAppPrincipals(appName string) ([]tuf.Principal, error) {
+	entry, hasEntry := r.GitHubApps[appName]
+	if !hasEntry {
 		return nil, tuf.ErrGitHubAppInformationNotFoundInRoot
 	}
 
-	principals := make([]tuf.Principal, 0, role.PrincipalIDs.Len())
-	for _, id := range role.PrincipalIDs.Contents() {
+	principals := make([]tuf.Principal, 0, entry.PrincipalIDs.Len())
+	for _, id := range entry.PrincipalIDs.Contents() {
 		principals = append(principals, r.Principals[id])
 	}
 
@@ -318,17 +344,17 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage in place of tuf interfaces
 	type tempType struct {
-		Type                   string                     `json:"type"`
-		Version                string                     `json:"schemaVersion"`
-		Expires                string                     `json:"expires"`
-		RepositoryLocation     string                     `json:"repositoryLocation,omitempty"`
-		Principals             map[string]json.RawMessage `json:"principals"`
-		Roles                  map[string]Role            `json:"roles"`
-		GitHubApprovalsTrusted bool                       `json:"githubApprovalsTrusted"`
-		GlobalRules            []json.RawMessage          `json:"globalRules,omitempty"`
-		Propagations           []json.RawMessage          `json:"propagations,omitempty"`
-		MultiRepository        *MultiRepository           `json:"multiRepository,omitempty"`
-		Hooks                  map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
+		Type               string                     `json:"type"`
+		Version            string                     `json:"schemaVersion"`
+		Expires            string                     `json:"expires"`
+		RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
+		Principals         map[string]json.RawMessage `json:"principals"`
+		Roles              map[string]Role            `json:"roles"`
+		GitHubApps         map[string]*GitHubApp      `json:"githubApps,omitempty"`
+		GlobalRules        []json.RawMessage          `json:"globalRules,omitempty"`
+		Propagations       []json.RawMessage          `json:"propagations,omitempty"`
+		MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
+		Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -374,7 +400,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.Roles = temp.Roles
-	r.GitHubApprovalsTrusted = temp.GitHubApprovalsTrusted
+	r.GitHubApps = temp.GitHubApps
 
 	r.GlobalRules = []tuf.GlobalRule{}
 	for _, globalRuleBytes := range temp.GlobalRules {
@@ -943,3 +969,5 @@ func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
 	}
 	return hooks, nil
 }
+
+type GitHubApp = tufv01.GitHubApp

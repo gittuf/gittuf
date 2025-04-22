@@ -9,7 +9,8 @@ gittuf trust remove-github-app [flags]
 ### Options
 
 ```
-  -h, --help   help for remove-github-app
+      --app-name string   name of app to add to root of trust (default "https://gittuf.dev/github-app")
+  -h, --help              help for remove-github-app
 ```
 
 ### Options inherited from parent commands
