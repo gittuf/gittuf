@@ -36,13 +36,11 @@ func (r *Repository) GetGitRepository() *gitinterface.Repository {
 }
 
 func LoadRepository(repositoryPath string) (*Repository, error) {
-	level := slog.LevelInfo
 	if InDebugMode() {
-		level = slog.LevelDebug
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})))
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-	})))
 
 	slog.Debug(fmt.Sprintf("Loading Git repository from '%s'...", repositoryPath))
 
