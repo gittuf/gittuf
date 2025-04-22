@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/dev"
 	svgit "github.com/gittuf/gittuf/internal/signerverifier/git"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
@@ -76,17 +75,12 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 // LoadSigner loads a metadata signer for the specified key bytes. Currently,
 // the signer must be either for an SSH key (in which case the `key` is a path
 // to the private key) or for signing with Sigstore (where `key` has a prefix
-// `fulcio:`). For Sigstore, developer mode must be enabled by setting
-// GITTUF_DEV=1 in the environment.
+// `fulcio:`).
 func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) {
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		return nil, fmt.Errorf("not implemented")
 	case strings.HasPrefix(key, FulcioPrefix):
-		if !dev.InDevMode() {
-			return nil, dev.ErrNotInDevMode
-		}
-
 		opts := []sigstoresigneropts.Option{}
 
 		gitRepo := repo.GetGitRepository()

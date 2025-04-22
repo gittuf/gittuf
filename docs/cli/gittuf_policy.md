@@ -7,7 +7,7 @@ Tools to manage gittuf policies
 ```
       --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
   -h, --help                 help for policy
-  -k, --signing-key string   signing key to use to sign policy file
+  -k, --signing-key string   signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
 ```
 
 ### Options inherited from parent commands
