@@ -4,13 +4,13 @@
 ![Build and Tests (CI)](https://github.com/gittuf/gittuf/actions/workflows/ci.yml/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/gittuf/gittuf/badge.svg)](https://coveralls.io/github/gittuf/gittuf)
 
-gittuf is a security layer for Git repositories. With gittuf, any developer who
-can pull from a Git repository can independently verify that the repository's
-security policies were followed. gittuf's policy, inspired by [The Update
-Framework (TUF)], handles key management for all trusted developers in a
-repository, allows for setting permissions for repository branches, tags, files,
-etc., protects against [other attacks] Git is vulnerable to, and more — all
-while being backwards compatible with forges such as GitHub and GitLab.
+gittuf is a platform-agnostic Git security system. The maintainers of a Git
+repository can use gittuf to protect the contents of a Git repository from
+unauthorized or malicious changes. Most significantly, gittuf’s policy controls
+and enforcement is not tied to your source control platform (SCP) or “forge”,
+meaning any developer can independently verify that a repository’s changes
+followed the expected security policies. In other words, gittuf removes the
+forge as a single point of trust in the software supply chain!
 
 gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
 as part of the [Supply Chain Integrity Working Group].
@@ -18,21 +18,17 @@ as part of the [Supply Chain Integrity Working Group].
 ## Current Status
 
 gittuf is currently in beta. gittuf's metadata is versioned, and updates should
-not require reinitializing a repository's gittuf policy. gittuf may be used as a
-repository's primary security mechanism, but beta-type bugs may be present (and
-reports are welcome!)
+not require reinitializing a repository's gittuf policy. We recommend trying out
+gittuf in addition to existing repository security mechanisms you may already be
+using (e.g., forge security policies). We're actively seeking feedback from
+users, please open an issue with any suggestions or bugs you encounter!
 
-We're actively seeking feedback from users. Take a look at the [get
-started guide] to learn how to install and try gittuf out! Additionally,
-contributions are welcome, please refer to the [contributing guide], our
-[roadmap], and the issue tracker for ways to get involved.
+## Installation, Get Started, Get Involved
 
-## Installation & Get Started
+Take a look at the [get started guide] to learn how to install and try gittuf
+out! Additionally, contributions are welcome, please refer to the [contributing
+guide], our [roadmap], and the issue tracker for ways to get involved.
 
-See the [get started guide].
-
-[The Update Framework (TUF)]: https://theupdateframework.io/
-[other attacks]: https://ssl.engineering.nyu.edu/papers/torres_toto_usenixsec-2016.pdf
 [contributing guide]: /CONTRIBUTING.md
 [roadmap]: /docs/roadmap.md
 [Open Source Security Foundation (OpenSSF)]: https://openssf.org/
