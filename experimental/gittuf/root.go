@@ -1229,7 +1229,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 
 func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.RootMetadata, error) {
 	slog.Debug("Loading current root metadata...")
-	rootMetadata, err := state.GetRootMetadata(false)
+	rootMetadata, err := state.GetRootMetadata(true)
 	if err != nil {
 		return nil, err
 	}
