@@ -8,15 +8,24 @@ import (
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	p      *persistent.Options
-	appKey string
+	p       *persistent.Options
+	appName string
+	appKey  string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.appName,
+		"app-name",
+		tuf.GitHubAppRoleName,
+		"name of app to add to root of trust",
+	)
+
 	cmd.Flags().StringVar(
 		&o.appKey,
 		"app-key",
@@ -46,7 +55,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.AddGitHubApp(cmd.Context(), signer, appKey, true, opts...)
+	return repo.AddGitHubApp(cmd.Context(), signer, o.appName, appKey, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

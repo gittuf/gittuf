@@ -365,7 +365,7 @@ func TestAddGitHubAppPrincipal(t *testing.T) {
 	err = rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
 	assert.Nil(t, err)
 	assert.Equal(t, appKey, rootMetadata.Keys[appKey.KeyID])
-	assert.Equal(t, set.NewSetFromItems(appKey.KeyID), rootMetadata.Roles[tuf.GitHubAppRoleName].KeyIDs)
+	assert.Equal(t, set.NewSetFromItems(appKey.KeyID), rootMetadata.GitHubApps[tuf.GitHubAppRoleName].PrincipalIDs)
 }
 
 func TestDeleteGitHubAppPrincipal(t *testing.T) {
@@ -377,26 +377,36 @@ func TestDeleteGitHubAppPrincipal(t *testing.T) {
 	assert.Nil(t, err)
 
 	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
-	assert.Nil(t, rootMetadata.Roles[tuf.GitHubAppRoleName].KeyIDs)
+	assert.NotContains(t, rootMetadata.GitHubApps, tuf.GitHubAppRoleName)
 }
 
 func TestEnableGitHubAppApprovals(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
-	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
 
-	rootMetadata.EnableGitHubAppApprovals()
-	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+	appName := "github-app"
+	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
+	require.Nil(t, err)
+
+	rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
 }
 
 func TestDisableGitHubAppApprovals(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
-	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
 
-	rootMetadata.EnableGitHubAppApprovals()
-	assert.True(t, rootMetadata.GitHubApprovalsTrusted)
+	appName := "github-app"
+	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	rootMetadata.DisableGitHubAppApprovals()
-	assert.False(t, rootMetadata.GitHubApprovalsTrusted)
+	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
+	require.Nil(t, err)
+
+	rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
+
+	rootMetadata.DisableGitHubAppApprovals(appName)
+	assert.False(t, rootMetadata.GitHubApps[appName].Trusted)
 }
 
 func TestUpdateAndGetRootThreshold(t *testing.T) {
@@ -516,7 +526,7 @@ func TestGetGitHubAppPrincipals(t *testing.T) {
 		assert.Nil(t, err)
 
 		expectedPrincipals := []tuf.Principal{key}
-		principals, err := rootMetadata.GetGitHubAppPrincipals()
+		principals, err := rootMetadata.GetGitHubAppPrincipals(tuf.GitHubAppRoleName)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedPrincipals, principals)
 	})
@@ -524,7 +534,7 @@ func TestGetGitHubAppPrincipals(t *testing.T) {
 	t.Run("role does not exist", func(t *testing.T) {
 		rootMetadata := NewRootMetadata()
 
-		rootPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
+		rootPrincipals, err := rootMetadata.GetGitHubAppPrincipals(tuf.GitHubAppRoleName)
 		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 		assert.Nil(t, rootPrincipals)
 	})
@@ -533,15 +543,12 @@ func TestGetGitHubAppPrincipals(t *testing.T) {
 func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
-	trusted := rootMetadata.IsGitHubAppApprovalTrusted()
-	assert.False(t, trusted)
-
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
 	assert.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals()
-	trusted = rootMetadata.IsGitHubAppApprovalTrusted()
+	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	trusted := rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName)
 	assert.True(t, trusted)
 }
 

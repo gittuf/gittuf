@@ -44,7 +44,7 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	}
 
 	// Set app attestations support
-	newRootMetadata.GitHubApprovalsTrusted = rootMetadata.GitHubApprovalsTrusted
+	newRootMetadata.GitHubApps = rootMetadata.GitHubApps
 
 	// Set global rules
 	newRootMetadata.GlobalRules = rootMetadata.GlobalRules

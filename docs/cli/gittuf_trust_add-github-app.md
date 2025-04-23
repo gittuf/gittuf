@@ -13,8 +13,9 @@ gittuf trust add-github-app [flags]
 ### Options
 
 ```
-      --app-key string   app key to add to root of trust
-  -h, --help             help for add-github-app
+      --app-key string    app key to add to root of trust
+      --app-name string   name of app to add to root of trust (default "https://gittuf.dev/github-app")
+  -h, --help              help for add-github-app
 ```
 
 ### Options inherited from parent commands

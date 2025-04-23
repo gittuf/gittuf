@@ -306,7 +306,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 // AddGitHubApp is the interface for the user to add the authorized key for the
 // trusted GitHub app. This key is used to verify GitHub pull request approval
 // attestation signatures recorded by the app.
-func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appName string, appKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -337,7 +337,11 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 	}
 
 	slog.Debug("Adding GitHub app key...")
-	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
+	if appName == "" {
+		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		appName = tuf.GitHubAppRoleName
+	}
+	if err := rootMetadata.AddGitHubAppPrincipal(appName, appKey); err != nil {
 		return fmt.Errorf("failed to add GitHub app key: %w", err)
 	}
 
@@ -347,7 +351,7 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 
 // RemoveGitHubApp is the interface for the user to de-authorize the key for the
 // special GitHub app role.
-func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -378,7 +382,11 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	slog.Debug("Removing GitHub app key...")
-	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
+	if appName == "" {
+		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		appName = tuf.GitHubAppRoleName
+	}
+	rootMetadata.DeleteGitHubAppPrincipal(appName)
 
 	commitMessage := "Remove GitHub app key from root"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -386,7 +394,7 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 
 // TrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as trusted.
-func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -416,13 +424,17 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	if rootMetadata.IsGitHubAppApprovalTrusted() {
+	if appName == "" {
+		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		appName = tuf.GitHubAppRoleName
+	}
+	if rootMetadata.IsGitHubAppApprovalTrusted(appName) {
 		slog.Debug("GitHub app approvals are already trusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as trusted in root...")
-	rootMetadata.EnableGitHubAppApprovals()
+	rootMetadata.EnableGitHubAppApprovals(appName)
 
 	commitMessage := "Mark GitHub app approvals as trusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -430,7 +442,7 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 
 // UntrustGitHubApp updates the root metadata to mark GitHub app pull request
 // approvals as untrusted.
-func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.SignerVerifier, appName string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -460,13 +472,17 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
-	if !rootMetadata.IsGitHubAppApprovalTrusted() {
+	if appName == "" {
+		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		appName = tuf.GitHubAppRoleName
+	}
+	if !rootMetadata.IsGitHubAppApprovalTrusted(appName) {
 		slog.Debug("GitHub app approvals are already untrusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as untrusted in root...")
-	rootMetadata.DisableGitHubAppApprovals()
+	rootMetadata.DisableGitHubAppApprovals(appName)
 
 	commitMessage := "Mark GitHub app approvals as untrusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)

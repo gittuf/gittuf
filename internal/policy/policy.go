@@ -63,9 +63,7 @@ type State struct {
 
 	Hooks map[tuf.HookStage][]tuf.Hook
 
-	githubAppApprovalsTrusted bool
-	githubAppKeys             []tuf.Principal
-	githubAppRoleName         string
+	GitHubApps map[string]tuf.GitHubApp
 
 	repository     *gitinterface.Repository
 	loadedEntry    rsl.ReferenceUpdaterEntry
@@ -460,11 +458,18 @@ func (s *State) Verify(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if rootMetadata.IsGitHubAppApprovalTrusted() {
-		// Check that the GitHub app role is declared
-		_, err := rootMetadata.GetGitHubAppPrincipals()
-		if err != nil {
-			return err
+	githubAppEntries, err := rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return err
+	}
+	for appName := range githubAppEntries {
+		// TODO: retire IsGitHubAppApprovalTrusted
+		if rootMetadata.IsGitHubAppApprovalTrusted(appName) {
+			// Check that the GitHub app role is declared
+			_, err := rootMetadata.GetGitHubAppPrincipals(appName)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1166,6 +1171,11 @@ func (s *State) preprocess() error {
 		s.allPrincipals[principalID] = principal
 	}
 
+	s.GitHubApps, err = rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return err
+	}
+
 	if s.Metadata.TargetsEnvelope == nil {
 		return nil
 	}
@@ -1429,21 +1439,6 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 
 	if err := state.preprocess(); err != nil {
 		return nil, err
-	}
-
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-
-	state.githubAppApprovalsTrusted = rootMetadata.IsGitHubAppApprovalTrusted()
-
-	githubAppPrincipals, err := rootMetadata.GetGitHubAppPrincipals()
-	if err == nil {
-		state.githubAppKeys = githubAppPrincipals
-		state.githubAppRoleName = tuf.GitHubAppRoleName
-	} else if state.githubAppApprovalsTrusted {
-		return nil, tuf.ErrGitHubAppInformationNotFoundInRoot
 	}
 
 	return state, nil

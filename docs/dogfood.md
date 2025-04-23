@@ -1,6 +1,6 @@
 # Dogfooding gittuf
 
-Last Modified: April 24, 2024
+Last Modified: April 23, 2025
 
 As noted in gittuf's [roadmap](/docs/roadmap.md), we want to use gittuf to
 secure the development of gittuf itself. Note that when we are dogfooding
@@ -60,6 +60,52 @@ be verified using gittuf.
 ```bash
 gittuf verify-ref --verbose v0.4.0
 gittuf verify-ref --verbose main
+```
+
+## Log of Dogfood Reinitializations
+
+As noted above, from time to time, we may need to reinitialize gittuf metadata.
+The first reinitialization happened on April 22, 2025. The previously recorded
+gittuf metadata are preserved in new references:
+
+- refs/gittuf-dogfood/reference-state-log
+- refs/gittuf-dogfood/policy-staging
+- refs/gittuf-dogfood/policy
+- refs/gittuf-dogfood/attestations
+
+## gittuf Initialization Runbook
+
+NOTE: This is for the maintainers to initialize gittuf for the gittuf repository
+as part of the dogfood.
+
+```bash
+gittuf trust init -k fulcio:
+
+gittuf trust add-root-key -k fulcio: --root-key fulcio:billy@chainguard.dev::https://accounts.google.com
+gittuf trust add-root-key -k fulcio: --root-key fulcio:aditya@saky.in::https://github.com/login/oauth
+
+gittuf trust add-policy-key -k fulcio: --policy-key fulcio:billy@chainguard.dev::https://accounts.google.com
+gittuf trust add-policy-key -k fulcio: --policy-key fulcio:aditya@saky.in::https://github.com/login/oauth
+
+curl -o /tmp/gittuf-github-app-key.pub https://raw.githubusercontent.com/gittuf/github-app/refs/heads/main/docs/hosted-app-key.pub
+chmod 600 /tmp/gittuf-github-app-key.pub
+gittuf trust add-github-app -k fulcio: --app-key /tmp/gittuf-github-app-key.pub
+gittuf trust enable-github-app-approvals -k fulcio:
+
+gittuf policy init -k fulcio:
+
+gittuf policy add-person -k fulcio: --person-ID adityasaky --public-key fulcio:aditya@saky.in::https://github.com/login/oauth --public-key gpg:B83110D012545604 --associated-identity https://gittuf.dev/github-app::adityasaky+8928778
+gittuf policy add-person -k fulcio: --person-ID wlynch --public-key fulcio:billy@chainguard.dev::https://accounts.google.com --associated-identity https://gittuf.dev/github-app::wlynch+1844673
+gittuf policy add-person -k fulcio: --person-ID patzielinski --associated-identity https://gittuf.dev/github-app::patzielinski+70954403
+gittuf policy add-person -k fulcio: --person-ID JustinCappos --associated-identity https://gittuf.dev/github-app::JustinCappos+857871
+gittuf policy add-person -k fulcio: --person-ID reza-curtmola --associated-identity https://gittuf.dev/github-app::reza-curtmola+14241779
+gittuf policy add-person -k fulcio: --person-ID neilnaveen --associated-identity https://gittuf.dev/github-app::neilnaveen+42328488
+
+gittuf policy add-rule -k fulcio: --rule-name protect-main --rule-pattern "git:refs/heads/main" --authorize adityasaky --authorize wlynch --authorize patzielinski --authorize JustinCappos --authorize reza-curtmola --authorize neilnaveen
+gittuf policy add-rule -k fulcio: --rule-name protect-releases --rule-pattern "git:refs/tags/v*" --authorize adityasaky --authorize wlynch --authorize patzielinski
+
+gittuf policy stage --local-only
+gittuf policy apply --local-only
 ```
 
 [get started guide]: /docs/get-started.md

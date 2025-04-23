@@ -739,7 +739,7 @@ func TestVerifyMergeable(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -787,7 +787,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -801,7 +801,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -849,7 +849,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -886,7 +886,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -934,7 +934,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -948,7 +948,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit zero, not mergeable", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -997,7 +997,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1011,7 +1011,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1074,7 +1074,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1088,7 +1088,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1151,7 +1151,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1188,7 +1188,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1251,7 +1251,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1265,7 +1265,7 @@ func TestVerifyMergeable(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, not mergeable", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1329,7 +1329,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1378,7 +1378,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	featureRefName := "refs/heads/feature"
 
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1424,7 +1424,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1438,7 +1438,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1484,7 +1484,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1521,7 +1521,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1567,7 +1567,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1581,7 +1581,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit zero, not mergeable", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1628,7 +1628,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1642,7 +1642,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1703,7 +1703,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1717,7 +1717,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using mixed approvals, RSL entry signature required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1778,7 +1778,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1815,7 +1815,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, mergeable using GitHub approval, RSL entry signature not required", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1876,7 +1876,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1890,7 +1890,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 	})
 
 	t.Run("base commit not zero, not mergeable", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
@@ -1952,7 +1952,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2824,7 +2824,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2881,7 +2881,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2936,7 +2936,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3015,7 +3015,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3093,7 +3093,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3147,7 +3147,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, state.githubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
