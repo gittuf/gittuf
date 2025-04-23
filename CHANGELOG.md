@@ -2,6 +2,30 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.10.0
+
+Starting with this release, gittuf is now in beta!
+
+### Added
+
+- Added a sync workflow that updates gittuf metadata as needed before making
+  policy changes
+- Added functionality to list and update global rules
+- Added support to the API for loading repositories in a specified directory
+- Added features and workflows to support deploying gittuf over multiple
+  repositories
+- Added gittuf hooks, which enable support for user-defined checks in gittuf
+  metadata that are run in a sandboxed lua environment
+
+### Updated
+
+- Set v02 of gittuf's metadata as the default
+- Made Fulcio support no longer restricted to developer mode
+- Updated the policy staging and apply workflows to now use the sync workflow
+- Updated gitinterface to now support systems with different locales than en_US
+- Updated gittuf's roadmap
+- Updated various dependencies and CI workflows
+
 ## v0.9.0
 
 ### Added
