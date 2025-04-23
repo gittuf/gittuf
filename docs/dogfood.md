@@ -1,6 +1,6 @@
 # Dogfooding gittuf
 
-Last Modified: April 24, 2024
+Last Modified: April 23, 2025
 
 As noted in gittuf's [roadmap](/docs/roadmap.md), we want to use gittuf to
 secure the development of gittuf itself. Note that when we are dogfooding
@@ -61,5 +61,16 @@ be verified using gittuf.
 gittuf verify-ref --verbose v0.4.0
 gittuf verify-ref --verbose main
 ```
+
+## Log of Dogfood Reinitializations
+
+As noted above, from time to time, we may need to reinitialize gittuf metadata.
+The first reinitialization happened on April 22, 2025. The previously recorded
+gittuf metadata are preserved in new references:
+
+- refs/gittuf-dogfood/reference-state-log
+- refs/gittuf-dogfood/policy-staging
+- refs/gittuf-dogfood/policy
+- refs/gittuf-dogfood/attestations
 
 [get started guide]: /docs/get-started.md
