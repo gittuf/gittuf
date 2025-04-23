@@ -54,7 +54,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.associatedIdentities,
 		"associated-identity",
 		[]string{},
-		"identities on code review platforms in the form 'providerID::identity' (e.g., 'https://github.com::<username>')",
+		fmt.Sprintf("identities on code review platforms in the form 'providerID::identity' (e.g., '%s::<username>+<user ID>')", tuf.GitHubAppRoleName),
 	)
 
 	cmd.Flags().StringArrayVar(

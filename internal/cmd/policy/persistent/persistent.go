@@ -3,7 +3,12 @@
 
 package persistent
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/spf13/cobra"
+)
 
 type Options struct {
 	SigningKey   string
@@ -16,7 +21,7 @@ func (o *Options) AddPersistentFlags(cmd *cobra.Command) {
 		"signing-key",
 		"k",
 		"",
-		"signing key to use to sign policy file",
+		fmt.Sprintf("signing key to use to sign root of trust (path to SSH key, \"%s\" for Sigstore)", gittuf.FulcioPrefix),
 	)
 
 	cmd.PersistentFlags().BoolVar(

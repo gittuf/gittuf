@@ -4,6 +4,8 @@
 package addgithubapp
 
 import (
+	"fmt"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
@@ -30,7 +32,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.appKey,
 		"app-key",
 		"",
-		"app key to add to root of trust",
+		fmt.Sprintf("app key to add to root of trust (path to SSH key, \"%s<identity>::<issuer>\" for Sigstore, \"%s<fingerprint>\" for GPG key)", gittuf.FulcioPrefix, gittuf.GPGKeyPrefix),
 	)
 	cmd.MarkFlagRequired("app-key") //nolint:errcheck
 }
