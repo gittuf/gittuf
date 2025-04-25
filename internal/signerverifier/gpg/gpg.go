@@ -8,6 +8,8 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
@@ -18,30 +20,28 @@ const KeyType = "gpg"
 
 // Verifier is a dsse.Verifier implementation for GPG keys.
 type Verifier struct {
-	keyID   string
-	gpgKey  openpgp.Key
-	keyring openpgp.EntityList
+	keyID  string
+	entity *openpgp.Entity
 }
 
-// NewVerifierFromKey creates a new Verifier from SSlibKey of type GPG.
+// NewVerifierFromKey creates a new erifier from SSlibKey of type GPG.
 func NewVerifierFromKey(key *signerverifier.SSLibKey) (*Verifier, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(key.KeyVal.Public)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse GPG key: %w", err)
+		return nil, fmt.Errorf("failed to parse gpg key: %w", err)
 	}
-	// entity := keyring[0]
+
+	entity := keyring[0]
 	return &Verifier{
-		keyID:   key.KeyID,
-		gpgKey:  entity.PrimaryKey, // TODO: not sure how to get the openpgp.Key instance here, or if it should be a required field for Verifier?
-		keyring: keyring,
+		keyID:  key.KeyID,
+		entity: entity,
 	}, nil
 }
 
 // Verify implements the dsse.Verifier.Verify interface for GPG keys.
 func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 	sigReader := bytes.NewReader(sig)
-	// TODO: can we assume sig is in armored format?
-	_, err := openpgp.CheckArmoredDetachedSignature(v.keyring, bytes.NewReader(data), sigReader, nil)
+	_, err := openpgp.CheckArmoredDetachedSignature(openpgp.EntityList{v.entity}, bytes.NewReader(data), sigReader, nil)
 	if err != nil {
 		return fmt.Errorf("failed to verify gpg signature: %w", err)
 	}
@@ -57,7 +57,7 @@ func (v *Verifier) KeyID() (string, error) {
 // Public implements the dsse.Verifier.Public interface for GPG keys.
 // FIXME: consider removing in interface, "Verify()" is all that's needed
 func (v *Verifier) Public() crypto.PublicKey {
-	return v.gpgKey.PublicKey
+	return v.entity.PrimaryKey.PublicKey
 }
 
 // LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
@@ -70,9 +70,42 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 	}
 
 	// TODO: check if this is correct for subkeys
+	// TODO: might want to handle case where there is more than one entity
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
 	publicKey := strings.TrimSpace(string(contents))
 
+	gpgKey := &signerverifier.SSLibKey{
+		KeyID:   fingerprint,
+		KeyType: KeyType,
+		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
+		KeyVal: signerverifier.KeyVal{
+			Public: publicKey,
+		},
+	}
+
+	return gpgKey, nil
+}
+
+func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	keyring, err := openpgp.ReadArmoredKeyRing(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: might want to handle case where there is more than one entity
+	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
+	cmd := exec.Command("gpg", "--armor", "--export")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+	}
+
+	publicKey := strings.TrimSpace(string(output))
 	gpgKey := &signerverifier.SSLibKey{
 		KeyID:   fingerprint,
 		KeyType: KeyType,
