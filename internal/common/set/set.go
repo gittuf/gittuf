@@ -12,13 +12,13 @@ import (
 // Set implements a generic set data structure for use in gittuf metadata and
 // workflows.
 type Set[T cmp.Ordered] struct {
-	contents map[T]bool
+	contents map[T]struct{}
 }
 
 // NewSet creates a new instance of a set for the specified type that fulfils
 // the cmp.Ordered constraint.
 func NewSet[T cmp.Ordered]() *Set[T] {
-	return &Set[T]{contents: map[T]bool{}}
+	return &Set[T]{contents: map[T]struct{}{}}
 }
 
 // NewSetFromItems creates a new instance of a set and populates it with the
@@ -47,7 +47,7 @@ func (s *Set[T]) UnmarshalJSON(jsonBytes []byte) error {
 		return err
 	}
 
-	s.contents = map[T]bool{}
+	s.contents = map[T]struct{}{}
 	for _, item := range items {
 		s.Add(item)
 	}
@@ -70,7 +70,7 @@ func (s *Set[T]) Contents() []T {
 
 // Add inserts an item into the set.
 func (s *Set[T]) Add(item T) {
-	s.contents[item] = true
+	s.contents[item] = struct{}{}
 }
 
 // Remove deletes the item from the set.
@@ -92,7 +92,8 @@ func (s *Set[T]) Extend(set *Set[T]) {
 
 // Has returns true if the set has the corresponding item.
 func (s *Set[T]) Has(item T) bool {
-	return s.contents[item]
+	_, ok := s.contents[item]
+	return ok
 }
 
 // Len returns the number of objects in the set.
