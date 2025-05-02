@@ -47,7 +47,7 @@ func (s *Set[T]) UnmarshalJSON(jsonBytes []byte) error {
 		return err
 	}
 
-	s.contents = map[T]struct{}{}
+	s.contents = make(map[T]struct{}, len(items))
 	for _, item := range items {
 		s.Add(item)
 	}
@@ -61,7 +61,7 @@ func (s *Set[T]) Contents() []T {
 		return nil
 	}
 
-	items := []T{}
+	items := make([]T, 0, len(s.contents))
 	for item := range s.contents {
 		items = append(items, item)
 	}
@@ -70,7 +70,11 @@ func (s *Set[T]) Contents() []T {
 
 // Add inserts an item into the set.
 func (s *Set[T]) Add(item T) {
-	s.contents[item] = struct{}{}
+	if s.contents == nil {
+		s.contents = map[T]struct{}{item: {}}
+	} else {
+		s.contents[item] = struct{}{}
+	}
 }
 
 // Remove deletes the item from the set.
@@ -91,7 +95,10 @@ func (s *Set[T]) Extend(set *Set[T]) {
 }
 
 // Has returns true if the set has the corresponding item.
-func (s *Set[T]) Has(item T) bool {
+func (s Set[T]) Has(item T) bool {
+	if s.contents == nil {
+		return false
+	}
 	_, ok := s.contents[item]
 	return ok
 }
@@ -104,6 +111,9 @@ func (s *Set[T]) Len() int {
 // Intersection returns a new set consisting of the items present in both sets.
 func (s *Set[T]) Intersection(set *Set[T]) *Set[T] {
 	intersection := NewSet[T]()
+	if set == nil {
+		return intersection
+	}
 
 	rangeOver := s
 	other := set
@@ -127,7 +137,7 @@ func (s *Set[T]) Minus(set *Set[T]) *Set[T] {
 	minus := NewSet[T]()
 
 	for item := range s.contents {
-		if !set.Has(item) {
+		if set == nil || !set.Has(item) {
 			minus.Add(item)
 		}
 	}
@@ -137,6 +147,9 @@ func (s *Set[T]) Minus(set *Set[T]) *Set[T] {
 
 // Equal returns true if both sets have the same items.
 func (s *Set[T]) Equal(set *Set[T]) bool {
+	if set == nil {
+		return false
+	}
 	if s.Len() != set.Len() {
 		return false
 	}
