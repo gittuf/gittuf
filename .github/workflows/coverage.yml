@@ -22,7 +22,9 @@ jobs:
         go-version: 1.24
         cache: true
     - name: Check Coverage
-      run: go test -covermode=atomic -coverprofile='coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
+      run: |
+        go test -covermode=atomic -coverprofile='unfiltered_coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
+        grep -v -f .test_ignore.txt unfiltered_coverage.cov > coverage.cov
     - name: Coveralls Parallel
       uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b
       with:
