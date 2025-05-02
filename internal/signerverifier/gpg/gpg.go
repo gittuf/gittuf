@@ -48,6 +48,37 @@ func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 	return nil
 }
 
+type Signer struct {
+	*Verifier
+}
+
+// NewSignerFromFile creates an GPG signer from the passed path.
+func NewSignerFromFile(path string) (*Signer, error) {
+	keyObj, err := NewKeyFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	verifier, err := NewVerifierFromKey(keyObj)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Signer{
+		Verifier: verifier,
+	}, nil
+}
+
+// Sign implements the dsse.Signer.Sign interface for GPG keys.
+func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	err := openpgp.ArmoredDetachSign(buf, s.Verifier.entity, bytes.NewReader(data), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign with gpg key: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
 // KeyID implements the dsse.Verifier.KeyID interface for GPG keys.
 // FIXME: consider removing error in interface; a dsse.Verifier needs a keyid
 func (v *Verifier) KeyID() (string, error) {
@@ -70,7 +101,7 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 	}
 
 	// TODO: check if this is correct for subkeys
-	// TODO: might want to handle case where there is more than one entity
+	// TODO: might have to handle case where there is more than one entity
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
 	publicKey := strings.TrimSpace(string(contents))
 
@@ -97,7 +128,7 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 		return nil, err
 	}
 
-	// TODO: might want to handle case where there is more than one entity
+	// TODO: might have to handle case where there is more than one entity
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
 	cmd := exec.Command("gpg", "--armor", "--export")
 	output, err := cmd.CombinedOutput()
