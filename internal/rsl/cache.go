@@ -3,23 +3,39 @@
 
 package rsl
 
-import "github.com/gittuf/gittuf/internal/gitinterface"
+import (
+	"sync"
+
+	"github.com/gittuf/gittuf/internal/gitinterface"
+)
 
 type rslCache struct {
 	entryCache  map[string]Entry
 	parentCache map[string]string
+
+	entryCacheMutex  sync.RWMutex
+	parentCacheMutex sync.RWMutex
 }
 
 func (r *rslCache) getEntry(id gitinterface.Hash) (Entry, bool) {
+	r.entryCacheMutex.RLock()
+	defer r.entryCacheMutex.RUnlock()
+
 	entry, has := r.entryCache[id.String()]
 	return entry, has
 }
 
 func (r *rslCache) setEntry(id gitinterface.Hash, entry Entry) {
+	r.entryCacheMutex.Lock()
+	defer r.entryCacheMutex.Unlock()
+
 	r.entryCache[id.String()] = entry
 }
 
 func (r *rslCache) getParent(id gitinterface.Hash) (gitinterface.Hash, bool, error) {
+	r.parentCacheMutex.RLock()
+	defer r.parentCacheMutex.RUnlock()
+
 	parentID, has := r.parentCache[id.String()]
 	if !has {
 		return nil, false, nil
@@ -33,6 +49,9 @@ func (r *rslCache) getParent(id gitinterface.Hash) (gitinterface.Hash, bool, err
 }
 
 func (r *rslCache) setParent(id, parentID gitinterface.Hash) {
+	r.parentCacheMutex.Lock()
+	defer r.parentCacheMutex.Unlock()
+
 	r.parentCache[id.String()] = parentID.String()
 }
 
