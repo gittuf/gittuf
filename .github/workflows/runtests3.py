@@ -7,6 +7,12 @@ import ssl
 import shutil
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
+port = 8000
+TEST_CLONE_DIR = "test_clone"
+TEST_REPO_URL_HTTPS = f"https://localhost:{port}/repo.git"
+TEST_REMOTE_NAME = "origin"
+GITTUF_TEST_BRANCH = "test-branch"
+
 def run_command(cmd, expected_retcode=0):
     """Runs the supplied command and checks for the expected return code."""
     retcode = subprocess.call(shlex.split(cmd))
@@ -14,7 +20,6 @@ def run_command(cmd, expected_retcode=0):
         raise Exception(f"Expected {expected_retcode} from process but it exited with {retcode}.")
 
 # Cleanup previous runs
-TEST_CLONE_DIR = "test_clone"
 for path in [TEST_CLONE_DIR, 'repo']:
     if os.path.exists(path):
         shutil.rmtree(path)
@@ -77,7 +82,6 @@ with tempfile.TemporaryDirectory() as server_dir, tempfile.TemporaryDirectory() 
             super().end_headers()
 
     # Start HTTPS server
-    port = 8000
     server = HTTPServer(('localhost', port), GitHTTPRequestHandler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(certfile=certfile, keyfile=keyfile)
@@ -87,9 +91,6 @@ with tempfile.TemporaryDirectory() as server_dir, tempfile.TemporaryDirectory() 
     server_thread.start()
     
     try:
-        TEST_REPO_URL_HTTPS = f"gittuf::https://localhost:{port}/repo.git"
-        TEST_REMOTE_NAME = "origin"
-        GITTUF_TEST_BRANCH = "test-branch"
 
         print(f"Testing clone using {TEST_REPO_URL_HTTPS}...")
         run_command(f"git -c http.sslVerify=false clone {TEST_REPO_URL_HTTPS} {TEST_CLONE_DIR}")
