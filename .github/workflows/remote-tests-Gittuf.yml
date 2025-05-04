@@ -1,0 +1,36 @@
+name: remote tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.23', '1.24']
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+    - name: Install Go
+      uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Build gittuf
+      run: make just-install
+
+    - name: Expose git-http-backend
+      run: echo "$(git --exec-path)" >> $GITHUB_PATH
+      
+    - name: Run integration tests
+      run: |
+        chmod +x .github/workflows/Gittuf-transport-tests.py
+        python .github/workflows/Gittuf-transport-tests.py

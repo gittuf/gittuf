@@ -41,10 +41,11 @@ def run(cmd, cwd=None):
 def run_http_server(repo_root, port):
     # Prepare CGI directory and link git-http-backend
     os.makedirs(CGI_DIR, exist_ok=True)
-    backend = shutil.which('git-http-backend')
+    backend = shutil.which('git-http-backend') or shutil.which('git-http-backend.exe')
     if not backend:
-        print('[!] git-http-backend not found in PATH')
-        sys.exit(1)
+        sys.exit('[!] cannot find git-http-backend on this PATH')
+    os.makedirs(CGI_DIR, exist_ok=True)
+    shutil.copy2(backend, os.path.join(CGI_DIR, os.path.basename(backend)))
     link = os.path.join(CGI_DIR, 'git-http-backend')
     if os.path.exists(link):
         os.remove(link)
@@ -92,7 +93,7 @@ def main():
     time.sleep(1)
 
     # 5. Clone over HTTP, update, and push
-    http_url = f'http://127.0.0.1:{PORT}/cgi-bin/git-http-backend/repo.git'
+    http_url = f'gittuf::http://127.0.0.1:{PORT}/cgi-bin/git-http-backend/repo.git'
     run(['git', 'clone', http_url, WORK_HTTP])
     with open(os.path.join(WORK_HTTP, 'README.md'), 'w') as f:
         f.write('hello world\n')
