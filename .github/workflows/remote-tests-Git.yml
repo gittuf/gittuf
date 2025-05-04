@@ -1,4 +1,4 @@
-name: remote tests
+name: remote tests Git
 
 on:
   push:
