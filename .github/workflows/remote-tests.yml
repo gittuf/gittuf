@@ -29,5 +29,5 @@ jobs:
 
     - name: Run integration tests
       run: |
-        chmod +x .github/workflows/runtests3.py
-        python .github/workflows/runtests3.py
+        chmod +x .github/workflows/run-transport-tests.py
+        python .github/workflows/run-transport-tests.py
