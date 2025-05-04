@@ -27,6 +27,9 @@ jobs:
     - name: Build gittuf
       run: make just-install
 
+    - name: Expose git-http-backend
+      run: echo "$(git --exec-path)" >> $GITHUB_PATH
+      
     - name: Run integration tests
       run: |
         chmod +x .github/workflows/run-transport-tests.py
