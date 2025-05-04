@@ -29,6 +29,9 @@ WORK_HTTP = os.path.join(BASE_DIR, 'work2')
 WORK_VERIFY = os.path.join(BASE_DIR, 'verify')
 CGI_DIR = os.path.join(BASE_DIR, 'cgi-bin')
 
+# set a fallback identity so commits don’t fail in CI
+subprocess.check_call(["git", "config", "--global", "user.email", "action@github.com"])
+subprocess.check_call(["git", "config", "--global", "user.name",  "GitHub Action"])
 
 def run(cmd, cwd=None):
     print(f"[*] Running: {' '.join(cmd)}")
