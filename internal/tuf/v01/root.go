@@ -962,6 +962,34 @@ func (r *RootMetadata) RemoveHook(stages []tuf.HookStage, hookName string) error
 	return nil
 }
 
+// UpdateHook updates the hook specified by stage and hookName with the new
+// principalIDs, hashes, environment, and timeout.
+func (r *RootMetadata) UpdateHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) (tuf.Hook, error) {
+	if r.Hooks == nil {
+		return nil, tuf.ErrNoHooksDefined
+	}
+
+	var updatedHook *Hook
+
+	for _, stage := range stages {
+		for i, hook := range r.Hooks[stage] {
+			if hook.Name == hookName {
+				r.Hooks[stage][i].PrincipalIDs = set.NewSetFromItems(principalIDs...)
+				r.Hooks[stage][i].Hashes = hashes
+				r.Hooks[stage][i].Environment = environment
+				r.Hooks[stage][i].Timeout = timeout
+				updatedHook = r.Hooks[stage][i]
+			}
+		}
+	}
+
+	if updatedHook != nil {
+		return updatedHook, nil
+	}
+
+	return nil, tuf.ErrHookNotFound
+}
+
 // GetHooks returns the hooks for the specified stage.
 func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
 	if r.Hooks == nil {
