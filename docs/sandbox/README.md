@@ -84,6 +84,18 @@ Retrieve the remote URL for the specified Git remote.
 gitGetRemoteURL("origin") -> "example.com/example/example"
 ```
 
+## gitGetStagedFilePaths
+
+**Signature:** `gitGetStagedFilePaths() -> paths`
+
+Retrieve a Lua table of file paths that have staged changes (changes in the index).
+
+### Example 1
+
+```
+gitGetStagedFilePaths() -> ["foo/bar.txt", "baz/qux.py"]
+```
+
 ## gitGetSymbolicReferenceTarget
 
 **Signature:** `gitGetSymbolicReferenceTarget(ref) -> ref`
