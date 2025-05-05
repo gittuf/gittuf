@@ -31,7 +31,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	err = repo.UpdateHook(gittuf.HookPrePush, prePushScript, o.force)
+	err = repo.UpdateGitHook(gittuf.HookPrePush, prePushScript, o.force)
 	var hookErr *gittuf.ErrHookExists
 	if errors.As(err, &hookErr) {
 		fmt.Fprintf(
