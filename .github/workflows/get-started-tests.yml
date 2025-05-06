@@ -50,3 +50,4 @@ jobs:
       run: make just-install
     - name: Test Getting Started
       run: python3 docs/testing/test-get-started-md.py
+      
