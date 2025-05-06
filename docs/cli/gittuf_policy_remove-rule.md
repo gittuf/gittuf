@@ -2,6 +2,10 @@
 
 Remove rule from a policy file
 
+### Synopsis
+
+This command allows users to remove and existing rule to the specified policy file. By default, the main policy file is selected.
+
 ```
 gittuf policy remove-rule [flags]
 ```

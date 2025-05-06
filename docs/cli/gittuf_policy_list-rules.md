@@ -2,6 +2,10 @@
 
 List rules for the current state
 
+### Synopsis
+
+This command allows a user to list the rules for the current policy state. The policy ref that should be inspected must be specified.
+
 ```
 gittuf policy list-rules [flags]
 ```

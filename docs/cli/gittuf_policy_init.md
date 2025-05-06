@@ -2,6 +2,10 @@
 
 Initialize policy file
 
+### Synopsis
+
+This command initializes a new gittuf policy file with the specified policy name. The user must provide a valid signing key.
+
 ```
 gittuf policy init [flags]
 ```

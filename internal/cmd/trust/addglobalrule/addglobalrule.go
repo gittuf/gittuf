@@ -102,6 +102,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-global-rule",
 		Short:             fmt.Sprintf("Add a new global rule to root of trust (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:              "This command allows a user to add a new global rule to the root of trust. The user must specify the name, type, and rule pattern for the rule.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
