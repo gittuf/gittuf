@@ -794,3 +794,39 @@ func TestRemoveHook(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 }
+
+func TestUpdateHook(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	_, err := rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
+
+	_, err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": "newhash"}, tuf.HookEnvironmentLua, 200)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	preCommitHook := rootMetadata.Hooks[tuf.HookStagePreCommit][0]
+	assert.Equal(t, "test-hook", preCommitHook.Name)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID), preCommitHook.PrincipalIDs)
+	assert.Equal(t, map[string]string{"sha1": "newhash"}, preCommitHook.Hashes)
+	assert.Equal(t, tuf.HookEnvironmentLua, preCommitHook.Environment)
+	assert.Equal(t, 200, preCommitHook.Timeout)
+
+	_, err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key.KeyID}, map[string]string{"sha256": "anotherhash"}, tuf.HookEnvironmentLua, 150)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
+
+	prePushHook := rootMetadata.Hooks[tuf.HookStagePrePush][0]
+	assert.Equal(t, "test-hook", prePushHook.Name)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID), prePushHook.PrincipalIDs)
+	assert.Equal(t, map[string]string{"sha1": gitinterface.ZeroHash.String(), "sha256": "anotherhash"}, prePushHook.Hashes)
+	assert.Equal(t, tuf.HookEnvironmentLua, prePushHook.Environment)
+	assert.Equal(t, 150, prePushHook.Timeout)
+}

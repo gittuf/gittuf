@@ -213,6 +213,10 @@ type RootMetadata interface {
 	// RemoveHook removes the hook identified by hookName in the specified Git
 	// stage.
 	RemoveHook(stages []HookStage, hookName string) error
+	// UpdateHook updates the hook identified by hookName in the specified Git
+	// stage with the provided parameters. The parameters are the same as those
+	// used in AddHook.
+	UpdateHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) (Hook, error)
 	// GetHooks returns all hooks in the metadata for the specified Git stage.
 	GetHooks(stage HookStage) ([]Hook, error)
 }

@@ -788,3 +788,40 @@ func TestRemoveHook(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 }
+
+func TestUpdateHook(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+
+	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+
+	_, err := rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	assert.Nil(t, err)
+
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	assert.Nil(t, err)
+
+	_, err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha256": "newhash"}, tuf.HookEnvironmentLua, 200)
+	assert.Nil(t, err)
+
+	preCommitHooks, err := rootMetadata.GetHooks(tuf.HookStagePreCommit)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(preCommitHooks))
+	assert.Equal(t, 200, preCommitHooks[0].GetTimeout())
+	assert.Equal(t, set.NewSetFromItems(key1.KeyID, key2.KeyID), preCommitHooks[0].GetPrincipalIDs())
+	assert.Equal(t, tuf.HookEnvironmentLua, preCommitHooks[0].GetEnvironment())
+	assert.Equal(t, "test-hook", preCommitHooks[0].ID())
+	assert.Equal(t, map[string]string{"sha256": "newhash"}, preCommitHooks[0].GetHashes())
+
+	_, err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key1.KeyID, key2.KeyID}, map[string]string{"sha512": "anothernewhash"}, tuf.HookEnvironmentLua, 300)
+	assert.Nil(t, err)
+
+	prePushHooks, err := rootMetadata.GetHooks(tuf.HookStagePrePush)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(prePushHooks))
+	assert.Equal(t, 300, prePushHooks[0].GetTimeout())
+	assert.Equal(t, set.NewSetFromItems(key1.KeyID, key2.KeyID), prePushHooks[0].GetPrincipalIDs())
+	assert.Equal(t, tuf.HookEnvironmentLua, prePushHooks[0].GetEnvironment())
+	assert.Equal(t, "test-hook", prePushHooks[0].ID())
+	assert.Equal(t, map[string]string{"sha512": "anothernewhash"}, prePushHooks[0].GetHashes())
+}
