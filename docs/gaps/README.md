@@ -30,6 +30,7 @@ the gittuf/community repository.
 | 4 | [Supporting Global Constraints in gittuf](/docs/gaps/4/README.md) | No | No |
 | 5 | [Principals, not Keys](/docs/gaps/5/README.md) | No | No |
 | 6 | [Code Review Tool Attestations](/docs/gaps/6/README.md) | No | No |
+| 9 | [Programmable Policy Extensions](/docs/gaps/9/README.md) | No | No |
 
 ## GAP Format
 
