@@ -51,6 +51,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-policy-key",
 		Short:             "Remove Policy key from gittuf root of trust",
+		Long:              "This command allows users to remove a policy key from the gittuf root of trust. The policy key ID must be specified.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

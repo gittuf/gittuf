@@ -2,6 +2,10 @@
 
 Remove Policy key from gittuf root of trust
 
+### Synopsis
+
+This command allows users to remove a policy key from the gittuf root of trust. The policy key ID must be specified.
+
 ```
 gittuf trust remove-policy-key [flags]
 ```
