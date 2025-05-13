@@ -452,6 +452,70 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// UpdatePrincipalInTargets is the interface for a user to update a principal's
+// information in gittuf rule file metadata.
+func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, principal tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current rule file...")
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, true)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Updating principal '%s' in rule file...", strings.TrimSpace(principal.ID())))
+	if err := targetsMetadata.UpdatePrincipal(principal); err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.Metadata.TargetsEnvelope = env
+	} else {
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Update principal '%s' in policy '%s'", principal.ID(), targetsRoleName)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // RemovePrincipalFromTargets is the interface for a user to remove a principal
 // from gittuf rule file metadata.
 func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, principalID string, signCommit bool, opts ...trustpolicyopts.Option) error {
