@@ -199,13 +199,19 @@ func (t *TargetsMetadata) RemoveRule(ruleName string) error {
 	return nil
 }
 
-// GetPrincipals returns all the principals in the rule file.
+// GetPrincipals returns all the principals in the metadata.
 func (t *TargetsMetadata) GetPrincipals() map[string]tuf.Principal {
 	principals := map[string]tuf.Principal{}
 	for id, key := range t.Delegations.Keys {
 		principals[id] = key
 	}
 	return principals
+}
+
+// GetPerson returns a person by their ID. Since v01 does not support persons,
+// this always returns ErrInvalidPrincipalType.
+func (t *TargetsMetadata) GetPerson(_ string) (tuf.Principal, error) {
+	return nil, tuf.ErrInvalidPrincipalType
 }
 
 // GetRules returns all the rules in the metadata.
@@ -232,6 +238,27 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
+}
+
+// UpdatePrincipal updates an existing principal in the metadata while preserving their ID.
+// The principal must already exist in the metadata.
+func (t *TargetsMetadata) UpdatePrincipal(principal tuf.Principal) error {
+	if principal == nil {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	principalID := principal.ID()
+	if _, exists := t.Delegations.Keys[principalID]; !exists {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	keyT, isKnownType := principal.(*Key)
+	if !isKnownType {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	t.Delegations.Keys[principalID] = keyT
+	return nil
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets

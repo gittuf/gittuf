@@ -230,6 +230,10 @@ type TargetsMetadata interface {
 	// GetPrincipals returns all the principals in the rule file.
 	GetPrincipals() map[string]Principal
 
+	// GetPerson returns a person by their ID. Returns ErrPrincipalNotFound if the person
+	// does not exist or ErrInvalidPrincipalType if the principal is not a person.
+	GetPerson(personID string) (Principal, error)
+
 	// GetRules returns all the rules in the metadata.
 	GetRules() []Rule
 
@@ -249,6 +253,9 @@ type TargetsMetadata interface {
 
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
+
+	// UpdatePrincipal updates an existing principal in the metadata while preserving their ID.
+	UpdatePrincipal(principal Principal) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).

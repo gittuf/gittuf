@@ -204,14 +204,29 @@ func (t *TargetsMetadata) RemoveRule(ruleName string) error {
 	return nil
 }
 
-// GetPrincipals returns all the principals in the rule file.
+// GetPrincipals returns all the principals in the metadata.
 func (t *TargetsMetadata) GetPrincipals() map[string]tuf.Principal {
-	principals := map[string]tuf.Principal{}
-	for id, principal := range t.Delegations.Principals {
-		principals[id] = principal
+	return t.Delegations.Principals
+}
+
+// GetPerson returns a person by their ID. Returns ErrPrincipalNotFound if the person
+// does not exist or ErrInvalidPrincipalType if the principal is not a person.
+func (t *TargetsMetadata) GetPerson(personID string) (tuf.Principal, error) {
+	if personID == "" {
+		return nil, tuf.ErrInvalidPrincipalID
 	}
 
-	return principals
+	principal, exists := t.Delegations.Principals[personID]
+	if !exists {
+		return nil, tuf.ErrPrincipalNotFound
+	}
+
+	person, ok := principal.(*Person)
+	if !ok {
+		return nil, tuf.ErrInvalidPrincipalType
+	}
+
+	return person, nil
 }
 
 // GetRules returns all the rules in the metadata.
@@ -239,6 +254,28 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 // RemovePrincipal removes a principal from the metadata.
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removePrincipal(principalID)
+}
+
+// UpdatePrincipal updates an existing principal in the metadata while preserving their ID.
+// The principal must already exist in the metadata.
+func (t *TargetsMetadata) UpdatePrincipal(principal tuf.Principal) error {
+	if principal == nil {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	principalID := principal.ID()
+	if _, exists := t.Delegations.Principals[principalID]; !exists {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	switch principal := principal.(type) {
+	case *Key, *Person:
+		t.Delegations.Principals[principalID] = principal
+	default:
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	return nil
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets

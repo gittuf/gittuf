@@ -37,6 +37,40 @@ type Person struct {
 	Custom               map[string]string `json:"custom"`
 }
 
+// NewPersonFromExisting creates a new Person instance with the same ID as an existing person.
+// If no new values are provided for a field (empty/nil), it will use the values from the existing person.
+func NewPersonFromExisting(existingPerson *Person, newKeys map[string]*Key, newIdentities map[string]string, newCustom map[string]string) *Person {
+	person := &Person{
+		PersonID:             existingPerson.PersonID,
+		PublicKeys:           make(map[string]*Key),
+		AssociatedIdentities: make(map[string]string),
+		Custom:               make(map[string]string),
+	}
+
+	// If no new keys provided, use existing ones
+	if len(newKeys) == 0 {
+		person.PublicKeys = existingPerson.PublicKeys
+	} else {
+		person.PublicKeys = newKeys
+	}
+
+	// If no new identities provided, use existing ones
+	if len(newIdentities) == 0 {
+		person.AssociatedIdentities = existingPerson.AssociatedIdentities
+	} else {
+		person.AssociatedIdentities = newIdentities
+	}
+
+	// If no new custom metadata provided, use existing ones
+	if len(newCustom) == 0 {
+		person.Custom = existingPerson.Custom
+	} else {
+		person.Custom = newCustom
+	}
+
+	return person
+}
+
 func (p *Person) ID() string {
 	return p.PersonID
 }
