@@ -13,9 +13,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct{}
+type options struct {
+	policyRef string
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&o.policyRef,
+		"policy-ref",
+		policy.PolicyStagingRef,
+		"policy reference to inspect",
+	)
+}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository(".")
@@ -23,7 +32,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	state, err := policy.LoadCurrentState(cmd.Context(), repo.GetGitRepository(), policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(cmd.Context(), repo.GetGitRepository(), o.policyRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -47,7 +56,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "inspect-root",
 		Short:             "Inspect root metadata",
-		Long:              "This command displays the root metadata in a human-readable format.",
+		Long:              "This command displays the root metadata in a human-readable format. By default, it inspects the policy-staging ref, but you can specify a different policy ref using --policy-ref.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
