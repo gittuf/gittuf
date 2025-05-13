@@ -19,6 +19,7 @@ A security layer for Git repositories, powered by TUF
 * [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
 * [gittuf clone](gittuf_clone.md)	 - Clone repository and its gittuf references
 * [gittuf dev](gittuf_dev.md)	 - Developer mode commands
+* [gittuf inspect-root](gittuf_inspect-root.md)	 - Inspect and print all gittuf root metadata
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log
 * [gittuf sync](gittuf_sync.md)	 - Synchronize local references with remote references based on RSL
