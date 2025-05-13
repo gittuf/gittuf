@@ -206,12 +206,7 @@ func (t *TargetsMetadata) RemoveRule(ruleName string) error {
 
 // GetPrincipals returns all the principals in the rule file.
 func (t *TargetsMetadata) GetPrincipals() map[string]tuf.Principal {
-	principals := map[string]tuf.Principal{}
-	for id, principal := range t.Delegations.Principals {
-		principals[id] = principal
-	}
-
-	return principals
+	return t.Delegations.Principals
 }
 
 // GetRules returns all the rules in the metadata.
@@ -234,6 +229,12 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 // verify-commit and verify-tag, it may not make sense anymore
 func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addPrincipal(principal)
+}
+
+// UpdatePrincipal updates an existing principal in the metadata while preserving their ID.
+// The principal must already exist in the metadata.
+func (t *TargetsMetadata) UpdatePrincipal(principal tuf.Principal) error {
+	return t.Delegations.updatePrincipal(principal)
 }
 
 // RemovePrincipal removes a principal from the metadata.
@@ -308,6 +309,28 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 	switch principal := principal.(type) {
 	case *Key, *Person:
 		d.Principals[principal.ID()] = principal
+	default:
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	return nil
+}
+
+// updatePrincipal updates an existing principal in the metadata while preserving their ID.
+// The principal must already exist in the metadata.
+func (d *Delegations) updatePrincipal(principal tuf.Principal) error {
+	if principal == nil {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	principalID := principal.ID()
+	if _, exists := d.Principals[principalID]; !exists {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	switch principal := principal.(type) {
+	case *Key, *Person:
+		d.Principals[principalID] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType
 	}

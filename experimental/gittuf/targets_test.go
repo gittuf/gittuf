@@ -4,6 +4,7 @@
 package gittuf
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -377,4 +378,57 @@ func TestSignTargets(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, len(state.Metadata.TargetsEnvelope.Signatures))
+}
+
+func TestUpdatePrincipalInTargets(t *testing.T) {
+	repo, err := LoadRepository(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	signer, err := LoadSigner(repo, "test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// First add a principal
+	principal := tufv02.NewKey("test-key", "test-key", "test-key", "test-key")
+	err = repo.AddPrincipalToTargets(ctx, signer, "targets", principal, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the principal
+	updatedPrincipal := tufv02.NewKey("test-key", "updated-key", "updated-key", "updated-key")
+	err = repo.UpdatePrincipalInTargets(ctx, signer, "targets", updatedPrincipal, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify the update
+	state, err := policy.LoadCurrentState(ctx, repo.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata("targets")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	principals := targetsMetadata.GetPrincipals()
+	updatedKey, exists := principals["test-key"]
+	if !exists {
+		t.Fatal("updated principal not found")
+	}
+
+	key, ok := updatedKey.(*tufv02.Key)
+	if !ok {
+		t.Fatal("principal is not a key")
+	}
+
+	if key.KeyID != "updated-key" {
+		t.Fatal("principal was not updated correctly")
+	}
 }
