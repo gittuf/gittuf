@@ -118,6 +118,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(verifymergeable.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
+	cmd.AddCommand(trust.NewInspectRootCommand())
 
 	return cmd
 }
