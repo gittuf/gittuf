@@ -70,6 +70,8 @@ const (
 	screenAddGlobalRule
 	screenUpdateGlobalRule
 	screenRemoveGlobalRule
+	screenViewRootMetadata
+	screenViewTargetsMetadata
 )
 
 type rule struct {
@@ -136,6 +138,8 @@ func initialModel(o *options) model {
 		item{title: "Add Global Rule", desc: "Add a new global rule"},
 		item{title: "Update Global Rule", desc: "Modify an existing global rule"},
 		item{title: "Remove Global Rule", desc: "Remove a global rule"},
+		item{title: "View Root Metadata", desc: "View Root metadata information"},
+		item{title: "View Targets Metadata", desc: "View Targets metadata information"},
 	}
 
 	// Set up the list delegate
@@ -302,6 +306,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "Remove Global Rule":
 						m.screen = screenRemoveGlobalRule
 						m.updateGlobalRuleList()
+
+					case "View Root Metadata":
+						m.screen = screenViewRootMetadata
+
+					case "View Targets Metadata":
+						m.screen = screenViewTargetsMetadata
 					}
 				}
 
@@ -592,6 +602,85 @@ func (m model) View() string {
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
 				"\nPress Enter to remove selected global rule, Left Arrow to go back",
 		)
+
+	case screenViewRootMetadata:
+		var sb strings.Builder
+		sb.WriteString(titleStyle.Render("Root Metadata") + "\n\n")
+
+		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
+		if err != nil {
+			m.footer = fmt.Sprintf("Error loading state: %v", err)
+			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			m.footer = fmt.Sprintf("Error loading root metadata: %v", err)
+			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+		}
+
+		// Display schema version
+		sb.WriteString(fmt.Sprintf("Schema Version: %s\n\n", rootMetadata.SchemaVersion()))
+
+		// Display principals
+		principals, err := rootMetadata.GetRootPrincipals()
+		if err != nil {
+			m.footer = fmt.Sprintf("Error loading principals: %v", err)
+			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+		}
+
+		sb.WriteString("Root Principals:\n")
+		for _, principal := range principals {
+			sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", principal.ID()))
+			sb.WriteString("    Keys:\n")
+			for _, key := range principal.Keys() {
+				sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
+			}
+			if metadata := principal.CustomMetadata(); len(metadata) > 0 {
+				sb.WriteString("    Custom Metadata:\n")
+				for key, value := range metadata {
+					sb.WriteString(fmt.Sprintf("        %s: %s\n", key, value))
+				}
+			}
+		}
+
+		sb.WriteString("\nPress Left Arrow to go back")
+		return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+
+	case screenViewTargetsMetadata:
+		var sb strings.Builder
+		sb.WriteString(titleStyle.Render("Targets Metadata") + "\n\n")
+
+		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
+		if err != nil {
+			m.footer = fmt.Sprintf("Error loading state: %v", err)
+			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+		}
+
+		targetsMetadata, err := state.GetTargetsMetadata(m.policyName, false)
+		if err != nil {
+			m.footer = fmt.Sprintf("Error loading targets metadata: %v", err)
+			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+		}
+
+		// Display schema version
+		sb.WriteString(fmt.Sprintf("Schema Version: %s\n\n", targetsMetadata.SchemaVersion()))
+
+		// Display rules
+		rules := targetsMetadata.GetRules()
+		if len(rules) > 0 {
+			sb.WriteString("Rules:\n")
+			for _, rule := range rules {
+				sb.WriteString(fmt.Sprintf("\nRule %s:\n", rule.ID()))
+				sb.WriteString(fmt.Sprintf("    Patterns: %s\n", strings.Join(rule.GetProtectedNamespaces(), ", ")))
+				sb.WriteString(fmt.Sprintf("    Principals: %s\n", strings.Join(rule.GetPrincipalIDs().Contents(), ", ")))
+				sb.WriteString(fmt.Sprintf("    Threshold: %d\n", rule.GetThreshold()))
+			}
+		}
+
+		sb.WriteString("\nPress Left Arrow to go back")
+		return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
+
 	default:
 		return "Unknown screen"
 	}
