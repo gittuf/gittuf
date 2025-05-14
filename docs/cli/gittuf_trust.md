@@ -35,6 +35,7 @@ Tools for gittuf's root of trust
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
+* [gittuf trust inspect-root](gittuf_trust_inspect-root.md)	 - Print root metadata in JSON format
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust list-hooks](gittuf_trust_list-hooks.md)	 - List gittuf hooks for the current policy state
 * [gittuf trust make-controller](gittuf_trust_make-controller.md)	 - Make current repository a controller (developer mode only, set GITTUF_DEV=1)
