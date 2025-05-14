@@ -56,6 +56,7 @@ type Verifier struct {
 	issuer   string
 	identity string
 	ext      *structpb.Struct
+	offline  bool
 }
 
 func NewVerifierFromIdentityAndIssuer(identity, issuer string, opts ...verifieropts.Option) *Verifier {
@@ -68,6 +69,7 @@ func NewVerifierFromIdentityAndIssuer(identity, issuer string, opts ...verifiero
 		rekorURL: options.RekorURL,
 		issuer:   issuer,
 		identity: identity,
+		offline:  options.OfflineMode,
 	}
 }
 
@@ -89,12 +91,9 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 		verify.WithTransparencyLog(1),
 		verify.WithIntegratedTimestamps(1),
 	}
-	if privateInstance {
-		// privateInstance requires online verification if rekor is configured
-		// using env var rather than TUF.
-		// This is because the trusted_root.json delivered via TUF indicates
-		// from when the log can be trusted, which we cannot decide (without a
-		// custom env var just for that).
+
+	// Only enable online verification if not in offline mode
+	if !v.offline && privateInstance {
 		opts = append(opts, verify.WithOnlineVerification())
 	}
 

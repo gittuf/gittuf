@@ -156,7 +156,9 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 					continue
 				case sigstore.KeyType:
 					slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
-					opts := []sigstoreverifieropts.Option{}
+					opts := []sigstoreverifieropts.Option{
+						sigstoreverifieropts.WithOfflineMode(true), // Enable offline mode by default
+					}
 					config, err := v.repository.GetGitConfig()
 					if err != nil {
 						return nil, err

@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -22,7 +21,6 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/sigstore/cosign/v2/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
-	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"golang.org/x/crypto/ssh"
 )
@@ -144,6 +142,7 @@ func verifyGitsignSignature(ctx context.Context, repo *Repository, key *signerve
 			Issuer:  key.KeyVal.Issuer,
 			Subject: key.KeyVal.Identity,
 		}},
+		Offline: true, // Enable offline mode
 	}
 
 	var verifier *gitsignVerifier.CertVerifier
@@ -194,36 +193,7 @@ func verifyGitsignSignature(ctx context.Context, repo *Repository, key *signerve
 		return ErrIncorrectVerificationKey
 	}
 
-	rekorURL := rekorPublicGoodInstance
-	// Check git config to see if rekor server must be overridden
-	config, err := repo.GetGitConfig()
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-	if configValue, has := config[sigstore.GitConfigRekor]; has {
-		slog.Debug(fmt.Sprintf("Using '%s' as Rekor instance...", configValue))
-		rekorURL = configValue
-	}
-
-	// gitsignRekor.NewWithOptions invokes cosign.GetRekorPubs which looks at
-	// the env var, so we don't have to do anything here
-	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorURL)
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-
-	checkOpts.RekorClient = rekor.Rekor
-	checkOpts.RekorPubKeys = rekor.PublicKeys()
-
-	// cosign.GetCTLogPubs already looks at the env var, so we don't have to do
-	// anything here
-	ctPub, err := cosign.GetCTLogPubs(ctx)
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-
-	checkOpts.CTLogPubKeys = ctPub
-
+	// Skip rekor verification in offline mode
 	if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
 		return errors.Join(ErrIncorrectVerificationKey, err)
 	}

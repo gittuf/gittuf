@@ -8,11 +8,13 @@ const (
 )
 
 type Options struct {
-	RekorURL string
+	RekorURL    string
+	OfflineMode bool
 }
 
 var DefaultOptions = &Options{
-	RekorURL: defaultRekorURL,
+	RekorURL:    defaultRekorURL,
+	OfflineMode: false,
 }
 
 type Option func(o *Options)
@@ -20,5 +22,11 @@ type Option func(o *Options)
 func WithRekorURL(rekorURL string) Option {
 	return func(o *Options) {
 		o.RekorURL = rekorURL
+	}
+}
+
+func WithOfflineMode(offline bool) Option {
+	return func(o *Options) {
+		o.OfflineMode = offline
 	}
 }
