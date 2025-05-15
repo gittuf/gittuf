@@ -610,12 +610,14 @@ func (m model) View() string {
 		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
 		if err != nil {
 			m.footer = fmt.Sprintf("Error loading state: %v", err)
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
 
 		rootMetadata, err := state.GetRootMetadata(false)
 		if err != nil {
 			m.footer = fmt.Sprintf("Error loading root metadata: %v", err)
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
 
@@ -626,6 +628,7 @@ func (m model) View() string {
 		principals, err := rootMetadata.GetRootPrincipals()
 		if err != nil {
 			m.footer = fmt.Sprintf("Error loading principals: %v", err)
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
 
