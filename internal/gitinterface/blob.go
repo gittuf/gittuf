@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // ReadBlob returns the contents of the blob referenced by blobID.
@@ -41,4 +42,26 @@ func (r *Repository) WriteBlob(contents []byte) (Hash, error) {
 	}
 
 	return hash, nil
+}
+
+// GetBlobID returns the ID of the blob at the specified path in the given
+// reference. If the reference is ":", it will look for the blob at the path
+// in the current working directory of the repository.
+func (r *Repository) GetBlobID(ref, path string) (Hash, error) {
+	var fullRef string
+	if ref == ":" {
+		fullRef = ":" + path
+	} else {
+		fullRef = ref + ":" + path
+	}
+
+	stdout, err := r.executor("rev-parse", fullRef).executeString()
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to resolve blobID for %s in %s: %w", path, ref, err)
+	}
+	blobID, err := NewHash(strings.TrimSpace(stdout))
+	if err != nil {
+		return ZeroHash, fmt.Errorf("invalid blob id: %w", err)
+	}
+	return blobID, nil
 }

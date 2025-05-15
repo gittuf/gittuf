@@ -105,7 +105,7 @@ func (l *LuaEnvironment) RunScript(script string, parameters lua.LTable) (int, e
 
 	// If a table is returned, then this likely means that the hook didn't
 	// return an exit code. Return a 1 for safety.
-	_, ok := returnValue.(*lua.LNumber)
+	_, ok := returnValue.(lua.LNumber)
 	if !ok {
 		return 1, nil
 	}
@@ -218,6 +218,8 @@ func (l *LuaEnvironment) registerAPIFunctions() error {
 		"gitGetCommitMessage":            l.apiGitGetCommitMessage(),
 		"gitGetFilePathsChangedByCommit": l.apiGitGetFilePathsChangedByCommit(),
 		"gitGetRemoteURL":                l.apiGitGetRemoteURL(),
+		"gitGetStagedFilePaths":          l.apiGitGetStagedFilePaths(),
+		"gitGetBlobID":                   l.apiGitGetBlobID(),
 	}
 
 	for name, availableAPI := range registerAPIs {
