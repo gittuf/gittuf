@@ -639,11 +639,15 @@ func (m model) View() string {
 			for _, key := range principal.Keys() {
 				sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
 			}
+			// Check if principal has custom metadata (richer object)
 			if metadata := principal.CustomMetadata(); len(metadata) > 0 {
 				sb.WriteString("    Custom Metadata:\n")
 				for key, value := range metadata {
 					sb.WriteString(fmt.Sprintf("        %s: %s\n", key, value))
 				}
+			} else {
+				// Principal is just a key ID
+				sb.WriteString("    Type: Key ID\n")
 			}
 		}
 
@@ -657,19 +661,43 @@ func (m model) View() string {
 		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
 		if err != nil {
 			m.footer = fmt.Sprintf("Error loading state: %v", err)
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
 
 		targetsMetadata, err := state.GetTargetsMetadata(m.policyName, false)
 		if err != nil {
 			m.footer = fmt.Sprintf("Error loading targets metadata: %v", err)
+			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
 
 		// Display schema version
 		sb.WriteString(fmt.Sprintf("Schema Version: %s\n\n", targetsMetadata.SchemaVersion()))
 
-		// Display rules
+		// Display principals
+		principals := targetsMetadata.GetPrincipals()
+		if len(principals) > 0 {
+			sb.WriteString("Principals:\n")
+			for id, principal := range principals {
+				sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", id))
+				if keys := principal.Keys(); len(keys) > 0 {
+					sb.WriteString("    Keys:\n")
+					for _, key := range keys {
+						sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
+					}
+				}
+				if metadata := principal.CustomMetadata(); len(metadata) > 0 {
+					sb.WriteString("    Custom Metadata:\n")
+					for key, value := range metadata {
+						sb.WriteString(fmt.Sprintf("        %s: %s\n", key, value))
+					}
+				}
+			}
+			sb.WriteString("\n")
+		}
+
+		// Display rules with more detailed information
 		rules := targetsMetadata.GetRules()
 		if len(rules) > 0 {
 			sb.WriteString("Rules:\n")
