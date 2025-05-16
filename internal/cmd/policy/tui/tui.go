@@ -675,10 +675,10 @@ func (m model) View() string {
 		// Display schema version
 		sb.WriteString(fmt.Sprintf("Schema Version: %s\n\n", targetsMetadata.SchemaVersion()))
 
-		// Display principals
+		// Display policy principals
 		principals := targetsMetadata.GetPrincipals()
 		if len(principals) > 0 {
-			sb.WriteString("Principals:\n")
+			sb.WriteString("List Policy Principals:\n")
 			for id, principal := range principals {
 				sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", id))
 				if metadata := principal.CustomMetadata(); len(metadata) > 0 {
@@ -688,19 +688,8 @@ func (m model) View() string {
 					}
 				}
 			}
-			sb.WriteString("\n")
-		}
-
-		// Display rules with more detailed information
-		rules := targetsMetadata.GetRules()
-		if len(rules) > 0 {
-			sb.WriteString("Rules:\n")
-			for _, rule := range rules {
-				sb.WriteString(fmt.Sprintf("\nRule %s:\n", rule.ID()))
-				sb.WriteString(fmt.Sprintf("    Patterns: %s\n", strings.Join(rule.GetProtectedNamespaces(), ", ")))
-				sb.WriteString(fmt.Sprintf("    Principals: %s\n", strings.Join(rule.GetPrincipalIDs().Contents(), ", ")))
-				sb.WriteString(fmt.Sprintf("    Threshold: %d\n", rule.GetThreshold()))
-			}
+		} else {
+			sb.WriteString("No principals defined in the policy.\n")
 		}
 
 		sb.WriteString("\nPress Left Arrow to go back")
