@@ -681,12 +681,6 @@ func (m model) View() string {
 			sb.WriteString("Principals:\n")
 			for id, principal := range principals {
 				sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", id))
-				if keys := principal.Keys(); len(keys) > 0 {
-					sb.WriteString("    Keys:\n")
-					for _, key := range keys {
-						sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
-					}
-				}
 				if metadata := principal.CustomMetadata(); len(metadata) > 0 {
 					sb.WriteString("    Custom Metadata:\n")
 					for key, value := range metadata {
