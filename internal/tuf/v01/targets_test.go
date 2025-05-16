@@ -421,3 +421,26 @@ func TestAllowRule(t *testing.T) {
 	assert.Empty(t, allowRule.KeyIDs)
 	assert.Equal(t, 1, allowRule.Threshold)
 }
+
+func TestUpdatePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+
+	// Test updating non-existent principal
+	err := targetsMetadata.UpdatePrincipal(key1)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	// Add a principal and then update it
+	err = targetsMetadata.AddPrincipal(key1)
+	assert.Nil(t, err)
+	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
+
+	err = targetsMetadata.UpdatePrincipal(key2)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	// Test updating with nil principal
+	err = targetsMetadata.UpdatePrincipal(nil)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+}

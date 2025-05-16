@@ -4,6 +4,8 @@
 package policy
 
 import (
+	"github.com/spf13/cobra"
+
 	"github.com/gittuf/gittuf/internal/cmd/policy/addkey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/addperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
@@ -17,12 +19,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
+	"github.com/gittuf/gittuf/internal/cmd/policy/updateperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/stage"
-	"github.com/spf13/cobra"
 )
 
 func New() *cobra.Command {
@@ -51,6 +53,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(tui.New(o))
 	cmd.AddCommand(updaterule.New(o))
+	cmd.AddCommand(updateperson.New(o))
 
 	return cmd
 }
