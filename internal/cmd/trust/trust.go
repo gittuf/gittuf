@@ -15,6 +15,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
+	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
 	"github.com/gittuf/gittuf/internal/cmd/trust/makecontroller"
@@ -57,6 +58,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
+	cmd.AddCommand(inspectroot.New())
 	cmd.AddCommand(listhooks.New())
 	cmd.AddCommand(makecontroller.New(o))
 	cmd.AddCommand(remote.New())
