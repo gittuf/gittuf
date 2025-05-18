@@ -22,6 +22,11 @@ var (
 	cmd = &cobra.Command{
 		Use:   "gendoc",
 		Short: "Generate sandbox docs",
+		Long: `The 'gendoc' command generates documentation for all available Lua sandbox APIs used within the gittuf CLI.
+
+This includes API signatures, descriptions, and examples, making it easier for developers to understand and utilize available sandbox functionality.
+
+The generated documentation is saved to the specified directory, defaulting to the current working directory if not provided.`,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			repository, err := gitinterface.LoadRepository(".")
