@@ -121,9 +121,31 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-person",
-		Short:             "Add a trusted person to a policy file",
-		Long:              `This command allows users to add a trusted person to the specified policy file. By default, the main policy file is selected. Note that the person's keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Use:   "add-person",
+		Short: "Add a trusted person to a policy file",
+		Long: `The 'add-person' command adds a trusted person to a gittuf policy file, enabling them to participate
+in signing operations governed by the trust policy.
+
+A person consists of:
+- A unique identifier (--person-ID)
+- One or more authorized public keys (--public-key)
+- Optional associated identities on external platforms (e.g., GitHub, GitLab) via --associated-identity
+- Optional custom metadata (--custom) for tracking additional attributes
+
+Supported public key formats:
+- Local PEM-encoded public key files
+- GPG keys using the "gpg:<fingerprint>" syntax
+- Sigstore identities using "fulcio:<identity>::<issuer>"
+
+By default, the trusted person is added to the main policy file (targets), unless overridden with --policy-name.
+The command also supports adding an RSL (Record of State Log) entry if --rsl is specified.
+
+Requirements:
+- A valid signing key must be provided using --signing-key
+- The person ID and at least one public key are required
+
+Usage:
+  gittuf policy add-person --person-ID <id> --public-key <path|gpg:fingerprint|fulcio:identity::issuer> [flags]`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
