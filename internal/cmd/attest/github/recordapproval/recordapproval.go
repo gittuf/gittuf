@@ -92,7 +92,12 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "record-approval",
 		Short: "Record GitHub pull request approval",
-		RunE:  o.Run,
+		Long: `The 'record-approval' command creates an attestation for an approval action on a GitHub pull request in a gittuf-secured repository.
+
+This command requires the repository in the {owner}/{repo} format, the pull request number, the specific review ID, and the identity of the reviewer who approved the pull request. These attestations enhance transparency and trust in the pull request review process by recording verified reviewer approvals.
+
+It supports GitHub Enterprise and custom deployments via the --base-URL flag and can optionally include the attestation in the Repository Snapshot Log (RSL).`,
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
