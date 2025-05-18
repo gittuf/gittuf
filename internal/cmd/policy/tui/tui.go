@@ -635,9 +635,11 @@ func (m model) View() string {
 		sb.WriteString("Root Principals:\n")
 		for _, principal := range principals {
 			sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", principal.ID()))
-			sb.WriteString("    Keys:\n")
-			for _, key := range principal.Keys() {
-				sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
+			if keys := principal.Keys(); len(keys) > 0 {
+				sb.WriteString("    Keys:\n")
+				for _, key := range keys {
+					sb.WriteString(fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType))
+				}
 			}
 			// Check if principal has custom metadata (richer object)
 			if metadata := principal.CustomMetadata(); len(metadata) > 0 {
@@ -645,9 +647,6 @@ func (m model) View() string {
 				for key, value := range metadata {
 					sb.WriteString(fmt.Sprintf("        %s: %s\n", key, value))
 				}
-			} else {
-				// Principal is just a key ID
-				sb.WriteString("    Type: Key ID\n")
 			}
 		}
 
@@ -678,7 +677,7 @@ func (m model) View() string {
 		// Display policy principals
 		principals := targetsMetadata.GetPrincipals()
 		if len(principals) > 0 {
-			sb.WriteString("List Policy Principals:\n")
+			sb.WriteString("Policy Principals:\n")
 			for id, principal := range principals {
 				sb.WriteString(fmt.Sprintf("\nPrincipal %s:\n", id))
 				if metadata := principal.CustomMetadata(); len(metadata) > 0 {
