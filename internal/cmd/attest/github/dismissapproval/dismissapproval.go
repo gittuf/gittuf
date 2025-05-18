@@ -66,7 +66,12 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dismiss-approval",
 		Short: "Record dismissal of GitHub pull request approval",
-		RunE:  o.Run,
+		Long: `The 'dismiss-approval' command creates an attestation that a previously recorded approval of a GitHub pull request has been dismissed.
+
+It requires the review ID of the pull request and the identity of the dismissed approver. These attestations provide an auditable record of review state changes on GitHub, improving transparency and trust in the contribution workflow.
+
+This command supports custom GitHub base URLs for enterprise environments and can optionally include the attestation in the Repository Snapshot Log (RSL).`,
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
