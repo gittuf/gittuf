@@ -102,9 +102,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "update-rule",
-		Short:             "Update an existing rule in a policy file",
-		Long:              `This command allows users to update an existing rule to the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Use:   "update-rule",
+		Short: "Update an existing rule in a policy file",
+		Long: `Update an existing rule in the specified policy file.
+
+By default, the main policy file is used. Authorized keys can be from disk, GPG keyring ("gpg:<fingerprint>"), or Sigstore identity ("fulcio:<identity>::<issuer>").`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
