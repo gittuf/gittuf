@@ -24,4 +24,5 @@ jobs:
           version: latest
           args: release --clean
         env:
+          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
