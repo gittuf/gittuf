@@ -119,6 +119,26 @@ func TestPullPolicy(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPullingPolicy)
 	})
 }
+
+func TestHasPolicy(t *testing.T) {
+	t.Run("policy exists", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+		hasPolicy, err := repo.HasPolicy()
+		assert.Nil(t, err)
+		assert.True(t, hasPolicy)
+	})
+
+	t.Run("policy does not exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		repo := &Repository{r: r}
+
+		hasPolicy, err := repo.HasPolicy()
+		assert.Nil(t, err)
+		assert.False(t, hasPolicy)
+	})
+}
+
 func TestDiscardPolicy(t *testing.T) {
 	t.Run("successful discard with existing policy", func(t *testing.T) {
 		repo := createTestRepositoryWithPolicy(t, "")

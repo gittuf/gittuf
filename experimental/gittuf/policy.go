@@ -47,6 +47,20 @@ func (r *Repository) PullPolicy(remoteName string) error {
 	return nil
 }
 
+// HasPolicy indicates if the repository has a gittuf policy applied.
+func (r *Repository) HasPolicy() (bool, error) {
+	_, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+	if err != nil {
+		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return false, nil
+		}
+
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (r *Repository) ApplyPolicy(ctx context.Context, remoteName string, localOnly, signRSLEntry bool) error {
 	if signRSLEntry {
 		slog.Debug("Checking if Git signing is configured...")
