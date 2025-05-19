@@ -47,9 +47,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "init",
-		Short:             "Initialize policy file",
-		Long:              "This command initializes a new gittuf policy file with the specified policy name. The user must provide a valid signing key.",
+		Use:   "init",
+		Short: "Initialize policy file",
+		Long: `Initialize a new gittuf policy file. This sets up the targets role with the given policy name (or defaults to the main policy file if unspecified) and signs it with the provided signing key.
+
+Use this to bootstrap trust in a new repository or create a new policy scope for an existing one.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
