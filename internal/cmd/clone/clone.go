@@ -63,8 +63,13 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "clone",
-		Short:             "Clone repository and its gittuf references",
+		Use:   "clone",
+		Short: "Clone repository and its gittuf references",
+		Long: `The 'clone' command clones a gittuf-secured Git repository along with its associated TUF metadata and trusted references.
+
+This command behaves similarly to 'git clone' but also ensures the repository's trust root is established correctly by using specified root keys. These keys can be supplied using the --root-key flag, supporting multiple formats such as SSH key paths, GPG fingerprints, and Sigstore/Fulcio identities.
+
+You may specify a particular branch to check out with --branch and choose whether to create a bare repository using --bare. This is a foundational step in working with secure gittuf repositories, as it sets up the verification context for future secure operations.`,
 		Args:              cobra.MinimumNArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

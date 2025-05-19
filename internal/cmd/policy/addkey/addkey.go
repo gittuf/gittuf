@@ -67,9 +67,26 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-key",
-		Short:             "Add a trusted key to a policy file",
-		Long:              `This command allows users to add trusted keys to the specified policy file. By default, the main policy file is selected. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Use:   "add-key",
+		Short: "Add a trusted key to a policy file",
+		Long: `The 'add-key' command adds one or more trusted public keys to a gittuf trust policy file.
+
+This command is used to define which keys are authorized to sign commits, references, or policy changes
+according to the repository's trust model. It supports various key formats and sources, including:
+
+- Local PEM-encoded public key files
+- GPG keys from a local keyring using the "gpg:<fingerprint>" syntax
+- Sigstore identities using the "fulcio:<identity>::<issuer>" syntax
+
+By default, the main policy file (targets) is used, but you can override this with the --policy-name flag.
+This command also supports generating Record of State Log (RSL) entries when the --rsl flag is enabled.
+
+Requirements:
+- A valid signing key must be provided via --signing-key
+- At least one public key must be supplied using --public-key
+
+Usage:
+  gittuf policy add-key --public-key <path|gpg:fingerprint|fulcio:identity::issuer> [--policy-name <name>] [--signing-key <path>]`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

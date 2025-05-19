@@ -65,8 +65,22 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "rsl-record",
 		Short: fmt.Sprintf("Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set %s=1)", dev.DevModeKey),
-		Args:  cobra.ExactArgs(1),
-		RunE:  o.Run,
+		Long: fmt.Sprintf(`The 'rsl-record' command explicitly records the state of a Git reference into the Record of State Log (RSL),
+signed using the provided key.
+
+This command is intended for developer and testing workflows where you need to manually insert entries into
+the RSL for a specific Git reference (e.g., branch or tag) at a given commit (target ID).
+
+You can optionally specify a destination reference name using --dst-ref to override the default.
+
+Requirements:
+- Developer mode must be enabled by setting %s=1
+- The signing key must be in PEM format (SSH or GPG)
+
+Usage:
+  gittuf dev rsl-record <reference> --target <commit-id> --signing-key <path-to-key> [--dst-ref <override-ref>]`, dev.DevModeKey),
+		Args: cobra.ExactArgs(1),
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 

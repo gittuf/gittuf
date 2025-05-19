@@ -18,8 +18,14 @@ var (
 	dir string
 	cmd = &cobra.Command{
 		Use:   "gendoc",
-		Short: "Generate help docs",
-		Args:  cobra.NoArgs,
+		Short: "Generate Markdown documentation for all commands in gittuf",
+		Long: `The 'gendoc' command generates Markdown documentation for all available
+commands in the gittuf CLI. This is useful for creating detailed, human-readable
+docs for the project that describe how each command works and its options.
+
+The generated documentation will be saved to the specified directory, which
+defaults to the current working directory if not provided.`,
+		Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
 			return doc.GenMarkdownTree(root.New(), dir)
 		},
