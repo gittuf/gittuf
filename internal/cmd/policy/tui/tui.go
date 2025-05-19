@@ -719,7 +719,14 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "tui",
 		Short:             "Start the TUI for managing policies",
-		Long:              "This command allows users to start a terminal-based interface to manage policies. The signing key specified will be used to sign all operations while in the TUI. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes",
+		Long: `Launches an interactive terminal user interface (TUI) for managing policy files.
+
+All operations performed within the TUI are automatically signed using the provided signing key.
+
+Changes made in the TUI are staged immediately without additional confirmation. To finalize and commit these staged changes, users must run the separate command \`gittuf policy apply\`.
+
+This provides a convenient and interactive way to review and modify policies securely from the terminal.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

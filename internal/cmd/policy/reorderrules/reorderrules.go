@@ -50,9 +50,22 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "reorder-rules",
-		Short:             "Reorder rules in the specified policy file",
-		Long:              "This command allows users to reorder rules in the specified policy file. By default, the main policy file is selected. The rule names need to be passed as arguments, in the new order they must appear in, starting from the first to the last rule. Rule names may contain spaces, so they should be enclosed in quotes if necessary.",
+		Use:   "reorder-rules",
+		Short: "Reorder rules in the specified policy file",
+		Long: `The 'reorder-rules' command allows users to reorder the delegation rules within a gittuf policy file.
+
+Users specify the new order of rules by passing the rule names as command-line arguments in the desired sequence, starting from the first to the last.
+
+Rule names containing spaces should be enclosed in quotes.
+
+By default, this command operates on the main policy file (targets), but a different policy file can be specified with --policy-name.
+
+A valid signing key (--signing-key) is required to authorize this operation.
+
+This command also supports adding an RSL (Record of State Log) entry if enabled.
+
+Use this command to update the priority or evaluation order of rules in your policy.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

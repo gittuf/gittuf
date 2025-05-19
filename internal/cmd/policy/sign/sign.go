@@ -47,9 +47,18 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "sign",
-		Short:             "Sign policy file",
-		Long:              "This command allows users to add their signature to the specified policy file.",
+		Use:   "sign",
+		Short: "Sign policy file",
+		Long: `The 'sign' command allows a user to add their cryptographic signature to a gittuf policy file, ensuring trust and integrity.
+
+By default, it operates on the main policy file (targets), but a specific policy file can be provided using the --policy-name flag.
+
+This command requires a valid signing key provided via the --signing-key flag.
+
+If RSL (Record of State Log) tracking is enabled with --rsl-entry, an entry is added to maintain a verifiable audit trail of the signature.
+
+Use this command to approve policy changes and contribute a valid signature as required by the threshold.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

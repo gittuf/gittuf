@@ -74,9 +74,23 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "list-rules",
-		Short:             "List rules for the current state",
-		Long:              "This command allows a user to list the rules for the current policy state. The policy ref that should be inspected must be specified.",
+		Use:   "list-rules",
+		Short: "List rules for the current state",
+		Long: `The 'list-rules' command displays the rules defined in the current policy state, organized as a delegation tree.
+
+Each rule specifies:
+- The rule ID
+- The paths and Git refs the rule affects
+- The authorized principals (keys) for that rule
+- The required threshold of valid signatures
+
+Rules are displayed in order of delegation hierarchy, with indentation reflecting the depth of each rule in the tree.
+
+Flags:
+  --target-ref: specifies which policy reference should be inspected (default "policy")
+
+Use this command to review and audit the active rules governing authorization within the gittuf policy.`,
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

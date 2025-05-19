@@ -68,9 +68,23 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "list-principals",
-		Short:             "List principals for the current policy in the specified rule file",
-		Long:              "This command retrieves and lists the authorized principals for the specified policy and rule. The user must specify the policy ref they wish to inspect, and the name of the rule file to retrieve the principals for.",
+		Use:   "list-principals",
+		Short: "List principals for the current policy in the specified rule file",
+		Long: `The 'list-principals' command retrieves and displays the authorized principals associated with a specified policy reference and rule file.
+
+Principals are entities authorized to act under a gittuf trust policy, each identified by a unique ID and associated public keys.
+
+This command outputs details including:
+- Principal ID
+- Associated public keys (with key IDs and types)
+- Any custom metadata linked to the principal
+
+Flags:
+  --policy-ref: specifies which policy reference to inspect (default "policy")
+  --policy-name: specifies the rule file name from which to list principals (default "targets")
+
+Use this command to audit or verify the principals currently authorized in a gittuf policy context.`,
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

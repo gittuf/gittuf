@@ -56,9 +56,20 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-rule",
-		Short:             "Remove rule from a policy file",
-		Long:              "This command allows users to remove and existing rule to the specified policy file. By default, the main policy file is selected.",
+		Use:   "remove-rule",
+		Short: "Remove rule from a policy file",
+		Long: `The 'remove-rule' command removes an existing rule (delegation) from a gittuf policy file.
+
+Users must specify the name of the rule to be removed using the --rule-name flag.
+
+By default, the command targets the main policy file (targets), but a different policy file can be selected with --policy-name.
+
+This command requires a valid signing key (--signing-key) to authorize the removal.
+
+It supports adding an RSL (Record of State Log) entry if enabled.
+
+Use this command to revoke delegated trust and update the policy accordingly.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
