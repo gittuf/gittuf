@@ -607,16 +607,9 @@ func (m model) View() string {
 		var sb strings.Builder
 		sb.WriteString(titleStyle.Render("Root Metadata") + "\n\n")
 
-		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
+		rootMetadata, err := m.getRootMetadata()
 		if err != nil {
-			m.footer = fmt.Sprintf("Error loading state: %v", err)
-			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
-			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
-		}
-
-		rootMetadata, err := state.GetRootMetadata(false)
-		if err != nil {
-			m.footer = fmt.Sprintf("Error loading root metadata: %v", err)
+			m.footer = err.Error()
 			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
@@ -657,16 +650,9 @@ func (m model) View() string {
 		var sb strings.Builder
 		sb.WriteString(titleStyle.Render("Targets Metadata") + "\n\n")
 
-		state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), m.options.targetRef)
+		targetsMetadata, err := m.getTargetsMetadata()
 		if err != nil {
-			m.footer = fmt.Sprintf("Error loading state: %v", err)
-			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
-			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
-		}
-
-		targetsMetadata, err := state.GetTargetsMetadata(m.policyName, false)
-		if err != nil {
-			m.footer = fmt.Sprintf("Error loading targets metadata: %v", err)
+			m.footer = err.Error()
 			sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 			return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
 		}
@@ -953,4 +939,34 @@ func repoUpdateGlobalRule(o *options, gr globalRule) error {
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+// getRootMetadata loads and returns the root metadata
+func (m *model) getRootMetadata() (tuf.RootMetadata, error) {
+	state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), policy.PolicyStagingRef)
+	if err != nil {
+		return nil, fmt.Errorf("error loading state: %w", err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, fmt.Errorf("error loading root metadata: %w", err)
+	}
+
+	return rootMetadata, nil
+}
+
+// getTargetsMetadata loads and returns the targets metadata
+func (m *model) getTargetsMetadata() (tuf.TargetsMetadata, error) {
+	state, err := policy.LoadCurrentState(context.Background(), m.repo.GetGitRepository(), policy.PolicyStagingRef)
+	if err != nil {
+		return nil, fmt.Errorf("error loading state: %w", err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(m.policyName, false)
+	if err != nil {
+		return nil, fmt.Errorf("error loading targets metadata: %w", err)
+	}
+
+	return targetsMetadata, nil
 }
