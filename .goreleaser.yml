@@ -47,7 +47,7 @@ builds:
 
 archives:
 - id: binary
-  format: binary
+  formats: ['binary']
   allow_different_binary_count: true
 
 # This section defines how gittuf releases are automatically sent to WinGet as
