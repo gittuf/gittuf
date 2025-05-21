@@ -174,7 +174,7 @@ func TestGitHubPullRequestApprovalAttestation_WithDismissedApprovers(t *testing.
 
 func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers, dismissedApprovers []string) *sslibdsse.Envelope {
 	t.Helper()
-	
+
 	att, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
 		t.Fatal(err)
