@@ -350,3 +350,58 @@ func (l *LuaEnvironment) apiGitGetRemoteURL() API {
 		},
 	}
 }
+
+func (l *LuaEnvironment) apiGitGetStagedFilePaths() API {
+	return &GoAPI{
+		Name:      "gitGetStagedFilePaths",
+		Signature: "gitGetStagedFilePaths() -> paths",
+		Help:      "Retrieve a Lua table of file paths that have staged changes (changes in the index).",
+		Examples: []string{
+			"gitGetStagedFilePaths() -> [\"foo/bar.txt\", \"baz/qux.py\"]",
+		},
+		Implementation: func(s *lua.LState) int {
+			statuses, err := l.repository.Status()
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+
+			resultTable := s.NewTable()
+			localIndex := 1
+			for filePath, fileStatus := range statuses {
+				if fileStatus.X != gitinterface.StatusCodeUnmodified && fileStatus.X != gitinterface.StatusCodeIgnored {
+					resultTable.RawSetInt(localIndex, lua.LString(filePath))
+					localIndex++
+				}
+			}
+
+			s.Push(resultTable)
+			return 1
+		},
+	}
+}
+
+func (l *LuaEnvironment) apiGitGetBlobID() API {
+	return &GoAPI{
+		Name:      "gitGetBlobID",
+		Signature: "gitGetBlobID(ref, path) -> blobID",
+		Help:      "Retrieve the blob ID of the file at the given path from a specific reference (commit or staged index).",
+		Examples: []string{
+			"gitGetBlobID(\":\", \"s.txt\") -> \"abc123...\" (staged)",
+			"gitGetBlobID(\"HEAD\", \"s.txt\") -> \"def456...\" (current commit)",
+			"gitGetBlobID(\"HEAD~1\", \"s.txt\") -> \"ghi789...\" (previous commit)",
+		},
+		Implementation: func(s *lua.LState) int {
+			ref := s.ToString(1)
+			path := s.ToString(2)
+
+			blobID, err := l.repository.GetBlobID(ref, path)
+			if err != nil {
+				s.Push(lua.LString(err.Error()))
+				return 1
+			}
+			s.Push(lua.LString(blobID.String()))
+			return 1
+		},
+	}
+}
