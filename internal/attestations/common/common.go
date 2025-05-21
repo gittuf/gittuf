@@ -22,15 +22,3 @@ func PredicateToPBStruct(predicate any) (*structpb.Struct, error) {
 
 	return structpb.NewStruct(*predicateInterface)
 }
-
-// UnmarshalPBStruct converts a *structpb.Struct into a Go struct.
-func UnmarshalPBStruct(pbStruct *structpb.Struct, out any) error {
-	// Convert structpb.Struct to JSON bytes
-	jsonBytes, err := pbStruct.MarshalJSON()
-	if err != nil {
-		return err
-	}
-
-	// Unmarshal into the provided Go struct
-	return json.Unmarshal(jsonBytes, out)
-}
