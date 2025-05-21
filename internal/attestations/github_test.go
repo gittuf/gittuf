@@ -12,7 +12,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations/common"
 	"github.com/gittuf/gittuf/internal/attestations/github"
-	"github.com/gittuf/gittuf/internal/attestations/github/v01"
+	v01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -136,7 +136,6 @@ func TestGitHubPullRequestApprovalAttestation_WithDismissedApprovers(t *testing.
 	assert.ElementsMatch(t, []string{"charlie"}, stripEmail(parsed.GetDismissedApprovers()))
 }
 
-
 // stripEmail returns the username part before '@' for each email in the slice.
 func stripEmail(emails []string) []string {
 	result := make([]string, len(emails))
@@ -233,12 +232,10 @@ func TestGitHubPullRequestApproval_WithApproversAndDismissed(t *testing.T) {
 	assert.NotEmpty(t, env.Payload)
 }
 
-
-
 // createGitHubPullRequestApprovalAttestationEnvelope creates a GitHub Pull Request Approval attestation envelope
 func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers, dismissedApprovers []string) *sslibdsse.Envelope {
 	t.Helper()
-	//adding dismissed approvers to the attestation
+	// Adding dismissed approvers to the attestation
 	authorization, err := NewGitHubPullRequestApprovalAttestation(refName, fromID, toID, approvers, dismissedApprovers)
 	if err != nil {
 		t.Fatal(err)
