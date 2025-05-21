@@ -33,8 +33,6 @@ var (
 	ErrNoGitHubToken = errors.New("authentication token for GitHub API not provided")
 )
 
-var githubClient *gogithub.Client
-
 // ApplyAttestations records the state of the attestations reference and syncs
 // it with the specified remote, making the attestation available at the
 // synchronization point.
@@ -697,9 +695,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 // base URL other than https://github.com is supplied, the client is configured
 // to interact with the specified enterprise instance.
 func getGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
-	if githubClient == nil {
-		githubClient = gogithub.NewClient(nil).WithAuthToken(githubToken)
-	}
+	githubClient := gogithub.NewClient(nil).WithAuthToken(githubToken)
 
 	if baseURL != githubopts.DefaultGitHubBaseURL {
 		baseURL = strings.TrimSuffix(baseURL, "/")
