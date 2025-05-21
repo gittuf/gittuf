@@ -279,14 +279,6 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(ref))
 	if err != nil {
-		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			// If no RSL entry exists, fall back to loading directly from the reference
-			commitID, err := repo.GetReference(ref)
-			if err != nil {
-				return nil, err
-			}
-			return loadStateFromCommit(repo, commitID)
-		}
 		return nil, err
 	}
 
