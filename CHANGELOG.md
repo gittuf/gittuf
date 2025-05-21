@@ -2,6 +2,13 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.10.2
+
+### Updated
+
+- Updated how GitHub API tokens are loaded to prevent issues with expiry
+- Updated release workflow to replace deprecated option
+
 ## v0.10.1
 
 ### Added
