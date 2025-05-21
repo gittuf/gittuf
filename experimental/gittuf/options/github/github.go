@@ -3,25 +3,41 @@
 
 package github
 
-const DefaultGitHubBaseURL = "https://github.com"
+import (
+	"context"
+	"os"
+)
+
+const (
+	DefaultGitHubBaseURL = "https://github.com"
+
+	githubTokenEnvKey = "GITHUB_TOKEN" //nolint:gosec
+)
+
+// TokenSource is a lightweight interface that can be used to fetch a GitHub
+// token.
+type TokenSource interface {
+	Token(context.Context) (string, error)
+}
 
 type Options struct {
-	GitHubToken    string
-	GitHubBaseURL  string
-	CreateRSLEntry bool
+	GitHubTokenSource TokenSource
+	GitHubBaseURL     string
+	CreateRSLEntry    bool
 }
 
 var DefaultOptions = &Options{
-	GitHubBaseURL: DefaultGitHubBaseURL,
+	GitHubBaseURL:     DefaultGitHubBaseURL,
+	GitHubTokenSource: &TokenSourceEnvironment{},
 }
 
 type Option func(o *Options)
 
-// WithGitHubToken can be used to specify an authentication token to use the
-// GitHub API.
-func WithGitHubToken(token string) Option {
+// WithGitHubTokenSource can be used to specify an authentication token source
+// to fetch a token to use the GitHub API.
+func WithGitHubTokenSource(tokenSource TokenSource) Option {
 	return func(o *Options) {
-		o.GitHubToken = token
+		o.GitHubTokenSource = tokenSource
 	}
 }
 
@@ -37,4 +53,12 @@ func WithRSLEntry() Option {
 	return func(o *Options) {
 		o.CreateRSLEntry = true
 	}
+}
+
+// TokenSourceEnvironment reads the GitHub API token from the GITHUB_TOKEN
+// environment variable. It implements the TokenSource interface.
+type TokenSourceEnvironment struct{}
+
+func (t *TokenSourceEnvironment) Token(_ context.Context) (string, error) {
+	return os.Getenv(githubTokenEnvKey), nil
 }

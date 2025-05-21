@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 
 	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
@@ -29,14 +28,10 @@ import (
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
-const githubTokenEnvKey = "GITHUB_TOKEN" //nolint:gosec
-
 var (
 	ErrNotSigningKey = errors.New("expected signing key")
 	ErrNoGitHubToken = errors.New("authentication token for GitHub API not provided")
 )
-
-var githubClient *gogithub.Client
 
 // ApplyAttestations records the state of the attestations reference and syncs
 // it with the specified remote, making the attestation available at the
@@ -273,9 +268,10 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 
 // AddGitHubPullRequestAttestationForCommit identifies the pull request for a
 // specified commit ID and triggers AddGitHubPullRequestAttestationForNumber for
-// that pull request. The authentication token for the GitHub API can be passed
-// in as an option. If it is not, it is read from the GITHUB_TOKEN environment
-// variable. A custom GitHub instance can be specified via opts.
+// that pull request. The source of the authentication token for the GitHub API
+// can be passed in as an option. If a source is not provided, the token is read
+// from the GITHUB_TOKEN environment variable. A custom GitHub instance can be
+// specified via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool, opts ...githubopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -290,16 +286,15 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		fn(options)
 	}
 
-	if options.GitHubToken == "" {
-		options.GitHubToken = os.Getenv(githubTokenEnvKey)
-
-		if options.GitHubToken == "" {
-			// still empty
-			return ErrNoGitHubToken
-		}
+	token, err := options.GitHubTokenSource.Token(ctx)
+	if err != nil {
+		return err
+	}
+	if token == "" {
+		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, options.GitHubToken)
+	client, err := getGitHubClient(options.GitHubBaseURL, token)
 	if err != nil {
 		return err
 	}
@@ -330,10 +325,10 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 
 // AddGitHubPullRequestAttestationForNumber wraps the API response for the
 // specified pull request in an in-toto attestation. `pullRequestID` must be the
-// number of the pull request. The authentication token for the GitHub API can
-// be passed in as an option. If it is not passed in, it is read from the
-// GITHUB_TOKEN environment variable. A custom GitHub instance can be specified
-// via opts.
+// number of the pull request. The source of the authentication token for the
+// GitHub API can be passed in as an option. If it is not passed in, the token
+// is read from the GITHUB_TOKEN environment variable. A custom GitHub instance
+// can be specified via opts.
 func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, signCommit bool, opts ...githubopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -348,16 +343,15 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		fn(options)
 	}
 
-	if options.GitHubToken == "" {
-		options.GitHubToken = os.Getenv(githubTokenEnvKey)
-
-		if options.GitHubToken == "" {
-			// still empty
-			return ErrNoGitHubToken
-		}
+	token, err := options.GitHubTokenSource.Token(ctx)
+	if err != nil {
+		return err
+	}
+	if token == "" {
+		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, options.GitHubToken)
+	client, err := getGitHubClient(options.GitHubBaseURL, token)
 
 	if err != nil {
 		return err
@@ -376,9 +370,10 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 // for the specified parameters. If an attestation already exists, the specified
 // approver is added to the existing attestation's predicate and it is re-signed
 // and stored in the repository. To find the review information, the GitHub API
-// is used and the authentication token for the API is passed in as an option.
-// If the token is not passed in, it's read from the GITHUB_TOKEN environment
-// variable. A custom GitHub instance can be specified via opts.
+// is used and the source for the authentication token for the API is passed in
+// as an option.  If the source is not passed in, the token is read from the
+// GITHUB_TOKEN environment variable. A custom GitHub instance can be specified
+// via opts.
 func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository string, pullRequestNumber int, reviewID int64, approver string, signCommit bool, opts ...githubopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -393,15 +388,6 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		fn(options)
 	}
 
-	if options.GitHubToken == "" {
-		options.GitHubToken = os.Getenv(githubTokenEnvKey)
-
-		if options.GitHubToken == "" {
-			// still empty
-			return ErrNoGitHubToken
-		}
-	}
-
 	currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
 	if err != nil {
 		return err
@@ -413,7 +399,15 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	}
 	appName := tuf.GitHubAppRoleName // TODO: make this configurable, check appName's key matches signer
 
-	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, options.GitHubToken, owner, repository, pullRequestNumber, reviewID)
+	token, err := options.GitHubTokenSource.Token(ctx)
+	if err != nil {
+		return err
+	}
+	if token == "" {
+		return ErrNoGitHubToken
+	}
+
+	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, token, owner, repository, pullRequestNumber, reviewID)
 	if err != nil {
 		return err
 	}
@@ -701,9 +695,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 // base URL other than https://github.com is supplied, the client is configured
 // to interact with the specified enterprise instance.
 func getGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
-	if githubClient == nil {
-		githubClient = gogithub.NewClient(nil).WithAuthToken(githubToken)
-	}
+	githubClient := gogithub.NewClient(nil).WithAuthToken(githubToken)
 
 	if baseURL != githubopts.DefaultGitHubBaseURL {
 		baseURL = strings.TrimSuffix(baseURL, "/")
