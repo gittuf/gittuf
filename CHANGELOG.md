@@ -2,6 +2,24 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.10.1
+
+### Added
+
+- Added a `HasPolicy` API to check if a repository has gittuf policy defined
+- Added documentation on how to inspect gittuf metadata
+- Added `gittuf trust inspect-root` to pretty-print repository's root of trust
+  metadata
+- Added long documentation for some gittuf commands
+- Added global rules support to TUI
+
+### Updated
+
+- Updated tests and generic set implementation used internally
+- Updated documentation with typo fixes and Slack information
+- Updated release workflow to automatically bump gittuf's Winget package
+- Updated various dependencies and CI workflows
+
 ## v0.10.0
 
 Starting with this release, gittuf is now in beta!
