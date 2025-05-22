@@ -1,5 +1,6 @@
 <img src="https://raw.githubusercontent.com/gittuf/community/bd8b367fa91fab0fddaa1943e0131e90e04e6b10/artwork/PNG/gittuf_horizontal-color.png" alt="gittuf logo" width="25%"/>
 
+[![gittuf Verification](https://github.com/gittuf/gittuf/actions/workflows/gittuf-verify.yml/badge.svg)](https://github.com/gittuf/gittuf/actions/workflows/gittuf-verify.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/7789/badge)](https://www.bestpractices.dev/projects/7789)
 ![Build and Tests (CI)](https://github.com/gittuf/gittuf/actions/workflows/ci.yml/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/gittuf/gittuf/badge.svg)](https://coveralls.io/github/gittuf/gittuf)
