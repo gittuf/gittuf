@@ -29,9 +29,49 @@ automated testing such as (but not limited to):
 * Static analysis using linters
 * Developer Certificate of Origin (DCO) check
 
-In future, as gittuf matures, this repository will also be secured using gittuf.
-At that point, the contributor workflow may evolve to record gittuf specific
-information.
+## Dependencies Policy
+
+As third-party dependencies vary in code quality compared to gittuf, and can
+introduce issues, their use in gittuf is regulated by this policy. This policy
+applies to all gittuf contributors and all third-party packages used in the
+gittuf project.
+
+### Policy
+
+gittuf contributors must follow these guidelines when consuming third-party
+packages:
+
+- Only use third-party packages that are necessary for the functionality of
+  gittuf.
+- Use the latest version of all third-party packages whenever possible.
+- Avoid using third-party packages that are known to have security
+  vulnerabilities.
+- Pin all third-party packages to specific versions in the gittuf codebase.
+- Use a dependency management tool, such as Go modules, to manage third-party
+  dependencies.
+
+### Procedure
+
+When adding a new third-party package to gittuf, maintainers must follow these
+steps:
+
+1. Evaluate the need for the package. Is it necessary for the functionality of
+   gittuf?
+2. Research the package. Is it well-maintained? Does it have a good reputation?
+3. Choose a version of the package. Use the latest version whenever possible.
+4. Pin the package to the specific version in the gittuf codebase.
+5. Update the gittuf documentation to reflect the new dependency.
+
+### Enforcement
+
+This policy is enforced by the gittuf maintainers. Maintainers are expected to
+review each other's as well as contributors' code changes to ensure that they 
+comply with this policy.
+
+### Exceptions
+
+Exceptions to this policy may be granted by the gittuf TSC on a case-by-case
+basis.
 
 ## Other Guidelines
 
