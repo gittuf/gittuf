@@ -13,5 +13,6 @@ jobs:
       - name: Checkout and verify repository
         run: |
           gittuf clone https://github.com/${{ github.repository }}
+          sleep 10s
           cd gittuf
           gittuf verify-ref main --verbose
