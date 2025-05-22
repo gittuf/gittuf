@@ -84,7 +84,7 @@ repository:
     review-policy: TODO?
     security-policy: https://github.com/gittuf/gittuf/blob/main/SECURITY.md
     governance: https://github.com/gittuf/community
-    dependency-management-policy: TODO
+    dependency-management-policy: https://github.com/gittuf/gittuf/blob/main/CONTRIBUTING.md#dependencies-policy
   license:
     url: https://github.com/gittuf/gittuf/blob/main/LICENSE
     expression: Apache-2.0
