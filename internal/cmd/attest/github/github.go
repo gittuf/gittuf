@@ -14,8 +14,16 @@ import (
 
 func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "github",
-		Short:   "Tools to attest about GitHub actions and entities",
+		Use:   "github",
+		Short: "Tools to attest about GitHub actions and entities",
+		Long: `The 'github' command is a parent command that provides tools to create attestations for actions and entities associated with GitHub, such as pull requests and approvals.
+
+It includes subcommands to:
+- Record approval of a GitHub pull request
+- Dismiss a previously recorded approval
+- Attest to metadata related to GitHub pull requests
+
+These attestations help establish trust around code contributions made through GitHub by enabling verifiable links between repository events and contributor actions.`,
 		PreRunE: common.CheckForSigningKeyFlag,
 	}
 
