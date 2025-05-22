@@ -75,8 +75,8 @@ func TestGetGitHubPullRequestApprovalAttestationFor(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 	attestations := &Attestations{}
 
-	require.NoError(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, mainEnv, baseURL, 1, appName, testRef, testID, testID))
-	require.NoError(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, featureEnv, baseURL, 2, appName, testAnotherRef, testID, testID))
+	require.Nil(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, mainEnv, baseURL, 1, appName, testRef, testID, testID))
+	require.Nil(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, featureEnv, baseURL, 2, appName, testAnotherRef, testID, testID))
 
 	mainGot, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, appName, testRef, testID, testID)
 	assert.NoError(t, err)
@@ -136,16 +136,16 @@ func TestGitHubPullRequestApprovalAttestation_WithDismissedApprovers(t *testing.
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 	attestations := &Attestations{}
 
-	require.NoError(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, env, baseURL, 1, appName, testRef, testID, testID))
+	require.Nil(t, attestations.SetGitHubPullRequestApprovalAttestation(repo, env, baseURL, 1, appName, testRef, testID, testID))
 
 	got, err := attestations.GetGitHubPullRequestApprovalAttestationFor(repo, appName, testRef, testID, testID)
 	assert.NoError(t, err)
 
 	payloadBytes, err := base64.StdEncoding.DecodeString(got.Payload)
-	require.NoError(t, err)
+	require.Nil(t, err)
 
 	var statement ita.Statement
-	require.NoError(t, json.Unmarshal(payloadBytes, &statement))
+	require.Nil(t, json.Unmarshal(payloadBytes, &statement))
 
 	predicate := statement.Predicate.AsMap()
 
@@ -153,9 +153,9 @@ func TestGitHubPullRequestApprovalAttestation_WithDismissedApprovers(t *testing.
 	approverVals, ok := predicate["approvers"].([]interface{})
 	require.True(t, ok, "approvers should be a list")
 
-	var gotApprovers []string
-	for _, a := range approverVals {
-		gotApprovers = append(gotApprovers, a.(string))
+	gotApprovers := make([]string, len(approverVals))
+	for i, a := range approverVals {
+		gotApprovers[i] = a.(string)
 	}
 	expectedApprovers := []string{"alice@example.com", "bob@example.com"}
 	assert.Equal(t, expectedApprovers, gotApprovers)
@@ -164,9 +164,9 @@ func TestGitHubPullRequestApprovalAttestation_WithDismissedApprovers(t *testing.
 	dismissedVals, ok := predicate["dismissedApprovers"].([]interface{})
 	require.True(t, ok, "dismissedApprovers should be a list")
 
-	var gotDismissed []string
-	for _, d := range dismissedVals {
-		gotDismissed = append(gotDismissed, d.(string))
+	gotDismissed := make([]string, len(dismissedVals))
+	for i, d := range dismissedVals {
+		gotDismissed[i] = d.(string)
 	}
 	expectedDismissed := []string{"charlie@example.com"}
 	assert.Equal(t, expectedDismissed, gotDismissed)
