@@ -2,6 +2,7 @@ name: gittuf Verification
 on:
   push:
     branches: ['main']
+permissions: read-all
 jobs:
   gittuf-verify:
     if: github.repository == 'gittuf/gittuf'
