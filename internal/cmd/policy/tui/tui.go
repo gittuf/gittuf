@@ -717,9 +717,12 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "tui",
-		Short:             "Start the TUI for managing policies",
-		Long:              "This command allows users to start a terminal-based interface to manage policies. The signing key specified will be used to sign all operations while in the TUI. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes",
+		Use:   "tui",
+		Short: "Start the TUI for managing policies",
+		Long: `Launch a terminal UI to manage policies.
+
+All operations in the TUI use the specified signing key. Changes are staged immediately; run 'gittuf policy apply' to commit them.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

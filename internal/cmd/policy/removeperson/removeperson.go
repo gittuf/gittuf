@@ -56,9 +56,18 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-person",
-		Short:             "Remove a person from a policy file",
-		Long:              `This command allows users to remove a person from the specified policy file. The person's ID is required. By default, the main policy file is selected.`,
+		Use:   "remove-person",
+		Short: "Remove a person from a policy file",
+		Long: `The 'remove-person' command removes a trusted person from the specified gittuf policy file.
+
+You must provide:
+- The person’s unique identifier via --person-ID
+- A signing key using --signing-key
+
+By default, this operation targets the main policy file (targets), unless --policy-name is specified.
+
+If --rsl is provided, an entry will be added to the Record of State Log (RSL).`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

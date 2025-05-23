@@ -56,9 +56,21 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-key",
-		Short:             "Remove a key from a policy file",
-		Long:              `This command allows users to remove keys from the specified policy file. The public key ID is required. By default, the main policy file is selected.`,
+		Use:   "remove-key",
+		Short: "Remove a key from a policy file",
+		Long: `The 'remove-key' command removes a public key from the specified gittuf policy file.
+
+You must specify the public key ID to remove using --public-key.
+By default, the key is removed from the main policy file (targets), unless overridden with --policy-name.
+If RSL logging is enabled, an RSL entry will be recorded.
+
+Flags:
+- --public-key (required): Key ID to remove
+- --policy-name: Policy file to update (default: targets)
+
+Example:
+  gittuf policy remove-key --public-key <keyID> --policy-name custom`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

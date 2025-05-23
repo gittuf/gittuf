@@ -98,8 +98,12 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "gittuf",
-		Short:             "A security layer for Git repositories, powered by TUF",
+		Use:   "gittuf",
+		Short: "A security layer for Git repositories, powered by TUF",
+		Long: `gittuf is a security layer for Git repositories, powered by The Update Framework (TUF).
+
+It provides commands to enhance repository security including trust management, policy enforcement, signing, verification, and synchronization. Use this CLI to manage repository security policies, verify integrity, and apply cryptographic signatures. Supports profiling, verbose logging, and colorized output customization.`,
+
 		SilenceUsage:      true,
 		DisableAutoGenTag: true,
 		PersistentPreRunE: o.PreRunE,
