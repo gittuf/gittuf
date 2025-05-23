@@ -199,7 +199,7 @@ func (t *TargetsMetadata) RemoveRule(ruleName string) error {
 	return nil
 }
 
-// GetPrincipals returns all the principals in the rule file.
+// GetPrincipals returns all the principals in the metadata.
 func (t *TargetsMetadata) GetPrincipals() map[string]tuf.Principal {
 	principals := map[string]tuf.Principal{}
 	for id, key := range t.Delegations.Keys {
@@ -230,6 +230,23 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addKey(principal)
 }
 
+// UpdatePrincipal updates an existing principal in the metadata while preserving their ID.
+// The principal must already exist in the metadata.
+func (t *TargetsMetadata) UpdatePrincipal(principal tuf.Principal) error {
+	if principal == nil {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	// Check if principal exists
+	if !t.Delegations.hasKey(principal.ID()) {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	// Update principal
+	return t.Delegations.updateKey(principal)
+}
+
+// RemovePrincipal removes a principal from the metadata.
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
 }
@@ -250,6 +267,34 @@ func (d *Delegations) addKey(key tuf.Principal) error {
 	keyT, isKnownType := key.(*Key)
 	if !isKnownType {
 		return tuf.ErrInvalidPrincipalType
+	}
+
+	d.Keys[key.ID()] = keyT
+	return nil
+}
+
+// hasKey checks if a key exists in the delegations.
+func (d *Delegations) hasKey(keyID string) bool {
+	if d.Keys == nil {
+		return false
+	}
+	_, exists := d.Keys[keyID]
+	return exists
+}
+
+// updateKey updates an existing key in the delegations.
+func (d *Delegations) updateKey(key tuf.Principal) error {
+	if d.Keys == nil {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	keyT, isKnownType := key.(*Key)
+	if !isKnownType {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	if !d.hasKey(key.ID()) {
+		return tuf.ErrPrincipalNotFound
 	}
 
 	d.Keys[key.ID()] = keyT

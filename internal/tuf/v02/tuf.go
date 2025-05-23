@@ -30,10 +30,11 @@ func NewKeyFromSSLibKey(key *signerverifier.SSLibKey) *Key {
 	return &k
 }
 
+// Person represents a human in the gittuf metadata.
 type Person struct {
-	PersonID             string            `json:"personID"`
-	PublicKeys           map[string]*Key   `json:"keys"`
-	AssociatedIdentities map[string]string `json:"associatedIdentities"`
+	PersonID            string            `json:"id"`
+	PublicKeys         map[string]*Key    `json:"keys"`
+	AssociatedIdentities map[string]string `json:"associated_identities"`
 	Custom               map[string]string `json:"custom"`
 }
 
