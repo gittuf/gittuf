@@ -17,9 +17,13 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "dev",
-		Short:   "Developer mode commands",
-		Long:    fmt.Sprintf("These commands are meant to be used to aid gittuf development, and are not expected to be used during standard workflows. If used, they can undermine repository security. To proceed, set %s=1.", dev.DevModeKey),
+		Use:   "dev",
+		Short: "Developer mode commands",
+		Long: fmt.Sprintf(`The 'dev' command group provides advanced utilities for use during gittuf development and debugging.
+
+These commands are intended strictly for internal or development use and are not designed to be run in production or standard repository workflows. Improper use may compromise repository security guarantees.
+
+To enable these commands, the environment variable %s must be set to 1. This acts as a safeguard to prevent accidental invocation in secure environments.`, dev.DevModeKey),
 		PreRunE: checkInDevMode,
 	}
 
