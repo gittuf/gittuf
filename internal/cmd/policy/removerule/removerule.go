@@ -56,9 +56,18 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-rule",
-		Short:             "Remove rule from a policy file",
-		Long:              "This command allows users to remove and existing rule to the specified policy file. By default, the main policy file is selected.",
+		Use:   "remove-rule",
+		Short: "Remove rule from a policy file",
+		Long: `The 'remove-rule' command deletes an existing rule from the specified gittuf policy file.
+
+You must provide:
+- The name of the rule via --rule-name
+- A valid signing key using --signing-key
+
+By default, the rule is removed from the main policy file (targets), unless overridden with --policy-name.
+
+If --rsl is provided, an entry is added to the Record of State Log (RSL).`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

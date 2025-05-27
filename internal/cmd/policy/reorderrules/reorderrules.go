@@ -50,9 +50,18 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "reorder-rules",
-		Short:             "Reorder rules in the specified policy file",
-		Long:              "This command allows users to reorder rules in the specified policy file. By default, the main policy file is selected. The rule names need to be passed as arguments, in the new order they must appear in, starting from the first to the last rule. Rule names may contain spaces, so they should be enclosed in quotes if necessary.",
+		Use:   "reorder-rules",
+		Short: "Reorder rules in the specified policy file",
+		Long: `The 'reorder-rules' command reorders rules in the specified policy file based on the order of rule names provided as arguments.
+
+You must provide:
+- Rule names as positional arguments, in the desired order.
+- A valid signing key via --signing-key.
+
+Rule names with spaces should be quoted. By default, the 'targets' policy file is used unless --policy-name is specified.
+
+Use --rsl to add a Record of State Log (RSL) entry.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
