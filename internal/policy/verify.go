@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/attestations"
@@ -26,13 +27,15 @@ import (
 )
 
 var (
-	ErrVerificationFailed             = errors.New("gittuf policy verification failed")
-	ErrInvalidEntryNotSkipped         = errors.New("invalid entry found not marked as skipped")
-	ErrLastGoodEntryIsSkipped         = errors.New("entry expected to be unskipped is marked as skipped")
-	ErrNoVerifiers                    = errors.New("no verifiers present for verification")
-	ErrInvalidVerifier                = errors.New("verifier has invalid parameters (is threshold 0?)")
-	ErrVerifierConditionsUnmet        = errors.New("verifier's key and threshold constraints not met")
-	ErrCannotVerifyMergeableForTagRef = errors.New("cannot verify mergeable into tag reference")
+	ErrVerificationFailed                                = errors.New("gittuf policy verification failed")
+	ErrInvalidEntryNotSkipped                            = errors.New("invalid entry found not marked as skipped")
+	ErrLastGoodEntryIsSkipped                            = errors.New("entry expected to be unskipped is marked as skipped")
+	ErrNoVerifiers                                       = errors.New("no verifiers present for verification")
+	ErrInvalidVerifier                                   = errors.New("verifier has invalid parameters (is threshold 0?)")
+	ErrVerifierConditionsUnmet                           = errors.New("verifier's key and threshold constraints not met")
+	ErrCannotVerifyMergeableForTagRef                    = errors.New("cannot verify mergeable into tag reference")
+	ErrNetworkRepositoryDoesNotDeclareRequiredController = errors.New("network repository does not declare required controller repository")
+	ErrNetworkRepositoryHasStaleControllerMetadata       = errors.New("network repository has not fetched latest controller metadata")
 )
 
 // PolicyVerifier implements various gittuf verification workflows.
@@ -303,6 +306,109 @@ func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, 
 	}
 
 	return rslEntrySignatureNeededForThreshold, nil
+}
+
+func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
+	slog.Debug("Finding latest policy entry in the RSL...")
+	policyEntry, err := v.searcher.FindLatestPolicyEntry()
+	if err != nil {
+		return err
+	}
+
+	policyTreeID, err := v.repo.GetCommitTreeID(policyEntry.GetTargetID())
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Loading current policy from entry '%s'...", policyEntry.GetID().String()))
+	policyState, err := LoadState(ctx, v.repo, policyEntry)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := policyState.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+
+	if !rootMetadata.IsController() {
+		slog.Debug("Repository is not a controller")
+		return nil
+	}
+
+	networkRepositoryEntries := rootMetadata.GetNetworkRepositories()
+	if len(networkRepositoryEntries) == 0 {
+		slog.Debug("No network repository entries found")
+		return nil
+	}
+
+	for _, entry := range networkRepositoryEntries {
+		slog.Debug(fmt.Sprintf("Inspecting entry for repository '%s' at '%s'...", entry.GetName(), entry.GetLocation()))
+		tmpDir, err := os.MkdirTemp("", fmt.Sprintf("gittuf-network-%s-", entry.GetName()))
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmpDir) //nolint:errcheck
+
+		slog.Debug(fmt.Sprintf("Cloning from '%s'...", entry.GetLocation()))
+		networkRepo, err := gitinterface.CloneAndFetchRepository(entry.GetLocation(), tmpDir, "", []string{rsl.Ref, PolicyRef}, true)
+		if err != nil {
+			return err
+		}
+
+		slog.Debug(fmt.Sprintf("Identifying latest policy entry in network repository '%s'...", entry.GetName()))
+		latestNetworkPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(networkRepo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			return err
+		}
+
+		slog.Debug(fmt.Sprintf("Loading latest policy state for network repository from '%s'...", latestNetworkPolicyEntry.GetID().String()))
+		latestNetworkPolicyState, err := LoadState(ctx, networkRepo, latestNetworkPolicyEntry)
+		if err != nil {
+			return err
+		}
+
+		networkRootMetadata, err := latestNetworkPolicyState.GetRootMetadata(false)
+		if err != nil {
+			return err
+		}
+
+		controllerEntries := networkRootMetadata.GetControllerRepositories()
+		declaredControllerName := ""
+		for _, controllerEntry := range controllerEntries {
+			if controllerEntry.GetLocation() == rootMetadata.GetRepositoryLocation() {
+				declaredControllerName = controllerEntry.GetName()
+				break
+			}
+		}
+
+		if declaredControllerName == "" {
+			return fmt.Errorf("%w: repository '%s' is invalid", ErrNetworkRepositoryDoesNotDeclareRequiredController, entry.GetName())
+		}
+
+		slog.Debug(fmt.Sprintf("Network repository '%s' has declared required controller repository with name '%s'", entry.GetName(), declaredControllerName))
+
+		// Check if it has correctly propagated changes
+		networkPolicyTreeID, err := networkRepo.GetCommitTreeID(latestNetworkPolicyEntry.GetTargetID())
+		if err != nil {
+			return err
+		}
+
+		controllerPath := fmt.Sprintf("%s/%s/%s", tuf.GittufControllerPrefix, declaredControllerName, metadataTreeEntryName)
+		propagatedTreeID, err := networkRepo.GetPathIDInTree(controllerPath, networkPolicyTreeID)
+		if err != nil {
+			return err
+		}
+
+		if !propagatedTreeID.Equal(policyTreeID) {
+			return fmt.Errorf("%w: repository '%s' is stale", ErrNetworkRepositoryHasStaleControllerMetadata, entry.GetName())
+		}
+
+		slog.Debug(fmt.Sprintf("Successfully verified network repository '%s'!", entry.GetName()))
+	}
+
+	return nil
 }
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
