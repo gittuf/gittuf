@@ -102,9 +102,33 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-rule",
-		Short:             "Add a new rule to a policy file",
-		Long:              `This command allows users to add a new rule to the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Use:   "add-rule",
+		Short: "Add a new rule to a policy file",
+		Long: `The 'add-rule' command adds a new delegation rule to a gittuf policy file, enabling fine-grained
+authorization based on path patterns and principals.
+
+Each rule defines:
+- A name (--rule-name)
+- One or more principals (--authorize or --authorize-key) who are allowed to sign within the scope of the rule
+- A set of rule patterns (--rule-pattern) defining the namespaces or paths the rule governs
+- A signature threshold (--threshold), which is the minimum number of valid signatures required to satisfy the rule
+
+Principal identifiers can include:
+- GPG fingerprints ("gpg:<fingerprint>")
+- Fulcio Sigstore identities ("fulcio:<identity>::<issuer>")
+- Person IDs (if already added to the policy)
+- Public key files (deprecated flag: --authorize-key)
+
+By default, the rule is added to the main policy file unless --policy-name is specified. If the --rsl flag is passed,
+a Record of State Log (RSL) entry will be added to log this policy change.
+
+Requirements:
+- A valid signing key must be provided using --signing-key
+- At least one of --authorize or --authorize-key must be specified
+- --rule-name and --rule-pattern are required
+
+Usage:
+  gittuf policy add-rule --rule-name <name> --authorize <principalID> --rule-pattern <pattern> [flags]`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
