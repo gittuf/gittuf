@@ -395,7 +395,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 			return err
 		}
 
-		controllerPath := fmt.Sprintf("%s/%s/%s", tuf.GittufControllerPrefix, declaredControllerName, metadataTreeEntryName)
+		controllerPath := fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, declaredControllerName)
 		propagatedTreeID, err := networkRepo.GetPathIDInTree(controllerPath, networkPolicyTreeID)
 		if err != nil {
 			return err
