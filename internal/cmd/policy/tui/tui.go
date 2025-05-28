@@ -70,6 +70,10 @@ const (
 	screenAddGlobalRule
 	screenUpdateGlobalRule
 	screenRemoveGlobalRule
+	screenListPropDirectives
+	screenAddPropDirective
+	screenUpdatePropDirective
+	screenRemovePropDirective
 )
 
 type rule struct {
@@ -85,21 +89,31 @@ type globalRule struct {
 	threshold    int
 }
 
+type propagationDirective struct {
+	name           string
+	upstreamRepo   string
+	upstreamRef    string
+	downstreamRef  string
+	downstreamPath string
+}
+
 type model struct {
-	screen         screen
-	mainList       list.Model
-	rules          []rule
-	ruleList       list.Model
-	globalRules    []globalRule
-	globalRuleList list.Model
-	inputs         []textinput.Model
-	focusIndex     int
-	cursorMode     cursor.Mode
-	repo           *gittuf.Repository
-	signer         dsse.SignerVerifier
-	policyName     string
-	options        *options
-	footer         string
+	screen            screen
+	mainList          list.Model
+	rules             []rule
+	ruleList          list.Model
+	globalRules       []globalRule
+	globalRuleList    list.Model
+	propDirectives    []propagationDirective
+	propDirectiveList list.Model
+	inputs            []textinput.Model
+	focusIndex        int
+	cursorMode        cursor.Mode
+	repo              *gittuf.Repository
+	signer            dsse.SignerVerifier
+	policyName        string
+	options           *options
+	footer            string
 }
 
 // initialModel returns the initial model for the Terminal UI
@@ -116,14 +130,15 @@ func initialModel(o *options) model {
 
 	// Initialize the model
 	m := model{
-		screen:      screenMain,
-		cursorMode:  cursor.CursorBlink,
-		repo:        repo,
-		signer:      signer,
-		policyName:  o.policyName,
-		rules:       getCurrRules(o),
-		globalRules: getGlobalRules(o),
-		options:     o,
+		screen:         screenMain,
+		cursorMode:     cursor.CursorBlink,
+		repo:           repo,
+		signer:         signer,
+		policyName:     o.policyName,
+		rules:          getCurrRules(o),
+		globalRules:    getGlobalRules(o),
+		propDirectives: getCurrPropDirectives(o),
+		options:        o,
 	}
 
 	// Set up the main list items
@@ -136,6 +151,10 @@ func initialModel(o *options) model {
 		item{title: "Add Global Rule", desc: "Add a new global rule"},
 		item{title: "Update Global Rule", desc: "Modify an existing global rule"},
 		item{title: "Remove Global Rule", desc: "Remove a global rule"},
+		item{title: "List Propagation Directives", desc: "View all propagation directives"},
+		item{title: "Add Propagation Directive", desc: "Add a new propagation directive"},
+		item{title: "Update Propagation Directive", desc: "Modify an existing propagation directive"},
+		item{title: "Remove Propagation Directive", desc: "Remove a propagation directive"},
 	}
 
 	// Set up the list delegate
@@ -161,13 +180,21 @@ func initialModel(o *options) model {
 	m.ruleList.Styles.Title = titleStyle
 	m.ruleList.SetShowHelp(false)
 
-	// set up global rule list
+	// Set up global rule list
 	m.globalRuleList = list.New([]list.Item{}, delegate, 0, 0)
 	m.globalRuleList.Title = "Global Rules"
 	m.globalRuleList.SetShowStatusBar(false)
 	m.globalRuleList.SetFilteringEnabled(false)
 	m.globalRuleList.Styles.Title = titleStyle
 	m.globalRuleList.SetShowHelp(false)
+
+	// Set up propagation directive list
+	m.propDirectiveList = list.New([]list.Item{}, delegate, 0, 0)
+	m.propDirectiveList.Title = "Propagation Directives"
+	m.propDirectiveList.SetShowStatusBar(false)
+	m.propDirectiveList.SetFilteringEnabled(false)
+	m.propDirectiveList.Styles.Title = titleStyle
+	m.propDirectiveList.SetShowHelp(false)
 
 	// Set up the input fields
 	m.inputs = make([]textinput.Model, 3)
@@ -229,6 +256,35 @@ func (m *model) initGlobalInputs() {
 	}
 }
 
+// reinitialize inputs for propagation directives
+func (m *model) initPropInputs() {
+	prompts := []struct{ placeholder, prompt string }{
+		{"Enter Directive Name Here", "Name:"},
+		{"Enter Upstream Repository Here", "Upstream Repo:"},
+		{"Enter Upstream Reference Here", "Upstream Ref:"},
+		{"Enter Downstream Reference Here", "Downstream Ref:"},
+		{"Enter Downstream Path Here", "Downstream Path:"},
+	}
+	m.inputs = make([]textinput.Model, len(prompts))
+	for i, p := range prompts {
+		t := textinput.New()
+		t.Cursor.Style = cursorStyle
+		t.CharLimit = 64
+		t.Placeholder = p.placeholder
+		t.Prompt = p.prompt
+		if i == 0 {
+			t.Focus()
+			t.PromptStyle = focusedStyle
+			t.TextStyle = focusedStyle
+		} else {
+			t.Blur()
+			t.PromptStyle = blurredStyle
+			t.TextStyle = blurredStyle
+		}
+		m.inputs[i] = t
+	}
+}
+
 type item struct {
 	title, desc string
 }
@@ -258,6 +314,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 		m.mainList.SetSize(msg.Width-h, msg.Height-v)
 		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
+		m.globalRuleList.SetSize(msg.Width-h, msg.Height-v)
+		m.propDirectiveList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -290,18 +348,44 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "List Global Rules":
 						m.screen = screenListGlobalRules
 						m.updateGlobalRuleList()
-
 					case "Add Global Rule":
 						m.screen = screenAddGlobalRule
 						m.initGlobalInputs()
-
 					case "Update Global Rule":
 						m.screen = screenUpdateGlobalRule
 						m.initGlobalInputs()
-
 					case "Remove Global Rule":
 						m.screen = screenRemoveGlobalRule
 						m.updateGlobalRuleList()
+					case "List Propagation Directives":
+						m.screen = screenListPropDirectives
+						m.updatePropDirectiveList()
+					case "Add Propagation Directive":
+						m.screen = screenAddPropDirective
+						m.focusIndex = 0
+						m.initPropInputs()
+					case "Update Propagation Directive":
+						m.updatePropDirectiveList()
+						if sel, ok := m.propDirectiveList.SelectedItem().(item); ok {
+							m.screen = screenUpdatePropDirective
+							m.focusIndex = 0
+							m.initPropInputs()
+							var existing propagationDirective
+							for _, pd := range m.propDirectives {
+								if pd.name == sel.title {
+									existing = pd
+									break
+								}
+							}
+							m.inputs[0].SetValue(existing.name)
+							m.inputs[1].SetValue(existing.upstreamRepo)
+							m.inputs[2].SetValue(existing.upstreamRef)
+							m.inputs[3].SetValue(existing.downstreamRef)
+							m.inputs[4].SetValue(existing.downstreamPath)
+						}
+					case "Remove Propagation Directive":
+						m.screen = screenRemovePropDirective
+						m.updatePropDirectiveList()
 					}
 				}
 
@@ -417,6 +501,64 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.footer = "Global rule updated!"
 					m.screen = screenMain
 				}
+			case screenAddPropDirective:
+				if m.focusIndex == len(m.inputs)-1 {
+					pd := propagationDirective{
+						name:           m.inputs[0].Value(),
+						upstreamRepo:   m.inputs[1].Value(),
+						upstreamRef:    m.inputs[2].Value(),
+						downstreamRef:  m.inputs[3].Value(),
+						downstreamPath: m.inputs[4].Value(),
+					}
+					if err := repoAddPropDirective(m.options, pd); err != nil {
+						m.footer = fmt.Sprintf("Error adding directive: %v", err)
+						return m, nil
+					}
+					m.propDirectives = append(m.propDirectives, pd)
+					m.updatePropDirectiveList()
+					m.footer = "Directive added successfully!"
+					m.screen = screenMain
+				}
+			case screenUpdatePropDirective:
+				if m.focusIndex == len(m.inputs)-1 {
+					pd := propagationDirective{
+						name:           m.inputs[0].Value(),
+						upstreamRepo:   m.inputs[1].Value(),
+						upstreamRef:    m.inputs[2].Value(),
+						downstreamRef:  m.inputs[3].Value(),
+						downstreamPath: m.inputs[4].Value(),
+					}
+					if err := repoUpdatePropDirective(m.options, pd); err != nil {
+						m.footer = fmt.Sprintf("Error updating directive: %v", err)
+						return m, nil
+					}
+					for i := range m.propDirectives {
+						if m.propDirectives[i].name == pd.name {
+							m.propDirectives[i] = pd
+							break
+						}
+					}
+					m.updatePropDirectiveList()
+					m.footer = "Directive updated successfully!"
+					m.screen = screenMain
+				}
+			case screenRemovePropDirective:
+				if sel, ok := m.propDirectiveList.SelectedItem().(item); ok {
+					pd := propagationDirective{name: sel.title}
+					if err := repoRemovePropDirective(m.options, pd); err != nil {
+						m.footer = fmt.Sprintf("Error removing directive: %v", err)
+						return m, nil
+					}
+					for i := range m.propDirectives {
+						if m.propDirectives[i].name == sel.title {
+							m.propDirectives = append(m.propDirectives[:i], m.propDirectives[i+1:]...)
+							break
+						}
+					}
+					m.updatePropDirectiveList()
+					m.footer = "Directive removed successfully!"
+					m.screen = screenMain
+				}
 			}
 		case "u":
 			if m.screen == screenReorderRules {
@@ -443,7 +585,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "tab", "shift+tab", "up", "down":
-			if m.screen == screenAddRule || m.screen == screenAddGlobalRule || m.screen == screenUpdateGlobalRule {
+			if m.screen == screenAddRule || m.screen == screenAddGlobalRule || m.screen == screenUpdateGlobalRule || m.screen == screenAddPropDirective ||
+				m.screen == screenUpdatePropDirective {
 				s := msg.String()
 				if s == "up" || s == "shift+tab" {
 					if m.focusIndex > 0 {
@@ -487,6 +630,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	case screenListGlobalRules, screenRemoveGlobalRule:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
+	case screenListPropDirectives, screenRemovePropDirective:
+		m.propDirectiveList, cmd = m.propDirectiveList.Update(msg)
+	case screenAddPropDirective, screenUpdatePropDirective:
+		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	}
 
 	return m, cmd
@@ -516,6 +663,20 @@ func (m *model) updateGlobalRuleList() {
 		items[i] = item{title: gr.ruleName, desc: desc}
 	}
 	m.globalRuleList.SetItems(items)
+}
+
+// updatePropDirectiveList updates the propagation directive list within TUI
+func (m *model) updatePropDirectiveList() {
+	items := make([]list.Item, len(m.propDirectives))
+	for i, pd := range m.propDirectives {
+		desc := fmt.Sprintf(
+			"Upstream: %s@%s\nDownstream: %s@%s",
+			pd.upstreamRepo, pd.upstreamRef,
+			pd.downstreamRef, pd.downstreamPath,
+		)
+		items[i] = item{title: pd.name, desc: desc}
+	}
+	m.propDirectiveList.SetItems(items)
 }
 
 // View renders the TUI
@@ -568,14 +729,12 @@ func (m model) View() string {
 		b.WriteString("\nPress Enter to add, Left Arrow to go back\n")
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
-
 	case screenListGlobalRules:
 		return lipgloss.NewStyle().Margin(1, 2).Render(
 			m.globalRuleList.View() + "\n\n" +
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
 				"\nPress Left Arrow to go back",
 		)
-
 	case screenUpdateGlobalRule:
 		var b strings.Builder
 		b.WriteString(titleStyle.Render("Update Global Rule") + "\n\n")
@@ -585,12 +744,41 @@ func (m model) View() string {
 		b.WriteString("\nPress Enter to update, Left Arrow to go back\n")
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
 		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
-
 	case screenRemoveGlobalRule:
 		return lipgloss.NewStyle().Margin(1, 2).Render(
 			m.globalRuleList.View() + "\n\n" +
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
 				"\nPress Enter to remove selected global rule, Left Arrow to go back",
+		)
+	case screenListPropDirectives:
+		return lipgloss.NewStyle().Margin(1, 2).Render(
+			m.propDirectiveList.View() + "\n\n" +
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
+				"\nPress Left Arrow to go back",
+		)
+	case screenAddPropDirective:
+		var b strings.Builder
+		b.WriteString(titleStyle.Render("Add Propagation Directive") + "\n\n")
+		for _, input := range m.inputs {
+			b.WriteString(input.View() + "\n")
+		}
+		b.WriteString("\nPress Enter to add, Left Arrow to go back\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
+		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
+	case screenUpdatePropDirective:
+		var b strings.Builder
+		b.WriteString(titleStyle.Render("Update Propagation Directive") + "\n\n")
+		for _, input := range m.inputs {
+			b.WriteString(input.View() + "\n")
+		}
+		b.WriteString("\nPress Enter to update, Left Arrow to go back\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
+		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
+	case screenRemovePropDirective:
+		return lipgloss.NewStyle().Margin(1, 2).Render(
+			m.propDirectiveList.View() + "\n\n" +
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
+				"\nPress Enter to remove selected directive, Left Arrow to go back",
 		)
 	default:
 		return "Unknown screen"
@@ -851,4 +1039,89 @@ func repoUpdateGlobalRule(o *options, gr globalRule) error {
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+func getCurrPropDirectives(o *options) []propagationDirective {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+	// load the full policy state
+	state, err := policy.LoadCurrentState(context.Background(), repo.GetGitRepository(), o.targetRef)
+	if err != nil {
+		return nil
+	}
+	// grab the root metadata, then its propagation directives
+	rootMeta, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil
+	}
+	directives := rootMeta.GetPropagationDirectives()
+	// convert into local struct
+	curr := make([]propagationDirective, len(directives))
+	for i, d := range directives {
+		curr[i] = propagationDirective{
+			name:           d.GetName(),
+			upstreamRepo:   d.GetUpstreamRepository(),
+			upstreamRef:    d.GetUpstreamReference(),
+			downstreamRef:  d.GetDownstreamReference(),
+			downstreamPath: d.GetDownstreamPath(),
+		}
+	}
+	return curr
+}
+
+func repoAddPropDirective(o *options, pd propagationDirective) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.AddPropagationDirective(
+		context.Background(),
+		signer,
+		pd.name,
+		pd.upstreamRepo,
+		pd.upstreamRef,
+		pd.downstreamRef,
+		pd.downstreamPath,
+		true,
+		opts...,
+	)
+}
+
+func repoRemovePropDirective(o *options, pd propagationDirective) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.RemovePropagationDirective(
+		context.Background(),
+		signer,
+		pd.name,
+		true,
+		opts...,
+	)
+}
+
+func repoUpdatePropDirective(o *options, pd propagationDirective) error {
+	if err := repoRemovePropDirective(o, pd); err != nil {
+		return err
+	}
+	return repoAddPropDirective(o, pd)
 }
