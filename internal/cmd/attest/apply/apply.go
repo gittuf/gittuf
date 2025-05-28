@@ -40,7 +40,16 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Apply and push local attestations changes to remote repository",
-		RunE:  o.Run,
+		Long: `The 'apply' command takes all locally recorded attestations (stored in the
+Reference State Log, or RSL) and applies them to the target repository.
+
+By default, the command pushes those attestations to the remote specified
+in your Git configuration.  Pass '--local-only' to record the attestation
+locally without pushing upstream.
+
+Optionally, you may supply the remote name as the first positional argument.
+If omitted, the default remote is used.`,
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
