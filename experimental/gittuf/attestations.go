@@ -23,6 +23,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	ghutils "github.com/gittuf/gittuf/internal/utils/github"
 	"github.com/go-git/go-git/v5/plumbing"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
@@ -294,7 +295,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
+	client, err := ghutils.GetGitHubClient(options.GitHubBaseURL, token)
 	if err != nil {
 		return err
 	}
@@ -351,7 +352,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
+	client, err := ghutils.GetGitHubClient(options.GitHubBaseURL, token)
 
 	if err != nil {
 		return err
@@ -657,7 +658,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 	// Note: there's the potential for a TOCTOU issue here, we may query the
 	// repo after things have moved in either branch.
 
-	client, err := getGitHubClient(githubBaseURL, githubToken)
+	client, err := ghutils.GetGitHubClient(githubBaseURL, githubToken)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -689,26 +690,4 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 	toID := *commit.Tree.SHA
 
 	return baseRef, fromID, toID, nil
-}
-
-// getGitHubClient creates a client to interact with a GitHub instance. If a
-// base URL other than https://github.com is supplied, the client is configured
-// to interact with the specified enterprise instance.
-func getGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
-	githubClient := gogithub.NewClient(nil).WithAuthToken(githubToken)
-
-	if baseURL != githubopts.DefaultGitHubBaseURL {
-		baseURL = strings.TrimSuffix(baseURL, "/")
-
-		endpointAPI := fmt.Sprintf("%s/%s/%s/", baseURL, "api", "v3")
-		endpointUpload := fmt.Sprintf("%s/%s/%s/", baseURL, "api", "uploads")
-
-		var err error
-		githubClient, err = githubClient.WithEnterpriseURLs(endpointAPI, endpointUpload)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return githubClient, nil
 }
