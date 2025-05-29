@@ -14,8 +14,8 @@ meaning any developer can independently verify that a repository’s changes
 followed the expected security policies. In other words, gittuf removes the
 forge as a single point of trust in the software supply chain!
 
-gittuf is a sandbox project at the [Open Source Security Foundation (OpenSSF)]
-as part of the [Supply Chain Integrity Working Group].
+gittuf is an incubating project at the [Open Source Security Foundation
+(OpenSSF)] as part of the [Supply Chain Integrity Working Group].
 
 ## Current Status
 

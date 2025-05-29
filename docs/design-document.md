@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: March 25, 2025
+Last Modified: May 29, 2025
 
 ## Introduction
 
@@ -14,7 +14,7 @@ and provides protections against
 [attacks targeting Git metadata](https://www.usenix.org/conference/usenixsecurity16/technical-sessions/presentation/torres-arias).
 At the same time, gittuf is backwards compatible with existing source control
 platforms ("forges") such as GitHub, GitLab, and Bitbucket. gittuf is currently
-a sandbox project at the
+an incubating project at the
 [Open Source Security Foundation (OpenSSF)](https://openssf.org/) as part of the
 [Supply Chain Integrity Working Group](https://github.com/ossf/wg-supply-chain-integrity).
 The core concepts of gittuf described in this document have been
