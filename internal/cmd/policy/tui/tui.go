@@ -365,24 +365,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.focusIndex = 0
 						m.initPropInputs()
 					case "Update Propagation Directive":
+						m.screen = screenListPropDirectives
 						m.updatePropDirectiveList()
-						if sel, ok := m.propDirectiveList.SelectedItem().(item); ok {
-							m.screen = screenUpdatePropDirective
-							m.focusIndex = 0
-							m.initPropInputs()
-							var existing propagationDirective
-							for _, pd := range m.propDirectives {
-								if pd.name == sel.title {
-									existing = pd
-									break
-								}
-							}
-							m.inputs[0].SetValue(existing.name)
-							m.inputs[1].SetValue(existing.upstreamRepo)
-							m.inputs[2].SetValue(existing.upstreamRef)
-							m.inputs[3].SetValue(existing.downstreamRef)
-							m.inputs[4].SetValue(existing.downstreamPath)
-						}
 					case "Remove Propagation Directive":
 						m.screen = screenRemovePropDirective
 						m.updatePropDirectiveList()
@@ -559,6 +543,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.footer = "Directive removed successfully!"
 					m.screen = screenMain
 				}
+			case screenListPropDirectives:
+				if sel, ok := m.propDirectiveList.SelectedItem().(item); ok {
+					m.screen = screenUpdatePropDirective
+					m.focusIndex = 0
+					m.initPropInputs()
+					for _, pd := range m.propDirectives {
+						if pd.name == sel.title {
+							m.inputs[0].SetValue(pd.name)
+							m.inputs[1].SetValue(pd.upstreamRepo)
+							m.inputs[2].SetValue(pd.upstreamRef)
+							m.inputs[3].SetValue(pd.downstreamRef)
+							m.inputs[4].SetValue(pd.downstreamPath)
+							break
+						}
+					}
+				}
 			}
 		case "u":
 			if m.screen == screenReorderRules {
@@ -667,6 +667,8 @@ func (m *model) updateGlobalRuleList() {
 
 // updatePropDirectiveList updates the propagation directive list within TUI
 func (m *model) updatePropDirectiveList() {
+	m.propDirectives = getCurrPropDirectives(m.options)
+
 	items := make([]list.Item, len(m.propDirectives))
 	for i, pd := range m.propDirectives {
 		desc := fmt.Sprintf(
