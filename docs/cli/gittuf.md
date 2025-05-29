@@ -24,6 +24,7 @@ A security layer for Git repositories, powered by TUF
 * [gittuf sync](gittuf_sync.md)	 - Synchronize local references with remote references based on RSL
 * [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
 * [gittuf verify-mergeable](gittuf_verify-mergeable.md)	 - Tools for verifying mergeability using gittuf policies
+* [gittuf verify-network](gittuf_verify-network.md)	 - Verify state of network repositories
 * [gittuf verify-ref](gittuf_verify-ref.md)	 - Tools for verifying gittuf policies
 * [gittuf version](gittuf_version.md)	 - Version of gittuf
 

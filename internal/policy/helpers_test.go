@@ -61,6 +61,90 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 	return repo, state
 }
 
+func createControllerAndNetworkRepositories(t *testing.T) (*gitinterface.Repository, *gitinterface.Repository) {
+	t.Helper()
+
+	controllerRepositoryLocation := t.TempDir()
+	networkRepositoryLocation := t.TempDir()
+
+	controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+	controllerState := createTestStateWithGlobalConstraintThreshold(t)
+	controllerState.repository = controllerRepository
+
+	networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+	networkState := createTestStateWithOnlyRoot(t)
+	networkState.repository = networkRepository
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controllerRootMetadata.SetRepositoryLocation(controllerRepositoryLocation)
+	err = controllerRootMetadata.EnableController()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controllerState.Metadata.RootEnvelope = controllerRootEnv
+	err = controllerState.preprocess()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Apply(testCtx, controllerRepository, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	networkRootMetadata, err := networkState.GetRootMetadata(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	if err != nil {
+		t.Fatal(err)
+	}
+	networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	networkState.Metadata.RootEnvelope = networkRootEnv
+	err = networkState.preprocess()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Apply(testCtx, networkRepository, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return controllerRepository, networkRepository
+}
+
 func createTestStateWithOnlyRoot(t *testing.T) *State {
 	t.Helper()
 
