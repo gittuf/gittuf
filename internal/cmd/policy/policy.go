@@ -28,8 +28,28 @@ import (
 func New() *cobra.Command {
 	o := &persistent.Options{}
 	cmd := &cobra.Command{
-		Use:               "policy",
-		Short:             "Tools to manage gittuf policies",
+		Use:   "policy",
+		Short: "Tools to manage gittuf policies",
+		Long: `The 'policy' command provides a suite of tools for managing gittuf policy configurations,
+which define and enforce trust relationships and verification requirements for Git repositories.
+
+This command serves as a parent for several subcommands that allow users to:
+
+- Initialize policy directories
+- Add or remove principals (e.g., people or machines)
+- Assign keys and define rules for commit or reference validation
+- View or reorder existing rules and principals
+- Apply, stage, or discard trust policy changes
+- Interact with policies through a terminal UI
+- Cryptographically sign policy documents
+
+These commands support both interactive and automated workflows to ensure Git repository security and compliance
+with organizational policies.
+
+Usage:
+  gittuf policy <subcommand> [flags]
+
+Run 'gittuf policy <subcommand> --help' for more information on a specific subcommand.`,
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)
