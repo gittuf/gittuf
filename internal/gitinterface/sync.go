@@ -13,6 +13,18 @@ import (
 
 const DefaultRemoteName = "origin"
 
+type FetchOptions struct {
+	Depth int
+}
+
+type FetchOption func(*FetchOptions)
+
+func WithFetchDepth(depth int) FetchOption {
+	return func(o *FetchOptions) {
+		o.Depth = depth
+	}
+}
+
 func (r *Repository) PushRefSpec(remoteName string, refSpecs []string) error {
 	args := []string{"push", remoteName}
 	args = append(args, refSpecs...)
@@ -38,8 +50,19 @@ func (r *Repository) Push(remoteName string, refs []string) error {
 	return r.PushRefSpec(remoteName, refSpecs)
 }
 
-func (r *Repository) FetchRefSpec(remoteName string, refSpecs []string) error {
-	args := []string{"fetch", remoteName}
+func (r *Repository) FetchRefSpec(remoteName string, refSpecs []string, opts ...FetchOption) error {
+	options := &FetchOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	args := []string{"fetch"}
+
+	if options.Depth != 0 {
+		args = append(args, "--depth", fmt.Sprintf("%d", options.Depth))
+	}
+
+	args = append(args, remoteName)
 	args = append(args, refSpecs...)
 
 	_, err := r.executor(args...).executeString()
@@ -50,7 +73,7 @@ func (r *Repository) FetchRefSpec(remoteName string, refSpecs []string) error {
 	return nil
 }
 
-func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly bool) error {
+func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly bool, opts ...FetchOption) error {
 	refSpecs := make([]string, 0, len(refs))
 	for _, ref := range refs {
 		refSpec, err := r.RefSpec(ref, "", fastForwardOnly)
@@ -60,7 +83,7 @@ func (r *Repository) Fetch(remoteName string, refs []string, fastForwardOnly boo
 		refSpecs = append(refSpecs, refSpec)
 	}
 
-	return r.FetchRefSpec(remoteName, refSpecs)
+	return r.FetchRefSpec(remoteName, refSpecs, opts...)
 }
 
 func (r *Repository) FetchObject(remoteName string, objectID Hash) error {
