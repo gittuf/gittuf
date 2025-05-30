@@ -5,6 +5,7 @@ package gittuf
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,8 +17,10 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 )
 
 const gittufTransportPrefix = "gittuf::"
@@ -790,10 +793,6 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 		return err
 	}
 	directives := rootMetadata.GetPropagationDirectives()
-	if len(directives) == 0 {
-		slog.Debug("No propagation directives found")
-		return nil
-	}
 
 	upstreamRepositoryDirectivesMapping := map[string][]tuf.PropagationDirective{}
 	for _, directive := range directives {
@@ -803,6 +802,76 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 		}
 
 		upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()] = append(upstreamRepositoryDirectivesMapping[directive.GetUpstreamRepository()], directive)
+	}
+
+	controllerRepositories := rootMetadata.GetControllerRepositories()
+	seenControllerRepositoryLocations := set.NewSet[string]()
+	for len(controllerRepositories) != 0 {
+		controllerRepository := controllerRepositories[0]
+		controllerRepositories = controllerRepositories[1:]
+
+		if seenControllerRepositoryLocations.Has(controllerRepository.GetLocation()) {
+			continue
+		}
+
+		seenControllerRepositoryLocations.Add(controllerRepository.GetLocation())
+
+		if _, has := upstreamRepositoryDirectivesMapping[controllerRepository.GetLocation()]; !has {
+			upstreamRepositoryDirectivesMapping[controllerRepository.GetLocation()] = []tuf.PropagationDirective{}
+		}
+
+		// Calculate base64 encoding of the URL: this is the subdirectory where
+		// the contents are sent
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepository.GetLocation()))
+
+		// FIXME: this assumes tufv01.PropagationDirective
+		directive := tufv01.NewPropagationDirective(
+			// directive name
+			fmt.Sprintf("%s-%s-%s", tuf.GittufControllerPrefix, controllerRepository.GetName(), encodedLocation),
+			// upstream location
+			controllerRepository.GetLocation(),
+			// upstream ref
+			policy.PolicyRef,
+			// upstream path
+			"metadata",
+			// downstream ref
+			policy.PolicyRef,
+			// downstream path
+			fmt.Sprintf("%s/%s-%s", tuf.GittufControllerPrefix, controllerRepository.GetName(), encodedLocation),
+		)
+		upstreamRepositoryDirectivesMapping[controllerRepository.GetLocation()] = append(upstreamRepositoryDirectivesMapping[controllerRepository.GetLocation()], directive)
+
+		// FIXME: we're cloning some repositories twice, once to see the
+		// manifest to resolve controller graph, another time to actually
+		// propagate contents
+
+		// DFS to resolve transitive propagations
+		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-controller-resolve")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
+
+		fetchReferences := set.NewSetFromItems(rsl.Ref, policy.PolicyRef)
+
+		upstreamRepository, err := gitinterface.CloneAndFetchRepository(controllerRepository.GetLocation(), upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
+		if err != nil {
+			return fmt.Errorf("unable to fetch controller repository '%s': %w", controllerRepository.GetLocation(), err)
+		}
+
+		upstreamState, err := policy.LoadCurrentState(ctx, upstreamRepository, policy.PolicyRef, policyopts.WithInitialRootPrincipals(controllerRepository.GetInitialRootPrincipals()))
+		if err != nil {
+			return err
+		}
+
+		upstreamRootMetadata, err := upstreamState.GetRootMetadata(false)
+		if err != nil {
+			return err
+		}
+
+		upstreamControllerRepositories := upstreamRootMetadata.GetControllerRepositories()
+		upstreamControllerRepositories = append(upstreamControllerRepositories, controllerRepositories...)
+		controllerRepositories = upstreamControllerRepositories
 	}
 
 	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {

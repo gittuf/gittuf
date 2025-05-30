@@ -5,6 +5,7 @@ package policy
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"path"
 	"testing"
@@ -391,7 +392,7 @@ func TestLoadStateForEntry(t *testing.T) {
 		state := createTestStateWithPolicy(t)
 		state.ControllerMetadata = map[string]*StateMetadata{
 			controller1Name: controller1State.Metadata,
-			path.Join(controller1Name, controller2Name): controller2State.Metadata,
+			controller2Name: controller2State.Metadata,
 		}
 
 		tempDir := t.TempDir()
@@ -557,7 +558,7 @@ func TestStateVerify(t *testing.T) {
 		require.Nil(t, err)
 		networkState.loadedEntry = latestNetworkEntry.(rsl.ReferenceUpdaterEntry)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		latestEntry, err := rsl.GetLatestEntry(networkRepository)
@@ -606,7 +607,7 @@ func TestStateCommit(t *testing.T) {
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
-		controllerPrefix := path.Join(tuf.GittufControllerPrefix, controllerName, metadataTreeEntryName)
+		controllerPrefix := path.Join(tuf.GittufControllerPrefix, controllerName)
 		expectedPaths := set.NewSetFromItems(
 			path.Join(metadataTreeEntryName, "root.json"),
 			path.Join(metadataTreeEntryName, "targets.json"),
@@ -652,8 +653,8 @@ func TestStateCommit(t *testing.T) {
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
-		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, metadataTreeEntryName)
-		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller2Name, metadataTreeEntryName)
+		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name)
+		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller2Name)
 		expectedPaths := set.NewSetFromItems(
 			path.Join(metadataTreeEntryName, "root.json"),
 			path.Join(metadataTreeEntryName, "targets.json"),
@@ -691,7 +692,7 @@ func TestStateCommit(t *testing.T) {
 		state := createTestStateWithPolicy(t)
 		state.ControllerMetadata = map[string]*StateMetadata{
 			controller1Name: controller1State.Metadata,
-			path.Join(controller1Name, controller2Name): controller2State.Metadata,
+			controller2Name: controller2State.Metadata,
 		}
 
 		tempDir := t.TempDir()
@@ -702,8 +703,8 @@ func TestStateCommit(t *testing.T) {
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
-		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, metadataTreeEntryName)
-		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name, tuf.GittufControllerPrefix, controller2Name, metadataTreeEntryName)
+		controller1Prefix := path.Join(tuf.GittufControllerPrefix, controller1Name)
+		controller2Prefix := path.Join(tuf.GittufControllerPrefix, controller2Name)
 		expectedPaths := set.NewSetFromItems(
 			path.Join(metadataTreeEntryName, "root.json"),
 			path.Join(metadataTreeEntryName, "targets.json"),
@@ -1232,7 +1233,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// 1. Now, propagate changes from the controller into the network
 		// repository
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// These should not be equal, as policy has been updated, but *not*
@@ -1261,7 +1262,8 @@ func TestReconcileStaging(t *testing.T) {
 		require.Nil(t, err)
 
 		// Check that controller metadata has in fact been propagated...
-		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		controllerName := fmt.Sprintf("controller-%s", base64.URLEncoding.EncodeToString([]byte(controllerRepositoryLocation)))
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata[controllerName].RootEnvelope)
 		// ...and that other metadata has remained the same.
 		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
 		assert.Nil(t, networkState.Metadata.TargetsEnvelope)
@@ -1330,7 +1332,7 @@ func TestReconcileStaging(t *testing.T) {
 		// 2. Apply the controller's changes and propagate
 		err = Apply(testCtx, controllerRepository, false)
 		require.Nil(t, err)
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// The network repository's staging ref should not have changed since
@@ -1346,7 +1348,8 @@ func TestReconcileStaging(t *testing.T) {
 		require.Nil(t, err)
 
 		// Check that controller metadata has in fact been propagated...
-		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		controllerName := fmt.Sprintf("controller-%s", base64.URLEncoding.EncodeToString([]byte(controllerRepositoryLocation)))
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata[controllerName].RootEnvelope)
 		// ...and that other metadata has remained the same.
 		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
 		assert.Nil(t, networkState.Metadata.TargetsEnvelope)
@@ -1441,7 +1444,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// 3. Propagate changes from the controller repository into the network
 		// repository
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// These should not be equal, as policy has been updated, but *not*
@@ -1467,7 +1470,8 @@ func TestReconcileStaging(t *testing.T) {
 		require.Nil(t, err)
 
 		// Check that controller metadata has in fact been propagated...
-		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata["controller"].RootEnvelope)
+		controllerName := fmt.Sprintf("controller-%s", base64.URLEncoding.EncodeToString([]byte(controllerRepositoryLocation)))
+		assert.Equal(t, controllerState.Metadata.RootEnvelope, networkState.ControllerMetadata[controllerName].RootEnvelope)
 		// ...and that other metadata has remained the same.
 		assert.Equal(t, networkRootEnv, networkState.Metadata.RootEnvelope)
 		assert.Nil(t, networkState.Metadata.TargetsEnvelope)

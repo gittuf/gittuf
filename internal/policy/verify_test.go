@@ -4,6 +4,8 @@
 package policy
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	"github.com/gittuf/gittuf/internal/common"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -2017,7 +2020,7 @@ func TestVerifyNetwork(t *testing.T) {
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		verifier := NewPolicyVerifier(controllerRepository)
@@ -2100,7 +2103,7 @@ func TestVerifyNetwork(t *testing.T) {
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
@@ -3576,7 +3579,7 @@ func TestVerifyEntry(t *testing.T) {
 		err = Apply(testCtx, networkRepository, false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
@@ -3881,4 +3884,81 @@ func TestStateVerifyNewState(t *testing.T) {
 		err = currentPolicy.VerifyNewState(testCtx, newPolicy)
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
+}
+
+func getPropagationDirectivesForNetworkRepository(t *testing.T, rootMetadata tuf.RootMetadata) []tuf.PropagationDirective {
+	directives := rootMetadata.GetPropagationDirectives()
+
+	// This is a simplified copy from the API
+	// PropagateChangesFromUpstreamRepositories
+
+	controllerRepositories := rootMetadata.GetControllerRepositories()
+	seenControllerRepositoryLocations := set.NewSet[string]()
+	for len(controllerRepositories) != 0 {
+		controllerRepository := controllerRepositories[0]
+		controllerRepositories = controllerRepositories[1:]
+
+		if seenControllerRepositoryLocations.Has(controllerRepository.GetLocation()) {
+			continue
+		}
+
+		seenControllerRepositoryLocations.Add(controllerRepository.GetLocation())
+
+		// Calculate base64 encoding of the URL: this is the subdirectory where
+		// the contents are sent
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepository.GetLocation()))
+
+		// FIXME: this assumes tufv01.PropagationDirective
+		directive := tufv01.NewPropagationDirective(
+			// directive name
+			fmt.Sprintf("%s-%s-%s", tuf.GittufControllerPrefix, controllerRepository.GetName(), encodedLocation),
+			// upstream location
+			controllerRepository.GetLocation(),
+			// upstream ref
+			PolicyRef,
+			// upstream path
+			"metadata",
+			// downstream ref
+			PolicyRef,
+			// downstream path
+			fmt.Sprintf("%s/%s-%s", tuf.GittufControllerPrefix, controllerRepository.GetName(), encodedLocation),
+		)
+		directives = append(directives, directive)
+
+		// FIXME: we're cloning some repositories twice, once to see the
+		// manifest to resolve controller graph, another time to actually
+		// propagate contents
+
+		// DFS to resolve transitive propagations
+		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-controller-resolve")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
+
+		fetchReferences := set.NewSetFromItems(rsl.Ref, PolicyRef)
+
+		upstreamRepository, err := gitinterface.CloneAndFetchRepository(controllerRepository.GetLocation(), upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
+		if err != nil {
+			t.Fatal(fmt.Errorf("unable to fetch controller repository '%s': %w", controllerRepository.GetLocation(), err))
+		}
+
+		// We're not checking the initial root principals here because tests
+		// check elsewhere!
+		upstreamState, err := LoadCurrentState(t.Context(), upstreamRepository, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamRootMetadata, err := upstreamState.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamControllerRepositories := upstreamRootMetadata.GetControllerRepositories()
+		upstreamControllerRepositories = append(upstreamControllerRepositories, controllerRepositories...)
+		controllerRepositories = upstreamControllerRepositories
+	}
+
+	return directives
 }
