@@ -329,12 +329,17 @@ type PropagationDirective interface {
 	// the upstream repository.
 	GetUpstreamReference() string
 
+	// GetUpstreamPath returns the path in the Git tree of the upstream
+	// reference whose contents must be propagated into the downstream
+	// repository.
+	GetUpstreamPath() string
+
 	// GetDownstreamReference returns the reference that the upstream components
 	// must be propagated into in the downstream repository (i.e., the
 	// repository where this directive is set.)
 	GetDownstreamReference() string
 
-	// GetDownstreamPath() returns the path in the Git tree of the downstream
+	// GetDownstreamPath returns the path in the Git tree of the downstream
 	// reference where the upstream repository's contents must be stored by the
 	// propagation workflow.
 	GetDownstreamPath() string

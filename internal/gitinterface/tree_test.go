@@ -505,7 +505,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 		upstreamCommitID, err := upstreamRepository.Commit(upstreamTreeID, upstreamRef, "Initial commit\n", false)
 		require.Nil(t, err)
 
-		downstreamCommitIDNew, err := downstreamRepository.CreateSubtreeFromUpstreamRepository(upstreamRepository, upstreamCommitID, "refs/heads/main", "upstream")
+		downstreamCommitIDNew, err := downstreamRepository.CreateSubtreeFromUpstreamRepository(upstreamRepository, upstreamCommitID, "", "refs/heads/main", "upstream")
 		assert.Nil(t, err)
 		assert.NotEqual(t, downstreamCommitID, downstreamCommitIDNew)
 
@@ -553,7 +553,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 		// foo/b            -> blobB
 		// foobar/foo/bar/b -> blobB
 
-		upstreamTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]TreeEntry{
+		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]TreeEntry{
 			NewEntryBlob("a", blobAID),
 			NewEntryBlob("foo/a", blobAID),
 			NewEntryBlob("foo/b", blobBID),
@@ -562,10 +562,11 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 		require.Nil(t, err)
 
 		upstreamRef := "refs/heads/main"
-		upstreamCommitID, err := upstreamRepository.Commit(upstreamTreeID, upstreamRef, "Initial commit\n", false)
+		upstreamCommitID, err := upstreamRepository.Commit(upstreamRootTreeID, upstreamRef, "Initial commit\n", false)
 		require.Nil(t, err)
 
 		tests := map[string]struct {
+			upstreamPath     string
 			localPath        string
 			refExists        bool // refExists -> we must check for other files but no prior propagation has happened
 			priorPropagation bool // priorPropagation -> localPath is already populated, mutually exclusive with refExists
@@ -631,6 +632,155 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
+			"with upstream path, directory in root, no trailing slash, ref does not exist": {
+				upstreamPath:     "foo",
+				localPath:        "upstream",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in root, trailing slash, ref does not exist": {
+				upstreamPath:     "foo/",
+				localPath:        "upstream/",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in root, no trailing slash, ref exists": {
+				upstreamPath:     "foo",
+				localPath:        "upstream",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in root, trailing slash, ref exists": {
+				upstreamPath:     "foo/",
+				localPath:        "upstream/",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in root, no trailing slash, prior propagation exists": {
+				upstreamPath:     "foo",
+				localPath:        "upstream",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path, directory in root, trailing slash, prior propagation exists": {
+				upstreamPath:     "foo/",
+				localPath:        "upstream/",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path, directory in subdirectory, no trailing slash, ref does not exist": {
+				upstreamPath:     "foo",
+				localPath:        "foo/upstream",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in subdirectory, trailing slash, ref does not exist": {
+				upstreamPath:     "foo/",
+				localPath:        "foo/upstream/",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in subdirectory, no trailing slash, ref exists": {
+				upstreamPath:     "foo",
+				localPath:        "foo/upstream",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in subdirectory, trailing slash, ref exists": {
+				upstreamPath:     "foo/",
+				localPath:        "foo/upstream/",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path, directory in subdirectory, no trailing slash, prior propagation exists": {
+				upstreamPath:     "foo",
+				localPath:        "foo/upstream",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path, directory in subdirectory, trailing slash, prior propagation exists": {
+				upstreamPath:     "foo",
+				localPath:        "foo/upstream/",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path as subdirectory, directory in root, no trailing slash, ref does not exist": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "upstream",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in root, trailing slash, ref does not exist": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "upstream/",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in root, no trailing slash, ref exists": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "upstream",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in root, trailing slash, ref exists": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "upstream/",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in root, no trailing slash, prior propagation exists": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "upstream",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path as subdirectory, directory in root, trailing slash, prior propagation exists": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "upstream/",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, ref does not exist": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "foo/upstream",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, trailing slash, ref does not exist": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "foo/upstream/",
+				refExists:        false,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, ref exists": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "foo/upstream",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, trailing slash, ref exists": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "foo/upstream/",
+				refExists:        true,
+				priorPropagation: false,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, prior propagation exists": {
+				upstreamPath:     "foobar/foo",
+				localPath:        "foo/upstream",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"with upstream path as subdirectory, directory in subdirectory, trailing slash, prior propagation exists": {
+				upstreamPath:     "foobar/foo/",
+				localPath:        "foo/upstream/",
+				refExists:        false,
+				priorPropagation: true,
+			},
+			"upstream path does not exist": {
+				upstreamPath: "does-not-exist",
+				localPath:    "foo/upstream/",
+				err:          ErrTreeDoesNotHavePath,
+			},
 			"empty localPath": {
 				err: ErrCannotCreateSubtreeIntoRootTree,
 			},
@@ -640,8 +790,10 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				require.False(t, test.refExists && test.priorPropagation, "refExists and priorPropagation can't both be true")
 
+				downstreamRef := testNameToRefName(name)
+
 				if test.refExists {
-					_, err := downstreamRepository.Commit(downstreamTreeID, testNameToRefName(name), "Initial commit\n", false)
+					_, err := downstreamRepository.Commit(downstreamTreeID, downstreamRef, "Initial commit\n", false)
 					require.Nil(t, err)
 				} else if test.priorPropagation {
 					// We set the upstream path to contain the same tree as the
@@ -657,11 +809,11 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 					rootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries(entries)
 					require.Nil(t, err)
 
-					_, err = downstreamRepository.Commit(rootTreeID, testNameToRefName(name), "Initial commit\n", false)
+					_, err = downstreamRepository.Commit(rootTreeID, downstreamRef, "Initial commit\n", false)
 					require.Nil(t, err)
 				}
 
-				downstreamCommitID, err := downstreamRepository.CreateSubtreeFromUpstreamRepository(upstreamRepository, upstreamCommitID, testNameToRefName(name), test.localPath)
+				downstreamCommitID, err := downstreamRepository.CreateSubtreeFromUpstreamRepository(upstreamRepository, upstreamCommitID, test.upstreamPath, downstreamRef, test.localPath)
 				if test.err != nil {
 					assert.ErrorIs(t, err, test.err)
 				} else {
@@ -672,6 +824,12 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 
 					itemID, err := downstreamRepository.GetPathIDInTree(test.localPath, rootTreeID)
 					require.Nil(t, err)
+
+					upstreamTreeID := upstreamRootTreeID
+					if test.upstreamPath != "" {
+						upstreamTreeID, err = upstreamRepository.GetPathIDInTree(test.upstreamPath, upstreamRootTreeID)
+						require.Nil(t, err)
+					}
 					assert.Equal(t, upstreamTreeID, itemID)
 
 					if test.refExists {

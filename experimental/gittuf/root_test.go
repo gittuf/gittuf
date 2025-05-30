@@ -1216,7 +1216,7 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1234,7 +1234,7 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		directives = rootMetadata.GetPropagationDirectives()
 		assert.Len(t, directives, 1)
-		assert.Equal(t, tufv01.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/"), directives[0])
+		assert.Equal(t, tufv01.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/"), directives[0])
 	})
 
 	t.Run("with tuf v02 metadata", func(t *testing.T) {
@@ -1255,7 +1255,7 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1273,7 +1273,7 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		directives = rootMetadata.GetPropagationDirectives()
 		assert.Len(t, directives, 1)
-		assert.Equal(t, tufv02.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/"), directives[0])
+		assert.Equal(t, tufv02.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/"), directives[0])
 	})
 }
 
@@ -1298,7 +1298,7 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
 		require.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1316,7 +1316,7 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		directives = rootMetadata.GetPropagationDirectives()
 		require.Len(t, directives, 1)
-		require.Equal(t, tufv01.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/"), directives[0])
+		require.Equal(t, tufv01.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/"), directives[0])
 
 		err = r.RemovePropagationDirective(testCtx, rootSigner, "test", false)
 		assert.Nil(t, err)
@@ -1359,7 +1359,7 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
 		require.Nil(t, err)
 
 		err = r.StagePolicy(testCtx, "", true, false)
@@ -1377,7 +1377,7 @@ func TestRemovePropagationDirective(t *testing.T) {
 
 		directives = rootMetadata.GetPropagationDirectives()
 		require.Len(t, directives, 1)
-		require.Equal(t, tufv02.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/"), directives[0])
+		require.Equal(t, tufv02.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/"), directives[0])
 
 		err = r.RemovePropagationDirective(testCtx, rootSigner, "test", false)
 		assert.Nil(t, err)

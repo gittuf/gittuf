@@ -9,6 +9,7 @@ gittuf trust add-propagation-directive [flags]
 ### Options
 
 ```
+      --from-path string         path in upstream reference to propagate contents from
       --from-reference string    reference to propagate from in upstream repository
       --from-repository string   location of upstream repository
   -h, --help                     help for add-propagation-directive

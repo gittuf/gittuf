@@ -1127,7 +1127,7 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 			continue
 		}
 
-		commitID, err := downstreamRepo.CreateSubtreeFromUpstreamRepository(upstreamRepo, latestUpstreamEntry.GetTargetID(), detail.GetDownstreamReference(), detail.GetDownstreamPath())
+		commitID, err := downstreamRepo.CreateSubtreeFromUpstreamRepository(upstreamRepo, latestUpstreamEntry.GetTargetID(), detail.GetUpstreamPath(), detail.GetDownstreamReference(), detail.GetDownstreamPath())
 		if err != nil {
 			return err
 		}

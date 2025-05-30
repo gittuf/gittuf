@@ -557,7 +557,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	// propagated into this repository
 	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
 	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationLocation))
+	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "", "refs/gittuf/policy", propagationLocation))
 }
 
 // AddNetworkRepository adds the specified repository as part of the network for
@@ -818,6 +818,7 @@ type PropagationDirective struct {
 	Name                string `json:"name"`
 	UpstreamRepository  string `json:"upstreamRepository"`
 	UpstreamReference   string `json:"upstreamReference"`
+	UpstreamPath        string `json:"upstreamPath"`
 	DownstreamReference string `json:"downstreamReference"`
 	DownstreamPath      string `json:"downstreamPath"`
 }
@@ -834,6 +835,10 @@ func (p *PropagationDirective) GetUpstreamReference() string {
 	return p.UpstreamReference
 }
 
+func (p *PropagationDirective) GetUpstreamPath() string {
+	return p.UpstreamPath
+}
+
 func (p *PropagationDirective) GetDownstreamReference() string {
 	return p.DownstreamReference
 }
@@ -842,11 +847,12 @@ func (p *PropagationDirective) GetDownstreamPath() string {
 	return p.DownstreamPath
 }
 
-func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string) tuf.PropagationDirective {
 	return &PropagationDirective{
 		Name:                name,
 		UpstreamRepository:  upstreamRepository,
 		UpstreamReference:   upstreamReference,
+		UpstreamPath:        upstreamPath,
 		DownstreamReference: downstreamReference,
 		DownstreamPath:      downstreamPath,
 	}

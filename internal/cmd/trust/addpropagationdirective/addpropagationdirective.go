@@ -19,6 +19,7 @@ type options struct {
 	name                string
 	upstreamRepository  string
 	upstreamReference   string
+	upstreamPath        string
 	downstreamReference string
 	downstreamPath      string
 }
@@ -47,6 +48,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"reference to propagate from in upstream repository",
 	)
 	cmd.MarkFlagRequired("from-reference") //nolint:errcheck
+
+	cmd.Flags().StringVar(
+		&o.upstreamPath,
+		"from-path",
+		"",
+		"path in upstream reference to propagate contents from",
+	)
 
 	cmd.Flags().StringVar(
 		&o.downstreamReference,
@@ -84,7 +92,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.AddPropagationDirective(cmd.Context(), signer, o.name, o.upstreamRepository, o.upstreamReference, o.downstreamReference, o.downstreamPath, true, opts...)
+	return repo.AddPropagationDirective(cmd.Context(), signer, o.name, o.upstreamRepository, o.upstreamReference, o.upstreamPath, o.downstreamReference, o.downstreamPath, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

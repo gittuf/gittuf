@@ -244,7 +244,7 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 // created commit in localRef. localPath must be specified, if left blank (say
 // to imply copying into the root directory of the downstream repository),
 // creating a subtree will fail.
-func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, upstreamCommitID Hash, localRef, localPath string) (Hash, error) {
+func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, upstreamCommitID Hash, upstreamPath, localRef, localPath string) (Hash, error) {
 	if localPath == "" {
 		return nil, ErrCannotCreateSubtreeIntoRootTree
 	}
@@ -290,6 +290,15 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	treeID, err := upstream.GetCommitTreeID(upstreamCommitID)
 	if err != nil {
 		return nil, err
+	}
+
+	if upstreamPath != "" {
+		// If upstreamPath is empty, then the entire tree is copied over,
+		// otherwise, identify the subtree to copy over
+		treeID, err = upstream.GetPathIDInTree(upstreamPath, treeID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if r.HasObject(treeID) {

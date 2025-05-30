@@ -800,7 +800,7 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
+func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
 	}
@@ -838,9 +838,9 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 	var directive tuf.PropagationDirective
 	switch rootMetadata.(type) {
 	case *tufv01.RootMetadata:
-		directive = tufv01.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+		directive = tufv01.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
 	case *tufv02.RootMetadata:
-		directive = tufv02.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+		directive = tufv02.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
 	}
 
 	if err := rootMetadata.AddPropagationDirective(directive); err != nil {
