@@ -1083,7 +1083,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		refName := "refs/heads/main"
 		localPath := "upstream"
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName, refName, localPath, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName, "", refName, localPath, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
@@ -1218,10 +1218,10 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		refName2 := "refs/heads/feature"
 		localPath1 := "main"
 		localPath2 := "feature"
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, refName1, localPath1, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, "", refName1, localPath1, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, refName1, localPath2, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, "", refName1, localPath2, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1383,10 +1383,10 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		refName1 := "refs/heads/main"
 		refName2 := "refs/heads/feature"
 		localPath := "upstream"
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, refName1, localPath, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName1, "", refName1, localPath, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, refName2, localPath, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName2, "", refName2, localPath, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1568,10 +1568,10 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		refName := "refs/heads/main"
 		localPath1 := "upstream1"
 		localPath2 := "upstream2"
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-1", upstreamRepo1Location, refName, refName, localPath1, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-1", upstreamRepo1Location, refName, "", refName, localPath1, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-2", upstreamRepo2Location, refName, refName, localPath2, false); err != nil {
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-2", upstreamRepo2Location, refName, "", refName, localPath2, false); err != nil {
 			t.Fatal(err)
 		}
 

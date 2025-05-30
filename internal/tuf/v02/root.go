@@ -660,7 +660,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	// propagated into this repository
 	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
 	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "refs/gittuf/policy", propagationLocation))
+	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "", "refs/gittuf/policy", propagationLocation))
 }
 
 // AddNetworkRepository adds the specified repository as part of the network for
@@ -791,11 +791,12 @@ var NewGlobalRuleBlockForcePushes = tufv01.NewGlobalRuleBlockForcePushes
 
 type PropagationDirective = tufv01.PropagationDirective
 
-func NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string) tuf.PropagationDirective {
+func NewPropagationDirective(name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string) tuf.PropagationDirective {
 	return &PropagationDirective{
 		Name:                name,
 		UpstreamRepository:  upstreamRepository,
 		UpstreamReference:   upstreamReference,
+		UpstreamPath:        upstreamPath,
 		DownstreamReference: downstreamReference,
 		DownstreamPath:      downstreamPath,
 	}

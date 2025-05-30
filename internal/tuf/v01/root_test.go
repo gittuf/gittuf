@@ -677,10 +677,11 @@ func TestPropagationDirective(t *testing.T) {
 	refName := "refs/heads/main"
 	localPath := "upstream/"
 
-	directive := NewPropagationDirective(name, upstreamRepository, refName, refName, localPath)
+	directive := NewPropagationDirective(name, upstreamRepository, refName, "", refName, localPath)
 	assert.Equal(t, name, directive.GetName())
 	assert.Equal(t, upstreamRepository, directive.GetUpstreamRepository())
 	assert.Equal(t, refName, directive.GetUpstreamReference())
+	assert.Equal(t, "", directive.GetUpstreamPath())
 	assert.Equal(t, refName, directive.GetDownstreamReference())
 	assert.Equal(t, localPath, directive.GetDownstreamPath())
 }
