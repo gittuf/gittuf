@@ -572,7 +572,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 			priorPropagation bool // priorPropagation -> localPath is already populated, mutually exclusive with refExists
 			err              error
 		}{
-			"directory in root, no trailing slash, ref does not exist": {
+			"directory in root, ref does not exist": {
 				localPath:        "upstream",
 				refExists:        false,
 				priorPropagation: false,
@@ -582,7 +582,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"directory in root, no trailing slash, ref exists": {
+			"directory in root, ref exists": {
 				localPath:        "upstream",
 				refExists:        true,
 				priorPropagation: false,
@@ -592,7 +592,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"directory in root, no trailing slash, prior propagation exists": {
+			"directory in root, prior propagation exists": {
 				localPath:        "upstream",
 				refExists:        false,
 				priorPropagation: true,
@@ -602,7 +602,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
-			"directory in subdirectory, no trailing slash, ref does not exist": {
+			"directory in subdirectory, ref does not exist": {
 				localPath:        "foo/upstream",
 				refExists:        false,
 				priorPropagation: false,
@@ -612,7 +612,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"directory in subdirectory, no trailing slash, ref exists": {
+			"directory in subdirectory, ref exists": {
 				localPath:        "foo/upstream",
 				refExists:        true,
 				priorPropagation: false,
@@ -622,7 +622,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"directory in subdirectory, no trailing slash, prior propagation exists": {
+			"directory in subdirectory, prior propagation exists": {
 				localPath:        "foo/upstream",
 				refExists:        false,
 				priorPropagation: true,
@@ -632,7 +632,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
-			"with upstream path, directory in root, no trailing slash, ref does not exist": {
+			"with upstream path, directory in root, ref does not exist": {
 				upstreamPath:     "foo",
 				localPath:        "upstream",
 				refExists:        false,
@@ -644,7 +644,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"with upstream path, directory in root, no trailing slash, ref exists": {
+			"with upstream path, directory in root, ref exists": {
 				upstreamPath:     "foo",
 				localPath:        "upstream",
 				refExists:        true,
@@ -656,7 +656,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"with upstream path, directory in root, no trailing slash, prior propagation exists": {
+			"with upstream path, directory in root, prior propagation exists": {
 				upstreamPath:     "foo",
 				localPath:        "upstream",
 				refExists:        false,
@@ -668,7 +668,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
-			"with upstream path, directory in subdirectory, no trailing slash, ref does not exist": {
+			"with upstream path, directory in subdirectory, ref does not exist": {
 				upstreamPath:     "foo",
 				localPath:        "foo/upstream",
 				refExists:        false,
@@ -680,7 +680,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"with upstream path, directory in subdirectory, no trailing slash, ref exists": {
+			"with upstream path, directory in subdirectory, ref exists": {
 				upstreamPath:     "foo",
 				localPath:        "foo/upstream",
 				refExists:        true,
@@ -692,7 +692,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"with upstream path, directory in subdirectory, no trailing slash, prior propagation exists": {
+			"with upstream path, directory in subdirectory, prior propagation exists": {
 				upstreamPath:     "foo",
 				localPath:        "foo/upstream",
 				refExists:        false,
@@ -704,7 +704,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
-			"with upstream path as subdirectory, directory in root, no trailing slash, ref does not exist": {
+			"with upstream path as subdirectory, directory in root, ref does not exist": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "upstream",
 				refExists:        false,
@@ -716,7 +716,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"with upstream path as subdirectory, directory in root, no trailing slash, ref exists": {
+			"with upstream path as subdirectory, directory in root, ref exists": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "upstream",
 				refExists:        true,
@@ -728,7 +728,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"with upstream path as subdirectory, directory in root, no trailing slash, prior propagation exists": {
+			"with upstream path as subdirectory, directory in root, prior propagation exists": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "upstream",
 				refExists:        false,
@@ -740,7 +740,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: true,
 			},
-			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, ref does not exist": {
+			"with upstream path as subdirectory, directory in subdirectory, ref does not exist": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "foo/upstream",
 				refExists:        false,
@@ -752,7 +752,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        false,
 				priorPropagation: false,
 			},
-			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, ref exists": {
+			"with upstream path as subdirectory, directory in subdirectory, ref exists": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "foo/upstream",
 				refExists:        true,
@@ -764,7 +764,7 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				refExists:        true,
 				priorPropagation: false,
 			},
-			"with upstream path as subdirectory, directory in subdirectory, no trailing slash, prior propagation exists": {
+			"with upstream path as subdirectory, directory in subdirectory, prior propagation exists": {
 				upstreamPath:     "foobar/foo",
 				localPath:        "foo/upstream",
 				refExists:        false,
