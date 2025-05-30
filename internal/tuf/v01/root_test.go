@@ -110,16 +110,6 @@ func TestRootMetadata(t *testing.T) {
 		controllerRepositories := rootMetadata.GetControllerRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: []*Key{key}}}, controllerRepositories)
 
-		propagations := rootMetadata.GetPropagationDirectives()
-		found := false
-		for _, propagation := range propagations {
-			if propagation.GetName() == "gittuf-controller-test" {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found)
-
 		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
 		assert.ErrorIs(t, err, tuf.ErrNotAControllerRepository)
 

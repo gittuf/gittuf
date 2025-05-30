@@ -6,7 +6,6 @@ package v01
 import (
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/danwakefield/fnmatch"
@@ -553,11 +552,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 
 	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
 
-	// Add the controller as a repository whose policy contents must be
-	// propagated into this repository
-	propagationName := fmt.Sprintf("%s-%s", tuf.GittufControllerPrefix, name)
-	propagationLocation := path.Join(tuf.GittufControllerPrefix, name)
-	return r.AddPropagationDirective(NewPropagationDirective(propagationName, location, "refs/gittuf/policy", "", "refs/gittuf/policy", propagationLocation))
+	return nil
 }
 
 // AddNetworkRepository adds the specified repository as part of the network for

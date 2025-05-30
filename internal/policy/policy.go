@@ -619,21 +619,11 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
 
 	for absoluteControllerPath, metadata := range s.ControllerMetadata {
-		// If path is "1", it should become gittuf-controller/1/metadata
-		// If path is "1/2", it should become gittuf-controller/1/gittuf-controller/2/metadata
-		// If path is "1/2/3", it should become gittuf-controller/1/gittuf-controller/2/gittuf-controller/3/metadata
-
-		pathComponents := strings.Split(absoluteControllerPath, "/")
-		newPath := strings.Join(pathComponents, "/"+tuf.GittufControllerPrefix+"/")
-		// For "1/2/3", newPath is now "1/gittuf-controller/2/gittuf-controller/3"
-		// Add the controller prefix and metadata tree suffix
-		newPath = fmt.Sprintf("%s/%s/%s", tuf.GittufControllerPrefix, newPath, metadataTreeEntryName)
-
 		stateMetadataTreeID, err := metadata.WriteTree(repo)
 		if err != nil {
 			return nil
 		}
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(newPath, stateMetadataTreeID))
+		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath), stateMetadataTreeID))
 	}
 
 	for stage, hookSet := range s.Hooks {
@@ -1345,45 +1335,14 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 	// metadataQueue is populated with metadata/ subtrees we want to load for
 	// either the current repository or its controllers.
 	metadataQueue := []*policyTreeItem{{name: "", treeID: treeItems[metadataTreeEntryName]}}
-	// controllerQueue is populated with gittuf-controller/ subtrees as we need
-	// to unwrap them to identify the applicable metadata/ tree entries.
-	// Here, the `name` parameter identifies the set of parents. If the
-	// controller subtree is directly declared in the current repository, then
-	// its name is empty.
-	controllerQueue := []*policyTreeItem{}
-	if controllerTreeID, hasController := treeItems[tuf.GittufControllerPrefix]; hasController {
-		controllerQueue = append(controllerQueue, &policyTreeItem{name: "", treeID: controllerTreeID})
-	}
-
-	for len(controllerQueue) != 0 {
-		currentControllerEntry := controllerQueue[0]
-		controllerQueue = controllerQueue[1:]
-
-		controllerTreeItems, err := repo.GetTreeItems(currentControllerEntry.treeID)
+	if controllerTreeID, hasControllers := treeItems[tuf.GittufControllerPrefix]; hasControllers {
+		controllerEntries, err := repo.GetTreeItems(controllerTreeID)
 		if err != nil {
 			return nil, err
 		}
 
-		// controllerTreeItems should be 1+ subtrees that have the name of the controller in question.
-		// Each subtree in turn has a metadata subtree and optionally more controller subtrees.
-
-		for controllerName, subtreeID := range controllerTreeItems {
-			subtreeItems, err := repo.GetTreeItems(subtreeID)
-			if err != nil {
-				return nil, err
-			}
-
-			absoluteControllerName := currentControllerEntry.name + "/" + controllerName
-			absoluteControllerName = strings.Trim(absoluteControllerName, "/")
-
-			for treeName, treeID := range subtreeItems {
-				switch treeName {
-				case metadataTreeEntryName:
-					metadataQueue = append(metadataQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
-				case tuf.GittufControllerPrefix:
-					controllerQueue = append(controllerQueue, &policyTreeItem{name: absoluteControllerName, treeID: treeID})
-				}
-			}
+		for controllerName, treeID := range controllerEntries {
+			metadataQueue = append(metadataQueue, &policyTreeItem{name: controllerName, treeID: treeID})
 		}
 	}
 
@@ -1392,6 +1351,8 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 	for len(metadataQueue) != 0 {
 		currentMetadataEntry := metadataQueue[0]
 		metadataQueue = metadataQueue[1:]
+
+		slog.Debug(fmt.Sprintf("Loading policy for '%s' from '%s'...", currentMetadataEntry.name, currentMetadataEntry.treeID.String()))
 
 		metadataItems, err := repo.GetTreeItems(currentMetadataEntry.treeID)
 		if err != nil {
@@ -1435,6 +1396,12 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 
 			state.ControllerMetadata[currentMetadataEntry.name] = stateMetadata
 		}
+	}
+
+	slog.Debug("Loaded current repository policy!")
+
+	for name := range state.ControllerMetadata {
+		slog.Debug(fmt.Sprintf("Loaded policy from controller '%s'!", name))
 	}
 
 	if err := state.preprocess(); err != nil {

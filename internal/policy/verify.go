@@ -5,6 +5,7 @@ package policy
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -320,6 +321,11 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 		return err
 	}
 
+	policyMetadataTreeID, err := v.repo.GetPathIDInTree(metadataTreeEntryName, policyTreeID)
+	if err != nil {
+		return err
+	}
+
 	slog.Debug(fmt.Sprintf("Loading current policy from entry '%s'...", policyEntry.GetID().String()))
 	policyState, err := LoadState(ctx, v.repo, policyEntry)
 	if err != nil {
@@ -387,6 +393,8 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 			return fmt.Errorf("%w: repository '%s' is invalid", ErrNetworkRepositoryDoesNotDeclareRequiredController, entry.GetName())
 		}
 
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(rootMetadata.GetRepositoryLocation()))
+
 		slog.Debug(fmt.Sprintf("Network repository '%s' has declared required controller repository with name '%s'", entry.GetName(), declaredControllerName))
 
 		// Check if it has correctly propagated changes
@@ -395,13 +403,13 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 			return err
 		}
 
-		controllerPath := fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, declaredControllerName)
+		controllerPath := fmt.Sprintf("%s/%s-%s", tuf.GittufControllerPrefix, declaredControllerName, encodedLocation)
 		propagatedTreeID, err := networkRepo.GetPathIDInTree(controllerPath, networkPolicyTreeID)
 		if err != nil {
 			return err
 		}
 
-		if !propagatedTreeID.Equal(policyTreeID) {
+		if !propagatedTreeID.Equal(policyMetadataTreeID) {
 			return fmt.Errorf("%w: repository '%s' is stale", ErrNetworkRepositoryHasStaleControllerMetadata, entry.GetName())
 		}
 

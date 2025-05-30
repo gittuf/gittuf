@@ -42,21 +42,21 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		for _, hook := range data {
 			fmt.Printf(indentString+"Hook '%s':\n", hook.ID())
 
-			fmt.Printf(strings.Repeat(indentString, 2) + "Principal IDs:\n")
+			fmt.Printf("%sPrincipal IDs:\n", strings.Repeat(indentString, 2))
 			for _, id := range hook.GetPrincipalIDs().Contents() {
-				fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", id)
+				fmt.Printf("%s%s\n", strings.Repeat(indentString, 3), id)
 			}
 
-			fmt.Printf(strings.Repeat(indentString, 2) + "Hashes:\n")
+			fmt.Printf("%sHashes:\n", strings.Repeat(indentString, 2))
 			for algo, hash := range hook.GetHashes() {
-				fmt.Printf(strings.Repeat(indentString, 3)+"%s: %s\n", algo, hash)
+				fmt.Printf("%s%s: %s\n", strings.Repeat(indentString, 3), algo, hash)
 			}
 
-			fmt.Printf(strings.Repeat(indentString, 2) + "Environment:\n")
-			fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", hook.GetEnvironment().String())
+			fmt.Printf("%sEnvironment:\n", strings.Repeat(indentString, 2))
+			fmt.Printf("%s%s\n", strings.Repeat(indentString, 3), hook.GetEnvironment().String())
 
-			fmt.Printf(strings.Repeat(indentString, 2) + "Timeout:\n")
-			fmt.Printf(strings.Repeat(indentString, 3)+"%s\n", hook.GetTimeout())
+			fmt.Printf("%sTimeout:\n", strings.Repeat(indentString, 2))
+			fmt.Printf("%s%d\n", strings.Repeat(indentString, 3), hook.GetTimeout())
 		}
 		fmt.Println()
 	}
