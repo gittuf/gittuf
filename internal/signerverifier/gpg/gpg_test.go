@@ -5,10 +5,6 @@ package gpg
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
@@ -16,37 +12,18 @@ import (
 )
 
 func TestGPG(t *testing.T) {
-	// Q: Is using the primary key's fingerprint appropriate?
+	// fingerprint should be the same among public/private keys
 	fprGPG1 := "157507bbe151e378ce8126c1dcfe043cdd2db96e"
-	// fprGPG1Pub := "157507bbe151e378ce8126c1dcfe043cdd2db96e"
 	fprGPG2 := "7707e87f10df498472babc32e517e211cb23a9e9"
 
 	tests := []struct {
-		keyName  string
-		keyBytes []byte
-		keyID    string
+		keyName      string
+		pubkeyBytes  []byte
+		privkeyBytes []byte
+		keyID        string
 	}{
-		// Q: For keyid, use fingerprint?
-		{"gpg1", artifacts.GPGKey1Private, fprGPG1},
-		// {"gpg1.pub", artifacts.GPGKey1Public, fprGPG1},
-		{"gpg2", artifacts.GPGKey2Private, fprGPG2},
-		// {"gpg2.pub", artifacts.GPGKey2Public, fprGPG2},
-	}
-	// Setup tests
-	tmpDir := t.TempDir()
-	// Write script to mock password prompt
-
-	scriptPath := filepath.Join(tmpDir, "askpass.sh")
-	if err := os.WriteFile(scriptPath, artifacts.AskpassScript, 0o500); err != nil { //nolint:gosec
-		t.Fatal(err)
-	}
-
-	// Write test key pairs to temp dir with permissions required by ssh-keygen
-	for _, test := range tests {
-		keyPath := filepath.Join(tmpDir, test.keyName)
-		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		{"gpg1", artifacts.GPGKey1Public, artifacts.GPGKey1Private, fprGPG1},
+		{"gpg2", artifacts.GPGKey2Public, artifacts.GPGKey2Private, fprGPG2},
 	}
 
 	data := []byte("DATA")
@@ -55,32 +32,26 @@ func TestGPG(t *testing.T) {
 	// Run tests
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
-			if strings.Contains(test.keyName, "_enc") {
-				if runtime.GOOS == "windows" {
-					t.Skip("TODO: test encrypted keys on windows")
-				}
-				// Q: what are these?
-				t.Setenv("SSH_ASKPASS", scriptPath)
-				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
-			}
-
-			keyPath := filepath.Join(tmpDir, test.keyName)
-
-			key, err := NewKeyFromFile(keyPath)
+			// load publ key for verifier
+			pubKey, err := LoadGPGKeyFromBytes(test.pubkeyBytes)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
-			assert.Equal(t,
-				key.KeyID,
-				test.keyID,
-			)
+			assert.Equal(t, test.keyID, pubKey.KeyID)
 
-			verifier, err := NewVerifierFromKey(key)
+			verifier, err := NewVerifierFromKey(pubKey)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}
 
-			signer, err := NewSignerFromFile(keyPath)
+			// load priv key for signer
+			privKey, err := LoadGPGPrivKeyFromBytes(test.privkeyBytes)
+			if err != nil {
+				t.Fatalf("%s: %v", test.keyName, err)
+			}
+			assert.Equal(t, test.keyID, privKey.KeyID)
+
+			signer, err := NewSignerFromKey(privKey)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}

@@ -24,7 +24,7 @@ type Verifier struct {
 	entity *openpgp.Entity
 }
 
-// NewVerifierFromKey creates a new erifier from SSlibKey of type GPG.
+// NewVerifierFromKey creates a new verifier from SSlibKey of type GPG.
 func NewVerifierFromKey(key *signerverifier.SSLibKey) (*Verifier, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(key.KeyVal.Public)))
 	if err != nil {
@@ -49,29 +49,45 @@ func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 }
 
 type Signer struct {
-	*Verifier
+	keyID  string
+	entity *openpgp.Entity
 }
 
-// NewSignerFromFile creates an GPG signer from the passed path.
-func NewSignerFromFile(path string) (*Signer, error) {
-	keyObj, err := NewKeyFromFile(path)
+// // NewSignerFromFile creates an GPG signer from the passed path.
+// func NewSignerFromFile(path string, pkPath string) (*Signer, error) {
+// 	keyObj, err := NewKeyFromFile(path)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	verifier, err := NewVerifierFromKey(keyObj)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return &Signer{
+// 		Path:     pkPath,
+// 		Verifier: verifier,
+// 	}, nil
+// }
+
+// NewSignerFromKey creates a new GPG signer from an SSLibKey containing a private key.
+func NewSignerFromKey(key *signerverifier.SSLibKey) (*Signer, error) {
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(key.KeyVal.Private)))
 	if err != nil {
-		return nil, err
-	}
-	verifier, err := NewVerifierFromKey(keyObj)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse private gpg key: %w", err)
 	}
 
+	entity := keyring[0]
 	return &Signer{
-		Verifier: verifier,
+		keyID:  key.KeyID,
+		entity: entity,
 	}, nil
 }
 
 // Sign implements the dsse.Signer.Sign interface for GPG keys.
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := openpgp.ArmoredDetachSign(buf, s.Verifier.entity, bytes.NewReader(data), nil)
+	err := openpgp.ArmoredDetachSign(buf, s.entity, bytes.NewReader(data), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign with gpg key: %w", err)
 	}
@@ -101,16 +117,40 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 	}
 
 	// TODO: check if this is correct for subkeys
-	// TODO: might have to handle case where there is more than one entity
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
-	publicKey := strings.TrimSpace(string(contents))
+	key := strings.TrimSpace(string(contents))
 
 	gpgKey := &signerverifier.SSLibKey{
 		KeyID:   fingerprint,
 		KeyType: KeyType,
 		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
 		KeyVal: signerverifier.KeyVal{
-			Public: publicKey,
+			Public: key,
+		},
+	}
+
+	return gpgKey, nil
+}
+
+// LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
+// armored bytes. The returned signerverifier.SSLibKey uses the primary key's fingerprint as the
+// key ID.
+func LoadGPGPrivKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(contents))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: check if this is correct for subkeys
+	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
+	key := strings.TrimSpace(string(contents))
+
+	gpgKey := &signerverifier.SSLibKey{
+		KeyID:   fingerprint,
+		KeyType: KeyType,
+		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
+		KeyVal: signerverifier.KeyVal{
+			Private: key,
 		},
 	}
 
