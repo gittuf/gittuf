@@ -162,6 +162,7 @@ type RootMetadata interface {
 	DisableGitHubAppApprovals(appName string)
 	// IsGitHubAppApprovalTrusted indicates if the GitHub app is trusted.
 	// TODO: this needs to be generalized across tools
+
 	IsGitHubAppApprovalTrusted(appName string) bool
 	// GetGitHubAppPrincipals returns the principals trusted for the GitHub app
 	// attestations.
@@ -246,6 +247,9 @@ type TargetsMetadata interface {
 
 	// AddPrincipal adds a principal to the metadata.
 	AddPrincipal(principal Principal) error
+
+	// UpdatePrincipal updates an existing principal in the metadata.
+	UpdatePrincipal(principal Principal) error
 
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
