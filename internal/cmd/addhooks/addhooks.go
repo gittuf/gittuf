@@ -49,6 +49,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-hooks",
 		Short:             "Add git hooks that automatically create and sync RSL",
+		Long:              `The 'add-hooks' command installs Git hooks that automatically create and sync the RSL when certain Git actions occur, such as a push. By default, it prevents overwriting existing hooks unless the '--force' flag is specified.`,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
