@@ -2,6 +2,10 @@
 
 Record dismissal of GitHub pull request approval
 
+### Synopsis
+
+The 'dismiss-approval' command creates an attestation that a previously recorded approval of a GitHub pull request has been dismissed. It requires the review ID of the pull request and the identity of the dismissed approver. The command also supports custom GitHub base URLs for enterprise GitHub instances, with the flag '--base-URL'.
+
 ```
 gittuf attest github dismiss-approval [flags]
 ```
