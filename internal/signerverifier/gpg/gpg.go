@@ -188,3 +188,65 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 
 	return gpgKey, nil
 }
+
+// FIXME: trying to import gitinterface causes circular dependency
+func getKeyIDFromGitConfig(r *Repository) (string, error) {
+	config, err := r.GetGitConfig()
+	if err != nil {
+		return "", err
+	}
+	keyID, ok := config["user.signingkey"]
+	if !ok || keyID == "" {
+		return "", fmt.Errorf("no user.signingkey found")
+	}
+
+	// check if keyID is a gpg keyID
+	var isGPG bool
+	if !isGPG {
+		return "", fmt.Errorf("user.signingkey is not a GPG key")
+	}
+
+	return keyID, nil
+}
+
+func NewPublicKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
+	cmd := exec.Command("gpg", "--armor", "--export", keyID)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+	}
+
+	publicKey := strings.TrimSpace(string(output))
+	gpgKey := &signerverifier.SSLibKey{
+		KeyID:   keyID,
+		KeyType: KeyType,
+		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
+		KeyVal: signerverifier.KeyVal{
+			Public: publicKey,
+		},
+	}
+
+	return gpgKey, nil
+
+}
+
+func NewPrivateKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
+	cmd := exec.Command("gpg", "--armor", "--export-secret-keys", keyID)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+	}
+
+	privateKey := strings.TrimSpace(string(output))
+	gpgKey := &signerverifier.SSLibKey{
+		KeyID:   keyID,
+		KeyType: KeyType,
+		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
+		KeyVal: signerverifier.KeyVal{
+			Private: privateKey,
+		},
+	}
+
+	return gpgKey, nil
+
+}
