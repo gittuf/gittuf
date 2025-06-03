@@ -30,6 +30,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "policy",
 		Short:             "Tools to manage gittuf policies",
+		Long:              `The 'policy' command provides a suite of tools for managing gittuf policy configurations. This command serves as a parent for several subcommands that allow users to initialize policy, add or remove principals, view or reorder existing rules and principals, apply, stage, or discard trust policy changes, or interact with policies through a terminal UI.`,
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)
