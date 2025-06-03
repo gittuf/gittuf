@@ -32,6 +32,10 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		remoteName = args[0]
 	}
 
+	if !o.localOnly && remoteName == "" {
+		return gittuf.ErrRemoteNotSpecified
+	}
+
 	return repo.ApplyAttestations(cmd.Context(), remoteName, o.localOnly, true)
 }
 
