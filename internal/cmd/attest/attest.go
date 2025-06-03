@@ -16,6 +16,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "attest",
 		Short:             "Tools for attesting to code contributions",
+		Long:              `The 'attest' command provides tools for attesting to code contributions. It includes subcommands to apply attestations, authorize contributors, and integrate GitHub-based attestations.`,
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)

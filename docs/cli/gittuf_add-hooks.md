@@ -2,6 +2,10 @@
 
 Add git hooks that automatically create and sync RSL
 
+### Synopsis
+
+The 'add-hooks' command installs Git hooks that automatically create and sync the RSL when certain Git actions occur, such as a push. By default, it prevents overwriting existing hooks unless the '--force' flag is specified.
+
 ```
 gittuf add-hooks [flags]
 ```
