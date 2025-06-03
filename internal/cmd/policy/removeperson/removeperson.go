@@ -58,7 +58,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-person",
 		Short:             "Remove a person from a policy file",
-		Long:              `This command allows users to remove a person from the specified policy file. The person's ID is required. By default, the main policy file is selected.`,
+		Long:              `The 'remove-person' command removes the specified person from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

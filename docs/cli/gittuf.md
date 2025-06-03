@@ -2,6 +2,10 @@
 
 A security layer for Git repositories, powered by TUF
 
+### Synopsis
+
+gittuf is a security layer for Git repositories, powered by TUF. The CLI provides commands to manage gittuf on the repository, including trust management, policy enforcement, signing, verification, and synchronization.
+
 ### Options
 
 ```

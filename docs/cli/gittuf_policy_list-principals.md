@@ -4,7 +4,7 @@ List principals for the current policy in the specified rule file
 
 ### Synopsis
 
-This command retrieves and lists the authorized principals for the specified policy and rule. The user must specify the policy ref they wish to inspect, and the name of the rule file to retrieve the principals for.
+The 'list-principals' command lists all trusted principals defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy list-principals [flags]

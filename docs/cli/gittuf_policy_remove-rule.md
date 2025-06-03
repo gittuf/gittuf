@@ -4,7 +4,7 @@ Remove rule from a policy file
 
 ### Synopsis
 
-This command allows users to remove and existing rule to the specified policy file. By default, the main policy file is selected.
+The 'remove-rule' command deletes the specified rule from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy remove-rule [flags]

@@ -4,7 +4,7 @@ Sign policy file
 
 ### Synopsis
 
-This command allows users to add their signature to the specified policy file.
+Sign the specified policy file with the provided signing key. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy sign [flags]

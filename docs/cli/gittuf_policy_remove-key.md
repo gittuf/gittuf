@@ -4,7 +4,7 @@ Remove a key from a policy file
 
 ### Synopsis
 
-This command allows users to remove keys from the specified policy file. The public key ID is required. By default, the main policy file is selected.
+The 'remove-key' command removes the specified public key from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy remove-key [flags]

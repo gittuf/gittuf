@@ -101,6 +101,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "gittuf",
 		Short:             "A security layer for Git repositories, powered by TUF",
+		Long:              `gittuf is a security layer for Git repositories, powered by TUF. The CLI provides commands to manage gittuf on the repository, including trust management, policy enforcement, signing, verification, and synchronization.`,
 		SilenceUsage:      true,
 		DisableAutoGenTag: true,
 		PersistentPreRunE: o.PreRunE,
