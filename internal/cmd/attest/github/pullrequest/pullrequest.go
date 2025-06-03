@@ -99,6 +99,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull-request",
 		Short: "Record GitHub pull request information as an attestation",
+		Long:  `The 'pull-request' command creates an attestation for a GitHub pull request. It supports attesting either by pull request number or a specific commit and its associated base branch. These attestations help verify the origin and legitimacy of code contributions merged via GitHub. The command also supports custom GitHub base URLs for enterprise GitHub instances, with the flag '--base-URL'.`,
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
