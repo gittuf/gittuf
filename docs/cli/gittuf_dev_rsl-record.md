@@ -2,6 +2,10 @@
 
 Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
 
+### Synopsis
+
+The 'rsl-record' command records the explicit state of a Git reference into the RSL. This command is intended for developer and testing workflows where manual creation of entries in the RSL for a specific Git reference (e.g., branch or tag) at a given commit (target ID) is required. You can optionally specify a destination reference name using --dst-ref to override the default. It requires developer mode to be enabled by setting the environment variable GITTUF_DEV=1.
+
 ```
 gittuf dev rsl-record [flags]
 ```
