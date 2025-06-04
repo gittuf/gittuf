@@ -76,7 +76,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-rules",
 		Short:             "List rules for the current state",
-		Long:              "This command allows a user to list the rules for the current policy state. The policy ref that should be inspected must be specified.",
+		Long:              `The 'list-rules' command displays all policy rules defined in the current gittuf policy. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

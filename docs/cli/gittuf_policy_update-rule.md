@@ -4,7 +4,7 @@ Update an existing rule in a policy file
 
 ### Synopsis
 
-This command allows users to update an existing rule to the specified policy file. By default, the main policy file is selected. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
+Update an existing rule in the specified policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy update-rule [flags]

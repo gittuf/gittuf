@@ -4,7 +4,7 @@ Remove a person from a policy file
 
 ### Synopsis
 
-This command allows users to remove a person from the specified policy file. The person's ID is required. By default, the main policy file is selected.
+The 'remove-person' command removes the specified person from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy remove-person [flags]
