@@ -6,6 +6,7 @@ package root
 import (
 	"log/slog"
 	"os"
+	"runtime"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
@@ -77,6 +78,9 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 	isTerminal := isatty.IsTerminal(output.Fd()) || isatty.IsCygwinTerminal(output.Fd())
 	if o.noColor || !isTerminal {
 		display.DisableColor()
+	} else if runtime.GOOS != "windows" {
+		os.Setenv("PAGER", "less -R")
+		os.Setenv("LESS", "-R")
 	}
 
 	// Setup logging
