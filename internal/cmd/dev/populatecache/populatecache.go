@@ -29,6 +29,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "populate-cache",
 		Short: fmt.Sprintf("Populate persistent cache (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:  fmt.Sprintf(`The 'populate-cache' command generates and populates the local persistent cache for a gittuf repository, intended to improve performance of gittuf operations. This cache is local-only and is not synchronzied with the remote. It requires developer mode to be enabled by setting the environment variable %s=1.`, dev.DevModeKey),
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
