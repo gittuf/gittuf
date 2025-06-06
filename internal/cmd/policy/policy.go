@@ -17,6 +17,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
+	"github.com/gittuf/gittuf/internal/cmd/policy/updateperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
@@ -51,6 +52,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(tui.New(o))
+	cmd.AddCommand(updateperson.New(o))
 	cmd.AddCommand(updaterule.New(o))
 
 	return cmd
