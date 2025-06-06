@@ -80,9 +80,14 @@ as `gittuf.exe` from this directory, or add it to your PATH as desired.
 > in PowerShell.
 > You can also install it from the [GNU website] or the [chocolatey] package manager.
 
-To build from source, clone the repository and run
-`make`. This will also run the test suite prior to installing gittuf. Note that
-Go 1.23 or higher is necessary to build gittuf.
+Before building from source, please ensure that your Go environment is correctly
+set up. You can do this by following the official [Go installation
+instructions]. If you encounter any issues when building, make sure your
+`GOPATH` and `PATH` are configured correctly.
+
+To build from source, clone the repository and run `make`. This will also run
+the test suite prior to installing gittuf. Note that Go 1.23 or higher is
+necessary to build gittuf.
 
 ```sh
 git clone https://github.com/gittuf/gittuf
@@ -227,3 +232,4 @@ the gittuf repository.
 [GNU website]: https://gnuwin32.sourceforge.net/packages/make.htm
 [chocolatey]: https://community.chocolatey.org/packages/make
 [official Go guide for Windows]: https://go.dev/wiki/SettingGOPATH#
+[Go installation instructions]: https://go.dev/doc/install
