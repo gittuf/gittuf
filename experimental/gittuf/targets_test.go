@@ -307,7 +307,63 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
 }
 
-func TestRemovePrincicpalFromTargets(t *testing.T) {
+func TestUpdatePrincipalInTargets(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{},
+		Custom:               map[string]string{},
+	}
+
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{person}, false)
+	require.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.Nil(t, err)
+
+	require.Equal(t, targetsMetadata.GetPrincipals()["jane.doe"], person)
+	require.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+
+	person = &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{"a": "a"},
+		Custom:               map[string]string{},
+	}
+
+	err = r.UpdatePrincipalInTargets(testCtx, targetsSigner, policy.TargetsRoleName, person, false)
+	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.Nil(t, err)
+
+	assert.Equal(t, targetsMetadata.GetPrincipals()["jane.doe"], person)
+	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+}
+
+func TestRemovePrincipalFromTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
