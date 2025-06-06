@@ -51,7 +51,7 @@ func TestGPG(t *testing.T) {
 			}
 			assert.Equal(t, test.keyID, privKey.KeyID)
 
-			signer, err := NewSignerFromKey(privKey)
+			signer, err := NewSignerFromKey(privKey, verifier)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyName, err)
 			}

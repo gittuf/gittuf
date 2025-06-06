@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -49,29 +48,45 @@ func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 }
 
 type Signer struct {
-	keyID  string
 	entity *openpgp.Entity
+	*Verifier
 }
 
-// // NewSignerFromFile creates an GPG signer from the passed path.
-// func NewSignerFromFile(path string, pkPath string) (*Signer, error) {
-// 	keyObj, err := NewKeyFromFile(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	verifier, err := NewVerifierFromKey(keyObj)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+func (s *Signer) KeyID() (string, error) {
+	return s.keyID, nil
+}
 
-// 	return &Signer{
-// 		Path:     pkPath,
-// 		Verifier: verifier,
-// 	}, nil
-// }
+func NewSignerFromKeyID(keyID string) (*Signer, error) {
+	signingKey, err := NewPrivateKeyFromKeyID(keyID)
+	if err != nil {
+		return nil, err
+	}
+	pubKeyObj, err := NewPublicKeyFromKeyID(keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	verifier, err := NewVerifierFromKey(pubKeyObj)
+	if err != nil {
+		return nil, err
+	}
+
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(signingKey.KeyVal.Private)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private gpg key: %w", err)
+	}
+
+	entity := keyring[0]
+	return &Signer{
+		Verifier: verifier,
+		entity:   entity,
+	}, nil
+}
 
 // NewSignerFromKey creates a new GPG signer from an SSLibKey containing a private key.
-func NewSignerFromKey(key *signerverifier.SSLibKey) (*Signer, error) {
+// This method requires passing in the verifier from a possibly different keyID.
+// When loading a signer using Git config, NewSignerFromKeyID should be used instead.
+func NewSignerFromKey(key *signerverifier.SSLibKey, verifier *Verifier) (*Signer, error) {
 	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(key.KeyVal.Private)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private gpg key: %w", err)
@@ -79,8 +94,8 @@ func NewSignerFromKey(key *signerverifier.SSLibKey) (*Signer, error) {
 
 	entity := keyring[0]
 	return &Signer{
-		keyID:  key.KeyID,
-		entity: entity,
+		Verifier: verifier,
+		entity:   entity,
 	}, nil
 }
 
@@ -157,60 +172,8 @@ func LoadGPGPrivKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) 
 	return gpgKey, nil
 }
 
-func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	keyring, err := openpgp.ReadArmoredKeyRing(file)
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: might have to handle case where there is more than one entity
-	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
-	cmd := exec.Command("gpg", "--armor", "--export")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
-	}
-
-	publicKey := strings.TrimSpace(string(output))
-	gpgKey := &signerverifier.SSLibKey{
-		KeyID:   fingerprint,
-		KeyType: KeyType,
-		Scheme:  KeyType, // TODO: this should use the underlying key algorithm
-		KeyVal: signerverifier.KeyVal{
-			Public: publicKey,
-		},
-	}
-
-	return gpgKey, nil
-}
-
-// FIXME: trying to import gitinterface causes circular dependency
-func getKeyIDFromGitConfig(r *Repository) (string, error) {
-	config, err := r.GetGitConfig()
-	if err != nil {
-		return "", err
-	}
-	keyID, ok := config["user.signingkey"]
-	if !ok || keyID == "" {
-		return "", fmt.Errorf("no user.signingkey found")
-	}
-
-	// check if keyID is a gpg keyID
-	var isGPG bool
-	if !isGPG {
-		return "", fmt.Errorf("user.signingkey is not a GPG key")
-	}
-
-	return keyID, nil
-}
-
 func NewPublicKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
-	cmd := exec.Command("gpg", "--armor", "--export", keyID)
+	cmd := exec.Command("gpg", "--batch", "--armor", "--export", keyID)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
@@ -227,11 +190,10 @@ func NewPublicKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
 	}
 
 	return gpgKey, nil
-
 }
 
 func NewPrivateKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
-	cmd := exec.Command("gpg", "--armor", "--export-secret-keys", keyID)
+	cmd := exec.Command("gpg", "--batch", "--armor", "--export-secret-keys", keyID)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
@@ -248,5 +210,27 @@ func NewPrivateKeyFromKeyID(keyID string) (*signerverifier.SSLibKey, error) {
 	}
 
 	return gpgKey, nil
+}
 
+// getKeyIDFromGitConfig queries the user git config and returns the keyID if it exists.
+func getKeyIDFromGitConfig() (string, error) {
+	cmd := exec.Command("git", "config", "--get", "user.signingkey")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("unable to read Git config: %w", err)
+	}
+
+	keyID := strings.TrimSpace(string(output))
+	if keyID == "" {
+		return "", fmt.Errorf("no user.signingkey set in git")
+	}
+
+	// TODO: check if keyID is a gpg key
+	var isGPG bool
+	isGPG = true
+	if !isGPG {
+		return "", fmt.Errorf("user.signingkey is not a GPG key")
+	}
+	// TODO: keyID may need to be converted to full fingerprint
+	return keyID, nil
 }
