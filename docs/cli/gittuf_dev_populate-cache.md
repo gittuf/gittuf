@@ -2,6 +2,10 @@
 
 Populate persistent cache (developer mode only, set GITTUF_DEV=1)
 
+### Synopsis
+
+The 'populate-cache' command generates and populates the local persistent cache for a gittuf repository, intended to improve performance of gittuf operations. This cache is local-only and is not synchronzied with the remote. It requires developer mode to be enabled by setting the environment variable GITTUF_DEV=1.
+
 ```
 gittuf dev populate-cache [flags]
 ```

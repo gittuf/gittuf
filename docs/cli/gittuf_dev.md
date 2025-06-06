@@ -4,7 +4,7 @@ Developer mode commands
 
 ### Synopsis
 
-These commands are meant to be used to aid gittuf development, and are not expected to be used during standard workflows. If used, they can undermine repository security. To proceed, set GITTUF_DEV=1.
+The 'dev' command group provides advanced utilities for use during gittuf development and debugging. These commands are intended for internal or development use and are not designed to be run in production or standard repository workflows. Improper use may compromise repository security guarantees. To enable these commands, the environment variable GITTUF_DEV must be set to 1.
 
 ### Options
 
@@ -25,6 +25,5 @@ These commands are meant to be used to aid gittuf development, and are not expec
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf dev populate-cache](gittuf_dev_populate-cache.md)	 - Populate persistent cache (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev rsl-record](gittuf_dev_rsl-record.md)	 - Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
 

@@ -12,7 +12,7 @@ jobs:
         uses: gittuf/gittuf-installer@fe9ac76ca1aa34dfebacfdb3e5a7b31bfbff1f1c
       - name: Checkout and verify repository
         run: |
-          gittuf clone https://github.com/${{ github.repository }}
           sleep 10s
+          gittuf clone https://github.com/${{ github.repository }}
           cd gittuf
           gittuf verify-ref main --verbose

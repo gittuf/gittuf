@@ -1,13 +1,10 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package populatecache
+package init
 
 import (
-	"fmt"
-
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
 
@@ -27,8 +24,9 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:   "populate-cache",
-		Short: fmt.Sprintf("Populate persistent cache (developer mode only, set %s=1)", dev.DevModeKey),
+		Use:   "init",
+		Short: "Initialize persistent cache",
+		Long:  `The 'init' command initializes the local persistent cache for a gittuf repository, intended to improve performance of gittuf operations. This cache is local-only and is not synchronized with the remote.`,
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

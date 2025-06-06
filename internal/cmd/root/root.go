@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/addhooks"
 	"github.com/gittuf/gittuf/internal/cmd/attest"
+	"github.com/gittuf/gittuf/internal/cmd/cache"
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
@@ -115,6 +116,7 @@ func New() *cobra.Command {
 
 	cmd.AddCommand(addhooks.New())
 	cmd.AddCommand(attest.New())
+	cmd.AddCommand(cache.New())
 	cmd.AddCommand(clone.New())
 	cmd.AddCommand(dev.New())
 	cmd.AddCommand(trust.New())

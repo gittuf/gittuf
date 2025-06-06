@@ -9,7 +9,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/dev/addgithubapproval"
 	"github.com/gittuf/gittuf/internal/cmd/dev/attestgithub"
 	"github.com/gittuf/gittuf/internal/cmd/dev/dismissgithubapproval"
-	"github.com/gittuf/gittuf/internal/cmd/dev/populatecache"
 	"github.com/gittuf/gittuf/internal/cmd/dev/rslrecordat"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
@@ -19,14 +18,13 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Short:   "Developer mode commands",
-		Long:    fmt.Sprintf("These commands are meant to be used to aid gittuf development, and are not expected to be used during standard workflows. If used, they can undermine repository security. To proceed, set %s=1.", dev.DevModeKey),
+		Long:    fmt.Sprintf(`The 'dev' command group provides advanced utilities for use during gittuf development and debugging. These commands are intended for internal or development use and are not designed to be run in production or standard repository workflows. Improper use may compromise repository security guarantees. To enable these commands, the environment variable %s must be set to 1.`, dev.DevModeKey),
 		PreRunE: checkInDevMode,
 	}
 
 	cmd.AddCommand(attestgithub.New())
 	cmd.AddCommand(addgithubapproval.New())
 	cmd.AddCommand(dismissgithubapproval.New())
-	cmd.AddCommand(populatecache.New())
 	cmd.AddCommand(rslrecordat.New())
 
 	return cmd
