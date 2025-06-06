@@ -65,6 +65,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "clone",
 		Short:             "Clone repository and its gittuf references",
+		Long:              `The 'clone' command clones a gittuf-enabled Git repository along with its associated gittuf metadata. This command can also ensure the repository's trust root is established correctly by using specified root keys, optionally supplied using the --root-key flag. You may also specify a particular branch to check out with --branch and choose whether to create a bare repository using --bare.`,
 		Args:              cobra.MinimumNArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
