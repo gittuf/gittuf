@@ -851,6 +851,57 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating propagation directive...")
+	var directive tuf.PropagationDirective
+	switch rootMetadata.(type) {
+	case *tufv01.RootMetadata:
+		directive = tufv01.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
+	case *tufv02.RootMetadata:
+		directive = tufv02.NewPropagationDirective(directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
+	}
+
+	if err := rootMetadata.UpdatePropagationDirective(directive); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Update propagation directive '%s' in root metadata", directiveName)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if !dev.InDevMode() {
 		return dev.ErrNotInDevMode
