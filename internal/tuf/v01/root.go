@@ -440,8 +440,36 @@ func (r *RootMetadata) UpdateGlobalRule(globalRule tuf.GlobalRule) error {
 
 // AddPropagationDirective adds a propagation directive to the root metadata.
 func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirective) error {
-	// TODO: handle duplicates / updates
+	// TODO: handle duplicates
 	r.Propagations = append(r.Propagations, directive)
+	return nil
+}
+
+// UpdatePropagationDirective updates a propagation directive in the root
+// metadata.
+func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
+	updatedPropagationDirectives := []tuf.PropagationDirective{}
+	found := false
+
+	if len(r.Propagations) == 0 {
+		return tuf.ErrPropagationDirectiveNotFound
+	}
+
+	for _, oldPropagationDirective := range r.Propagations {
+		if oldPropagationDirective.GetName() == directive.GetName() {
+			found = true
+			updatedPropagationDirectives = append(updatedPropagationDirectives, directive)
+		} else {
+			updatedPropagationDirectives = append(updatedPropagationDirectives, oldPropagationDirective)
+		}
+	}
+
+	if !found {
+		return tuf.ErrPropagationDirectiveNotFound
+	}
+
+	r.Propagations = updatedPropagationDirectives
+
 	return nil
 }
 

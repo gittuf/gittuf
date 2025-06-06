@@ -97,6 +97,21 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, 1, len(directives))
 		assert.Equal(t, directive, directives[0])
 
+		updatedDirective := &PropagationDirective{
+			Name:                "test",
+			UpstreamRepository:  "https://example.org/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+
+		err = rootMetadata.UpdatePropagationDirective(updatedDirective)
+		assert.Nil(t, err)
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, updatedDirective, directives[0])
+
 		err = rootMetadata.DeletePropagationDirective("test")
 		assert.Nil(t, err)
 

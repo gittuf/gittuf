@@ -1277,6 +1277,100 @@ func TestAddPropagationDirective(t *testing.T) {
 	})
 }
 
+func TestUpdatePropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	t.Run("with tuf v01 metadata", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		directives := rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		err = r.UpdatePropagationDirective(testCtx, rootSigner, "test", "https://newexample.com/git/repository", "refs/newheads/main", "upstreamPath/", "refs/newheads/main", "newupstream/", false)
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Len(t, directives, 1)
+		assert.Equal(t, tufv01.NewPropagationDirective("test", "https://newexample.com/git/repository", "refs/newheads/main", "upstreamPath/", "refs/newheads/main", "newupstream/"), directives[0])
+	})
+
+	t.Run("with tuf v02 metadata", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		directives := rootMetadata.GetPropagationDirectives()
+		assert.Empty(t, directives)
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		err = r.UpdatePropagationDirective(testCtx, rootSigner, "test", "https://newexample.com/git/repository", "refs/newheads/main", "upstreamPath/", "refs/newheads/main", "newupstream/", false)
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef) // we haven't applied
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Len(t, directives, 1)
+		assert.Equal(t, tufv02.NewPropagationDirective("test", "https://newexample.com/git/repository", "refs/newheads/main", "upstreamPath/", "refs/newheads/main", "newupstream/"), directives[0])
+	})
+}
+
 func TestRemovePropagationDirective(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 
