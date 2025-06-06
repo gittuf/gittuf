@@ -25,6 +25,5 @@ The 'dev' command group provides advanced utilities for use during gittuf develo
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf dev populate-cache](gittuf_dev_populate-cache.md)	 - Populate persistent cache (developer mode only, set GITTUF_DEV=1)
 * [gittuf dev rsl-record](gittuf_dev_rsl-record.md)	 - Record explicit state of a Git reference in the RSL, signed with specified key (developer mode only, set GITTUF_DEV=1)
 

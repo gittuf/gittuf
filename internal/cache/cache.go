@@ -85,8 +85,7 @@ func (p *Persistent) Commit(repo *gitinterface.Repository) error {
 
 // PopulatePersistentCache scans the repository's RSL and generates a persistent
 // local-only cache of policy and attestation entries. This makes subsequent
-// verifications faster. This is currently only available in gittuf's developer
-// mode.
+// verifications faster.
 func PopulatePersistentCache(repo *gitinterface.Repository) error {
 	persistent := &Persistent{
 		PolicyEntries:      []RSLEntryIndex{},
