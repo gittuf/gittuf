@@ -2,6 +2,26 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.11.0
+
+### Added
+
+- Added support for verifying policy status of repository's network for a
+  controller
+- Added long descriptions for various gittuf CLI commands
+- Added support for shallow fetches in gitinterface
+- Added support for propagating specified subtree from upstream repository
+- Added CI workflow to verify repository's gittuf policy
+
+### Updated
+
+- Improved test coverage for GitHub attestations
+- Moved persistent caching out of developer mode
+- Updated security insights documentation with project's dependency policy
+- Updated documentation to indicate promotion to incubating status
+- Updated documentation to indicate Go setup requirements
+- Updated various dependencies and CI workflows
+
 ## v0.10.2
 
 ### Updated
