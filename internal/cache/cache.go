@@ -179,6 +179,19 @@ func LoadPersistentCache(repo *gitinterface.Repository) (*Persistent, error) {
 	return persistentCache, nil
 }
 
+// ResetPersistentCache deletes the local persistent cache ref.
+// This is useful when the cache is corrupted or the user wants a fresh start.
+func ResetPersistentCache(repo *gitinterface.Repository) error {
+	err := repo.DeleteReference(Ref)
+	if err != nil {
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // RSLEntryIndex is essentially a tuple that maps RSL entry IDs to numbers. This
 // may be expanded in future to include more information as needed.
 type RSLEntryIndex struct {
