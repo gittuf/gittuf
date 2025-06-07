@@ -1,11 +1,19 @@
-## gittuf cache
+## gittuf cache delete
 
-Manage gittuf's caching functionality
+Delete the local persistent cache
+
+### Synopsis
+
+The 'delete' command deletes the local persistent cache used by gittuf.
+
+```
+gittuf cache delete [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for cache
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -20,7 +28,5 @@ Manage gittuf's caching functionality
 
 ### SEE ALSO
 
-* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf cache delete](gittuf_cache_delete.md)	 - Delete the local persistent cache
-* [gittuf cache init](gittuf_cache_init.md)	 - Initialize persistent cache
+* [gittuf cache](gittuf_cache.md)	 - Manage gittuf's caching functionality
 

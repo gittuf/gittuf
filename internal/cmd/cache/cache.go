@@ -4,6 +4,7 @@
 package cache
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/cache/delete"
 	i "github.com/gittuf/gittuf/internal/cmd/cache/init"
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,7 @@ func New() *cobra.Command {
 	}
 
 	cmd.AddCommand(i.New())
+	cmd.AddCommand(delete.New())
 
 	return cmd
 }
