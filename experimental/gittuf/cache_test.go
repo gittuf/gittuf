@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/cache"
+	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/stretchr/testify/assert"
@@ -72,5 +73,32 @@ func TestPopulateCache(t *testing.T) {
 		}
 
 		assert.Equal(t, currentCacheID, newCacheID)
+	})
+}
+
+func TestResetCache(t *testing.T) {
+	t.Run("successful cache reset", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := createTestRepositoryWithPolicy(t, tmpDir)
+
+		err := repo.PopulateCache()
+		assert.Nil(t, err)
+
+		err = repo.ResetCache()
+		assert.Nil(t, err)
+
+		_, err = cache.LoadPersistentCache(repo.r)
+		assert.ErrorIs(t, err, cache.ErrNoPersistentCache)
+	})
+
+	t.Run("reset on non-existent cache", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := createTestRepositoryWithPolicy(t, tmpDir)
+
+		err := repo.ResetCache()
+		assert.Nil(t, err)
+
+		_, err = repo.r.GetReference(cache.Ref)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 }
