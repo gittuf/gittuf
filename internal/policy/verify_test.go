@@ -739,9 +739,6 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 func TestVerifyMergeable(t *testing.T) {
 	refName := "refs/heads/main"
 	featureRefName := "refs/heads/feature"
-
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("base commit zero, mergeable using GitHub approval, RSL entry signature required", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 

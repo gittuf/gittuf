@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -701,8 +700,6 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 //     ID set as the app name
 func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *testing.T) *State {
 	t.Helper()
-
-	t.Setenv(dev.DevModeKey, "1")
 
 	state := createTestStateWithPolicyUsingPersons(t)
 
