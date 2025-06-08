@@ -1,6 +1,6 @@
 ## gittuf rsl propagate
 
-Propagate contents of remote repositories into local repository (developer mode only, set GITTUF_DEV=1)
+Propagate contents of remote repositories into local repository
 
 ```
 gittuf rsl propagate [flags]

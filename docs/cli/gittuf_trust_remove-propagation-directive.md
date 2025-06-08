@@ -1,6 +1,6 @@
 ## gittuf trust remove-propagation-directive
 
-Remove propagation directive from gittuf root of trust (developer mode only, set GITTUF_DEV=1)
+Remove propagation directive from gittuf root of trust
 
 ```
 gittuf trust remove-propagation-directive [flags]

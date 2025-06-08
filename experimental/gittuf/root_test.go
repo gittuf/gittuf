@@ -630,8 +630,6 @@ func TestSignRoot(t *testing.T) {
 }
 
 func TestAddGlobalRuleThreshold(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	r := createTestRepositoryWithRoot(t, "")
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
@@ -676,8 +674,6 @@ func TestAddGlobalRuleThreshold(t *testing.T) {
 }
 
 func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	r := createTestRepositoryWithRoot(t, "")
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
@@ -717,8 +713,6 @@ func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
 	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleBlockForcePushes).GetProtectedNamespaces())
 }
 func TestRemoveGlobalRule(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("remove threshold global rule", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -831,8 +825,6 @@ func TestRemoveGlobalRule(t *testing.T) {
 }
 
 func TestUpdateGlobalRule(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("update threshold in threshold global rule", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -1172,8 +1164,6 @@ func TestUpdateGlobalRule(t *testing.T) {
 }
 
 func TestListGlobalRules(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("list global rules after add and remove", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -1196,8 +1186,6 @@ func TestListGlobalRules(t *testing.T) {
 }
 
 func TestAddPropagationDirective(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -1278,8 +1266,6 @@ func TestAddPropagationDirective(t *testing.T) {
 }
 
 func TestRemovePropagationDirective(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 

@@ -1,6 +1,6 @@
 ## gittuf trust add-global-rule
 
-Add a new global rule to root of trust (developer mode only, set GITTUF_DEV=1)
+Add a new global rule to root of trust
 
 ### Synopsis
 
