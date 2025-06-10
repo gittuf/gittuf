@@ -174,6 +174,9 @@ type RootMetadata interface {
 	// AddPropagationDirective adds a propagation directive to the root
 	// metadata.
 	AddPropagationDirective(directive PropagationDirective) error
+	// UpdatePropagationDirective updates a propagation directive in the root
+	// metadata.
+	UpdatePropagationDirective(directive PropagationDirective) error
 	// GetPropagationDirectives returns the propagation directives found in the
 	// root metadata.
 	GetPropagationDirectives() []PropagationDirective
