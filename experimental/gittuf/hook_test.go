@@ -11,7 +11,7 @@ import (
 	hookopts "github.com/gittuf/gittuf/experimental/gittuf/options/hooks"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
-	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/stretchr/testify/assert"
@@ -88,7 +88,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		r := &Repository{r: repo}
 
 		_, err := r.InvokeHooksForStage(testCtx, nil, tuf.HookStagePreCommit)
-		assert.ErrorIs(t, err, sslibdsse.ErrNoSigners)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
 	t.Run("pre-commit hook, but for different principal", func(t *testing.T) {
@@ -145,6 +145,16 @@ func TestInvokeHooksForStage(t *testing.T) {
 		require.Nil(t, err)
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		require.Nil(t, err)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		codes, err := r.InvokeHooksForStage(testCtx, rootSigner, hookStage)
 		assert.Nil(t, err)
