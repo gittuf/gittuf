@@ -32,6 +32,10 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		remoteName = args[0]
 	}
 
+	if !o.localOnly && remoteName == "" {
+		return gittuf.ErrRemoteNotSpecified
+	}
+
 	return repo.ApplyAttestations(cmd.Context(), remoteName, o.localOnly, true)
 }
 
@@ -40,6 +44,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Apply and push local attestations changes to remote repository",
+		Long:  `The 'apply' command takes all locally recorded attestations (stored in the RSL), applies them, and pushes them to the remote repository. Pass '--local-only' to record the attestation locally without pushing upstream. Otherwise, you must supply the remote name as the first positional argument.`,
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
