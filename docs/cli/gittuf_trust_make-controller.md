@@ -1,6 +1,6 @@
 ## gittuf trust make-controller
 
-Make current repository a controller (developer mode only, set GITTUF_DEV=1)
+Make current repository a controller
 
 ```
 gittuf trust make-controller [flags]

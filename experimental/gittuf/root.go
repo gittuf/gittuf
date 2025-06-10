@@ -572,10 +572,6 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 
 // AddGlobalRuleThreshold adds a threshold global rule to the root metadata.
 func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	options := &trustpolicyopts.Options{}
 	for _, fn := range opts {
 		fn(options)
@@ -616,10 +612,6 @@ func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdss
 
 // AddGlobalRuleBlockForcePushes adds a global rule that blocks force pushes to the root metadata.
 func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	options := &trustpolicyopts.Options{}
 	for _, fn := range opts {
 		fn(options)
@@ -665,10 +657,6 @@ func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer s
 
 // UpdateGlobalRuleThreshold updates an existing threshold global rule in the root metadata.
 func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -709,10 +697,6 @@ func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslib
 
 // UpdateGlobalRuleBlockForcePushes updates an existing block-force-pushes global rule in the root metadata.
 func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signer sslibdsse.SignerVerifier, name string, patterns []string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -758,10 +742,6 @@ func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signe
 
 // RemoveGlobalRule removes a global rule from the root metadata.
 func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -801,10 +781,6 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 }
 
 func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -852,10 +828,6 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 }
 
 func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1022,10 +994,6 @@ func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVeri
 // EnableController makes the current repository a "controller" repository used
 // to specify gittuf policies for other repositories.
 func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1068,10 +1036,6 @@ func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.Sign
 // gittuf repositories. Any policies declared in this repository will not be
 // enforced for other repositories part of the network.
 func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1113,10 +1077,6 @@ func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.Sig
 // AddControllerRepository adds a repository as a controller to the current
 // repository.
 func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1158,10 +1118,6 @@ func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibds
 // AddNetworkRepository adds a repository as part of the network overseen by the
 // current repository.
 func (r *Repository) AddNetworkRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()

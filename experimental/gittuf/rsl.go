@@ -773,11 +773,6 @@ func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash
 // workflow. It inspects the latest policy metadata to find the applicable
 // propagation directives, and executes the workflow on each one.
 func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Context, sign bool) error {
-	if !dev.InDevMode() {
-		slog.Debug("Propagation is only supported in developer mode, skipping check...")
-		return nil
-	}
-
 	slog.Debug("Checking if upstream changes must be propagated...")
 	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
 	if err != nil {
