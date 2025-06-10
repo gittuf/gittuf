@@ -74,9 +74,27 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "list-rules",
-		Short:             "List rules for the current state",
-		Long:              `The 'list-rules' command displays all policy rules defined in the current gittuf policy. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Use:   "list-rules",
+		Short: "List rules for the current state",
+		Long: `List all policy rules defined in a gittuf-controlled Git repository at the specified reference.
+
+For each rule, this command shows:
+  • Rule ID and name
+  • The protected Git namespace(s) it applies to (branches, tags, paths)
+  • Principal IDs (signing keys or identities) authorized to modify those namespaces
+  • Required signature threshold for enforcement
+  • Delegation hierarchy, presented in a tree structure (root → delegated rules)
+
+By inspecting this output, users can understand which parts of the repository are protected, who is allowed to change them, and how trust is structured.
+
+Flags:
+  --target-ref string   Git reference containing the policy metadata (defaults to “policy”)
+
+Example:
+  gittuf list-rules --target-ref main
+`
+
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
