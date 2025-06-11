@@ -13,3 +13,8 @@ import (
 func (r *Repository) PopulateCache() error {
 	return cache.PopulatePersistentCache(r.r)
 }
+
+// ResetCache deletes the local persistent cache.
+func (r *Repository) ResetCache() error {
+	return cache.ResetPersistentCache(r.r)
+}

@@ -1,11 +1,19 @@
-## gittuf cache
+## gittuf cache reset
 
-Manage gittuf's caching functionality
+Reset (delete) the local persistent cache
+
+### Synopsis
+
+The 'reset' command deletes the local persistent cache used by gittuf.
+
+```
+gittuf cache reset [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for cache
+  -h, --help   help for reset
 ```
 
 ### Options inherited from parent commands
@@ -20,7 +28,5 @@ Manage gittuf's caching functionality
 
 ### SEE ALSO
 
-* [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf cache init](gittuf_cache_init.md)	 - Initialize persistent cache
-* [gittuf cache reset](gittuf_cache_reset.md)	 - Reset (delete) the local persistent cache
+* [gittuf cache](gittuf_cache.md)	 - Manage gittuf's caching functionality
 
