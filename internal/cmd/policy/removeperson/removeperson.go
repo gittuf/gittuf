@@ -56,9 +56,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-person",
-		Short:             "Remove a person from a policy file",
-		Long:              `The 'remove-person' command removes the specified person from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Use:   "remove-person",
+		Short: "Remove a person from a policy file",
+		Long:  "Remove a person from the repository’s policy to revoke their delegated authority and associated keys.",
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
