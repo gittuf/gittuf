@@ -6,7 +6,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.3.0
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
-	github.com/go-git/go-git/v5 v5.16.1
+	github.com/go-git/go-git/v5 v5.16.2
 	github.com/google/go-github/v61 v61.0.0
 	github.com/hiddeco/sshsig v0.2.0
 	github.com/in-toto/attestation v1.1.1
@@ -14,7 +14,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.9.0
 	github.com/sigstore/cosign/v2 v2.4.1
 	github.com/sigstore/gitsign v0.12.0
-	github.com/sigstore/protobuf-specs v0.4.2
+	github.com/sigstore/protobuf-specs v0.4.3
 	github.com/sigstore/sigstore v1.9.1
 	github.com/sigstore/sigstore-go v0.6.2
 	github.com/spf13/cobra v1.9.1
