@@ -26,6 +26,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "skip-rewritten",
 		Short:             "Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref",
+		Long:              "Annotate the RSL to skip entries for rewritten commits that no longer exist in the specified Git reference.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
