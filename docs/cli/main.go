@@ -25,6 +25,7 @@ docs for the project that describe how each command works and its options.
 
 The generated documentation will be saved to the specified directory, which
 defaults to the current working directory if not provided.`,
+
 		Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
 			return doc.GenMarkdownTree(root.New(), dir)
