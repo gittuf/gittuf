@@ -55,8 +55,10 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync [remoteName]",
 		Short: "Synchronize local references with remote references based on RSL",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  o.Run,
+		Long:  "Synchronize local Git references with the remote based on the RSL, optionally overwriting divergent refs to match upstream.",
+
+		Args: cobra.MaximumNArgs(1),
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
