@@ -56,9 +56,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "remove-key",
-		Short:             "Remove a key from a policy file",
-		Long:              `The 'remove-key' command removes the specified public key from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Use:   "remove-key",
+		Short: "Remove a key from a policy file",
+		Long:  "Remove an authorized key from the repository’s policy to revoke its signing privileges under a rule.",
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
