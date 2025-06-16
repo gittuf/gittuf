@@ -1,6 +1,6 @@
 ## gittuf trust update-global-rule
 
-Update an existing global rule in the root of trust (developer mode only, set GITTUF_DEV=1)
+Update an existing global rule in the root of trust
 
 ### Synopsis
 

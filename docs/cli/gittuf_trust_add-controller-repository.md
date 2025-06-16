@@ -1,6 +1,6 @@
 ## gittuf trust add-controller-repository
 
-Add a controller repository (developer mode only, set GITTUF_DEV=1)
+Add a controller repository
 
 ```
 gittuf trust add-controller-repository [flags]

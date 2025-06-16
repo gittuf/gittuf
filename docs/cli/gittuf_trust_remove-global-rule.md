@@ -1,6 +1,6 @@
 ## gittuf trust remove-global-rule
 
-Remove a global rule from root of trust (developer mode only, set GITTUF_DEV=1)
+Remove a global rule from root of trust
 
 ### Synopsis
 
