@@ -234,6 +234,10 @@ func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
 }
 
+func (t *TargetsMetadata) AddTeam(_ string, _ []*tuf.Principal, _ int) error {
+	return fmt.Errorf("v01 does not implement Teams")
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {

@@ -84,6 +84,12 @@ type Principal interface {
 	CustomMetadata() map[string]string
 }
 
+// type Team interface {
+// 	ID() string
+// 	Principals []*Person
+// 	Threshold int
+// }
+
 // RootMetadata represents the root of trust metadata for gittuf.
 type RootMetadata interface {
 	// SetExpires sets the expiry time for the metadata.
@@ -249,6 +255,9 @@ type TargetsMetadata interface {
 
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
+
+	// AddTeam adds a team to the metadata.
+	AddTeam(teamID string, principals []*Principal, threshold int) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
