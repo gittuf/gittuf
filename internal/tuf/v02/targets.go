@@ -241,11 +241,17 @@ func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removePrincipal(principalID)
 }
 
+// AddTeam adds a team to the metadata.
+func (t *TargetsMetadata) AddTeam(teamID string, principals []*tuf.Principal, threshold int) error {
+	return t.Delegations.addTeam(teamID, principals, threshold)
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
 	Principals map[string]tuf.Principal `json:"principals"`
-	Roles      []*Delegation            `json:"roles"`
+	Teams      map[string]Team
+	Roles      []*Delegation `json:"roles"`
 }
 
 func (d *Delegations) UnmarshalJSON(data []byte) error {
@@ -330,6 +336,16 @@ func (d *Delegations) removePrincipal(principalID string) error {
 		}
 	}
 	delete(d.Principals, principalID)
+	return nil
+}
+
+func (d *Delegations) addTeam(teamID string, principals []*tuf.Principal, threshold int) error {
+	team := &Team{
+		TeamID:     teamID,
+		Principals: principals,
+		Threshold:  threshold,
+	}
+	d.Teams[teamID] = *team
 	return nil
 }
 

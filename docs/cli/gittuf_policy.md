@@ -30,6 +30,7 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy add-key](gittuf_policy_add-key.md)	 - Add a trusted key to a policy file
 * [gittuf policy add-person](gittuf_policy_add-person.md)	 - Add a trusted person to a policy file
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
+* [gittuf policy add-team](gittuf_policy_add-team.md)	 - Add a trusted team to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file

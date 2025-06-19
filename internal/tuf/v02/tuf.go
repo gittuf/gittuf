@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/tuf"
 	v01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
@@ -35,6 +36,12 @@ type Person struct {
 	PublicKeys           map[string]*Key   `json:"keys"`
 	AssociatedIdentities map[string]string `json:"associatedIdentities"`
 	Custom               map[string]string `json:"custom"`
+}
+
+type Team struct {
+	TeamID     string
+	Principals []*tuf.Principal
+	Threshold  int
 }
 
 func (p *Person) ID() string {
@@ -75,5 +82,6 @@ func (p *Person) CustomMetadata() map[string]string {
 // and in a delegation entry.
 type Role struct {
 	PrincipalIDs *set.Set[string] `json:"principalIDs"`
+	TeamIDs      *set.Set[string] `json:"teamIDs"`
 	Threshold    int              `json:"threshold"`
 }
