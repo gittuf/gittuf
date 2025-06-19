@@ -39,8 +39,14 @@ import (
 func New() *cobra.Command {
 	o := &persistent.Options{}
 	cmd := &cobra.Command{
-		Use:               "trust",
-		Short:             "Tools for gittuf's root of trust",
+		Use:   "trust",
+		Short: "Tools for gittuf's root of trust",
+		Long: `Provides a collection of subcommands to manage gittuf's Root of Trust (ROT) configuration, policies, and key material.
+
+The trust command is a parent command that enables fine-grained control over the security primitives that govern a gittuf-enabled repository. These subcommands allow you to initialize trust data, manage root and policy keys, define and modify global and propagation rules, interact with GitHub App-based workflows, and configure repository-specific validation logic.
+
+Through this interface, users can set up secure code-signing workflows, enforce commit validation policies, and manage trusted entities and rules over time. This modular structure ensures that each component of the trust framework can be independently managed to meet the security needs of diverse repositories and organizations.`,
+
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)

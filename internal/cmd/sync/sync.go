@@ -55,8 +55,16 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync [remoteName]",
 		Short: "Synchronize local references with remote references based on RSL",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  o.Run,
+		Long: `Synchronizes local references with the remote repository using information recorded in the Repository Signing Log (RSL).
+
+This command compares the references in the local Git repository with those from the specified remote (defaults to 'origin' if not provided) and updates the local repository to match the upstream state. It helps ensure that both repositories are cryptographically aligned according to the trusted RSL entries.
+
+If any references have diverged—meaning the local and remote histories differ—these will be listed without modifying them. To forcefully update the local references and overwrite local changes, the --overwrite flag must be used. WARNING: using --overwrite may result in loss of unmerged or uncommitted local work.
+
+This command is useful when maintaining RSL consistency across collaborators or machines in a secure supply chain setup.`,
+
+		Args: cobra.MaximumNArgs(1),
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
