@@ -55,6 +55,15 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync [remoteName]",
 		Short: "Synchronize local references with remote references based on RSL",
+		Long: "The sync command synchronizes the gittuf metadata between the local repository
+and the remote sources.
+
+It ensures that the local cache and state of trusted metadata is consistent with what's
+available on the remote. This is useful after changes are made to the trust policies,
+principals, or rules either locally or by other collaborators, and the updates have been
+pushed to a remote source of truth.
+
+Running this command helps maintain trust and consistency across multiple environments.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  o.Run,
 	}

@@ -42,6 +42,15 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "trust",
 		Short:             "Tools for gittuf's root of trust",
+		Long: 				"The trust command allows you to mark a specific Git identity (GPG or SSH key) as trusted.
+
+Trusted identities are allowed to sign commits, tags, or other Git objects, and their
+signatures will be considered valid when enforcing verification policies defined by gittuf.
+
+This command is a central part of the trust model in gittuf, allowing users to configure
+which contributors or automation tools are authorized to make verifiable contributions
+within a repository.",
+
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)
