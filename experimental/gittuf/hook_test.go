@@ -25,7 +25,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 
 		r := &Repository{r: repo}
 
-		err := r.UpdateHook(HookPrePush, []byte("some content"), false)
+		err := r.UpdateGitHook(HookPrePush, []byte("some content"), false)
 		require.NoError(t, err)
 
 		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
@@ -44,7 +44,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
 		require.NoError(t, err)
 
-		err = r.UpdateHook(HookPrePush, []byte("new hook script"), false)
+		err = r.UpdateGitHook(HookPrePush, []byte("new hook script"), false)
 		var hookErr *ErrHookExists
 		if assert.ErrorAs(t, err, &hookErr) {
 			assert.Equal(t, HookPrePush, hookErr.HookType)
@@ -61,7 +61,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
 		require.NoError(t, err)
 
-		err = r.UpdateHook(HookPrePush, []byte("new hook script"), true)
+		err = r.UpdateGitHook(HookPrePush, []byte("new hook script"), true)
 		assert.NoError(t, err)
 
 		content, err := os.ReadFile(hookFile)
