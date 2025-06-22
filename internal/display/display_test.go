@@ -13,12 +13,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getPagerTestCat() string {
+type pagerTestCat struct{}
+
+func getPagerTestCat() pager {
+	return &pagerTestCat{}
+}
+
+func (p *pagerTestCat) getBinary() string {
 	return "cat"
 }
 
-func getPagerTestNone() string {
-	return ""
+func (p *pagerTestCat) getFlags() []string {
+	return nil
+}
+
+func getPagerTestNone() pager {
+	return nil
 }
 
 func TestNewDisplayWriter(t *testing.T) {
