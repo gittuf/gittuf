@@ -1,6 +1,6 @@
 ## gittuf trust add-propagation-directive
 
-Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
+Add propagation directive into gittuf root of trust
 
 ```
 gittuf trust add-propagation-directive [flags]

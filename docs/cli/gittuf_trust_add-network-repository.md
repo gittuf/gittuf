@@ -1,6 +1,6 @@
 ## gittuf trust add-network-repository
 
-Add a network repository (developer mode only, set GITTUF_DEV=1)
+Add a network repository
 
 ```
 gittuf trust add-network-repository [flags]
