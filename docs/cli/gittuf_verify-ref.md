@@ -9,10 +9,13 @@ gittuf verify-ref [flags]
 ### Options
 
 ```
-      --from-entry string        perform verification from specified RSL entry (developer mode only, set GITTUF_DEV=1)
-  -h, --help                     help for verify-ref
-      --latest-only              perform verification against latest entry in the RSL
-      --remote-ref-name string   name of remote reference, if it differs from the local name
+      --from-entry string                              perform verification from specified RSL entry (developer mode only, set GITTUF_DEV=1)
+  -h, --help                                           help for verify-ref
+      --latest-only                                    perform verification against latest entry in the RSL
+      --remote-ref-name string                         name of remote reference, if it differs from the local name
+      --sign-verification-summary string               signing key or identity for one or more verification summaries
+      --write-granular-verification-summaries string   path to write granular verification summary attestations (one per policy) as an in-toto attestation bundle
+      --write-overall-verification-summary string      path to write a single verification summary attestation
 ```
 
 ### Options inherited from parent commands
