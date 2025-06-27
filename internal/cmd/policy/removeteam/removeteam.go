@@ -1,8 +1,4 @@
-// Copyright The gittuf Authors
-// SPDX-License-Identifier: Apache-2.0
-
-package addteam
-
+package removeteam
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
@@ -13,11 +9,9 @@ import (
 )
 
 type options struct {
-	p            *persistent.Options
-	policyName   string
-	teamID       string
-	principalIDs []string
-	threshold    int
+	p          *persistent.Options
+	policyName string
+	teamID   string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -25,7 +19,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"name of policy file to add key to",
+		"name of policy file to remove team from",
 	)
 
 	cmd.Flags().StringVar(
@@ -35,20 +29,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"team ID",
 	)
 	cmd.MarkFlagRequired("team-ID") //nolint:errcheck
-
-	cmd.Flags().StringArrayVar(
-		&o.principalIDs,
-		"principalIDs",
-		[]string{},
-		"authorized principalIDs of this team",
-	)
-
-	cmd.Flags().IntVar(
-		&o.threshold,
-		"threshold",
-		1,
-		"threshold of required valid signatures",
-	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -66,16 +46,15 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-
-	return repo.AddTeamToTargets(cmd.Context(), signer, o.policyName, o.teamID, o.principalIDs, o.threshold, true, opts...)
+	return repo.RemoveTeamFromTargets(cmd.Context(), signer, o.policyName, o.teamID, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-team",
-		Short:             "Add a trusted team to a policy file",
-		Long:              `The 'add-team' command adds a trusted team to a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Use:               "remove-team",
+		Short:             "Remove an entire team from a policy file",
+		Long:              `The 'remove-team' command removes the specified team from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

@@ -1,23 +1,21 @@
-## gittuf policy add-team
+## gittuf policy remove-team
 
-Add a trusted team to a policy file
+Remove a team from a policy file
 
 ### Synopsis
 
-The 'add-team' command adds a trusted team to a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'remove-team' command removes the specified team from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
-gittuf policy add-team [flags]
+gittuf policy remove-person [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                       help for add-team
-      --policy-name string         name of policy file to add key to (default "targets")
-      --principalIDs stringArray   authorized principalIDs of this team
-      --team-ID string             team ID
-      --threshold int              threshold of required valid signatures (default 1)
+  -h, --help                 help for remove-person
+      --team-ID string       team ID
+      --policy-name string   name of policy file to remove team from (default "targets")
 ```
 
 ### Options inherited from parent commands

@@ -11,6 +11,7 @@ import (
 	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listprincipals"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
+	"github.com/gittuf/gittuf/internal/cmd/policy/listteams"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removekey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removeperson"
@@ -45,6 +46,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(listprincipals.New())
 	cmd.AddCommand(listrules.New())
+	cmd.AddCommand(listteams.New())
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removekey.New(o))
 	cmd.AddCommand(removeperson.New(o))

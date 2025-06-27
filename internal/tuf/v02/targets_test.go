@@ -77,6 +77,32 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 		assert.Empty(t, delegations.Principals)
 	})
+
+	t.Run("test addTeam", func(t *testing.T) {
+		delegations := &Delegations{}
+		assert.Nil(t, delegations.Principals)
+		assert.Nil(t, delegations.Teams)
+
+		team1 := &Team{
+			TeamID:     "team1",
+			Principals: []tuf.Principal{},
+			Threshold:  1,
+		}
+
+		err := delegations.addTeam("team1", []tuf.Principal{}, 1)
+		assert.Nil(t, err)
+		assert.Equal(t, team1, delegations.Teams["team1"])
+
+		team2 := &Team{
+			TeamID:     "team2",
+			Principals: []tuf.Principal{person},
+			Threshold:  1,
+		}
+
+		err = delegations.addTeam("team2", []tuf.Principal{person}, 1)
+		assert.Nil(t, err)
+		assert.Equal(t, team2, delegations.Teams["team2"])
+	})
 }
 
 func TestDelegation(t *testing.T) {

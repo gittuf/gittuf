@@ -1,23 +1,21 @@
-## gittuf policy add-team
+## gittuf policy list-teams
 
-Add a trusted team to a policy file
+List teams for the current policy in the specified rule file
 
 ### Synopsis
 
-The 'add-team' command adds a trusted team to a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'list-teams' command lists all trusted teams and their principals defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
-gittuf policy add-team [flags]
+gittuf policy list-teams [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                       help for add-team
-      --policy-name string         name of policy file to add key to (default "targets")
-      --principalIDs stringArray   authorized principalIDs of this team
-      --team-ID string             team ID
-      --threshold int              threshold of required valid signatures (default 1)
+  -h, --help                 help for list-teams
+      --policy-name string   specify rule file to list teams for (default "targets")
+      --policy-ref string    specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands

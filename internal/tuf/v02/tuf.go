@@ -38,12 +38,6 @@ type Person struct {
 	Custom               map[string]string `json:"custom"`
 }
 
-type Team struct {
-	TeamID     string
-	Principals []*tuf.Principal
-	Threshold  int
-}
-
 func (p *Person) ID() string {
 	return p.PersonID
 }
@@ -76,6 +70,24 @@ func (p *Person) CustomMetadata() map[string]string {
 	}
 
 	return metadata
+}
+
+type Team struct {
+	TeamID     string
+	Principals []tuf.Principal
+	Threshold  int
+}
+
+func (t *Team) ID() string{
+	return t.TeamID
+} 
+
+func (t *Team) GetPrincipals() []tuf.Principal{
+	return t.Principals
+}
+
+func (t *Team) GetThreshold() int{
+	return t.Threshold
 }
 
 // Role records common characteristics recorded in a role entry in Root metadata
