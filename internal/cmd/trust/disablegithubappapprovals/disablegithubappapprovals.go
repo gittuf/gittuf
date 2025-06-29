@@ -55,7 +55,7 @@ GitHub Apps can be integrated into a repository’s trust policy to automaticall
 
 This command enables repository maintainers to explicitly untrust a GitHub App by specifying its name using the '--app-name' flag. By default, the app name is set to the conventional role used by gittuf, but it can be overridden as needed. Once untrusted, the GitHub App will no longer have the authority to approve actions under the repository’s trust policy.
 
-The action requires a signing key, passed using the persistent '--signing-key' flag, to authorize the change. Optionally, if the '--rsl-entry' flag is set, the change will be recorded in the Repository Signing Log (RSL), ensuring that the modification to the trust configuration is auditable and tamper-evident.
+The action requires a signing key, passed using the persistent '--signing-key' flag, to authorize the change. Optionally, if the '--rsl-entry' flag is set, the change will be recorded in the Reference State Log (RSL), ensuring that the modification to the trust configuration is auditable and tamper-evident.
 
 This command is useful for managing trust lifecycle events, reducing the risk of unauthorized access, and maintaining the integrity of the approval process within secure Git workflows.`,
 

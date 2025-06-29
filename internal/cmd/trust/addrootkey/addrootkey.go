@@ -60,7 +60,7 @@ In gittuf, the root of trust is initialized with one or more root keys that are 
 
 To perform this operation, the user must specify the new root key file using the '--root-key' flag, which should point to a PEM-encoded public key file. The current user must also provide a signing key via the persistent '--signing-key' flag, as adding a root key is a signed action that updates the trust policy.
 
-Optionally, the '--rsl-entry' flag can be set to indicate that the addition of the new root key should be recorded in the Repository Signing Log (RSL), providing an auditable trail of trust-related changes.
+Optionally, the '--rsl-entry' flag can be set to indicate that the addition of the new root key should be recorded in the Reference State Log (RSL), providing an auditable trail of trust-related changes.
 
 This command is essential for administrative operations such as delegating trust to additional parties, performing key rotations, or implementing key recovery strategies within a secure and verifiable Git ecosystem.`,
 

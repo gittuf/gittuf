@@ -55,7 +55,7 @@ In gittuf, trust policies govern which actors—such as developers, maintainers,
 
 This command registers the specified GitHub App as a trusted approver by adding it to the root of trust. The app’s name must be provided using the '--app-name' flag; by default, this is set to the conventional role used by gittuf, but it can be customized as needed.
 
-To authorize this trust modification, the user must provide a valid signing key via the persistent '--signing-key' flag. Optionally, the '--rsl-entry' flag may be included to log the trust change in the Repository Signing Log (RSL), providing a verifiable audit trail of trust policy updates.
+To authorize this trust modification, the user must provide a valid signing key via the persistent '--signing-key' flag. Optionally, the '--rsl-entry' flag may be included to log the trust change in the Reference State Log (RSL), providing a verifiable audit trail of trust policy updates.
 
 This command is essential for securely integrating GitHub Apps into the approval workflow of secure software supply chains, especially in CI/CD environments, automated governance setups, or multi-party review systems.`,
 
