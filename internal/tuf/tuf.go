@@ -181,29 +181,6 @@ type RootMetadata interface {
 	// metadata.
 	DeletePropagationDirective(name string) error
 
-	// IsController indicates if the repository serves as the controller for
-	// a multi-repository gittuf network.
-	IsController() bool
-	// EnableController marks the current repository as a controller
-	// repository.
-	EnableController() error
-	// DisableController marks the current repository as not-a-controller.
-	DisableController() error
-	// AddControllerRepository adds the specified repository as a controller
-	// for the current repository.
-	AddControllerRepository(name, location string, initialRootPrincipals []Principal) error
-	// AddNetworkRepository adds the specified repository as part of the
-	// network for which the current repository is a controller. The current
-	// repository must be marked as a controller before this can be used.
-	AddNetworkRepository(name, location string, initialRootPrincipals []Principal) error
-	// GetControllerRepositories returns the repositories that serve as the
-	// controllers for the networks the current repository is a part of.
-	GetControllerRepositories() []OtherRepository
-	// GetNetworkRepositories returns the repositories that are part of the
-	// network for which the current repository is a controller.
-	// IsController must return true for this to be set.
-	GetNetworkRepositories() []OtherRepository
-
 	// AddHook adds to the metadata for the specified Git stage a hook named
 	// hookName to be run by the specified principals. For support of more than
 	// one hashing algorithm, providing multiple hashes is supported. The hook's
@@ -343,43 +320,6 @@ type PropagationDirective interface {
 	// reference where the upstream repository's contents must be stored by the
 	// propagation workflow.
 	GetDownstreamPath() string
-}
-
-// MultiRepository is used to configure gittuf to act in multi-repository
-// setups. If the repository is a "controller", i.e., it declares policies for
-// one or more other repositories, the contents of the controller repository's
-// policy must be propagated to each of the other repositories.
-type MultiRepository interface {
-	// IsController indicates if the current repository acts as a controller
-	// for a network of gittuf-enabled repositories.
-	IsController() bool
-
-	// GetControllerRepositories returns the repositories configured as a
-	// controller for the current repository. In other words, the current
-	// repository is a part of the network overseen by each of the
-	// configured controller repositories.
-	GetControllerRepositories() []OtherRepository
-
-	// GetNetworkRepositories returns the repositories configured as part of
-	// the network overseen by the repository. This must return `nil` if
-	// IsController is `false`.
-	GetNetworkRepositories() []OtherRepository
-}
-
-// OtherRepository represents another gittuf-enabled repository in the root
-// metadata.
-type OtherRepository interface {
-	// GetName returns the user-friendly name of the other repository. It
-	// must be unique among all the listed OtherRepository entries.
-	GetName() string
-
-	// GetLocation returns the clone-friendly location of the other
-	// repository.
-	GetLocation() string
-
-	// GetInitialRootPrincipals returns the set of principals trusted to
-	// sign the other repository's initial gittuf root of trust metadata.
-	GetInitialRootPrincipals() []Principal
 }
 
 // HookStage encodes the Git stage at which a hook is to run

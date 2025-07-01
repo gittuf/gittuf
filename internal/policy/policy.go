@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -46,20 +45,17 @@ const (
 )
 
 var (
-	ErrMetadataNotFound              = errors.New("unable to find requested metadata file; has it been initialized?")
-	ErrDanglingDelegationMetadata    = errors.New("unreachable targets metadata found")
-	ErrPolicyNotFound                = errors.New("cannot find policy")
-	ErrInvalidPolicy                 = errors.New("invalid policy state (is policy reference out of sync with corresponding RSL entry?)")
-	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
-	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
-	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
+	ErrMetadataNotFound           = errors.New("unable to find requested metadata file; has it been initialized?")
+	ErrDanglingDelegationMetadata = errors.New("unreachable targets metadata found")
+	ErrPolicyNotFound             = errors.New("cannot find policy")
+	ErrInvalidPolicy              = errors.New("invalid policy state (is policy reference out of sync with corresponding RSL entry?)")
+	ErrNotAncestor                = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 )
 
 // State contains the full set of metadata and root keys present in a policy
 // state.
 type State struct {
-	Metadata           *StateMetadata
-	ControllerMetadata map[string]*StateMetadata
+	Metadata *StateMetadata
 
 	Hooks map[tuf.HookStage][]tuf.Hook
 
@@ -549,57 +545,6 @@ func (s *State) Verify(ctx context.Context) error {
 		return nil
 	}
 
-	// Check controller root metadata
-	if len(s.ControllerMetadata) != 0 {
-		controllerRepositories := rootMetadata.GetControllerRepositories()
-		for _, controllerRepositoryDetail := range controllerRepositories {
-			controllerName := controllerRepositoryDetail.GetName()
-
-			tmpDir, err := os.MkdirTemp("", fmt.Sprintf("gittuf-controller-%s-", controllerName))
-			if err != nil {
-				return fmt.Errorf("unable to clone controller repository: %w", err)
-			}
-			defer os.RemoveAll(tmpDir) //nolint:errcheck
-
-			controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
-			if err != nil {
-				return fmt.Errorf("unable to clone controller repository: %w", err)
-			}
-
-			// We need to LoadState() the state from which the root is derived
-			// For that, we need to know when it was propagated into this repository
-			upstreamEntryID := gitinterface.ZeroHash
-			if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
-				// Check this entry
-				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
-					upstreamEntryID = entry.UpstreamEntryID
-				}
-			}
-			if upstreamEntryID.IsZero() {
-				// not found yet
-				// find propagation entry in local repo
-				propagationEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(s.repository, rsl.BeforeEntryID(s.loadedEntry.GetID()), rsl.IsPropagationEntryForRepository(controllerRepositoryDetail.GetLocation()), rsl.ForReference(PolicyRef))
-				if err != nil {
-					return fmt.Errorf("%w, unable to verify controller repository: %w", ErrControllerMetadataNotVerified, err)
-				}
-				// We know propagationEntry is of this type because of the rsl.IsPropagationEntryForReference opt
-				upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
-			}
-
-			upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
-			if err != nil {
-				return err
-			}
-
-			// LoadState does full verification up until the requested entry
-			if _, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), policyopts.WithInitialRootPrincipals(controllerRepositoryDetail.GetInitialRootPrincipals())); err != nil {
-				return fmt.Errorf("%w, unable to verify root of trust for controller '%s': %w", ErrControllerMetadataNotVerified, controllerName, err)
-			}
-
-			// TODO: verify git tree ID in upstream matches propagated
-		}
-	}
-
 	return nil
 }
 
@@ -617,14 +562,6 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 		return nil
 	}
 	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
-
-	for absoluteControllerPath, metadata := range s.ControllerMetadata {
-		stateMetadataTreeID, err := metadata.WriteTree(repo)
-		if err != nil {
-			return nil
-		}
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath), stateMetadataTreeID))
-	}
 
 	for stage, hookSet := range s.Hooks {
 		for _, hook := range hookSet {
@@ -932,7 +869,7 @@ func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
 
 	// Diverged
 	// Create new policy-staging that is "rebased"
-	policyState, err := loadStateForEntry(repo, policyEntry)
+	_, err = loadStateForEntry(repo, policyEntry)
 	if err != nil {
 		return err
 	}
@@ -954,9 +891,8 @@ func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
 	// This includes the changes made in staging + the controller changes
 	// propagated into policy
 	newStagingState := &State{
-		Metadata:           policyStagingState.Metadata,
-		ControllerMetadata: policyState.ControllerMetadata,
-		repository:         repo,
+		Metadata:   policyStagingState.Metadata,
+		repository: repo,
 	}
 
 	return newStagingState.Commit(repo, "Rebase policy staging\n", true, signCommit)
@@ -980,19 +916,6 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 		return nil, err
 	}
 	return s.getRootMetadataFromBytes(payloadBytes, migrate)
-}
-
-func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetadata, error) {
-	metadata, has := s.ControllerMetadata[controllerName]
-	if !has {
-		return nil, fmt.Errorf("%w: '%s'", ErrControllerMetadataNotFound, controllerName)
-	}
-
-	payloadBytes, err := metadata.RootEnvelope.DecodeB64Payload()
-	if err != nil {
-		return nil, err
-	}
-	return s.getRootMetadataFromBytes(payloadBytes, false) // never migrate
 }
 
 func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tuf.RootMetadata, error) {
@@ -1238,22 +1161,6 @@ func (s *State) preprocess() error {
 		}
 	}
 
-	for controllerName := range s.ControllerMetadata {
-		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName)
-		if err != nil {
-			return err
-		}
-
-		globalRules := controllerRootMetadata.GetGlobalRules()
-		if len(globalRules) > 0 {
-			if s.globalRules == nil {
-				s.globalRules = map[string][]tuf.GlobalRule{}
-			}
-
-			s.globalRules[controllerName] = globalRules
-		}
-	}
-
 	return nil
 }
 
@@ -1389,20 +1296,10 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 
 		if currentMetadataEntry.name == "" {
 			state.Metadata = stateMetadata
-		} else {
-			if state.ControllerMetadata == nil {
-				state.ControllerMetadata = map[string]*StateMetadata{}
-			}
-
-			state.ControllerMetadata[currentMetadataEntry.name] = stateMetadata
 		}
 	}
 
 	slog.Debug("Loaded current repository policy!")
-
-	for name := range state.ControllerMetadata {
-		slog.Debug(fmt.Sprintf("Loaded policy from controller '%s'!", name))
-	}
 
 	if err := state.preprocess(); err != nil {
 		return nil, err

@@ -52,30 +52,6 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	// Set propagations
 	newRootMetadata.Propagations = rootMetadata.Propagations
 
-	if rootMetadata.MultiRepository != nil {
-		newRootMetadata.MultiRepository = &tufv02.MultiRepository{
-			Controller:             rootMetadata.MultiRepository.Controller,
-			ControllerRepositories: []*tufv02.OtherRepository{},
-			NetworkRepositories:    []*tufv02.OtherRepository{},
-		}
-
-		for _, otherRepository := range rootMetadata.MultiRepository.ControllerRepositories {
-			newRootMetadata.MultiRepository.ControllerRepositories = append(newRootMetadata.MultiRepository.ControllerRepositories, &tufv02.OtherRepository{
-				Name:                  otherRepository.GetName(),
-				Location:              otherRepository.GetLocation(),
-				InitialRootPrincipals: otherRepository.GetInitialRootPrincipals(),
-			})
-		}
-
-		for _, otherRepository := range rootMetadata.MultiRepository.NetworkRepositories {
-			newRootMetadata.MultiRepository.NetworkRepositories = append(newRootMetadata.MultiRepository.NetworkRepositories, &tufv02.OtherRepository{
-				Name:                  otherRepository.GetName(),
-				Location:              otherRepository.GetLocation(),
-				InitialRootPrincipals: otherRepository.GetInitialRootPrincipals(),
-			})
-		}
-	}
-
 	// Set hooks
 	newRootMetadata.Hooks = rootMetadata.Hooks
 

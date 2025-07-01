@@ -19,7 +19,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/sync"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
 	"github.com/gittuf/gittuf/internal/cmd/verifymergeable"
-	"github.com/gittuf/gittuf/internal/cmd/verifynetwork"
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/gittuf/gittuf/internal/cmd/version"
 	"github.com/gittuf/gittuf/internal/display"
@@ -120,7 +119,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(rsl.New())
 	cmd.AddCommand(sync.New())
 	cmd.AddCommand(verifymergeable.New())
-	cmd.AddCommand(verifynetwork.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
 

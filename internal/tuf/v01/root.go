@@ -28,7 +28,6 @@ type RootMetadata struct {
 	GitHubApps         map[string]*GitHubApp      `json:"githubApps,omitempty"`
 	GlobalRules        []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
-	MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
 	Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
@@ -470,171 +469,6 @@ func (r *RootMetadata) DeletePropagationDirective(name string) error {
 	return nil
 }
 
-// IsController indicates if the repository serves as the controller for a
-// multi-repository gittuf network.
-func (r *RootMetadata) IsController() bool {
-	if r.MultiRepository == nil {
-		return false
-	}
-
-	return r.MultiRepository.IsController()
-}
-
-// EnableController marks the current repository as a controller repository.
-func (r *RootMetadata) EnableController() error {
-	if r.MultiRepository == nil {
-		r.MultiRepository = &MultiRepository{}
-	}
-
-	r.MultiRepository.Controller = true
-	return nil // TODO: what if it's already a controller? noop?
-}
-
-// DisableController marks the current repository as not-a-controller.
-func (r *RootMetadata) DisableController() error {
-	if r.MultiRepository == nil {
-		// nothing to do
-		return nil
-	}
-
-	r.MultiRepository.Controller = false
-	// TODO: should we remove the network repository entries?
-	return nil
-}
-
-// AddControllerRepository adds the specified repository as a controller for the
-// current repository.
-func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
-	if r.MultiRepository == nil {
-		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
-	}
-
-	for _, repo := range r.MultiRepository.ControllerRepositories {
-		if repo.Name == name || repo.Location == location {
-			return tuf.ErrDuplicateControllerRepository
-		}
-	}
-
-	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
-	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-		newKeyIDs = append(newKeyIDs, key)
-	}
-
-	newKeyIDsSet := set.NewSet[string]()
-	for _, principal := range newKeyIDs {
-		newKeyIDsSet.Add(principal.ID())
-	}
-
-	for _, repo := range r.MultiRepository.ControllerRepositories {
-		existingKeyIDs := set.NewSet[string]()
-		for _, existingPrincipal := range repo.InitialRootPrincipals {
-			existingKeyIDs.Add(existingPrincipal.KeyID)
-		}
-		if existingKeyIDs.Equal(newKeyIDsSet) {
-			return tuf.ErrDuplicateControllerRepository
-		}
-	}
-
-	otherRepository := &OtherRepository{
-		Name:                  name,
-		Location:              location,
-		InitialRootPrincipals: make([]*Key, 0, len(initialRootPrincipals)),
-	}
-
-	for _, principal := range initialRootPrincipals {
-		key := principal.(*Key)
-		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
-	}
-
-	r.MultiRepository.ControllerRepositories = append(r.MultiRepository.ControllerRepositories, otherRepository)
-
-	return nil
-}
-
-// AddNetworkRepository adds the specified repository as part of the network for
-// which the current repository is a controller. The current repository must be
-// marked as a controller before this can be used.
-func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
-	if r.MultiRepository == nil || !r.MultiRepository.Controller {
-		// EnableController must be called first
-		return tuf.ErrNotAControllerRepository
-	}
-
-	if r.MultiRepository.NetworkRepositories == nil {
-		r.MultiRepository.NetworkRepositories = []*OtherRepository{}
-	}
-
-	for _, repo := range r.MultiRepository.NetworkRepositories {
-		if repo.Name == name || repo.Location == location {
-			return tuf.ErrDuplicateNetworkRepository
-		}
-	}
-
-	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
-	for _, principal := range initialRootPrincipals {
-		key, isKey := principal.(*Key)
-		if !isKey {
-			return tuf.ErrInvalidPrincipalType
-		}
-		newKeyIDs = append(newKeyIDs, key)
-	}
-
-	newKeyIDsSet := set.NewSet[string]()
-	for _, principal := range newKeyIDs {
-		newKeyIDsSet.Add(principal.ID())
-	}
-
-	for _, repo := range r.MultiRepository.NetworkRepositories {
-		existingKeyIDs := set.NewSet[string]()
-		for _, existingPrincipal := range repo.InitialRootPrincipals {
-			existingKeyIDs.Add(existingPrincipal.KeyID)
-		}
-
-		if existingKeyIDs.Equal(newKeyIDsSet) {
-			return tuf.ErrDuplicateNetworkRepository
-		}
-	}
-
-	otherRepository := &OtherRepository{
-		Name:                  name,
-		Location:              location,
-		InitialRootPrincipals: make([]*Key, 0, len(initialRootPrincipals)),
-	}
-
-	for _, principal := range initialRootPrincipals {
-		key := principal.(*Key)
-		otherRepository.InitialRootPrincipals = append(otherRepository.InitialRootPrincipals, key)
-	}
-
-	r.MultiRepository.NetworkRepositories = append(r.MultiRepository.NetworkRepositories, otherRepository)
-	return nil
-}
-
-// GetControllerRepositories returns the repositories that serve as the
-// controllers for the networks the current repository is a part of.
-func (r *RootMetadata) GetControllerRepositories() []tuf.OtherRepository {
-	if r.MultiRepository == nil {
-		return nil
-	}
-
-	return r.MultiRepository.GetControllerRepositories()
-}
-
-// GetNetworkRepositories returns the repositories that are part of the network
-// for which the current repository is a controller. IsController must return
-// true for this to be set.
-func (r *RootMetadata) GetNetworkRepositories() []tuf.OtherRepository {
-	if r.MultiRepository == nil {
-		return nil
-	}
-
-	return r.MultiRepository.GetNetworkRepositories()
-}
-
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage for tuf interfaces
@@ -647,7 +481,6 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		GitHubApps         map[string]*GitHubApp     `json:"githubApps,omitempty"`
 		GlobalRules        []json.RawMessage         `json:"globalRules,omitempty"`
 		Propagations       []json.RawMessage         `json:"propagations,omitempty"`
-		MultiRepository    *MultiRepository          `json:"multiRepository,omitempty"`
 		Hooks              map[tuf.HookStage][]*Hook `json:"hooks,omitempty"`
 	}
 
@@ -701,8 +534,6 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 
 		r.Propagations = append(r.Propagations, propagationDirective)
 	}
-
-	r.MultiRepository = temp.MultiRepository
 
 	r.Hooks = temp.Hooks
 
@@ -851,58 +682,6 @@ func NewPropagationDirective(name, upstreamRepository, upstreamReference, upstre
 		DownstreamReference: downstreamReference,
 		DownstreamPath:      downstreamPath,
 	}
-}
-
-type MultiRepository struct {
-	Controller             bool               `json:"controller"`
-	ControllerRepositories []*OtherRepository `json:"controllerRepositories,omitempty"`
-	NetworkRepositories    []*OtherRepository `json:"networkRepositories,omitempty"`
-}
-
-func (m *MultiRepository) IsController() bool {
-	return m.Controller
-}
-
-func (m *MultiRepository) GetControllerRepositories() []tuf.OtherRepository {
-	controllerRepositories := []tuf.OtherRepository{}
-	for _, repository := range m.ControllerRepositories {
-		controllerRepositories = append(controllerRepositories, repository)
-	}
-	return controllerRepositories
-}
-
-func (m *MultiRepository) GetNetworkRepositories() []tuf.OtherRepository {
-	if !m.Controller {
-		return nil
-	}
-
-	networkRepositories := []tuf.OtherRepository{}
-	for _, repository := range m.NetworkRepositories {
-		networkRepositories = append(networkRepositories, repository)
-	}
-	return networkRepositories
-}
-
-type OtherRepository struct {
-	Name                  string `json:"name"`
-	Location              string `json:"location"`
-	InitialRootPrincipals []*Key `json:"initialRootPrincipals"`
-}
-
-func (o *OtherRepository) GetName() string {
-	return o.Name
-}
-
-func (o *OtherRepository) GetLocation() string {
-	return o.Location
-}
-
-func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
-	initialRootPrincipals := []tuf.Principal{}
-	for _, key := range o.InitialRootPrincipals {
-		initialRootPrincipals = append(initialRootPrincipals, key)
-	}
-	return initialRootPrincipals
 }
 
 // AddHook adds the specified hook to the metadata.

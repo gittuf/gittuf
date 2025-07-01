@@ -4,11 +4,9 @@
 package trust
 
 import (
-	"github.com/gittuf/gittuf/internal/cmd/trust/addcontrollerrepository"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addhook"
-	"github.com/gittuf/gittuf/internal/cmd/trust/addnetworkrepository"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
@@ -18,7 +16,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
-	"github.com/gittuf/gittuf/internal/cmd/trust/makecontroller"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
@@ -47,11 +44,9 @@ func New() *cobra.Command {
 	o.AddPersistentFlags(cmd)
 
 	cmd.AddCommand(i.New(o))
-	cmd.AddCommand(addcontrollerrepository.New(o))
 	cmd.AddCommand(addgithubapp.New(o))
 	cmd.AddCommand(addglobalrule.New(o))
 	cmd.AddCommand(addhook.New(o))
-	cmd.AddCommand(addnetworkrepository.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addpropagationdirective.New(o))
 	cmd.AddCommand(addrootkey.New(o))
@@ -60,7 +55,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(inspectroot.New())
 	cmd.AddCommand(listhooks.New())
-	cmd.AddCommand(makecontroller.New(o))
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubapp.New(o))
 	cmd.AddCommand(removeglobalrule.New(o))

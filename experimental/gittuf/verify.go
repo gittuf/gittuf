@@ -199,11 +199,6 @@ func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef 
 	return needRSLSignature, nil
 }
 
-func (r *Repository) VerifyNetwork(ctx context.Context) error {
-	verifier := policy.NewPolicyVerifier(r.r)
-	return verifier.VerifyNetwork(ctx)
-}
-
 // verifyRefTip inspects the specified reference in the local repository to
 // check if it points to the expected Git object.
 func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) error {
