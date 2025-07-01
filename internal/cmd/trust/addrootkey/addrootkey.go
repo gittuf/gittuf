@@ -52,8 +52,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-root-key",
-		Short:             "Add Root key to gittuf root of trust",
+		Use:   "add-root-key",
+		Short: "Add Root key to gittuf root of trust",
+		Long:  `The 'add-root-key' command adds a new root key to the root of trust in a gittuf-secured repository. It requires a public key file via --root-key and a signing key via --signing-key. Optionally, the change can be recorded in the RSL.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

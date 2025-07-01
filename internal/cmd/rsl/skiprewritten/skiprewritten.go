@@ -24,8 +24,20 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "skip-rewritten",
-		Short:             "Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref",
+		Use:   "skip-rewritten",
+		Short: "Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref",
+		Long: `The 'skip-rewritten' command adds an RSL annotation to skip reference entries
+that point to commits no longer present in the given Git reference.
+
+This is useful when the history of a branch has been rewritten and some RSL entries
+refer to commits that no longer exist.
+
+It takes exactly one argument: the Git reference to check against.
+
+Example:
+
+  gittuf trust skip-rewritten main`,
+
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
