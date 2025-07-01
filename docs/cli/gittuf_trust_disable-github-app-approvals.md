@@ -2,6 +2,10 @@
 
 Mark GitHub app approvals as untrusted henceforth
 
+### Synopsis
+
+The 'disable-github-app-approvals' command revokes a GitHub App's ability to approve changes by marking it untrusted in the trust policy.
+
 ```
 gittuf trust disable-github-app-approvals [flags]
 ```

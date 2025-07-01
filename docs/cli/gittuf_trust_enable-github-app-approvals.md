@@ -2,6 +2,10 @@
 
 Mark GitHub app approvals as trusted henceforth
 
+### Synopsis
+
+The 'enable-github-app-approvals' command marks a GitHub App as trusted, allowing it to approve protected operations under the repository's trust policy.
+
 ```
 gittuf trust enable-github-app-approvals [flags]
 ```
