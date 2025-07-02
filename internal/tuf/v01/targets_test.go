@@ -394,6 +394,16 @@ func TestRemoveRule(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
 }
 
+func TestUpdatePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	// Test updating non-existent principal
+	err := targetsMetadata.UpdatePrincipal(key1)
+	assert.ErrorIs(t, err, tuf.ErrInvalidOperationForMetadataVersion)
+}
+
 func TestGetPrincipals(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))

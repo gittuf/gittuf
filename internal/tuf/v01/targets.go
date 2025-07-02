@@ -230,6 +230,14 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addKey(principal)
 }
 
+// UpdatePrincipal is not a valid operation for tufv01 metadata, as principals
+// were introduced in tufv02. For keys in tufv01, we only support adding new
+// ones and removing existing ones.
+func (t *TargetsMetadata) UpdatePrincipal(_ tuf.Principal) error {
+	return tuf.ErrInvalidOperationForMetadataVersion
+}
+
+// RemovePrincipal removes a principal from the metadata.
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
 }
