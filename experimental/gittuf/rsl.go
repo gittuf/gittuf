@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -869,29 +870,41 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 		controllerRepositories = upstreamControllerRepositories
 	}
 
+	errs := []error{}
+	waitGroup := sync.WaitGroup{}
 	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
-		slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", upstreamRepositoryURL))
-		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
+		waitGroup.Add(1)
+		do := func() {
+			defer waitGroup.Done()
+			slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", upstreamRepositoryURL))
+			upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
+			if err != nil {
+				errs = append(errs, err)
+			}
+			defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
 
-		fetchReferences := set.NewSetFromItems(rsl.Ref)
-		for _, directive := range directives {
-			fetchReferences.Add(directive.GetUpstreamReference())
-		}
+			fetchReferences := set.NewSetFromItems(rsl.Ref)
+			for _, directive := range directives {
+				fetchReferences.Add(directive.GetUpstreamReference())
+			}
 
-		upstreamRepository, err := gitinterface.CloneAndFetchRepository(upstreamRepositoryURL, upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
-		if err != nil {
-			// TODO: we see this error when required upstream ref isn't found, handle gracefully?
-			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
-		}
+			upstreamRepository, err := gitinterface.CloneAndFetchRepository(upstreamRepositoryURL, upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
+			if err != nil {
+				// TODO: we see this error when required upstream ref isn't found, handle gracefully?
+				errs = append(errs, fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err))
+			}
 
-		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
-			// TODO: atomic? abort?
-			return err
+			if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+				// TODO: atomic? abort?
+				errs = append(errs, err)
+			}
 		}
+		go do()
+	}
+
+	waitGroup.Wait()
+	if len(errs) != 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
