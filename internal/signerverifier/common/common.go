@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package common
+package common //nolint:revive
 
 import (
 	"crypto/x509"
