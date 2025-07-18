@@ -222,6 +222,16 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
+// GetTeams returns an error as teams are not enabled in v01
+func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
+	return nil, fmt.Errorf("v01 does not implement teams")
+}
+
+// RemoveTeams returns an error as teams are not enabled in v01
+func (t *TargetsMetadata) RemoveTeam(teamID string) error{
+	return fmt.Errorf("v01 does not implement teams")
+} 
+
 // AddPrincipal adds a principal to the metadata.
 //
 // TODO: this isn't associated with a specific rule; with the removal of
@@ -232,6 +242,10 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
+}
+
+func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
+	return fmt.Errorf("v01 does not implement Teams")
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets

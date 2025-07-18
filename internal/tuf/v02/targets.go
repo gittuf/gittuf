@@ -228,6 +228,14 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
+func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
+	teams := map[string]tuf.Team{}
+	for id, team := range t.Delegations.Teams {
+		teams[id] = team
+	}
+	return teams, nil
+}
+
 // AddPrincipal adds a principal to the metadata.
 //
 // TODO: this isn't associated with a specific rule; with the removal of
@@ -241,11 +249,21 @@ func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removePrincipal(principalID)
 }
 
+//RemoveTeam removes a team from the metadata.
+func (t *TargetsMetadata) RemoveTeam(teamID string) error{
+	return t.Delegations.removeTeam(teamID)
+}
+// AddTeam adds a team to the metadata.
+func (t *TargetsMetadata) AddTeam(teamID string, principals []tuf.Principal, threshold int) error {
+	return t.Delegations.addTeam(teamID, principals, threshold)
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
 	Principals map[string]tuf.Principal `json:"principals"`
-	Roles      []*Delegation            `json:"roles"`
+	Teams      map[string]tuf.Team
+	Roles      []*Delegation `json:"roles"`
 }
 
 func (d *Delegations) UnmarshalJSON(data []byte) error {
@@ -333,6 +351,36 @@ func (d *Delegations) removePrincipal(principalID string) error {
 	return nil
 }
 
+// removeTeam removes a delegations team. 
+func (d *Delegations) removeTeam(teamID string) error{
+	if d.Teams == nil{
+		return tuf.ErrTeamNotFound
+	}
+	if teamID == ""{
+		return tuf.ErrInvalidTeamID
+	}
+	for _, curRole := range d.Roles {
+		if curRole.GetTeamIDs() != nil && curRole.GetPrincipalIDs().Has(teamID) {
+			return tuf.ErrTeamStillInUse
+		}
+	}
+	delete(d.Teams, teamID)
+	return nil
+}
+
+func (d *Delegations) addTeam(teamID string, principals []tuf.Principal, threshold int) error {
+	if d.Teams == nil {
+		d.Teams = map[string]tuf.Team{}
+	}
+	team := &Team{
+		TeamID:     teamID,
+		Principals: principals,
+		Threshold:  threshold,
+	}
+	d.Teams[teamID] = team
+	return nil
+}
+
 // AllowRule returns the default, last rule for all policy files.
 func AllowRule() *Delegation {
 	return &Delegation{
@@ -376,6 +424,12 @@ func (d *Delegation) Matches(target string) bool {
 // trusted by the rule.
 func (d *Delegation) GetPrincipalIDs() *set.Set[string] {
 	return d.PrincipalIDs
+}
+
+//GetTeamIDs returns the identifiers of the identifiers of the teams that are listed as 
+// trusted by the rule.
+func (d *Delegation) GetTeamIDs() *set.Set[string] {
+	return d.TeamIDs
 }
 
 // GetThreshold returns the threshold of principals that must approve to meet
