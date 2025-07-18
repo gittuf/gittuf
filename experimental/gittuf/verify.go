@@ -5,15 +5,20 @@ package gittuf
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/slsa"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified
@@ -27,8 +32,8 @@ var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does
 
 func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (
-		expectedTip gitinterface.Hash
-		err         error
+		verificationReport *policy.VerificationReport
+		err                error
 	)
 
 	options := &verifyopts.Options{}
@@ -63,9 +68,9 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		verificationReport, err = verifier.VerifyRef(ctx, refName)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		verificationReport, err = verifier.VerifyRefFull(ctx, refName)
 	}
 	if err != nil {
 		return err
@@ -73,11 +78,88 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, verificationReport.ExpectedTip); err != nil {
 		return err
 	}
 
 	slog.Debug("Verification successful!")
+
+	if options.GranularVSAsPath != "" || options.MetaVSAPath != "" {
+		slog.Debug("Generating verification summary attestation(s)...")
+
+		latestPolicy, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+		if err != nil {
+			return err
+		}
+		rootMetadata, err := latestPolicy.GetRootMetadata(false)
+		if err != nil {
+			return err
+		}
+
+		allAttestations, err := slsa.GenerateGranularVSAs(verificationReport, rootMetadata.GetRepositoryLocation())
+		if err != nil {
+			return err
+		}
+
+		if options.GranularVSAsPath != "" {
+			// Write attestation bundle to disk
+			envs := []string{}
+
+			for _, attestation := range allAttestations {
+				env, err := dsse.CreateEnvelope(attestation)
+				if err != nil {
+					return err
+				}
+
+				if options.VSASigner != nil {
+					env, err = dsse.SignEnvelope(ctx, env, options.VSASigner)
+					if err != nil {
+						return err
+					}
+				}
+
+				envBytes, err := json.Marshal(env)
+				if err != nil {
+					return err
+				}
+				envs = append(envs, string(envBytes))
+			}
+
+			jsonLines := strings.Join(envs, "\n")
+			if err := os.WriteFile(options.GranularVSAsPath, []byte(jsonLines), 0o600); err != nil {
+				return fmt.Errorf("error writing attestation bundle of all VSAs: %w", err)
+			}
+		}
+
+		if options.MetaVSAPath != "" {
+			metaVSA, err := slsa.GenerateMetaVSAFromGranularVSAs(allAttestations, rootMetadata.GetRepositoryLocation())
+			if err != nil {
+				return err
+			}
+
+			env, err := dsse.CreateEnvelope(metaVSA)
+			if err != nil {
+				return err
+			}
+
+			if options.VSASigner != nil {
+				env, err = dsse.SignEnvelope(ctx, env, options.VSASigner)
+				if err != nil {
+					return err
+				}
+			}
+
+			envBytes, err := json.Marshal(env)
+			if err != nil {
+				return err
+			}
+
+			if err := os.WriteFile(options.MetaVSAPath, envBytes, 0o600); err != nil {
+				return fmt.Errorf("error writing meta VSA: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -122,14 +204,14 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
 	verifier := policy.NewPolicyVerifier(r.r)
-	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
+	verificationReport, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
 		return err
 	}
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, verificationReport.ExpectedTip); err != nil {
 		return err
 	}
 
