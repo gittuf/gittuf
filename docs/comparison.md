@@ -1,20 +1,38 @@
 # Comparison: gittuf vs Guix vs sequoia-git
 
+# Comparison: gittuf vs Guix vs sequoia-git
+
 This document compares gittuf with other systems that integrate trust, signing, and verification into Git-based workflows.  
 The criteria below are directly based on [gittuf’s stated goals](https://gittuf.dev/goals.html).
 
-| Goal                                           | gittuf | Guix | sequoia-git |
-|-----------------------------------------------|--------|------|--------------|
-| Enforce trust for all Git refs                | ✅     | ❌   | ✅           |
-| Store trust metadata in Git                   | ✅     | ✅   | ✅           |
-| Make trust decisions based on policy          | ✅     | ❌   | ❌           |
-| Support decentralized and delegated trust     | ✅     | ❌   | ❌           |
+---
+
+## 📊 Comparison: Independent Policy Verification
+
+| Feature | gittuf | Guix | sequoia-git |
+|--------|:------:|:----:|:-----------:|
+| Enables verification independent of SCP | ✅ Policies & signatures stored in repo, verifiable by anyone with read access | ✅ Package reproducibility can be independently verified | ⚠️ Focuses mainly on commit signing; policy verification is limited |
+| Uses cryptographic signatures for commits/policies | ✅ Uses public key cryptography | ✅ Uses cryptographic hashes for reproducibility | ✅ Commit signing via OpenPGP |
+| Designed to prevent bypass if SCP is compromised | ✅ Metadata & policies in repo, SCP compromise doesn't break verification | ⚠️ Less direct; relies on reproducibility | ⚠️ Relies on SCP for policies; focuses mainly on signatures |
 
 ---
 
-**Legend:**
+## 🛡️ Comparison: Guardrails & Logs
 
-- ✅ = Fully supported  
-- ❌ = Not supported  
+| Feature | gittuf | Guix | sequoia-git |
+|--------|:------:|:----:|:-----------:|
+| Guardrails on who can update policies | ✅ Policy can require multiple approvals & use delegations | ⚠️ Maintainers control package definitions; no enforced multi-approval | ⚠️ No built-in guardrails beyond commit signing |
+| Append-only repository activity log | ✅ Append-only log synchronized across clones | ⚠️ Logs are outside core model | ⚠️ Logs rely on SCP or external tools |
+| Mitigates single point of failure | ✅ Requires multiple maintainers for policy changes | ⚠️ Maintainers still have direct control | ⚠️ Single signer/maintainer can override |
 
-> **Note:** These are the core goals of gittuf. RSL (Reference State Log) and other internal features support these foundational principles.
+---
+
+## ⚙️ Comparison: System Compatibility & Metadata
+
+| Feature | gittuf | Guix | sequoia-git |
+|--------|:------:|:----:|:-----------:|
+| Works with existing Git repos | ✅ Compatible with native Git objects & refs | ⚠️ Separate from Git; manages packages & builds | ✅ Extends Git via OpenPGP |
+| Compatible with popular tools (GitHub, GitLab) | ✅ SCP-agnostic; works alongside popular Git hosts | ⚠️ Not built for standard Git workflows | ✅ Works alongside existing platforms |
+| Supports multiple signing mechanisms | ✅ GPG, SSH, Sigstore | ✅ GPG | ✅ OpenPGP |
+
+---
