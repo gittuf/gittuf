@@ -42,13 +42,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "trust",
 		Short: "Tools for gittuf's root of trust",
-		Long: `The 'trust' command provides tools to manage gittuf's root of trust.
-
-It includes subcommands for initializing trust, adding or removing keys and rules,
-configuring GitHub App approvals, signing commits, and managing policy and repository settings.
-
-These commands enable fine-grained control over repository security and trust policies
-enforced through gittuf's RSL framework.`,
+		Long:  `The 'trust' command provides tools to manage gittuf's root of trust, including subcommands to initialize trust, add/remove keys and rules, configure GitHub App approvals, sign commits, and manage policy settings enforced through gittuf's RSL framework.`,
 
 		DisableAutoGenTag: true,
 	}
