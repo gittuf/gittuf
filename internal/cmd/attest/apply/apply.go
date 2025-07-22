@@ -40,7 +40,11 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Apply and push local attestations changes to remote repository",
-		RunE:  o.Run,
+		Long: `Apply local attestation changes to the Repository Signing Log (RSL).
+Optionally push those changes to a remote repository.
+Use '--local-only' to apply without pushing.`,
+
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 
