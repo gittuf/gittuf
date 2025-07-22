@@ -47,8 +47,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "enable-github-app-approvals",
-		Short:             "Mark GitHub app approvals as trusted henceforth",
+		Use:   "enable-github-app-approvals",
+		Short: "Mark GitHub app approvals as trusted henceforth",
+		Long:  `The 'enable-github-app-approvals' command marks a GitHub App as trusted, allowing it to approve protected operations under the repository's trust policy.`,
+
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
