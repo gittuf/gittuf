@@ -201,7 +201,7 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.S
 
 // UpdateHook updates a git hook in the repository's .git/hooks folder.
 // Existing hook files are not overwritten, unless force flag is set.
-func (r *Repository) UpdateHook(hookType HookType, content []byte, force bool) error {
+func (r *Repository) UpdateGitHook(hookType HookType, content []byte, force bool) error {
 	// TODO: rely on go-git to find .git folder, once
 	// https://github.com/go-git/go-git/issues/977 is available.
 	// Note, until then gittuf does not support separate git dir.
