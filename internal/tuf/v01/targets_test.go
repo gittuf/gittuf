@@ -421,3 +421,9 @@ func TestAllowRule(t *testing.T) {
 	assert.Empty(t, allowRule.KeyIDs)
 	assert.Equal(t, 1, allowRule.Threshold)
 }
+
+func TestAddTeam(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+	err := targetsMetadata.AddTeam("team1", []tuf.Principal{}, 1)
+	assert.Error(t, err)
+}
