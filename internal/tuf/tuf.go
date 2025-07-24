@@ -47,6 +47,7 @@ var (
 	ErrInvalidRootMetadata                             = errors.New("invalid root metadata")
 	ErrUnknownRootMetadataVersion                      = errors.New("unknown schema version for root metadata")
 	ErrUnknownTargetsMetadataVersion                   = errors.New("unknown schema version for rule file metadata")
+	ErrInvalidOperationForMetadataVersion              = errors.New("invalid operation for metadata version")
 	ErrPrimaryRuleFileInformationNotFoundInRoot        = errors.New("root metadata does not contain primary rule file information")
 	ErrGitHubAppInformationNotFoundInRoot              = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
 	ErrDuplicatedRuleName                              = errors.New("two rules with same name found in policy")
@@ -249,6 +250,9 @@ type TargetsMetadata interface {
 
 	// AddPrincipal adds a principal to the metadata.
 	AddPrincipal(principal Principal) error
+
+	// UpdatePrincipal updates an existing principal in the metadata.
+	UpdatePrincipal(principal Principal) error
 
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
