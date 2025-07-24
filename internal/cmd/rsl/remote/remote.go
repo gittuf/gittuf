@@ -12,8 +12,11 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "remote",
-		Short:             "Tools for managing remote RSLs",
+		Use:   "remote",
+		Short: "Tools for managing remote RSLs",
+		Long: `The 'remote' command groups subcommands for interacting with remote Repository Signing Log (RSL). 
+It includes tools to pull, push, and reconcile the local RSL with remote repositories.`,
+
 		DisableAutoGenTag: true,
 	}
 

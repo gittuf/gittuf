@@ -72,8 +72,12 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "record",
-		Short:             "Record latest state of a Git reference in the RSL",
+		Use:   "record",
+		Short: "Record latest state of a Git reference in the RSL",
+		Long: `The 'record' command adds a new entry to the Repository Signing Log (RSL) reflecting the latest state of a Git reference.
+It can override the reference name, skip duplicate checks, and choose to record locally or push to a remote.
+This helps keep the RSL up-to-date with important repository state changes.`,
+
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

@@ -23,8 +23,12 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "pull <remote>",
-		Short:             "Pull RSL from the specified remote",
+		Use:   "pull <remote>",
+		Short: "Pull RSL from the specified remote",
+		Long: `The 'pull' command downloads the Repository Signing Log (RSL) data from a specified remote.
+This ensures the local repository has up-to-date RSL entries reflecting trusted state from the remote.
+It requires exactly one argument: the name of the remote repository.`,
+
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

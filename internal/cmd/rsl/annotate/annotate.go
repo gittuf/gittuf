@@ -69,8 +69,12 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "annotate",
-		Short:             "Annotate prior RSL entries",
+		Use:   "annotate",
+		Short: "Annotate prior RSL entries",
+		Long: `The 'annotate' command adds annotations to prior entries in the Repository State Log (RSL).
+These annotations can mark entries to be skipped or add descriptive messages for auditing and review purposes.
+The command supports annotating entries locally or on a remote repository.`,
+
 		Args:              cobra.MinimumNArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

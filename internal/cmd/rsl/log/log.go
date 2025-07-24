@@ -27,8 +27,12 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "log",
-		Short:             "Display the repository's Reference State Log",
+		Use:   "log",
+		Short: "Display the repository's Reference State Log",
+		Long: `The 'log' command shows the entries in the repository's Repository Signing Log (RSL).
+The RSL tracks significant security-related events and changes in the repository.
+This log helps with auditing and reviewing the repository's trusted state over time.`,
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

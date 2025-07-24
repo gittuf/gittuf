@@ -23,8 +23,12 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "push <remote>",
-		Short:             "Push RSL to the specified remote",
+		Use:   "push <remote>",
+		Short: "Push RSL to the specified remote",
+		Long: `The 'push' command uploads local Repository Signing Log (RSL) entries to the specified remote.
+This ensures the remote repository has up-to-date trusted RSL data reflecting local repository state.
+It requires exactly one argument: the name of the remote repository.`,
+
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

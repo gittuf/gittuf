@@ -31,8 +31,12 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "propagate",
-		Short:             fmt.Sprintf("Propagate contents of remote repositories into local repository (developer mode only, set %s=1)", dev.DevModeKey),
+		Use:   "propagate",
+		Short: fmt.Sprintf("Propagate contents of remote repositories into local repository (developer mode only, set %s=1)", dev.DevModeKey),
+		Long: fmt.Sprintf(`The 'propagate' command copies RSL entries from upstream repositories into the local repository.
+This command is only available in developer mode (enable with %s=1).
+It helps simulate or test how upstream RSL changes affect the local repository.`, dev.DevModeKey),
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
