@@ -25,5 +25,11 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
+    - name: Install updated Git from PPA
+      if: runner.os == 'Linux'
+      run: |
+        sudo add-apt-repository ppa:git-core/ppa
+        sudo apt update
+        sudo apt install git    
     - name: Test
       run: go test -race -timeout 20m ./...

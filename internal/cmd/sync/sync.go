@@ -55,8 +55,14 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync [remoteName]",
 		Short: "Synchronize local references with remote references based on RSL",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  o.Run,
+<<<<<<< HEAD
+		
+=======
+		Long:  `The 'sync' command synchronizes local references with the remote references based on the RSL (Reference Signing Log). By default, it uses the 'origin' remote unless a different remote name is provided. If references have diverged, it prints the list of affected refs and suggests rerunning the command with --overwrite to apply remote changes. Use with caution: --overwrite may discard local changes.`,
+>>>>>>> ffb8afe (docs: update long descriptions based on reviewer suggestions)
+
+		Args: cobra.MaximumNArgs(1),
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 

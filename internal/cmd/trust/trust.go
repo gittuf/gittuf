@@ -41,8 +41,10 @@ import (
 func New() *cobra.Command {
 	o := &persistent.Options{}
 	cmd := &cobra.Command{
-		Use:               "trust",
-		Short:             "Tools for gittuf's root of trust",
+		Use:   "trust",
+		Short: "Tools for gittuf's root of trust",
+		Long:  `The 'trust' command provides tools to manage gittuf's root of trust, including subcommands to initialize trust, add/remove keys and rules, configure GitHub App approvals, sign commits, and manage policy settings enforced through gittuf's RSL framework.`,
+
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)
