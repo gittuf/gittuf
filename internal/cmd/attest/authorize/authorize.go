@@ -68,8 +68,12 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "authorize",
-		Short:             "Add or revoke reference authorization",
+		Use:   "authorize",
+		Short: "Add or revoke reference authorization",
+		Long: `Authorize or revoke permission to merge changes from one ref to another.
+Supports adding new authorizations or revoking existing ones.
+Use '--from-ref' to specify the source reference.`,
+
 		Args:              cobra.MinimumNArgs(1),
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
