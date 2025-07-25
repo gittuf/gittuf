@@ -13,6 +13,10 @@ and enforcement is not tied to your source control platform (SCP) or “forge”
 meaning any developer can independently verify that a repository’s changes
 followed the expected security policies. In other words, gittuf removes the
 forge as a single point of trust in the software supply chain!
+📊 A detailed [comparison](./docs/comparison.md) is available, showing how gittuf compares to other trust-based systems like Guix and sequoia-git across independent policy verification, guardrails, and system compatibility.
+
+
+
 
 gittuf is an incubating project at the [Open Source Security Foundation
 (OpenSSF)] as part of the [Supply Chain Integrity Working Group].
