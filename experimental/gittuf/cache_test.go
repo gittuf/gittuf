@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/cache"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/stretchr/testify/assert"
@@ -15,8 +14,6 @@ import (
 
 func TestPopulateCache(t *testing.T) {
 	t.Run("successful cache population", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
 		tmpDir := t.TempDir()
 		repo := createTestRepositoryWithPolicy(t, tmpDir)
 
@@ -52,8 +49,6 @@ func TestPopulateCache(t *testing.T) {
 	})
 
 	t.Run("successful repeated cache population", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
 		tmpDir := t.TempDir()
 		repo := createTestRepositoryWithPolicy(t, tmpDir)
 

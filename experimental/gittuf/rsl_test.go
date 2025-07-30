@@ -1070,8 +1070,6 @@ func TestPullRSL(t *testing.T) {
 }
 
 func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("single upstream repo", func(t *testing.T) {
 		// Create upstreamRepo
 		upstreamRepoLocation := t.TempDir()

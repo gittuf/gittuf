@@ -1,23 +1,21 @@
-## gittuf trust update-global-rule
+## gittuf trust update-propagation-directive
 
-Update an existing global rule in the root of trust
-
-### Synopsis
-
-This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified. Note that a global rule may only be updated with the same type of global rule, and changes to the type require removing and adding it again.
+Update propagation directive in the root of trust (developer mode only, set GITTUF_DEV=1)
 
 ```
-gittuf trust update-global-rule [flags]
+gittuf trust update-propagation-directive [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                       help for update-global-rule
-      --rule-name string           name of rule
-      --rule-pattern stringArray   patterns used to identify namespaces rule applies to
-      --threshold int              threshold of required valid signatures (default 1)
-      --type string                type of rule (threshold|block-force-pushes)
+      --from-path string         path in upstream reference to propagate contents from
+      --from-reference string    reference to propagate from in upstream repository
+      --from-repository string   location of upstream repository
+  -h, --help                     help for update-propagation-directive
+      --into-path string         path to propagate upstream contents into in downstream reference
+      --into-reference string    reference to propagate into in downstream repository
+      --name string              name of propagation directive
 ```
 
 ### Options inherited from parent commands

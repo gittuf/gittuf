@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Downgrade Git
-        run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.12 git-man=1:2.34.1-1ubuntu1.12
+        run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.15 git-man=1:2.34.1-1ubuntu1.15
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install Go
