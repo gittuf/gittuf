@@ -2,6 +2,10 @@
 
 Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref
 
+### Synopsis
+
+The 'skip-rewritten' command adds an RSL annotation to skip reference entries that point to commits no longer present in the given Git reference, useful when the history of a branch has been rewritten and some RSL entries refer to commits that no longer exist on the branch.
+
 ```
 gittuf rsl skip-rewritten [flags]
 ```
