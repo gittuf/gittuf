@@ -2,6 +2,10 @@
 
 Apply and push local attestations changes to remote repository
 
+### Synopsis
+
+The 'apply' command records the latest state of gittuf attestations in the RSL and pushes them to the remote repository. Pass '--local-only' to record the attestation locally without pushing upstream. Otherwise, you must supply the remote name as the first positional argument.
+
 ```
 gittuf attest apply [flags]
 ```
