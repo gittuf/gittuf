@@ -54,6 +54,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-root-key",
 		Short:             "Add Root key to gittuf root of trust",
+		Long:              `The 'add-root-key' command allows users to add a new root key to the repository's root of trust. This command facilitates the addition of an extra root key to the existing trusted root keys, enabling multiple root keys or key rotation.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

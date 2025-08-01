@@ -2,6 +2,10 @@
 
 Add Root key to gittuf root of trust
 
+### Synopsis
+
+The 'add-root-key' command allows users to add a new root key to the repository's root of trust. This command facilitates the addition of an extra root key to the existing trusted root keys, enabling multiple root keys or key rotation.
+
 ```
 gittuf trust add-root-key [flags]
 ```

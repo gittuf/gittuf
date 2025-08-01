@@ -2,6 +2,10 @@
 
 Synchronize local references with remote references based on RSL
 
+### Synopsis
+
+The 'sync' command synchronizes local references with the remote references based on the RSL (Reference State Log). By default, it uses the 'origin' remote unless a different remote name is provided. If references have diverged, it prints the list of affected refs and suggests rerunning the command with --overwrite to apply remote changes. Use with caution: --overwrite may discard local changes.
+
 ```
 gittuf sync [remoteName] [flags]
 ```
