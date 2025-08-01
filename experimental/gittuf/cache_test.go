@@ -74,3 +74,30 @@ func TestPopulateCache(t *testing.T) {
 		assert.Equal(t, currentCacheID, newCacheID)
 	})
 }
+
+func TestDeleteCache(t *testing.T) {
+	t.Run("successful cache deletion", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := createTestRepositoryWithPolicy(t, tmpDir)
+
+		err := repo.PopulateCache()
+		assert.Nil(t, err)
+
+		_, err = cache.LoadPersistentCache(repo.r)
+		assert.Nil(t, err)
+
+		err = repo.DeleteCache()
+		assert.Nil(t, err)
+
+		_, err = cache.LoadPersistentCache(repo.r)
+		assert.ErrorIs(t, err, cache.ErrNoPersistentCache)
+	})
+
+	t.Run("attempt to delete non-existent cache", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := createTestRepositoryWithPolicy(t, tmpDir)
+
+		err := repo.DeleteCache()
+		assert.ErrorIs(t, err, cache.ErrNoPersistentCache)
+	})
+}
