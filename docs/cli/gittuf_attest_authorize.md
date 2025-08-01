@@ -2,6 +2,10 @@
 
 Add or revoke reference authorization
 
+### Synopsis
+
+Authorize or revoke permission to merge changes from one ref to another. Use '--from-ref' to specify the source reference.
+
 ```
 gittuf attest authorize [flags]
 ```

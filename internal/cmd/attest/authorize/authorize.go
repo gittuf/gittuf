@@ -70,6 +70,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "authorize",
 		Short:             "Add or revoke reference authorization",
+		Long:              `Authorize or revoke permission to merge changes from one ref to another. Use '--from-ref' to specify the source reference.`,
 		Args:              cobra.MinimumNArgs(1),
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
