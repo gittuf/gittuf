@@ -425,6 +425,49 @@ func TestRemoveRule(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
 }
 
+func TestUpdatePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+
+	// Test updating non-existent principal
+	err := targetsMetadata.UpdatePrincipal(key1)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	// Add a principal and then update it
+	err = targetsMetadata.AddPrincipal(key1)
+	assert.Nil(t, err)
+	assert.Equal(t, key1, targetsMetadata.Delegations.Principals[key1.KeyID])
+
+	err = targetsMetadata.UpdatePrincipal(key2)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	// Test updating with nil principal
+	err = targetsMetadata.UpdatePrincipal(nil)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	// Test updating person
+	person1 := &Person{
+		PersonID: "jane.doe",
+		PublicKeys: map[string]*Key{
+			key1.KeyID: key1,
+		},
+	}
+	err = targetsMetadata.AddPrincipal(person1)
+	assert.Nil(t, err)
+
+	person2 := &Person{
+		PersonID: person1.PersonID,
+		PublicKeys: map[string]*Key{
+			key2.KeyID: key2,
+		},
+	}
+	err = targetsMetadata.UpdatePrincipal(person2)
+	assert.Nil(t, err)
+	assert.Equal(t, person2, targetsMetadata.Delegations.Principals[person1.PersonID])
+}
+
 func TestGetPrincipals(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 	key1 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))

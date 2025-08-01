@@ -236,6 +236,11 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 	return t.Delegations.addPrincipal(principal)
 }
 
+// UpdatePrincipal updates an existing principal in the metadata.
+func (t *TargetsMetadata) UpdatePrincipal(principal tuf.Principal) error {
+	return t.Delegations.updatePrincipal(principal)
+}
+
 // RemovePrincipal removes a principal from the metadata.
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removePrincipal(principalID)
@@ -308,6 +313,28 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 	switch principal := principal.(type) {
 	case *Key, *Person:
 		d.Principals[principal.ID()] = principal
+	default:
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	return nil
+}
+
+// updatePrincipal updates an existing principal in the metadata. v02 supports
+// Key and Person as principal types.
+func (d *Delegations) updatePrincipal(principal tuf.Principal) error {
+	if principal == nil {
+		return tuf.ErrInvalidPrincipalType
+	}
+
+	principalID := principal.ID()
+	if _, exists := d.Principals[principalID]; !exists {
+		return tuf.ErrPrincipalNotFound
+	}
+
+	switch principal := principal.(type) {
+	case *Key, *Person:
+		d.Principals[principalID] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType
 	}
