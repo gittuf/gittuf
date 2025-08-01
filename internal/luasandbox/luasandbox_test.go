@@ -6,6 +6,9 @@ package luasandbox
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -655,4 +658,89 @@ func TestAPIGitGetRemoteURL(t *testing.T) {
 	expectedValue := lua.LString(remoteURL)
 
 	assert.Equal(t, expectedValue, result)
+}
+
+func TestAPIGitGetStagedFilePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	emptyTreeID, _ := treeBuilder.WriteTreeFromEntries(nil)
+	_, _ = repo.Commit(emptyTreeID, "refs/heads/main", "init\n", true)
+
+	_ = os.MkdirAll(filepath.Join(tmpDir, "foo"), 0o755)
+	_ = os.WriteFile(filepath.Join(tmpDir, "foo", "bar.txt"), []byte("hello"), 0o644)
+	cmd := exec.Command("git", "-C", tmpDir, "add", "foo/bar.txt")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	environment, err := NewLuaEnvironment(testCtx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer environment.Cleanup()
+
+	script := `
+	local result = gitGetStagedFilePaths()
+	return result
+	`
+	err = environment.lState.DoString(script)
+	assert.Nil(t, err)
+
+	res := environment.lState.Get(-1)
+	environment.lState.Pop(1)
+
+	table := res.(*lua.LTable)
+	assert.Equal(t, 1, table.Len())
+	assert.Equal(t, lua.LString("foo/bar.txt"), table.Remove(1))
+}
+
+func TestAPIGitGetBlobID(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	blobV1, _ := repo.WriteBlob([]byte("v1"))
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	treeID, _ := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("s.txt", blobV1)})
+	_, _ = repo.Commit(treeID, "refs/heads/main", "init\n", true)
+
+	_ = os.WriteFile(filepath.Join(tmpDir, "s.txt"), []byte("v2"), 0o644)
+	cmd := exec.Command("git", "-C", tmpDir, "add", "s.txt")
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+
+	stagedBlob, err := repo.GetBlobID(":", "s.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	environment, err := NewLuaEnvironment(testCtx, repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer environment.Cleanup()
+
+	headScript := `
+	local result = gitGetBlobID("HEAD", "s.txt")
+	return result
+	`
+	err = environment.lState.DoString(headScript)
+	assert.Nil(t, err)
+
+	gotHead := environment.lState.Get(-1)
+	environment.lState.Pop(1)
+	assert.Equal(t, lua.LString(blobV1.String()), gotHead)
+
+	stageScript := `
+	local result = gitGetBlobID(":", "s.txt")
+	return result
+	`
+	err = environment.lState.DoString(stageScript)
+	assert.Nil(t, err)
+
+	gotStage := environment.lState.Get(-1)
+	environment.lState.Pop(1)
+	assert.Equal(t, lua.LString(stagedBlob.String()), gotStage)
 }
