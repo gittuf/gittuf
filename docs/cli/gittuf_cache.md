@@ -2,6 +2,10 @@
 
 Manage gittuf's caching functionality
 
+### Synopsis
+
+The 'cache' command group contains subcommands to manage gittuf's local persistent cache. This cache helps improve performance by storing metadata locally. The cache is local-only and is not synchronized with remote repositories.
+
 ### Options
 
 ```
