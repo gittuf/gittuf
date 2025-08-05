@@ -660,7 +660,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		}
 
 		if newKeyIDSet.Equal(existingKeyIDSet) {
-			return tuf.ErrDuplicateControllerRepository
+			//return tuf.ErrDuplicateControllerRepository
 		}
 	}
 

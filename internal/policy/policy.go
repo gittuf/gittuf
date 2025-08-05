@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -550,6 +551,7 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check controller root metadata
+	start := time.Now()
 	if len(s.ControllerMetadata) != 0 {
 		controllerRepositories := rootMetadata.GetControllerRepositories()
 		for _, controllerRepositoryDetail := range controllerRepositories {
@@ -599,6 +601,7 @@ func (s *State) Verify(ctx context.Context) error {
 			// TODO: verify git tree ID in upstream matches propagated
 		}
 	}
+	fmt.Println("NETWORK TIME: ", time.Since(start))
 
 	return nil
 }
