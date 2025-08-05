@@ -551,7 +551,6 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check controller root metadata
-	start := time.Now()
 	if len(s.ControllerMetadata) != 0 {
 		controllerRepositories := rootMetadata.GetControllerRepositories()
 		for _, controllerRepositoryDetail := range controllerRepositories {
@@ -563,10 +562,12 @@ func (s *State) Verify(ctx context.Context) error {
 			}
 			defer os.RemoveAll(tmpDir) //nolint:errcheck
 
+			start := time.Now()
 			controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
 			if err != nil {
 				return fmt.Errorf("unable to clone controller repository: %w", err)
 			}
+			fmt.Println("NETWORK TIME: ", time.Since(start))
 
 			// We need to LoadState() the state from which the root is derived
 			// For that, we need to know when it was propagated into this repository
@@ -601,7 +602,6 @@ func (s *State) Verify(ctx context.Context) error {
 			// TODO: verify git tree ID in upstream matches propagated
 		}
 	}
-	fmt.Println("NETWORK TIME: ", time.Since(start))
 
 	return nil
 }
