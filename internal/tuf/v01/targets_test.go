@@ -427,3 +427,15 @@ func TestAddTeam(t *testing.T) {
 	err := targetsMetadata.AddTeam("team1", []tuf.Principal{}, 1)
 	assert.Error(t, err)
 }
+
+func TestRemoveTeam(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+	err := targetsMetadata.RemoveTeam("team1")
+	assert.Error(t, err)
+}
+
+func TestGetTeams(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+	_, err := targetsMetadata.GetTeams()
+	assert.Error(t, err)
+}

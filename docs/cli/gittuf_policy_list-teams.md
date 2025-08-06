@@ -4,7 +4,7 @@ List teams for the current policy in the specified rule file
 
 ### Synopsis
 
-The 'list-teams' command lists all trusted teams and their principals defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'list-teams' command lists all trusted teams defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
 gittuf policy list-teams [flags]

@@ -222,15 +222,20 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
-// GetTeams returns an error as teams are not enabled in v01
+// GetTeams is not supported in v01 metadata.
 func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
-	return nil, fmt.Errorf("v01 does not implement teams")
+	return nil, tuf.ErrMetadataVersionDoesNotSupportTeams
 }
 
-// RemoveTeams returns an error as teams are not enabled in v01
-func (t *TargetsMetadata) RemoveTeam(teamID string) error{
-	return fmt.Errorf("v01 does not implement teams")
-} 
+// AddTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// RemoveTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) RemoveTeam(teamID string) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
 
 // AddPrincipal adds a principal to the metadata.
 //
@@ -242,10 +247,6 @@ func (t *TargetsMetadata) AddPrincipal(principal tuf.Principal) error {
 
 func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removeKey(principalID)
-}
-
-func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
-	return fmt.Errorf("v01 does not implement Teams")
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets

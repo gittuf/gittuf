@@ -228,6 +228,7 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
+// GetTeams returns all the teams in the metadata.
 func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
 	teams := map[string]tuf.Team{}
 	for id, team := range t.Delegations.Teams {
@@ -249,13 +250,14 @@ func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 	return t.Delegations.removePrincipal(principalID)
 }
 
-//RemoveTeam removes a team from the metadata.
-func (t *TargetsMetadata) RemoveTeam(teamID string) error{
-	return t.Delegations.removeTeam(teamID)
-}
 // AddTeam adds a team to the metadata.
 func (t *TargetsMetadata) AddTeam(teamID string, principals []tuf.Principal, threshold int) error {
 	return t.Delegations.addTeam(teamID, principals, threshold)
+}
+
+// RemoveTeam removes a team from the metadata.
+func (t *TargetsMetadata) RemoveTeam(teamID string) error {
+	return t.Delegations.removeTeam(teamID)
 }
 
 // Delegations defines the schema for specifying delegations in TUF's Targets
@@ -351,23 +353,6 @@ func (d *Delegations) removePrincipal(principalID string) error {
 	return nil
 }
 
-// removeTeam removes a delegations team. 
-func (d *Delegations) removeTeam(teamID string) error{
-	if d.Teams == nil{
-		return tuf.ErrTeamNotFound
-	}
-	if teamID == ""{
-		return tuf.ErrInvalidTeamID
-	}
-	for _, curRole := range d.Roles {
-		if curRole.GetTeamIDs() != nil && curRole.GetPrincipalIDs().Has(teamID) {
-			return tuf.ErrTeamStillInUse
-		}
-	}
-	delete(d.Teams, teamID)
-	return nil
-}
-
 func (d *Delegations) addTeam(teamID string, principals []tuf.Principal, threshold int) error {
 	if d.Teams == nil {
 		d.Teams = map[string]tuf.Team{}
@@ -378,6 +363,25 @@ func (d *Delegations) addTeam(teamID string, principals []tuf.Principal, thresho
 		Threshold:  threshold,
 	}
 	d.Teams[teamID] = team
+	return nil
+}
+
+func (d *Delegations) removeTeam(teamID string) error {
+	if d.Teams == nil {
+		return tuf.ErrTeamNotFound
+	}
+	if teamID == "" {
+		return tuf.ErrInvalidTeamID
+	}
+	if _, ok := d.Teams[teamID]; !ok {
+		return tuf.ErrTeamNotFound
+	}
+	for _, curRole := range d.Roles {
+		if curRole.GetTeamIDs() != nil && curRole.GetPrincipalIDs().Has(teamID) {
+			return tuf.ErrTeamStillInUse
+		}
+	}
+	delete(d.Teams, teamID)
 	return nil
 }
 
@@ -426,7 +430,7 @@ func (d *Delegation) GetPrincipalIDs() *set.Set[string] {
 	return d.PrincipalIDs
 }
 
-//GetTeamIDs returns the identifiers of the identifiers of the teams that are listed as 
+// GetTeamIDs returns the identifiers of the identifiers of the teams that are listed as
 // trusted by the rule.
 func (d *Delegation) GetTeamIDs() *set.Set[string] {
 	return d.TeamIDs

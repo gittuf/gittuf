@@ -36,12 +36,11 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
-* [gittuf policy list-teams](gittuf_policy_list-teams.md)    - List teams for the current policy in the specified rule file
+* [gittuf policy list-teams](gittuf_policy_list-teams.md)	 - List teams for the current policy in the specified rule file
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
 * [gittuf policy remove-key](gittuf_policy_remove-key.md)	 - Remove a key from a policy file
 * [gittuf policy remove-person](gittuf_policy_remove-person.md)	 - Remove a person from a policy file
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
-* [gittuf policy remove-team](gittuf_policy_remove-team.md)  - Remove team from a policy file
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
 * [gittuf policy stage](gittuf_policy_stage.md)	 - Stage and push local policy-staging changes to remote repository

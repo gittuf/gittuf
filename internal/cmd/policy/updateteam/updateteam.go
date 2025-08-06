@@ -1,26 +1,23 @@
-
 package updateteam
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	p                *persistent.Options
-	policyName       string
-	teamID           string
-	addPersonIDs     []string
-	removePersonIDs  []string
-	threshold        int
+	p               *persistent.Options
+	policyName      string
+	teamID          string
+	addPersonIDs    []string
+	removePersonIDs []string
+	threshold       int
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {

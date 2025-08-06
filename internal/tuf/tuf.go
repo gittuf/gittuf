@@ -56,9 +56,10 @@ var (
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
 	ErrPrincipalStillInUse                             = errors.New("principal is still in use")
-	ErrInvalidTeamID								   = errors.New("team ID is invalid")
-	ErrTeamNotFound									   = errors.New("team not found")
-	ErrTeamStillInUse								   = errors.New("team is still in use")
+	ErrMetadataVersionDoesNotSupportTeams              = errors.New("the tuf metadata version v01 does not implement teams")
+	ErrInvalidTeamID                                   = errors.New("team ID is invalid")
+	ErrTeamNotFound                                    = errors.New("team not found")
+	ErrTeamStillInUse                                  = errors.New("team is still in use")
 	ErrRuleNotFound                                    = errors.New("cannot find rule entry")
 	ErrMissingRules                                    = errors.New("some rules are missing")
 	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
@@ -87,11 +88,11 @@ type Principal interface {
 	CustomMetadata() map[string]string
 }
 
- type Team interface {
- 	ID() string
- 	GetPrincipals() []Principal
- 	GetThreshold() int
- }
+type Team interface {
+	ID() string
+	GetPrincipals() []Principal
+	GetThreshold() int
+}
 
 // RootMetadata represents the root of trust metadata for gittuf.
 type RootMetadata interface {
@@ -265,11 +266,11 @@ type TargetsMetadata interface {
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
 
-	//RemoveTeam removes a team from the metadata
-	RemoveTeam(teamID string) error
-
 	// AddTeam adds a team to the metadata.
 	AddTeam(teamID string, principals []Principal, threshold int) error
+
+	// RemoveTeam removes a team from the metadata.
+	RemoveTeam(teamID string) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
