@@ -872,6 +872,7 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 
 	errs := []error{}
 	waitGroup := sync.WaitGroup{}
+	upstreamRepositories := []*gitinterface.Repository{}
 	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
 		waitGroup.Add(1)
 		do := func() {
@@ -894,15 +895,20 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 				errs = append(errs, fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err))
 			}
 
-			if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
-				// TODO: atomic? abort?
-				errs = append(errs, err)
-			}
+			upstreamRepositories = append(upstreamRepositories, upstreamRepository)
 		}
 		go do()
 	}
 
 	waitGroup.Wait()
+
+	for _, upstreamRepository := range upstreamRepositories {
+		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+			// TODO: atomic? abort?
+			errs = append(errs, err)
+		}
+	}
+
 	if len(errs) != 0 {
 		return errors.Join(errs...)
 	}
