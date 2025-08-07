@@ -9,9 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
@@ -551,60 +549,60 @@ func (s *State) Verify(ctx context.Context) error {
 	}
 
 	// Check controller root metadata
-	var totalTime time.Time
-	if len(s.ControllerMetadata) != 0 {
-		controllerRepositories := rootMetadata.GetControllerRepositories()
-		for _, controllerRepositoryDetail := range controllerRepositories {
-			controllerName := controllerRepositoryDetail.GetName()
-
-			tmpDir, err := os.MkdirTemp("", fmt.Sprintf("gittuf-controller-%s-", controllerName))
-			if err != nil {
-				return fmt.Errorf("unable to clone controller repository: %w", err)
-			}
-			defer os.RemoveAll(tmpDir) //nolint:errcheck
-
-			start := time.Now()
-			controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
-			if err != nil {
-				return fmt.Errorf("unable to clone controller repository: %w", err)
-			}
-			fmt.Println("NETWORK TIME: ", time.Since(start))
-			totalTime = totalTime.Add(time.Since(start))
-
-			// We need to LoadState() the state from which the root is derived
-			// For that, we need to know when it was propagated into this repository
-			upstreamEntryID := gitinterface.ZeroHash
-			if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
-				// Check this entry
-				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
-					upstreamEntryID = entry.UpstreamEntryID
-				}
-			}
-			if upstreamEntryID.IsZero() {
-				// not found yet
-				// find propagation entry in local repo
-				propagationEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(s.repository, rsl.BeforeEntryID(s.loadedEntry.GetID()), rsl.IsPropagationEntryForRepository(controllerRepositoryDetail.GetLocation()), rsl.ForReference(PolicyRef))
-				if err != nil {
-					return fmt.Errorf("%w, unable to verify controller repository: %w", ErrControllerMetadataNotVerified, err)
-				}
-				// We know propagationEntry is of this type because of the rsl.IsPropagationEntryForReference opt
-				upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
-			}
-
-			upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
-			if err != nil {
-				return err
-			}
-
-			// LoadState does full verification up until the requested entry
-			if _, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), policyopts.WithInitialRootPrincipals(controllerRepositoryDetail.GetInitialRootPrincipals())); err != nil {
-				return fmt.Errorf("%w, unable to verify root of trust for controller '%s': %w", ErrControllerMetadataNotVerified, controllerName, err)
-			}
-
-			// TODO: verify git tree ID in upstream matches propagated
-		}
-	}
-	fmt.Println("TOTAL NETWORK TIME: ", totalTime)
+	//var totalTime time.Time
+	//if len(s.ControllerMetadata) != 0 {
+	//	controllerRepositories := rootMetadata.GetControllerRepositories()
+	//	for _, controllerRepositoryDetail := range controllerRepositories {
+	//		controllerName := controllerRepositoryDetail.GetName()
+	//
+	//		tmpDir, err := os.MkdirTemp("", fmt.Sprintf("gittuf-controller-%s-", controllerName))
+	//		if err != nil {
+	//			return fmt.Errorf("unable to clone controller repository: %w", err)
+	//		}
+	//		defer os.RemoveAll(tmpDir) //nolint:errcheck
+	//
+	//		start := time.Now()
+	//		controllerRepository, err := gitinterface.CloneAndFetchRepository(controllerRepositoryDetail.GetLocation(), tmpDir, "", []string{PolicyRef, rsl.Ref}, true)
+	//		if err != nil {
+	//			return fmt.Errorf("unable to clone controller repository: %w", err)
+	//		}
+	//		fmt.Println("NETWORK TIME: ", time.Since(start))
+	//		totalTime = totalTime.Add(time.Since(start))
+	//
+	//		// We need to LoadState() the state from which the root is derived
+	//		// For that, we need to know when it was propagated into this repository
+	//		upstreamEntryID := gitinterface.ZeroHash
+	//		if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
+	//			// Check this entry
+	//			if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
+	//				upstreamEntryID = entry.UpstreamEntryID
+	//			}
+	//		}
+	//		if upstreamEntryID.IsZero() {
+	//			// not found yet
+	//			// find propagation entry in local repo
+	//			propagationEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(s.repository, rsl.BeforeEntryID(s.loadedEntry.GetID()), rsl.IsPropagationEntryForRepository(controllerRepositoryDetail.GetLocation()), rsl.ForReference(PolicyRef))
+	//			if err != nil {
+	//				return fmt.Errorf("%w, unable to verify controller repository: %w", ErrControllerMetadataNotVerified, err)
+	//			}
+	//			// We know propagationEntry is of this type because of the rsl.IsPropagationEntryForReference opt
+	//			upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
+	//		}
+	//
+	//		upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
+	//		if err != nil {
+	//			return err
+	//		}
+	//
+	//		// LoadState does full verification up until the requested entry
+	//		if _, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), policyopts.WithInitialRootPrincipals(controllerRepositoryDetail.GetInitialRootPrincipals())); err != nil {
+	//			return fmt.Errorf("%w, unable to verify root of trust for controller '%s': %w", ErrControllerMetadataNotVerified, controllerName, err)
+	//		}
+	//
+	//		// TODO: verify git tree ID in upstream matches propagated
+	//	}
+	//}
+	//fmt.Println("TOTAL NETWORK TIME: ", totalTime)
 
 	return nil
 }
