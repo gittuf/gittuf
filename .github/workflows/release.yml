@@ -19,7 +19,7 @@ jobs:
           go-version: '1.24'
           cache: true
       - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159
-      - uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552
+      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
           version: latest
           args: release --clean
