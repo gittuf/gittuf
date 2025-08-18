@@ -78,15 +78,15 @@ type Team struct {
 	Threshold  int
 }
 
-func (t *Team) ID() string{
+func (t *Team) ID() string {
 	return t.TeamID
-} 
+}
 
-func (t *Team) GetPrincipals() []tuf.Principal{
+func (t *Team) GetPrincipals() []tuf.Principal {
 	return t.Principals
 }
 
-func (t *Team) GetThreshold() int{
+func (t *Team) GetThreshold() int {
 	return t.Threshold
 }
 

@@ -53,8 +53,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 				fmt.Printf(strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType)
 			}
 		}
-
 	}
+
 	return nil
 }
 

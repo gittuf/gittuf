@@ -233,7 +233,7 @@ func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
 }
 
 // RemoveTeam is not supported in v01 metadata.
-func (t *TargetsMetadata) RemoveTeam(teamID string) error {
+func (t *TargetsMetadata) RemoveTeam(_ string) error {
 	return tuf.ErrMetadataVersionDoesNotSupportTeams
 }
 

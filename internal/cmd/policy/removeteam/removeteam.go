@@ -1,4 +1,5 @@
 package removeteam
+
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
@@ -11,7 +12,7 @@ import (
 type options struct {
 	p          *persistent.Options
 	policyName string
-	teamID   string
+	teamID     string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
