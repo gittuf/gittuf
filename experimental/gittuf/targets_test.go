@@ -405,55 +405,57 @@ func TestAddTeamToTargets(t *testing.T) {
 	assert.Equal(t, 1, len(teams))
 }
 
-// TODO
-// func TestRemoveTeamFromTargets(t *testing.T) {
-// 	r := createTestRepositoryWithPolicy(t, "")
+func TestRemoveTeamFromTargets(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
 
-// 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-// 	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
-// 	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-// 	authorizedKeysBytes := []tuf.Principal{targetsPubKey, gpgKey}
+	authorizedKeysBytes := []tuf.Principal{targetsPubKey, gpgKey}
 
-// 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
-// 	assert.Nil(t, err)
-// 	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
-// 	assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
+	assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
 
-// 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
-// 	assert.Nil(t, err)
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
+	assert.Nil(t, err)
 
-// 	err = r.AddTeamToTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team1", []string{targetsPubKey.KeyID, gpgKey.KeyID}, 1, false)
-// 	assert.Nil(t, err)
+	err = r.AddTeamToTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team1", []string{targetsPubKey.KeyID, gpgKey.KeyID}, 1, false)
+	assert.Nil(t, err)
 
-// 	err = r.RemoveTeamFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team1", false)
-// 	assert.NotNil(t, err)
+	err = r.RemoveTeamFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team1", false)
+	assert.Nil(t, err)
 
-// 	err = r.StagePolicy(testCtx, "", true, false)
-// 	require.Nil(t, err)
+	err = r.RemoveTeamFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team2", false)
+	assert.ErrorIs(t, tuf.ErrTeamNotFound, err)
 
-// 	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
 
-// 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
-// 	assert.Nil(t, err)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	teams, err := targetsMetadata.GetTeams()
-// 	assert.Nil(t, err)
-// 	assert.Equal(t, 0, len(teams))
-// }
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	assert.Nil(t, err)
+
+	teams, err := targetsMetadata.GetTeams()
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(teams))
+}
 
 func TestSignTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
