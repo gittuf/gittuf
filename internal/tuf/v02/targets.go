@@ -264,8 +264,8 @@ func (t *TargetsMetadata) RemoveTeam(teamID string) error {
 // metadata.
 type Delegations struct {
 	Principals map[string]tuf.Principal `json:"principals"`
-	Teams      map[string]tuf.Team
-	Roles      []*Delegation `json:"roles"`
+	Teams      map[string]tuf.Team      `json:"teams"`
+	Roles      []*Delegation            `json:"roles"`
 }
 
 func (d *Delegations) UnmarshalJSON(data []byte) error {
@@ -273,6 +273,7 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 	// json.RawMessage in place of tuf.Principal
 	type tempType struct {
 		Principals map[string]json.RawMessage `json:"principals"`
+		Teams      map[string]json.RawMessage `json:"teams"`
 		Roles      []*Delegation              `json:"roles"`
 	}
 
@@ -311,6 +312,15 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 		}
 
 		return fmt.Errorf("unrecognized principal type '%s'", string(principalBytes))
+	}
+
+	d.Teams = make(map[string]tuf.Team)
+	for teamID, teamBytes := range temp.Teams {
+		team := &Team{}
+		if err := json.Unmarshal(teamBytes, team); err != nil {
+			return fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+		d.Teams[teamID] = team
 	}
 
 	d.Roles = temp.Roles
@@ -455,4 +465,50 @@ func (d *Delegation) IsLastTrustedInRuleFile() bool {
 // delegation.
 func (d *Delegation) GetProtectedNamespaces() []string {
 	return d.Paths
+}
+
+func (t *Team) UnmarshalJSON(b []byte) error {
+	type tempType struct {
+		TeamID     string            `json:"teamID"`
+		Principals []json.RawMessage `json:"principals"`
+		Threshold  int               `json:"threshold"`
+	}
+
+	tempTeam := &tempType{}
+	if err := json.Unmarshal(b, tempTeam); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	t.TeamID = tempTeam.TeamID
+	t.Threshold = tempTeam.Threshold
+	t.Principals = make([]tuf.Principal, 0, len(tempTeam.Principals))
+
+	for _, principalBytes := range tempTeam.Principals {
+		tempPrincipal := map[string]any{}
+		if err := json.Unmarshal(principalBytes, &tempPrincipal); err != nil {
+			return fmt.Errorf("unable to unmarshal json: %w", err)
+		}
+
+		if _, has := tempPrincipal["keyid"]; has {
+			key := &Key{}
+			if err := json.Unmarshal(principalBytes, key); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+			t.Principals = append(t.Principals, key)
+			continue
+		}
+
+		if _, has := tempPrincipal["personID"]; has {
+			person := &Person{}
+			if err := json.Unmarshal(principalBytes, person); err != nil {
+				return fmt.Errorf("unable to unmarshal json: %w", err)
+			}
+			t.Principals = append(t.Principals, person)
+			continue
+		}
+
+		return fmt.Errorf("unrecognized principal type '%s'", string(principalBytes))
+	}
+
+	return nil
 }

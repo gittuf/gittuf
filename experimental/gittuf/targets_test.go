@@ -383,10 +383,9 @@ func TestAddTeamToTargets(t *testing.T) {
 	err = r.AddTeamToTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team1", []string{targetsPubKey.KeyID, gpgKey.KeyID}, 1, false)
 	assert.Nil(t, err)
 
-	// TODO: uncomment later when bug is resolved
-	// err = r.AddTeamToTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team2", []string{"nonexistent-ID"}, 1, false)
-	// assert.NotNil(t, err)
-	// assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
+	err = r.AddTeamToTargets(testCtx, targetsSigner, policy.TargetsRoleName, "team2", []string{"nonexistent-ID"}, 1, false)
+	assert.NotNil(t, err)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
 
 	err = r.StagePolicy(testCtx, "", true, false)
 	require.Nil(t, err)
