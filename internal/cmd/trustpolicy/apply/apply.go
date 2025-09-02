@@ -40,7 +40,12 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Validate and apply changes from policy-staging to policy",
-		RunE:  o.Run,
+		Long: `Apply validates and promotes changes from 'policy-staging' to the active
+'policy' reference. By default, it also updates the remote repository. You may
+specify a remote name to target a specific remote. Use '--local-only' to apply
+changes only in the local repository without pushing to a remote.`,
+
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 

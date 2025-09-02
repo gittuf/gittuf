@@ -11,8 +11,12 @@ import (
 
 func New() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "remote",
-		Short:             "Tools for managing remote policies",
+		Use:   "remote",
+		Short: "Tools for managing remote policies",
+		Long: `The 'remote' command provides tools for synchronizing trust policies
+between the local repository and remotes. Use 'pull' to fetch policy updates
+from a remote, or 'push' to upload the local policy to a remote.`,
+
 		DisableAutoGenTag: true,
 	}
 

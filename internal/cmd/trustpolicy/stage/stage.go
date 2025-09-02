@@ -40,7 +40,13 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stage",
 		Short: "Stage and push local policy-staging changes to remote repository",
-		RunE:  o.Run,
+		Long: `Stage records local policy changes into 'policy-staging' for validation
+before they are applied to the active policy. By default, staged changes are
+also pushed to a remote repository. You may provide a remote name to target a
+specific remote, or use '--local-only' to stage changes only in the local
+repository.`,
+
+		RunE: o.Run,
 	}
 	o.AddFlags(cmd)
 

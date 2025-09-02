@@ -23,8 +23,12 @@ func (o *options) Run(_ *cobra.Command, args []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "push <remote>",
-		Short:             "Push policy to the specified remote",
+		Use:   "push <remote>",
+		Short: "Push policy to the specified remote",
+		Long: `Push uploads the local trust policy to the specified remote, ensuring the
+remote repository is updated with the latest policy state. The remote name must
+be provided as an argument.`,
+
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

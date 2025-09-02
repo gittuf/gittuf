@@ -24,8 +24,12 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
-		Use:               "discard",
-		Short:             "Discard the currently staged changes to policy",
+		Use:   "discard",
+		Short: "Discard the currently staged changes to policy",
+		Long: `Discard removes all staged changes from 'policy-staging' without applying
+them to the active 'policy' reference. This is useful if staged updates are no
+longer needed or should be reset before applying new changes.`,
+
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
