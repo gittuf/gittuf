@@ -456,6 +456,55 @@ func TestRemoveTeamFromTargets(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 0, len(teams))
 }
+func TestUpdatePrincipalInTargets(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	err = r.AddPrincipalToTargets(
+		testCtx,
+		targetsSigner,
+		policy.TargetsRoleName,
+		[]tuf.Principal{targetsPubKey, gpgKey},
+		false,
+	)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	err = r.UpdatePrincipalInTargets(
+		testCtx,
+		targetsSigner,
+		policy.TargetsRoleName,
+		[]tuf.Principal{gpgKey},
+		false,
+	)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	assert.Nil(t, err)
+
+	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
+	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.ID())
+}
+
 
 func TestSignTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
