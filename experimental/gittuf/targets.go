@@ -515,6 +515,96 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
+//
+// UpdatePrincipalInTargets loads the current policy state, finds the given
+// targets role, and replaces existing principals (matched by ID) with the
+// supplied updated principals. After applying the changes, it re-persists the
+// updated policy state, optionally creating an RSL entry and committing a
+// signed update.
+func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibdsse.SignerVerifier,targetsRoleName string, updatedPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option,) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured…")
+		if err := r.r.CanSign(); err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return fmt.Errorf("cannot get signer key ID: %w", err)
+	}
+
+	slog.Debug("Loading current policy state…")
+	state, err := policy.LoadCurrentState(
+		ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL(),
+	)
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current targets metadata…")
+	targetsMD, err := state.GetTargetsMetadata(targetsRoleName, true) // writable
+	if err != nil {
+		return err
+	}
+
+	var updatedIDs []string
+	for _, p := range updatedPrincipals {
+		id := strings.TrimSpace(p.ID())
+		updatedIDs = append(updatedIDs, id)
+
+		if replacer, ok := interface{}(targetsMD).(interface {
+			ReplacePrincipal(tuf.Principal) error
+		}); ok {
+			if err := replacer.ReplacePrincipal(p); err != nil {
+				return fmt.Errorf("cannot replace principal %q: %w", id, err)
+			}
+			continue
+		}
+
+		// Fallback: add first (so threshold not broken), then remove old copy
+		if err := targetsMD.AddPrincipal(p); err != nil {
+			return fmt.Errorf("cannot add principal %q: %w", id, err)
+		}
+		// If an old version of the same key existed under the same ID, remove it
+		_ = targetsMD.RemovePrincipal(id) // ignore "not found" error
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMD)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Signing updated targets metadata with key " + keyID)
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.Metadata.TargetsEnvelope = env
+	} else {
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	msg := fmt.Sprintf(
+		"Update principals in policy %q:\n%s",
+		targetsRoleName,
+		strings.Join(updatedIDs, "\n"),
+	)
+
+	slog.Debug("Committing updated policy…")
+	return state.Commit(r.r, msg, options.CreateRSLEntry, signCommit)
+}
+
 
 // AddTeamToTargets is the interface for a user to add a team definition
 // to gittuf rule file metadata.
