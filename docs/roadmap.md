@@ -10,20 +10,6 @@ already completed.
 
 ## Partial / Work in Progress
 
-### Reach Beta Milestone
-
-After sufficient dogfooding and testing, gittuf should be released as a beta. As
-a rule of thumb, post reaching beta, repositories should not have to
-reinitialize gittuf due to breaking changes or incompatibility in metadata
-formats.
-
-### Support Multi-repository Policies
-
-If gittuf operates only within the boundary of a single Git repository, scaling
-gittuf across thousands of repositories becomes impractical. gittuf must
-include mechanisms to enable reuse of gittuf policies across repositories so
-that policy management overhead is minimized.
-
 ### Support Developer Teams
 
 gittuf currently identifies each developer by their signing key or identity.
@@ -68,8 +54,6 @@ for the repository and adds a [status
 check](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/collaborating-on-repositories-with-code-quality-features/about-status-checks)
 to pull requests with the verification status.
 
-## Planned
-
 ### Read Permissions
 
 gittuf's design implements _write_ permission policies such as who can write to
@@ -77,6 +61,22 @@ a Git reference or a file. This must be accompanied by support for _read_
 permissions. This needs to be developed further as the feature can range from
 the ability to store secrets all the way to maintaining encrypted objects for
 certain Git references so only specific users can read that reference.
+
+### Programmable Policy Extensions
+
+gittuf implements write access control policies that pertain to whether changes
+were made to a namespace in a Git repository (i.e. validating that a commit
+on the main branch was created by an authorized person). However, other policies
+may be important to users of a Git repository, such as for example mandating
+that all commits have a DCO signoff. In these cases, gittuf should be able to
+allow repository administrators to configure more open-ended policies.
+
+[#765](https://github.com/gittuf/gittuf/pull/765) introduces the notion of a
+_Programmable Policy Extension (PPE)_. This draws inspiration from
+[Git hooks](https://git-scm.com/docs/githooks), but addresses many issues with
+Git hooks today, such as secure distribution and sandboxing of these programs.
+
+## Planned
 
 ### Develop Hash Algorithm Agility Extension
 
@@ -123,3 +123,17 @@ of the source track.
 Once gittuf achieves sufficient maturity, the gittuf source must be protected
 using gittuf. This will contribute significantly to the usability and further
 development of the tool, and will demonstrate its features and viability.
+
+### Reach Beta Milestone
+
+After sufficient dogfooding and testing, gittuf should be released as a beta. As
+a rule of thumb, post reaching beta, repositories should not have to
+reinitialize gittuf due to breaking changes or incompatibility in metadata
+formats.
+
+### Support Multi-repository Policies
+
+If gittuf operates only within the boundary of a single Git repository, scaling
+gittuf across thousands of repositories becomes impractical. gittuf must
+include mechanisms to enable reuse of gittuf policies across repositories so
+that policy management overhead is minimized.
