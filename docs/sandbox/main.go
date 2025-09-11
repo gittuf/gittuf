@@ -44,7 +44,14 @@ var (
 				"",
 			}
 			for _, api := range allAPIs {
-				allLines = append(allLines, fmt.Sprintf("## %s", api.GetName()))
+				if _, isGo := api.(*luasandbox.GoAPI); isGo {
+					allLines = append(allLines, fmt.Sprintf("## %s (Go)", api.GetName()))
+				} else if _, isLua := api.(*luasandbox.LuaAPI); isLua {
+					allLines = append(allLines, fmt.Sprintf("## %s (Lua)", api.GetName()))
+				} else {
+					return fmt.Errorf("unknown API type: %s", api.GetName())
+				}
+
 				allLines = append(allLines, "")
 				allLines = append(allLines, fmt.Sprintf("**Signature:** `%s`", api.GetSignature()))
 				allLines = append(allLines, "")
