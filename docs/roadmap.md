@@ -65,11 +65,11 @@ certain Git references so only specific users can read that reference.
 ### Programmable Policy Extensions
 
 gittuf implements write access control policies that pertain to whether changes
-were made to a namespace in a Git repository (i.e. validating that a commit
-on the main branch was created by an authorized person). However, other policies
-may be important to users of a Git repository, such as for example mandating
-that all commits have a DCO signoff. In these cases, gittuf should be able to
-allow repository administrators to configure more open-ended policies.
+were made to a namespace in a Git repository (i.e. validating that a commit on
+the main branch was created by an authorized person). However, other policies
+may be important to users of a Git repository, such as mandating that all
+commits have a DCO signoff. In these cases, gittuf should be able to allow
+repository administrators to configure more open-ended policies.
 
 [#765](https://github.com/gittuf/gittuf/pull/765) introduces the notion of a
 _Programmable Policy Extension (PPE)_. This draws inspiration from
