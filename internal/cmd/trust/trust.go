@@ -29,6 +29,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/setrepositorylocation"
 	"github.com/gittuf/gittuf/internal/cmd/trust/sign"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updateglobalrule"
+	"github.com/gittuf/gittuf/internal/cmd/trust/updatehook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepolicythreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updaterootthreshold"
@@ -74,6 +75,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(updateglobalrule.New(o))
+	cmd.AddCommand(updatehook.New(o))
 	cmd.AddCommand(updatepolicythreshold.New(o))
 	cmd.AddCommand(updatepropagationdirective.New(o))
 	cmd.AddCommand(updaterootthreshold.New(o))
