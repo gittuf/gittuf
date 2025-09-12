@@ -653,6 +653,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		var fixEntry *rsl.ReferenceEntry
 		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
 		newEntryQueue := []rsl.ReferenceUpdaterEntry{}
+	lookForFixes:
 		for len(entries) != 0 {
 			newEntry := entries[0]
 			entries = entries[1:]
@@ -695,7 +696,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					}
 				}
 				if fixed {
-					break
+					break lookForFixes
 				}
 
 				// newEntry is not tree-same / commit-same, so it is automatically
