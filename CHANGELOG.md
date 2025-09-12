@@ -2,6 +2,22 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.12.0
+
+### Added
+
+- Added CLI documentation for various commands
+- Added support for updating propagation directives
+- Added support for updating persons in gittuf metadata
+- Added support for resetting gittuf's persistent cache
+
+### Updated
+
+- Moved various functionality out of developer mode
+- Fixed issue with gittuf verification and propagation entries
+- Fixed color gittuf output in some environments
+- Updated various dependencies and CI workflows
+
 ## v0.11.0
 
 ### Added
