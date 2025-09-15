@@ -112,7 +112,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.UpdatePrincipalInTargets(cmd.Context(), signer, o.policyName, []tuf.Principal{person}, opts...)
+	return repo.UpdatePrincipalInTargets(cmd.Context(), signer, o.policyName, []tuf.Principal{person}, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
