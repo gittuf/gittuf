@@ -1,21 +1,21 @@
 ## gittuf policy remove-team
 
-Remove a team from a policy file
+Remove an entire team from a policy file
 
 ### Synopsis
 
 The 'remove-team' command removes the specified team from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
-gittuf policy remove-person [flags]
+gittuf policy remove-team [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                 help for remove-person
-      --team-ID string       team ID
+  -h, --help                 help for remove-team
       --policy-name string   name of policy file to remove team from (default "targets")
+      --team-ID string       team ID
 ```
 
 ### Options inherited from parent commands

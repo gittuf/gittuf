@@ -16,10 +16,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/removekey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removeperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/removeteam"
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/updateteam"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
@@ -50,12 +52,14 @@ func New() *cobra.Command {
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removekey.New(o))
 	cmd.AddCommand(removeperson.New(o))
+	cmd.AddCommand(removeteam.New(o))
 	cmd.AddCommand(removerule.New(o))
 	cmd.AddCommand(reorderrules.New(o))
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(tui.New(o))
 	cmd.AddCommand(updaterule.New(o))
+	cmd.AddCommand(updateteam.New(o))
 
 	return cmd
 }
