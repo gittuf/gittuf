@@ -8,14 +8,16 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
 
 type options struct {
-	latestOnly    bool
-	fromEntry     string
-	remoteRefName string
+	latestOnly         bool
+	fromEntry          string
+	remoteRefName      string
+	exportAttestations string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -41,6 +43,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of remote reference, if it differs from the local name",
 	)
+
+	cmd.Flags().StringVar(
+		&o.exportAttestations,
+		"export-attestations",
+		"",
+		"export to the specified directory all attestations used to perform verification",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -49,19 +58,37 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
+	if o.exportAttestations != "" {
+		opts = append(opts, verifyopts.WithExportAttestationsDirectory(o.exportAttestations))
+	}
+
+	var usedAttestations []*attestations.Attestations
+
 	if o.fromEntry != "" {
 		if !dev.InDevMode() {
 			return dev.ErrNotInDevMode
 		}
 
-		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, verifyopts.WithOverrideRefName(o.remoteRefName))
+		usedAttestations, err = repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, opts...)
+		if err != nil {
+			return err
+		}
 	}
 
-	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
 	if o.latestOnly {
 		opts = append(opts, verifyopts.WithLatestOnly())
 	}
-	return repo.VerifyRef(cmd.Context(), args[0], opts...)
+	usedAttestations, err = repo.VerifyRef(cmd.Context(), args[0], opts...)
+	if err != nil {
+		return err
+	}
+
+	if o.exportAttestations != "" {
+		fmt.Println(usedAttestations)
+	}
+
+	return nil
 }
 
 func New() *cobra.Command {

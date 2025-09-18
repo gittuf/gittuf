@@ -11,6 +11,7 @@ import (
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -25,10 +26,11 @@ import (
 // another is to create a new RSL entry for the current state.
 var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does not match latest RSL entry")
 
-func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
+func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) ([]*attestations.Attestations, error) {
 	var (
-		expectedTip gitinterface.Hash
-		err         error
+		expectedTip      gitinterface.Hash
+		usedAttestations []*attestations.Attestations
+		err              error
 	)
 
 	options := &verifyopts.Options{}
@@ -39,7 +41,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	slog.Debug("Identifying absolute reference path...")
 	refName, err = r.r.AbsoluteReference(refName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Track localRefName to check the expected tip as we may override refName
@@ -52,7 +54,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
 		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		refName = refNameOverride
@@ -63,27 +65,27 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		expectedTip, usedAttestations, err = verifier.VerifyRef(ctx, refName)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		expectedTip, usedAttestations, err = verifier.VerifyRefFull(ctx, refName)
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
 	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
-		return err
+		return nil, err
 	}
 
 	slog.Debug("Verification successful!")
-	return nil
+	return usedAttestations, nil
 }
 
-func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID string, opts ...verifyopts.Option) error {
+func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID string, opts ...verifyopts.Option) ([]*attestations.Attestations, error) {
 	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
+		return nil, dev.ErrNotInDevMode
 	}
 
 	options := &verifyopts.Options{}
@@ -96,12 +98,12 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 	slog.Debug("Identifying absolute reference path...")
 	refName, err = r.r.AbsoluteReference(refName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	entryIDHash, err := gitinterface.NewHash(entryID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Track localRefName to check the expected tip as we may override refName
@@ -114,7 +116,7 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
 		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		refName = refNameOverride
@@ -122,19 +124,23 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
 	verifier := policy.NewPolicyVerifier(r.r)
-	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
+	expectedTip, usedAttestations, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
 	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
-		return err
+		return nil, err
 	}
 
 	slog.Debug("Verification successful!")
-	return nil
+
+	if options.ExportAttestationsDirectory != "" {
+
+	}
+	return usedAttestations, nil
 }
 
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes

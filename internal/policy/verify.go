@@ -70,21 +70,22 @@ func NewPolicyVerifier(repo *gitinterface.Repository) *PolicyVerifier {
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, []*attestations.Attestations, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return gitinterface.ZeroHash, nil, err
 	}
 
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
+	usedAttestations, err := v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), usedAttestations, err
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, []*attestations.Attestations, error) {
 	// Trace RSL back to the start
 	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
 	var (
@@ -98,7 +99,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 		if entryNumber != 0 {
 			firstEntry, err = loadRSLReferenceUpdaterEntry(v.repo, entryID)
 			if err != nil {
-				return gitinterface.ZeroHash, err
+				return gitinterface.ZeroHash, nil, err
 			}
 
 			// break because we've loaded the entry and don't need to fallthrough
@@ -109,7 +110,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	case false:
 		firstEntry, _, err = rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, target)
 		if err != nil {
-			return gitinterface.ZeroHash, err
+			return gitinterface.ZeroHash, nil, err
 		}
 	}
 
@@ -117,41 +118,43 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return gitinterface.ZeroHash, nil, err
 	}
 
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
+	usedAttestations, err := v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), usedAttestations, err
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, []*attestations.Attestations, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return gitinterface.ZeroHash, nil, err
 	}
 
 	fromEntry, isRefEntry := fromEntryT.(*rsl.ReferenceEntry)
 	if !isRefEntry {
 		// TODO: we should instead find the latest reference entry
 		// before the entryID and use that
-		return gitinterface.ZeroHash, fmt.Errorf("starting entry is not an RSL reference entry")
+		return gitinterface.ZeroHash, nil, fmt.Errorf("starting entry is not an RSL reference entry")
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return gitinterface.ZeroHash, nil, err
 	}
 
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target)
+	usedAttestations, err := v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), usedAttestations, err
 }
 
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes
@@ -446,7 +449,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string) error {
+func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string) ([]*attestations.Attestations, error) {
 	/*
 		require firstEntry != nil
 		require lastEntry != nil
@@ -459,6 +462,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 	var (
 		currentPolicy       *State
+		allAttestations     []*attestations.Attestations
 		currentAttestations *attestations.Attestations
 		err                 error
 	)
@@ -469,13 +473,13 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	if err == nil {
 		state, err := LoadState(ctx, v.repo, initialPolicyEntry)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		currentPolicy = state
 	} else if !errors.Is(err, ErrPolicyNotFound) {
 		// Searcher gives us nil when firstEntry is the very first entry
 		// or close to it (i.e., before a policy was applied)
-		return err
+		return nil, err
 	}
 	// require currentPolicy != nil || parent(firstEntry) == nil
 
@@ -484,13 +488,14 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(v.repo, initialAttestationsEntry)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		currentAttestations = attestationsState
+		allAttestations = append(allAttestations, currentAttestations)
 	} else if !errors.Is(err, attestations.ErrAttestationsNotFound) {
 		// Attestations are not compulsory, so return err only
 		// if it's some other error
-		return err
+		return nil, err
 	}
 	// require currentAttestations != nil || (entry.Ref != attestations.Ref for entry in 0..firstEntry)
 
@@ -498,7 +503,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	slog.Debug("Identifying all entries in range...")
 	entries, annotations, err := rsl.GetReferenceUpdaterEntriesInRangeForRef(v.repo, firstEntry.GetID(), lastEntry.GetID(), target)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// require len(entries) != 0
 
@@ -533,7 +538,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 					newPolicy, err := loadStateForEntry(v.repo, entry)
 					if err != nil {
-						return err
+						return nil, err
 					}
 					// require newPolicy != nil
 
@@ -544,7 +549,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 						// refs
 						slog.Debug("Verifying new policy using current policy...")
 						if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
-							return err
+							return nil, err
 						}
 						slog.Debug("Updating current policy...")
 					} else {
@@ -564,10 +569,11 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				if entry.GetRefName() == attestations.Ref {
 					newAttestationsState, err := attestations.LoadAttestationsForEntry(v.repo, entry)
 					if err != nil {
-						return err
+						return nil, err
 					}
 
 					currentAttestations = newAttestationsState
+					allAttestations = append(allAttestations, currentAttestations)
 
 					if v.persistentCacheEnabled {
 						v.persistentCache.InsertAttestationEntryNumber(entry.GetNumber(), entry.GetID())
@@ -578,14 +584,14 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 				slog.Debug("Verifying changes...")
 				if currentPolicy == nil {
-					return ErrPolicyNotFound
+					return nil, ErrPolicyNotFound
 				}
 				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
 					slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
 					slog.Debug("Checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
 					if !entry.SkippedBy(annotations[entry.GetID().String()]) {
-						return err
+						return nil, err
 					}
 
 					// The invalid entry's been marked as skipped but we still need
@@ -596,7 +602,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 					if len(entries) == 0 {
 						// Fix entry does not exist after revoking annotation
-						return verificationErr
+						return nil, verificationErr
 					}
 				} else if v.persistentCacheEnabled {
 					// Verification has passed, add to cache
@@ -627,12 +633,12 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		slog.Debug("Identifying last valid state...")
 		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(invalidEntry.GetRefName()), rsl.BeforeEntryID(invalidEntry.GetID()), rsl.IsUnskipped(), rsl.IsReferenceEntry())
 		if err != nil {
-			return err
+			return nil, err
 		}
 		slog.Debug("Verifying identified last valid entry has not been revoked...")
 		if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
 			// this type assertion is fine because we use the rsl.IsReferenceEntry opt
-			return ErrLastGoodEntryIsSkipped
+			return nil, ErrLastGoodEntryIsSkipped
 		}
 		// require lastGoodEntry != nil
 
@@ -642,7 +648,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		// last good state
 		lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// 2. What entries do we have in the current verification set for the
@@ -677,7 +683,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 			case *rsl.ReferenceEntry:
 				newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				slog.Debug("Checking if entry is tree-same with last valid state...")
@@ -710,13 +716,13 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 		if !fixed {
 			// If we haven't found a fix, return the original error
-			return verificationErr
+			return nil, verificationErr
 		}
 
 		if len(invalidIntermediateEntries) != 0 {
 			// We may have found a fix but if an invalid intermediate entry
 			// wasn't skipped, return error
-			return ErrInvalidEntryNotSkipped
+			return nil, ErrInvalidEntryNotSkipped
 		}
 
 		// Reset these trackers to continue verification with rest of the queue
@@ -731,7 +737,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		}
 	}
 
-	return nil
+	return allAttestations, nil
 }
 
 // VerifyNewState ensures that when a new policy is encountered, its root role
