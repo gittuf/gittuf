@@ -46,6 +46,34 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 	return r.TargetID
 }
 
+type ReferenceHatAuthorization struct {
+	TargetRef   string `json:"targetRef"`
+	FromID      string `json:"fromID"`
+	TargetID    string `json:"targetID"`
+	PrincipalID string `json:"principalID"`
+	Hat         string `json:"hat"`
+}
+
+func (r *ReferenceHatAuthorization) GetRef() string {
+	return r.TargetRef
+}
+
+func (r *ReferenceHatAuthorization) GetFromID() string {
+	return r.FromID
+}
+
+func (r *ReferenceHatAuthorization) GetTargetID() string {
+	return r.TargetID
+}
+
+func (r *ReferenceHatAuthorization) GetPrincipalID() string {
+	return r.PrincipalID
+}
+
+func (r *ReferenceHatAuthorization) GetHat() string {
+	return r.Hat
+}
+
 // NewReferenceAuthorizationForCommit creates a new reference authorization for
 // the provided information. The authorization is embedded in an in-toto
 // "statement" and returned with the appropriate "predicate type" set. The
@@ -54,6 +82,24 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 // tree ID of the resultant commit.
 func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*ita.Statement, error) {
 	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ita.Statement{
+		Type: ita.StatementTypeUri,
+		Subject: []*ita.ResourceDescriptor{
+			{
+				Digest: map[string]string{digestGitTreeKey: targetID},
+			},
+		},
+		PredicateType: PredicateType,
+		Predicate:     predicateStruct,
+	}, nil
+}
+
+func NewReferenceHatAuthorizationForCommit(targetRef, fromID, targetID, principalID, hat string) (*ita.Statement, error) {
+	predicateStruct, err := newReferenceHatAuthorizationStruct(targetRef, fromID, targetID, principalID, hat)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +195,18 @@ func newReferenceAuthorizationStruct(targetRef, fromID, targetID string) (*struc
 		TargetRef: targetRef,
 		FromID:    fromID,
 		TargetID:  targetID,
+	}
+
+	return common.PredicateToPBStruct(predicate)
+}
+
+func newReferenceHatAuthorizationStruct(targetRef, fromID, targetID, principalID, hat string) (*structpb.Struct, error) {
+	predicate := &ReferenceHatAuthorization{
+		TargetRef:   targetRef,
+		FromID:      fromID,
+		TargetID:    targetID,
+		PrincipalID: principalID,
+		Hat:         hat,
 	}
 
 	return common.PredicateToPBStruct(predicate)

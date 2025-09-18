@@ -187,6 +187,91 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+func (r *Repository) AddReferenceHatAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, hat string, signCommit bool, opts ...attestopts.Option) error {
+
+	options := &attestopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	var err error
+	targetRef, err = r.r.AbsoluteReference(targetRef)
+	if err != nil {
+		return err
+	}
+
+	var (
+		fromID gitinterface.Hash
+		toID   gitinterface.Hash
+	)
+
+	slog.Debug("Identifying current status of target Git reference...")
+	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))
+	if err == nil {
+		fromID = latestTargetEntry.GetTargetID()
+	} else {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return err
+		}
+		fromID = gitinterface.ZeroHash
+	}
+
+	slog.Debug("Loading current set of attestations...")
+	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	// Does a reference authorization already exist for the parameters?
+	hasAuthorization := false
+	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String()) //need to make a hat search
+	if err == nil {
+		slog.Debug("Found existing reference authorization...")
+		hasAuthorization = true
+	} else if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
+		return err
+	}
+
+	if !hasAuthorization {
+		// Create a new reference authorization and embed in env
+		slog.Debug("Creating new reference authorization...")
+		var statement *ita.Statement
+		principalID, err := signer.KeyID()
+		if err != nil {
+			return err
+		}
+		statement, err = attestations.NewReferenceHatAuthorizationForCommit(targetRef, fromID.String(), toID.String(), principalID, hat)
+		if err != nil {
+			return err
+		}
+
+		env, err = dsse.CreateEnvelope(statement)
+		if err != nil {
+			return err
+		}
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing reference authorization using '%s' while wearing '%s' hat...", keyID, hat))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID.String(), toID.String()); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add reference authorization for '%s' from '%s' to '%s'", targetRef, fromID, toID)
+
+	slog.Debug("Committing attestations...")
+	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
 // their key.

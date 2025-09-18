@@ -57,6 +57,10 @@ var (
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
 	ErrPrincipalStillInUse                             = errors.New("principal is still in use")
+	ErrMetadataVersionDoesNotSupportTeams              = errors.New("the tuf metadata version v01 does not implement teams")
+	ErrInvalidTeamID                                   = errors.New("team ID is invalid")
+	ErrTeamNotFound                                    = errors.New("team not found")
+	ErrTeamStillInUse                                  = errors.New("team is still in use")
 	ErrRuleNotFound                                    = errors.New("cannot find rule entry")
 	ErrMissingRules                                    = errors.New("some rules are missing")
 	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
@@ -83,6 +87,12 @@ type Principal interface {
 	ID() string
 	Keys() []*signerverifier.SSLibKey
 	CustomMetadata() map[string]string
+}
+
+type Team interface {
+	ID() string
+	GetPrincipals() []Principal
+	GetThreshold() int
 }
 
 // RootMetadata represents the root of trust metadata for gittuf.
@@ -241,6 +251,9 @@ type TargetsMetadata interface {
 	// GetRules returns all the rules in the metadata.
 	GetRules() []Rule
 
+	// GetTeams returns all the teams in the rule file.
+	GetTeams() (map[string]Team, error)
+
 	// AddRule adds a rule to the metadata file.
 	AddRule(ruleName string, authorizedPrincipalIDs, rulePatterns []string, threshold int) error
 	// UpdateRule updates an existing rule identified by ruleName with the
@@ -260,6 +273,12 @@ type TargetsMetadata interface {
 
 	// RemovePrincipal removes a principal from the metadata.
 	RemovePrincipal(principalID string) error
+
+	// AddTeam adds a team to the metadata.
+	AddTeam(teamID string, principals []Principal, threshold int) error
+
+	// RemoveTeam removes a team from the metadata.
+	RemoveTeam(teamID string) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).

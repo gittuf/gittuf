@@ -222,6 +222,21 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
+// GetTeams is not supported in v01 metadata.
+func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
+	return nil, tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// AddTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// RemoveTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) RemoveTeam(_ string) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
 // AddPrincipal adds a principal to the metadata.
 //
 // TODO: this isn't associated with a specific rule; with the removal of
