@@ -12,6 +12,30 @@ Retried the fully qualified reference path for the specified Git reference.
 gitGetAbsoluteReference("main") -> "refs/heads/main"
 ```
 
+## gitGetBlobID
+
+**Signature:** `gitGetBlobID(ref, path) -> blobID`
+
+Retrieve the blob ID of the file at the given path from a specific reference (commit or staged index).
+
+### Example 1
+
+```
+gitGetBlobID(":", "s.txt") -> "abc123..." (staged)
+```
+
+### Example 2
+
+```
+gitGetBlobID("HEAD", "s.txt") -> "def456..." (current commit)
+```
+
+### Example 3
+
+```
+gitGetBlobID("HEAD~1", "s.txt") -> "ghi789..." (previous commit)
+```
+
 ## gitGetCommitMessage
 
 **Signature:** `gitGetCommitMessage(commitID) -> message`
@@ -82,6 +106,18 @@ Retrieve the remote URL for the specified Git remote.
 
 ```
 gitGetRemoteURL("origin") -> "example.com/example/example"
+```
+
+## gitGetStagedFilePaths
+
+**Signature:** `gitGetStagedFilePaths() -> paths`
+
+Retrieve a Lua table of file paths that have staged changes (changes in the index).
+
+### Example 1
+
+```
+gitGetStagedFilePaths() -> ["foo/bar.txt", "baz/qux.py"]
 ```
 
 ## gitGetSymbolicReferenceTarget
