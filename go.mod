@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/ProtonMail/go-crypto v1.3.0
-	github.com/charmbracelet/bubbletea v1.3.9
+	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/google/go-github/v61 v61.0.0
