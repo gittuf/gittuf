@@ -66,6 +66,7 @@ type State struct {
 	GitHubApps map[string]tuf.GitHubApp
 
 	repository     *gitinterface.Repository
+	policyID       gitinterface.Hash
 	loadedEntry    rsl.ReferenceUpdaterEntry
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
@@ -294,6 +295,10 @@ func LoadFirstState(ctx context.Context, repo *gitinterface.Repository, opts ...
 	}
 
 	return LoadState(ctx, repo, firstEntry, opts...)
+}
+
+func (s *State) GetID() gitinterface.Hash {
+	return s.policyID
 }
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
@@ -1346,7 +1351,7 @@ func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Ha
 		}
 	}
 
-	state := &State{repository: repo}
+	state := &State{repository: repo, policyID: commitID}
 
 	for len(metadataQueue) != 0 {
 		currentMetadataEntry := metadataQueue[0]
