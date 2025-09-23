@@ -158,6 +158,24 @@ func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// GetRepositoryLocation returns the canonical location of the Git repository
+func (r *Repository) GetRepositoryLocation(ctx context.Context) (string, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return "", err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return "", err
+	}
+
+	location := rootMetadata.GetRepositoryLocation()
+
+	return location, nil
+}
+
 // AddRootKey is the interface for the user to add an authorized key
 // for the Root role.
 func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
@@ -240,6 +258,26 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+func (r *Repository) GetRootKeys(ctx context.Context) ([]tuf.Principal, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return nil, err
+	}
+
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	return principals, nil
+}
+
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
 func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
@@ -320,6 +358,28 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 
 	commitMessage := fmt.Sprintf("Remove policy key '%s' from root", targetsKeyID)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// GetPrimaryRuleFilePrincipals returns the principals trusted for the primary
+// rule file.
+func (r *Repository) GetPrimaryRuleFilePrincipals(ctx context.Context) ([]tuf.Principal, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return nil, err
+	}
+
+	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	return principals, nil
 }
 
 // AddGitHubApp is the interface for the user to add the authorized key for the
@@ -507,6 +567,70 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// AreGitHubAppApprovalsTrusted returns which of the GitHub apps defined in the
+// metadata are trusted.
+func (r *Repository) AreGitHubAppApprovalsTrusted(ctx context.Context, opts ...trustpolicyopts.Option) (map[string]bool, error) {
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return nil, err
+	}
+
+	appNames, err := rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	var appsStatus = make(map[string]bool)
+	for appName, entry := range appNames {
+		appsStatus[appName] = entry.IsTrusted()
+	}
+
+	return appsStatus, nil
+}
+
+// GetGitHubAppPrincipals returns the principals used for GitHub app
+// attestations.
+func (r *Repository) GetGitHubAppPrincipals(ctx context.Context) (map[string][]tuf.Principal, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return nil, err
+	}
+
+	appNames, err := rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return nil, err
+	}
+
+	var appPrincipals = make(map[string][]tuf.Principal)
+
+	for appName := range appNames {
+		principals, err := rootMetadata.GetGitHubAppPrincipals(appName)
+		if err != nil {
+			return nil, err
+		}
+		appPrincipals[appName] = principals
+	}
+
+	return appPrincipals, nil
+}
+
 // UpdateRootThreshold sets the threshold of valid signatures required for the
 // Root role.
 func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
@@ -548,6 +672,29 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// GetRootThreshold retrieves the threshold of valid signatures required for
+// changes to the root of trust
+func (r *Repository) GetRootThreshold(ctx context.Context) (int, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return -1, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return -1, err
+	}
+
+	slog.Debug("Getting root threshold...")
+	rootThreshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		return -1, err
+	}
+
+	return rootThreshold, nil
+}
+
 // UpdateTopLevelTargetsThreshold sets the threshold of valid signatures
 // required for the top level Targets role.
 func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer sslibdsse.SignerVerifier, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
@@ -587,6 +734,27 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 
 	commitMessage := fmt.Sprintf("Update policy threshold to %d", threshold)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// GetTopLevelTargetsThreshold returns the threshold of approvals needed to make changes to the primary rule file.
+func (r *Repository) GetTopLevelTargetsThreshold(ctx context.Context) (int, error) {
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return -1, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	if err != nil {
+		return -1, err
+	}
+
+	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		return -1, err
+	}
+
+	return threshold, nil
 }
 
 // AddGlobalRuleThreshold adds a threshold global rule to the root metadata.

@@ -131,6 +131,26 @@ func TestSetRepositoryLocation(t *testing.T) {
 	assert.Equal(t, location, rootMetadata.GetRepositoryLocation())
 }
 
+func TestGetRepositoryLocation(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	location, err := r.GetRepositoryLocation(testCtx)
+	assert.Nil(t, err)
+	assert.Equal(t, location, "")
+
+	location = "https://example.com/repository/location"
+	err = r.SetRepositoryLocation(testCtx, sv, location, false)
+	require.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	location, err = r.GetRepositoryLocation(testCtx)
+	assert.Nil(t, err)
+	assert.Equal(t, location, "https://example.com/repository/location")
+}
+
 func TestAddRootKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
@@ -240,6 +260,24 @@ func TestRemoveRootKey(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestGetRootKeys(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	originalSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootKey := tufv01.NewKeyFromSSLibKey(originalSigner.MetadataKey())
+
+	err := r.AddRootKey(testCtx, originalSigner, rootKey, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	rootPrincipals, err := r.GetRootKeys(testCtx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(rootPrincipals))
+}
+
 func TestAddTopLevelTargetsKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
@@ -324,6 +362,53 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
+}
+
+func TestGetPrimaryRuleFilePrincipals(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootKey := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+	err := r.AddTopLevelTargetsKey(testCtx, sv, rootKey, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	targetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+
+	err = r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsPrincipalIDs := getPrimaryRuleFilePrincipalIDs(t, rootMetadata)
+	assert.True(t, targetsPrincipalIDs.Has(rootKey.KeyID))
+	assert.True(t, targetsPrincipalIDs.Has(targetsKey.KeyID))
+
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+
+	principals, err := r.GetPrimaryRuleFilePrincipals(testCtx)
+	assert.Nil(t, err)
+
+	assert.Equal(t, len(principals), 2)
+	assert.Contains(t, principals, rootKey)
+	assert.Contains(t, principals, targetsKey)
 }
 
 func TestAddGitHubApp(t *testing.T) {
@@ -508,6 +593,68 @@ func TestUntrustGitHubApp(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestAreGitHubAppApprovalsTrusted(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	assert.Nil(t, err)
+
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
+
+	err = r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+	assert.Nil(t, err)
+
+	err = r.TrustGitHubApp(testCtx, sv, "github-app", false)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	githubApps, err := r.AreGitHubAppApprovalsTrusted(testCtx)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(githubApps))
+	assert.Equal(t, githubApps["github-app"], true)
+}
+
+func TestGetGitHubAppPrincipals(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	assert.Nil(t, err)
+
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
+
+	err = r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	githubAppPrincipals, err := r.GetGitHubAppPrincipals(testCtx)
+	assert.Nil(t, err)
+
+	principals := []tuf.Principal{key}
+
+	assert.Equal(t, 1, len(githubAppPrincipals))
+	assert.Equal(t, principals, githubAppPrincipals["github-app"])
+}
+
 func TestUpdateRootThreshold(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
@@ -556,6 +703,37 @@ func TestUpdateRootThreshold(t *testing.T) {
 	assert.Equal(t, 2, getRootPrincipalIDs(t, rootMetadata).Len())
 
 	rootThreshold, err = rootMetadata.GetRootThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, rootThreshold)
+}
+
+func TestGetRootThreshold(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	rootThreshold, err := r.GetRootThreshold(testCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, rootThreshold)
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	secondKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+
+	if err := r.AddRootKey(testCtx, signer, secondKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.UpdateRootThreshold(testCtx, signer, 2, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	rootThreshold, err = r.GetRootThreshold(testCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -618,6 +796,44 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	assert.Equal(t, 2, getPrimaryRuleFilePrincipalIDs(t, rootMetadata).Len())
 
 	targetsThreshold, err = rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, targetsThreshold)
+}
+
+func TestGetTopLevelTargetsThreshold(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+	if err := r.AddTopLevelTargetsKey(testCtx, sv, key, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err := r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	targetsThreshold, err := r.GetTopLevelTargetsThreshold(testCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 1, targetsThreshold)
+
+	targetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+
+	if err := r.AddTopLevelTargetsKey(testCtx, sv, targetsKey, false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 2, false)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	targetsThreshold, err = r.GetTopLevelTargetsThreshold(testCtx)
 	if err != nil {
 		t.Fatal(err)
 	}
