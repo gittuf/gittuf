@@ -38,6 +38,12 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
+* [gittuf trust get-github-app-approvals-status](gittuf_trust_get-github-app-approvals-status.md)	 - Get whether GitHub App approvals are trusted
+* [gittuf trust get-github-app-key](gittuf_trust_get-github-app-key.md)	 - Get the current defined keys for GitHub Apps
+* [gittuf trust get-policy-key](gittuf_trust_get-policy-key.md)	 - Get the current policy key
+* [gittuf trust get-policy-threshold](gittuf_trust_get-policy-threshold.md)	 - List the currently defined global rules for the root of trust
+* [gittuf trust get-repository-location](gittuf_trust_get-repository-location.md)	 - Get the current repository location
+* [gittuf trust get-root-threshold](gittuf_trust_get-root-threshold.md)	 - Get the current root threshold
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
 * [gittuf trust inspect-root](gittuf_trust_inspect-root.md)	 - Inspect root metadata
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state

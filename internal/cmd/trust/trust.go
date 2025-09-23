@@ -14,6 +14,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getgithubappapprovalsstatus"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getgithubappkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getpolicykeys"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getpolicythreshold"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getrepositorylocation"
+	"github.com/gittuf/gittuf/internal/cmd/trust/getrootthreshold"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
@@ -60,6 +66,12 @@ func New() *cobra.Command {
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
+	cmd.AddCommand(getgithubappapprovalsstatus.New())
+	cmd.AddCommand(getgithubappkey.New())
+	cmd.AddCommand(getpolicykeys.New())
+	cmd.AddCommand(getpolicythreshold.New())
+	cmd.AddCommand(getrepositorylocation.New())
+	cmd.AddCommand(getrootthreshold.New())
 	cmd.AddCommand(inspectroot.New())
 	cmd.AddCommand(listhooks.New())
 	cmd.AddCommand(makecontroller.New(o))
