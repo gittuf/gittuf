@@ -51,6 +51,12 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 		t.Fatal(err)
 	}
 
+	stateID, err := repo.GetReference(PolicyRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.policyID = stateID
+
 	latestEntry, err := rsl.GetLatestEntry(repo)
 	if err != nil {
 		t.Fatal(err)
