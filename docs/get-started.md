@@ -1,7 +1,8 @@
 # Get Started
 
 This guide presents a quick primer to using gittuf. Note that gittuf is
-currently in alpha, and it is not intended for use in a production repository.
+currently in beta, so if you encounter any issues, we encourage you to
+[report them](https://github.com/gittuf/gittuf/issues).
 
 ## Install gittuf using pre-built binaries
 
