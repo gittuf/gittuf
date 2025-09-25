@@ -38,78 +38,7 @@ func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.State
 
 // SetReferenceAuthorization writes the new reference authorization attestation
 // to the object store and tracks it in the current attestations state.
-func (a *Attestations) SetReferenceAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
-	payloadBytes, err := env.DecodeB64Payload()
-	if err != nil {
-		return fmt.Errorf("unable to inspect reference authorization: %w", err)
-	}
-
-	inspectAuthorization := map[string]any{}
-	if err := json.Unmarshal(payloadBytes, &inspectAuthorization); err != nil {
-		return fmt.Errorf("unable to inspect reference authorization: %w", err)
-	}
-	switch inspectAuthorization["predicate_type"] {
-	case authorizationsv01.PredicateType:
-		if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
-			return err
-		}
-	case authorizationsv02.PredicateType:
-		if err := authorizationsv02.Validate(env, refName, fromID, toID); err != nil {
-			return err
-		}
-	default:
-		return authorizations.ErrUnknownAuthorizationVersion
-	}
-
-	envBytes, err := json.Marshal(env)
-	if err != nil {
-		return err
-	}
-
-	blobID, err := repo.WriteBlob(envBytes)
-	if err != nil {
-		return err
-	}
-
-	if a.referenceAuthorizations == nil {
-		a.referenceAuthorizations = map[string]gitinterface.Hash{}
-	}
-
-	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)] = blobID
-	return nil
-}
-
-// RemoveReferenceAuthorization removes a set reference authorization
-// attestation entirely. The object, however, isn't removed from the object
-// store as prior states may still need it.
-func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string) error {
-	authPath := ReferenceAuthorizationPath(refName, fromID, toID)
-	if _, has := a.referenceAuthorizations[authPath]; !has {
-		return authorizations.ErrAuthorizationNotFound
-	}
-
-	delete(a.referenceAuthorizations, authPath)
-	return nil
-}
-
-// GetReferenceAuthorizationFor returns the requested reference authorization
-// attestation (with its signatures).
-func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
-	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)]
-	if !has {
-		return nil, authorizations.ErrAuthorizationNotFound
-	}
-
-	envBytes, err := repo.ReadBlob(blobID)
-	if err != nil {
-		return nil, err
-	}
-
-	env := &sslibdsse.Envelope{}
-	if err := json.Unmarshal(envBytes, env); err != nil {
-		return nil, err
-	}
-
+func (a *Attestations) SetReferenceAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) (gitinterface.Hash, error) {
 	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return nil, fmt.Errorf("unable to inspect reference authorization: %w", err)
@@ -132,7 +61,79 @@ func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repositor
 		return nil, authorizations.ErrUnknownAuthorizationVersion
 	}
 
-	return env, nil
+	envBytes, err := json.Marshal(env)
+	if err != nil {
+		return nil, err
+	}
+
+	blobID, err := repo.WriteBlob(envBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if a.referenceAuthorizations == nil {
+		a.referenceAuthorizations = map[string]gitinterface.Hash{}
+	}
+
+	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)] = blobID
+	return blobID, nil
+}
+
+// RemoveReferenceAuthorization removes a set reference authorization
+// attestation entirely. The object, however, isn't removed from the object
+// store as prior states may still need it.
+func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string) error {
+	authPath := ReferenceAuthorizationPath(refName, fromID, toID)
+	if _, has := a.referenceAuthorizations[authPath]; !has {
+		return authorizations.ErrAuthorizationNotFound
+	}
+
+	delete(a.referenceAuthorizations, authPath)
+	return nil
+}
+
+// GetReferenceAuthorizationFor returns the requested reference authorization
+// attestation (with its signatures), and the hash of the attestation, for
+// exporting the attestation, if desired.
+func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, gitinterface.Hash, error) {
+	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)]
+	if !has {
+		return nil, nil, authorizations.ErrAuthorizationNotFound
+	}
+
+	envBytes, err := repo.ReadBlob(blobID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	env := &sslibdsse.Envelope{}
+	if err := json.Unmarshal(envBytes, env); err != nil {
+		return nil, nil, err
+	}
+
+	payloadBytes, err := env.DecodeB64Payload()
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+
+	inspectAuthorization := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectAuthorization); err != nil {
+		return nil, nil, fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+	switch inspectAuthorization["predicate_type"] {
+	case authorizationsv01.PredicateType:
+		if err := authorizationsv01.Validate(env, refName, fromID, toID); err != nil {
+			return nil, nil, err
+		}
+	case authorizationsv02.PredicateType:
+		if err := authorizationsv02.Validate(env, refName, fromID, toID); err != nil {
+			return nil, nil, err
+		}
+	default:
+		return nil, nil, authorizations.ErrUnknownAuthorizationVersion
+	}
+
+	return env, blobID, nil
 }
 
 // ReferenceAuthorizationPath constructs the expected path on-disk for the

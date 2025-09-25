@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
@@ -27,8 +29,9 @@ var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does
 
 func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (
-		expectedTip gitinterface.Hash
-		err         error
+		expectedTip      gitinterface.Hash
+		usedAttestations []gitinterface.Hash
+		err              error
 	)
 
 	options := &verifyopts.Options{}
@@ -63,9 +66,9 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		expectedTip, usedAttestations, err = verifier.VerifyRef(ctx, refName)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		expectedTip, usedAttestations, err = verifier.VerifyRefFull(ctx, refName)
 	}
 	if err != nil {
 		return err
@@ -78,6 +81,11 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	}
 
 	slog.Debug("Verification successful!")
+
+	if options.AttestationsExportPath != "" {
+		return r.exportAttestations(usedAttestations, options.AttestationsExportPath)
+	}
+
 	return nil
 }
 
@@ -122,7 +130,7 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
 	verifier := policy.NewPolicyVerifier(r.r)
-	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
+	expectedTip, usedAttestations, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
 		return err
 	}
@@ -134,6 +142,11 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 	}
 
 	slog.Debug("Verification successful!")
+
+	if options.AttestationsExportPath != "" {
+		return r.exportAttestations(usedAttestations, options.AttestationsExportPath)
+	}
+
 	return nil
 }
 
@@ -214,6 +227,30 @@ func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) 
 
 	if !refTip.Equal(expectedTip) {
 		return ErrRefStateDoesNotMatchRSL
+	}
+
+	return nil
+}
+
+// exportAttestations reads the supplied attestation hashes, and writes them to
+// a bundle to the specified path.
+func (r *Repository) exportAttestations(attestations []gitinterface.Hash, path string) error {
+	// Write attestation bundle to disk
+	envs := []string{}
+
+	for _, attestation := range attestations {
+		env, err := r.r.ReadBlob(attestation)
+		if err != nil {
+			return err
+		}
+
+		envs = append(envs, string(env))
+	}
+
+	jsonLines := strings.Join(envs, "\n")
+	jsonLines += "\n"
+	if err := os.WriteFile(path, []byte(jsonLines), 0o600); err != nil {
+		return err
 	}
 
 	return nil

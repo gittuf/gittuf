@@ -136,7 +136,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 
 	// Does a reference authorization already exist for the parameters?
 	hasAuthorization := false
-	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String())
+	env, _, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String())
 	if err == nil {
 		slog.Debug("Found existing reference authorization...")
 		hasAuthorization = true
@@ -174,7 +174,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		return err
 	}
 
-	if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID.String(), toID.String()); err != nil {
+	if _, err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID.String(), toID.String()); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 	}
 
 	slog.Debug("Loading reference authorization...")
-	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID, toID)
+	env, _, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID, toID)
 	if err != nil {
 		if errors.Is(err, authorizations.ErrAuthorizationNotFound) {
 			// No reference authorization at all
@@ -255,7 +255,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 		// We still have other signatures, so set the ReferenceAuthorization
 		// envelope
 		env.Signatures = newSignatures
-		if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID, toID); err != nil {
+		if _, err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID, toID); err != nil {
 			return err
 		}
 	}
@@ -414,7 +414,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 
 	// TODO: if the helper above has an indexPath, we can directly load that blob, simplifying the logic here
 	hasApprovalAttestation := false
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, appName, baseRef, fromID, toID)
+	env, _, err := currentAttestations.GetGitHubPullRequestApprovalAttestationFor(r.r, appName, baseRef, fromID, toID)
 	if err == nil {
 		slog.Debug("Found existing GitHub pull request approval attestation...")
 		hasApprovalAttestation = true
@@ -455,7 +455,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
+	if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
@@ -495,7 +495,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 	}
 	appName := tuf.GitHubAppRoleName
 
-	env, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, options.GitHubBaseURL, reviewID, appName)
+	env, _, err := currentAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(r.r, options.GitHubBaseURL, reviewID, appName)
 	if err != nil {
 		return err
 	}
@@ -540,7 +540,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
+	if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(r.r, env, options.GitHubBaseURL, reviewID, appName, baseRef, fromID, toID); err != nil {
 		return err
 	}
 
