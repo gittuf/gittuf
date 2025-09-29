@@ -334,6 +334,7 @@ func TestTagReferenceName(t *testing.T) {
 		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
 	}
 }
+
 func TestDeleteReference(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
@@ -358,4 +359,33 @@ func TestDeleteReference(t *testing.T) {
 
 	_, err = repo.GetReference(refName)
 	assert.ErrorIs(t, err, ErrReferenceNotFound)
+}
+
+func TestRemoteReferenceName(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		expected string
+	}{
+		"adds prefix if missing": {
+			input:    "origin/main",
+			expected: "refs/remotes/origin/main",
+		},
+		"keeps prefix if already present": {
+			input:    "refs/remotes/origin/main",
+			expected: "refs/remotes/origin/main",
+		},
+		"empty input returns prefix only": {
+			input:    "",
+			expected: "refs/remotes/",
+		},
+		"exact prefix is preserved": {
+			input:    "refs/remotes/",
+			expected: "refs/remotes/",
+		},
+	}
+
+	for name, test := range tests {
+		referenceName := RemoteReferenceName(test.input)
+		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+	}
 }
