@@ -27,16 +27,32 @@ func TestSetReferenceAuthorization(t *testing.T) {
 		attestations := &Attestations{}
 
 		// Add auth for first branch
-		err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+		blobID, err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
 		assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
+		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, expectedBlobID, err := attestations.GetReferenceAuthorizationFor(repo, testRef, testID, testID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedBlobID, blobID)
+
 		// Add auth for the other branch
-		err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
+		blobID, err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
+
+		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		_, expectedBlobID, err = attestations.GetReferenceAuthorizationFor(repo, testAnotherRef, testID, testID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedBlobID, blobID)
 	})
 
 	t.Run("for tag", func(t *testing.T) {
@@ -49,9 +65,13 @@ func TestSetReferenceAuthorization(t *testing.T) {
 
 		attestations := &Attestations{}
 
-		err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
+		blobID, err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(tagRef, testID, testID))
+
+		_, expectedBlobID, err := attestations.GetReferenceAuthorizationFor(repo, tagRef, testID, testID)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedBlobID, blobID)
 	})
 }
 
@@ -68,14 +88,14 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 
 		attestations := &Attestations{}
 
-		err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+		_, err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testRef, testID, testID))
 		assert.NotContains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(testAnotherRef, testID, testID))
 
-		err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
+		_, err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -103,7 +123,7 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 
 		attestations := &Attestations{}
 
-		err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
+		_, err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,22 +148,23 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 
 		attestations := &Attestations{}
 
-		err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
+		expectedBlobID, err := attestations.SetReferenceAuthorization(repo, mainZeroZero, testRef, testID, testID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		mainAuth, err := attestations.GetReferenceAuthorizationFor(repo, testRef, testID, testID)
+		mainAuth, blobID, err := attestations.GetReferenceAuthorizationFor(repo, testRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Equal(t, mainZeroZero, mainAuth)
+		assert.Equal(t, expectedBlobID, blobID)
 
-		featureAuth, err := attestations.GetReferenceAuthorizationFor(repo, testAnotherRef, testID, testID)
+		expectedBlobID, err = attestations.SetReferenceAuthorization(repo, featureZeroZero, testAnotherRef, testID, testID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		featureAuth, blobID, err := attestations.GetReferenceAuthorizationFor(repo, testAnotherRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Equal(t, featureZeroZero, featureAuth)
+		assert.Equal(t, expectedBlobID, blobID)
 	})
 
 	t.Run("for tag", func(t *testing.T) {
@@ -156,15 +177,16 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 
 		attestations := &Attestations{}
 
-		err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
+		expectedBlobID, err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(tagRef, testID, testID))
 
-		tagApprovalFetched, err := attestations.GetReferenceAuthorizationFor(repo, tagRef, testID, testID)
+		tagApprovalFetched, blobID, err := attestations.GetReferenceAuthorizationFor(repo, tagRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Equal(t, tagApproval, tagApprovalFetched)
+		assert.Equal(t, expectedBlobID, blobID)
 	})
 }
 

@@ -4,8 +4,9 @@
 package verify
 
 type Options struct {
-	RefNameOverride string
-	LatestOnly      bool
+	RefNameOverride        string
+	AttestationsExportPath string
+	LatestOnly             bool
 }
 
 type Option func(o *Options)
@@ -13,6 +14,12 @@ type Option func(o *Options)
 func WithOverrideRefName(refNameOverride string) Option {
 	return func(o *Options) {
 		o.RefNameOverride = refNameOverride
+	}
+}
+
+func WithAttestationsExportPath(path string) Option {
+	return func(o *Options) {
+		o.AttestationsExportPath = path
 	}
 }
 
