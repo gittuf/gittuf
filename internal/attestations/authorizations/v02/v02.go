@@ -46,7 +46,7 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 	return r.TargetID
 }
 
-type ReferenceHatAuthorization struct {
+type ReferenceAuthorizationWithHat struct {
 	TargetRef   string `json:"targetRef"`
 	FromID      string `json:"fromID"`
 	TargetID    string `json:"targetID"`
@@ -54,23 +54,23 @@ type ReferenceHatAuthorization struct {
 	Hat         string `json:"hat"`
 }
 
-func (r *ReferenceHatAuthorization) GetRef() string {
+func (r *ReferenceAuthorizationWithHat) GetRef() string {
 	return r.TargetRef
 }
 
-func (r *ReferenceHatAuthorization) GetFromID() string {
+func (r *ReferenceAuthorizationWithHat) GetFromID() string {
 	return r.FromID
 }
 
-func (r *ReferenceHatAuthorization) GetTargetID() string {
+func (r *ReferenceAuthorizationWithHat) GetTargetID() string {
 	return r.TargetID
 }
 
-func (r *ReferenceHatAuthorization) GetPrincipalID() string {
+func (r *ReferenceAuthorizationWithHat) GetPrincipalID() string {
 	return r.PrincipalID
 }
 
-func (r *ReferenceHatAuthorization) GetHat() string {
+func (r *ReferenceAuthorizationWithHat) GetHat() string {
 	return r.Hat
 }
 
@@ -99,7 +99,7 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*it
 }
 
 func NewReferenceHatAuthorizationForCommit(targetRef, fromID, targetID, principalID, hat string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceHatAuthorizationStruct(targetRef, fromID, targetID, principalID, hat)
+	predicateStruct, err := newReferenceHAuthorizationWithHatStruct(targetRef, fromID, targetID, principalID, hat)
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +200,8 @@ func newReferenceAuthorizationStruct(targetRef, fromID, targetID string) (*struc
 	return common.PredicateToPBStruct(predicate)
 }
 
-func newReferenceHatAuthorizationStruct(targetRef, fromID, targetID, principalID, hat string) (*structpb.Struct, error) {
-	predicate := &ReferenceHatAuthorization{
+func newReferenceHAuthorizationWithHatStruct(targetRef, fromID, targetID, principalID, hat string) (*structpb.Struct, error) {
+	predicate := &ReferenceAuthorizationWithHat{
 		TargetRef:   targetRef,
 		FromID:      fromID,
 		TargetID:    targetID,

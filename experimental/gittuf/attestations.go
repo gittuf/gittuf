@@ -187,7 +187,19 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-func (r *Repository) AddReferenceHatAuthorization(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, hat string, signCommit bool, opts ...attestopts.Option) error {
+// AddReferenceHatAuthorization adds a reference hat authorization attestation to the
+// repository for the specified target ref. The from ID is identified using the
+// last RSL entry for the target ref. The to ID is that of the expected Git tree
+// created by merging the feature ref into the target ref. The commit used to
+// calculate the merge tree ID is identified using the RSL for the feature ref.
+func (r *Repository) AddReferenceAuthorizationWithHat(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, hat string, signCommit bool, opts ...attestopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
 
 	options := &attestopts.Options{}
 	for _, fn := range opts {
@@ -200,10 +212,18 @@ func (r *Repository) AddReferenceHatAuthorization(ctx context.Context, signer ss
 		return err
 	}
 
+	featureRef, err = r.r.AbsoluteReference(featureRef)
+	if err != nil {
+		return err
+	}
+
 	var (
-		fromID gitinterface.Hash
-		toID   gitinterface.Hash
+		fromID          gitinterface.Hash
+		featureCommitID gitinterface.Hash
+		toID            gitinterface.Hash
 	)
+
+	isTag := strings.HasPrefix(targetRef, gitinterface.TagRefPrefix)
 
 	slog.Debug("Identifying current status of target Git reference...")
 	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))
@@ -216,6 +236,27 @@ func (r *Repository) AddReferenceHatAuthorization(ctx context.Context, signer ss
 		fromID = gitinterface.ZeroHash
 	}
 
+	slog.Debug("Identifying current status of feature Git reference...")
+	latestFeatureEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(featureRef))
+	if err != nil {
+		// We don't have an RSL entry for the feature ref to use to approve the
+		// merge
+		return err
+	}
+	featureCommitID = latestFeatureEntry.GetTargetID()
+
+	if isTag {
+		// for tags, the toID is the commitID the tag will point to
+		toID = featureCommitID
+	} else {
+		slog.Debug("Computing expected merge tree...")
+		mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
+		if err != nil {
+			return err
+		}
+		toID = mergeTreeID
+	}
+
 	slog.Debug("Loading current set of attestations...")
 	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
 	if err != nil {
@@ -224,7 +265,7 @@ func (r *Repository) AddReferenceHatAuthorization(ctx context.Context, signer ss
 
 	// Does a reference authorization already exist for the parameters?
 	hasAuthorization := false
-	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String()) //need to make a hat search
+	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String()) // TODO: need to make a hat search
 	if err == nil {
 		slog.Debug("Found existing reference authorization...")
 		hasAuthorization = true
