@@ -70,7 +70,7 @@ func NewPolicyVerifier(repo *gitinterface.Repository) *PolicyVerifier {
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string, automaticRepair bool) (gitinterface.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
@@ -78,13 +78,13 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinter
 		return gitinterface.ZeroHash, err
 	}
 
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string, automaticRepair bool) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
 	var (
@@ -121,13 +121,13 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	}
 
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash, automaticRepair bool) (gitinterface.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
@@ -151,7 +151,7 @@ func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, 
 
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes
@@ -446,7 +446,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string) error {
+func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string, automaticRepair bool) error {
 	/*
 		require firstEntry != nil
 		require lastEntry != nil
@@ -596,7 +596,10 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 					if len(entries) == 0 {
 						// Fix entry does not exist after revoking annotation
-						return verificationErr
+						if !automaticRepair {
+							return verificationErr
+						}
+						// TODO: Perform automatic repair of the repository here.
 					}
 				} else if v.persistentCacheEnabled {
 					// Verification has passed, add to cache
