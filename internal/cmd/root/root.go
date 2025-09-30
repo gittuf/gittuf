@@ -22,6 +22,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/verifynetwork"
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/gittuf/gittuf/internal/cmd/version"
+	"github.com/gittuf/gittuf/internal/cmd/approve_temp"
 	"github.com/gittuf/gittuf/internal/display"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -123,6 +124,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(verifynetwork.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
+	cmd.AddCommand(approve_temp.New())
 
 	return cmd
 }
