@@ -46,6 +46,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	count := 0
 	for _, principal := range principals {
 		fmt.Printf("Principal %s:\n", principal.ID())
 
@@ -61,6 +62,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 				fmt.Printf(strings.Repeat(indentString, 2)+"%s: %s\n", key, value)
 			}
 		}
+		if count < len(principals)-1 {
+			fmt.Println()
+		}
+		count++
 	}
 	return nil
 }
