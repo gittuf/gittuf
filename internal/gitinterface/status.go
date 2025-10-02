@@ -6,7 +6,6 @@ package gitinterface
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -98,16 +97,9 @@ func (r *Repository) Status() (map[string]FileStatus, error) {
 	if !r.IsBare() {
 		worktree = strings.TrimSuffix(worktree, ".git") // TODO: this doesn't support detached git dir
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	if err := os.Chdir(worktree); err != nil {
-		return nil, err
-	}
-	defer os.Chdir(cwd) //nolint:errcheck
 
-	output, err := r.executor("status", "--porcelain=1", "-z", "--untracked-files=all", "--ignored").executeString()
+	output, err := r.executor("-C", worktree, "status", "--porcelain=1", "-z", "--untracked-files=all", "--ignored").executeString()
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to check status of repository: %w", err)
 	}
