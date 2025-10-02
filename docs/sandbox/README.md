@@ -1,6 +1,6 @@
 # Lua Sandbox APIs
 
-## gitGetAbsoluteReference
+## gitGetAbsoluteReference (Go)
 
 **Signature:** `gitGetAbsoluteReference(ref) -> absoluteRef`
 
@@ -12,7 +12,7 @@ Retried the fully qualified reference path for the specified Git reference.
 gitGetAbsoluteReference("main") -> "refs/heads/main"
 ```
 
-## gitGetCommitMessage
+## gitGetCommitMessage (Go)
 
 **Signature:** `gitGetCommitMessage(commitID) -> message`
 
@@ -24,7 +24,7 @@ Retrieve the message for the specified Git commit.
 gitGetCommitMessage("e7fca95377c9bad2418c5df7ab3bab5d652a5309") -> "Commit message."
 ```
 
-## gitGetFilePathsChangedByCommit
+## gitGetFilePathsChangedByCommit (Go)
 
 **Signature:** `gitGetFilePathsChangedByCommit(commitID) -> paths`
 
@@ -36,7 +36,7 @@ Retrieve a Lua table of file paths changed by the specified Git commit.
 gitGetFilePathsChangedByCommit("e7fca95377c9bad2418c5df7ab3bab5d652a5309") -> 2, "foo/bar", "foo/baz"
 ```
 
-## gitGetObjectSize
+## gitGetObjectSize (Go)
 
 **Signature:** `gitGetObjectSize(objectID) -> size`
 
@@ -48,7 +48,7 @@ Retrieve the size of the Git object specified using its ID from the repository.
 gitGetObjectSize("e7fca95377c9bad2418c5df7ab3bab5d652a5309") -> 13
 ```
 
-## gitGetReference
+## gitGetReference (Go)
 
 **Signature:** `gitGetReference(ref) -> hash`
 
@@ -72,7 +72,7 @@ gitGetReference("refs/heads/main") -> "e7fca95377c9bad2418c5df7ab3bab5d652a5309"
 gitGetReference("refs/gittuf/reference-state-log") -> "c70885ffc33866dbdfe95d0e10efa6d77c77a43b"
 ```
 
-## gitGetRemoteURL
+## gitGetRemoteURL (Go)
 
 **Signature:** `gitGetRemoteURL(remote) -> remoteURL`
 
@@ -84,7 +84,7 @@ Retrieve the remote URL for the specified Git remote.
 gitGetRemoteURL("origin") -> "example.com/example/example"
 ```
 
-## gitGetSymbolicReferenceTarget
+## gitGetSymbolicReferenceTarget (Go)
 
 **Signature:** `gitGetSymbolicReferenceTarget(ref) -> ref`
 
@@ -96,7 +96,7 @@ Retrieve the name of the Git reference the specified symbolic Git reference is p
 gitGetSymbolicReferenceTarget("HEAD") -> "refs/heads/main"
 ```
 
-## gitGetTagTarget
+## gitGetTagTarget (Go)
 
 **Signature:** `gitGetTagTarget(tagID) -> targetID`
 
@@ -108,7 +108,7 @@ Retrieve the ID of the Git object that the tag with the specified ID points to.
 gitGetTagTarget("f38f261f5df1d393a97aec3a5463017da6c22934") ->  "e7fca95377c9bad2418c5df7ab3bab5d652a5309"
 ```
 
-## gitReadBlob
+## gitReadBlob (Go)
 
 **Signature:** `gitReadBlob(blobID) -> blob`
 
@@ -120,13 +120,13 @@ Retrieve the bytes of the Git blob specified using its ID from the repository.
 gitReadBlob("e7fca95377c9bad2418c5df7ab3bab5d652a5309") -> "Hello, world!"
 ```
 
-## matchRegex
+## matchRegex (Go)
 
 **Signature:** `matchRegex(pattern, text) -> matched`
 
 Check if the regular expression pattern matches the provided text.
 
-## strSplit
+## strSplit (Lua)
 
 **Signature:** `strSplit(str, sep) -> components`
 
