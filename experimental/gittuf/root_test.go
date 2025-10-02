@@ -1727,6 +1727,195 @@ func TestRemoveHook(t *testing.T) {
 	})
 }
 
+func TestUpdateHook(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	rootPubKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+
+	t.Run("update pre-commit hook", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		hookStage := tuf.HookStagePreCommit
+		hookName := "test-hook"
+		environment := tuf.HookEnvironmentLua
+		timeout := 100
+		principals := []string{rootPubKey.KeyID}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		_, err = rootMetadata.GetHooks(tuf.HookStagePreCommit)
+		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
+
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		hooks, err := rootMetadata.GetHooks(tuf.HookStagePreCommit)
+		assert.Nil(t, err)
+
+		hookHash, err := r.r.WriteBlob(hookBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sha256Hash := sha256.New()
+		sha256Hash.Write(hookBytes)
+		sha256HashSum := hex.EncodeToString(sha256Hash.Sum(nil))
+
+		preCommitHook := tufv01.Hook{
+			Name:         hookName,
+			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
+			Hashes:       map[string]string{gitinterface.GitBlobHashName: hookHash.String(), gitinterface.SHA256HashName: sha256HashSum},
+			Environment:  environment,
+			Timeout:      timeout,
+		}
+		preCommitHooks := []tuf.Hook{&preCommitHook}
+		assert.Equal(t, preCommitHooks, hooks)
+
+		newHookBytes := []byte("new hook content")
+		newHookHash, err := r.r.WriteBlob(newHookBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newSha256Hash := sha256.New()
+		newSha256Hash.Write(newHookBytes)
+		newSha256HashSum := hex.EncodeToString(newSha256Hash.Sum(nil))
+
+		err = r.UpdateHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, newHookBytes, environment, principals, timeout,
+			true, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		hooks, err = rootMetadata.GetHooks(tuf.HookStagePreCommit)
+		assert.Nil(t, err)
+
+		preCommitHook = tufv01.Hook{
+			Name:         hookName,
+			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
+			Hashes:       map[string]string{gitinterface.GitBlobHashName: newHookHash.String(), gitinterface.SHA256HashName: newSha256HashSum},
+			Environment:  environment,
+			Timeout:      timeout,
+		}
+		preCommitHooks = []tuf.Hook{&preCommitHook}
+		assert.Equal(t, preCommitHooks, hooks)
+	})
+
+	t.Run("update pre-push hook", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		hookStage := tuf.HookStagePrePush
+		hookName := "test-hook"
+		environment := tuf.HookEnvironmentLua
+		timeout := 100
+		principals := []string{rootPubKey.KeyID}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		_, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
+		assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
+
+		err = r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, true, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		hooks, err := rootMetadata.GetHooks(tuf.HookStagePrePush)
+		assert.Nil(t, err)
+
+		hookHash, err := r.r.WriteBlob(hookBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sha256Hash := sha256.New()
+		sha256Hash.Write(hookBytes)
+		sha256HashSum := hex.EncodeToString(sha256Hash.Sum(nil))
+
+		prePushHook := tufv01.Hook{
+			Name:         hookName,
+			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
+			Hashes:       map[string]string{gitinterface.GitBlobHashName: hookHash.String(), gitinterface.SHA256HashName: sha256HashSum},
+			Environment:  environment,
+			Timeout:      timeout,
+		}
+		prePushHooks := []tuf.Hook{&prePushHook}
+		assert.Equal(t, prePushHooks, hooks)
+
+		newHookBytes := []byte("new hook content")
+		newHookHash, err := r.r.WriteBlob(newHookBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		newSha256Hash := sha256.New()
+		newSha256Hash.Write(newHookBytes)
+		newSha256HashSum := hex.EncodeToString(newSha256Hash.Sum(nil))
+
+		err = r.UpdateHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, newHookBytes, environment, principals, timeout,
+			true, trustpolicyopts.WithRSLEntry())
+		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err = state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		hooks, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
+		assert.Nil(t, err)
+
+		prePushHook = tufv01.Hook{
+			Name:         hookName,
+			PrincipalIDs: set.NewSetFromItems(rootPubKey.KeyID),
+			Hashes:       map[string]string{gitinterface.GitBlobHashName: newHookHash.String(), gitinterface.SHA256HashName: newSha256HashSum},
+			Environment:  environment,
+			Timeout:      timeout,
+		}
+		prePushHooks = []tuf.Hook{&prePushHook}
+		assert.Equal(t, prePushHooks, hooks)
+	})
+}
+
 func getRootPrincipalIDs(t *testing.T, rootMetadata tuf.RootMetadata) *set.Set[string] {
 	t.Helper()
 

@@ -1042,6 +1042,80 @@ func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVeri
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// UpdateHook updates the hook specified by stage and hookName with the new
+// principalIDs, hashes, environment, and timeout.
+func (r *Repository) UpdateHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, hookBytes []byte, environment tuf.HookEnvironment, principalIDs []string, timeout int, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	if hookName == "" {
+		return ErrNoHookName
+	}
+
+	if timeout < 1 {
+		return ErrInvalidHookTimeout
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	var hashes = make(map[string]string, 2)
+	blobID, err := r.r.WriteBlob(hookBytes)
+	if err != nil {
+		return err
+	}
+	hashes[gitinterface.GitBlobHashName] = blobID.String()
+
+	sha256Hash := sha256.New()
+	sha256Hash.Write(hookBytes)
+	hashes[gitinterface.SHA256HashName] = hex.EncodeToString(sha256Hash.Sum(nil))
+
+	slog.Debug("Updating hook in rule file...")
+	err = rootMetadata.UpdateHook(stages, hookName, principalIDs, hashes, environment, timeout)
+	if err != nil {
+		return err
+	}
+
+	for _, stage := range stages {
+		updatedHooks, err := rootMetadata.GetHooks(stage)
+		if err != nil {
+			return err
+		}
+
+		state.Hooks[stage] = updatedHooks
+	}
+
+	commitMessage := fmt.Sprintf("Update hook '%s' in root metadata", hookName)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // EnableController makes the current repository a "controller" repository used
 // to specify gittuf policies for other repositories.
 func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
