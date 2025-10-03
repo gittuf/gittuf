@@ -1,7 +1,4 @@
-// Copyright The gittuf Authors
-// SPDX-License-Identifier: Apache-2.0
-
-package addteam
+package updateteam
 
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -25,7 +22,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"name of policy file to add team to",
+		"name of policy file to update team in",
 	)
 
 	cmd.Flags().StringVar(
@@ -42,6 +39,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		[]string{},
 		"authorized principalIDs of this team",
 	)
+	cmd.MarkFlagRequired("principalIDs")
 
 	cmd.Flags().IntVar(
 		&o.threshold,
@@ -49,6 +47,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		1,
 		"threshold of required valid signatures",
 	)
+	cmd.MarkFlagRequired("threshold")
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -67,15 +66,15 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.AddTeamToTargets(cmd.Context(), signer, o.policyName, o.teamID, o.principalIDs, o.threshold, true, opts...)
+	return repo.UpdateTeamInTargets(cmd.Context(), signer, o.policyName, o.teamID, o.principalIDs, o.threshold, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:               "add-team",
-		Short:             "Add a trusted team to a policy file",
-		Long:              `The 'add-team' command adds a trusted team to a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Use:               "update-team",
+		Short:             "Update an existing trusted team in a policy file",
+		Long:              `The 'update-team' command updates the principals or the theshold of an existing trusted team in a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

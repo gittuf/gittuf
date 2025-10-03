@@ -444,6 +444,12 @@ func TestRemoveTeam(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUpdateTeam(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+	err := targetsMetadata.UpdateTeam("team1", []tuf.Principal{}, 1)
+	assert.Error(t, err)
+}
+
 func TestGetTeams(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 	_, err := targetsMetadata.GetTeams()
