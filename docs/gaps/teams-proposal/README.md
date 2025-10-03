@@ -3,18 +3,19 @@
 ## Metadata
 
 * **Number:** TBD
-* **Title:** Supporting Teams in gittuf
+* **Title:** Supporting Teams and Hats in gittuf
 * **Implemented:** No
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Yongjae Chung (yongjae354)
 * **Contributors:**
 * **Related GAPs:** [GAP-5](/docs/gaps/5/README.md)
-* **Last Modified:** September 23, 2025
+* **Last Modified:** October 3, 2025
 
 ## Abstract
 Currently gittuf requires identities to be limited to a single key or person. In
-this GAP, we aim to increase the usability by introducing the idea of Teams,
-where multiple identities can be grouped together to be given equal privileges.
+this GAP, we aim to increase the usability and scalability of gittuf by
+introducing the idea of Teams, where multiple identities can be grouped together
+to be given equal privileges.
 
 ## Motivation
 In some usecases of gittuf, repository administrators may need to delegate
@@ -24,9 +25,11 @@ namespace. [GAP-5](/docs/gaps/5/README.md) introduces the notion of a principal,
 which allows multiple keys to be grouped to a single entity. However, the
 current implementation of principals does not support grouping multiple entities
 into a single entity. This makes it difficult for a delegating entity to
-identify groups within a delegation (since they are implicit), as well as
-modifying all associated delegations when someone needs to be added to or
-removed from a group.
+identify groups within a delegation (since they are implicit), as well as to
+modify all associated delegations when someone needs to be added to or removed
+from a group. With teams in gittuf, the delegating entity only needs to run an
+update to their team definition once, which will affect all delegations where
+the team is authorized.
 
 This GAP introduces the idea of a Team in gittuf, in which multiple principals
 can be grouped together as part of a single entity, and a single principal can
@@ -81,23 +84,52 @@ The schema of a team would look like the following.
 }
 ```
 
-TODO: add hat attestation definition, schema, examples
-- hat attestation should only count towards a team threshold, not a general rule
-  threshold.
-    - if a user attests using a hat, we assume they are representing a team.
-- during current verification workflow, there is a part where we count all
-  principals towards a threshold. 
-- we expand that area to include teams as well, generalizing the current flow to
-  entities, not principals.
-- for a team, we check if there are hat attestations from members and it fills
-  the threshold requirement.
-- we need to track keys used for those team members, so that it is not included
-  in the future for individual approvals.
+When a user in a team wishes to approve a change, they attest using a
+`ReferenceAuthorizationWithHat`.
+```go
+type ReferenceAuthorizationWithHat struct {
+	TargetRef   string `json:"targetRef"`
+	FromID      string `json:"fromID"`
+	TargetID    string `json:"targetID"`
+	PrincipalID string `json:"principalID"`
+	Hat         string `json:"hat"`
+}
+```
+A ReferenceAuthorizationWithHat only counts towards a team threshold, not a
+  general rule threshold. If a user attests indicating a hat, gittuf assumes
+  they are attesting as part of a team, not as an individual principal.
 
 ## Reasoning
+
+### Verification Workflow with Teams & Hats
 TODO:
-- Should a team further delegating authorization downstream be allowed?
-- Add changes to verification workflow
+```
+There are mainly 2 different cases for verification when including teams.
+
+Example:
+Protect-main requires 2 signatures (threshold=2). 
+Authorized entities: {dev-team, Carol}
+- dev-team: Principals = {Alice, Bob}, threshold = 2
+
+1st case: Alice signs a git object. (directly makes a change on main branch)
+ - need attestation from bob to satisfy team threshold -> check hat attestations
+ - then, need attestation from Carol to satisfy rule threshold.
+
+2nd case: Carol signs a git object.
+- need attestations from both Alice and Bob to satisfy team threshold
+- dev-team counts 1 towards rule threshold. And Carol's changes are approved.
+```
+
+*TODO: We need a way to indicate that Alice is wearing dev-team hat when she
+directly signs a git object. For attestations, we can use a new attestation type
+`ReferenceAuthorizationWithHat` which includes hat information. However, for
+direct changes, we may need to add a flag in rsl record to indicate which hat
+the user is wearing. I think we should also enforce the validity of the hat the
+user inputs, rather than leaving it up to the verification flow. Unless there is
+a usecase for allowing temporarily invalid hat attestations in the RSL, (maybe a
+user's team inclusion is approved latter than a user's hat attestation?)*
+
+### TODO: Using Teams to Delegate Authorization
 
 ## Backwards Compatibility
 Introducing teams and hat selection in gittuf must be backwards compatible, as
@@ -107,20 +139,23 @@ using previous key-based or principal-based metadata for smaller projects, and
 incorporating teams in larger projects with groups of collaborators. 
 
 ## Security
-TODO: Allowing hat-based authorizations may increase key compromise risk. For
-example, having a principal with a high-privilege security hat and a regular
-developer hat increases the key compromise risk for a single key. A potential
-solution for this is to require Sigstore integration for multi-factor and
-ephemeral authorization.
+
+### Addressing Additional Key Compromise Risk
+Allowing hat-based authorizations may increase the risk of key compromise for a
+single user key. For example, assume a user Alice, with a high-privilege
+security hat and a regular developer hat. The key compromise risk for a single
+key is now higher for Alice, as obtaining Alice's private keys for developer hat
+access also implies access to the security hat. A potential solution for this
+problem is to require Sigstore integration for users that are members of teams,
+enforcing multi-factor and ephemeral authorization.
 
 ### Counting a Team towards a Threshold
-Similarly to what has been discussed in [GAP-5](/docs/gaps/5/README.md), adding
+Similar to what has been discussed in [GAP-5](/docs/gaps/5/README.md), adding
 teams introduces some additional complexity during verification. 
 
 > The workflow must now track whether a key was used for another previously
 examined principal to avoid counting a single signature for two principals who
-both have the same key associated with them. [GAP-5, Counting a Principal towards a
-Threshold](/docs/gaps/5/README.md##Security###Counting-a-Principal-towards-Threshold)
+both have the same key associated with them.
 
 For team thresholds, since we don't allow for nested teams (a team consisting
 another team as a member), the above workflow still applies. That is, counting
