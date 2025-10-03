@@ -4,7 +4,7 @@ Chainguard, and New Jersey Institute of Technology (NJIT).
 Aditya Sirish A Yelgundhalli
   Email: aditya.sirish@nyu.edu
   GitHub username: @adityasaky
-  Affiliation: NYU
+  Affiliation: Bloomberg
 
 Justin Cappos
   Email: jcappos@nyu.edu
