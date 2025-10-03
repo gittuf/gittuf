@@ -22,6 +22,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updateperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updaterule"
+	"github.com/gittuf/gittuf/internal/cmd/policy/updateteam"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/apply"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/discard"
 	"github.com/gittuf/gittuf/internal/cmd/trustpolicy/remote"
@@ -60,6 +61,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(tui.New(o))
 	cmd.AddCommand(updateperson.New(o))
 	cmd.AddCommand(updaterule.New(o))
+	cmd.AddCommand(updateteam.New(o))
 
 	return cmd
 }

@@ -1,20 +1,20 @@
-## gittuf policy add-team
+## gittuf policy update-team
 
-Add a trusted team to a policy file
+Update an existing trusted team in a policy file
 
 ### Synopsis
 
-The 'add-team' command adds a trusted team to a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'update-team' command updates the principals or the theshold of an existing trusted team in a gittuf policy file. In gittuf, a team definition consists of a unique identifier ('--team-ID'), zero or more unique IDs for authorized team members ('--principal-IDs'), and a threshold. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
 
 ```
-gittuf policy add-team [flags]
+gittuf policy update-team [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                       help for add-team
-      --policy-name string         name of policy file to add team to (default "targets")
+  -h, --help                       help for update-team
+      --policy-name string         name of policy file to update team in (default "targets")
       --principalIDs stringArray   authorized principalIDs of this team
       --team-ID string             team ID
       --threshold int              threshold of required valid signatures (default 1)

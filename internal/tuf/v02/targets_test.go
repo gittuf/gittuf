@@ -125,6 +125,26 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrTeamNotFound)
 	})
 
+	t.Run("test UpdateTeam", func(t *testing.T) {
+		targetsMetadata := NewTargetsMetadata()
+		assert.Nil(t, targetsMetadata.Delegations.Teams)
+
+		team1 := &Team{
+			TeamID:     "team1",
+			Principals: []tuf.Principal{},
+			Threshold:  1,
+		}
+
+		err := targetsMetadata.AddTeam("team1", []tuf.Principal{}, 1)
+		assert.Nil(t, err)
+		assert.Equal(t, team1, targetsMetadata.Delegations.Teams["team1"])
+
+		err = targetsMetadata.UpdateTeam("team1", []tuf.Principal{person}, 2)
+		assert.Nil(t, err)
+		assert.Equal(t, []tuf.Principal{person}, targetsMetadata.Delegations.Teams["team1"].GetPrincipals())
+		assert.Equal(t, 2, targetsMetadata.Delegations.Teams["team1"].GetThreshold())
+	})
+
 	t.Run("test GetTeams", func(t *testing.T) {
 		targetsMetadata := NewTargetsMetadata()
 		assert.Nil(t, targetsMetadata.Delegations.Teams)

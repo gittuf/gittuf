@@ -48,4 +48,5 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy tui](gittuf_policy_tui.md)	 - Start the TUI for managing policies
 * [gittuf policy update-person](gittuf_policy_update-person.md)	 - Update a person in a policy file
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
+* [gittuf policy update-team](gittuf_policy_update-team.md)	 - Update an existing trusted team in a policy file
 

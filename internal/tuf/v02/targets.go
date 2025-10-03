@@ -265,6 +265,11 @@ func (t *TargetsMetadata) RemoveTeam(teamID string) error {
 	return t.Delegations.removeTeam(teamID)
 }
 
+// UpdateTeam updates a team in the metadata with the given principals and threshold.
+func (t *TargetsMetadata) UpdateTeam(teamID string, principals []tuf.Principal, threshold int) error {
+	return t.Delegations.updateTeam(teamID, principals, threshold)
+}
+
 // Delegations defines the schema for specifying delegations in TUF's Targets
 // metadata.
 type Delegations struct {
@@ -419,6 +424,26 @@ func (d *Delegations) removeTeam(teamID string) error {
 		}
 	}
 	delete(d.Teams, teamID)
+	return nil
+}
+
+func (d *Delegations) updateTeam(teamID string, principals []tuf.Principal, threshold int) error {
+	if d.Teams == nil {
+		return tuf.ErrTeamNotFound
+	}
+
+	if teamID == "" {
+		return tuf.ErrInvalidTeamID
+	}
+
+	val := d.Teams[teamID]
+	team, ok := val.(*Team)
+	if !ok {
+		return tuf.ErrTeamNotFound
+	}
+	team.Principals = principals
+	team.Threshold = threshold
+
 	return nil
 }
 

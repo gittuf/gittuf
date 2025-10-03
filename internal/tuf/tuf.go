@@ -279,6 +279,9 @@ type TargetsMetadata interface {
 
 	// RemoveTeam removes a team from the metadata.
 	RemoveTeam(teamID string) error
+
+	// UpdateTeam updates a team in the metadata with the given principals and threshold.
+	UpdateTeam(teamID string, principals []Principal, threshold int) error
 }
 
 // Rule represents a rule entry in a rule file (`TargetsMetadata`).
@@ -296,6 +299,11 @@ type Rule interface {
 	// GetPrincipalIDs returns the identifiers of the principals that are listed
 	// as trusted by the rule.
 	GetPrincipalIDs() *set.Set[string]
+
+	// GetTeamIDs returns the identifiers of the teams that are listed
+	// as trusted by the rule.
+	GetTeamIDs() *set.Set[string]
+
 	// GetThreshold returns the threshold of principals that must approve to
 	// meet the rule.
 	GetThreshold() int
