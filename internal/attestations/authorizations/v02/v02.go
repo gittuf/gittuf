@@ -23,6 +23,7 @@ const (
 	targetRefKey       = "targetRef"
 	fromIDKey          = "fromID"
 	targetIDKey        = "targetID"
+	teamIDKey          = "teamID"
 )
 
 // ReferenceAuthorization is a lightweight record of a detached authorization in
@@ -32,6 +33,7 @@ type ReferenceAuthorization struct {
 	TargetRef string `json:"targetRef"`
 	FromID    string `json:"fromID"`
 	TargetID  string `json:"targetID"`
+	TeamID    string `json:"teamID"`
 }
 
 func (r *ReferenceAuthorization) GetRef() string {
@@ -46,32 +48,8 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 	return r.TargetID
 }
 
-type ReferenceAuthorizationWithHat struct {
-	TargetRef   string `json:"targetRef"`
-	FromID      string `json:"fromID"`
-	TargetID    string `json:"targetID"`
-	PrincipalID string `json:"principalID"`
-	Hat         string `json:"hat"`
-}
-
-func (r *ReferenceAuthorizationWithHat) GetRef() string {
-	return r.TargetRef
-}
-
-func (r *ReferenceAuthorizationWithHat) GetFromID() string {
-	return r.FromID
-}
-
-func (r *ReferenceAuthorizationWithHat) GetTargetID() string {
-	return r.TargetID
-}
-
-func (r *ReferenceAuthorizationWithHat) GetPrincipalID() string {
-	return r.PrincipalID
-}
-
-func (r *ReferenceAuthorizationWithHat) GetHat() string {
-	return r.Hat
+func (r *ReferenceAuthorization) GetTeamID() string {
+	return r.TeamID
 }
 
 // NewReferenceAuthorizationForCommit creates a new reference authorization for
@@ -80,26 +58,8 @@ func (r *ReferenceAuthorizationWithHat) GetHat() string {
 // `fromID` and `targetID` specify the change to `targetRef` that is to be
 // authorized by invoking this function. The targetID is expected to be the Git
 // tree ID of the resultant commit.
-func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ita.Statement{
-		Type: ita.StatementTypeUri,
-		Subject: []*ita.ResourceDescriptor{
-			{
-				Digest: map[string]string{digestGitTreeKey: targetID},
-			},
-		},
-		PredicateType: PredicateType,
-		Predicate:     predicateStruct,
-	}, nil
-}
-
-func NewReferenceHatAuthorizationForCommit(targetRef, fromID, targetID, principalID, hat string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceHAuthorizationWithHatStruct(targetRef, fromID, targetID, principalID, hat)
+func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID, teamID string) (*ita.Statement, error) {
+	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,8 +82,8 @@ func NewReferenceHatAuthorizationForCommit(targetRef, fromID, targetID, principa
 // `targetID` specify the change to `targetRef` that is to be authorized by
 // invoking this function. The targetID is expected to be the ID of the commit
 // the tag will point to.
-func NewReferenceAuthorizationForTag(targetRef, fromID, targetID string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
+func NewReferenceAuthorizationForTag(targetRef, fromID, targetID, teamID string) (*ita.Statement, error) {
+	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID, teamID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,23 +150,12 @@ func Validate(env *sslibdsse.Envelope, targetRef, fromID, targetID string) error
 	return nil
 }
 
-func newReferenceAuthorizationStruct(targetRef, fromID, targetID string) (*structpb.Struct, error) {
+func newReferenceAuthorizationStruct(targetRef, fromID, targetID, teamID string) (*structpb.Struct, error) {
 	predicate := &ReferenceAuthorization{
 		TargetRef: targetRef,
 		FromID:    fromID,
 		TargetID:  targetID,
-	}
-
-	return common.PredicateToPBStruct(predicate)
-}
-
-func newReferenceHAuthorizationWithHatStruct(targetRef, fromID, targetID, principalID, hat string) (*structpb.Struct, error) {
-	predicate := &ReferenceAuthorizationWithHat{
-		TargetRef:   targetRef,
-		FromID:      fromID,
-		TargetID:    targetID,
-		PrincipalID: principalID,
-		Hat:         hat,
+		TeamID:    teamID,
 	}
 
 	return common.PredicateToPBStruct(predicate)

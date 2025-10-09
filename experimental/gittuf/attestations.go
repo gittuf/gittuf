@@ -149,9 +149,9 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		slog.Debug("Creating new reference authorization...")
 		var statement *ita.Statement
 		if isTag {
-			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String())
+			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String(), options.TeamID)
 		} else {
-			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String())
+			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String(), options.TeamID)
 		}
 		if err != nil {
 			return err

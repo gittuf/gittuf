@@ -20,6 +20,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -75,29 +76,41 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 	if gitObjectID != nil && !gitObjectID.IsZero() {
 		slog.Debug(fmt.Sprintf("Verifying signature of Git object with ID '%s'...", gitObjectID.String()))
 		for _, principal := range v.principals {
-			// there are multiple keys we must try
-			keys := principal.Keys()
+			// If the principal is of a person type, then we simply check all
+			// the person's keys
 
-			for _, key := range keys {
-				err := v.repository.VerifySignature(ctx, gitObjectID, key)
-				if err == nil {
-					// Signature verification succeeded
-					slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
-					usedPrincipalIDs.Add(principal.ID())
-					usedKeyIDs.Add(key.KeyID)
-					gitObjectVerified = true
+			if _, ok := principal.(*tufv02.Person); ok {
+				// there are multiple keys we must try
+				keys := principal.Keys()
 
-					// No need to try the other keys for this principal, break
-					break
+				for _, key := range keys {
+					err := v.repository.VerifySignature(ctx, gitObjectID, key)
+					if err == nil {
+						// Signature verification succeeded
+						slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
+						usedPrincipalIDs.Add(principal.ID())
+						usedKeyIDs.Add(key.KeyID)
+						gitObjectVerified = true
+
+						// No need to try the other keys for this principal, break
+						break
+					}
+					if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+						// TODO: this should be removed once we have unified signing
+						// methods across metadata and git signatures
+						continue
+					}
+					if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+						return nil, err
+					}
 				}
-				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
-					// TODO: this should be removed once we have unified signing
-					// methods across metadata and git signatures
-					continue
-				}
-				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
-					return nil, err
-				}
+			}
+
+			// If the principal is of a team type, then we must identify which
+			// team members have approved on behalf of said team
+
+			if _, ok := principal.(*tufv02.Team); ok {
+				//TODO: Do fancy team logic here.
 			}
 
 			if gitObjectVerified {

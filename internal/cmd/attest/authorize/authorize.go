@@ -16,6 +16,7 @@ import (
 type options struct {
 	p       *persistent.Options
 	fromRef string
+	teamID  string
 	revoke  bool
 }
 
@@ -28,6 +29,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"ref to authorize merging changes from",
 	)
 	cmd.MarkFlagRequired("from-ref") //nolint:errcheck
+
+	cmd.Flags().StringVarP(
+		&o.teamID,
+		"team-ID",
+		"",
+		"",
+		"team ID to perform approval on behalf of",
+	)
 
 	cmd.Flags().BoolVarP(
 		&o.revoke,
@@ -60,6 +69,9 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	opts := []attestopts.Option{}
 	if o.p.WithRSLEntry {
 		opts = append(opts, attestopts.WithRSLEntry())
+	}
+	if o.teamID != "" {
+		opts = append(opts, attestopts.WithTeamID(o.teamID))
 	}
 
 	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true, opts...)

@@ -22,12 +22,8 @@ import (
 // `fromID` and `toID` specify the change to `targetRef` that is to be
 // authorized by invoking this function. Since this is for a commit, the `toID`
 // is expected to be a Git tree ID.
-func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.Statement, error) {
-	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID)
-}
-
-func NewReferenceHatAuthorizationForCommit(targetRef, fromID, toID, principalID, hat string) (*ita.Statement, error) {
-	return authorizationsv02.NewReferenceHatAuthorizationForCommit(targetRef, fromID, toID, principalID, hat)
+func NewReferenceAuthorizationForCommit(targetRef, fromID, toID, teamID string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID, teamID)
 }
 
 // NewReferenceAuthorizationForTag creates a new reference authorization for the
@@ -36,8 +32,8 @@ func NewReferenceHatAuthorizationForCommit(targetRef, fromID, toID, principalID,
 // `toID` specify the change to `targetRef` that is to be authorized by invoking
 // this function. Since this is for a tag, the `toID` is expected to be a Git
 // commit ID.
-func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.Statement, error) {
-	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID)
+func NewReferenceAuthorizationForTag(targetRef, fromID, toID, teamID string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID, teamID)
 }
 
 // SetReferenceAuthorization writes the new reference authorization attestation

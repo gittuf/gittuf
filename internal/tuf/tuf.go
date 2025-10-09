@@ -90,7 +90,7 @@ type Principal interface {
 }
 
 type Team interface {
-	ID() string
+	Principal
 	GetPrincipals() []Principal
 	GetThreshold() int
 }
