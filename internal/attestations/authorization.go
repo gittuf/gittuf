@@ -26,6 +26,10 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.St
 	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID)
 }
 
+func NewReferenceHatAuthorizationForCommit(targetRef, fromID, toID, principalID, hat string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceHatAuthorizationForCommit(targetRef, fromID, toID, principalID, hat)
+}
+
 // NewReferenceAuthorizationForTag creates a new reference authorization for the
 // provided information. The authorization is embedded in an in-toto "statement"
 // and returned with the appropriate "predicate type" set. The `fromID` and

@@ -187,6 +187,132 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// AddReferenceHatAuthorization adds a reference hat authorization attestation to the
+// repository for the specified target ref. The from ID is identified using the
+// last RSL entry for the target ref. The to ID is that of the expected Git tree
+// created by merging the feature ref into the target ref. The commit used to
+// calculate the merge tree ID is identified using the RSL for the feature ref.
+func (r *Repository) AddReferenceAuthorizationWithHat(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, featureRef string, hat string, signCommit bool, opts ...attestopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &attestopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	var err error
+	targetRef, err = r.r.AbsoluteReference(targetRef)
+	if err != nil {
+		return err
+	}
+
+	featureRef, err = r.r.AbsoluteReference(featureRef)
+	if err != nil {
+		return err
+	}
+
+	var (
+		fromID          gitinterface.Hash
+		featureCommitID gitinterface.Hash
+		toID            gitinterface.Hash
+	)
+
+	isTag := strings.HasPrefix(targetRef, gitinterface.TagRefPrefix)
+
+	slog.Debug("Identifying current status of target Git reference...")
+	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))
+	if err == nil {
+		fromID = latestTargetEntry.GetTargetID()
+	} else {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return err
+		}
+		fromID = gitinterface.ZeroHash
+	}
+
+	slog.Debug("Identifying current status of feature Git reference...")
+	latestFeatureEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(featureRef))
+	if err != nil {
+		// We don't have an RSL entry for the feature ref to use to approve the
+		// merge
+		return err
+	}
+	featureCommitID = latestFeatureEntry.GetTargetID()
+
+	if isTag {
+		// for tags, the toID is the commitID the tag will point to
+		toID = featureCommitID
+	} else {
+		slog.Debug("Computing expected merge tree...")
+		mergeTreeID, err := r.r.GetMergeTree(fromID, featureCommitID)
+		if err != nil {
+			return err
+		}
+		toID = mergeTreeID
+	}
+
+	slog.Debug("Loading current set of attestations...")
+	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	// Does a reference authorization already exist for the parameters?
+	hasAuthorization := false
+	env, err := allAttestations.GetReferenceAuthorizationFor(r.r, targetRef, fromID.String(), toID.String()) // TODO: need to make a hat search
+	if err == nil {
+		slog.Debug("Found existing reference authorization...")
+		hasAuthorization = true
+	} else if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
+		return err
+	}
+
+	if !hasAuthorization {
+		// Create a new reference authorization and embed in env
+		slog.Debug("Creating new reference authorization...")
+		var statement *ita.Statement
+		principalID, err := signer.KeyID()
+		if err != nil {
+			return err
+		}
+		statement, err = attestations.NewReferenceHatAuthorizationForCommit(targetRef, fromID.String(), toID.String(), principalID, hat)
+		if err != nil {
+			return err
+		}
+
+		env, err = dsse.CreateEnvelope(statement)
+		if err != nil {
+			return err
+		}
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing reference authorization using '%s' while wearing '%s' hat...", keyID, hat))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if err := allAttestations.SetReferenceAuthorization(r.r, env, targetRef, fromID.String(), toID.String()); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add reference authorization for '%s' from '%s' to '%s'", targetRef, fromID, toID)
+
+	slog.Debug("Committing attestations...")
+	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // RemoveReferenceAuthorization removes a previously issued authorization for
 // the specified parameters. The issuer of the authorization is identified using
 // their key.
