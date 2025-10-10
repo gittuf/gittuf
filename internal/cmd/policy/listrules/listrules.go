@@ -38,7 +38,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	// Iterate through the rules, they are already in order, and the depth tells us how to indent.
 	// The order is a pre-order traversal of the delegation tree, so that the parent is always before the children.
 
-	for _, curRule := range rules {
+	for i, curRule := range rules {
 		fmt.Printf(strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.ID())
 		gitpaths, filepaths := []string{}, []string{}
 		for _, path := range curRule.Delegation.GetProtectedNamespaces() {
@@ -67,6 +67,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		}
 
 		fmt.Println(strings.Repeat("    ", curRule.Depth+1) + fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.GetThreshold()))
+		if i < len(rules)-1 {
+			fmt.Println()
+		}
 	}
 	return nil
 }

@@ -214,6 +214,10 @@ type RootMetadata interface {
 	// environment (e.g. lua) and maximum allowable running time in seconds are
 	// also required.
 	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) (Hook, error)
+	// UpdateHook updates the hook identified by hookName in the specified Git
+	// stage with the provided parameters. The parameters are the same as those
+	// used in AddHook.
+	UpdateHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) error
 	// RemoveHook removes the hook identified by hookName in the specified Git
 	// stage.
 	RemoveHook(stages []HookStage, hookName string) error

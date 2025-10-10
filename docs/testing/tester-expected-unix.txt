@@ -14,9 +14,8 @@
 + gittuf trust init -k ../keys/root
 + gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
 + gittuf policy init -k ../keys/policy --policy-name targets
-+ gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
-+ gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
-Flag --authorize-key has been deprecated, use --authorize instead
++ gittuf policy add-person -k ../keys/policy --person-ID developer --public-key ../keys/developer.pub
++ gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize developer
 + gittuf policy stage --local-only
 + gittuf policy apply --local-only
 + echo 'Hello, world!'

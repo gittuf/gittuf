@@ -25,7 +25,7 @@ ARCH=amd64
 # One of: linux, darwin, freebsd
 OS=linux
 # See https://github.com/gittuf/gittuf/releases for the latest version
-VERSION=0.8.0
+VERSION=0.12.0
 cd $(mktemp -d)
 
 curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}
@@ -58,19 +58,19 @@ winget install gittuf
 #### Manual installation
 
 Copy and paste these commands in PowerShell to install gittuf. Please remember
-to change the version number (0.8.0 in this example) and architecture
+to change the version number (0.12.0 in this example) and architecture
 (amd64 in this example) according to your use-case and system.
 
 ```powershell
-curl "https://github.com/gittuf/gittuf/releases/download/v0.8.0/gittuf_0.8.0_windows_amd64.exe" -O "gittuf_0.8.0_windows_amd64.exe"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.8.0/gittuf_0.8.0_windows_amd64.exe.sig" -O "gittuf_0.8.0_windows_amd64.exe.sig"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.8.0/gittuf_0.8.0_windows_amd64.exe.pem" -O "gittuf_0.8.0_windows_amd64.exe.pem"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe" -O "gittuf_0.12.0_windows_amd64.exe"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.sig" -O "gittuf_0.12.0_windows_amd64.exe.sig"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.pem" -O "gittuf_0.12.0_windows_amd64.exe.pem"
 
-cosign verify-blob --certificate gittuf_0.8.0_windows_amd64.exe.pem --signature gittuf_0.8.0_windows_amd64.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v0.8.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_0.8.0_windows_amd64.exe
+cosign verify-blob --certificate gittuf_0.12.0_windows_amd64.exe.pem --signature gittuf_0.12.0_windows_amd64.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v0.12.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_0.12.0_windows_amd64.exe
 ```
 
-The gittuf binary is now verified on your system. You can run it from the terminal
-as `gittuf.exe` from this directory, or add it to your PATH as desired.
+The gittuf binary is now verified on your system. You can run it from the
+terminal as `gittuf.exe` from this directory, or add it to your PATH as desired.
 
 ## Building from source
 
@@ -79,7 +79,8 @@ as `gittuf.exe` from this directory, or add it to your PATH as desired.
 > the OS. The easiest way to install `make` on Windows is to use the
 > `ezwinports.make` package: Simply type `winget install ezwinports.make`
 > in PowerShell.
-> You can also install it from the [GNU website] or the [chocolatey] package manager.
+> You can also install it from the [GNU website] or the [chocolatey] package
+> manager.
 
 Before building from source, please ensure that your Go environment is correctly
 set up. You can do this by following the official [Go installation
@@ -87,7 +88,7 @@ instructions]. If you encounter any issues when building, make sure your
 `GOPATH` and `PATH` are configured correctly.
 
 To build from source, clone the repository and run `make`. This will also run
-the test suite prior to installing gittuf. Note that Go 1.23 or higher is
+the test suite prior to installing gittuf. Note that Go 1.24 or higher is
 necessary to build gittuf.
 
 ```sh
@@ -104,7 +105,8 @@ First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
 
 > [!NOTE]
-> If running on Windows, do not use the `-N ""` flag in the `ssh-keygen` commands.
+> If running on Windows, do not use the `-N ""` flag in the `ssh-keygen`
+> commands.
 > Instead, enter an empty passphrase when prompted.
 
 ```bash
@@ -145,20 +147,18 @@ from TUF) must be signed by keys specified in the root of trust.
 gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
 gittuf policy init -k ../keys/policy --policy-name targets
 ```
-Then, use the policy key to initialize a policy and add a rule protecting the
-`main` branch.
+Add trusted person to the policy file. Then, use the policy key to initialize
+a policy and add a rule protecting the `main` branch.
 
 ```bash
-gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
-gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
+gittuf policy add-person -k ../keys/policy --person-ID developer --public-key ../keys/developer.pub
+gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize developer
 ```
 
 Note that `add-key` can also be used to specify a GPG key or a [Sigstore]
 identity for use with [gitsign]. However, we're using SSH keys throughout in
 this guide, as gittuf policy metadata currently cannot be signed using GPG (see
-[#229]). Also, `--authorize-key` in `gittuf policy add-rule` may return a
-deprecation warning. This guide will be updated with the new `--authorize` flag
-in its place.
+[#229]).
 
 Next, _stage_ the policies into the policy-staging area. The policy-staging
 area is useful for sharing changes to policies that must not be used yet.
@@ -198,9 +198,15 @@ gittuf verify-ref --verbose main
 
 ## Communicating with a remote
 
-gittuf includes helpers to push and fetch the policy and RSL references.
-However, there are some known issues (see [#328]) with these commands. In the
-meantime, Git can be used to keep gittuf's references updated.
+gittuf includes two main ways to push and fetch the policy and RSL references.
+You may use the `gittuf sync` command to synchronize changes with the remote
+automatically. You may also instead use the [gittuf
+transport](/internal/git-remote-gittuf), which handles the synchronization of
+gittuf metadata transparently upon standard Git pushes and pulls, without
+needing to explicitly invoke gittuf.
+
+If you prefer to manually synchronize references, Git can be used to keep
+gittuf's references updated.
 
 ```sh
 git push <remote> refs/gittuf/*
