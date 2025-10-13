@@ -147,20 +147,18 @@ from TUF) must be signed by keys specified in the root of trust.
 gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
 gittuf policy init -k ../keys/policy --policy-name targets
 ```
-Then, use the policy key to initialize a policy and add a rule protecting the
-`main` branch.
+Add a trusted person to the policy file. Then, use the policy key to initialize
+a policy and add a rule protecting the `main` branch.
 
 ```bash
-gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
-gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
+gittuf policy add-person -k ../keys/policy --person-ID developer --public-key ../keys/developer.pub
+gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize developer
 ```
 
 Note that `add-key` can also be used to specify a GPG key or a [Sigstore]
 identity for use with [gitsign]. However, we're using SSH keys throughout in
 this guide, as gittuf policy metadata currently cannot be signed using GPG (see
-[#229]). Also, `--authorize-key` in `gittuf policy add-rule` may return a
-deprecation warning. This guide will be updated with the new `--authorize` flag
-in its place.
+[#229]).
 
 Next, _stage_ the policies into the policy-staging area. The policy-staging
 area is useful for sharing changes to policies that must not be used yet.
