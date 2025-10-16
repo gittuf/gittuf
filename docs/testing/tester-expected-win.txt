@@ -50,9 +50,8 @@ DEBUG:   11+  >>>> git config --local user.signingkey ../keys/developer
 DEBUG:   12+  >>>> gittuf trust init -k ../keys/root
 DEBUG:   13+  >>>> gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
 DEBUG:   14+  >>>> gittuf policy init -k ../keys/policy --policy-name targets
-DEBUG:   15+  >>>> gittuf policy add-key -k ../keys/policy --public-key ../keys/developer.pub
-DEBUG:   16+  >>>> gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize-key ../keys/developer.pub
-Flag --authorize-key has been deprecated, use --authorize instead
+DEBUG:   15+  >>>> gittuf policy add-person -k ../keys/policy --person-ID developer --public-key ../keys/developer.pub
+DEBUG:   16+  >>>> gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize developer
 DEBUG:   17+  >>>> gittuf policy stage --local-only
 DEBUG:   18+  >>>> gittuf policy apply --local-only
 DEBUG:   19+  >>>> echo "Hello, world!" > README.md
