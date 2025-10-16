@@ -27,7 +27,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 		}
 
 		_, err := LoadSignerFromGitConfig(repo)
-		assert.ErrorContains(t, err, "not implemented")
+		assert.ErrorContains(t, err, "not specified")
 	})
 
 	t.Run("ssh key configured, but no signing key specified", func(t *testing.T) {
