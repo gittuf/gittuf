@@ -87,6 +87,29 @@ func TestInitializeRoot(t *testing.T) {
 	})
 }
 
+func TestPreventReinitializeRoot(t *testing.T) {
+	t.Run("fails when root already applied (policy ref exists)", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		err := r.InitializeRoot(testCtx, signer, false)
+		assert.ErrorIs(t, err, ErrCannotReinitialize)
+	})
+
+	t.Run("fails when root staged but not applied (policy-staging has root)", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		r := &Repository{r: repo}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.InitializeRoot(testCtx, signer, false)
+		assert.Nil(t, err)
+
+		err = r.InitializeRoot(testCtx, signer, false)
+		assert.ErrorIs(t, err, ErrCannotReinitialize)
+	})
+}
+
 func TestSetRepositoryLocation(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 

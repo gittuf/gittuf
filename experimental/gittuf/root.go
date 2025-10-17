@@ -46,6 +46,24 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		}
 	}
 
+	if _, err := r.r.GetReference(policy.PolicyRef); err == nil {
+		return ErrCannotReinitialize
+	} else if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+		return err
+	}
+
+	if _, err := r.r.GetReference(policy.PolicyStagingRef); err == nil {
+		state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+		if err != nil {
+			return err
+		}
+		if state != nil && state.Metadata != nil && state.Metadata.RootEnvelope != nil {
+			return ErrCannotReinitialize
+		}
+	} else if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+		return err
+	}
+
 	options := &root.Options{}
 	for _, fn := range opts {
 		fn(options)
