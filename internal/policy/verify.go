@@ -420,7 +420,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 		}
 
 		// gittuf stores the controller metadata in a subdirectory in the policy
-		// ref that includes b64 encoded cntroller repo location
+		// ref that includes b64 encoded controller repo location
 		encodedLocation := base64.URLEncoding.EncodeToString([]byte(rootMetadata.GetRepositoryLocation()))
 
 		controllerPath := fmt.Sprintf("%s/%s-%s", tuf.GittufControllerPrefix, declaredControllerName, encodedLocation)

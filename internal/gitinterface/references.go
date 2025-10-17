@@ -149,7 +149,7 @@ func (r *Repository) AbsoluteReference(target string) (string, error) {
 	remoteRefName := RemoteReferenceName(target)
 	_, err = r.GetReference(remoteRefName)
 	if err == nil {
-		return branchName, nil
+		return remoteRefName, nil
 	}
 	if !errors.Is(err, ErrReferenceNotFound) {
 		return "", err
