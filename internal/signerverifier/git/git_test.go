@@ -19,10 +19,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		// If the local machine has a format set, setting it with an
-		// empty string would not overwrite the existing configuration.
-		// Setting it to "gpg" is equivalent to leaving it unspecified.
-		if err := repo.SetGitConfig("gpg.format", "gpg"); err != nil {
+		if err := repo.SetGitConfig("gpg.format", ""); err != nil {
 			t.Fatal(err)
 		}
 		if err := repo.SetGitConfig("user.signingkey", ""); err != nil {
