@@ -67,6 +67,7 @@ var (
 	ErrGlobalRuleAlreadyExists                         = errors.New("global rule already exists")
 	ErrCannotUpdateGlobalRuleType                      = errors.New("cannot change type of global rule")
 	ErrPropagationDirectiveNotFound                    = errors.New("specified propagation directive not found")
+	ErrPropagationDirectiveAlreadyExists               = errors.New("specified propagation directive already exists")
 	ErrNotAControllerRepository                        = errors.New("current repository is not marked as a controller repository")
 	ErrDuplicatedHookName                              = errors.New("two hooks with same name found in policy")
 	ErrInvalidHookStage                                = errors.New("invalid stage for hook")
