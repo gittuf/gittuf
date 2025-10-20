@@ -344,7 +344,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 				The helper has two commands, in reality: list, list
 				for-push. Both of these are used to list the states of refs
 				on the remote. The for-push variation just formats it in a
-				way that can be used for the push comamnd later.
+				way that can be used for the push command later.
 
 				We inspect this to learn we're in a push. We also use the
 				output of this command, implemented by git-remote-https, to
