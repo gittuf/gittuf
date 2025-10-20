@@ -18,6 +18,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
+	"github.com/gittuf/gittuf/internal/cmd/trust/listpropagationdirectives"
 	"github.com/gittuf/gittuf/internal/cmd/trust/makecontroller"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
@@ -62,7 +63,9 @@ func New() *cobra.Command {
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(inspectroot.New())
+	cmd.AddCommand(listglobalrules.New())
 	cmd.AddCommand(listhooks.New())
+	cmd.AddCommand(listpropagationdirectives.New())
 	cmd.AddCommand(makecontroller.New(o))
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubapp.New(o))
@@ -79,7 +82,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(updatepolicythreshold.New(o))
 	cmd.AddCommand(updatepropagationdirective.New(o))
 	cmd.AddCommand(updaterootthreshold.New(o))
-	cmd.AddCommand(listglobalrules.New())
 
 	return cmd
 }
