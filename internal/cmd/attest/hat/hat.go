@@ -7,6 +7,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +17,7 @@ type options struct {
 	teamID    string
 }
 
-func (o *options) AddFlag(cmd *cobra.Command) {
+func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(
 		&o.targetRef,
 		"target-ref",
@@ -24,6 +25,7 @@ func (o *options) AddFlag(cmd *cobra.Command) {
 		"",
 		"ref that the commit in question was made on",
 	)
+	cmd.MarkFlagRequired("target-ref")
 
 	cmd.Flags().StringVarP(
 		&o.teamID,
@@ -32,6 +34,7 @@ func (o *options) AddFlag(cmd *cobra.Command) {
 		"",
 		"team ID to perform the operation on behalf of",
 	)
+	cmd.MarkFlagRequired("team-ID")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -50,5 +53,21 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		opts = append(opts, attestopts.WithRSLEntry())
 	}
 
-	return repo.TODO
+	return repo.AddHatAttestation(cmd.Context(), signer, o.targetRef, o.teamID, true, opts...)
+}
+
+func New(persistent *persistent.Options) *cobra.Command {
+	o := &options{p: persistent}
+	cmd := &cobra.Command{
+		Use:               "hat",
+		Short:             "Add (todo: or revoke) hat attestation",
+		Long:              "This command creates a hat attestation that attests the hat a user has worn for a commit or tag.",
+		Args:              cobra.MinimumNArgs(2),
+		PreRunE:           common.CheckForSigningKeyFlag,
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
+	}
+	o.AddFlags(cmd)
+
+	return cmd
 }

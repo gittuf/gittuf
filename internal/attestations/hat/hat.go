@@ -1,12 +1,13 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package authorizations
+package hat
 
 import "errors"
 
 var (
-	ErrInvalidHatAttestation = errors.New("authorization attestation does not match expected details")
+	ErrInvalidHatAttestation  = errors.New("authorization attestation does not match expected details")
+	ErrHatAttestationNotFound = errors.New("requested hat attestation not found")
 )
 
 // HatAttestation represents an attestation that declares which team a person

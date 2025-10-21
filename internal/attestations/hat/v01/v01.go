@@ -71,6 +71,7 @@ func NewHatAttestationForTag(targetRef, targetID, teamID string) (*ita.Statement
 	}, nil
 }
 
+// TODO
 func Validate(env *sslibdsse.Envelope, targetRef, targetID, teamID string) error {
 	return nil
 }
