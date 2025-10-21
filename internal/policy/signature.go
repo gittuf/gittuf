@@ -110,7 +110,8 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 			// team members have approved on behalf of said team
 
 			if _, ok := principal.(*tufv02.Team); ok {
-				//TODO: Do fancy team logic here.
+				// TODO: We do not need to verify the approval attestations
+				// here, rather, we must verify
 			}
 
 			if gitObjectVerified {
