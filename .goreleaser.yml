@@ -100,13 +100,11 @@ signs:
 - cmd: cosign
   env:
   - COSIGN_YES=true
-  certificate: '${artifact}.pem'
-  signature: '${artifact}.sig'
+  signature: '${artifact}.sigstore.json'
   args:
   - sign-blob
-  - '--output-certificate=${certificate}'
-  - '--output-signature=${signature}'
   - '${artifact}'
+  - '--bundle=${signature}'
   artifacts: binary
   output: true
 
