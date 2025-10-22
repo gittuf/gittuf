@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/rsl"
 )
 
 /*
@@ -175,28 +177,24 @@ func run(ctx context.Context) error {
 			}
 		}
 
-		// Uncomment after gittuf can accept a git_dir env var; this will happen
-		// with the gitinterface PRs naturally.
-
 		// TODO: this must either be looped to address each changed ref that
 		// exists locally or gittuf needs another flag for --all.
-		// var cmd *exec.Cmd
-		// if rslTip != "" {
-		// 	log("we have rsl tip")
-		// 	cmd = exec.Command("gittuf", "verify-ref", "--from-entry", rslTip, "HEAD")
-		// } else {
-		// 	cwd, _ := os.Getwd()
-		// 	log("we don't have rsl tip", cwd)
-		// 	cmd = exec.Command("gittuf", "verify-ref", "HEAD")
-		// }
-		// _, err := cmd.Output()
-		// if err != nil {
-		// 	log(err.Error())
-		// 	if _, nerr := os.Stderr.Write([]byte("gittuf verification failed\n")); nerr != nil {
-		// 		return errors.Join(err, nerr)
-		// 	}
-		// 	return err
-		// }
+		rslTip := gittufRefsTips[rsl.Ref]
+		if rslTip != "" {
+			log("we have rsl tip")
+			err = repo.VerifyRefFromEntry(ctx, "HEAD", rslTip)
+		} else {
+			cwd, _ := os.Getwd()
+			log("we don't have rsl tip", cwd)
+			err = repo.VerifyRef(ctx, "HEAD")
+		}
+		if err != nil {
+			log(err.Error())
+			if _, nerr := os.Stderr.Write([]byte("gittuf verification failed\n")); nerr != nil {
+				return errors.Join(err, nerr)
+			}
+			return err
+		}
 	}
 
 	return nil
