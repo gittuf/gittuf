@@ -25,6 +25,8 @@ const (
 	codeReviewApprovalAttestationsTreeEntryName = "code-review-approvals"
 	codeReviewApprovalIndexTreeEntryName        = "review-index.json"
 
+	hatAttestationsTreeEntryName = "hat-attestations"
+
 	initialCommitMessage = "Initial commit"
 	defaultCommitMessage = "Update attestations"
 )
@@ -70,6 +72,9 @@ type Attestations struct {
 	// attestations namespace as a special blob in the
 	// codeReviewApprovalAttestations tree.
 	codeReviewApprovalIndex map[string]string
+
+	// TODO: HatAttestations maps each ??? to the blob ID of the attestation.
+	HatAttestations map[string]gitinterface.Hash
 }
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
@@ -126,6 +131,8 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.Reference
 			attestations.githubPullRequestAttestations[strings.TrimPrefix(name, githubPullRequestAttestationsTreeEntryName+"/")] = blobID
 		case strings.HasPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/"):
 			attestations.codeReviewApprovalAttestations[strings.TrimPrefix(name, codeReviewApprovalAttestationsTreeEntryName+"/")] = blobID
+		case strings.HasPrefix(name, hatAttestationsTreeEntryName+"/"):
+			attestations.HatAttestations[strings.TrimPrefix(name, hatAttestationsTreeEntryName+"/")] = blobID
 		}
 	}
 
