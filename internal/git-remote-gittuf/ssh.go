@@ -585,6 +585,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if oldTip != gitinterface.ZeroHash.String() {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
 				}
+
+				if err = repo.VerifyRef(ctx, dstRef); err != nil {
+					return nil, false, err
+				}
 			}
 
 			// TODO: gittuf verify-ref for each dstRef; abort if
