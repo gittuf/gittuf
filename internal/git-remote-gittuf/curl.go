@@ -24,7 +24,7 @@ var ErrFailedAuthentication = errors.New("failed getting remote refs")
 // handleCurl implements the helper for remotes configured to use the curl
 // backend. For this transport, we invoke git-remote-http, only interjecting at
 // specific points to make gittuf specific additions.
-func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, []string, error) {
 	// Scan git-remote-gittuf stdin for commands from the parent process
 	stdInScanner := &logScanner{name: "git-remote-gittuf stdin", scanner: bufio.NewScanner(os.Stdin)}
 	stdInScanner.Split(splitInput)
@@ -38,7 +38,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 	// We want to inspect the helper's stdout for the gittuf ref statuses
 	helperStdOutPipe, err := helper.StdoutPipe()
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	helperStdOut := &logReadCloser{name: "git-remote-http stdout", readCloser: helperStdOutPipe}
 
@@ -46,17 +46,18 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 	// specific objects and refs
 	helperStdInPipe, err := helper.StdinPipe()
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 	helperStdIn := &logWriteCloser{name: "git-remote-http stdin", writeCloser: helperStdInPipe}
 
 	if err := helper.Start(); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	var (
 		gittufRefsTips = map[string]string{}
 		isPush         bool
+		fetchedRefs    []string
 	)
 
 	for stdInScanner.Scan() {
@@ -75,7 +76,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 			// Write to git-remote-http
 			if _, err := helperStdIn.Write(input); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			// Receive the initial info sent by the service via
@@ -96,13 +97,13 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 					output := helperStdOutScanner.Bytes()
 
 					if _, err := stdOutWriter.Write(output); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 
 					// If nothing is returned, the user has likely failed to
 					// authenticate with the remote
 					if len(output) == 0 {
-						return nil, false, ErrFailedAuthentication
+						return nil, false, nil, ErrFailedAuthentication
 					}
 
 					// flushPkt is used to indicate the end of
@@ -135,12 +136,12 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 					log("adding ref-prefix for refs/gittuf/")
 					gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
 					if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 				}
 
 				if _, err := helperStdIn.Write(input); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// flushPkt is used to indicate the end of input
@@ -176,7 +177,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 				// Write output to parent process
 				if _, err := stdOutWriter.Write(output); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// endOfReadPkt indicates end of response
@@ -225,7 +226,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 								// gittuf obj
 								wantCmd := fmt.Sprintf("want %s\n", tip)
 								if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
-									return nil, false, err
+									return nil, false, nil, err
 								}
 							}
 						}
@@ -237,7 +238,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 								// gittuf obj
 								haveCmd := fmt.Sprintf("have %s\n", tip)
 								if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
-									return nil, false, err
+									return nil, false, nil, err
 								}
 							}
 						}
@@ -276,7 +277,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 				}
 
 				if _, err := helperStdIn.Write(input); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// Read from remote if wants are done
@@ -292,7 +293,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 						// Send along to parent process
 						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 
 						if bytes.Equal(output, endOfReadPkt) {
@@ -330,13 +331,14 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 							// This assumes the very first input isn't just
 							// flush again...
 							if _, err := helperStdIn.Write(input); err != nil {
-								return nil, false, err
+								return nil, false, nil, err
 							}
 							wroteWants = false
 							break
 						}
 					}
 				}
+				fetchedRefs = allWants.Contents()
 			}
 
 		case bytes.HasPrefix(input, []byte("list for-push")):
@@ -355,7 +357,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 			// Write it to git-remote-http
 			if _, err := helperStdIn.Write(input); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			// Read remote refs
@@ -368,7 +370,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 				// If nothing is returned, the user has likely failed to
 				// authenticate with the remote
 				if len(output) == 0 {
-					return nil, false, ErrFailedAuthentication
+					return nil, false, nil, ErrFailedAuthentication
 				}
 
 				refAdSplit := strings.Split(strings.TrimSpace(string(output)), " ")
@@ -381,7 +383,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 				// Pass remote ref status to parent process
 				if _, err := stdOutWriter.Write(output); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// flushPkt indicates end of message
@@ -407,7 +409,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 			if len(gittufRefsTips) != 0 {
 				if err := repo.ReconcileLocalRSLWithRemote(ctx, remoteName, true); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 			}
 
@@ -443,14 +445,14 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 						// TODO: skipping propagation; invoke it once total instead of per ref
 						if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 					}
 				}
 
 				// Write push command to helper
 				if _, err := helperStdIn.Write(pushCommand); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 			}
 
@@ -458,13 +460,13 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 				// Push RSL if it hasn't been explicitly pushed
 				pushCommand := fmt.Sprintf("push %s:%s\n", rsl.Ref, rsl.Ref)
 				if _, err := helperStdIn.Write([]byte(pushCommand)); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 			}
 
 			// Indicate end of push statements
 			if _, err := helperStdIn.Write([]byte("\n")); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			seenTrailingNewLine := false
@@ -495,14 +497,14 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 						// if it does, just send it back
 						// to the caller
 						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 					} else {
 						if dstRefs.Has(strings.TrimSpace(string(outputSplit[1]))) {
 							// this was explicitly
 							// pushed by the user
 							if _, err := stdOutWriter.Write(output); err != nil {
-								return nil, false, err
+								return nil, false, nil, err
 							}
 						}
 					}
@@ -521,7 +523,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 			// Pass through other commands we don't want to interpose to the
 			// curl helper
 			if _, err := helperStdIn.Write(input); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			// Receive the initial info sent by the service
@@ -532,7 +534,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 				output := helperStdOutScanner.Bytes()
 
 				if _, err := stdOutWriter.Write(output); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// Check for end of message
@@ -544,16 +546,16 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 	}
 
 	if err := helperStdIn.Close(); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	if err := helperStdOut.Close(); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
 	if err := helper.Wait(); err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
 
-	return gittufRefsTips, isPush, nil
+	return gittufRefsTips, isPush, fetchedRefs, nil
 }
