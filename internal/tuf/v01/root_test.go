@@ -86,6 +86,12 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, 1, len(directives))
 		assert.Equal(t, directive, directives[0])
 
+		err = rootMetadata.AddPropagationDirective(directive)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
 		updatedDirective := &PropagationDirective{
 			Name:                "test",
 			UpstreamRepository:  "https://example.org/git/repository",
