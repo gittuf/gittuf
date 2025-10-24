@@ -42,7 +42,7 @@ type Team struct {
 	// TeamID is a unique name or identifier for a team.
 	TeamID string `json:"teamID"`
 	// PublicKeys stores all public keys for all members of a team.
-	PublicKeys []*signerverifier.SSLibKey `json:"keys"`
+	PublicKeys []*Key `json:"keys"`
 	// Metadata stores custom metadata for a team.
 	Metadata map[string]string `json:"custom"`
 	// Members stores references to individual persons of a team.
@@ -71,6 +71,14 @@ func (t *Team) Keys() []*signerverifier.SSLibKey {
 // CustomMetadata returns the custom metadata of a team.
 func (t *Team) CustomMetadata() map[string]string {
 	return t.Metadata
+}
+
+func (t *Team) GetMembers() []*Person {
+	return t.Members
+}
+
+func (t *Team) GetThreshold() int {
+	return t.Threshold
 }
 
 // Role records common characteristics recorded in a role entry in Root metadata
