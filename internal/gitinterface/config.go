@@ -20,11 +20,12 @@ func (r *Repository) GetGitConfig() (map[string]string, error) {
 
 	lines := strings.Split(strings.TrimSpace(stdOut), "\n")
 	for _, line := range lines {
-		split := strings.Split(line, " ")
-		if len(split) < 2 {
-			continue
+		split := strings.SplitN(line, " ", 2)
+		if len(split) == 2 {
+			config[strings.ToLower(split[0])] = split[1]
+		} else if len(split) == 1 && split[0] == "gpg.format" {
+			config[strings.ToLower(split[0])] = ""
 		}
-		config[strings.ToLower(split[0])] = strings.Join(split[1:], " ")
 	}
 
 	return config, nil
