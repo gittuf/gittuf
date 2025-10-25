@@ -103,25 +103,12 @@ changes. This ensures that changes are propagated as quickly as possible to
 downstream repositories, and are applied to the RSL prior to any other
 downstream changes.
 
-TODO: is this significant overhead / propagation for every push if the upstream
-repository has significant traffic?
-
-TODO: what if the propagation is triggered during a push and the refs are the
-same? For example, a propagation directive says `refs/heads/main` must be
-updated from some upstream repo. Alice makes a change to the same branch and
-wants to push. Propagation will add a commit after her latest one, should the
-push go through without propagating (i.e., with a regular reference entry for
-Alice) and then trigger propagation right after?
-
 ## Motivation
 
 Frequently, a Git repository also needs to include within it another repository
 which is developed with its own history, for example, a project `foo` wants to
 use a library `bar`. While Git has features built in to enable consuming a Git
 repository within another, these lack the guarantees provided by gittuf.
-
-TODO: add specific guarantees since this doesn't do full upstream verification
-of the ref (though we could?)
 
 ## Reasoning
 
@@ -187,10 +174,6 @@ Finally, a Git submodule keeps the commit history for the upstream repository
 separate, and is available when checked out to the developer. On the other hand,
 with gittuf propagation, there is no upstream history tracking.
 
-TODO: how can we provide the upstream repository's history? what's the UX +
-garbage collection mitigation? Can we just do the same merge-commit approach
-taken by subtree?
-
 ### Propagation vs Git Subtree
 
 Git Subtree is very similar to gittuf's propagation pattern. A specified
@@ -229,14 +212,6 @@ therefore clients will need to be updated to support this.
 
 ## Security
 
-## Propagation Loops
-
-TODO
-
-### Upstream Repository Availability
-
-TODO
-
 ### Handling Revoked Propagated Changes
 
 If the upstream entry is revoked after being propagated to a downstream
@@ -247,24 +222,32 @@ necessary for propagation.
 
 ### Handling Propagation into Protected Namespace in Downstream Repository
 
-TODO: what if we propagate changes from upstream to `foo` but also have a
-`file:foo/*` policy in place? Like the recovery flow, can anyone propagate?
-should propagation be the responsibility of only authorized users if the
-directory is protected? I lean towards the former.
+TODO
 
-TODO: what if propagation into `foo/*` happens at upstream revision A, then
-downstream modifies contents, then upstream has revision B? Should propagation
-recognize that local changes have been made and abort? Should propagation
-overwrite changes, i.e., we make it as clear as possible that this pattern must
-not be used if "automatic" propagations will overwrite changes?
+## Blockers to Implementing
 
-## Open Questions
+Before this GAP is considered to be implemented, the following items must be
+addressed. Until then, any implementation of the GAP is a prototype.
 
 1. Should a gittuf client add "witness" entries as well? A gittuf client says I
-checked upstream and saw RSL entry X, nothing to propagate. Next time, a client
-needn't check beyond entry X. However, we must be careful with how this is
-verified as a malicious client could skip propagating and then say nothing to
-propagate.
+   checked upstream and saw RSL entry X, nothing to propagate. Next time, a
+   client needn't check beyond entry X. However, we must be careful with how
+   this is verified as a malicious client could skip propagating and then say
+   nothing to propagate.
+2. How should propagation checks be performed to avoid adding substantial
+   overhead due to lookups? For instance, checking on every push may be too
+   often when pushes happen frequently.
+3. How must propagations to a branch be handled when a push is made to update
+   the same branch?
+4. What must be checked in the upsteam repository by a client propagating from
+   upstream repository into downstream repository? Full verification of the ref
+   against upstream gittuf policy?
+5. How must a client handle unavailability of an upstream repository?
+6. What if client must propagate changes from upstream to `foo/` but the
+   repository has a `file:foo/*` policy in place? Like the recovery flow, can
+   anyone propagate? Should adding propagation workflow ensure downstream path
+   is not protected by a file rule?
+7. What's the UX for upstream repository history in downstream repository?
 
 ## References
 
