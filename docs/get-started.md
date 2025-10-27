@@ -4,7 +4,71 @@ This guide presents a quick primer to using gittuf. Note that gittuf is
 currently in beta, so if you encounter any issues, we encourage you to
 [report them](https://github.com/gittuf/gittuf/issues).
 
-## Install gittuf using pre-built binaries
+If you'd like a very simplified process to get started with gittuf, go to the
+[Express Setup / TL;DR](#express-setup--tldr) section.
+
+If you'd like to read a bit more about what you're setting up, go to the
+[Custom Setup](#custom-setup) section.
+
+## Express Setup  / TL;DR
+
+First install gittuf based on your OS:
+
+Windows:
+`winget install gittuf.gittuf`
+
+macOS:
+`brew install gittuf`
+
+Linux:
+`apt/dnf/pacman install gittuf`
+
+Now, run the commands below depending on whether you are a repository
+administrator or contributor, or both.
+
+### Administrator
+
+Now, open a terminal in the directory containing the repository, and initialize 
+signing keys if you do not have them, or skip this step if you do:
+
+```bash
+mkdir keys && cd keys
+ssh-keygen -q -t ecdsa -N "" -f root
+ssh-keygen -q -t ecdsa -N "" -f policy
+ssh-keygen -q -t ecdsa -N "" -f developer
+cd ..
+```
+
+Finally, navigate to the top-level folder of the repository, and setup the
+repository's gittuf policy. In this case, a rule is created such that only
+known users may commit to the `main` branch:
+
+```bash
+gittuf trust init -k keys/root
+gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/policy.pub
+gittuf policy init -k ../keys/policy --policy-name targets
+gittuf policy add-person -k ../keys/policy --person-ID developer --public-key ../keys/developer.pub
+gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern git:refs/heads/main --authorize developer
+gittuf policy stage --local-only
+gittuf policy apply --local-only
+```
+
+gittuf is now set up on your Git repository.
+
+### Contributor
+
+Ensure that commit and tag signing are enabled:
+
+```bash
+git config commit.gpgsign true
+git config tag.gpgsign true
+```
+
+TODO...
+
+## Custom Setup
+
+### Install gittuf using pre-built binaries
 
 > [!NOTE]
 > Please use release v0.1.0 or higher, as prior releases were created to
@@ -16,7 +80,7 @@ using the release workflow's identity. Make sure you have [cosign] installed on
 your system, then you will be able to securely download and verify the gittuf
 release:
 
-### Unix-like operating systems
+#### Unix-like operating systems
 
 ```sh
 # Modify these values as necessary.
@@ -44,9 +108,9 @@ cd -
 gittuf version
 ```
 
-### Windows
+#### Windows
 
-#### Winget
+##### Winget
 
 gittuf can be installed on Windows from winget, provided winget is installed
 on the system:
@@ -55,7 +119,7 @@ on the system:
 winget install gittuf
 ```
 
-#### Manual installation
+##### Manual installation
 
 Copy and paste these commands in PowerShell to install gittuf. Please remember
 to change the version number (0.12.0 in this example) and architecture
@@ -72,7 +136,7 @@ cosign verify-blob --certificate gittuf_0.12.0_windows_amd64.exe.pem --signature
 The gittuf binary is now verified on your system. You can run it from the
 terminal as `gittuf.exe` from this directory, or add it to your PATH as desired.
 
-## Building from source
+### Building from source
 
 > [!NOTE]
 > `make` needs to be installed manually on Windows as it is not packaged with
@@ -99,7 +163,7 @@ make
 
 This will automatically put `gittuf` in the `GOPATH` as configured.
 
-## Create keys
+### Create keys
 
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
@@ -117,7 +181,7 @@ ssh-keygen -q -t ecdsa -N "" -f policy
 ssh-keygen -q -t ecdsa -N "" -f developer
 ```
 
-## Create a Git repository
+### Create a Git repository
 
 gittuf can be used with either a brand new repository or with an existing
 repository. Here, we assume gittuf is being deployed with a fresh repository.
@@ -131,7 +195,7 @@ git config --local gpg.format ssh
 git config --local user.signingkey ../keys/developer
 ```
 
-## Initialize gittuf
+### Initialize gittuf
 
 Initialize gittuf's root of trust metadata.
 
@@ -174,7 +238,7 @@ means the policy will be applicable henceforth.
 gittuf policy apply --local-only
 ```
 
-## Making repository changes
+### Making repository changes
 
 You can make changes in the repository using standard Git workflows. However,
 changes to Git references (i.e., branches and tags) must be recorded in gittuf's
@@ -188,7 +252,7 @@ git add . && git commit -q -S -m "Initial commit"
 gittuf rsl record main --local-only
 ```
 
-## Verifying policy
+### Verifying policy
 
 gittuf allows for verifying rules for Git references and files.
 
@@ -196,7 +260,7 @@ gittuf allows for verifying rules for Git references and files.
 gittuf verify-ref --verbose main
 ```
 
-## Communicating with a remote
+### Communicating with a remote
 
 gittuf includes two main ways to push and fetch the policy and RSL references.
 You may use the `gittuf sync` command to synchronize changes with the remote
@@ -213,13 +277,13 @@ git push <remote> refs/gittuf/*
 git fetch <remote> refs/gittuf/*:refs/gittuf/*
 ```
 
-## Verify gittuf itself
+### Verify gittuf itself
 
 You can also verify the state of the gittuf source code repository with gittuf
 itself. For more information on verifying gittuf with gittuf, visit the
 [dogfooding] document.
 
-## Conclusion
+### Conclusion
 
 This is a very quick primer to gittuf! Please take a look at gittuf's [CLI docs]
 to learn more about using gittuf. If you find a bug, please [open an issue] on
