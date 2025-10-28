@@ -2,6 +2,10 @@
 
 Remove a gittuf hook specified in the policy (developer mode only, set GITTUF_DEV=1)
 
+### Synopsis
+
+The 'remove-hook' command removes the specified gittuf hook from the repository's gittuf policy for the selected Git stages. This command can only be used in developer mode (set GITTUF_DEV=1) and supports removing hooks from the pre-commit or pre-push stages.
+
 ```
 gittuf trust remove-hook [flags]
 ```

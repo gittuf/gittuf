@@ -2,6 +2,10 @@
 
 Initialize gittuf root of trust for repository
 
+### Synopsis
+
+The 'init' command initializes a gittuf root of trust for the current repository. This sets up the initial trusted root metadata and prepares the repository for gittuf policy operations. It can optionally specify the repository location and records initialization details in the repository's trust metadata.
+
 ```
 gittuf trust init [flags]
 ```

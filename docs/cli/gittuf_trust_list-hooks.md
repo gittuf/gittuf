@@ -2,6 +2,10 @@
 
 List gittuf hooks for the current policy state
 
+### Synopsis
+
+The 'list-hooks' command displays all gittuf hooks defined in the current repository's gittuf policy, including each hook's stage, ID, authorized principals, hashes, environment, and timeout.
+
 ```
 gittuf trust list-hooks [flags]
 ```

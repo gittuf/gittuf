@@ -2,6 +2,10 @@
 
 Set repository location
 
+### Synopsis
+
+The 'set-repository-location' command sets or updates the repository's canonical location.
+
 ```
 gittuf trust set-repository-location [flags]
 ```

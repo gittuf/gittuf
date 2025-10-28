@@ -2,6 +2,10 @@
 
 Remove propagation directive from gittuf root of trust
 
+### Synopsis
+
+The 'remove-propagation-directive' command removes the specified propagation directive from the current repository's gittuf policy.
+
 ```
 gittuf trust remove-propagation-directive [flags]
 ```

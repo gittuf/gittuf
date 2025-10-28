@@ -2,6 +2,10 @@
 
 Remove GitHub app from gittuf root of trust
 
+### Synopsis
+
+The 'remove-github-app' command removes the specified GitHub App from the current repository's gittuf policy. You must specify the app name with --app-name
+
 ```
 gittuf trust remove-github-app [flags]
 ```

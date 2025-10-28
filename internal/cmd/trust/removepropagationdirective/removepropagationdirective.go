@@ -49,6 +49,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-propagation-directive",
 		Short:             `Remove propagation directive from gittuf root of trust`,
+		Long:              `The 'remove-propagation-directive' command removes the specified propagation directive from the current repository's gittuf policy.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

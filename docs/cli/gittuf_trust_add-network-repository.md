@@ -2,6 +2,10 @@
 
 Add a network repository
 
+### Synopsis
+
+The 'add-network-repository' command registers a new network repository in the current repository's gittuf policy. You must specify the repository's name with --name, its location with --location, and one or more initial root principals with --initial-root-principal.
+
 ```
 gittuf trust add-network-repository [flags]
 ```

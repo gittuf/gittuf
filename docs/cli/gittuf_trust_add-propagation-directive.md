@@ -2,6 +2,10 @@
 
 Add propagation directive into gittuf root of trust
 
+### Synopsis
+
+The 'add-propagation-directive' command defines how changes from an upstream repository and reference should be propagated into a downstream repository reference. It specifies the upstream and downstream locations and paths involved, enabling controlled content synchronization between repositories within gittuf's trust framework.
+
 ```
 gittuf trust add-propagation-directive [flags]
 ```

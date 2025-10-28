@@ -48,6 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "init",
 		Short:             "Initialize gittuf root of trust for repository",
+		Long:              "The 'init' command initializes a gittuf root of trust for the current repository. This sets up the initial trusted root metadata and prepares the repository for gittuf policy operations. It can optionally specify the repository location and records initialization details in the repository's trust metadata.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

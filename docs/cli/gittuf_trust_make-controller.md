@@ -2,6 +2,10 @@
 
 Make current repository a controller
 
+### Synopsis
+
+The 'make-controller' command makes the current repository a controller and allows other repositories to utilize its policies.
+
 ```
 gittuf trust make-controller [flags]
 ```
