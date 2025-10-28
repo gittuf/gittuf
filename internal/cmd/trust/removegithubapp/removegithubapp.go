@@ -49,6 +49,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-github-app",
 		Short:             "Remove GitHub app from gittuf root of trust",
+		Long:              "Remove a GitHub App from the repository's root of trust. Specify the app with --app-name (defaults to the repository's GitHub App role name). Requires a signing key and must be run inside a gittuf-managed repository.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

@@ -85,6 +85,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-hook",
 		Short:             fmt.Sprintf("Remove a gittuf hook specified in the policy (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:              "The 'remove-hook' command removes the specified gittuf hook from the repository's trust policy for the selected Git stages. This command can only be used in developer mode and supports removing hooks from the pre-commit or pre-push stages.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
