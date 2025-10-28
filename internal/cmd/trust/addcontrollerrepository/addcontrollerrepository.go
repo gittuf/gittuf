@@ -78,6 +78,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-controller-repository",
 		Short:             `Add a controller repository`,
+		Long:              `The 'add-controller-repository' command registers a new controller repository in the current gittuf-managed repository's trust policy. You must specify the controller repository's name with --name, its location with --location, and at least one initial root principal with --initial-root-principal. Once added, the controller repository is trusted to manage policy or propagate trust within the repository's namespace.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

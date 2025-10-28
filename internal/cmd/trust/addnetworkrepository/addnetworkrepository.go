@@ -78,6 +78,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-network-repository",
 		Short:             `Add a network repository`,
+		Long:              `The 'add-network-repository' command registers a new network repository within the current gittuf-managed repository's trust configuration. It requires specifying the repository's name (--name), the repository's location (--location), and one or more initial root principals (--initial-root-principal). Once added, this repository is recognised as part of the trust network and may participate in policy propagation or enforcement.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

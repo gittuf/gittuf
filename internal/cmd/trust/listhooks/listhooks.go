@@ -69,6 +69,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-hooks",
 		Short:             "List gittuf hooks for the current policy state",
+		Long:              "The 'list-hooks' command displays all gittuf hooks defined in the repository's trust policy, including their stage, ID, authorized principals, hashes, environment, and timeout.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

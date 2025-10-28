@@ -49,6 +49,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "set-repository-location",
 		Short:             "Set repository location",
+		Long:              "The 'set-repository-location' command sets or updates the repository's location in the gittuf trust policy using --location.",
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
