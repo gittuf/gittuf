@@ -11,6 +11,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/tuf"
 	v01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
@@ -71,9 +72,38 @@ func (p *Person) CustomMetadata() map[string]string {
 	return metadata
 }
 
+type Team struct {
+	TeamID     string
+	Metadata   map[string]string
+	AllKeys    []*signerverifier.SSLibKey
+	Principals []tuf.Principal
+	Threshold  int
+}
+
+func (t *Team) ID() string {
+	return t.TeamID
+}
+
+func (t *Team) Keys() []*signerverifier.SSLibKey {
+	return t.AllKeys //TODO
+}
+
+func (t *Team) GetPrincipals() []tuf.Principal {
+	return t.Principals
+}
+
+func (t *Team) GetThreshold() int {
+	return t.Threshold
+}
+
+func (t *Team) CustomMetadata() map[string]string {
+	return t.Metadata
+}
+
 // Role records common characteristics recorded in a role entry in Root metadata
 // and in a delegation entry.
 type Role struct {
 	PrincipalIDs *set.Set[string] `json:"principalIDs"`
+	TeamIDs      *set.Set[string] `json:"teamIDs"`
 	Threshold    int              `json:"threshold"`
 }
