@@ -934,6 +934,13 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 }
 
 func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*EntryVerificationReport, error) {
+	entryVerificationReport := &EntryVerificationReport{
+		EntryID:  entry.GetID(),
+		PolicyID: policy.GetID(),
+		RefName:  entry.RefName,
+		TargetID: entry.TargetID,
+	}
+
 	entryTagRef, err := repo.GetReference(entry.RefName)
 	if err != nil {
 		return nil, err
@@ -959,7 +966,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 
 	// TODO: handle global rules
 
-	return nil, nil // TODO: return report
+	return entryVerificationReport, nil
 }
 
 func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *set.Set[string], error) {
