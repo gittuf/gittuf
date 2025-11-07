@@ -774,7 +774,7 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	// Load the applicable reference authorization and approvals from trusted
 	// code review systems
 	slog.Debug("Searching for applicable reference authorizations and code reviews...")
-	authorizationAttestation, attestationHashes, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
+	authorizationAttestation, attestationHashes, approverKeyIDs, err := GetApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return nil, err
 	}
@@ -836,7 +836,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return nil, fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
 	}
 
-	authorizationAttestation, attestationHashes, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
+	authorizationAttestation, attestationHashes, approverKeyIDs, err := GetApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +848,7 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	return attestationHashes, nil
 }
 
-func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, []gitinterface.Hash, *set.Set[string], error) {
+func GetApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, []gitinterface.Hash, *set.Set[string], error) {
 	if attestationsState == nil {
 		return nil, nil, nil, nil
 	}

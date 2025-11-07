@@ -19,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -548,6 +549,54 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 
 	slog.Debug("Committing attestations...")
 	return currentAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+func (r *Repository) ExportAttestationsForRevision(ctx context.Context, target gitinterface.Hash, path string) error {
+
+	//currentAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	//if err != nil {
+	//	return err
+	//}
+
+	entry, err := rsl.GetLatestEntry(r.r)
+	if err != nil {
+		return err
+	}
+
+	var targetEntry rsl.ReferenceUpdaterEntry
+
+	for {
+		if entry, ok := entry.(rsl.ReferenceUpdaterEntry); ok {
+			if entry.GetTargetID().Equal(target) {
+				targetEntry = entry
+				break
+			}
+		}
+
+		entry, err = rsl.GetParentForEntry(r.r, entry)
+		if err != nil {
+			return errors.New("exhausted all entries in the RSL")
+		}
+	}
+
+	fmt.Println(targetEntry.GetID())
+
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+	if err != nil {
+		return err
+	}
+
+	attestationsState, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	_, attestationHashes, _, err := policy.GetApproverAttestationAndKeyIDs(ctx, r.r, state, attestationsState, targetEntry.(*rsl.ReferenceEntry))
+	if err != nil {
+		return err
+	}
+
+	return r.exportAttestations(attestationHashes, path)
 }
 
 func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *gogithub.PullRequest, createRSLEntry, signCommit bool) error {
