@@ -13,9 +13,10 @@ import (
 )
 
 type options struct {
-	latestOnly    bool
-	fromEntry     string
-	remoteRefName string
+	latestOnly             bool
+	fromEntry              string
+	remoteRefName          string
+	attestationsExportPath string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -41,6 +42,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of remote reference, if it differs from the local name",
 	)
+
+	cmd.Flags().StringVar(
+		&o.attestationsExportPath,
+		"export-attestations",
+		"",
+		"path to export attestations used in verification",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -49,15 +57,19 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
+	if o.attestationsExportPath != "" {
+		opts = append(opts, verifyopts.WithAttestationsExportPath(o.attestationsExportPath))
+	}
+
 	if o.fromEntry != "" {
 		if !dev.InDevMode() {
 			return dev.ErrNotInDevMode
 		}
 
-		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, verifyopts.WithOverrideRefName(o.remoteRefName))
+		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, opts...)
 	}
 
-	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
 	if o.latestOnly {
 		opts = append(opts, verifyopts.WithLatestOnly())
 	}

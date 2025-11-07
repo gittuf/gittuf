@@ -104,7 +104,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		env, _, err := allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +120,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		env, _, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,7 +137,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
+		env, _, err = allAttestations.GetReferenceAuthorizationFor(r, absTargetRef, fromCommitID.String(), targetTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -195,7 +195,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		env, _, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.Nil(t, err)
 		assert.Len(t, env.Signatures, 1)
 		assert.Equal(t, keyID, env.Signatures[0].KeyID)
@@ -222,7 +222,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		_, _, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
 	})
 }
