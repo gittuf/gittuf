@@ -96,7 +96,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 			return err
 		}
 
-		allAttestations, err := slsa.GenerateGranularVSAs(verificationReport, rootMetadata.GetRepositoryLocation())
+		allAttestations, err := slsa.GenerateGranularVSAs(r.r, verificationReport, rootMetadata.GetRepositoryLocation())
 		if err != nil {
 			return err
 		}
@@ -132,7 +132,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		}
 
 		if options.MetaVSAPath != "" {
-			metaVSA, err := slsa.GenerateMetaVSAFromGranularVSAs(allAttestations, rootMetadata.GetRepositoryLocation())
+			metaVSA, err := slsa.GenerateMetaVSAFromGranularVSAs(r.r, allAttestations, rootMetadata.GetRepositoryLocation())
 			if err != nil {
 				return err
 			}

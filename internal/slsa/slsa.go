@@ -72,7 +72,7 @@ func slsaSourceLevelFromString(s string) slsaSourceLevel {
 	}
 }
 
-func GenerateGranularVSAs(verificationReport *policy.VerificationReport, repositoryLocation string) ([]*ita.Statement, error) {
+func GenerateGranularVSAs(repo *gitinterface.Repository, verificationReport *policy.VerificationReport, repositoryLocation string) ([]*ita.Statement, error) {
 	generators := []*vsaGenerator{}
 
 	for index, entryVerificationReport := range verificationReport.EntryVerificationReports {
@@ -82,6 +82,7 @@ func GenerateGranularVSAs(verificationReport *policy.VerificationReport, reposit
 		if len(generators) == 0 {
 			// This is the very start of verification
 			generators = append(generators, &vsaGenerator{
+				repo:       repo,
 				policyID:   entryVerificationReport.PolicyID,
 				revisionID: entryVerificationReport.TargetID,
 				startIndex: 0, // hardcoded because this is the first, we also don't need this because it's the default, but more readable!
@@ -107,6 +108,7 @@ func GenerateGranularVSAs(verificationReport *policy.VerificationReport, reposit
 				generators[len(generators)-1].endIndex = index // we don't use index-1 because we use this for range constraints later
 
 				generators = append(generators, &vsaGenerator{
+					repo:       repo,
 					policyID:   entryVerificationReport.PolicyID,
 					revisionID: entryVerificationReport.TargetID,
 					startIndex: index,
@@ -131,7 +133,7 @@ func GenerateGranularVSAs(verificationReport *policy.VerificationReport, reposit
 	return allAttestations, nil
 }
 
-func GenerateMetaVSAFromGranularVSAs(granularVSAs []*ita.Statement, repositoryLocation string) (*ita.Statement, error) {
+func GenerateMetaVSAFromGranularVSAs(repo *gitinterface.Repository, granularVSAs []*ita.Statement, repositoryLocation string) (*ita.Statement, error) {
 	// The meta VSA's policy is set to the applicable policy at the current revision
 	// However, SLSA source level is set to whatever is the lowest of all VSAs
 	// due to the current revision being built on top of the older changes that
@@ -160,11 +162,17 @@ func GenerateMetaVSAFromGranularVSAs(granularVSAs []*ita.Statement, repositoryLo
 	revisionID, _ := gitinterface.NewHash(lastVSAStatement.Subject[0].Digest[gitCommitDigestType])    // TODO
 	refName := lastVSAStatement.Subject[0].Annotations.AsMap()[sourceBranchesAnnotationType].(string) // TODO
 
-	generator := &vsaGenerator{policyID: policyID, revisionID: revisionID}
+	generator := &vsaGenerator{
+		repo:       repo,
+		policyID:   policyID,
+		revisionID: revisionID,
+	}
 	return generator.generateWithSourceLevel(repositoryLocation, refName, sourceLevel)
 }
 
 type vsaGenerator struct {
+	repo *gitinterface.Repository
+
 	policyID   gitinterface.Hash
 	revisionID gitinterface.Hash
 
@@ -231,7 +239,7 @@ func (v *vsaGenerator) identifySourceLevel(entryVerificationReports []*policy.En
 	// Level 4: Two-person review
 	// We can currently go straight to level 4 and drop in levels based on what's not enabled
 	sourceLevel := sourceLevel4
-	for _, report := range entryVerificationReports {
+	for idx, report := range entryVerificationReports {
 		var (
 			hasForcePushesRule = false
 			hasTwoPersonReview = false
@@ -249,6 +257,24 @@ func (v *vsaGenerator) identifySourceLevel(entryVerificationReports []*policy.En
 				globalRule := globalRuleReport.GlobalRule.(tuf.GlobalRuleThreshold)
 				if globalRule.GetThreshold() >= 2 {
 					hasTwoPersonReview = true
+				}
+			}
+		}
+
+		if !hasForcePushesRule {
+			// force pushes are not blocked using global rule but may still have
+			// been enforced
+			// TODO: consider taking this logic out
+			if idx == 0 {
+				// First report, check from here on out
+				// TODO: this can be an issue on policy rotation in case there
+				// was a force push right after policy change?
+				hasForcePushesRule = true
+			} else {
+				// We don't return on err, we just don't assume rule is present
+				knows, _ := v.repo.KnowsCommit(report.TargetID, entryVerificationReports[idx-1].TargetID)
+				if knows {
+					hasForcePushesRule = true
 				}
 			}
 		}
