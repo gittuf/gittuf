@@ -82,43 +82,56 @@ func GenerateGranularVSAs(repo *gitinterface.Repository, verificationReport *pol
 		if len(generators) == 0 {
 			// This is the very start of verification
 			generators = append(generators, &vsaGenerator{
-				repo:       repo,
-				policyID:   entryVerificationReport.PolicyID,
-				revisionID: entryVerificationReport.TargetID,
-				startIndex: 0, // hardcoded because this is the first, we also don't need this because it's the default, but more readable!
+				repo:               repo,
+				policyID:           entryVerificationReport.PolicyID,
+				revisionID:         entryVerificationReport.TargetID,
+				previousRevisionID: gitinterface.ZeroHash,
+				startIndex:         0, // hardcoded because this is the first, we also don't need this because it's the default, but more readable!
+				endIndex:           1,
 			})
 		} else {
 			// We have at least one generator
 			// We have to update the existing generator **unless the policy has
 			// now changed**
 
-			if entryVerificationReport.PolicyID.Equal(generators[len(generators)-1].policyID) {
-				// The policy has not changed, so we just update the revision ID
-				generators[len(generators)-1].revisionID = entryVerificationReport.TargetID
-			} else {
-				// The policy has changed!
-				// So, first we set the end conditions for the last generator,
-				// then we add a new generator for subsequent entries
+			generators = append(generators, &vsaGenerator{
+				repo:               repo,
+				policyID:           entryVerificationReport.PolicyID,
+				revisionID:         entryVerificationReport.TargetID,
+				previousRevisionID: generators[len(generators)-1].revisionID,
+				startIndex:         index,
+				endIndex:           index + 1,
+			})
 
-				// Note that only endIndex must be set
-				// startIndex is set when the generator is added, as is the policyID
-				// the revisionID is not set here because the last entry that
-				// used the policy already has that set when there was no policy
-				// change
-				generators[len(generators)-1].endIndex = index // we don't use index-1 because we use this for range constraints later
+			// TODO: let's do a VSA per entry?
 
-				generators = append(generators, &vsaGenerator{
-					repo:       repo,
-					policyID:   entryVerificationReport.PolicyID,
-					revisionID: entryVerificationReport.TargetID,
-					startIndex: index,
-				})
-			}
+			// if entryVerificationReport.PolicyID.Equal(generators[len(generators)-1].policyID) {
+			// 	// The policy has not changed, so we just update the revision ID
+			// 	generators[len(generators)-1].revisionID = entryVerificationReport.TargetID
+			// } else {
+			// 	// The policy has changed!
+			// 	// So, first we set the end conditions for the last generator,
+			// 	// then we add a new generator for subsequent entries
+
+			// 	// Note that only endIndex must be set
+			// 	// startIndex is set when the generator is added, as is the policyID
+			// 	// the revisionID is not set here because the last entry that
+			// 	// used the policy already has that set when there was no policy
+			// 	// change
+			// 	generators[len(generators)-1].endIndex = index // we don't use index-1 because we use this for range constraints later
+
+			// 	generators = append(generators, &vsaGenerator{
+			// 		repo:       repo,
+			// 		policyID:   entryVerificationReport.PolicyID,
+			// 		revisionID: entryVerificationReport.TargetID,
+			// 		startIndex: index,
+			// 	})
+			// }
 		}
 	}
 
 	// We must update the end conditions for the last generator
-	generators[len(generators)-1].endIndex = len(verificationReport.EntryVerificationReports)
+	// generators[len(generators)-1].endIndex = len(verificationReport.EntryVerificationReports)
 
 	// Now, for each generator, we produce the corresponding attestation
 	allAttestations := []*ita.Statement{}
@@ -175,6 +188,8 @@ type vsaGenerator struct {
 
 	policyID   gitinterface.Hash
 	revisionID gitinterface.Hash
+
+	previousRevisionID gitinterface.Hash
 
 	startIndex int
 	endIndex   int
