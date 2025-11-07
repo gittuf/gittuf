@@ -47,14 +47,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&o.granularVSAsPath,
-		"write-source-provenance-attestations",
+		"write-all-vsas",
 		"",
-		"path to write source provenance attestations (one per policy) as an in-toto attestation bundle",
+		"path to write source verification summary attestations (one per policy) as an in-toto attestation bundle",
 	)
 
 	cmd.Flags().StringVar(
 		&o.metaVSAPath,
-		"",
+		"write-unified-vsa",
 		"",
 		"path to write a single source verification summary attestation",
 	)
