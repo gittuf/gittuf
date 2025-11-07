@@ -7,6 +7,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 type VerificationReport struct {
@@ -87,6 +88,7 @@ type FileVerificationReport struct {
 }
 
 type GlobalRuleVerificationReport struct {
-	RuleName string
-	RuleType string
+	GlobalRule tuf.GlobalRule
+	RuleName   string
+	RuleType   string
 }

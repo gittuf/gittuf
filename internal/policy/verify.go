@@ -1466,7 +1466,8 @@ func verifyGlobalRules(repo *gitinterface.Repository, globalRules map[string][]t
 			slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))
 
 			verificationReport := &GlobalRuleVerificationReport{
-				RuleName: rule.GetName(),
+				RuleName:   rule.GetName(),
+				GlobalRule: rule,
 			}
 
 			switch rule := rule.(type) {

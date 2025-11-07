@@ -224,21 +224,54 @@ func (v *vsaGenerator) generateWithSourceLevel(repositoryLocation, refName strin
 }
 
 func (v *vsaGenerator) identifySourceLevel(entryVerificationReports []*policy.EntryVerificationReport) slsaSourceLevel {
-	// If all entry verification reports have block-force-pushes type global rule, then it's level 2
-	// Otherwise, it's level 1
-	sourceLevel := sourceLevel2
+	// Level 1: Use Git
+	// Level 2: Block Force Pushes
+	// Level 3: Enable additional protections (not implemented yet but this
+	// doesn't reflect in VSA either; it's an SCS capability requirement)
+	// Level 4: Two-person review
+	// We can currently go straight to level 4 and drop in levels based on what's not enabled
+	sourceLevel := sourceLevel4
 	for _, report := range entryVerificationReports {
-		has := false
-		for _, globalRule := range report.GlobalRuleVerificationReports {
-			if globalRule.RuleType == tuf.GlobalRuleBlockForcePushesType {
-				has = true
-				break
+		var (
+			hasForcePushesRule = false
+			hasTwoPersonReview = false
+		)
+		for _, globalRuleReport := range report.GlobalRuleVerificationReports {
+			// In inspecting global rule reports, we don't need to determine
+			// that they apply to the verified ref because verifier only sets
+			// the report if the namespace is matched
+			switch globalRuleReport.RuleType {
+			case tuf.GlobalRuleBlockForcePushesType:
+				hasForcePushesRule = true
+			case tuf.GlobalRuleThresholdType:
+				// But here, we do need to check that the threshold rule is for
+				// >= 2 approvals
+				globalRule := globalRuleReport.GlobalRule.(tuf.GlobalRuleThreshold)
+				if globalRule.GetThreshold() >= 2 {
+					hasTwoPersonReview = true
+				}
 			}
 		}
 
-		if !has {
+		// TODO: these conditionals are messy, we need to refactor
+		if !hasTwoPersonReview && !hasForcePushesRule {
+			// doesn't have either; level 1
 			sourceLevel = sourceLevel1
-			break
+			break // no need to look at more reports for this VSA
+		} else if hasTwoPersonReview && !hasForcePushesRule {
+			// still level 1 as force pushes are not blocked
+			sourceLevel = sourceLevel1
+			break // no need to look at more reports for this VSA
+		} else if hasTwoPersonReview && hasForcePushesRule {
+			// do nothing
+		} else if !hasTwoPersonReview && hasForcePushesRule {
+			if sourceLevel > sourceLevel3 {
+				// this is overly protective, we only go down so we shouldn't
+				// worry about going up from level 1 to 3 between iterations,
+				// but good to check that we only set to level 3 when we're
+				// still operating on initial assumptions of level 4
+				sourceLevel = sourceLevel3
+			}
 		}
 	}
 
