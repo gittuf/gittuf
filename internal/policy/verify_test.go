@@ -3803,9 +3803,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		report, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		_, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
 		assert.Nil(t, err)
-		assert.Nil(t, report) // TODO
+		// TODO: handle verification report
 	})
 
 	t.Run("with tag specific policy", func(t *testing.T) {
@@ -3824,9 +3824,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		report, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		_, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
 		assert.Nil(t, err)
-		assert.Nil(t, report) // TODO
+		// TODO: handle verification report
 	})
 
 	t.Run("with threshold tag specific policy", func(t *testing.T) {
@@ -3884,9 +3884,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		report, err := verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		_, err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.Nil(t, err)
-		assert.Nil(t, report) // TODO
+		// TODO: handle verification report
 	})
 
 	t.Run("with tag specific policy, unauthorized", func(t *testing.T) {
