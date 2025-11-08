@@ -293,6 +293,13 @@ func (v *vsaGenerator) identifySourceLevel(entryVerificationReports []*policy.En
 			}
 		}
 
+		if !hasTwoPersonReview {
+			// TODO: consider taking this logic out?
+			if report.AcceptedPrincipalIDs.Len() >= 2 {
+				hasTwoPersonReview = true
+			}
+		}
+
 		// TODO: these conditionals are messy, we need to refactor
 		if !hasTwoPersonReview && !hasForcePushesRule {
 			// doesn't have either; level 1
