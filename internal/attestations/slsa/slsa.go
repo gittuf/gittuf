@@ -21,6 +21,7 @@ const (
 	verifierIDFormatter              = "https://gittuf.dev/verifier/%s"
 	verificationSummaryPredicateType = "https://slsa.dev/verification_summary/v1"
 	gitCommitDigestType              = "gitCommit"
+	gitTreeDigestType                = "gitTree"
 	passedVSAStatus                  = "PASSED"
 	sourceBranchesAnnotationType     = "source_branches"
 )
@@ -230,12 +231,18 @@ func (v *vsaGenerator) generateWithSourceLevel(repositoryLocation, refName strin
 		return nil, err
 	}
 
+	treeID, err := v.repo.GetCommitTreeID(v.revisionID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ita.Statement{
 		Type: ita.StatementTypeUri,
 		Subject: []*ita.ResourceDescriptor{
 			{
 				Digest: map[string]string{
 					gitCommitDigestType: v.revisionID.String(),
+					gitTreeDigestType:   treeID.String(),
 				},
 				Annotations: annotations,
 			},
