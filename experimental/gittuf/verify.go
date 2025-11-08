@@ -14,11 +14,11 @@ import (
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
+	"github.com/gittuf/gittuf/internal/attestations/slsa"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
-	"github.com/gittuf/gittuf/internal/slsa"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified

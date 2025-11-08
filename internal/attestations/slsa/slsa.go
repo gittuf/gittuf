@@ -5,7 +5,6 @@ package slsa
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -321,16 +320,4 @@ func (v *vsaGenerator) identifySourceLevel(entryVerificationReports []*policy.En
 
 func generateVerifierID() string {
 	return fmt.Sprintf(verifierIDFormatter, version.GetVersion())
-}
-
-func generateRepositoryLocation(location string) string {
-	if location == "" {
-		return ""
-	}
-
-	if strings.HasPrefix(location, "git+") {
-		return location
-	}
-
-	return fmt.Sprintf("git+%s", location)
 }
