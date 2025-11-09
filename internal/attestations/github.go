@@ -23,7 +23,7 @@ func NewGitHubPullRequestAttestation(owner, repository string, pullRequestNumber
 	return githubv01.NewPullRequestAttestation(owner, repository, pullRequestNumber, commitID, pullRequest)
 }
 
-func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, targetRefName, commitID string) error {
+func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, baseRepoInfo, targetRefName, commitID string) error {
 	envBytes, err := json.Marshal(env)
 	if err != nil {
 		return err
@@ -35,16 +35,22 @@ func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repo
 	}
 
 	if a.githubPullRequestAttestations == nil {
-		a.githubPullRequestAttestations = map[string]gitinterface.Hash{}
+		a.githubPullRequestAttestations = map[string]map[string]gitinterface.Hash{}
+	}
+	if a.githubPullRequestAttestations[baseRepoInfo] == nil {
+		a.githubPullRequestAttestations[baseRepoInfo] = map[string]gitinterface.Hash{}
 	}
 
-	a.githubPullRequestAttestations[GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID
+	a.githubPullRequestAttestations[baseRepoInfo][GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID
 	return nil
 }
 
-func (a *Attestations) GetGitHubPullRequestAttestation(repo *gitinterface.Repository, refPath, commitID string) (*sslibdsse.Envelope, error) {
-	lookupKey := path.Join(refPath, commitID)
-	blobID, has := a.githubPullRequestAttestations[lookupKey]
+func (a *Attestations) GetGitHubPullRequestAttestation(repo *gitinterface.Repository, baseRepoInfo, refPath, commitID string) (*sslibdsse.Envelope, error) {
+	mapping, has := a.githubPullRequestAttestations[baseRepoInfo]
+	if !has {
+		return nil, ErrRequestedAttestationNotFound
+	}
+	blobID, has := mapping[GitHubPullRequestAttestationPath(refPath, commitID)]
 	if !has {
 		return nil, ErrRequestedAttestationNotFound
 	}

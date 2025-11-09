@@ -552,17 +552,20 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 
 func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, githubBaseURL, owner, repository string, pullRequest *gogithub.PullRequest, createRSLEntry, signCommit bool) error {
 	var (
+		baseInfo       string
 		targetRef      string
 		targetCommitID string
 	)
 
 	if pullRequest.MergedAt == nil {
 		// not yet merged
-		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Head.User.Login, *pullRequest.Head.User.ID, *pullRequest.Head.Ref)
+		baseInfo = fmt.Sprintf("%s-%d", pullRequest.GetHead().GetUser().GetLogin(), pullRequest.GetHead().GetUser().GetID())
+		targetRef = fmt.Sprintf("refs/heads/%s", *pullRequest.Head.Ref)
 		targetCommitID = *pullRequest.Head.SHA
 	} else {
 		// merged
-		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Base.User.Login, *pullRequest.Base.User.ID, *pullRequest.Base.Ref)
+		baseInfo = fmt.Sprintf("%s-%d", pullRequest.GetBase().GetUser().GetLogin(), pullRequest.GetBase().GetUser().GetID())
+		targetRef = fmt.Sprintf("refs/heads/%s", *pullRequest.Base.Ref)
 		targetCommitID = *pullRequest.MergeCommitSHA
 	}
 
@@ -593,7 +596,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 		return err
 	}
 
-	if err := allAttestations.SetGitHubPullRequestAuthorization(r.r, env, targetRef, targetCommitID); err != nil {
+	if err := allAttestations.SetGitHubPullRequestAuthorization(r.r, env, baseInfo, targetRef, targetCommitID); err != nil {
 		return err
 	}
 

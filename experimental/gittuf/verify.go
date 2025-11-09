@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 
@@ -179,7 +180,12 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
 			}
 
-			mergeAttestation, err := attestationsState.GetGitHubPullRequestAttestation(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
+			baseInfo, err := getBaseInfoFromRepository(ctx, rootMetadata.GetRepositoryLocation())
+			if err != nil {
+				return fmt.Errorf("unable to fetch base repository information for source provenance: %w", err)
+			}
+
+			mergeAttestation, err := attestationsState.GetGitHubPullRequestAttestation(r.r, baseInfo, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
 			if err != nil {
 				return fmt.Errorf("unable to fetch source provenance merge attestations: %w", err)
 			}
@@ -342,4 +348,32 @@ func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) 
 	}
 
 	return nil
+}
+
+func getBaseInfoFromRepository(ctx context.Context, location string) (string, error) {
+	// Return <username>-<id> for the entity that owns the repository
+	// Say location is https://github.com/gittuf/gittuf
+	u, err := url.Parse(location)
+	if err != nil {
+		return "", err
+	}
+
+	baseLocation := fmt.Sprintf("https://%s", u.Host)
+
+	token := os.Getenv("GITHUB_TOKEN")
+
+	client, err := getGitHubClient(baseLocation, token)
+	if err != nil {
+		return "", err
+	}
+
+	// u.Path is gittuf/gittuf from our example above
+	split := strings.Split(u.Path, "/")
+
+	repo, _, err := client.Repositories.Get(ctx, split[0], split[1])
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d", repo.GetOwner().GetLogin(), repo.GetOwner().GetID()), nil
 }
