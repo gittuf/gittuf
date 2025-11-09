@@ -14,10 +14,12 @@ import (
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/slsa"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 )
 
@@ -126,6 +128,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 			}
 
 			jsonLines := strings.Join(envs, "\n")
+			jsonLines += "\n"
 			if err := os.WriteFile(options.GranularVSAsPath, []byte(jsonLines), 0o600); err != nil {
 				return fmt.Errorf("error writing attestation bundle of all VSAs: %w", err)
 			}
@@ -156,6 +159,46 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 			if err := os.WriteFile(options.MetaVSAPath, envBytes, 0o600); err != nil {
 				return fmt.Errorf("error writing meta VSA: %w", err)
+			}
+		}
+
+		if options.SourceProvenanceBundlePath != "" {
+			// Find last entry verification report
+			entryVerificationReport := verificationReport.EntryVerificationReports[len(verificationReport.EntryVerificationReports)-1]
+
+			// The attestations we care about are in the entry's field. In
+			// addition, we need the merge attestation.
+			sourceProvenanceAttestations := entryVerificationReport.ReferenceAuthorizations
+
+			attestationsEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.BeforeEntryID(entryVerificationReport.EntryID), rsl.ForReference(attestations.Ref))
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
+			}
+			attestationsState, err := attestations.LoadAttestationsForEntry(r.r, attestationsEntry)
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
+			}
+
+			mergeAttestation, err := attestationsState.GetGitHubPullRequestAttestation(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance merge attestations: %w", err)
+			}
+			sourceProvenanceAttestations = append(sourceProvenanceAttestations, mergeAttestation)
+
+			envs := []string{}
+			for _, attestation := range sourceProvenanceAttestations {
+				envBytes, err := json.Marshal(attestation)
+				if err != nil {
+					return fmt.Errorf("unable to prepare source provenance payload: %w", err)
+				}
+
+				envs = append(envs, string(envBytes))
+			}
+
+			jsonLines := strings.Join(envs, "\n")
+			jsonLines += "\n"
+			if err := os.WriteFile(options.SourceProvenanceBundlePath, []byte(jsonLines), 0o600); err != nil {
+				return fmt.Errorf("error writing attestation bundle of source provenance: %w", err)
 			}
 		}
 	}

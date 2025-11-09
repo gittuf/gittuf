@@ -9,9 +9,10 @@ type Options struct {
 	RefNameOverride string
 	LatestOnly      bool
 
-	GranularVSAsPath string
-	MetaVSAPath      string
-	VSASigner        sslibdsse.SignerVerifier
+	GranularVSAsPath           string
+	MetaVSAPath                string
+	SourceProvenanceBundlePath string
+	VSASigner                  sslibdsse.SignerVerifier
 }
 
 type Option func(o *Options)
@@ -37,6 +38,12 @@ func WithGranularVSAsPath(location string) Option {
 func WithMetaVSAPath(location string) Option {
 	return func(o *Options) {
 		o.MetaVSAPath = location
+	}
+}
+
+func WithSourceProvenanceBundlePath(location string) Option {
+	return func(o *Options) {
+		o.SourceProvenanceBundlePath = location
 	}
 }
 

@@ -29,7 +29,10 @@ const (
 	defaultCommitMessage = "Update attestations"
 )
 
-var ErrAttestationsNotFound = errors.New("attestations not found")
+var (
+	ErrAttestationsNotFound         = errors.New("attestations not found")
+	ErrRequestedAttestationNotFound = errors.New("requested attestation not found")
+)
 
 // Attestations tracks all the attestations in a gittuf repository.
 type Attestations struct {

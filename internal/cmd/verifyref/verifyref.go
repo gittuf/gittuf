@@ -13,12 +13,13 @@ import (
 )
 
 type options struct {
-	latestOnly       bool
-	fromEntry        string
-	remoteRefName    string
-	granularVSAsPath string
-	metaVSAPath      string
-	vsaSigner        string
+	latestOnly                 bool
+	fromEntry                  string
+	remoteRefName              string
+	granularVSAsPath           string
+	metaVSAPath                string
+	sourceProvenanceBundlePath string
+	vsaSigner                  string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -60,6 +61,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&o.sourceProvenanceBundlePath,
+		"write-source-provenance",
+		"",
+		"path to write source provenance attestations as an in-toto attestation bundle",
+	)
+
+	cmd.Flags().StringVar(
 		&o.vsaSigner,
 		"sign-source-attestation",
 		"",
@@ -91,6 +99,9 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	}
 	if o.metaVSAPath != "" {
 		opts = append(opts, verifyopts.WithMetaVSAPath(o.metaVSAPath))
+	}
+	if o.sourceProvenanceBundlePath != "" {
+		opts = append(opts, verifyopts.WithSourceProvenanceBundlePath(o.sourceProvenanceBundlePath))
 	}
 
 	if o.vsaSigner != "" {

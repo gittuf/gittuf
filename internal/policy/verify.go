@@ -284,7 +284,7 @@ func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, 
 		return false, err
 	}
 
-	authorizationAttestation, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, v.repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
+	authorizationAttestation, _, approverIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, v.repo, currentPolicy, currentAttestations, targetRef, fromID, mergeTreeID, false)
 	if err != nil {
 		return false, err
 	}
@@ -811,21 +811,22 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 	}
 
 	entryVerificationReport := &EntryVerificationReport{
-		EntryID:  entry.GetID(),
-		PolicyID: policy.GetID(),
-		RefName:  entry.RefName,
-		TargetID: entry.TargetID,
+		EntryID:                 entry.GetID(),
+		PolicyID:                policy.GetID(),
+		RefName:                 entry.RefName,
+		TargetID:                entry.TargetID,
+		ReferenceAuthorizations: []*sslibdsse.Envelope{},
 	}
 
 	// Load the applicable reference authorization and approvals from trusted
 	// code review systems
 	slog.Debug("Searching for applicable reference authorizations and code reviews...")
-	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
+	authorizationAttestation, approverAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return nil, err
 	}
 	if authorizationAttestation != nil {
-		entryVerificationReport.ReferenceAuthorization = authorizationAttestation
+		entryVerificationReport.ReferenceAuthorizations = append(entryVerificationReport.ReferenceAuthorizations, authorizationAttestation, approverAttestation)
 	}
 
 	// Verify Git namespace policies using the RSL entry and attestations
@@ -955,10 +956,12 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 		return nil, fmt.Errorf("verifying RSL entry failed, tag reference set to unexpected target")
 	}
 
-	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
+	authorizationAttestation, _, approverKeyIDs, err := getApproverAttestationAndKeyIDs(ctx, repo, policy, attestationsState, entry)
 	if err != nil {
 		return nil, err
 	}
+
+	entryVerificationReport.ReferenceAuthorizations = append(entryVerificationReport.ReferenceAuthorizations, authorizationAttestation)
 
 	if _, _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.GetID(), authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs), withTagObjectID(entry.TargetID)); err != nil {
 		return nil, fmt.Errorf("verifying tag entry failed, %w: %w", ErrVerificationFailed, err)
@@ -969,9 +972,9 @@ func verifyTagEntry(ctx context.Context, repo *gitinterface.Repository, policy *
 	return entryVerificationReport, nil
 }
 
-func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *set.Set[string], error) {
+func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) (*sslibdsse.Envelope, *sslibdsse.Envelope, *set.Set[string], error) {
 	if attestationsState == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	firstEntry := false
@@ -979,7 +982,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 	priorRefEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		firstEntry = true
@@ -1005,26 +1008,27 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		toID, err = repo.GetCommitTreeID(entry.TargetID)
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	return getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)
 }
 
-func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID gitinterface.Hash, isTag bool) (*sslibdsse.Envelope, *set.Set[string], error) {
+func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID gitinterface.Hash, isTag bool) (*sslibdsse.Envelope, *sslibdsse.Envelope, *set.Set[string], error) {
 	if attestationsState == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", targetRef, fromID.String(), toID.String()))
 	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, targetRef, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
 	approverIdentities := set.NewSet[string]()
+	var approverAttestation *sslibdsse.Envelope
 
 	// When we add other code review systems, we can move this into a
 	// generalized helper that inspects the attestations for each system trusted
@@ -1043,7 +1047,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 			githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, targetRef, fromID.String(), toID.String())
 			if err != nil {
 				if !errors.Is(err, github.ErrPullRequestApprovalAttestationNotFound) {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 			}
 
@@ -1063,12 +1067,12 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 				}
 				_, err := approvalVerifier.Verify(ctx, nil, githubApprovalAttestation)
 				if err != nil {
-					return nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
+					return nil, nil, nil, fmt.Errorf("%w: failed to verify GitHub app approval attestation, signed by untrusted key", ErrVerificationFailed)
 				}
 
 				payloadBytes, err := githubApprovalAttestation.DecodeB64Payload()
 				if err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				// TODO: support multiple versions
@@ -1080,17 +1084,19 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinter
 				}
 				stmt := new(tmpStatement)
 				if err := json.Unmarshal(payloadBytes, stmt); err != nil {
-					return nil, nil, err
+					return nil, nil, nil, err
 				}
 
 				for _, approver := range stmt.Predicate.GetApprovers() {
 					approverIdentities.Add(approver)
 				}
+
+				approverAttestation = githubApprovalAttestation
 			}
 		}
 	}
 
-	return authorizationAttestation, approverIdentities, nil
+	return authorizationAttestation, approverAttestation, approverIdentities, nil
 }
 
 // getCommits identifies the commits introduced to the entry's ref since the

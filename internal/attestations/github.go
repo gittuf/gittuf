@@ -42,6 +42,26 @@ func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repo
 	return nil
 }
 
+func (a *Attestations) GetGitHubPullRequestAttestation(repo *gitinterface.Repository, refPath, commitID string) (*sslibdsse.Envelope, error) {
+	lookupKey := path.Join(refPath, commitID)
+	blobID, has := a.githubPullRequestAttestations[lookupKey]
+	if !has {
+		return nil, ErrRequestedAttestationNotFound
+	}
+
+	envBytes, err := repo.ReadBlob(blobID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read attestation: %w", err)
+	}
+
+	var env *sslibdsse.Envelope
+	if err := json.Unmarshal(envBytes, env); err != nil {
+		return nil, fmt.Errorf("unable to read attestation: %w", err)
+	}
+
+	return env, nil
+}
+
 // GitHubPullRequestAttestationPath constructs the expected path on-disk for the
 // GitHub pull request attestation.
 func GitHubPullRequestAttestationPath(refName, commitID string) string {

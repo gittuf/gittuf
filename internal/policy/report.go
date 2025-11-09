@@ -48,7 +48,7 @@ type EntryVerificationReport struct {
 	// ReferenceAuthorization records the DSSE envelope for the reference
 	// authorization identified as approving the entry.
 	// TODO: should we capture the full envelope or just its blobID?
-	ReferenceAuthorization *dsse.Envelope
+	ReferenceAuthorizations []*dsse.Envelope
 
 	// Third, record information about the commit(s) verification result.
 

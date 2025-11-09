@@ -15,6 +15,7 @@ gittuf verify-ref [flags]
       --remote-ref-name string           name of remote reference, if it differs from the local name
       --sign-source-attestation string   signing key or identity for one or more source provenance or verification attestations
       --write-all-vsas string            path to write source verification summary attestations (one per policy) as an in-toto attestation bundle
+      --write-source-provenance string   path to write source provenance attestations as an in-toto attestation bundle
       --write-unified-vsa string         path to write a single source verification summary attestation
 ```
 
