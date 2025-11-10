@@ -46,7 +46,7 @@ func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repo
 	return nil
 }
 
-func (a *Attestations) GetGitHubPullRequestAttestation(repo *gitinterface.Repository, refPath, commitID string) ([]*sslibdsse.Envelope, error) {
+func (a *Attestations) GetGitHubPullRequestAttestations(repo *gitinterface.Repository, refPath, commitID string) ([]*sslibdsse.Envelope, error) {
 	attestations := []*sslibdsse.Envelope{}
 	for baseInfo, mapping := range a.githubPullRequestAttestations {
 		slog.Debug(fmt.Sprintf("Found information for '%s', looking for merge commit attestations...", baseInfo))
@@ -62,7 +62,7 @@ func (a *Attestations) GetGitHubPullRequestAttestation(repo *gitinterface.Reposi
 			// return nil, fmt.Errorf("unable to read attestation: %w", err)
 		}
 
-		var env *sslibdsse.Envelope
+		env := &sslibdsse.Envelope{}
 		if err := json.Unmarshal(envBytes, env); err != nil {
 			continue
 			// return nil, fmt.Errorf("unable to read attestation: %w", err)
