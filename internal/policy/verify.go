@@ -826,7 +826,10 @@ func verifyEntry(ctx context.Context, repo *gitinterface.Repository, policy *Sta
 		return nil, err
 	}
 	if authorizationAttestation != nil {
-		entryVerificationReport.ReferenceAuthorizations = append(entryVerificationReport.ReferenceAuthorizations, authorizationAttestation, approverAttestation)
+		entryVerificationReport.ReferenceAuthorizations = append(entryVerificationReport.ReferenceAuthorizations, authorizationAttestation)
+	}
+	if approverAttestation != nil {
+		entryVerificationReport.ReferenceAuthorizations = append(entryVerificationReport.ReferenceAuthorizations, approverAttestation)
 	}
 
 	// Verify Git namespace policies using the RSL entry and attestations

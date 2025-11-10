@@ -175,4 +175,22 @@ func TestAttestationsCommit(t *testing.T) {
 	attestations, err = LoadCurrentAttestations(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, attestations.referenceAuthorizations, authorizations)
+
+	// Add a GitHub pull request merge attestation
+	if err := attestations.SetGitHubPullRequestAuthorization(repo, testEnv, "test-account-123", testRef, testID); err != nil {
+		t.Fatal(err)
+	}
+	if err := attestations.Commit(repo, "Adding GitHub PR", true, false); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedGitHubPullRequestsAttestations := map[string]map[string]gitinterface.Hash{
+		"test-account-123": map[string]gitinterface.Hash{
+			path.Join(testRef, testID): blobID,
+		},
+	}
+
+	attestations, err = LoadCurrentAttestations(repo)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedGitHubPullRequestsAttestations, attestations.githubPullRequestAttestations)
 }

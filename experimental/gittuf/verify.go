@@ -106,6 +106,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 		if options.GranularVSAsPath != "" {
 			// Write attestation bundle to disk
+			slog.Debug("Writing granular VSAs...")
 			envs := []string{}
 
 			for _, attestation := range allAttestations {
@@ -136,6 +137,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		}
 
 		if options.MetaVSAPath != "" {
+			slog.Debug("Writing meta VSA...")
 			metaVSA, err := slsa.GenerateMetaVSAFromGranularVSAs(r.r, allAttestations, rootMetadata.GetRepositoryLocation())
 			if err != nil {
 				return err
@@ -164,6 +166,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		}
 
 		if options.SourceProvenanceBundlePath != "" {
+			slog.Debug("Writing source provenance attestations...")
 			// Find last entry verification report
 			entryVerificationReport := verificationReport.EntryVerificationReports[len(verificationReport.EntryVerificationReports)-1]
 
@@ -180,16 +183,11 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
 			}
 
-			baseInfo, err := getBaseInfoFromRepository(ctx, rootMetadata.GetRepositoryLocation())
-			if err != nil {
-				return fmt.Errorf("unable to fetch base repository information for source provenance: %w", err)
-			}
-
-			mergeAttestation, err := attestationsState.GetGitHubPullRequestAttestation(r.r, baseInfo, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
+			mergeAttestations, err := attestationsState.GetGitHubPullRequestAttestation(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
 			if err != nil {
 				return fmt.Errorf("unable to fetch source provenance merge attestations: %w", err)
 			}
-			sourceProvenanceAttestations = append(sourceProvenanceAttestations, mergeAttestation)
+			sourceProvenanceAttestations = append(sourceProvenanceAttestations, mergeAttestations...)
 
 			envs := []string{}
 			for _, attestation := range sourceProvenanceAttestations {
