@@ -183,7 +183,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
 			}
 
-			mergeAttestations, err := attestationsState.GetGitHubPullRequestAttestation(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
+			mergeAttestations, err := attestationsState.GetGitHubPullRequestAttestations(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
 			if err != nil {
 				return fmt.Errorf("unable to fetch source provenance merge attestations: %w", err)
 			}
