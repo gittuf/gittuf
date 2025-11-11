@@ -84,6 +84,53 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	assert.Equal(t, featureZeroZero, featureAuth)
 }
 
+func TestGetGitHubPullRequestAttestations(t *testing.T) {
+	env, err := dsse.CreateEnvelope(map[string]string{"hello": "world"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testRef := "refs/heads/main"
+	testID := gitinterface.ZeroHash.String()
+
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+	attestations := &Attestations{}
+	if err := attestations.SetGitHubPullRequestAuthorization(repo, env, "test-123", testRef, testID); err != nil {
+		t.Fatal(err)
+	}
+	if err := attestations.SetGitHubPullRequestAuthorization(repo, env, "test-456", testRef, testID); err != nil {
+		t.Fatal(err)
+	}
+
+	// We've set the env to two different apps
+
+	if err := attestations.Commit(repo, "Test", true, false); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(attestations.githubPullRequestAttestations))
+	assert.Contains(t, attestations.githubPullRequestAttestations, "test-123")
+	assert.Contains(t, attestations.githubPullRequestAttestations, "test-456")
+
+	loadedAttestations, err := LoadCurrentAttestations(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 2, len(loadedAttestations.githubPullRequestAttestations))
+	assert.Contains(t, loadedAttestations.githubPullRequestAttestations, "test-123")
+	assert.Contains(t, loadedAttestations.githubPullRequestAttestations, "test-456")
+
+	envelopes, err := loadedAttestations.GetGitHubPullRequestAttestations(repo, testRef, testID)
+	if err != nil {
+		t.Error(err)
+	}
+	assert.Equal(t, 2, len(envelopes))
+	assert.Equal(t, env, envelopes[0])
+	assert.Equal(t, env, envelopes[1])
+}
+
 func createGitHubPullRequestApprovalAttestationEnvelope(t *testing.T, refName, fromID, toID string, approvers []string) *sslibdsse.Envelope {
 	t.Helper()
 
