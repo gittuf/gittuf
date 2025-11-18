@@ -20,7 +20,7 @@ jobs:
       - name: Downgrade Git
         run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.15 git-man=1:2.34.1-1ubuntu1.15
       - name: Checkout code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
       - name: Install Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
         with:
