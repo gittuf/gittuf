@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sigstoresigneropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -44,7 +45,7 @@ func LoadSignerFromGitConfig(repo *gitinterface.Repository) (sslibdsse.SignerVer
 	case "gpg", "":
 		// GPG is assumed if "gpg" is specified, or if nothing is specified
 		keyType = SigningMethodGPG // nolint:ineffassign
-		return nil, fmt.Errorf("support for GPG keys is not implemented")
+		// return nil, fmt.Errorf("support for GPG keys is not implemented")
 	case "ssh":
 		keyType = SigningMethodSSH
 	case "x509":
@@ -58,6 +59,9 @@ func LoadSignerFromGitConfig(repo *gitinterface.Repository) (sslibdsse.SignerVer
 	signingKey := config["user.signingkey"]
 	if keyType == SigningMethodSSH && signingKey == "" {
 		return nil, ErrSigningKeyNotSpecified
+	}
+	if keyType == SigningMethodGPG && signingKey == "" {
+		return nil, fmt.Errorf("support for GPG keys default is not implemented")
 	}
 
 	switch keyType {
@@ -92,6 +96,8 @@ func LoadSignerFromGitConfig(repo *gitinterface.Repository) (sslibdsse.SignerVer
 			return sigstore.NewSigner(opts...), nil
 		}
 		return nil, ErrUnsupportedX509Method
+	case SigningMethodGPG:
+		return gpg.NewSignerFromKeyID(signingKey)
 	default:
 		// We don't handle GPG here due to the signing method check above. When
 		// we have an implementation for a GPG key-based signerverifier, this

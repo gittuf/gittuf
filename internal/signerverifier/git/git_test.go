@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
@@ -46,14 +47,24 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 	t.Run("gpg key specified", func(t *testing.T) {
 		// Test GPG behavior, should error out due to not being implemented
 		tmpDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		repo := gitinterface.CreateTestGitRepositoryForGPGSigning(t, tmpDir, false)
 
 		if err := repo.SetGitConfig("gpg.format", "gpg"); err != nil {
 			t.Fatal(err)
 		}
 
-		_, err := LoadSignerFromGitConfig(repo)
-		assert.ErrorContains(t, err, "not implemented")
+		// _, err := LoadSignerFromGitConfig(repo)
+		// assert.ErrorContains(t, err, "not implemented")
+		signer, err := LoadSignerFromGitConfig(repo)
+		assert.Nil(t, err)
+
+		compareKey := artifacts.GPGKey1Private
+
+		compareSigner, err := gpg.LoadGPGPrivKeyFromBytes(compareKey)
+		require.Nil(t, err)
+		signerKeyID, err := signer.KeyID()
+		require.Nil(t, err)
+		assert.Equal(t, compareSigner.KeyID, signerKeyID)
 	})
 
 	t.Run("ssh key specified", func(t *testing.T) {
