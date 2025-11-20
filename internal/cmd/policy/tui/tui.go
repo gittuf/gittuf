@@ -16,7 +16,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -100,6 +99,9 @@ type model struct {
 	policyName     string
 	options        *options
 	footer         string
+	// readOnly indicates whether the TUI is running without a signing key
+	// and should therefore hide mutating operations.
+	readOnly bool
 }
 
 // initialModel returns the initial model for the Terminal UI
@@ -109,9 +111,18 @@ func initialModel(o *options) model {
 		return model{}
 	}
 
-	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
-	if err != nil {
-		return model{}
+	// Determine if we are in read-only mode (no signing key provided).
+	readOnly := o.p.SigningKey == ""
+
+	var signer dsse.SignerVerifier
+	if !readOnly {
+		// Load signer only if a signing key was provided.
+		signer, err = gittuf.LoadSigner(repo, o.p.SigningKey)
+		if err != nil {
+			// If a signing key was specified but cannot be loaded, return an empty model
+			// to preserve existing error behavior.
+			return model{}
+		}
 	}
 
 	// Initialize the model
@@ -124,18 +135,28 @@ func initialModel(o *options) model {
 		rules:       getCurrRules(o),
 		globalRules: getGlobalRules(o),
 		options:     o,
+		readOnly:    readOnly,
 	}
 
 	// Set up the main list items
-	mainItems := []list.Item{
-		item{title: "Add Rule", desc: "Add a new policy rule"},
-		item{title: "Remove Rule", desc: "Remove an existing policy rule"},
-		item{title: "List Rules", desc: "View all current policy rules"},
-		item{title: "Reorder Rules", desc: "Change the order of policy rules"},
-		item{title: "List Global Rules", desc: "View repository-wide global rules"},
-		item{title: "Add Global Rule", desc: "Add a new global rule"},
-		item{title: "Update Global Rule", desc: "Modify an existing global rule"},
-		item{title: "Remove Global Rule", desc: "Remove a global rule"},
+	// In read-only mode, only non-mutating operations are available.
+	var mainItems []list.Item
+	if m.readOnly {
+		mainItems = []list.Item{
+			item{title: "List Rules", desc: "View all current policy rules"},
+			item{title: "List Global Rules", desc: "View repository-wide global rules"},
+		}
+	} else {
+		mainItems = []list.Item{
+			item{title: "Add Rule", desc: "Add a new policy rule"},
+			item{title: "Remove Rule", desc: "Remove an existing policy rule"},
+			item{title: "List Rules", desc: "View all current policy rules"},
+			item{title: "Reorder Rules", desc: "Change the order of policy rules"},
+			item{title: "List Global Rules", desc: "View repository-wide global rules"},
+			item{title: "Add Global Rule", desc: "Add a new global rule"},
+			item{title: "Update Global Rule", desc: "Modify an existing global rule"},
+			item{title: "Remove Global Rule", desc: "Remove a global rule"},
+		}
 	}
 
 	// Set up the list delegate
@@ -522,10 +543,15 @@ func (m *model) updateGlobalRuleList() {
 func (m model) View() string {
 	switch m.screen {
 	case screenMain:
+		// Show apply hint only when not in read-only mode.
+		hint := ""
+		if !m.readOnly {
+			hint = "Run `gittuf policy apply` to apply staged changes to the selected policy file"
+		}
 		return lipgloss.NewStyle().Margin(1, 2).Render(
 			m.mainList.View() + "\n" +
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\nRun `gittuf policy apply` to apply staged changes to the selected policy file",
+				"\n" + hint,
 		)
 	case screenAddRule:
 		var b strings.Builder
@@ -674,8 +700,7 @@ func repoReorderRules(o *options, rules []rule) error {
 
 	ruleNames := make([]string, len(rules))
 	for i, r := range rules {
-		ruleNames[i] = r.
-			name
+		ruleNames[i] = r.name
 	}
 
 	return repo.ReorderDelegations(context.Background(), signer, o.policyName, ruleNames, true)
@@ -719,8 +744,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "tui",
 		Short:             "Start the TUI for managing policies",
-		Long:              "This command allows users to start a terminal-based interface to manage policies. The signing key specified will be used to sign all operations while in the TUI. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes",
-		PreRunE:           common.CheckForSigningKeyFlag,
+		Long:              "This command starts a terminal-based interface to manage policies. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
