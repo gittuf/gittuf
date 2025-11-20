@@ -1,7 +1,7 @@
 header:
   schema-version: 2.0.0
-  last-updated: '2025-01-21'
-  last-reviewed: '2025-01-21'
+  last-updated: '2025-11-20'
+  last-reviewed: '2025-11-20'
   url: https://github.com/gittuf/gittuf
 
 project:
@@ -13,7 +13,7 @@ project:
       social: https://github.com/JustinCappos
       primary: false
     - name: Aditya Sirish A Yelgundhalli
-      affiliation: New York University
+      affiliation: Bloomberg
       email: aditya.sirish@nyu.edu
       social: https://github.com/adityasaky
       primary: true
@@ -37,6 +37,30 @@ project:
       url: https://github.com/gittuf/gittuf
       comment: |
         gittuf/gittuf is the main repository for gittuf.
+    - name: gittuf-community
+      url: https://github.com/gittuf/community
+      comment: |
+        gittuf/community contains the governance and community aspects of gittuf.
+    - name: gittuf-github-app
+      url: https://github.com/gittuf/github-app
+      comment: |
+        gittuf/github-app hosts the gittuf GitHub app that allows for easier deployment of gittuf on GitHub repositories.
+    - name: gittuf-visualizer
+      url: https://github.com/gittuf/visualizer
+      comment: |
+        gittuf/visualizer contains the code for the web visualizer that helps visualize gittuf metadata.
+    - name: gittuf.github.io
+      url: https://github.com/gittuf/gittuf.github.io
+      comment: |
+        gittuf/gittuf.github.io contains the official gittuf website code and resources.
+    - name: gittuf-demo
+      url: https://github.com/gittuf/demo
+      comment: |
+        gittuf/demo contains the demo showcasing gittuf features.
+    - name: gittuf-installer
+      url: https://github.com/gittuf/gittuf-installer
+      comment: |
+        gittuf/gittuf-installer contains the GitHub action which installs gittuf for a CI/CD workflow.
   vulnerability-reporting:
     reports-accepted: true
     bug-bounty-available: false
@@ -50,7 +74,7 @@ repository:
   no-third-party-packages: false
   core-team:
     - name:        Aditya Sirish A Yelgundhalli
-      affiliation: New York University
+      affiliation: Bloomberg
       email:       aditya.sirish@nyu.edu
       social:      https://github.com/adityasaky
       primary:     true
@@ -81,7 +105,7 @@ repository:
       primary:     false
   documentation:
     contributing-guide: https://github.com/gittuf/gittuf/blob/main/CONTRIBUTING.md
-    review-policy: TODO?
+    review-policy: TODO
     security-policy: https://github.com/gittuf/gittuf/blob/main/SECURITY.md
     governance: https://github.com/gittuf/community
     dependency-management-policy: https://github.com/gittuf/gittuf/blob/main/CONTRIBUTING.md#dependencies-policy
