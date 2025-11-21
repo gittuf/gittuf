@@ -222,6 +222,26 @@ func (t *TargetsMetadata) GetRules() []tuf.Rule {
 	return rules
 }
 
+// GetTeams is not supported in v01 metadata.
+func (t *TargetsMetadata) GetTeams() (map[string]tuf.Team, error) {
+	return nil, tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// AddTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) AddTeam(_ string, _ []tuf.Principal, _ int) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// RemoveTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) RemoveTeam(_ string) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
+// UpdateTeam is not supported in v01 metadata.
+func (t *TargetsMetadata) UpdateTeam(_ string, _ []tuf.Principal, _ int) error {
+	return tuf.ErrMetadataVersionDoesNotSupportTeams
+}
+
 // AddPrincipal adds a principal to the metadata.
 //
 // TODO: this isn't associated with a specific rule; with the removal of
@@ -320,6 +340,12 @@ func (d *Delegation) Matches(target string) bool {
 // trusted by the rule.
 func (d *Delegation) GetPrincipalIDs() *set.Set[string] {
 	return d.KeyIDs
+}
+
+// GetTeamIDs returns the identifiers of the teams that are listed as
+// trusted by the rule. Not supported in v01.
+func (d *Delegation) GetTeamIDs() *set.Set[string] {
+	return set.NewSet[string]()
 }
 
 // GetThreshold returns the threshold of principals that must approve to meet

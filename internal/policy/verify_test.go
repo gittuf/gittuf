@@ -855,7 +855,7 @@ func TestVerifyMergeable(t *testing.T) {
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1157,7 +1157,7 @@ func TestVerifyMergeable(t *testing.T) {
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, baseCommitIDs[1].String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, baseCommitIDs[1].String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1490,7 +1490,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1784,7 +1784,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, baseCommitIDs[1].String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, baseCommitIDs[1].String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2871,7 +2871,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3066,7 +3066,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3145,7 +3145,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3282,7 +3282,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3336,7 +3336,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3389,7 +3389,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3594,7 +3594,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), "")
 		require.Nil(t, err)
 
 		env, err := dsse.CreateEnvelope(authorization)
@@ -3686,7 +3686,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		// This uses the latest reference authorization version
 		// As this is for a tag, the target is the commit the tag points to,
 		// taken from the RSL entry we just created for it
-		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3765,7 +3765,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		// This uses the latest reference authorization version
 		// As this is for a tag, the target is the commit the tag points to,
 		// taken from the RSL entry we just created for it
-		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String(), "")
 		if err != nil {
 			t.Fatal(err)
 		}

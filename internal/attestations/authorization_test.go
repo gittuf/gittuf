@@ -176,9 +176,9 @@ func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fro
 		err           error
 	)
 	if tag {
-		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID, "")
 	} else {
-		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID, "")
 	}
 	if err != nil {
 		t.Fatal(err)

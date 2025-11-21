@@ -19,7 +19,7 @@ func TestNewReferenceAuthorization(t *testing.T) {
 		testRef := "refs/heads/main"
 		testID := gitinterface.ZeroHash.String()
 
-		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID, "")
 		assert.Nil(t, err)
 
 		// Check value of statement type
@@ -44,7 +44,7 @@ func TestNewReferenceAuthorization(t *testing.T) {
 		testRef := "refs/heads/main"
 		testID := gitinterface.ZeroHash.String()
 
-		authorization, err := NewReferenceAuthorizationForTag(testRef, testID, testID)
+		authorization, err := NewReferenceAuthorizationForTag(testRef, testID, testID, "")
 		assert.Nil(t, err)
 
 		// Check value of statement type
@@ -97,7 +97,7 @@ func TestValidate(t *testing.T) {
 		testRef := "refs/heads/main"
 		testID := gitinterface.ZeroHash.String()
 
-		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,9 +132,9 @@ func createTestEnvelope(t *testing.T, refName, fromID, toID string, tag bool) *s
 	)
 
 	if tag {
-		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID, "")
 	} else {
-		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID, "")
 	}
 	if err != nil {
 		t.Fatal(err)

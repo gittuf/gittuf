@@ -7,6 +7,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/attest/apply"
 	"github.com/gittuf/gittuf/internal/cmd/attest/authorize"
 	"github.com/gittuf/gittuf/internal/cmd/attest/github"
+	"github.com/gittuf/gittuf/internal/cmd/attest/hat"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(authorize.New(o))
 	cmd.AddCommand(github.New(o))
+	cmd.AddCommand(hat.New(o))
 
 	return cmd
 }
