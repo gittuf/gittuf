@@ -41,6 +41,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "make-controller",
 		Short:             `Make current repository a controller`,
+		Long:              `The 'make-controller' command makes the current repository a controller and allows other repositories to utilize its policies.`,
 		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
