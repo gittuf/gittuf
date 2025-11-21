@@ -21,6 +21,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	tufv03 "github.com/gittuf/gittuf/internal/tuf/v03"
 )
 
 const (
@@ -1016,6 +1017,11 @@ func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tu
 			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 		}
 
+		if tufv03.AllowV03Metadata() && migrate {
+			rootMetadataV02 := migrations.MigrateRootMetadataV01ToV02(rootMetadata)
+			return migrations.MigrateRootMetadataV02ToV03(rootMetadataV02), nil
+		}
+
 		if migrate {
 			return migrations.MigrateRootMetadataV01ToV02(rootMetadata), nil
 		}
@@ -1024,6 +1030,18 @@ func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tu
 
 	case schemaVersion == tufv02.RootVersion:
 		rootMetadata := &tufv02.RootMetadata{}
+		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		}
+
+		if tufv03.AllowV03Metadata() && migrate {
+			return migrations.MigrateRootMetadataV02ToV03(rootMetadata), nil
+		}
+
+		return rootMetadata, nil
+
+	case schemaVersion == tufv03.RootVersion:
+		rootMetadata := &tufv03.RootMetadata{}
 		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 		}
@@ -1077,6 +1095,11 @@ func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMe
 			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
 		}
 
+		if tufv03.AllowV03Metadata() && migrate {
+			targetsMetadataV02 := migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata)
+			return migrations.MigrateTargetsMetadataV02ToV03(targetsMetadataV02), nil
+		}
+
 		if migrate {
 			return migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata), nil
 		}
@@ -1085,6 +1108,18 @@ func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMe
 
 	case schemaVersion == tufv02.TargetsVersion:
 		targetsMetadata := &tufv02.TargetsMetadata{}
+		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+		}
+
+		if tufv03.AllowV03Metadata() && migrate {
+			return migrations.MigrateTargetsMetadataV02ToV03(targetsMetadata), nil
+		}
+
+		return targetsMetadata, nil
+
+	case schemaVersion == tufv03.TargetsVersion:
+		targetsMetadata := &tufv03.TargetsMetadata{}
 		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
 			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
 		}
