@@ -944,7 +944,7 @@ func (r *Repository) GetPropagationDirectives(ctx context.Context, signer sslibd
 		return nil, err
 	}
 
-	propagationDirectives:= rootMetadata.GetPropagationDirectives()
+	propagationDirectives := rootMetadata.GetPropagationDirectives()
 	if propagationDirectives == nil {
 		fmt.Println("No propagation directives found in root metadata")
 	}
@@ -1022,7 +1022,6 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 	commitMessage := fmt.Sprintf("Add hook '%s' to root metadata", hookName)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
-
 
 // RemoveHook defines the workflow for removing a hook defined in gittuf policy.
 func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVerifier, stages []tuf.HookStage, hookName string, signCommit bool, opts ...trustpolicyopts.Option) error {
