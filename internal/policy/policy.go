@@ -1017,13 +1017,14 @@ func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tu
 			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
 		}
 
-		if tufv03.AllowV03Metadata() && migrate {
-			rootMetadataV02 := migrations.MigrateRootMetadataV01ToV02(rootMetadata)
-			return migrations.MigrateRootMetadataV02ToV03(rootMetadataV02), nil
-		}
-
 		if migrate {
-			return migrations.MigrateRootMetadataV01ToV02(rootMetadata), nil
+			rootMetadataV02 := migrations.MigrateRootMetadataV01ToV02(rootMetadata)
+
+			if tufv03.AllowV03Metadata() {
+				return migrations.MigrateRootMetadataV02ToV03(rootMetadataV02), nil
+			}
+
+			return rootMetadataV02, nil
 		}
 
 		return rootMetadata, nil
@@ -1095,13 +1096,14 @@ func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMe
 			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
 		}
 
-		if tufv03.AllowV03Metadata() && migrate {
-			targetsMetadataV02 := migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata)
-			return migrations.MigrateTargetsMetadataV02ToV03(targetsMetadataV02), nil
-		}
-
 		if migrate {
-			return migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata), nil
+			targetsMetadataV02 := migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata)
+
+			if tufv03.AllowV03Metadata() {
+				return migrations.MigrateTargetsMetadataV02ToV03(targetsMetadataV02), nil
+			}
+
+			return targetsMetadataV02, nil
 		}
 
 		return targetsMetadata, nil
