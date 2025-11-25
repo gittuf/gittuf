@@ -294,7 +294,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
+	client, err := GetGitHubClient(options.GitHubBaseURL, token)
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return ErrNoGitHubToken
 	}
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
+	client, err := GetGitHubClient(options.GitHubBaseURL, token)
 
 	if err != nil {
 		return err
@@ -657,7 +657,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 	// Note: there's the potential for a TOCTOU issue here, we may query the
 	// repo after things have moved in either branch.
 
-	client, err := getGitHubClient(githubBaseURL, githubToken)
+	client, err := GetGitHubClient(githubBaseURL, githubToken)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -694,7 +694,7 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 // getGitHubClient creates a client to interact with a GitHub instance. If a
 // base URL other than https://github.com is supplied, the client is configured
 // to interact with the specified enterprise instance.
-func getGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
+func GetGitHubClient(baseURL, githubToken string) (*gogithub.Client, error) {
 	githubClient := gogithub.NewClient(nil).WithAuthToken(githubToken)
 
 	if baseURL != githubopts.DefaultGitHubBaseURL {
