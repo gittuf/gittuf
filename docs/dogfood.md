@@ -58,7 +58,7 @@ Next, the latest release of gittuf as well as changes to the `main` branch can
 be verified using gittuf.
 
 ```bash
-gittuf verify-ref --verbose v0.4.0
+gittuf verify-ref --verbose v0.12.0
 gittuf verify-ref --verbose main
 ```
 
