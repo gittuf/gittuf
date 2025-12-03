@@ -27,14 +27,15 @@ users, please open an issue with any suggestions or bugs you encounter!
 
 ## Installation, Get Started, Get Involved
 
-Take a look at the [get started guide] to learn how to install and try gittuf
-out! Additionally, contributions are welcome, please refer to the [contributing
+gittuf's getting started guide is available on the [gittuf website].
+
+Additionally, contributions are welcome, please refer to the [contributing
 guide], our [roadmap], and the issue tracker for ways to get involved. In
-addition, you can join the gittuf channel on the [OpenSSF Slack] and say hello! 
+addition, you can join the gittuf channel on the [OpenSSF Slack] and say hello!
 
 [contributing guide]: /CONTRIBUTING.md
 [roadmap]: /docs/roadmap.md
 [Open Source Security Foundation (OpenSSF)]: https://openssf.org/
 [Supply Chain Integrity Working Group]: https://github.com/ossf/wg-supply-chain-integrity
-[get started guide]: /docs/get-started.md
 [OpenSSF Slack]: https://slack.openssf.org/
+[gittuf website]: https://gittuf.dev/quickstart
