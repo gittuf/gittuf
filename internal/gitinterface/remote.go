@@ -13,6 +13,11 @@ func (r *Repository) RemoveRemote(remoteName string) error {
 	return err
 }
 
+func (r *Repository) SetRemote(remoteName string, url string) error {
+	_, err := r.executor("remote", "set-url", remoteName, url).executeString()
+	return err
+}
+
 func (r *Repository) GetRemoteURL(remoteName string) (string, error) {
 	return r.executor("remote", "get-url", remoteName).executeString()
 }
