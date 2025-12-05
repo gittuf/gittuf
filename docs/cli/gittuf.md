@@ -26,6 +26,7 @@ gittuf is a security layer for Git repositories, powered by TUF. The CLI provide
 * [gittuf dev](gittuf_dev.md)	 - Developer mode commands
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log
+* [gittuf setup](gittuf_setup.md)	 - Launch the gittuf setup wizard to quickly get started with gittuf on your repository
 * [gittuf sync](gittuf_sync.md)	 - Synchronize local references with remote references based on RSL
 * [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
 * [gittuf verify-mergeable](gittuf_verify-mergeable.md)	 - Tools for verifying mergeability using gittuf policies
