@@ -2,104 +2,39 @@
 
 This guide presents a quick primer to using gittuf. Note that gittuf is
 currently in beta, so if you encounter any issues, we encourage you to
-[report them](https://github.com/gittuf/gittuf/issues).
+[report them](https://github.com/gittuf/gittuf/issues). This guide assumes you
+have already installed gittuf. If you have not, see the [installation guide].
 
-## Install gittuf using pre-built binaries
+If you prefer to just get up and running with a basic gittuf setup, you can use
+the [Express Setup] instructions. Otherwise, if you are familiar with key
+management and security policies, see [Manual Setup].
 
-> [!NOTE]
-> Please use release v0.1.0 or higher, as prior releases were created to
-> test the release workflow.
+## Express Setup
 
-This repository provides pre-built binaries that are signed and published using
-[GoReleaser]. The signatures for these binaries are generated using [Sigstore],
-using the release workflow's identity. Make sure you have [cosign] installed on
-your system, then you will be able to securely download and verify the gittuf
-release:
+gittuf includes a built-in setup wizard that will:
 
-### Unix-like operating systems
+ 1. Initialize the root of trust in the repository with [Sigstore].
+ 2. Ask for the GitHub usernames of users authorized to commit to the default
+    branch, i.e. `main` or `master`.
+ 3. Create a rule that authorizes you, and all the users that you supplied in
+    Step 2 to make and approve commits to the default branch.
 
-```sh
-# Modify these values as necessary.
-# One of: amd64, arm64
-ARCH=amd64
-# One of: linux, darwin, freebsd
-OS=linux
-# See https://github.com/gittuf/gittuf/releases for the latest version
-VERSION=0.12.0
-cd $(mktemp -d)
+To set up gittuf, run `gittuf setup`, optionally with `--gittuf-token <your
+token>` if you wish to have the wizard automatically add GitHub users to the
+policy. The rules created by the setup wizard are fully reconfigurable later,
+should you wish to change the security policy on the repository.
 
-curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}
-curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}.sig
-curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}.pem
+As this wizard uses [Sigstore] for key management, you will not need to manually
+manage signing keys for gittuf's metadata, and may simply login with your
+preferred authentication service for [Sigstore] to authenticate instead.
 
-cosign verify-blob \
-    --certificate gittuf_${VERSION}_${OS}_${ARCH}.pem \
-    --signature gittuf_${VERSION}_${OS}_${ARCH}.sig \
-    --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v${VERSION} \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-    gittuf_${VERSION}_${OS}_${ARCH}
+## Manual Setup
 
-sudo install gittuf_${VERSION}_${OS}_${ARCH} /usr/local/bin/gittuf
-cd -
-gittuf version
-```
+gittuf allows you to define the keys and users that are allowed to make changes.
+Some familiarity with [The Update Framework] is ideal, as gittuf's metadata is
+similar (but not exactly the same) to TUF metadata.
 
-### Windows
-
-#### Winget
-
-gittuf can be installed on Windows from winget, provided winget is installed
-on the system:
-
-```powershell
-winget install gittuf
-```
-
-#### Manual installation
-
-Copy and paste these commands in PowerShell to install gittuf. Please remember
-to change the version number (0.12.0 in this example) and architecture
-(amd64 in this example) according to your use-case and system.
-
-```powershell
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe" -O "gittuf_0.12.0_windows_amd64.exe"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.sig" -O "gittuf_0.12.0_windows_amd64.exe.sig"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.pem" -O "gittuf_0.12.0_windows_amd64.exe.pem"
-
-cosign verify-blob --certificate gittuf_0.12.0_windows_amd64.exe.pem --signature gittuf_0.12.0_windows_amd64.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v0.12.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_0.12.0_windows_amd64.exe
-```
-
-The gittuf binary is now verified on your system. You can run it from the
-terminal as `gittuf.exe` from this directory, or add it to your PATH as desired.
-
-## Building from source
-
-> [!NOTE]
-> `make` needs to be installed manually on Windows as it is not packaged with
-> the OS. The easiest way to install `make` on Windows is to use the
-> `ezwinports.make` package: Simply type `winget install ezwinports.make`
-> in PowerShell.
-> You can also install it from the [GNU website] or the [chocolatey] package
-> manager.
-
-Before building from source, please ensure that your Go environment is correctly
-set up. You can do this by following the official [Go installation
-instructions]. If you encounter any issues when building, make sure your
-`GOPATH` and `PATH` are configured correctly.
-
-To build from source, clone the repository and run `make`. This will also run
-the test suite prior to installing gittuf. Note that Go 1.24 or higher is
-necessary to build gittuf.
-
-```sh
-git clone https://github.com/gittuf/gittuf
-cd gittuf
-make
-```
-
-This will automatically put `gittuf` in the `GOPATH` as configured.
-
-## Create keys
+### Create keys
 
 First, create some keys that are used for the gittuf root of trust, policies, as
 well as for commits created while following this guide.
@@ -117,9 +52,9 @@ ssh-keygen -q -t ecdsa -N "" -f policy
 ssh-keygen -q -t ecdsa -N "" -f developer
 ```
 
-## Create a Git repository
+### Create a Git repository
 
-gittuf can be used with either a brand new repository or with an existing
+gittuf can be used with either a brand-new repository or with an existing
 repository. Here, we assume gittuf is being deployed with a fresh repository.
 Initialize the repository and gittuf's root of trust metadata using the
 key.
@@ -131,7 +66,7 @@ git config --local gpg.format ssh
 git config --local user.signingkey ../keys/developer
 ```
 
-## Initialize gittuf
+### Initialize gittuf
 
 Initialize gittuf's root of trust metadata.
 
@@ -174,7 +109,7 @@ means the policy will be applicable henceforth.
 gittuf policy apply --local-only
 ```
 
-## Making repository changes
+### Making repository changes
 
 You can make changes in the repository using standard Git workflows. However,
 changes to Git references (i.e., branches and tags) must be recorded in gittuf's
@@ -188,7 +123,7 @@ git add . && git commit -q -S -m "Initial commit"
 gittuf rsl record main --local-only
 ```
 
-## Verifying policy
+### Verifying policy
 
 gittuf allows for verifying rules for Git references and files.
 
@@ -196,7 +131,7 @@ gittuf allows for verifying rules for Git references and files.
 gittuf verify-ref --verbose main
 ```
 
-## Communicating with a remote
+### Communicating with a remote
 
 gittuf includes two main ways to push and fetch the policy and RSL references.
 You may use the `gittuf sync` command to synchronize changes with the remote
@@ -240,3 +175,7 @@ the gittuf repository.
 [chocolatey]: https://community.chocolatey.org/packages/make
 [official Go guide for Windows]: https://go.dev/wiki/SettingGOPATH#
 [Go installation instructions]: https://go.dev/doc/install
+[installation guide]: /docs/installation.md
+[Express Setup]: #express-setup
+[Manual Setup]: #manual-setup
+[The Update Framework]: https://theupdateframework.io/
