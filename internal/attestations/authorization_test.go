@@ -5,6 +5,7 @@ package attestations
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -168,6 +169,71 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 	})
 }
 
+func TestCheckAuthorizationExpiration(t *testing.T) {
+	refName := "refs/heads/main"
+	fromID := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	toID := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+	t.Run("no expiration", func(t *testing.T) {
+		// Create authorization without expiration
+		att, err := NewReferenceAuthorizationForCommit(refName, fromID, toID, "")
+		assert.Nil(t, err)
+
+		env, err := dsse.CreateEnvelope(att)
+		assert.Nil(t, err)
+
+		// Check with any time
+		err = CheckAuthorizationExpiration(env, time.Now())
+		assert.Nil(t, err)
+	})
+
+	t.Run("future expiration", func(t *testing.T) {
+		// Expires in 1 hour
+		expires := time.Now().Add(time.Hour).Format(time.RFC3339)
+		att, err := NewReferenceAuthorizationForCommit(refName, fromID, toID, expires)
+		assert.Nil(t, err)
+
+		env, err := dsse.CreateEnvelope(att)
+		assert.Nil(t, err)
+
+		// Check now (should pass)
+		err = CheckAuthorizationExpiration(env, time.Now())
+		assert.Nil(t, err)
+	})
+
+	t.Run("past expiration", func(t *testing.T) {
+		// Expired 1 hour ago
+		expires := time.Now().Add(-time.Hour).Format(time.RFC3339)
+		att, err := NewReferenceAuthorizationForCommit(refName, fromID, toID, expires)
+		assert.Nil(t, err)
+
+		env, err := dsse.CreateEnvelope(att)
+		assert.Nil(t, err)
+
+		// Check now (should fail)
+		err = CheckAuthorizationExpiration(env, time.Now())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "reference authorization expired")
+	})
+
+	t.Run("invalid expiration format", func(t *testing.T) {
+		att, err := NewReferenceAuthorizationForCommit(refName, fromID, toID, "invalid-time")
+		if err != nil {
+			t.Log("NewReferenceAuthorizationForCommit might fail validation")
+		}
+
+		// If creation succeeds, verify check fails
+		if att != nil {
+			env, err := dsse.CreateEnvelope(att)
+			assert.Nil(t, err)
+
+			err = CheckAuthorizationExpiration(env, time.Now())
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid expiration timestamp")
+		}
+	})
+}
+
 func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fromID, toID string, tag bool) *sslibdsse.Envelope {
 	t.Helper()
 
@@ -176,9 +242,9 @@ func createReferenceAuthorizationAttestationEnvelopes(t *testing.T, refName, fro
 		err           error
 	)
 	if tag {
-		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForTag(refName, fromID, toID, "")
 	} else {
-		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID)
+		authorization, err = NewReferenceAuthorizationForCommit(refName, fromID, toID, "")
 	}
 	if err != nil {
 		t.Fatal(err)

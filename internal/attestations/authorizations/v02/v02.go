@@ -32,6 +32,7 @@ type ReferenceAuthorization struct {
 	TargetRef string `json:"targetRef"`
 	FromID    string `json:"fromID"`
 	TargetID  string `json:"targetID"`
+	Expires   string `json:"expires,omitempty"`
 }
 
 func (r *ReferenceAuthorization) GetRef() string {
@@ -46,14 +47,18 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 	return r.TargetID
 }
 
+func (r *ReferenceAuthorization) GetExpires() string {
+	return r.Expires
+}
+
 // NewReferenceAuthorizationForCommit creates a new reference authorization for
 // the provided information. The authorization is embedded in an in-toto
 // "statement" and returned with the appropriate "predicate type" set. The
 // `fromID` and `targetID` specify the change to `targetRef` that is to be
 // authorized by invoking this function. The targetID is expected to be the Git
 // tree ID of the resultant commit.
-func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
+func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID, expires string) (*ita.Statement, error) {
+	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID, expires)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +81,8 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*it
 // `targetID` specify the change to `targetRef` that is to be authorized by
 // invoking this function. The targetID is expected to be the ID of the commit
 // the tag will point to.
-func NewReferenceAuthorizationForTag(targetRef, fromID, targetID string) (*ita.Statement, error) {
-	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
+func NewReferenceAuthorizationForTag(targetRef, fromID, targetID, expires string) (*ita.Statement, error) {
+	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID, expires)
 	if err != nil {
 		return nil, err
 	}
@@ -144,11 +149,12 @@ func Validate(env *sslibdsse.Envelope, targetRef, fromID, targetID string) error
 	return nil
 }
 
-func newReferenceAuthorizationStruct(targetRef, fromID, targetID string) (*structpb.Struct, error) {
+func newReferenceAuthorizationStruct(targetRef, fromID, targetID, expires string) (*structpb.Struct, error) {
 	predicate := &ReferenceAuthorization{
 		TargetRef: targetRef,
 		FromID:    fromID,
 		TargetID:  targetID,
+		Expires:   expires,
 	}
 
 	return common.PredicateToPBStruct(predicate)

@@ -17,7 +17,7 @@ import (
 func TestLoadCurrentAttestations(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
-	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 func TestLoadAttestationsForEntry(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
-	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 func TestAttestationsCommit(t *testing.T) {
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
-	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
+	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID, "")
 	if err != nil {
 		t.Fatal(err)
 	}

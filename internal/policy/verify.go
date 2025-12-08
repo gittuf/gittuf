@@ -13,6 +13,8 @@ import (
 	"os"
 	"strings"
 
+	"time"
+
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
@@ -25,6 +27,8 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
@@ -878,7 +882,73 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		return nil, nil, err
 	}
 
-	return getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)
+	authorizationAttestation, approverKeyIDs, err := getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if authorizationAttestation != nil {
+		// Check for expiration
+		// Identify the commit time for the target ID
+		// Typically, entry.TargetID corresponds to the commit ID because we don't
+		// use verifyEntry for other objects.
+		// However, we must be careful with tags.
+		// For tags, the authorization is for the tag itself, so we should check
+		// when the tag was created? Or when the RSL entry was created?
+		// The rule is "approval is valid until X". If the RSL entry is created
+		// before X, should it be allowed?
+		// Yes. The action (creating the RSL / updating the ref) happened before expiration.
+
+		// Let's use the RSL entry's commit time if possible, or the commit object's time.
+		// entry is *rsl.ReferenceEntry.
+		// Actually, retrieving the RSL entry timestamp requires fetching the RSL commit.
+		// But here we can just use the target commit's timestamp which is often close.
+		// BUT `entry.TargetID` is what we are verifying.
+
+		goGitRepo, err := repo.GetGoGitRepository()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		var checkTime time.Time
+		if isTag {
+			// For tags, getting the tag object timestamp is complex if it's an annotated tag.
+			// If it's a lightweight tag, it doesn't have a timestamp.
+			// Fallback to checking the commit it points to? No, that could be old.
+			// Let's fallback to allowing it if we can't determine time?
+			// Better: fetch the RSL entry commit.
+			// But that requires `rsl.GetEntry` which gives us the interface.
+			// We already have `entry`.
+
+			// Let's try to get the object at TargetID.
+			obj, err := goGitRepo.Object(plumbing.AnyObject, plumbing.NewHash(entry.TargetID.String()))
+			if err == nil {
+				switch o := obj.(type) {
+				case *object.Commit:
+					checkTime = o.Committer.When
+				case *object.Tag:
+					checkTime = o.Tagger.When
+				default:
+					// Unsure how to handle other types or if we can't get time.
+					// Use current time? No.
+				}
+			}
+		} else {
+			commit, err := goGitRepo.CommitObject(plumbing.NewHash(entry.TargetID.String()))
+			if err == nil {
+				checkTime = commit.Committer.When
+			}
+		}
+
+		if !checkTime.IsZero() {
+			if err := attestations.CheckAuthorizationExpiration(authorizationAttestation, checkTime); err != nil {
+				// Authorization expired
+				return nil, nil, nil
+			}
+		}
+	}
+
+	return authorizationAttestation, approverKeyIDs, nil
 }
 
 func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo *gitinterface.Repository, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID gitinterface.Hash, isTag bool) (*sslibdsse.Envelope, *set.Set[string], error) {

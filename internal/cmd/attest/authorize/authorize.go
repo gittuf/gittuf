@@ -17,6 +17,7 @@ type options struct {
 	p       *persistent.Options
 	fromRef string
 	revoke  bool
+	expires string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -35,6 +36,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"r",
 		false,
 		"revoke existing authorization",
+	)
+
+	cmd.Flags().StringVar(
+		&o.expires,
+		"expires",
+		"",
+		"set expiration for authorization (ISO 8601 / RFC 3339)",
 	)
 }
 
@@ -60,6 +68,9 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	opts := []attestopts.Option{}
 	if o.p.WithRSLEntry {
 		opts = append(opts, attestopts.WithRSLEntry())
+	}
+	if o.expires != "" {
+		opts = append(opts, attestopts.WithExpires(o.expires))
 	}
 
 	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true, opts...)
