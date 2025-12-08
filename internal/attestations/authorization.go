@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"time"
 
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
@@ -22,8 +23,8 @@ import (
 // `fromID` and `toID` specify the change to `targetRef` that is to be
 // authorized by invoking this function. Since this is for a commit, the `toID`
 // is expected to be a Git tree ID.
-func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.Statement, error) {
-	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID)
+func NewReferenceAuthorizationForCommit(targetRef, fromID, toID, expires string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForCommit(targetRef, fromID, toID, expires)
 }
 
 // NewReferenceAuthorizationForTag creates a new reference authorization for the
@@ -32,8 +33,8 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.St
 // `toID` specify the change to `targetRef` that is to be authorized by invoking
 // this function. Since this is for a tag, the `toID` is expected to be a Git
 // commit ID.
-func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.Statement, error) {
-	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID)
+func NewReferenceAuthorizationForTag(targetRef, fromID, toID, expires string) (*ita.Statement, error) {
+	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID, expires)
 }
 
 // SetReferenceAuthorization writes the new reference authorization attestation
@@ -139,4 +140,49 @@ func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repositor
 // reference authorization attestation.
 func ReferenceAuthorizationPath(refName, fromID, toID string) string {
 	return path.Join(refName, fmt.Sprintf("%s-%s", fromID, toID))
+}
+
+// CheckAuthorizationExpiration checks if the authorization in the envelope has
+// expired relative to the observation time.
+func CheckAuthorizationExpiration(env *sslibdsse.Envelope, observationTime time.Time) error {
+	payloadBytes, err := env.DecodeB64Payload()
+	if err != nil {
+		return fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+
+	inspectAuthorization := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectAuthorization); err != nil {
+		return fmt.Errorf("unable to inspect reference authorization: %w", err)
+	}
+
+	var expires string
+	switch inspectAuthorization["predicate_type"] {
+	case authorizationsv02.PredicateType:
+		predicate, ok := inspectAuthorization["predicate"].(map[string]any)
+		if !ok {
+			return fmt.Errorf("unable to inspect reference authorization predicate") // should not happen if validated
+		}
+		if e, has := predicate["expires"]; has {
+			expires, _ = e.(string)
+		}
+	default:
+		// Older versions or unknown versions don't have expiration, so we
+		// assume they are valid indefinitely (or handled elsewhere).
+		return nil
+	}
+
+	if expires == "" {
+		return nil
+	}
+
+	expiryTime, err := time.Parse(time.RFC3339, expires)
+	if err != nil {
+		return fmt.Errorf("invalid expiration timestamp: %w", err)
+	}
+
+	if observationTime.After(expiryTime) {
+		return fmt.Errorf("reference authorization expired at %s", expires)
+	}
+
+	return nil
 }
