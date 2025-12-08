@@ -935,6 +935,41 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// GetPropagationDirectives lists all propagation directives defined in the
+// root metadata.
+func (r *Repository) GetPropagationDirectives(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool) ([]tuf.PropagationDirective, error) {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	propagationDirectives := rootMetadata.GetPropagationDirectives()
+	if propagationDirectives == nil {
+		fmt.Println("No propagation directives found in root metadata")
+	}
+
+	return propagationDirectives, nil
+}
+
 // AddHook defines the workflow for adding a file to be executed as a hook. It
 // writes the hook file, populates all fields in the hooks metadata associated
 // with this file and commits it to the root of trust metadata.
