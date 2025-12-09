@@ -41,8 +41,9 @@ func TestVerifyRef(t *testing.T) {
 
 	verifier := NewPolicyVerifier(repo)
 
-	currentTip, err := verifier.VerifyRef(testCtx, refName)
+	currentTip, usedAttestations, err := verifier.VerifyRef(testCtx, refName)
 	assert.Nil(t, err)
+	assert.Nil(t, usedAttestations)
 	assert.Equal(t, commitIDs[0], currentTip)
 }
 
@@ -60,8 +61,9 @@ func TestVerifyRefFull(t *testing.T) {
 
 	verifier := NewPolicyVerifier(repo)
 
-	currentTip, err := verifier.VerifyRefFull(testCtx, refName)
+	currentTip, usedAttestations, err := verifier.VerifyRefFull(testCtx, refName)
 	assert.Nil(t, err)
+	assert.Nil(t, usedAttestations)
 	assert.Equal(t, commitIDs[0], currentTip)
 }
 
@@ -87,8 +89,9 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	verifier := NewPolicyVerifier(repo)
 
 	// Verification passes because it's from a non-violating state only
-	currentTip, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
+	currentTip, usedAttestations, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
 	assert.Nil(t, err)
+	assert.Nil(t, usedAttestations)
 	assert.Equal(t, commitIDs[1], currentTip)
 }
 
@@ -108,10 +111,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
-		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
@@ -130,10 +134,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
-		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
@@ -165,7 +170,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrPolicyNotFound)
 	})
 
@@ -184,8 +189,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -195,7 +201,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -213,8 +219,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
@@ -232,8 +239,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -243,7 +251,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -261,8 +269,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
@@ -280,8 +289,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -291,7 +301,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -316,8 +326,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
@@ -335,8 +346,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -346,7 +358,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -371,8 +383,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -390,8 +403,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -401,7 +415,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -413,7 +427,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's still in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs = append(invalidEntryIDs, entryID)
@@ -433,8 +447,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -452,8 +467,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -463,7 +479,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -475,7 +491,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's still in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -493,7 +509,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// An invalid entry is not marked as skipped
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrInvalidEntryNotSkipped)
 	})
 
@@ -512,8 +528,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -523,7 +540,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -541,8 +558,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Send it into invalid state again
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -552,7 +570,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -570,8 +588,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
@@ -589,8 +608,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
 
@@ -601,8 +621,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -611,7 +632,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the invalid last good commit
@@ -629,7 +650,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -648,8 +669,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -659,7 +681,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -684,15 +706,16 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Skip the recovery entry as well
 		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -711,8 +734,9 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -721,7 +745,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Create a skip annotation for the invalid entry
@@ -731,7 +755,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		// No fix entry, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
@@ -788,7 +812,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -850,7 +874,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -872,7 +896,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -935,7 +959,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -998,7 +1022,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1075,7 +1099,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1152,7 +1176,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1174,7 +1198,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1252,7 +1276,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1330,7 +1354,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1425,7 +1449,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1485,7 +1509,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1507,7 +1531,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1568,7 +1592,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1629,7 +1653,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1704,7 +1728,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1779,7 +1803,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1801,7 +1825,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1877,7 +1901,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1953,7 +1977,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, baseCommitIDs[1].String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2143,10 +2167,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
-		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
@@ -2165,10 +2190,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
-		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
@@ -2200,7 +2226,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrPolicyNotFound)
 	})
 
@@ -2219,8 +2245,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2230,7 +2257,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -2248,8 +2275,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
@@ -2267,8 +2295,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2278,7 +2307,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -2296,8 +2325,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
@@ -2315,8 +2345,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2326,7 +2357,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -2351,8 +2382,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
@@ -2370,8 +2402,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2381,7 +2414,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -2406,8 +2439,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -2425,8 +2459,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -2436,7 +2471,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -2448,7 +2483,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's still in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs = append(invalidEntryIDs, entryID)
@@ -2468,8 +2503,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -2487,8 +2523,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -2498,7 +2535,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		invalidEntryIDs := []gitinterface.Hash{entryID}
@@ -2510,7 +2547,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's still in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -2528,7 +2565,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// An invalid entry is not marked as skipped
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrInvalidEntryNotSkipped)
 	})
 
@@ -2547,8 +2584,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2558,7 +2596,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -2576,8 +2614,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Send it into invalid state again
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2587,7 +2626,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit
@@ -2605,8 +2644,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
@@ -2624,8 +2664,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
 
@@ -2636,8 +2677,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2646,7 +2688,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the invalid last good commit
@@ -2664,7 +2706,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -2683,8 +2725,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2694,7 +2737,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
@@ -2719,15 +2762,16 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Skip the recovery entry as well
 		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -2746,8 +2790,9 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
-		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		usedAttestations, err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2756,7 +2801,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// It's in an invalid state right now, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Create a skip annotation for the invalid entry
@@ -2766,7 +2811,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		// No fix entry, error out
 		verifier = NewPolicyVerifier(repo)
-		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		_, err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
@@ -2782,8 +2827,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(testCtx, repo, state, nil, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, nil, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("successful verification using persons", func(t *testing.T) {
@@ -2796,8 +2842,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(testCtx, repo, state, nil, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, nil, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("successful verification with higher threshold using v0.1 reference authorization", func(t *testing.T) {
@@ -2834,7 +2881,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		blobID, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -2850,8 +2898,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 	})
 
 	t.Run("successful verification with higher threshold using latest reference authorization", func(t *testing.T) {
@@ -2887,7 +2936,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		blobID, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -2903,8 +2953,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 	})
 
 	t.Run("successful verification with higher threshold but using GitHub approval", func(t *testing.T) {
@@ -2944,7 +2995,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		blobID, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2960,8 +3012,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval due to invalid app key", func(t *testing.T) {
@@ -3001,7 +3054,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3017,7 +3070,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3056,7 +3109,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		gitHubApprovalBlobID, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3080,7 +3134,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		referenceAuthorizationBlobID, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3096,8 +3151,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{referenceAuthorizationBlobID, gitHubApprovalBlobID}, usedAttestations)
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval from untrusted key and reference authorization v0.2", func(t *testing.T) {
@@ -3135,7 +3191,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3159,7 +3215,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3175,7 +3231,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3213,7 +3269,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3229,7 +3285,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3267,7 +3323,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3296,7 +3352,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3315,7 +3371,7 @@ func TestVerifyEntry(t *testing.T) {
 		// We have an RSL signature from jane.doe, a GitHub approval from
 		// john.doe and a reference authorization from john.doe
 		// Insufficient to meet threshold 3
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3352,7 +3408,8 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		blobID, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3368,8 +3425,9 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 	})
 
 	t.Run("unsuccessful verification with global threshold constraint", func(t *testing.T) {
@@ -3405,7 +3463,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3421,7 +3479,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3440,8 +3498,9 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Only one entry, this is fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Add more entries
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
@@ -3450,8 +3509,9 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Rewrite history altogether
 		// Delete ref
@@ -3467,7 +3527,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Not fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3487,8 +3547,9 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Only one entry, this is fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Add more entries
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
@@ -3497,8 +3558,9 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 
 		// Rewrite history altogether
 		// Delete ref
@@ -3514,8 +3576,9 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine; this ref is not protected
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		usedAttestations, err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("verify global rules applied from controller repository", func(t *testing.T) {
@@ -3602,7 +3665,7 @@ func TestVerifyEntry(t *testing.T) {
 		env, err = dsse.SignEnvelope(testCtx, env, signer)
 		require.Nil(t, err)
 
-		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		blobID, err := currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		require.Nil(t, err)
 		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
 		require.Nil(t, err)
@@ -3615,8 +3678,9 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// We meet the threshold of with the reference authorization, so this should be successful
-		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		usedAttestations, err := verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 
 		// Make another change without reference authorization
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 2, gpgKeyBytes)
@@ -3624,7 +3688,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		_, err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
@@ -3646,8 +3710,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		usedAttestations, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with tag specific policy", func(t *testing.T) {
@@ -3666,8 +3731,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		usedAttestations, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
 		assert.Nil(t, err)
+		assert.Nil(t, usedAttestations)
 	})
 
 	t.Run("with threshold tag specific policy", func(t *testing.T) {
@@ -3707,7 +3773,8 @@ func TestVerifyTagEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+		blobID, err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		if err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3725,8 +3792,9 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		usedAttestations, err := verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.Nil(t, err)
+		assert.Equal(t, []gitinterface.Hash{blobID}, usedAttestations)
 	})
 
 	t.Run("with tag specific policy, unauthorized", func(t *testing.T) {
@@ -3745,7 +3813,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		_, err := verifyTagEntry(testCtx, repo, policy, nil, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3787,7 +3855,7 @@ func TestVerifyTagEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+		if _, err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3805,7 +3873,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		_, err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
