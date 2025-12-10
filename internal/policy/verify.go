@@ -70,7 +70,7 @@ func NewPolicyVerifier(repo *gitinterface.Repository) *PolicyVerifier {
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string, automaticRepair bool) (gitinterface.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
@@ -78,13 +78,13 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinter
 		return gitinterface.ZeroHash, err
 	}
 
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string, automaticRepair bool) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
 	var (
@@ -121,13 +121,13 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	}
 
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash, automaticRepair bool) (gitinterface.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
@@ -151,7 +151,7 @@ func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, 
 
 	// Do a relative verify from start entry to the latest entry
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, fromEntry, latestEntry, target, automaticRepair)
 }
 
 // VerifyMergeable checks if the targetRef can be updated to reflect the changes
@@ -446,7 +446,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string) error {
+func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string, automaticRepair bool) error {
 	/*
 		require firstEntry != nil
 		require lastEntry != nil
@@ -585,7 +585,50 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					slog.Debug("Checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
 					if !entry.SkippedBy(annotations[entry.GetID().String()]) {
-						return err
+						if !automaticRepair {
+							slog.Debug("Automatic recovery of repository not enabled. Verification failed.")
+							return err
+						}
+
+						slog.Debug("Automatic recovery of repository enabled. Attempting automatic recovery...")
+						// 0. Revoke the problematic entry.
+						if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.ID}, true, "Automatic fixup revocation").Commit(v.repo, true); err != nil {
+							return err
+						}
+
+						// 1. What's the last good state?
+						slog.Debug("Identifying last valid state...")
+						lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(entry.GetRefName()), rsl.BeforeEntryID(entry.GetID()), rsl.IsUnskipped(), rsl.IsReferenceEntry())
+						if err != nil {
+							return err
+						}
+						slog.Debug("Verifying identified last valid entry has not been revoked...")
+						if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
+							// this type assertion is fine because we use the rsl.IsReferenceEntry opt
+							return ErrLastGoodEntryIsSkipped
+						}
+						// require lastGoodEntry != nil
+
+						// gittuf requires the fix to point to a commit that is tree-same as the
+						// last good state
+						lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
+						if err != nil {
+							return err
+						}
+
+						newRefTip, err := v.repo.Commit(lastGoodTreeID, target, "Automatic fixup entry", true)
+						if err != nil {
+							return err
+						}
+
+						err = rsl.NewReferenceEntry(target, newRefTip).Commit(v.repo, true)
+						if err != nil {
+							return err
+						}
+
+						slog.Debug("Successfully recovered RSL! Please re-run verification.")
+
+						continue
 					}
 
 					// The invalid entry's been marked as skipped but we still need
