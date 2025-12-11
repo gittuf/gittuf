@@ -2,6 +2,30 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.13.0
+
+### Added
+
+- Added support for signing gittuf metadata with GPG keys
+- Added a new read-only mode to the TUI to allow viewing gittuf metadata
+- Added support for listing propagation directives and a duplicate check
+- Added documentation on extracting gittuf attestations data from the repository
+
+### Updated
+
+- Updated Sigstore dependency
+- Fixed Git GPG key configuration parsing issue
+- Added check to prevent reinitializing gittuf metadata when it already exists
+- Updated documentation for OSPS Baseline compliance
+- Updated the getting started guide
+- Updated documentation with various quality fixes
+- Updated various dependencies and CI workflows
+
+### Removed
+
+- Removed support for online verification from Sigstore, as it was removed
+  upstream
+
 ## v0.12.0
 
 ### Added
