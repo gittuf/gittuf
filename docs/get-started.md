@@ -1,8 +1,8 @@
 # Get Started
 
 This guide presents a quick primer to using gittuf. Note that gittuf is
-currently in beta, so if you encounter any issues, we encourage you to
-[report them](https://github.com/gittuf/gittuf/issues).
+currently in beta, so if you encounter any bugs, we encourage you to [open an
+issue].
 
 ## Install gittuf using pre-built binaries
 
@@ -120,9 +120,17 @@ ssh-keygen -q -t ecdsa -N "" -f developer
 ## Create a Git repository
 
 gittuf can be used with either a brand new repository or with an existing
-repository. Here, we assume gittuf is being deployed with a fresh repository.
-Initialize the repository and gittuf's root of trust metadata using the
-key.
+repository.
+
+If you are using gittuf on an existing repository, please note that gittuf
+currently does not make any claims about the contents of the repository before
+gittuf was set up. This means that all contents of the repository are assumed to
+be trusted, and only changes after gittuf initialization will be scrutinized
+according to the policy. To use gittuf on an existing repository, skip to
+[Initialize gittuf].
+
+If you would like to use gittuf on a new repository, simply initialize the
+repository and gittuf's root of trust metadata using the key.
 
 ```bash
 cd .. && mkdir repo && cd repo
@@ -200,10 +208,9 @@ gittuf verify-ref --verbose main
 
 gittuf includes two main ways to push and fetch the policy and RSL references.
 You may use the `gittuf sync` command to synchronize changes with the remote
-automatically. You may also instead use the [gittuf
-transport](/internal/git-remote-gittuf), which handles the synchronization of
-gittuf metadata transparently upon standard Git pushes and pulls, without
-needing to explicitly invoke gittuf.
+automatically. You may also instead use the [gittuf transport], which handles
+the synchronization of gittuf metadata transparently upon standard Git pushes
+and pulls, without needing to explicitly invoke gittuf.
 
 If you prefer to manually synchronize references, Git can be used to keep
 gittuf's references updated.
@@ -240,3 +247,5 @@ the gittuf repository.
 [chocolatey]: https://community.chocolatey.org/packages/make
 [official Go guide for Windows]: https://go.dev/wiki/SettingGOPATH#
 [Go installation instructions]: https://go.dev/doc/install
+[Initialize gittuf]: #initialize-gittuf
+[gittuf transport]: /internal/git-remote-gittuf/README.md
