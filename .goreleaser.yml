@@ -142,6 +142,10 @@ signs:
   artifacts: binary
   output: true
 
+sboms:
+  - id: gittuf
+    artifacts: binary
+
 release:
   prerelease: allow
   github:
