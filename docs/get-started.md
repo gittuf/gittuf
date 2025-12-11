@@ -25,7 +25,7 @@ ARCH=amd64
 # One of: linux, darwin, freebsd
 OS=linux
 # See https://github.com/gittuf/gittuf/releases for the latest version
-VERSION=0.12.0
+VERSION=0.13.0
 cd $(mktemp -d)
 
 curl -LO https://github.com/gittuf/gittuf/releases/download/v${VERSION}/gittuf_${VERSION}_${OS}_${ARCH}
@@ -58,15 +58,15 @@ winget install gittuf
 #### Manual installation
 
 Copy and paste these commands in PowerShell to install gittuf. Please remember
-to change the version number (0.12.0 in this example) and architecture
+to change the version number (0.13.0 in this example) and architecture
 (amd64 in this example) according to your use-case and system.
 
 ```powershell
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe" -O "gittuf_0.12.0_windows_amd64.exe"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.sig" -O "gittuf_0.12.0_windows_amd64.exe.sig"
-curl "https://github.com/gittuf/gittuf/releases/download/v0.12.0/gittuf_0.12.0_windows_amd64.exe.pem" -O "gittuf_0.12.0_windows_amd64.exe.pem"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.13.0/gittuf_0.13.0_windows_amd64.exe" -O "gittuf_0.13.0_windows_amd64.exe"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.13.0/gittuf_0.13.0_windows_amd64.exe.sig" -O "gittuf_0.13.0_windows_amd64.exe.sig"
+curl "https://github.com/gittuf/gittuf/releases/download/v0.13.0/gittuf_0.13.0_windows_amd64.exe.pem" -O "gittuf_0.13.0_windows_amd64.exe.pem"
 
-cosign verify-blob --certificate gittuf_0.12.0_windows_amd64.exe.pem --signature gittuf_0.12.0_windows_amd64.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v0.12.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_0.12.0_windows_amd64.exe
+cosign verify-blob --certificate gittuf_0.13.0_windows_amd64.exe.pem --signature gittuf_0.13.0_windows_amd64.exe.sig --certificate-identity https://github.com/gittuf/gittuf/.github/workflows/release.yml@refs/tags/v0.13.0 --certificate-oidc-issuer https://token.actions.githubusercontent.com gittuf_0.13.0_windows_amd64.exe
 ```
 
 The gittuf binary is now verified on your system. You can run it from the
