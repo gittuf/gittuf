@@ -20,14 +20,29 @@ The gittuf transport supports both HTTPS and SSH remotes.
 
 ## How to Install
 
+You can install the transport by either using pre-built binaries, or building
+from source if you wish.
+
+### Pre-built binaries
+
 This repository provides pre-built binaries for the transport that are signed
 and published using [GoReleaser]. The signature for these binaries are generated
 using [Sigstore], using the release workflow's identity. Refer to the
 instructions in the [get started guide] to verify the signature for the
 transport binary.
 
-Alternatively, the transport can be built from source. Running `go install` will
-compile the transport and place it in your `GOBIN`.
+If you are on Windows, you may also install the transport from Winget by
+running:
+
+```powershell
+winget install gittuf.git-remote-gittuf
+```
+
+### Building from source
+
+Alternatively, the transport can be built from source. Running `make` in the
+top-level directory of the gittuf repository will compile the transport and
+place it in your `GOBIN`.
 
 ## How to Use
 
