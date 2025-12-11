@@ -130,6 +130,9 @@ gomod:
 changelog:
   disable: true
 
+checksum:
+  name_template: "checksums.txt"
+
 signs:
 - cmd: cosign
   env:
@@ -139,8 +142,17 @@ signs:
   - sign-blob
   - '${artifact}'
   - '--bundle=${signature}'
-  artifacts: binary
+  artifacts: checksum
   output: true
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}.src"
+
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source
 
 release:
   prerelease: allow
