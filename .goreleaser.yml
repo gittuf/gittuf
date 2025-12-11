@@ -142,6 +142,20 @@ signs:
   artifacts: binary
   output: true
 
+sboms:
+  documents:
+    - "${artifact}.spdx.json"
+  cmd: syft
+  args: 
+    - "$artifact"
+    - "--output"
+    - "cyclonedx-json=$document"
+  artifacts: archive
+  ids:
+    - gittuf
+    - git-remote-gittuf
+  disable: false
+
 release:
   prerelease: allow
   github:
