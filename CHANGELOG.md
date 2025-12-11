@@ -2,6 +2,24 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.13.0
+
+### Added
+
+- [WIP] Added a new gittuf setup command for quick setup of gittuf on
+  repositories
+- Added a new read-only mode to the TUI to allow viewing gittuf metadata
+- Added documentation on extracting gittuf attestations data from the repository
+
+### Updated
+
+- Fixed Git GPG key configuration parsing issue
+- Added check to prevent reinitializing gittuf metadata when it already exists
+- Updated documentation for OSPS Baseline compliance
+- Updated the getting started guide
+- Updated documentation with various quality fixes
+- Updated various dependencies and CI workflows
+
 ## v0.12.0
 
 ### Added
