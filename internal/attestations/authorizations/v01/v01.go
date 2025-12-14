@@ -42,6 +42,8 @@ func (r *ReferenceAuthorization) GetTargetID() string {
 	return r.TargetTreeID
 }
 
+func (r *ReferenceAuthorization) GetTeamID() string { return "" }
+
 // NewReferenceAuthorization creates a new reference authorization for the
 // provided information. The authorization is embedded in an in-toto "statement"
 // and returned with the appropriate "predicate type" set. The `fromRevisionID`
