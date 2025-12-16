@@ -48,9 +48,9 @@ var (
 				allLines = append(allLines, "")
 				allLines = append(allLines, fmt.Sprintf("**Signature:** `%s`", api.GetSignature()))
 				if _, isGo := api.(*luasandbox.GoAPI); isGo {
-					allLines = append(allLines, fmt.Sprintf("**Implemented In:** Go"))
+					allLines = append(allLines, "**Implemented In:** Go")
 				} else if _, isLua := api.(*luasandbox.LuaAPI); isLua {
-					allLines = append(allLines, fmt.Sprintf("**Implemented In:** Lua"))
+					allLines = append(allLines, "**Implemented In:** Lua")
 				} else {
 					return fmt.Errorf("unknown API type: %s", api.GetName())
 				}
