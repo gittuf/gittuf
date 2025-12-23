@@ -34,11 +34,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	rules, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
-	if len(rules) == 0 {
-		fmt.Println("No global rules are currently defined.")
-	}
 	if err != nil {
 		return err
+	}
+	if len(rules) == 0 {
+		fmt.Println("No global rules are currently defined.")
 	}
 
 	thresholdRules := []tuf.GlobalRuleThreshold{}
