@@ -1,7 +1,7 @@
 name: golangci-lint
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
     paths-ignore:
       - "docs/**"
       - "**.md"
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5
         with:
-          go-version: '1.25'
+          go-version: "1.25"
           cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20
