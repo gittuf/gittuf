@@ -13,9 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/gittuf/gittuf/internal/signerverifier/common"
-	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
 const fulcioConfigurationEndpoint = "/api/v2/configuration"
@@ -140,21 +137,4 @@ func subjectFromToken(tok *idToken) string {
 	}
 
 	return tok.Subject
-}
-
-func parsePEMFile(path string) (*root.CertificateAuthority, error) {
-	// This is taken from sigstore/sigstore-go
-
-	certs, err := common.LoadCertsFromPath(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var ca root.CertificateAuthority
-	ca.Root = certs[len(certs)-1]
-	if len(certs) > 1 {
-		ca.Intermediates = certs[:len(certs)-1]
-	}
-
-	return &ca, nil
 }
