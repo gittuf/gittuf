@@ -1,7 +1,7 @@
 name: coverage
 on:
   push:
-    branches: ['main']
+    branches: ["main"]
     paths-ignore:
       - "docs/**"
       - "**.md"
@@ -14,18 +14,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-    - name: Install Go
-      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
-      with:
-        go-version: 1.25
-        cache: true
-    - name: Check Coverage
-      run: |
-        go test -covermode=atomic -coverprofile='unfiltered_coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
-        grep -v -f .test_ignore.txt unfiltered_coverage.cov > coverage.cov
-    - name: Coveralls Parallel
-      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e
-      with:
-        file: 'coverage.cov'
+      - name: Checkout code
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+      - name: Install Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
+        with:
+          go-version: 1.25
+          cache: true
+      - name: Check Coverage
+        run: |
+          go test -covermode=atomic -coverprofile='unfiltered_coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
+          grep -v -f .test_ignore.txt unfiltered_coverage.cov > coverage.cov
+      - name: Coveralls Parallel
+        uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e
+        with:
+          file: "coverage.cov"
