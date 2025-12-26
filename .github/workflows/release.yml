@@ -20,6 +20,7 @@ jobs:
           go-version: '1.25'
           cache: true
       - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad
+      - uses: anchore/sbom-action/download-syft@43a17d6e7add2b5535efe4dcae9952337c479a93
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
           distribution: goreleaser-pro
@@ -28,6 +29,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+      - uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34
+        with:
+          subject-path: "dist/*"
+          sbom-path: "**.sbom.json"
 
   release:
     if: github.event_name == 'push'
@@ -44,6 +49,7 @@ jobs:
           go-version: '1.25'
           cache: true
       - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad
+      - uses: anchore/sbom-action/download-syft@43a17d6e7add2b5535efe4dcae9952337c479a93
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a
         with:
           distribution: goreleaser-pro
@@ -53,3 +59,7 @@ jobs:
           WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+      - uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34
+        with:
+          subject-path: "dist/**"
+          sbom-path: "**.sbom.json"
