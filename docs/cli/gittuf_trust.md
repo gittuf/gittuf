@@ -42,6 +42,7 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust inspect-root](gittuf_trust_inspect-root.md)	 - Inspect root metadata
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust list-hooks](gittuf_trust_list-hooks.md)	 - List gittuf hooks for the current policy state
+* [gittuf trust list-propagation-directives](gittuf_trust_list-propagation-directives.md)	 - Lists propagation directives in the gittuf root of trust
 * [gittuf trust make-controller](gittuf_trust_make-controller.md)	 - Make current repository a controller
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust

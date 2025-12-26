@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
@@ -933,6 +934,28 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 
 	commitMessage := fmt.Sprintf("Remove propagation directive '%s' from root metadata", name)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// ListPropagationDirectives lists all propagation directives defined in the
+// root metadata.
+func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef string) ([]tuf.PropagationDirective, error) {
+	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
+		policyRef = "refs/gittuf/" + policyRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	if err != nil {
+		return nil, err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootMetadata.GetPropagationDirectives(), nil
 }
 
 // AddHook defines the workflow for adding a file to be executed as a hook. It
