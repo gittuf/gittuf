@@ -15,6 +15,7 @@ import (
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -84,6 +85,50 @@ func TestInitializeRoot(t *testing.T) {
 		}
 
 		assert.Equal(t, location, rootMetadata.GetRepositoryLocation())
+	})
+
+	t.Run("with GPG signer", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+		r := &Repository{r: repo}
+
+		// Make a test GPG keyring in tempdir to use for tests
+		gpg.SetupTestGPGHomeDir(t, artifacts.GPGKey1Private)
+
+		if err := repo.SetGitConfig("gpg.format", "openpgp"); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetGitConfig("user.signingkey", "157507bbe151e378ce8126c1dcfe043cdd2db96e"); err != nil {
+			t.Fatal(err)
+		}
+
+		signer, err := gpg.NewSignerFromKeyID("157507bbe151e378ce8126c1dcfe043cdd2db96e")
+		require.Nil(t, err)
+
+		location := "https://example.com/repository/location"
+		err = r.InitializeRoot(testCtx, signer, false, rootopts.WithRepositoryLocation(location))
+		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		if err := policy.Apply(testCtx, repo, false); err != nil {
+			t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+		}
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+		require.Nil(t, err)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.Nil(t, err)
+
+		rootPrincipals, err := rootMetadata.GetRootPrincipals()
+		require.Nil(t, err)
+		assert.Contains(t, rootPrincipals[0].Keys(), signer.MetadataKey())
+
+		rootEnvelope := state.Metadata.RootEnvelope
+		_, err = dsse.VerifyEnvelope(t.Context(), rootEnvelope, []sslibdsse.Verifier{signer.Verifier}, 1)
+		assert.Nil(t, err)
 	})
 }
 
