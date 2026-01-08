@@ -63,9 +63,9 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		expectedTip, err = verifier.VerifyRef(ctx, refName, options.AutomatedRecovery)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		expectedTip, err = verifier.VerifyRefFull(ctx, refName, options.AutomatedRecovery)
 	}
 	if err != nil {
 		return err
@@ -122,7 +122,7 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
 	verifier := policy.NewPolicyVerifier(r.r)
-	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
+	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash, options.AutomatedRecovery)
 	if err != nil {
 		return err
 	}
