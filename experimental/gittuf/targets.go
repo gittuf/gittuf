@@ -580,6 +580,218 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// AddTeamToTargets is the interface for a user to add a team definition
+// to gittuf rule file metadata.
+func (r *Repository) AddTeamToTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, teamID string, principalIDs []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current rule file...")
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, true)
+	if err != nil {
+		return err
+	}
+
+	principals := targetsMetadata.GetPrincipals()
+	associatedPrincipals := []tuf.Principal{}
+	for _, principalID := range principalIDs {
+		principal, exists := principals[principalID]
+		if !exists {
+			return tuf.ErrInvalidPrincipalID
+		}
+		associatedPrincipals = append(associatedPrincipals, principal)
+	}
+
+	slog.Debug(fmt.Sprintf("Adding team '%s' to rule file...", strings.TrimSpace(teamID)))
+	if err := targetsMetadata.AddTeam(teamID, associatedPrincipals, threshold); err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.Metadata.TargetsEnvelope = env
+	} else {
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Add team to policy '%s'\n%s", targetsRoleName, principalIDs)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// RemoveTeamFromTargets is the interface for a user to remove a team definition
+// from gittuf rule file metadata.
+func (r *Repository) RemoveTeamFromTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, teamID string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current rule file...")
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, true)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Removing team '%s' from rule file...", strings.TrimSpace(teamID)))
+	if err := targetsMetadata.RemoveTeam(teamID); err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.Metadata.TargetsEnvelope = env
+	} else {
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Remove team from policy '%s'\n%s", targetsRoleName, teamID)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// RemoveTeamFromTargets is the interface for a user to remove a team definition
+// from gittuf rule file metadata.
+func (r *Repository) UpdateTeamInTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, teamID string, principalIDs []string, threshold int, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	slog.Debug("Loading current rule file...")
+	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, true)
+	if err != nil {
+		return err
+	}
+
+	principals := targetsMetadata.GetPrincipals()
+	associatedPrincipals := []tuf.Principal{}
+	for _, principalID := range principalIDs {
+		principal, exists := principals[principalID]
+		if !exists {
+			return tuf.ErrInvalidPrincipalID
+		}
+		associatedPrincipals = append(associatedPrincipals, principal)
+	}
+
+	slog.Debug(fmt.Sprintf("Updating team '%s' from rule file...", strings.TrimSpace(teamID)))
+	if err := targetsMetadata.UpdateTeam(teamID, associatedPrincipals, threshold); err != nil {
+		return err
+	}
+
+	env, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing updated rule file using '%s'...", keyID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if targetsRoleName == policy.TargetsRoleName {
+		state.Metadata.TargetsEnvelope = env
+	} else {
+		state.Metadata.DelegationEnvelopes[targetsRoleName] = env
+	}
+
+	commitMessage := fmt.Sprintf("Update team in policy '%s'\n%s", targetsRoleName, teamID)
+
+	slog.Debug("Committing policy...")
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // SignTargets adds a signature to specified Targets role's envelope. Note that
 // the metadata itself is not modified, so its version remains the same.
 func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVerifier, targetsRoleName string, signCommit bool, opts ...trustpolicyopts.Option) error {

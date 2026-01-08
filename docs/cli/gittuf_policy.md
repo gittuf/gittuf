@@ -30,19 +30,23 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy add-key](gittuf_policy_add-key.md)	 - Add a trusted key to a policy file
 * [gittuf policy add-person](gittuf_policy_add-person.md)	 - Add a trusted person to a policy file
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
+* [gittuf policy add-team](gittuf_policy_add-team.md)	 - Add a trusted team to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
+* [gittuf policy list-teams](gittuf_policy_list-teams.md)	 - List teams for the current policy in the specified rule file
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
 * [gittuf policy remove-key](gittuf_policy_remove-key.md)	 - Remove a key from a policy file
 * [gittuf policy remove-person](gittuf_policy_remove-person.md)	 - Remove a person from a policy file
 * [gittuf policy remove-rule](gittuf_policy_remove-rule.md)	 - Remove rule from a policy file
+* [gittuf policy remove-team](gittuf_policy_remove-team.md)	 - Remove an entire team from a policy file
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
 * [gittuf policy stage](gittuf_policy_stage.md)	 - Stage and push local policy-staging changes to remote repository
 * [gittuf policy tui](gittuf_policy_tui.md)	 - Start the TUI for managing policies
 * [gittuf policy update-person](gittuf_policy_update-person.md)	 - Update a person in a policy file
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
+* [gittuf policy update-team](gittuf_policy_update-team.md)	 - Update an existing trusted team in a policy file
 

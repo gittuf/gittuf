@@ -17,6 +17,8 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
+	"github.com/gittuf/gittuf/internal/attestations/hat"
+
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -149,9 +151,9 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		slog.Debug("Creating new reference authorization...")
 		var statement *ita.Statement
 		if isTag {
-			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String())
+			statement, err = attestations.NewReferenceAuthorizationForTag(targetRef, fromID.String(), toID.String(), options.TeamID)
 		} else {
-			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String())
+			statement, err = attestations.NewReferenceAuthorizationForCommit(targetRef, fromID.String(), toID.String(), options.TeamID)
 		}
 		if err != nil {
 			return err
@@ -182,6 +184,100 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	if isTag {
 		commitMessage = fmt.Sprintf("Add reference authorization for '%s' at '%s'", targetRef, toID.String())
 	}
+
+	slog.Debug("Committing attestations...")
+	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// AddHatAttestation adds a hat attestation to the repository for the specified
+// target ref. A hat attestation is used to sign on behalf of a team for a
+// commit or a tag.
+func (r *Repository) AddHatAttestation(ctx context.Context, signer sslibdsse.SignerVerifier, targetRef, teamID string, signCommit bool, opts ...attestopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &attestopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	var err error
+	// TODO: Check - Is the given hat valid for this signer?
+	signerID, err := signer.KeyID()
+	slog.Debug("Validating current signer '%s' against given hat '%s'...,", signerID, teamID)
+
+	targetRef, err = r.r.AbsoluteReference(targetRef)
+	if err != nil {
+		return err
+	}
+
+	isTag := strings.HasPrefix(targetRef, gitinterface.TagRefPrefix)
+
+	slog.Debug("Identifying current status of target Git reference...")
+	latestTargetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(targetRef))
+	if err != nil {
+		// We don't have an RSL entry for the target ref to hat-attest on
+		return err
+	}
+
+	targetCommitID := latestTargetEntry.GetTargetID()
+
+	slog.Debug("Loading current set of attestations...")
+	allAttestations, err := attestations.LoadCurrentAttestations(r.r)
+	if err != nil {
+		return err
+	}
+
+	// Does a hat attestation already exist for the parameters?
+	hasHatAttestation := false
+	env, err := allAttestations.GetHatAttestationFor(r.r, targetRef, targetCommitID.String(), teamID) // TODO: need to make a hat search
+	if err == nil {
+		slog.Debug("Found existing hat attestation...")
+		hasHatAttestation = true
+	} else if !errors.Is(err, hat.ErrHatAttestationNotFound) {
+		return err
+	}
+
+	if !hasHatAttestation {
+		// Create a hat attestation and embed in env
+		slog.Debug("Creating new hat attestation...")
+		var statement *ita.Statement
+		if isTag {
+			statement, err = attestations.NewHatAttestationForTag(targetRef, targetCommitID.String(), options.TeamID)
+		} else {
+			statement, err = attestations.NewHatAttestationForCommit(targetRef, targetCommitID.String(), options.TeamID)
+		}
+		if err != nil {
+			return err
+		}
+
+		env, err = dsse.CreateEnvelope(statement)
+		if err != nil {
+			return err
+		}
+	}
+
+	keyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug(fmt.Sprintf("Signing hat attestation using '%s' while wearing '%s' hat...", keyID, teamID))
+	env, err = dsse.SignEnvelope(ctx, env, signer)
+	if err != nil {
+		return err
+	}
+
+	if err := allAttestations.SetHatAttestation(r.r, env, targetRef, targetCommitID.String(), options.TeamID); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add hat attestation for '%s' of '%s' wearing '%s' hat", targetRef, targetCommitID, teamID)
 
 	slog.Debug("Committing attestations...")
 	return allAttestations.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)

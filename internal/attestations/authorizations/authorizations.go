@@ -24,4 +24,8 @@ type ReferenceAuthorization interface {
 	// applied. Note that this is typically something that can be pre-computed,
 	// such as the Git tree ID for a merge that has not happened yet.
 	GetTargetID() string
+
+	// GetTeamID returns the ID of the team that the change is being made on
+	// behalf of.
+	GetTeamID() string
 }

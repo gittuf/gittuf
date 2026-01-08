@@ -197,6 +197,31 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
+func (r *Repository) ListTeams(ctx context.Context, targetRef, policyName string) (map[string]tuf.Team, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	if !state.HasTargetsRole(policyName) {
+		return nil, policy.ErrPolicyNotFound
+	}
+
+	metadata, err := state.GetTargetsMetadata(policyName, false)
+	if err != nil {
+		return nil, err
+	}
+	teams, err := metadata.GetTeams()
+	if err != nil {
+		return nil, err
+	}
+	return teams, nil
+}
+
 // ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
 func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
 	if !strings.HasPrefix(targetRef, "refs/gittuf/") {

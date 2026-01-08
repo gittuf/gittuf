@@ -70,6 +70,7 @@ type State struct {
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
 	allPrincipals  map[string]tuf.Principal
+	allTeams       map[string]tuf.Team
 	hasFileRule    bool
 	globalRules    map[string][]tuf.GlobalRule
 }
@@ -1179,6 +1180,19 @@ func (s *State) preprocess() error {
 
 	for principalID, principal := range targetsMetadata.GetPrincipals() {
 		s.allPrincipals[principalID] = principal
+	}
+
+	if s.allTeams == nil {
+		s.allTeams = map[string]tuf.Team{}
+	}
+
+	teams, err := targetsMetadata.GetTeams()
+	if err != nil {
+		return err
+	}
+
+	for teamID, team := range teams {
+		s.allTeams[teamID] = team
 	}
 
 	for _, rule := range targetsMetadata.GetRules() {
