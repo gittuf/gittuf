@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path"
 
@@ -23,7 +24,7 @@ func NewGitHubPullRequestAttestation(owner, repository string, pullRequestNumber
 	return githubv01.NewPullRequestAttestation(owner, repository, pullRequestNumber, commitID, pullRequest)
 }
 
-func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, targetRefName, commitID string) error {
+func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, baseRepoInfo, targetRefName, commitID string) error {
 	envBytes, err := json.Marshal(env)
 	if err != nil {
 		return err
@@ -35,11 +36,42 @@ func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repo
 	}
 
 	if a.githubPullRequestAttestations == nil {
-		a.githubPullRequestAttestations = map[string]gitinterface.Hash{}
+		a.githubPullRequestAttestations = map[string]map[string]gitinterface.Hash{}
+	}
+	if a.githubPullRequestAttestations[baseRepoInfo] == nil {
+		a.githubPullRequestAttestations[baseRepoInfo] = map[string]gitinterface.Hash{}
 	}
 
-	a.githubPullRequestAttestations[GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID
+	a.githubPullRequestAttestations[baseRepoInfo][GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID
 	return nil
+}
+
+func (a *Attestations) GetGitHubPullRequestAttestations(repo *gitinterface.Repository, refPath, commitID string) ([]*sslibdsse.Envelope, error) {
+	attestations := []*sslibdsse.Envelope{}
+	for baseInfo, mapping := range a.githubPullRequestAttestations {
+		slog.Debug(fmt.Sprintf("Found information for '%s', looking for merge commit attestations...", baseInfo))
+
+		blobID, has := mapping[GitHubPullRequestAttestationPath(refPath, commitID)]
+		if !has {
+			continue
+		}
+
+		envBytes, err := repo.ReadBlob(blobID)
+		if err != nil {
+			continue
+			// return nil, fmt.Errorf("unable to read attestation: %w", err)
+		}
+
+		env := &sslibdsse.Envelope{}
+		if err := json.Unmarshal(envBytes, env); err != nil {
+			continue
+			// return nil, fmt.Errorf("unable to read attestation: %w", err)
+		}
+
+		attestations = append(attestations, env)
+	}
+
+	return attestations, nil
 }
 
 // GitHubPullRequestAttestationPath constructs the expected path on-disk for the

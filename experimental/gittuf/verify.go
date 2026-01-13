@@ -5,15 +5,23 @@ package gittuf
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
+	"os"
+	"strings"
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
+	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/internal/attestations/slsa"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 )
 
 // ErrRefStateDoesNotMatchRSL is returned when a Git reference being verified
@@ -27,8 +35,8 @@ var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does
 
 func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (
-		expectedTip gitinterface.Hash
-		err         error
+		verificationReport *policy.VerificationReport
+		err                error
 	)
 
 	options := &verifyopts.Options{}
@@ -63,9 +71,9 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		verificationReport, err = verifier.VerifyRef(ctx, refName)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		verificationReport, err = verifier.VerifyRefFull(ctx, refName)
 	}
 	if err != nil {
 		return err
@@ -73,11 +81,132 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, verificationReport.ExpectedTip); err != nil {
 		return err
 	}
 
 	slog.Debug("Verification successful!")
+
+	if options.GranularVSAsPath != "" || options.MetaVSAPath != "" {
+		slog.Debug("Generating verification summary attestation(s)...")
+
+		latestPolicy, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyRef)
+		if err != nil {
+			return err
+		}
+		rootMetadata, err := latestPolicy.GetRootMetadata(false)
+		if err != nil {
+			return err
+		}
+
+		allAttestations, err := slsa.GenerateGranularVSAs(r.r, verificationReport, rootMetadata.GetRepositoryLocation())
+		if err != nil {
+			return err
+		}
+
+		if options.GranularVSAsPath != "" {
+			// Write attestation bundle to disk
+			slog.Debug("Writing granular VSAs...")
+			envs := []string{}
+
+			for _, attestation := range allAttestations {
+				env, err := dsse.CreateEnvelope(attestation)
+				if err != nil {
+					return err
+				}
+
+				if options.VSASigner != nil {
+					env, err = dsse.SignEnvelope(ctx, env, options.VSASigner)
+					if err != nil {
+						return err
+					}
+				}
+
+				envBytes, err := json.Marshal(env)
+				if err != nil {
+					return err
+				}
+				envs = append(envs, string(envBytes))
+			}
+
+			jsonLines := strings.Join(envs, "\n")
+			jsonLines += "\n"
+			if err := os.WriteFile(options.GranularVSAsPath, []byte(jsonLines), 0o600); err != nil {
+				return fmt.Errorf("error writing attestation bundle of all VSAs: %w", err)
+			}
+		}
+
+		if options.MetaVSAPath != "" {
+			slog.Debug("Writing meta VSA...")
+			metaVSA, err := slsa.GenerateMetaVSAFromGranularVSAs(r.r, allAttestations, rootMetadata.GetRepositoryLocation())
+			if err != nil {
+				return err
+			}
+
+			env, err := dsse.CreateEnvelope(metaVSA)
+			if err != nil {
+				return err
+			}
+
+			if options.VSASigner != nil {
+				env, err = dsse.SignEnvelope(ctx, env, options.VSASigner)
+				if err != nil {
+					return err
+				}
+			}
+
+			envBytes, err := json.Marshal(env)
+			if err != nil {
+				return err
+			}
+
+			if err := os.WriteFile(options.MetaVSAPath, envBytes, 0o600); err != nil {
+				return fmt.Errorf("error writing meta VSA: %w", err)
+			}
+		}
+
+		if options.SourceProvenanceBundlePath != "" {
+			slog.Debug("Writing source provenance attestations...")
+			// Find last entry verification report
+			entryVerificationReport := verificationReport.EntryVerificationReports[len(verificationReport.EntryVerificationReports)-1]
+
+			// The attestations we care about are in the entry's field. In
+			// addition, we need the merge attestation.
+			sourceProvenanceAttestations := entryVerificationReport.ReferenceAuthorizations
+
+			attestationsEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.BeforeEntryID(entryVerificationReport.EntryID), rsl.ForReference(attestations.Ref))
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
+			}
+			attestationsState, err := attestations.LoadAttestationsForEntry(r.r, attestationsEntry)
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance attestations: %w", err)
+			}
+
+			mergeAttestations, err := attestationsState.GetGitHubPullRequestAttestations(r.r, entryVerificationReport.RefName, entryVerificationReport.TargetID.String())
+			if err != nil {
+				return fmt.Errorf("unable to fetch source provenance merge attestations: %w", err)
+			}
+			sourceProvenanceAttestations = append(sourceProvenanceAttestations, mergeAttestations...)
+
+			envs := []string{}
+			for _, attestation := range sourceProvenanceAttestations {
+				envBytes, err := json.Marshal(attestation)
+				if err != nil {
+					return fmt.Errorf("unable to prepare source provenance payload: %w", err)
+				}
+
+				envs = append(envs, string(envBytes))
+			}
+
+			jsonLines := strings.Join(envs, "\n")
+			jsonLines += "\n"
+			if err := os.WriteFile(options.SourceProvenanceBundlePath, []byte(jsonLines), 0o600); err != nil {
+				return fmt.Errorf("error writing attestation bundle of source provenance: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -122,14 +251,14 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
 	verifier := policy.NewPolicyVerifier(r.r)
-	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
+	verificationReport, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
 		return err
 	}
 
 	// To verify the tip, we _must_ use the localRefName
 	slog.Debug("Verifying if tip of reference matches expected value from RSL...")
-	if err := r.verifyRefTip(localRefName, expectedTip); err != nil {
+	if err := r.verifyRefTip(localRefName, verificationReport.ExpectedTip); err != nil {
 		return err
 	}
 
@@ -217,4 +346,32 @@ func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) 
 	}
 
 	return nil
+}
+
+func getBaseInfoFromRepository(ctx context.Context, location string) (string, error) {
+	// Return <username>-<id> for the entity that owns the repository
+	// Say location is https://github.com/gittuf/gittuf
+	u, err := url.Parse(location)
+	if err != nil {
+		return "", err
+	}
+
+	baseLocation := fmt.Sprintf("https://%s", u.Host)
+
+	token := os.Getenv("GITHUB_TOKEN")
+
+	client, err := getGitHubClient(baseLocation, token)
+	if err != nil {
+		return "", err
+	}
+
+	// u.Path is gittuf/gittuf from our example above
+	split := strings.Split(u.Path, "/")
+
+	repo, _, err := client.Repositories.Get(ctx, split[0], split[1])
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%d", repo.GetOwner().GetLogin(), repo.GetOwner().GetID()), nil
 }
