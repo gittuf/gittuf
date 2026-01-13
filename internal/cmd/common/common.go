@@ -6,8 +6,6 @@ package common //nolint:revive
 import (
 	"errors"
 	"strings"
-
-	"github.com/spf13/cobra"
 )
 
 var ErrSigningKeyNotSet = errors.New("required flag \"signing-key\" not set")
@@ -29,17 +27,4 @@ func (p *PublicKeys) Set(value string) error {
 // Type implements part of the pflag.Value interface.
 func (p *PublicKeys) Type() string {
 	return "public-keys"
-}
-
-// CheckForSigningKeyFlag checks if a signing key was specified via the
-// "signing-key" flag
-func CheckForSigningKeyFlag(cmd *cobra.Command, _ []string) error {
-	signingKeyFlag := cmd.Flags().Lookup("signing-key")
-
-	// Check if a signing key was specified via the "signing-key" flag
-	if signingKeyFlag.Value.String() == "" {
-		return ErrSigningKeyNotSet
-	}
-
-	return nil
 }

@@ -6,7 +6,6 @@ package sign
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/spf13/cobra"
@@ -50,7 +49,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "sign",
 		Short:             "Sign policy file",
 		Long:              `Sign the specified policy file with the provided signing key. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

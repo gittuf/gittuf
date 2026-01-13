@@ -6,7 +6,6 @@ package updaterootthreshold
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 )
@@ -47,11 +46,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:     "update-root-threshold",
-		Short:   "Update Root threshold in the gittuf root of trust",
-		Long:    "This command allows users to update the threshold of valid signatures required for the root of trust.",
-		PreRunE: common.CheckForSigningKeyFlag,
-		RunE:    o.Run,
+		Use:   "update-root-threshold",
+		Short: "Update Root threshold in the gittuf root of trust",
+		Long:  "This command allows users to update the threshold of valid signatures required for the root of trust.",
+		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)
 
