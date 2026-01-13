@@ -8,7 +8,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
@@ -98,7 +97,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "add-global-rule",
 		Short:             `Add a new global rule to root of trust`,
 		Long:              "This command allows a user to add a new global rule to the root of trust. The user must specify the name, type, and rule pattern for the rule.",
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

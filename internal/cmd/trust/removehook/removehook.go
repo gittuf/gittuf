@@ -8,7 +8,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -85,7 +84,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-hook",
 		Short:             fmt.Sprintf("Remove a gittuf hook specified in the policy (developer mode only, set %s=1)", dev.DevModeKey),
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

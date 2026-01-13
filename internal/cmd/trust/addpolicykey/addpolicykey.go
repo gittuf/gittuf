@@ -6,7 +6,6 @@ package addpolicykey
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +54,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "add-policy-key",
 		Short:             "Add Policy key to gittuf root of trust",
 		Long:              `This command allows users to add a new trusted key for the main policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

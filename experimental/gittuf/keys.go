@@ -72,11 +72,16 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	return tufv01.NewKeyFromSSLibKey(keyObj), nil
 }
 
-// LoadSigner loads a metadata signer for the specified key bytes. Currently,
-// the signer must be either for an SSH key (in which case the `key` is a path
-// to the private key) or for signing with Sigstore (where `key` has a prefix
-// `fulcio:`).
+// LoadSigner loads a metadata signer for the specified key bytes. The signer
+// must be for a GPG key (in which case the `key` is the GPG key ID), an SSH key
+// (in which case the `key` is a path to the private key) or for signing with
+// Sigstore (where `key` has a prefix `fulcio:`). If no key ID is specified,
+// this function calls LoadSignerFromGitConfig.
 func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) {
+	if key == "" {
+		return LoadSignerFromGitConfig(repo)
+	}
+
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		keyID := strings.TrimPrefix(key, GPGKeyPrefix)

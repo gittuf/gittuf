@@ -8,7 +8,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 )
@@ -52,7 +51,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "remove-policy-key",
 		Short:             "Remove Policy key from gittuf root of trust",
 		Long:              "This command allows users to remove a policy key from the gittuf root of trust. The policy key ID must be specified.",
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

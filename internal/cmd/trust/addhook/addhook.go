@@ -10,7 +10,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/luasandbox"
@@ -143,7 +142,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "add-hook",
 		Short:             fmt.Sprintf("Add a script to be run as a gittuf hook, specify when and where to run it (developer mode only, set %s=1)", dev.DevModeKey),
 		Long:              fmt.Sprintf("Add a script to be run as a gittuf hook, specify when and which environment to run it in. The only currently supported environment is 'lua' (developer mode only, set %s=1)", dev.DevModeKey),
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

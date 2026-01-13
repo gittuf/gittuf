@@ -6,7 +6,6 @@ package removeglobalrule
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +50,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "remove-global-rule",
 		Short:             `Remove a global rule from root of trust`,
 		Long:              "This command allows users to remove an existing global rule from the root of trust. The name of the global rule must be specified.",
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

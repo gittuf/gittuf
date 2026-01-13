@@ -6,7 +6,6 @@ package addrule
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/spf13/cobra"
@@ -105,7 +104,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "add-rule",
 		Short:             "Add a new rule to a policy file",
 		Long:              `The 'add-rule' command adds a new rule to a gittuf policy file. Each rule contains a name ('--rule-name') for the rule, one or more principals ('--authorize') who are allowed to sign within the scope of the rule, a set of rule patterns ('--rule-pattern') defining the namespaces or paths the rule governs, and a signature threshold ('--threshold'), which is the minimum number of valid signatures required to satisfy the rule. Principals can be specified by their principal IDs. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
