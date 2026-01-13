@@ -9,7 +9,6 @@ linters:
     - gosec
     - importas
     - misspell
-    - prealloc
     - revive
     - staticcheck
     - tparallel
