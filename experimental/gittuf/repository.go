@@ -53,6 +53,17 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, err
 	}
 
+	config, err := repo.GetGitConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// This supports gpg clients other than "gpg"
+	// See internal/signerverifier/gpg/gpg.go
+	if config["gpg.program"] != "" {
+		os.Setenv("GITTUF_GPG_PROGRAM", config["gpg.program"])
+	}
+
 	return &Repository{
 		r: repo,
 	}, nil

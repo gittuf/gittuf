@@ -22,6 +22,7 @@ import (
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -83,6 +84,8 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		if err != nil {
 			return err
 		}
+	case *gpg.Signer:
+		publicKeyRaw = signer.MetadataKey()
 	default:
 		return common.ErrUnknownKeyType
 	}
