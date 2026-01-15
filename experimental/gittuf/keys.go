@@ -80,7 +80,20 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 	switch {
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		keyID := strings.TrimPrefix(key, GPGKeyPrefix)
-		return gpg.NewSignerFromKeyID(keyID)
+
+		opts := []gpg.SignerOption{}
+
+		gitRepo := repo.GetGitRepository()
+		config, err := gitRepo.GetGitConfig()
+		if err != nil {
+			return nil, err
+		}
+
+		if value, has := config["gpg.program"]; has {
+			opts = append(opts, gpg.WithGPGProgram(value))
+		}
+
+		return gpg.NewSignerFromKeyID(keyID, opts...)
 	case strings.HasPrefix(key, FulcioPrefix):
 		opts := []sigstoresigneropts.Option{}
 
