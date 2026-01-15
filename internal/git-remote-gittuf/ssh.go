@@ -22,7 +22,7 @@ import (
 
 // handleSSH implements the helper for remotes configured to use SSH. For this
 // transport, we invoke the installed ssh binary to interact with the remote.
-func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, error) {
+func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url string) (map[string]string, bool, []string, error) {
 	url = strings.TrimPrefix(url, "ssh://")
 	url = strings.TrimPrefix(url, "git+ssh://")
 	url = strings.TrimPrefix(url, "ssh+git://")
@@ -42,6 +42,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 		helperStdIn    io.WriteCloser
 		gittufRefsTips = map[string]string{}
 		remoteRefTips  = map[string]string{}
+		fetchedRefs    []string
 	)
 
 	for stdInScanner.Scan() {
@@ -88,7 +89,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			log("cmd: capabilities")
 
 			if _, err := stdOutWriter.Write([]byte("stateless-connect\npush\n\n")); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 		case bytes.HasPrefix(input, []byte("stateless-connect")):
@@ -138,10 +139,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			sshCmd, err := getSSHCommand(repo)
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			if err := testSSH(sshCmd, host); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			sshCmd = append(sshCmd, "-o", "SendEnv=GIT_PROTOCOL") // This allows us to request GIT_PROTOCOL v2
@@ -158,7 +159,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			// We want to inspect the helper's stdout for gittuf ref statuses
 			helperStdOutPipe, err := helper.StdoutPipe()
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			helperStdOut = &logReadCloser{readCloser: helperStdOutPipe, name: "ssh stdout"}
 
@@ -166,17 +167,17 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			// extra refs etc.
 			helperStdInPipe, err := helper.StdinPipe()
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			helperStdIn = &logWriteCloser{writeCloser: helperStdInPipe, name: "ssh stdin"}
 
 			if err := helper.Start(); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			// Indicate connection established successfully
 			if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			// Read from remote service
@@ -192,7 +193,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				// it tells us the ref statuses
 
 				if _, err := stdOutWriter.Write(output); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// check for end of message
@@ -212,12 +213,12 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					log("adding ref-prefix for refs/gittuf/")
 					gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
 					if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 				}
 
 				if _, err := helperStdIn.Write(input); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// Check for end of message
@@ -256,7 +257,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				// Write output to parent process
 				if _, err := stdOutWriter.Write(output); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				if bytes.Equal(output, flushPkt) {
@@ -264,7 +265,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// also add the endOfRead packet
 					// ourselves
 					if _, err := stdOutWriter.Write(endOfReadPkt); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 					break
 				}
@@ -291,16 +292,16 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if len(input) == 0 {
 					// We're done but we need to exit gracefully
 					if err := helperStdIn.Close(); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 					if err := helperStdOut.Close(); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 					if err := helper.Wait(); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 
-					return gittufRefsTips, false, nil
+					return gittufRefsTips, false, nil, nil
 				}
 
 				if bytes.Equal(input, flushPkt) {
@@ -322,7 +323,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 								// gittuf obj
 								wantCmd := fmt.Sprintf("want %s\n", tip)
 								if _, err := helperStdIn.Write(packetEncode(wantCmd)); err != nil {
-									return nil, false, err
+									return nil, false, nil, err
 								}
 							}
 						}
@@ -334,7 +335,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 								// gittuf obj
 								haveCmd := fmt.Sprintf("have %s\n", tip)
 								if _, err := helperStdIn.Write(packetEncode(haveCmd)); err != nil {
-									return nil, false, err
+									return nil, false, nil, err
 								}
 							}
 						}
@@ -364,8 +365,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					}
 				}
 
+				fetchedRefs = allWants.Contents()
+
 				if _, err := helperStdIn.Write(input); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				// Read from remote if wants are done
@@ -381,7 +384,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 						// Send along to parent process
 						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 
 						if len(output) > 4 {
@@ -393,7 +396,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 						} else if bytes.Equal(output, flushPkt) {
 							if packReusedSeen {
 								if _, err := stdOutWriter.Write(endOfReadPkt); err != nil {
-									return nil, false, err
+									return nil, false, nil, err
 								}
 								break
 							}
@@ -423,10 +426,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			sshCmd, err := getSSHCommand(repo)
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			if err := testSSH(sshCmd, host); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			sshCmd = append(sshCmd, "-o", "SendEnv=GIT_PROTOCOL") // This allows us to request GIT_PROTOCOL v2
@@ -443,7 +446,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			// We want to inspect the helper's stdout for gittuf ref statuses
 			helperStdOutPipe, err := helper.StdoutPipe()
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			helperStdOut = &logReadCloser{readCloser: helperStdOutPipe, name: "ssh stdout"}
 
@@ -451,12 +454,12 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			// extra refs etc.
 			helperStdInPipe, err := helper.StdinPipe()
 			if err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 			helperStdIn = &logWriteCloser{writeCloser: helperStdInPipe, name: "ssh stdin"}
 
 			if err := helper.Start(); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			helperStdOutScanner := bufio.NewScanner(helperStdOut)
@@ -487,7 +490,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// allows us to propagate remote capabilities to the parent
 					// process
 					if _, err := fmt.Fprintf(stdOutWriter, "%s %s\n", tip, refAdSplit[1]); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 				}
 
@@ -495,7 +498,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// Add trailing new line as we're bridging git-receive-pack
 					// output with git remote helper output
 					if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 					break
 				}
@@ -519,7 +522,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			if len(gittufRefsTips) != 0 {
 				if err := repo.ReconcileLocalRSLWithRemote(ctx, remoteName, true); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 			}
 
@@ -546,7 +549,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
 					// TODO: skipping propagation; invoke it once total instead of per ref
 					if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 				}
 
@@ -557,7 +560,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				newTipHash, err := repo.GetGitRepository().GetReference(srcRef)
 				if err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 				newTip := newTipHash.String()
 
@@ -576,7 +579,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				pushCmd += "\n"
 
 				if _, err := helperStdIn.Write(packetEncode(pushCmd)); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 
 				if newTip != gitinterface.ZeroHash.String() {
@@ -585,10 +588,11 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if oldTip != gitinterface.ZeroHash.String() {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
 				}
-			}
 
-			// TODO: gittuf verify-ref for each dstRef; abort if
-			// verification fails
+				if err = repo.VerifyRef(ctx, dstRef); err != nil {
+					return nil, false, nil, err
+				}
+			}
 
 			// TODO: find better way to evaluate if gittuf refs must
 			// be pushed
@@ -600,14 +604,14 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				newTipHash, err := repo.GetGitRepository().GetReference(rsl.Ref)
 				if err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 				newTip := newTipHash.String()
 				log("RSL now has tip", newTip)
 
 				pushCmd := fmt.Sprintf("%s %s %s\n", oldTip, newTip, rsl.Ref)
 				if _, err := helperStdIn.Write(packetEncode(pushCmd)); err != nil {
-					return nil, false, err
+					return nil, false, nil, err
 				}
 				if newTip != gitinterface.ZeroHash.String() {
 					pushObjects.Add(newTip)
@@ -619,7 +623,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			// Write the flush packet as we're done with ref processing
 			if _, err := helperStdIn.Write(flushPkt); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			cmd := exec.Command("git", "pack-objects", "--all-progress-implied", "--revs", "--stdout", "--thin", "--delta-base-offset", "--progress")
@@ -634,7 +638,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			cmd.Stderr = os.Stderr
 
 			if err := cmd.Run(); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 
 			helperStdOutScanner := bufio.NewScanner(helperStdOut)
@@ -645,18 +649,18 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				if len(output) == 4 {
 					if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 
 					if err := helperStdIn.Close(); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 
 					if err := helperStdOut.Close(); err != nil {
-						return nil, false, err
+						return nil, false, nil, err
 					}
 
-					return gittufRefsTips, true, nil
+					return gittufRefsTips, true, nil, nil
 				}
 
 				output = output[4:] // remove length prefix
@@ -665,7 +669,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if bytes.HasPrefix(output, []byte("ok")) {
 					if dstRefs.Has(pushedRef) {
 						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 					}
 				} else if bytes.HasPrefix(output, []byte("ng")) {
@@ -673,7 +677,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 						output = bytes.TrimPrefix(output, []byte("ng"))
 						output = append([]byte("error"), output...) // replace ng with error
 						if _, err := stdOutWriter.Write(output); err != nil {
-							return nil, false, err
+							return nil, false, nil, err
 						}
 					}
 				}
@@ -681,18 +685,18 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			// Trailing newline for end of output
 			if _, err := stdOutWriter.Write([]byte("\n")); err != nil {
-				return nil, false, err
+				return nil, false, nil, err
 			}
 		default:
 			c := string(bytes.TrimSpace(input))
 			if c == "" {
-				return nil, false, nil
+				return nil, false, fetchedRefs, nil
 			}
-			return nil, false, fmt.Errorf("unknown command %s to gittuf-ssh helper", c)
+			return nil, false, nil, fmt.Errorf("unknown command %s to gittuf-ssh helper", c)
 		}
 	}
 
 	// FIXME: we return in fetch and push when successful, need to assess when
 	// this is reachable
-	return nil, false, nil
+	return nil, false, fetchedRefs, nil
 }
