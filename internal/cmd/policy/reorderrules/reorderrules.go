@@ -6,7 +6,6 @@ package reorderrules
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +52,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "reorder-rules",
 		Short:             "Reorder rules in the specified policy file",
 		Long:              `The 'reorder-rules' command reorders rules in the specified policy file based on the order of rule names provided as arguments. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

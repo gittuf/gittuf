@@ -6,7 +6,6 @@ package init
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/spf13/cobra"
 )
@@ -48,7 +47,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "init",
 		Short:             "Initialize gittuf root of trust for repository",
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

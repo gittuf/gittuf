@@ -9,7 +9,6 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -72,7 +71,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Short:             "Add or revoke reference authorization",
 		Long:              `Authorize or revoke permission to merge changes from one ref to another. Use '--from-ref' to specify the source reference.`,
 		Args:              cobra.MinimumNArgs(1),
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

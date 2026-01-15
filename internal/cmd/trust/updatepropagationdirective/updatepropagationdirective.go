@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
@@ -95,7 +94,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-propagation-directive",
 		Short:             fmt.Sprintf("Update propagation directive in the root of trust (developer mode only, set %s=1)", dev.DevModeKey),
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
