@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/luasandbox/options/luasandbox"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 

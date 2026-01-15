@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 // RSLLog implements the display function for `gittuf rsl log`.

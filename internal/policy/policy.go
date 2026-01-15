@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -21,6 +20,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 const (

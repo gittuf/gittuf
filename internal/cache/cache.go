@@ -9,8 +9,8 @@ import (
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/attestations"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 const (

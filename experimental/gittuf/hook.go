@@ -14,12 +14,12 @@ import (
 	"strings"
 
 	hookopts "github.com/gittuf/gittuf/experimental/gittuf/options/hooks"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/luasandbox"
 	luasandboxopts "github.com/gittuf/gittuf/internal/luasandbox/options/luasandbox"
 	"github.com/gittuf/gittuf/internal/policy"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 

@@ -15,12 +15,12 @@ import (
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 const gittufTransportPrefix = "gittuf::"

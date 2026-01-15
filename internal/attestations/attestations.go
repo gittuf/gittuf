@@ -10,8 +10,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 const (

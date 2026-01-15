@@ -10,13 +10,13 @@ import (
 	"testing"
 
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/require"
 )
 

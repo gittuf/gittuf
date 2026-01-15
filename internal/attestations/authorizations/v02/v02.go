@@ -9,8 +9,8 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/common"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	"google.golang.org/protobuf/types/known/structpb"
 )

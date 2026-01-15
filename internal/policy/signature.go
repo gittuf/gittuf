@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -20,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 

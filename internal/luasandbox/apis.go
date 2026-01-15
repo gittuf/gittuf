@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
 

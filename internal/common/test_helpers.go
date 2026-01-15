@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/jonboulle/clockwork"
 )

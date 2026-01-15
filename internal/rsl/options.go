@@ -3,7 +3,7 @@
 
 package rsl
 
-import "github.com/gittuf/gittuf/internal/gitinterface"
+import "github.com/gittuf/gittuf/pkg/gitinterface"
 
 type GetLatestReferenceUpdaterEntryOptions struct {
 	Reference string

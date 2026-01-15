@@ -10,9 +10,9 @@ import (
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
 

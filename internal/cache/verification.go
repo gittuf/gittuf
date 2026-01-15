@@ -3,7 +3,7 @@
 
 package cache
 
-import "github.com/gittuf/gittuf/internal/gitinterface"
+import "github.com/gittuf/gittuf/pkg/gitinterface"
 
 func (p *Persistent) SetLastVerifiedEntryForRef(ref string, entryNumber uint64, entryID gitinterface.Hash) {
 	if p.LastVerifiedEntryForRef == nil {

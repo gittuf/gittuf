@@ -13,8 +13,8 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 )

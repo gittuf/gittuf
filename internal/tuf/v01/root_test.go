@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

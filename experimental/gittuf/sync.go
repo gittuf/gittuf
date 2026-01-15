@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 var (
