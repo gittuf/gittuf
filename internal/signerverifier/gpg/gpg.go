@@ -21,7 +21,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const KeyType = "gpg"
+const (
+	KeyType = "gpg"
+
+	defaultGPGProgram = "gpg"
+)
 
 // Verifier is a dsse.Verifier implementation for GPG keys.
 type Verifier struct {
@@ -73,6 +77,7 @@ func NewVerifierFromKey(key *signerverifier.SSLibKey) (*Verifier, error) {
 
 type Signer struct {
 	*Verifier
+	program string
 }
 
 func (s *Signer) KeyID() (string, error) {
@@ -81,13 +86,7 @@ func (s *Signer) KeyID() (string, error) {
 
 // Sign implements the dsse.Signer.Sign interface for GPG keys.
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
-	// Support GPG clients other than "gpg", if defined by the user
-	gpgProgram := "gpg"
-	if result := os.Getenv("GITTUF_GPG_PROGRAM"); result != "" {
-		gpgProgram = result
-	}
-
-	cmd := exec.Command(gpgProgram, "--status-fd=2", "-bsau", s.keyID) //nolint:gosec
+	cmd := exec.Command(s.program, "--status-fd=2", "-bsau", s.keyID) //nolint:gosec
 
 	cmd.Stdin = bytes.NewBuffer(data)
 
@@ -98,8 +97,13 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	return output, nil
 }
 
-func NewSignerFromKeyID(keyID string) (*Signer, error) {
-	pubKeyObj, err := getPublicKeyForKeyID(keyID)
+func NewSignerFromKeyID(keyID string, opts ...SignerOption) (*Signer, error) {
+	options := &SignerOptions{program: defaultGPGProgram}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	pubKeyObj, err := getPublicKeyForKeyID(keyID, options.program)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +113,7 @@ func NewSignerFromKeyID(keyID string) (*Signer, error) {
 		return nil, err
 	}
 
-	return &Signer{Verifier: verifier}, nil
+	return &Signer{Verifier: verifier, program: options.program}, nil
 }
 
 // LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
@@ -137,14 +141,8 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 	return gpgKey, nil
 }
 
-func getPublicKeyForKeyID(keyID string) (*signerverifier.SSLibKey, error) {
-	// Support GPG clients other than "gpg", if defined by the user
-	gpgProgram := "gpg"
-	if result := os.Getenv("GITTUF_GPG_PROGRAM"); result != "" {
-		gpgProgram = result
-	}
-
-	cmd := exec.Command(gpgProgram, "--batch", "--armor", "--export", keyID) //nolint:gosec
+func getPublicKeyForKeyID(keyID, program string) (*signerverifier.SSLibKey, error) {
+	cmd := exec.Command(program, "--batch", "--armor", "--export", keyID) //nolint:gosec
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
@@ -170,9 +168,6 @@ func SetupTestGPGHomeDir(t *testing.T, privateKeyBytes ...[]byte) {
 
 	t.Setenv("GNUPGHOME", tmpGpgHomeDir)
 
-	// We don't want to invoke the user's gpg client for tests
-	t.Setenv("GITTUF_GPG_PROGRAM", "gpg")
-
 	gpgAgentConfPath := filepath.Join(tmpGpgHomeDir, "gpg-agent.conf")
 	if err := os.WriteFile(gpgAgentConfPath, artifacts.GPGAgentConf, 0o600); err != nil {
 		t.Fatal(err)
@@ -185,5 +180,17 @@ func SetupTestGPGHomeDir(t *testing.T, privateKeyBytes ...[]byte) {
 		if output, err := cmd.CombinedOutput(); err != nil {
 			t.Fatal(fmt.Errorf("%w: %s", err, string(output)))
 		}
+	}
+}
+
+type SignerOptions struct {
+	program string
+}
+
+type SignerOption func(*SignerOptions)
+
+func WithGPGProgram(program string) SignerOption {
+	return func(opts *SignerOptions) {
+		opts.program = program
 	}
 }

@@ -4,7 +4,6 @@
 package gpg
 
 import (
-	"context"
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
@@ -56,17 +55,17 @@ func TestGPG(t *testing.T) {
 				t.Fatalf("%s: %v", test.keyID, err)
 			}
 
-			sig, err := signer.Sign(context.Background(), data)
+			sig, err := signer.Sign(t.Context(), data)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyID, err)
 			}
 
-			err = verifier.Verify(context.Background(), data, sig)
+			err = verifier.Verify(t.Context(), data, sig)
 			if err != nil {
 				t.Fatalf("%s: %v", test.keyID, err)
 			}
 
-			err = verifier.Verify(context.Background(), notData, sig)
+			err = verifier.Verify(t.Context(), notData, sig)
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyID, err)
 			}
