@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	fulciogrpc "github.com/sigstore/fulcio/pkg/generated/protobuf"
 	"github.com/sigstore/sigstore-go/pkg/root"
 )
 
@@ -62,28 +63,29 @@ func parseTokenForIdentityAndIssuer(token, fulcioURL string) (string, string, er
 		}
 
 		type configResponse struct {
-			Issuers []map[string]string `json:"issuers"`
+			Issuers []*fulciogrpc.OIDCIssuer `json:"issuers"`
 		}
 
-		responseObj := configResponse{Issuers: []map[string]string{}}
+		responseObj := configResponse{Issuers: []*fulciogrpc.OIDCIssuer{}}
 		if err := json.Unmarshal(responseData, &responseObj); err != nil {
 			return "", "", fmt.Errorf("unable to query Fulcio instance '%s': %w", fulcioURL, err)
 		}
 
 		for _, issuerConfig := range responseObj.Issuers {
-			if issuerConfig["issuerUrl"] != issuer {
+			if issuerConfig.GetIssuerUrl() != issuer {
 				continue
 			}
 
-			issuerType, hasIssuerType := issuerConfig["issuerType"]
-			if !hasIssuerType {
+			issuerType := issuerConfig.GetIssuerType()
+
+			if issuerType == "" {
 				slog.Debug("Fulcio instance does not list issuer type, cannot determine if subject domain must be added to identity")
 				break
 			}
 
 			if issuerType == "username" || issuerType == "uri" {
-				subjectDomain, hasSubjectDomain := issuerConfig["subjectDomain"]
-				if !hasSubjectDomain {
+				subjectDomain := issuerConfig.GetSubjectDomain()
+				if subjectDomain == "" {
 					slog.Debug("Fulcio instance lists issuer type but does not list subject domain, cannot determine subject domain to add to identity")
 					break
 				}
