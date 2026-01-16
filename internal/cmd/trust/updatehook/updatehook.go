@@ -10,7 +10,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/luasandbox"
@@ -143,7 +142,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "update-hook",
 		Short:             fmt.Sprintf("Modify the parameters of an existing gittuf hook (developer mode only, set %s=1)", dev.DevModeKey),
 		Long:              fmt.Sprintf("Modify the parameters of an existing gittuf hook. Specify the name of the hook to update and provide all parameters with their updated values. You can specify multiple stages where the hook is defined. Note that all parameters required to add the hook must also be provided. If a hook exists in multiple stages, only the specified stage(s) will be updated. If a hook does not exist in the specified stage, it won't be updated; you should add a new hook to that stage instead. Currently, only the 'lua' environment is supported (developer mode only, set %s=1)", dev.DevModeKey),
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

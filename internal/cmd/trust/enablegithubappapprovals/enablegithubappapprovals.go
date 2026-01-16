@@ -6,7 +6,6 @@ package enablegithubappapprovals
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
@@ -50,7 +49,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "enable-github-app-approvals",
 		Short:             "Mark GitHub app approvals as trusted henceforth",
 		Long:              `The 'enable-github-app-approvals' command marks a GitHub App as trusted, allowing it to approve protected operations under the repository's trust policy.`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -6,7 +6,6 @@ package removeperson
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/spf13/cobra"
@@ -59,7 +58,6 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "remove-person",
 		Short:             "Remove a person from a policy file",
 		Long:              `The 'remove-person' command removes the specified person from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
-		PreRunE:           common.CheckForSigningKeyFlag,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
