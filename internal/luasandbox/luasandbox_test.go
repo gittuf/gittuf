@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	lua "github.com/yuin/gopher-lua"
 )

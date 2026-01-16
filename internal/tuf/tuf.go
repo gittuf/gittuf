@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 

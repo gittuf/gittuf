@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 func (p *Persistent) GetAttestationsEntries() []RSLEntryIndex {

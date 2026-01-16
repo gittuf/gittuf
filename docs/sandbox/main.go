@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
 	"github.com/gittuf/gittuf/internal/luasandbox"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
 

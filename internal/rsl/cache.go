@@ -6,7 +6,7 @@ package rsl
 import (
 	"sync"
 
-	"github.com/gittuf/gittuf/internal/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 type rslCache struct {
