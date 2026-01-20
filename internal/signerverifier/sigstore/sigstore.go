@@ -92,7 +92,7 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 	// Note: WithOnlineVerification was removed in sigstore-go v0.7.0 as there's
 	// no security difference between online and offline verification.
 
-	sev, err := verify.NewSignedEntityVerifier(trustedRoot, opts...)
+	sev, err := verify.NewVerifier(trustedRoot, opts...)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Error creating signed entity verifier: %v", err))
 		return err
