@@ -78,7 +78,7 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	slog.Debug("Using Sigstore verifier...")
 
-	trustedRoot, privateInstance, err := v.getTUFRoot()
+	trustedRoot, err := v.getTUFRoot()
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Error getting TUF root: %v", err))
 		return err
@@ -89,14 +89,8 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 		verify.WithTransparencyLog(1),
 		verify.WithIntegratedTimestamps(1),
 	}
-	if privateInstance {
-		// privateInstance requires online verification if rekor is configured
-		// using env var rather than TUF.
-		// This is because the trusted_root.json delivered via TUF indicates
-		// from when the log can be trusted, which we cannot decide (without a
-		// custom env var just for that).
-		opts = append(opts, verify.WithOnlineVerification())
-	}
+	// Note: WithOnlineVerification was removed in sigstore-go v0.7.0 as there's
+	// no security difference between online and offline verification.
 
 	sev, err := verify.NewSignedEntityVerifier(trustedRoot, opts...)
 	if err != nil {
@@ -175,7 +169,7 @@ func (v *Verifier) ExpectedExtensionKind() string {
 	return ExtensionMimeType
 }
 
-func (v *Verifier) getTUFRoot() (root.TrustedMaterial, bool, error) {
+func (v *Verifier) getTUFRoot() (root.TrustedMaterial, error) {
 	// The env vars we look at for private sigstore:
 	// SIGSTORE_ROOT_FILE -> the Fulcio root
 	// SIGSTORE_CT_LOG_PUBLIC_KEY_FILE -> Fulcio's CT Log pubkey
@@ -188,29 +182,30 @@ func (v *Verifier) getTUFRoot() (root.TrustedMaterial, bool, error) {
 	if fulcioRootFilePath != "" || ctLogPublicKeyFilePath != "" || rekorPublicKeyFilePath != "" {
 		// if any env var is set, require all?
 		if fulcioRootFilePath == "" || ctLogPublicKeyFilePath == "" || rekorPublicKeyFilePath == "" {
-			return nil, false, fmt.Errorf("partial env var set") // TODO
+			return nil, fmt.Errorf("partial env var set") // TODO
 		}
 
 		slog.Debug("Using environment variables to establish trust for Sigstore instance...")
 
-		fulcioCertAuthorities := []root.CertificateAuthority{}
 		cert, err := parsePEMFile(fulcioRootFilePath)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		fulcioCertAuthorities = append(fulcioCertAuthorities, *cert)
+		// Note: CertificateAuthority is now an interface in sigstore-go v0.7.0+
+		// FulcioCertificateAuthority implements it with a pointer receiver
+		fulcioCertAuthorities := []root.CertificateAuthority{cert}
 
 		rekorPubKeyBytes, err := os.ReadFile(rekorPublicKeyFilePath)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		block, _ := pem.Decode(rekorPubKeyBytes)
 		if block == nil {
-			return nil, false, fmt.Errorf("failed to decode rekor public key")
+			return nil, fmt.Errorf("failed to decode rekor public key")
 		}
 		rekorKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		keyHash := sha256.Sum256(block.Bytes)
@@ -231,7 +226,7 @@ func (v *Verifier) getTUFRoot() (root.TrustedMaterial, bool, error) {
 		// TODO TSA
 
 		trustedRoot, err := root.NewTrustedRoot(root.TrustedRootMediaType01, fulcioCertAuthorities, nil, nil, rekorTransparencyLogs)
-		return trustedRoot, true, err
+		return trustedRoot, err
 	}
 
 	// Use the TUF flow
@@ -239,16 +234,16 @@ func (v *Verifier) getTUFRoot() (root.TrustedMaterial, bool, error) {
 
 	tufClient, err := sigstoretuf.New(sigstoretuf.DefaultOptions())
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	trustedRootJSON, err := tufClient.GetTarget("trusted_root.json")
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	trustedRoot, err := root.NewTrustedRootFromJSON(trustedRootJSON)
-	return trustedRoot, false, err
+	return trustedRoot, err
 }
 
 type Signer struct {

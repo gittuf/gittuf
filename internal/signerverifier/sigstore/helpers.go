@@ -144,7 +144,7 @@ func subjectFromToken(tok *idToken) string {
 	return tok.Subject
 }
 
-func parsePEMFile(path string) (*root.CertificateAuthority, error) {
+func parsePEMFile(path string) (*root.FulcioCertificateAuthority, error) {
 	// This is taken from sigstore/sigstore-go
 
 	certs, err := common.LoadCertsFromPath(path)
@@ -152,11 +152,12 @@ func parsePEMFile(path string) (*root.CertificateAuthority, error) {
 		return nil, err
 	}
 
-	var ca root.CertificateAuthority
-	ca.Root = certs[len(certs)-1]
+	ca := &root.FulcioCertificateAuthority{
+		Root: certs[len(certs)-1],
+	}
 	if len(certs) > 1 {
 		ca.Intermediates = certs[:len(certs)-1]
 	}
 
-	return &ca, nil
+	return ca, nil
 }
