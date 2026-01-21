@@ -14,6 +14,7 @@ import (
 
 type options struct {
 	latestOnly    bool
+	repairIssues  bool
 	fromEntry     string
 	remoteRefName string
 }
@@ -41,12 +42,24 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of remote reference, if it differs from the local name",
 	)
+
+	cmd.Flags().BoolVar(
+		&o.repairIssues,
+		"repair-issues",
+		false,
+		"perform automated recovery of verification issues",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
+	}
+
+	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
+	if o.repairIssues {
+		opts = append(opts, verifyopts.WithAutomatedRecovery())
 	}
 
 	if o.fromEntry != "" {
@@ -57,7 +70,6 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, verifyopts.WithOverrideRefName(o.remoteRefName))
 	}
 
-	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
 	if o.latestOnly {
 		opts = append(opts, verifyopts.WithLatestOnly())
 	}
