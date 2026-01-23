@@ -8,13 +8,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/addperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
 	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
-	"github.com/gittuf/gittuf/internal/cmd/policy/listprincipals"
-	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removekey"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removeperson"
 	"github.com/gittuf/gittuf/internal/cmd/policy/removerule"
 	"github.com/gittuf/gittuf/internal/cmd/policy/reorderrules"
+	"github.com/gittuf/gittuf/internal/cmd/policy/show"
 	"github.com/gittuf/gittuf/internal/cmd/policy/sign"
 	"github.com/gittuf/gittuf/internal/cmd/policy/tui"
 	"github.com/gittuf/gittuf/internal/cmd/policy/updateperson"
@@ -42,13 +41,12 @@ func New() *cobra.Command {
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(discard.New())
 	cmd.AddCommand(i.New(o))
-	cmd.AddCommand(listprincipals.New())
-	cmd.AddCommand(listrules.New())
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removekey.New(o))
 	cmd.AddCommand(removeperson.New(o))
 	cmd.AddCommand(removerule.New(o))
 	cmd.AddCommand(reorderrules.New(o))
+	cmd.AddCommand(show.New())
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(tui.New(o))

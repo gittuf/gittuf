@@ -1,19 +1,20 @@
-## gittuf trust inspect-root
+## gittuf trust show
 
-Inspect root metadata
+Show root metadata
 
 ### Synopsis
 
-This command displays the root metadata in a human-readable format.
+This command displays gittuf's root metadata for the current repository.
 
 ```
-gittuf trust inspect-root [flags]
+gittuf trust show [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for inspect-root
+  -h, --help                help for show
+      --target-ref string   specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands
