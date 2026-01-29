@@ -59,6 +59,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addpropagationdirective.New(o))
 	cmd.AddCommand(addrootkey.New(o))
+	cmd.AddCommand(newAddRootPersonCommand(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
