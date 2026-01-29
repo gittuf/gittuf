@@ -14,10 +14,12 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/clone"
 	"github.com/gittuf/gittuf/internal/cmd/dev"
 	"github.com/gittuf/gittuf/internal/cmd/policy"
+	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/profile"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
 	"github.com/gittuf/gittuf/internal/cmd/sync"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
+	"github.com/gittuf/gittuf/internal/cmd/tui"
 	"github.com/gittuf/gittuf/internal/cmd/verifymergeable"
 	"github.com/gittuf/gittuf/internal/cmd/verifynetwork"
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
@@ -123,6 +125,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(verifynetwork.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
+	cmd.AddCommand(tui.New(&persistent.Options{}))
 
 	return cmd
 }
