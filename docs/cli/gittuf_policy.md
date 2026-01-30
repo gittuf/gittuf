@@ -42,7 +42,6 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy reorder-rules](gittuf_policy_reorder-rules.md)	 - Reorder rules in the specified policy file
 * [gittuf policy sign](gittuf_policy_sign.md)	 - Sign policy file
 * [gittuf policy stage](gittuf_policy_stage.md)	 - Stage and push local policy-staging changes to remote repository
-* [gittuf policy tui](gittuf_policy_tui.md)	 - Start the TUI for managing policies
 * [gittuf policy update-person](gittuf_policy_update-person.md)	 - Update a person in a policy file
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
 
