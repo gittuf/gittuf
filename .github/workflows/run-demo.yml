@@ -9,17 +9,17 @@ on:
 permissions: read-all
 jobs:
   demo:
-    name: Run demo 
+    name: Run demo
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Install Go
-        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
         with:
-          go-version: '1.25'
+          go-version: "1.25"
       - name: Build gittuf
-        run:  make just-install
+        run: make just-install
       - name: Checkout demo repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
@@ -27,6 +27,6 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
-          python-version: '3.13'
+          python-version: "3.13"
       - name: Run demo script
         run: python run-demo.py --no-prompt
