@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -72,21 +73,21 @@ func initialModel(o *options) (model, error) {
 		return model{}, err
 	}
 
-	// Determine if we are in read-only mode. (no signing key provided, or read-only mode specified)
-	var footer string
-	if !o.readOnly && o.p.SigningKey == "" {
-		footer = "No signing key provided, running in read-only mode."
-	}
-	readOnly := o.p.SigningKey == "" || o.readOnly
-
+	// Determine if we are in read-only mode. (read-only mode specified, or no signing key found)
+	readOnly := o.readOnly
 	var signer dsse.SignerVerifier
+	var footer string
+
 	if !readOnly {
-		// Load signer only if a signing key was provided.
+		// Try to load signer. Uses Git config if signing key not explicitly provided
 		signer, err = gittuf.LoadSigner(repo, o.p.SigningKey)
 		if err != nil {
-			// If a signing key was specified but cannot be loaded, return an empty model
-			// to preserve existing error behavior.
-			return model{}, err
+			if !errors.Is(err, gittuf.ErrSigningKeyNotSpecified) {
+				// If a signing key was found but cannot be loaded, return error
+				return model{}, fmt.Errorf("failed to load signing key from Git config: %w", err)
+			}
+			readOnly = true
+			footer = "No signing key found in Git config, running in read-only mode."
 		}
 	}
 
