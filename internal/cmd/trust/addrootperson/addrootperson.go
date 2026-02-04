@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trust
+package addrootperson
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type addRootPersonOptions struct {
+type options struct {
 	p                    *persistent.Options
 	personID             string
 	publicKeys           []string
@@ -23,7 +23,7 @@ type addRootPersonOptions struct {
 	customMetadata       []string
 }
 
-func (o *addRootPersonOptions) AddFlags(cmd *cobra.Command) {
+func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&o.personID,
 		"person-ID",
@@ -55,7 +55,7 @@ func (o *addRootPersonOptions) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (o *addRootPersonOptions) Run(cmd *cobra.Command, _ []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -105,21 +105,18 @@ func (o *addRootPersonOptions) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-
-	return repo.AddRootKey(cmd.Context(), signer, person, true, opts...)
+	return repo.AddRootPerson(cmd.Context(), signer, person, true, opts...)
 }
 
-func newAddRootPersonCommand(p *persistent.Options) *cobra.Command {
-	o := &addRootPersonOptions{p: p}
-
+func New(persistent *persistent.Options) *cobra.Command {
+	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "add-root-person",
-		Short:             "Add a trusted person to the gittuf root of trust",
-		Long:              `The 'add-root-person' command allows users to add a new trusted person as a principal in the repository's root of trust. A person definition consists of a unique identifier ('--person-ID'), one or more authorized public keys ('--public-key'), optional associated identities ('--associated-identity') on external platforms (e.g., GitHub, GitLab), and optional custom metadata ('--custom') for tracking additional attributes. The keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Short:             "Add Root person to gittuf root of trust",
+		Long:              `The 'add-root-person' command allows users to add a new root person to the repository's root of trust. In gittuf, a person definition consists of a unique identifier ('--person-ID'), one or more authorized public keys ('--public-key'), optional associated identities ('--associated-identity') on external platforms (e.g., GitHub, GitLab), and optional custom metadata ('--custom') for tracking additional attributes. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". Optionally, the change can be recorded in the RSL.`,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
-
 	o.AddFlags(cmd)
 
 	return cmd
