@@ -35,6 +35,7 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
 * [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
+* [gittuf trust add-root-person](gittuf_trust_add-root-person.md)	 - Add Root person to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
@@ -59,4 +60,3 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust update-policy-threshold](gittuf_trust_update-policy-threshold.md)	 - Update Policy threshold in the gittuf root of trust
 * [gittuf trust update-propagation-directive](gittuf_trust_update-propagation-directive.md)	 - Update propagation directive in the root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust update-root-threshold](gittuf_trust_update-root-threshold.md)	 - Update Root threshold in the gittuf root of trust
-
