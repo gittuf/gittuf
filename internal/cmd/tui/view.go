@@ -47,14 +47,29 @@ var (
 // View renders the TUI
 func (m model) View() string {
 	switch m.screen {
-	case screenMain:
+	case screenChoice:
+		return lipgloss.NewStyle().Margin(1, 2).Render(
+			m.choiceList.View() + "\n" +
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer),
+		)
+	case screenPolicy:
 		// Show apply hint only when not in read-only mode.
 		hint := ""
 		if !m.readOnly {
 			hint = "Run `gittuf policy apply` to apply staged changes to the selected policy file"
 		}
 		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.mainList.View() + "\n" +
+			m.policyScreenList.View() + "\n" +
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
+				"\n" + hint,
+		)
+	case screenTrust:
+		hint := ""
+		if !m.readOnly {
+			hint = "Run `gittuf trust apply` to apply staged changes to the selected policy file"
+		}
+		return lipgloss.NewStyle().Margin(1, 2).Render(
+			m.trustScreenList.View() + "\n" +
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
 				"\n" + hint,
 		)

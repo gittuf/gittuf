@@ -22,7 +22,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-		m.mainList.SetSize(msg.Width-h, msg.Height-v)
+		m.choiceList.SetSize(msg.Width-h, msg.Height-v)
+		m.policyScreenList.SetSize(msg.Width-h, msg.Height-v)
+		m.trustScreenList.SetSize(msg.Width-h, msg.Height-v)
 		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
@@ -30,15 +32,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "left":
-			if m.screen != screenMain {
-				m.footer = "" // Clear footer on navigation
-				m.screen = screenMain
-				return m, nil
+			m.footer = ""
+			switch m.screen {
+			case screenPolicy, screenTrust:
+				m.screen = screenChoice
+			case screenAddRule, screenRemoveRule, screenListRules, screenReorderRules:
+				m.screen = screenPolicy
+			case screenAddGlobalRule, screenRemoveGlobalRule, screenUpdateGlobalRule, screenListGlobalRules:
+				m.screen = screenTrust
 			}
+			return m, nil
 		case "enter":
 			switch m.screen {
-			case screenMain:
-				i, ok := m.mainList.SelectedItem().(item)
+			case screenChoice:
+				i, ok := m.choiceList.SelectedItem().(item)
+				if ok {
+					switch i.title {
+					case "Policy":
+						m.screen = screenPolicy
+					case "Trust":
+						m.screen = screenTrust
+					}
+				}
+			case screenPolicy:
+				i, ok := m.policyScreenList.SelectedItem().(item)
 				if ok {
 					switch i.title {
 					case "Add Rule":
@@ -53,24 +70,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "Reorder Rules":
 						m.screen = screenReorderRules
 						m.updateRuleList()
-					case "List Global Rules":
-						m.screen = screenListGlobalRules
-						m.updateGlobalRuleList()
-
+					}
+				}
+			case screenTrust:
+				i, ok := m.trustScreenList.SelectedItem().(item)
+				if ok {
+					switch i.title {
 					case "Add Global Rule":
 						m.screen = screenAddGlobalRule
 						m.initGlobalInputs()
-
-					case "Update Global Rule":
-						m.screen = screenUpdateGlobalRule
-						m.initGlobalInputs()
-
 					case "Remove Global Rule":
 						m.screen = screenRemoveGlobalRule
 						m.updateGlobalRuleList()
+					case "Update Global Rule":
+						m.screen = screenUpdateGlobalRule
+						m.initGlobalInputs()
+					case "List Global Rules":
+						m.screen = screenListGlobalRules
+						m.updateGlobalRuleList()
 					}
 				}
-
 			case screenAddRule:
 				if m.focusIndex == len(m.inputs)-1 {
 					newRule := rule{
@@ -87,7 +106,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.rules = append(m.rules, newRule)
 					m.updateRuleList()
 					m.footer = "Rule added successfully!"
-					m.screen = screenMain
+					m.screen = screenPolicy
 				}
 			case screenRemoveRule:
 				if i, ok := m.ruleList.SelectedItem().(item); ok {
@@ -104,7 +123,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.updateRuleList()
 					m.footer = "Rule removed successfully!"
-					m.screen = screenMain
+					m.screen = screenPolicy
 				}
 			case screenAddGlobalRule:
 				// parse comma-separated input into []string
@@ -132,7 +151,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.globalRules = append(m.globalRules, newGR)
 					m.updateGlobalRuleList()
 					m.footer = "Global rule added!"
-					m.screen = screenMain
+					m.screen = screenTrust
 				}
 			case screenRemoveGlobalRule:
 				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
@@ -149,7 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.updateGlobalRuleList()
 					m.footer = "Global rule removed!"
-					m.screen = screenMain
+					m.screen = screenTrust
 				}
 			case screenUpdateGlobalRule:
 				if m.focusIndex == len(m.inputs)-1 {
@@ -181,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.updateGlobalRuleList()
 					m.footer = "Global rule updated!"
-					m.screen = screenMain
+					m.screen = screenTrust
 				}
 			}
 		case "u":
@@ -243,8 +262,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.screen {
-	case screenMain:
-		m.mainList, cmd = m.mainList.Update(msg)
+	case screenChoice:
+		m.choiceList, cmd = m.choiceList.Update(msg)
+	case screenPolicy:
+		m.policyScreenList, cmd = m.policyScreenList.Update(msg)
+	case screenTrust:
+		m.trustScreenList, cmd = m.trustScreenList.Update(msg)
 	case screenAddRule:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	case screenRemoveRule, screenReorderRules:
