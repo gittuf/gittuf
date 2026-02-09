@@ -20,7 +20,9 @@ import (
 type screen int
 
 const (
-	screenMain screen = iota
+	screenChoice screen = iota // initial screen
+	screenPolicy
+	screenTrust
 	screenAddRule
 	screenRemoveRule
 	screenListRules
@@ -35,8 +37,7 @@ type item struct {
 	title, desc string
 }
 
-// virtual methods must be implemented for the item struct
-
+// Note: virtual methods must be implemented for the item struct
 // Title returns the title of the item
 func (i item) Title() string { return i.title }
 
@@ -47,23 +48,23 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	screen         screen
-	mainList       list.Model
-	rules          []rule
-	ruleList       list.Model
-	globalRules    []globalRule
-	globalRuleList list.Model
-	inputs         []textinput.Model
-	focusIndex     int
-	cursorMode     cursor.Mode
-	repo           *gittuf.Repository
-	signer         dsse.SignerVerifier
-	policyName     string
-	options        *options
-	footer         string
-	// readOnly indicates whether the TUI is running without a signing key
-	// and should therefore hide mutating operations.
-	readOnly bool
+	screen           screen
+	choiceList       list.Model
+	policyScreenList list.Model
+	trustScreenList  list.Model
+	rules            []rule
+	ruleList         list.Model
+	globalRules      []globalRule
+	globalRuleList   list.Model
+	inputs           []textinput.Model
+	focusIndex       int
+	cursorMode       cursor.Mode
+	repo             *gittuf.Repository
+	signer           dsse.SignerVerifier
+	policyName       string
+	options          *options
+	footer           string
+	readOnly         bool
 }
 
 // initialModel returns the initial model for the Terminal UI
@@ -93,7 +94,7 @@ func initialModel(o *options) (model, error) {
 
 	// Initialize the model
 	m := model{
-		screen:      screenMain,
+		screen:      screenChoice,
 		cursorMode:  cursor.CursorBlink,
 		repo:        repo,
 		signer:      signer,
@@ -105,24 +106,40 @@ func initialModel(o *options) (model, error) {
 		footer:      footer,
 	}
 
-	// Set up the main list items
+	// Set up choice screen list items
+	choiceItems := []list.Item{
+		item{title: "Policy", desc: "Manage gittuf Policy"},
+		item{title: "Trust", desc: "Manage gittuf Root of Trust"},
+	}
+
+	// Set up the policy screen list items
 	// In read-only mode, only non-mutating operations are available.
-	var mainItems []list.Item
+	var policyItems []list.Item
 	if m.readOnly {
-		mainItems = []list.Item{
+		policyItems = []list.Item{
 			item{title: "List Rules", desc: "View all current policy rules"},
-			item{title: "List Global Rules", desc: "View repository-wide global rules"},
 		}
 	} else {
-		mainItems = []list.Item{
+		policyItems = []list.Item{
 			item{title: "Add Rule", desc: "Add a new policy rule"},
 			item{title: "Remove Rule", desc: "Remove an existing policy rule"},
 			item{title: "List Rules", desc: "View all current policy rules"},
 			item{title: "Reorder Rules", desc: "Change the order of policy rules"},
+		}
+	}
+
+	// Set up trust screen list items
+	var trustItems []list.Item
+	if m.readOnly {
+		trustItems = []list.Item{
 			item{title: "List Global Rules", desc: "View repository-wide global rules"},
+		}
+	} else {
+		trustItems = []list.Item{
 			item{title: "Add Global Rule", desc: "Add a new global rule"},
-			item{title: "Update Global Rule", desc: "Modify an existing global rule"},
 			item{title: "Remove Global Rule", desc: "Remove a global rule"},
+			item{title: "Update Global Rule", desc: "Modify an existing global rule"},
+			item{title: "List Global Rules", desc: "View repository-wide global rules"},
 		}
 	}
 
@@ -133,13 +150,29 @@ func initialModel(o *options) (model, error) {
 	delegate.Styles.NormalTitle = itemStyle
 	delegate.Styles.NormalDesc = itemStyle
 
-	// Set up the main list
-	m.mainList = list.New(mainItems, delegate, 0, 0)
-	m.mainList.Title = "gittuf Policy Operations"
-	m.mainList.SetShowStatusBar(false)
-	m.mainList.SetFilteringEnabled(false)
-	m.mainList.Styles.Title = titleStyle
-	m.mainList.SetShowHelp(false)
+	// Set up choice screen list
+	m.choiceList = list.New(choiceItems, delegate, 0, 0)
+	m.choiceList.Title = "gittuf TUI"
+	m.choiceList.SetShowStatusBar(false)
+	m.choiceList.SetFilteringEnabled(false)
+	m.choiceList.Styles.Title = titleStyle
+	m.choiceList.SetShowHelp(false)
+
+	// Set up the policy screen list
+	m.policyScreenList = list.New(policyItems, delegate, 0, 0)
+	m.policyScreenList.Title = "gittuf Policy Operations"
+	m.policyScreenList.SetShowStatusBar(false)
+	m.policyScreenList.SetFilteringEnabled(false)
+	m.policyScreenList.Styles.Title = titleStyle
+	m.policyScreenList.SetShowHelp(false)
+
+	// Set up the trust screen list
+	m.trustScreenList = list.New(trustItems, delegate, 0, 0)
+	m.trustScreenList.Title = "gittuf Trust Operations"
+	m.trustScreenList.SetShowStatusBar(false)
+	m.trustScreenList.SetFilteringEnabled(false)
+	m.trustScreenList.Styles.Title = titleStyle
+	m.trustScreenList.SetShowHelp(false)
 
 	// Set up the rule list
 	m.ruleList = list.New([]list.Item{}, delegate, 0, 0)
