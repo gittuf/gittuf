@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addrootkey"
+	"github.com/gittuf/gittuf/internal/cmd/trust/addrootperson"
 	"github.com/gittuf/gittuf/internal/cmd/trust/disablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
@@ -59,6 +60,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addpropagationdirective.New(o))
 	cmd.AddCommand(addrootkey.New(o))
+	cmd.AddCommand(addrootperson.New(o))
 	cmd.AddCommand(apply.New())
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
