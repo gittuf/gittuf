@@ -1,6 +1,6 @@
 # gittuf Design Document
 
-Last Modified: May 29, 2025
+Last Modified: Jan 29, 2026
 
 ## Introduction
 
@@ -77,13 +77,17 @@ Repository
 
 In a Git repository, an "actor" is any party, human or bot, who makes changes to
 the repository. These changes can involve any part of the repository, such as
-modifying files, branches or tags. In gittuf, each actor is identified by a
-unique signing key that they use to cryptographically sign their contributions.
-gittuf uses cryptographic signatures to authenticate actors as these signatures
-can be verified by anyone who has the corresponding public key, fundamental to
-gittuf's mission to enable independent verification of repository actions. Note
-that gittuf does not rely on Git commit metadata (e.g., author email, committer
-email) to identify the actor who created it, as that may be trivially spoofed.
+modifying files, branches or tags. In gittuf, each actor is represented by a
+"principal". In the simplest form, a principal is just a single signing key.
+However, a principal can also represent a more complex identity, such as a
+person who owns multiple signing keys and has associated metadata (see
+[GAP-5](/docs/gaps/5/README.md) for the full specification of principals).
+Regardless of form, gittuf uses cryptographic signatures to authenticate actors
+as these signatures can be verified by anyone who has the corresponding public
+key, fundamental to gittuf's mission to enable independent verification of
+repository actions. Note that gittuf does not rely on Git commit metadata (e.g.,
+author email, committer email) to identify the actor who created it, as that may
+be trivially spoofed.
 
 In practice, a gittuf policy allows an actor to make certain changes by granting
 trust to the actor's signing key to make those changes. To maintain security,
@@ -213,13 +217,13 @@ as the primary rule file. Signatures are omitted.
 
 ```
 rootOfTrust:
-keys: {R1, R2, R3, P1, P2, P3}
+principals: {R1, R2, R3, P1, P2, P3}
 signers:
     rootOfTrust: (2, {R1, R2, R3})
     primary: (2, {P1, P2, P3})
 
 ruleFile: primary
-keys: {Alice, Bob, Carol, Helen, Ilda}
+principals: {Alice, Bob, Carol, Helen, Ilda}
 rules:
     protect-main-prod: {git:refs/heads/main,
                         git:refs/heads/prod}
@@ -232,13 +236,13 @@ rules:
         -> (2, {Carol, Helen, Ilda})
 
 ruleFile: protect-ios-app
-keys: {Dana, George}
+principals: {Dana, George}
 rules:
     authorize-ios-team: {file:ios/*}
         -> (1, {Dana, George})
 
 ruleFile: protect-android-app
-keys: {Eric, Frank}
+principals: {Eric, Frank}
 rules:
     authorize-android-team: {file:android/*}
         -> (1, {Eric, Frank})
@@ -585,9 +589,9 @@ entry signatures are valid.
 #### Identifying Authorized Signers for Protected Namespaces
 
 When verifying a commit or RSL entry, the first step is identifying the set of
-keys authorized to sign a commit or RSL entry in their respective namespaces.
-This is achieved by performing pre-ordered depth first search over the
-delegations graph in a gittuf policy state. Assume the relevant policy state
+principals authorized to sign a commit or RSL entry in their respective
+namespaces. This is achieved by performing pre-ordered depth first search over
+the delegations graph in a gittuf policy state. Assume the relevant policy state
 entry is `P` and the namespace being checked is `N`. Then:
 
 1. Validate `P`'s root metadata using the TUF workflow starting from the initial
@@ -598,8 +602,10 @@ entry is `P` and the namespace being checked is `N`. Then:
    checked.
 1. Begin traversing the delegations graph rooted at the primary rule file
    metadata.
-1. Verify the signatures of the primary rule file using the trusted keys in the
-   root of trust. If a threshold of signatures cannot be verified, abort.
+1. Verify the signatures of the primary rule file using the keys of the trusted
+   principals in the root of trust. During this process, a principal can be only
+   counted once even if they sign multiple times using different keys. If a
+   threshold of signatures cannot be verified, abort.
 1. Populate `queue` with the rules in the primary rule file.
 1. While `queue` is not empty:
    1. Set `rule` to the first item in `queue`, removing it from `queue`.
