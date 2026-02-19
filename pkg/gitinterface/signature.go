@@ -20,7 +20,7 @@ import (
 	sslibsvssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/hiddeco/sshsig"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
-	"github.com/sigstore/cosign/v2/pkg/cosign"
+	"github.com/sigstore/cosign/v3/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
 	"github.com/sigstore/sigstore/pkg/fulcioroots"
