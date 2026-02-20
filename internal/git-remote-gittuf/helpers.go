@@ -127,7 +127,7 @@ func log(messages ...any) {
 	}
 	fmtStr += "\n"
 	if logFile != nil {
-		fmt.Fprintf(logFile, fmtStr, messages...)
+		fmt.Fprintf(logFile, fmtStr, messages...) //nolint:gosec
 	}
 }
 
