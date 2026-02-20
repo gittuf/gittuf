@@ -216,7 +216,7 @@ func populateGitVersion() error {
 func main() {
 	logFilePath := os.Getenv("GITTUF_LOG_FILE")
 	if logFilePath != "" {
-		file, err := os.Create(logFilePath)
+		file, err := os.Create(logFilePath) //nolint:gosec
 		if err != nil {
 			panic(err)
 		}

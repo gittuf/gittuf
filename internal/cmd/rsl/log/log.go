@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package log
+package log //nolint:revive
 
 import (
 	"os"

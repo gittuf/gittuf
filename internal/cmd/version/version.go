@@ -1,7 +1,7 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package version
+package version //nolint:revive
 
 import (
 	"fmt"

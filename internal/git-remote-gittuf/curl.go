@@ -32,7 +32,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 	stdOutWriter := &logWriteCloser{name: "git-remote-gittuf stdout", writeCloser: os.Stdout}
 
 	// We invoke git-remote-http, itself a Git remote helper
-	helper := exec.Command("git-remote-http", remoteName, url)
+	helper := exec.Command("git-remote-http", remoteName, url) //nolint:gosec
 	helper.Stderr = os.Stderr
 
 	// We want to inspect the helper's stdout for the gittuf ref statuses

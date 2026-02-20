@@ -92,10 +92,11 @@ func (m model) View() string {
 		var sb strings.Builder
 		sb.WriteString(titleStyle.Render("Current Rules") + "\n\n")
 		for _, rule := range m.rules {
-			sb.WriteString(fmt.Sprintf("- %s\n  Pattern: %s\n  Key: %s\n\n",
+			fmt.Fprintf(&sb, "- %s\n  Pattern: %s\n  Key: %s\n\n",
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorRegularText)).Bold(true).Render(rule.name),
 				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(rule.pattern),
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(rule.key)))
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(rule.key),
+			)
 		}
 		sb.WriteString("\nPress Left Arrow to go back")
 		return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
