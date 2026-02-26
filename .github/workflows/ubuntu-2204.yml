@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Downgrade Git
-        run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.15 git-man=1:2.34.1-1ubuntu1.15
+        run: sudo apt-get update && sudo apt-get install -y --allow-downgrades git=1:2.34.1-1ubuntu1.16 git-man=1:2.34.1-1ubuntu1.16
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
