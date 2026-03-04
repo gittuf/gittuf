@@ -13,6 +13,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -2765,6 +2766,126 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		annotation.ID = annotationID
 
 		// No fix entry, error out
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("with recovery when recovery is not needed", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithThresholdPolicy)
+		refName := "refs/heads/main"
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		authorization, err := authorizationsv02.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		firstValidCommitOnRef := commitIDs[0]
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// At this point, the verifier should pass; the change does not violate policy
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.Nil(t, err)
+
+		// Do this again so we have two successive valid changes
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+
+		commitTreeID, err = repo.GetCommitTreeID(commitIDs[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		authorization, err = authorizationsv02.NewReferenceAuthorizationForCommit(refName, firstValidCommitOnRef.String(), commitTreeID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		env, err = dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, firstValidCommitOnRef.String(), commitTreeID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry = rsl.NewReferenceEntry(refName, commitIDs[1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// At this point, the verifier should pass; the change does not violate policy
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.Nil(t, err)
+
+		// Pretend the second valid change is actually invalid, "recover from
+		// it" but without the threshold validation
+		if err := repo.SetReference(refName, firstValidCommitOnRef); err != nil {
+			t.Fatal(err)
+		}
+		// Create a skip annotation for the invalid entry
+		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Create a new entry moving branch back to earlier commit
+		entry = rsl.NewReferenceEntry(refName, firstValidCommitOnRef)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// Verification results in error because recovery was not needed and the
+		// rollback is invalid
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
