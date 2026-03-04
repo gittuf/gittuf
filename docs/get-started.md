@@ -164,9 +164,7 @@ gittuf policy add-rule -k ../keys/policy --rule-name protect-main --rule-pattern
 ```
 
 Note that `add-key` can also be used to specify a GPG key or a [Sigstore]
-identity for use with [gitsign]. However, we're using SSH keys throughout in
-this guide, as gittuf policy metadata currently cannot be signed using GPG (see
-[#229]).
+identity for use with [gitsign].
 
 Next, _stage_ the policies into the policy-staging area. The policy-staging
 area is useful for sharing changes to policies that must not be used yet.
