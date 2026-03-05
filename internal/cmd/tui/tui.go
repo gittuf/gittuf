@@ -6,6 +6,7 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/spf13/cobra"
 )
@@ -50,6 +51,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 		Use:               "tui",
 		Short:             "Start the TUI for gittuf",
 		Long:              "This command starts a terminal-based interface to view and/or manage gittuf metadata. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes.",
+		PreRunE:           checkInDevMode,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
@@ -70,4 +72,12 @@ func startTUI(o *options) error {
 	_, err = p.Run()
 
 	return err
+}
+
+// Temp: Require TUI to be in dev mode
+func checkInDevMode(_ *cobra.Command, _ []string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+	return nil
 }

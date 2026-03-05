@@ -20,17 +20,15 @@ import (
 type screen int
 
 const (
-	screenChoice screen = iota // initial screen
-	screenPolicy
-	screenTrust
-	screenAddRule
-	screenRemoveRule
-	screenListRules
-	screenReorderRules
-	screenListGlobalRules
-	screenAddGlobalRule
-	screenUpdateGlobalRule
-	screenRemoveGlobalRule
+	screenChoice              screen = iota // Choose Policy or Trust
+	screenPolicy                            // Intermediate menu for Policy operations
+	screenPolicyRules                       // View all policy rules - primary interface
+	screenPolicyAddRule                     // Form: add a new policy rule
+	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
+	screenTrust                             // Intermediate menu for Trust operations
+	screenTrustGlobalRules                  // View all global rules - primary interface
+	screenTrustAddGlobalRule                // Form: add a new global rule
+	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
 )
 
 type item struct {
@@ -38,13 +36,13 @@ type item struct {
 }
 
 // Note: virtual methods must be implemented for the item struct
-// Title returns the title of the item
+// Title returns the title of the item.
 func (i item) Title() string { return i.title }
 
-// Description returns the description of the item
+// Description returns the description of the item.
 func (i item) Description() string { return i.desc }
 
-// FilterValue returns the value to filter on
+// FilterValue returns the value to filter on.
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
@@ -65,9 +63,62 @@ type model struct {
 	options          *options
 	footer           string
 	readOnly         bool
+	confirmDelete    bool
+	deleteTarget     string
 }
 
-// initialModel returns the initial model for the Terminal UI
+// inputField describes a single text input's placeholder and prompt label.
+type inputField struct {
+	placeholder string
+	prompt      string
+}
+
+// newDelegate creates a styled list delegate for use in all list.Model instances.
+func newDelegate() list.DefaultDelegate {
+	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = selectedItemStyle
+	d.Styles.SelectedDesc = selectedItemStyle
+	d.Styles.NormalTitle = itemStyle
+	d.Styles.NormalDesc = itemStyle
+	return d
+}
+
+// newMenuList creates a configured list.Model with default settings.
+func newMenuList(title string, items []list.Item, delegate list.DefaultDelegate) list.Model {
+	l := list.New(items, delegate, 0, 0)
+	l.Title = title
+	l.Styles.Title = titleStyle
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.SetShowHelp(false)
+	return l
+}
+
+// initInputs creates a slice of text inputs from field definitions.
+// The first field is focused; the rest are blurred.
+func initInputs(fields []inputField) []textinput.Model {
+	inputs := make([]textinput.Model, len(fields))
+	for i, f := range fields {
+		t := textinput.New()
+		t.Cursor.Style = cursorStyle
+		t.CharLimit = 64
+		t.Placeholder = f.placeholder
+		t.Prompt = f.prompt
+		if i == 0 {
+			t.Focus()
+			t.PromptStyle = focusedStyle
+			t.TextStyle = focusedStyle
+		} else {
+			t.Blur()
+			t.PromptStyle = blurredStyle
+			t.TextStyle = blurredStyle
+		}
+		inputs[i] = t
+	}
+	return inputs
+}
+
+// initialModel returns the initial model for the Terminal UI.
 func initialModel(o *options) (model, error) {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
@@ -80,11 +131,9 @@ func initialModel(o *options) (model, error) {
 	var footer string
 
 	if !readOnly {
-		// Try to load signer. Uses Git config if signing key not explicitly provided
 		signer, err = gittuf.LoadSigner(repo, o.p.SigningKey)
 		if err != nil {
 			if !errors.Is(err, gittuf.ErrSigningKeyNotSpecified) {
-				// If a signing key was found but cannot be loaded, return error
 				return model{}, fmt.Errorf("failed to load signing key from Git config: %w", err)
 			}
 			readOnly = true
@@ -92,7 +141,8 @@ func initialModel(o *options) (model, error) {
 		}
 	}
 
-	// Initialize the model
+	delegate := newDelegate()
+
 	m := model{
 		screen:      screenChoice,
 		cursorMode:  cursor.CursorBlink,
@@ -104,158 +154,88 @@ func initialModel(o *options) (model, error) {
 		options:     o,
 		readOnly:    readOnly,
 		footer:      footer,
-	}
 
-	// Set up choice screen list items
-	choiceItems := []list.Item{
-		item{title: "Policy", desc: "Manage gittuf Policy"},
-		item{title: "Trust", desc: "Manage gittuf Root of Trust"},
-	}
+		choiceList: newMenuList("gittuf TUI", []list.Item{
+			item{title: "Policy", desc: "View and manage gittuf Policy"},
+			item{title: "Trust", desc: "View and manage gittuf Root of Trust"},
+		}, delegate),
+		policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
+			item{title: "View Rules", desc: "View and manage policy rules"},
+		}, delegate),
+		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
+			item{title: "View Global Rules", desc: "View and manage global rules"},
+		}, delegate),
+		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
+		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 
-	// Set up the policy screen list items
-	// In read-only mode, only non-mutating operations are available.
-	var policyItems []list.Item
-	if m.readOnly {
-		policyItems = []list.Item{
-			item{title: "List Rules", desc: "View all current policy rules"},
-		}
-	} else {
-		policyItems = []list.Item{
-			item{title: "Add Rule", desc: "Add a new policy rule"},
-			item{title: "Remove Rule", desc: "Remove an existing policy rule"},
-			item{title: "List Rules", desc: "View all current policy rules"},
-			item{title: "Reorder Rules", desc: "Change the order of policy rules"},
-		}
-	}
-
-	// Set up trust screen list items
-	var trustItems []list.Item
-	if m.readOnly {
-		trustItems = []list.Item{
-			item{title: "List Global Rules", desc: "View repository-wide global rules"},
-		}
-	} else {
-		trustItems = []list.Item{
-			item{title: "Add Global Rule", desc: "Add a new global rule"},
-			item{title: "Remove Global Rule", desc: "Remove a global rule"},
-			item{title: "Update Global Rule", desc: "Modify an existing global rule"},
-			item{title: "List Global Rules", desc: "View repository-wide global rules"},
-		}
-	}
-
-	// Set up the list delegate
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles.SelectedTitle = selectedItemStyle
-	delegate.Styles.SelectedDesc = selectedItemStyle
-	delegate.Styles.NormalTitle = itemStyle
-	delegate.Styles.NormalDesc = itemStyle
-
-	// Set up choice screen list
-	m.choiceList = list.New(choiceItems, delegate, 0, 0)
-	m.choiceList.Title = "gittuf TUI"
-	m.choiceList.SetShowStatusBar(false)
-	m.choiceList.SetFilteringEnabled(false)
-	m.choiceList.Styles.Title = titleStyle
-	m.choiceList.SetShowHelp(false)
-
-	// Set up the policy screen list
-	m.policyScreenList = list.New(policyItems, delegate, 0, 0)
-	m.policyScreenList.Title = "gittuf Policy Operations"
-	m.policyScreenList.SetShowStatusBar(false)
-	m.policyScreenList.SetFilteringEnabled(false)
-	m.policyScreenList.Styles.Title = titleStyle
-	m.policyScreenList.SetShowHelp(false)
-
-	// Set up the trust screen list
-	m.trustScreenList = list.New(trustItems, delegate, 0, 0)
-	m.trustScreenList.Title = "gittuf Trust Operations"
-	m.trustScreenList.SetShowStatusBar(false)
-	m.trustScreenList.SetFilteringEnabled(false)
-	m.trustScreenList.Styles.Title = titleStyle
-	m.trustScreenList.SetShowHelp(false)
-
-	// Set up the rule list
-	m.ruleList = list.New([]list.Item{}, delegate, 0, 0)
-	m.ruleList.Title = "Current Rules"
-	m.ruleList.SetShowStatusBar(false)
-	m.ruleList.SetFilteringEnabled(false)
-	m.ruleList.Styles.Title = titleStyle
-	m.ruleList.SetShowHelp(false)
-
-	// set up global rule list
-	m.globalRuleList = list.New([]list.Item{}, delegate, 0, 0)
-	m.globalRuleList.Title = "Global Rules"
-	m.globalRuleList.SetShowStatusBar(false)
-	m.globalRuleList.SetFilteringEnabled(false)
-	m.globalRuleList.Styles.Title = titleStyle
-	m.globalRuleList.SetShowHelp(false)
-
-	// Set up the input fields
-	m.inputs = make([]textinput.Model, 3)
-	for i := range m.inputs {
-		t := textinput.New()
-		t.Cursor.Style = cursorStyle
-		t.CharLimit = 64
-
-		switch i {
-		case 0:
-			t.Placeholder = "Enter Rule Name Here"
-			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.Prompt = "Rule Name:"
-			t.TextStyle = focusedStyle
-		case 1:
-			t.Placeholder = "Enter Pattern Here"
-			t.Prompt = "Pattern:"
-			t.PromptStyle = blurredStyle
-			t.TextStyle = blurredStyle
-		case 2:
-			t.Placeholder = "Enter Path to Key Here"
-			t.Prompt = "Authorize Key:"
-			t.PromptStyle = blurredStyle
-			t.TextStyle = blurredStyle
-		}
-
-		m.inputs[i] = t
+		inputs: initInputs([]inputField{
+			{"Enter Rule Name Here", "Rule Name:"},
+			{"Enter Pattern Here", "Pattern:"},
+			{"Enter Principal IDs Here (comma-separated)", "Authorize Principal:"},
+		}),
 	}
 
 	return m, nil
 }
 
-// Init initializes the input field
+// Init initializes the input field.
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-// reinitialize inputs for global rules
-func (m *model) initGlobalInputs() {
-	prompts := []struct{ placeholder, prompt string }{
+// initRuleInputs reinitializes the input fields for (policy) rule forms.
+func (m *model) initRuleInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Enter Rule Name Here", "Rule Name:"},
+		{"Enter Pattern Here", "Pattern:"},
+		{"Enter Principal IDs Here (comma-separated)", "Authorize Principal:"},
+	})
+	m.focusIndex = 0
+}
+
+// initRuleInputsPrefilled initializes rule inputs prefilled with an existing rule's values.
+func (m *model) initRuleInputsPrefilled(r rule) {
+	m.initRuleInputs()
+	m.inputs[0].SetValue(r.name)
+	m.inputs[1].SetValue(r.pattern)
+	m.inputs[2].SetValue(r.key)
+}
+
+// initGlobalRuleInputs reinitializes the input fields for global rule forms.
+func (m *model) initGlobalRuleInputs() {
+	m.inputs = initInputs([]inputField{
 		{"Enter Global Rule Name Here", "Rule Name:"},
 		{"Enter Rule Type (threshold|block-force-pushes)", "Type:"},
 		{"Enter Namespaces (comma-separated)", "Namespaces:"},
 		{"Enter Threshold (if threshold type)", "Threshold:"},
-	}
-	m.inputs = make([]textinput.Model, len(prompts))
-	for i, p := range prompts {
-		t := textinput.New()
-		t.Cursor.Style = cursorStyle
-		t.CharLimit = 64
-		t.Placeholder = p.placeholder
-		t.Prompt = p.prompt
-		if i == 0 {
-			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.TextStyle = focusedStyle
-		} else {
-			t.Blur()
-			t.PromptStyle = blurredStyle
-			t.TextStyle = blurredStyle
-		}
-		m.inputs[i] = t
+	})
+	m.focusIndex = 0
+}
+
+// initGlobalRuleInputsPrefilled initializes global rule inputs prefilled with an existing global rule's values.
+func (m *model) initGlobalRuleInputsPrefilled(gr globalRule) {
+	m.initGlobalRuleInputs()
+	m.inputs[0].SetValue(gr.ruleName)
+	m.inputs[1].SetValue(gr.ruleType)
+	m.inputs[2].SetValue(strings.Join(gr.rulePatterns, ", "))
+	if gr.ruleType == tuf.GlobalRuleThresholdType {
+		m.inputs[3].SetValue(fmt.Sprintf("%d", gr.threshold))
 	}
 }
 
-// updateRuleList updates the rule list within TUI
+// refreshRules re-fetches rules from the repo and rebuilds the list.
+func (m *model) refreshRules() {
+	m.rules = getCurrRules(m.options)
+	m.updateRuleList()
+}
+
+// refreshGlobalRules re-fetches global rules from the repo and rebuilds the list.
+func (m *model) refreshGlobalRules() {
+	m.globalRules = getGlobalRules(m.options)
+	m.updateGlobalRuleList()
+}
+
+// updateRuleList updates the rule list within TUI.
 func (m *model) updateRuleList() {
 	items := make([]list.Item, len(m.rules))
 	for i, rule := range m.rules {
@@ -264,7 +244,7 @@ func (m *model) updateRuleList() {
 	m.ruleList.SetItems(items)
 }
 
-// updateGlobalRuleList updates the global rule list within TUI
+// updateGlobalRuleList updates the global rule list within TUI.
 func (m *model) updateGlobalRuleList() {
 	items := make([]list.Item, len(m.globalRules))
 	for i, gr := range m.globalRules {

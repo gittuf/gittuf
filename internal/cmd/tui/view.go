@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -44,101 +45,114 @@ var (
 			Foreground(lipgloss.Color(colorRegularText))
 )
 
-// View renders the TUI
+// renderWithMargin wraps content in the standard margin used by all screens.
+func renderWithMargin(content string) string {
+	return lipgloss.NewStyle().Margin(1, 2).Render(content)
+}
+
+// renderFooter returns the footer text styled in the footer color.
+func renderFooter(text string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(text)
+}
+
+// renderFormScreen renders a form screen with a title, input fields, help text, and footer.
+func (m model) renderFormScreen(title, helpText string) string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render(title) + "\n\n")
+	for _, input := range m.inputs {
+		b.WriteString(input.View() + "\n")
+	}
+	b.WriteString("\n" + helpText + "\n")
+	b.WriteString(renderFooter(m.footer))
+	return renderWithMargin(b.String())
+}
+
+// renderListScreen renders a list with help text and footer.
+func (m model) renderListScreen(l list.Model, helpText string) string {
+	return renderWithMargin(
+		l.View() + "\n\n" +
+			renderFooter(m.footer) +
+			"\n" + helpText,
+	)
+}
+
+// screenPolicyRulesHelp returns the help bar for the policy rules view screen.
+func screenPolicyRulesHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc:back  q:quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a:add  e:edit  d:delete  u/k:up  j:down  esc:back  q:quit",
+	)
+}
+
+// screenTrustGlobalRulesHelp returns the help bar for the global rules view screen.
+func screenTrustGlobalRulesHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc:back  q:quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a:add  e:edit  d:delete  esc:back  q:quit",
+	)
+}
+
+// renderDeleteOverlay renders the delete confirmation prompt.
+func renderDeleteOverlay(target string) string {
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF0000")).
+		Bold(true).
+		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+}
+
+// View renders the TUI.
 func (m model) View() string {
 	switch m.screen {
 	case screenChoice:
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.choiceList.View() + "\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer),
-		)
+		return renderWithMargin(m.choiceList.View() + "\n" + renderFooter(m.footer))
 	case screenPolicy:
-		// Show apply hint only when not in read-only mode.
-		hint := ""
-		if !m.readOnly {
-			hint = "Run `gittuf policy apply` to apply staged changes to the selected policy file"
-		}
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.policyScreenList.View() + "\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\n" + hint,
-		)
+		return renderWithMargin(m.policyScreenList.View() + "\n" + renderFooter(m.footer))
 	case screenTrust:
+		return renderWithMargin(m.trustScreenList.View() + "\n" + renderFooter(m.footer))
+	case screenPolicyRules:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
 		hint := ""
 		if !m.readOnly {
-			hint = "Run `gittuf trust apply` to apply staged changes to the selected policy file"
-		}
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.trustScreenList.View() + "\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\n" + hint,
-		)
-	case screenAddRule:
-		var b strings.Builder
-		b.WriteString(titleStyle.Render("Add Rule") + "\n\n")
-		for _, input := range m.inputs {
-			b.WriteString(input.View() + "\n")
-		}
-		b.WriteString("\nPress Enter to add, Left Arrow to go back\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
-		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
-	case screenRemoveRule:
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.ruleList.View() + "\n\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\nPress Enter to remove selected rule, Left Arrow to go back",
-		)
-	case screenListRules:
-		var sb strings.Builder
-		sb.WriteString(titleStyle.Render("Current Rules") + "\n\n")
-		for _, rule := range m.rules {
-			fmt.Fprintf(&sb, "- %s\n  Pattern: %s\n  Key: %s\n\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorRegularText)).Bold(true).Render(rule.name),
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(rule.pattern),
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(rule.key),
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf policy apply` to apply staged changes to the selected policy file",
 			)
 		}
-		sb.WriteString("\nPress Left Arrow to go back")
-		return lipgloss.NewStyle().Margin(1, 2).Render(sb.String())
-	case screenReorderRules:
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.ruleList.View() + "\n\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\nUse 'u' to move up, 'd' to move down, Left Arrow to go back",
+		return m.renderListScreen(m.ruleList,
+			overlay+screenPolicyRulesHelp(m.readOnly)+hint,
 		)
-	case screenAddGlobalRule:
-		var b strings.Builder
-		b.WriteString(titleStyle.Render("Add Global Rule") + "\n\n")
-		for _, input := range m.inputs {
-			b.WriteString(input.View() + "\n")
+	case screenTrustGlobalRules:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
 		}
-		b.WriteString("\nPress Enter to add, Left Arrow to go back\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
-		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
-
-	case screenListGlobalRules:
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.globalRuleList.View() + "\n\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\nPress Left Arrow to go back",
-		)
-
-	case screenUpdateGlobalRule:
-		var b strings.Builder
-		b.WriteString(titleStyle.Render("Update Global Rule") + "\n\n")
-		for _, input := range m.inputs {
-			b.WriteString(input.View() + "\n")
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the selected policy file",
+			)
 		}
-		b.WriteString("\nPress Enter to update, Left Arrow to go back\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer))
-		return lipgloss.NewStyle().Margin(1, 2).Render(b.String())
-
-	case screenRemoveGlobalRule:
-		return lipgloss.NewStyle().Margin(1, 2).Render(
-			m.globalRuleList.View() + "\n\n" +
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer) +
-				"\nPress Enter to remove selected global rule, Left Arrow to go back",
+		return m.renderListScreen(m.globalRuleList,
+			overlay+screenTrustGlobalRulesHelp(m.readOnly)+hint,
 		)
+	case screenPolicyAddRule:
+		return m.renderFormScreen("Add Rule", "Press Enter to submit, Esc to go back")
+	case screenPolicyEditRule:
+		return m.renderFormScreen("Edit Rule", "Press Enter to save, Esc to go back")
+	case screenTrustAddGlobalRule:
+		return m.renderFormScreen("Add Global Rule", "Press Enter to submit, Esc to go back")
+	case screenTrustEditGlobalRule:
+		return m.renderFormScreen("Edit Global Rule", "Press Enter to save, Esc to go back")
 	default:
 		return "Unknown screen"
 	}
