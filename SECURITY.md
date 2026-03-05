@@ -7,8 +7,13 @@ following PGP key:
 
 > E9C0 59EC 0D32 64FA B35F 94AD 465B F9F6 F8EB 475A
 
-**Note:** Please do not report such issues publicly on the issue tracker. The
-*issue tracker is intended for bug reports and feature requests.
+> [!IMPORTANT]
+> If you used AI to identify the vulnerability or generate the report, please
+> indicate this in the report.
+
+> [!WARNING]
+> Please do not report potential security issues publicly on the issue tracker.
+> The issue tracker is intended for bug reports and feature requests.
 
 ## Responding to Reports
 
