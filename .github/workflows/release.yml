@@ -26,7 +26,7 @@ jobs:
         with:
           distribution: goreleaser-pro
           version: latest
-          args: release --clean --snapshot --skip=winget
+          args: release --clean --skip=winget
         env:
           WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
