@@ -2,6 +2,17 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.13.1
+
+This release is a follow-up to v0.13.0 to fix our releasing pipeline. Starting
+with this release, gittuf releases now ship with attested SBOMs and build
+provenance.
+
+### Updated
+
+- Updated a test for invalid RSL recovery
+- Updated various dependencies and CI workflows
+
 ## v0.13.0
 
 ### Added
