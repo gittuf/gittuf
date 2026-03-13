@@ -20,13 +20,13 @@ type globalRule struct {
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
-func getGlobalRules(o *options) []globalRule {
+func getGlobalRules(ctx context.Context, o *options) []globalRule {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return nil
 	}
 
-	rules, err := repo.ListGlobalRules(context.Background(), o.targetRef)
+	rules, err := repo.ListGlobalRules(ctx, o.targetRef)
 	if err != nil {
 		return nil
 	}
@@ -53,7 +53,7 @@ func getGlobalRules(o *options) []globalRule {
 }
 
 // repoAddGlobalRule adds a global rule
-func repoAddGlobalRule(o *options, gr globalRule) error {
+func repoAddGlobalRule(ctx context.Context, o *options, gr globalRule) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func repoAddGlobalRule(o *options, gr globalRule) error {
 			return fmt.Errorf("namespaces not set for global rule type '%s'", tuf.GlobalRuleThresholdType)
 		}
 		return repo.AddGlobalRuleThreshold(
-			context.Background(), signer,
+			ctx, signer,
 			gr.ruleName, gr.rulePatterns,
 			gr.threshold, true, opts...,
 		)
@@ -81,7 +81,7 @@ func repoAddGlobalRule(o *options, gr globalRule) error {
 			return fmt.Errorf("namespaces not set for global rule type '%s'", tuf.GlobalRuleBlockForcePushesType)
 		}
 		return repo.AddGlobalRuleBlockForcePushes(
-			context.Background(), signer,
+			ctx, signer,
 			gr.ruleName, gr.rulePatterns,
 			true, opts...,
 		)
@@ -91,7 +91,7 @@ func repoAddGlobalRule(o *options, gr globalRule) error {
 }
 
 // repoRemoveGlobalRule removes a global rule
-func repoRemoveGlobalRule(o *options, gr globalRule) error {
+func repoRemoveGlobalRule(ctx context.Context, o *options, gr globalRule) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -105,12 +105,12 @@ func repoRemoveGlobalRule(o *options, gr globalRule) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 	return repo.RemoveGlobalRule(
-		context.Background(), signer, gr.ruleName, true, opts...,
+		ctx, signer, gr.ruleName, true, opts...,
 	)
 }
 
 // repoUpdateGlobalRule updates a global rule
-func repoUpdateGlobalRule(o *options, gr globalRule) error {
+func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -129,14 +129,14 @@ func repoUpdateGlobalRule(o *options, gr globalRule) error {
 			return fmt.Errorf("namespaces not set for global rule type '%s'", tuf.GlobalRuleThresholdType)
 		}
 
-		return repo.UpdateGlobalRuleThreshold(context.Background(), signer, gr.ruleName, gr.rulePatterns, gr.threshold, true, opts...)
+		return repo.UpdateGlobalRuleThreshold(ctx, signer, gr.ruleName, gr.rulePatterns, gr.threshold, true, opts...)
 
 	case tuf.GlobalRuleBlockForcePushesType:
 		if len(gr.rulePatterns) == 0 {
 			return fmt.Errorf("namespaces not set for global rule type '%s'", tuf.GlobalRuleBlockForcePushesType)
 		}
 
-		return repo.UpdateGlobalRuleBlockForcePushes(context.Background(), signer, gr.ruleName, gr.rulePatterns, true, opts...)
+		return repo.UpdateGlobalRuleBlockForcePushes(ctx, signer, gr.ruleName, gr.rulePatterns, true, opts...)
 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
