@@ -11,19 +11,20 @@ import (
 )
 
 type rule struct {
-	name    string
-	pattern string
-	key     string
+	name      string
+	pattern   string
+	key       string
+	threshold int
 }
 
-// getCurrRules returns the current rules from the policy file
-func getCurrRules(o *options) []rule {
+// getCurrRules returns the current rules from the policy file.
+func getCurrRules(ctx context.Context, o *options) []rule {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return nil
 	}
 
-	rules, err := repo.ListRules(context.Background(), o.targetRef)
+	rules, err := repo.ListRules(ctx, o.targetRef)
 	if err != nil {
 		return nil
 	}
@@ -31,16 +32,17 @@ func getCurrRules(o *options) []rule {
 	var currRules = make([]rule, len(rules))
 	for i, r := range rules {
 		currRules[i] = rule{
-			name:    r.Delegation.ID(),
-			pattern: strings.Join(r.Delegation.GetProtectedNamespaces(), ", "),
-			key:     strings.Join(r.Delegation.GetPrincipalIDs().Contents(), ", "),
+			name:      r.Delegation.ID(),
+			pattern:   strings.Join(r.Delegation.GetProtectedNamespaces(), ", "),
+			key:       strings.Join(r.Delegation.GetPrincipalIDs().Contents(), ", "),
+			threshold: r.Delegation.GetThreshold(),
 		}
 	}
 	return currRules
 }
 
-// repoAddRule adds a rule to the policy file
-func repoAddRule(o *options, rule rule, keyPath []string) error {
+// repoAddRule adds a rule to the policy file.
+func repoAddRule(ctx context.Context, o *options, rule rule, authorizedPrincipalIDs []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -51,22 +53,11 @@ func repoAddRule(o *options, rule rule, keyPath []string) error {
 		return err
 	}
 
-	authorizedPrincipalIDs := []string{}
-	for _, key := range keyPath {
-		key, err := gittuf.LoadPublicKey(key)
-		if err != nil {
-			return err
-		}
-
-		authorizedPrincipalIDs = append(authorizedPrincipalIDs, key.ID())
-	}
-	res := repo.AddDelegation(context.Background(), signer, o.policyName, rule.name, authorizedPrincipalIDs, []string{rule.pattern}, 1, true)
-
-	return res
+	return repo.AddDelegation(ctx, signer, o.policyName, rule.name, authorizedPrincipalIDs, []string{rule.pattern}, rule.threshold, true)
 }
 
-// repoRemoveRule removes a rule from the policy file
-func repoRemoveRule(o *options, rule rule) error {
+// repoUpdateRule updates an existing rule in the policy file.
+func repoUpdateRule(ctx context.Context, o *options, r rule, authorizedPrincipalIDs []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -76,11 +67,26 @@ func repoRemoveRule(o *options, rule rule) error {
 	if err != nil {
 		return err
 	}
-	return repo.RemoveDelegation(context.Background(), signer, o.policyName, rule.name, true)
+
+	return repo.UpdateDelegation(ctx, signer, o.policyName, r.name, authorizedPrincipalIDs, []string{r.pattern}, r.threshold, true)
 }
 
-// repoReorderRules reorders the rules in the policy file
-func repoReorderRules(o *options, rules []rule) error {
+// repoRemoveRule removes a rule from the policy file.
+func repoRemoveRule(ctx context.Context, o *options, rule rule) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	return repo.RemoveDelegation(ctx, signer, o.policyName, rule.name, true)
+}
+
+// repoReorderRules reorders the rules in the policy file.
+func repoReorderRules(ctx context.Context, o *options, rules []rule) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -96,5 +102,5 @@ func repoReorderRules(o *options, rules []rule) error {
 		ruleNames[i] = r.name
 	}
 
-	return repo.ReorderDelegations(context.Background(), signer, o.policyName, ruleNames, true)
+	return repo.ReorderDelegations(ctx, signer, o.policyName, ruleNames, true)
 }
