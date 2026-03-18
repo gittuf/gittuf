@@ -4,6 +4,8 @@
 package setup
 
 import (
+	"context"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -14,8 +16,8 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 
 }
 
-func (o *options) Run(_ *cobra.Command, _ []string) error {
-	return startTUI(o)
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	return startTUI(cmd.Context(), o)
 }
 
 func New() *cobra.Command {
@@ -33,8 +35,8 @@ func New() *cobra.Command {
 }
 
 // startTUI intitializes a new model for the TUI
-func startTUI(o *options) error {
-	m, err := initialModel(o)
+func startTUI(ctx context.Context, o *options) error {
+	m, err := initialModel(ctx, o)
 	if err != nil {
 		return err
 	}

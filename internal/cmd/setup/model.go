@@ -4,10 +4,14 @@
 package setup
 
 import (
+	"context"
+
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
@@ -16,9 +20,10 @@ type screen int
 
 const (
 	screenChoice screen = iota // initial screen
-	screenAbout
 	screenRoot
 	screenTransport
+	screenMaintainerFinish
+	screenAbort
 	screenConclusion
 )
 
@@ -37,52 +42,70 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	screen     screen
-	choiceList list.Model
-	inputs     []textinput.Model
-	focusIndex int
-	cursorMode cursor.Mode
-	repo       *gittuf.Repository
-	signer     dsse.SignerVerifier
-	options    *options
-	footer     string
+	ctx              context.Context
+	screen           screen
+	choiceList       list.Model
+	inputs           []textinput.Model
+	focusIndex       int
+	cursorMode       cursor.Mode
+	repo             *gittuf.Repository
+	signer           dsse.SignerVerifier
+	options          *options
+	footer           string
+	errorMsg         string
+	rootExists       bool
+	transportExists  bool
+	spinner          spinner.Model
+	transportRunning bool
+	transportSteps   []string
+	width            int
+}
+
+// newDelegate creates a styled list delegate for use in all list.Model instances.
+func newDelegate() list.DefaultDelegate {
+	d := list.NewDefaultDelegate()
+	d.Styles.SelectedTitle = selectedItemStyle
+	d.Styles.SelectedDesc = selectedItemStyle
+	d.Styles.NormalTitle = itemStyle
+	d.Styles.NormalDesc = itemStyle
+	return d
+}
+
+// newMenuList creates a configured list.Model with default settings.
+func newMenuList(title string, items []list.Item, delegate list.DefaultDelegate) list.Model {
+	l := list.New(items, delegate, 0, 0)
+	l.Title = title
+	l.Styles.Title = titleStyle
+	l.SetShowStatusBar(false)
+	l.SetFilteringEnabled(false)
+	l.SetShowHelp(false)
+	return l
 }
 
 // initialModel returns the initial model for the Terminal UI
-func initialModel(o *options) (model, error) {
+func initialModel(ctx context.Context, o *options) (model, error) {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return model{}, err
 	}
 
-	// Initialize the model
+	delegate := newDelegate()
+
+	s := spinner.New(spinner.WithSpinner(spinner.MiniDot))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus))
+
 	m := model{
+		ctx:        ctx,
 		screen:     screenChoice,
 		cursorMode: cursor.CursorBlink,
 		repo:       repo,
 		options:    o,
+		choiceList: newMenuList("gittuf Setup", []list.Item{
+			item{title: "Maintainer", desc: "I'm a maintainer"},
+			item{title: "Contributor", desc: "I'm a contributor"},
+		}, delegate),
+		spinner: s,
 	}
-
-	// Set up choice screen list items
-	choiceItems := []list.Item{
-		item{title: "Maintainer", desc: "I'm a maintainer"},
-		item{title: "Contributer", desc: "I'm a contributer"},
-	}
-
-	// Set up the list delegate
-	delegate := list.NewDefaultDelegate()
-	delegate.Styles.SelectedTitle = selectedItemStyle
-	delegate.Styles.SelectedDesc = selectedItemStyle
-	delegate.Styles.NormalTitle = itemStyle
-	delegate.Styles.NormalDesc = itemStyle
-
-	// Set up choice screen list
-	m.choiceList = list.New(choiceItems, delegate, 0, 0)
-	m.choiceList.Title = "gittuf Setup"
-	m.choiceList.SetShowStatusBar(false)
-	m.choiceList.SetFilteringEnabled(false)
-	m.choiceList.Styles.Title = titleStyle
-	m.choiceList.SetShowHelp(false)
 
 	return m, nil
 }

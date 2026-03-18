@@ -5,14 +5,14 @@ package setup
 
 import (
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
 	colorRegularText = "#FFFFFF"
 	colorFocus       = "#007AFF"
-	colorBlur        = "#A0A0A0"
 	colorFooter      = "#11ff00"
-	colorSubtext     = "#555555"
+	colorErrorMsg    = "#FF0000"
 )
 
 var (
@@ -30,25 +30,54 @@ var (
 				PaddingLeft(4).
 				Foreground(lipgloss.Color(colorRegularText)).
 				Background(lipgloss.Color(colorFocus))
-
-	focusedStyle = lipgloss.NewStyle().
-			PaddingLeft(4)
-
-	blurredStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorBlur))
-
-	cursorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorRegularText))
 )
+
+// renderWithMargin wraps content in the standard margin used by all screens.
+// It also word-wraps content to fit the max width (defined by terminal width or const)
+// to prevent overflow.
+func (m model) renderWithMargin(content string) string {
+	style := lipgloss.NewStyle().Margin(1, 2)
+	if m.width > 0 {
+		h, _ := style.GetFrameSize()
+		content = ansi.Wordwrap(content, m.width-h, "")
+	}
+	return style.Render(content)
+}
+
+// renderFooter returns the footer text styled in the footer color.
+func renderFooter(text string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(text)
+}
+
+// renderErrorMsg returns error messages styled in the error color.
+func renderErrorMsg(text string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Render(text)
+}
 
 // View renders the TUI
 func (m model) View() string {
 	switch m.screen {
 	case screenChoice:
-		return "Welcome! This wizard will help you setup gittuf on your repository." + lipgloss.NewStyle().Margin(1, 2).Render(
-			m.choiceList.View()+"\n"+
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(m.footer),
-		)
+		return m.renderWithMargin("Welcome! This wizard will help you setup gittuf on your repository." + "\n" + m.choiceList.View())
+	case screenRoot:
+		return m.renderWithMargin("Hello maintainer! Let's get you started with gittuf." + "\n" + "TODO")
+	case screenTransport:
+		content := "Hello contributor! Let's get you started with gittuf.\n\n"
+		if m.transportRunning {
+			content += m.spinner.View() + " Setting up transport..."
+		}
+		if m.errorMsg != "" {
+			content += "\n" + renderErrorMsg(m.errorMsg) + "\n"
+		}
+		for _, step := range m.transportSteps {
+			content += "✔︎ " + step + "\n"
+		}
+		content += renderFooter("\n" + m.footer)
+		return m.renderWithMargin(content)
+	case screenAbort:
+		return m.renderWithMargin(renderErrorMsg("Looks like gittuf is already enabled on your repository. See https://gittuf.dev/ for more info."))
+	case screenConclusion:
+		return m.renderWithMargin("Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation.")
 	default:
 		return "Unknown screen"
 	}
