@@ -59,10 +59,39 @@ func (m model) View() string {
 	switch m.screen {
 	case screenChoice:
 		return m.renderWithMargin("Welcome! This wizard will help you setup gittuf on your repository." + "\n" + m.choiceList.View())
-	case screenRoot:
-		return m.renderWithMargin("Hello maintainer! Let's get you started with gittuf." + "\n" + "TODO")
+	case screenMaintainerSelections:
+		content := "Hello maintainer! Let's get you started with gittuf.\n\n"
+		if m.rootExists == true {
+			content += "Looks like gittuf is already setup on your repository. Please select where you would like to be added.\n"
+		} else {
+			content += "Looks like gittuf isn't initialized yet. Would you like to run the initial setup?\n"
+		}
+		for i, item := range m.rootChoices {
+			cursor := " "
+			if m.rootCursor == i {
+				cursor = ">"
+			}
+			checked := "[ ]"
+			if _, ok := m.rootSelected[i]; ok {
+				checked = "[x]"
+			}
+			content += cursor + checked + " " + item + "\n"
+		}
+		// submit button
+		content += "\n"
+		if m.rootCursor == len(m.rootChoices) {
+			content += "> [ Submit ]\n"
+		} else {
+			content += "  [ Submit ]\n"
+		}
+		return m.renderWithMargin(content)
+
+	case screenTransportConfirm:
+		content := "Hello contributor! Let's get you started with gittuf.\n\nWould you like to enable automatic push recording? [y/n]"
+		return m.renderWithMargin(content)
+
 	case screenTransport:
-		content := "Hello contributor! Let's get you started with gittuf.\n\n"
+		content := ""
 		if m.transportRunning {
 			content += m.spinner.View() + " Setting up transport..."
 		}
@@ -78,6 +107,8 @@ func (m model) View() string {
 		return m.renderWithMargin(renderErrorMsg("Looks like gittuf is already enabled on your repository. See https://gittuf.dev/ for more info."))
 	case screenConclusion:
 		return m.renderWithMargin("Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation.")
+	case screenMaintainerFinish:
+		return m.renderWithMargin("TODO: Show progress here, and a \"Setup complete\" confirmation when done")
 	default:
 		return "Unknown screen"
 	}

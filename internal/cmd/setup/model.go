@@ -20,8 +20,9 @@ type screen int
 
 const (
 	screenChoice screen = iota // initial screen
-	screenRoot
+	screenMaintainerSelections
 	screenTransport
+	screenTransportConfirm
 	screenMaintainerFinish
 	screenAbort
 	screenConclusion
@@ -54,6 +55,9 @@ type model struct {
 	footer           string
 	errorMsg         string
 	rootExists       bool
+	rootChoices      []string
+	rootCursor       int
+	rootSelected     map[int]struct{}
 	transportExists  bool
 	spinner          spinner.Model
 	transportRunning bool
@@ -104,7 +108,9 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 			item{title: "Maintainer", desc: "I'm a maintainer"},
 			item{title: "Contributor", desc: "I'm a contributor"},
 		}, delegate),
-		spinner: s,
+		spinner:      s,
+		rootChoices:  []string{"Add my key to Root", "Add my key to Policy", "Add my key to Rule"},
+		rootSelected: map[int]struct{}{0: {}, 1: {}, 2: {}}, // select all by default
 	}
 
 	return m, nil

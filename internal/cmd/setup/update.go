@@ -42,7 +42,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.footer = ""
 			switch m.screen {
-			case screenRoot, screenTransport:
+			case screenMaintainerSelections, screenTransport:
 				m.screen = screenChoice
 			}
 			return m, nil
@@ -54,7 +54,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch i.title {
 					case "Maintainer":
 						m.rootExists = checkRootExists(m.repo)
-						m.screen = screenRoot
+						m.screen = screenMaintainerSelections
+						return m, nil
 					case "Contributor":
 						exists, err := checkTransportExists(m.repo)
 						m.transportExists = exists
@@ -62,9 +63,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.errorMsg = err.Error()
 						}
 						if !m.transportExists {
-							m.transportRunning = true
-							m.screen = screenTransport
-							return m, tea.Batch(runTransportSetup(m.repo), m.spinner.Tick)
+							m.screen = screenTransportConfirm
+							return m, nil
 						}
 						m.screen = screenAbort
 					}
@@ -78,6 +78,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		case "tab", "shift+tab", "up", "down":
+		}
+
+		// root screen-specific input handling
+		switch m.screen {
+		case screenTransportConfirm:
+			switch msg.String() {
+			case "y", "Y":
+				m.transportRunning = true
+				m.screen = screenTransport
+				return m, tea.Batch(runTransportSetup(m.repo), m.spinner.Tick)
+			case "n", "N":
+				return m, tea.Quit
+			}
+
+		case screenMaintainerSelections:
+			switch msg.String() {
+			case "up", "k":
+				if m.rootCursor > 0 {
+					m.rootCursor--
+				}
+			case "down", "j":
+				if m.rootCursor < len(m.rootChoices) {
+					m.rootCursor++
+				}
+			case "space", "enter":
+				if m.rootCursor == len(m.rootChoices) {
+					// submit response
+					m.screen = screenMaintainerFinish
+					return m, nil
+				}
+				_, ok := m.rootSelected[m.rootCursor]
+				if ok {
+					if m.rootCursor != 0 || m.rootExists {
+						// "Add key to root" cannot be deselected when gittuf has not been initialized
+						delete(m.rootSelected, m.rootCursor)
+					}
+				} else {
+					m.rootSelected[m.rootCursor] = struct{}{}
+				}
+			}
 		}
 	}
 
