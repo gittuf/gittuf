@@ -10,6 +10,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/policy"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 const (
@@ -72,12 +73,15 @@ func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer
 				if err := repo.InitializeTargets(ctx, signer, policy.TargetsRoleName, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
-				if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"main"}, 1, true); err != nil {
+				if err := repo.AddPrincipalToTargets(ctx, signer, policy.TargetsRoleName, []tuf.Principal{principal}, true); err != nil {
+					return metadataDoneMsg{err: err}
+				}
+				if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"refs/heads/main"}, 1, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
 			} else {
 				// TODO: Add internal upgrades to return rule information
-				if err := repo.UpdateDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"main"}, 1, true); err != nil {
+				if err := repo.UpdateDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"refs/heads/main"}, 1, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
 			}
