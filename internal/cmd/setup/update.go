@@ -34,7 +34,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.transportSteps = msg.steps
 		m.footer = "Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation."
 		return m, nil
-
+	case metadataDoneMsg:
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -89,7 +93,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTransport
 				return m, tea.Batch(runTransportSetup(m.repo), m.spinner.Tick)
 			case "n", "N":
-				return m, tea.Quit
+				m.screen = screenConclusion
+				return m, nil
 			}
 
 		case screenMaintainerSelections:
@@ -105,8 +110,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "space", "enter":
 				if m.rootCursor == len(m.rootChoices) {
 					// submit response
-					m.screen = screenMaintainerFinish
-					return m, nil
+					m.screen = screenTransportConfirm
+					return m, tea.Batch(setupMaintainerChoices(m.ctx, m.repo, m.signer, m.rootSelected, m.rootExists))
 				}
 				_, ok := m.rootSelected[m.rootCursor]
 				if ok {
@@ -115,7 +120,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						delete(m.rootSelected, m.rootCursor)
 					}
 				} else {
-					m.rootSelected[m.rootCursor] = struct{}{}
+					m.rootSelected[m.rootCursor] = false
 				}
 			}
 		}

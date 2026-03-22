@@ -64,7 +64,7 @@ func (m model) View() string {
 		if m.rootExists == true {
 			content += "Looks like gittuf is already setup on your repository. Please select where you would like to be added.\n"
 		} else {
-			content += "Looks like gittuf isn't initialized yet. Would you like to run the initial setup?\n"
+			content += "Looks like gittuf isn't initialized yet. Let's initialize it and add you to the policy.\n"
 		}
 		for i, item := range m.rootChoices {
 			cursor := " "
@@ -87,9 +87,10 @@ func (m model) View() string {
 		return m.renderWithMargin(content)
 
 	case screenTransportConfirm:
-		content := "Hello contributor! Let's get you started with gittuf.\n\nWould you like to enable automatic push recording? [y/n]"
+		content := "gittuf can automatically manage your metadata in the background.\n" +
+			"See https://gittuf.dev/documentation/contributors for more information.\n\n" +
+			"Would you like to enable automatic push recording? [y/n]"
 		return m.renderWithMargin(content)
-
 	case screenTransport:
 		content := ""
 		if m.transportRunning {
@@ -104,11 +105,9 @@ func (m model) View() string {
 		content += renderFooter("\n" + m.footer)
 		return m.renderWithMargin(content)
 	case screenAbort:
-		return m.renderWithMargin(renderErrorMsg("Looks like gittuf is already enabled on your repository. See https://gittuf.dev/ for more info."))
+		return m.renderWithMargin(renderErrorMsg("gittuf setup has been cancelled. Any changes made to your repository have been reverted."))
 	case screenConclusion:
-		return m.renderWithMargin("Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation.")
-	case screenMaintainerFinish:
-		return m.renderWithMargin("TODO: Show progress here, and a \"Setup complete\" confirmation when done")
+		return m.renderWithMargin("Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation.\n\n" + "Press Q to quit.")
 	default:
 		return "Unknown screen"
 	}

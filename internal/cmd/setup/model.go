@@ -23,7 +23,6 @@ const (
 	screenMaintainerSelections
 	screenTransport
 	screenTransportConfirm
-	screenMaintainerFinish
 	screenAbort
 	screenConclusion
 )
@@ -57,7 +56,7 @@ type model struct {
 	rootExists       bool
 	rootChoices      []string
 	rootCursor       int
-	rootSelected     map[int]struct{}
+	rootSelected     map[int]bool
 	transportExists  bool
 	spinner          spinner.Model
 	transportRunning bool
@@ -109,8 +108,8 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 			item{title: "Contributor", desc: "I'm a contributor"},
 		}, delegate),
 		spinner:      s,
-		rootChoices:  []string{"Add my key to Root", "Add my key to Policy", "Add my key to Rule"},
-		rootSelected: map[int]struct{}{0: {}, 1: {}, 2: {}}, // select all by default
+		rootChoices:  []string{"Make me a Root of Trust User", "Make me a Policy Administrator", "Authorize me to make changes to the default branch"},
+		rootSelected: map[int]bool{addToRoot: true, addToTargets: true, addToRule: true}, // select all by default
 	}
 
 	return m, nil
