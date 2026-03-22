@@ -13,7 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 )
 
 type screen int
@@ -49,7 +49,7 @@ type model struct {
 	focusIndex       int
 	cursorMode       cursor.Mode
 	repo             *gittuf.Repository
-	signer           dsse.SignerVerifier
+	signer           sslibdsse.SignerVerifier
 	options          *options
 	footer           string
 	errorMsg         string
@@ -111,6 +111,12 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 		rootChoices:  []string{"Make me a Root of Trust User", "Make me a Policy Administrator", "Authorize me to make changes to the default branch"},
 		rootSelected: map[int]bool{addToRoot: true, addToTargets: true, addToRule: true}, // select all by default
 	}
+
+	signer, err := gittuf.LoadSignerFromGitConfig(repo)
+	if err != nil {
+		return model{}, err
+	}
+	m.signer = signer
 
 	return m, nil
 }

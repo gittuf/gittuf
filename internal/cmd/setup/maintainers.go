@@ -9,7 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/secure-systems-lab/go-securesystemslib/dsse"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 )
 
 const (
@@ -32,7 +32,7 @@ func checkRootExists(repo *gittuf.Repository) bool {
 
 // setupMaintainerChoices configures the gittuf policy on the repository as
 // desired by the maintainer
-func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer dsse.SignerVerifier, choices map[int]bool, alreadySetUp bool) tea.Cmd {
+func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer sslibdsse.SignerVerifier, choices map[int]bool, alreadySetUp bool) tea.Cmd {
 	return func() tea.Msg {
 		// Load the maintainer's public key
 		principal, err := gittuf.LoadPublicKeyFromGitConfig(repo)
