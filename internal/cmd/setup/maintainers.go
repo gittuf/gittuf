@@ -69,6 +69,9 @@ func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer
 		if choices[addToRule] {
 			// Add maintainer to rule protecting the default branch
 			if !alreadySetUp {
+				if err := repo.InitializeTargets(ctx, signer, policy.TargetsRoleName, true); err != nil {
+					return metadataDoneMsg{err: err}
+				}
 				if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"main"}, 1, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
