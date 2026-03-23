@@ -76,12 +76,12 @@ func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer
 				if err := repo.AddPrincipalToTargets(ctx, signer, policy.TargetsRoleName, []tuf.Principal{principal}, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
-				if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"refs/heads/main"}, 1, true); err != nil {
+				if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"git:refs/heads/main"}, 1, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
 			} else {
 				// TODO: Add internal upgrades to return rule information
-				if err := repo.UpdateDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"refs/heads/main"}, 1, true); err != nil {
+				if err := repo.UpdateDelegation(ctx, signer, policy.TargetsRoleName, "protect-main", []string{principal.ID()}, []string{"git:refs/heads/main"}, 1, true); err != nil {
 					return metadataDoneMsg{err: err}
 				}
 			}
