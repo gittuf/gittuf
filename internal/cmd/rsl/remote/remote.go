@@ -14,6 +14,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remote",
 		Short:             "Tools for managing remote RSLs",
+		Long:              "The 'remote' command provides tools for managing RSL interactions with remote repositories. It is used to organize and execute operations such as pulling, pushing, and the RSL between local and remote sources.",
 		DisableAutoGenTag: true,
 	}
 

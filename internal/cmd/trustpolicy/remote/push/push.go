@@ -25,6 +25,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "push <remote>",
 		Short:             "Push policy to the specified remote",
+		Long:              "The 'push' command sends the repository's policy to the specified remote. It is used to publish local policy changes so that they are available for other users to pull down.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

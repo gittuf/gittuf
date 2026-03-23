@@ -2,6 +2,10 @@
 
 List gittuf hooks for the current policy state
 
+### Synopsis
+
+The 'list-hooks' command displays the configured gittuf hooks for the current policy state. It is used to inspect existing hooks and view their configuration.
+
 ```
 gittuf trust list-hooks [flags]
 ```

@@ -2,6 +2,10 @@
 
 Verify state of network repositories
 
+### Synopsis
+
+The 'verify-network' command verifies the state of network repositories configured in the repository's root of trust. It is used to check the integrity and consistency of network repositories against the expected trust configuration.
+
 ```
 gittuf verify-network [flags]
 ```

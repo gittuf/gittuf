@@ -2,6 +2,10 @@
 
 Lists propagation directives in the gittuf root of trust
 
+### Synopsis
+
+The 'list-propagation-directives' command displays the propagation directives configured in the repository's root of trust. It is used to inspect existing directives and review how content is propagated between repositories for a given policy reference.
+
 ```
 gittuf trust list-propagation-directives [flags]
 ```

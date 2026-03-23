@@ -26,6 +26,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "verify-network",
 		Short:             "Verify state of network repositories",
+		Long:              "The 'verify-network' command verifies the state of network repositories configured in the repository's root of trust. It is used to check the integrity and consistency of network repositories against the expected trust configuration.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

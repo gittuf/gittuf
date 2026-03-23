@@ -2,6 +2,10 @@
 
 Set repository location
 
+### Synopsis
+
+The 'set-repository-location' command updates the canonical location of a repository in the repository's root of trust. It is used to encode the canonical location of the repository inside gittuf metadata.
+
 ```
 gittuf trust set-repository-location [flags]
 ```

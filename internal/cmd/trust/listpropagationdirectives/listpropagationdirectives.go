@@ -52,6 +52,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-propagation-directives",
 		Short:             "Lists propagation directives in the gittuf root of trust",
+		Long:              "The 'list-propagation-directives' command displays the propagation directives configured in the repository's root of trust. It is used to inspect existing directives and review how content is propagated between repositories for a given policy reference.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

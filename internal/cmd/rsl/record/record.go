@@ -74,6 +74,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "record",
 		Short:             "Record latest state of a Git reference in the RSL",
+		Long:              "The 'record' command records the latest state of a Git reference in the repository's RSL. It is used to capture and track changes to references over time for auditing and consistency.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

@@ -2,6 +2,10 @@
 
 Record latest state of a Git reference in the RSL
 
+### Synopsis
+
+The 'record' command records the latest state of a Git reference in the repository's RSL. It is used to capture and track changes to references over time for auditing and consistency.
+
 ```
 gittuf rsl record [flags]
 ```

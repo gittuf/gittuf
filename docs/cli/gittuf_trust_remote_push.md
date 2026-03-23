@@ -2,6 +2,10 @@
 
 Push policy to the specified remote
 
+### Synopsis
+
+The 'push' command sends the repository's policy to the specified remote. It is used to publish local policy changes so that they are available for other users to pull down.
+
 ```
 gittuf trust remote push <remote> [flags]
 ```
