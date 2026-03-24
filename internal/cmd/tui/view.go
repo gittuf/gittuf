@@ -178,7 +178,7 @@ func (m model) View() string {
 			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
 		}
 		hint := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-			"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
+			"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
 		)
 		return m.renderListScreen(m.rootPrincipalList,
 			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
