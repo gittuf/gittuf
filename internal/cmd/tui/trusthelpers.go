@@ -189,3 +189,58 @@ func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
 	}
 	return currPrincipals
 }
+
+func repoAddRootPrincipal(ctx context.Context, o *options, role, principalSource string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	principal, err := gittuf.LoadPublicKey(principalSource)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "root":
+		return repo.AddRootKey(ctx, signer, principal, true, opts...)
+	case "policy":
+		return repo.AddTopLevelTargetsKey(ctx, signer, principal, true, opts...)
+	default:
+		return fmt.Errorf("unknown role %q (expected 'root' or 'policy')", role)
+	}
+}
+
+func repoRemoveRootPrincipal(ctx context.Context, o *options, role, principalID string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	id := strings.ToLower(strings.TrimSpace(principalID))
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "root":
+		return repo.RemoveRootKey(ctx, signer, id, true, opts...)
+	case "policy":
+		return repo.RemoveTopLevelTargetsKey(ctx, signer, id, true, opts...)
+	default:
+		return fmt.Errorf("unknown role %q (expected 'root' or 'policy')", role)
+	}
+} 
