@@ -27,9 +27,12 @@ const (
 	screenPolicyAddRule                     // Form: add a new policy rule
 	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
 	screenTrust                             // Menu for Trust operations
-	screenTrustGlobalRules                  // Global rule management screen
+	screenTrustGlobalRules
+	screenTrustRootPrincipals               // Root principal management screen
 	screenTrustAddGlobalRule                // Form: add a new global rule
 	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
+	screenTrustAddRootPrincipal             // Form: add a new root principal
+	screenTrustEditRootPrincipal            // Form: edit selected root principal (prefilled)
 )
 
 type item struct {
@@ -56,6 +59,8 @@ type model struct {
 	ruleList         list.Model
 	globalRules      []globalRule
 	globalRuleList   list.Model
+	rootPrincipals   []rootPrincipal
+	rootPrincipalList list.Model
 	inputs           []textinput.Model
 	focusIndex       int
 	cursorMode       cursor.Mode
@@ -155,6 +160,7 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 		policyName:  o.policyName,
 		rules:       getCurrRules(ctx, o),
 		globalRules: getGlobalRules(ctx, o),
+		rootPrincipals: getRootPrincipals(ctx, o),
 		options:     o,
 		readOnly:    readOnly,
 		footer:      footer,
@@ -168,9 +174,11 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
+			item{title: "View Root Principals", desc: "View and manage root principals and keys"},
 		}, delegate),
 		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
 		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		rootPrincipalList: newMenuList("Root Principals", []list.Item{}, delegate),
 	}
 
 	return m, nil
@@ -233,6 +241,20 @@ func (m *model) refreshRules() {
 func (m *model) refreshGlobalRules() {
 	m.globalRules = getGlobalRules(m.ctx, m.options)
 	m.updateGlobalRuleList()
+}
+
+func (m *model) refreshRootPrincipals() {
+	m.rootPrincipals = getRootPrincipals(m.ctx, m.options)
+	m.updateRootPrincipalList()
+}
+
+func (m *model) updateRootPrincipalList() {
+	items := make([]list.Item, len(m.rootPrincipals))
+	for i, rp := range m.rootPrincipals {
+		desc := fmt.Sprintf("Roles: %s\nKeys: %d", rp.roles, rp.keyCount)
+		items[i] = item{title: rp.principalID, desc: desc}
+	}
+	m.rootPrincipalList.SetItems(items)
 }
 
 // updateRuleList updates the rule list within the TUI.

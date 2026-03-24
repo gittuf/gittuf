@@ -108,6 +108,17 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+func screenTrustRootPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  e: edit  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
 func renderDeleteOverlay(target string) string {
 	return lipgloss.NewStyle().
@@ -161,6 +172,21 @@ func (m model) View() string {
 		return m.renderFormScreen("Add Global Rule")
 	case screenTrustEditGlobalRule:
 		return m.renderFormScreen("Edit Global Rule")
+	case screenTrustRootPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
+		hint := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+			"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
+		)
+		return m.renderListScreen(m.rootPrincipalList,
+			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
+		)
+	case screenTrustAddRootPrincipal:
+    	return m.renderFormScreen("Add Root Principal")
+	case screenTrustEditRootPrincipal:
+    	return m.renderFormScreen("Edit Root Principal")
 	default:
 		return "Unknown screen"
 	}

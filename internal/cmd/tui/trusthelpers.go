@@ -6,7 +6,9 @@ package tui
 import (
 	"context"
 	"fmt"
-
+	"sort"
+	"strings"
+	
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -17,6 +19,12 @@ type globalRule struct {
 	ruleType     string
 	rulePatterns []string
 	threshold    int
+}
+
+type rootPrincipal struct {
+	principalID string
+	roles 	    string
+	keyCount	int
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
@@ -141,4 +149,43 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
+	principalsWithRoles, err := repo.ListRootPrincipals(ctx, o.targetRef)
+	if err != nil {
+		return nil
+	}
+
+	ids := make([]string, 0, len(principalsWithRoles))
+	for id := range principalsWithRoles {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	currPrincipals := make([]rootPrincipal, len(principalsWithRoles))
+	for _, id := range ids {
+		principalsWithRoles := principalsWithRoles[id]
+
+		roles := []string{}
+		if principalsWithRoles.IsRoot {
+			roles = append(roles, "root")
+		}
+		if principalsWithRoles.IsPrimaryRuleFileRole {
+			roles = append(roles, "policy")
+		}
+		if len(roles) == 0 {
+			roles = append(roles, "unscoped")
+		}
+		currPrincipals = append(currPrincipals, rootPrincipal{
+			principalID: id,
+			roles:       strings.Join(roles, ", "),
+			keyCount:    len(principalsWithRoles.Principal.Keys()),
+		})
+	}
+	return currPrincipals
 }
