@@ -91,14 +91,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
 			if msg.String() == "enter" {
-				m.footer = "Root principal mutations will be implemented in step 4."
-				return m, nil
+				return m.handleRootPrincipalFormSubmit()
 			}
 			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
 				m.cycleFocus(msg.String())
 				return m, nil
 			}
-		
+
 		}
 	}
 
@@ -114,7 +113,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ruleList, cmd = m.ruleList.Update(msg)
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule,
+		screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	case screenTrustRootPrincipals:
 		m.rootPrincipalList, cmd = m.rootPrincipalList.Update(msg)
@@ -161,46 +161,45 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !m.readOnly {
 		switch msg.String() {
 		// add rule
-		        // add rule
-        case "a":
-            switch m.screen {
-            case screenPolicyRules:
-                m.initRuleInputs()
-                m.screen = screenPolicyAddRule
-            case screenTrustGlobalRules:
-                m.initGlobalRuleInputs()
-                m.screen = screenTrustAddGlobalRule
-            case screenTrustRootPrincipals:
-                m.initRootPrincipalInputs()
+		case "a":
+			switch m.screen {
+			case screenPolicyRules:
+				m.initRuleInputs()
+				m.screen = screenPolicyAddRule
+			case screenTrustGlobalRules:
+				m.initGlobalRuleInputs()
+				m.screen = screenTrustAddGlobalRule
+			case screenTrustRootPrincipals:
+				m.initRootPrincipalInputs()
 				m.screen = screenTrustAddRootPrincipal
-            }
-            return m, nil
+			}
+			return m, nil
 
-        // edit rule
-        case "e":
-            switch m.screen {
-            case screenPolicyRules:
-                if sel, ok := m.ruleList.SelectedItem().(item); ok {
-                    for _, r := range m.rules {
-                        if r.name == sel.title {
-                            m.initRuleInputsPrefilled(r)
-                            m.screen = screenPolicyEditRule
-                            return m, nil
-                        }
-                    }
-                }
-            case screenTrustGlobalRules:
-                if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
-                    for _, gr := range m.globalRules {
-                        if gr.ruleName == sel.title {
-                            m.initGlobalRuleInputsPrefilled(gr)
-                            m.screen = screenTrustEditGlobalRule
-                            return m, nil
-                        }
-                    }
-                }
-            case screenTrustRootPrincipals:
-               if sel, ok := m.rootPrincipalList.SelectedItem().(item); ok {
+		// edit rule
+		case "e":
+			switch m.screen {
+			case screenPolicyRules:
+				if sel, ok := m.ruleList.SelectedItem().(item); ok {
+					for _, r := range m.rules {
+						if r.name == sel.title {
+							m.initRuleInputsPrefilled(r)
+							m.screen = screenPolicyEditRule
+							return m, nil
+						}
+					}
+				}
+			case screenTrustGlobalRules:
+				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
+					for _, gr := range m.globalRules {
+						if gr.ruleName == sel.title {
+							m.initGlobalRuleInputsPrefilled(gr)
+							m.screen = screenTrustEditGlobalRule
+							return m, nil
+						}
+					}
+				}
+			case screenTrustRootPrincipals:
+				if sel, ok := m.rootPrincipalList.SelectedItem().(item); ok {
 					for _, rp := range m.rootPrincipals {
 						if rp.principalID == sel.title {
 							m.initRootPrincipalInputsPrefilled(rp)
@@ -209,32 +208,30 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-            }
+			}
 
-        // delete rule
-        case "d":
-            switch m.screen {
-            case screenPolicyRules:
-                if sel, ok := m.ruleList.SelectedItem().(item); ok {
-                    m.confirmDelete = true
-                    m.deleteTarget = sel.title
-                    return m, nil
-                }
-            case screenTrustGlobalRules:
-                if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
-                    m.confirmDelete = true
-                    m.deleteTarget = sel.title
-                    return m, nil
-                }
-            case screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
-				if msg.String() == "enter" {
-					return m.handleRootPrincipalFormSubmit()
-				}
-				if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
-					m.cycleFocus(msg.String())
+		// delete rule
+		case "d":
+			switch m.screen {
+			case screenPolicyRules:
+				if sel, ok := m.ruleList.SelectedItem().(item); ok {
+					m.confirmDelete = true
+					m.deleteTarget = sel.title
 					return m, nil
 				}
-            }
+			case screenTrustGlobalRules:
+				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
+					m.confirmDelete = true
+					m.deleteTarget = sel.title
+					return m, nil
+				}
+			case screenTrustRootPrincipals:
+				if sel, ok := m.rootPrincipalList.SelectedItem().(item); ok {
+					m.confirmDelete = true
+					m.deleteTarget = sel.title
+					return m, nil
+				}
+			}
 
 		// reorder up
 		case "k":
@@ -251,16 +248,16 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate unhandled keys to the active list for navigation (up/down arrows, etc.)
-    var cmd tea.Cmd
-    switch m.screen {
-    case screenPolicyRules:
-        m.ruleList, cmd = m.ruleList.Update(msg)
-    case screenTrustGlobalRules:
-        m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-    case screenTrustRootPrincipals:
-        m.rootPrincipalList, cmd = m.rootPrincipalList.Update(msg)
-    }
-    return m, cmd
+	var cmd tea.Cmd
+	switch m.screen {
+	case screenPolicyRules:
+		m.ruleList, cmd = m.ruleList.Update(msg)
+	case screenTrustGlobalRules:
+		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
+	case screenTrustRootPrincipals:
+		m.rootPrincipalList, cmd = m.rootPrincipalList.Update(msg)
+	}
+	return m, cmd
 }
 
 // handleDeleteConfirm handles the delete confirmation overlay.

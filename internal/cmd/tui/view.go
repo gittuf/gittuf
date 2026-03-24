@@ -120,11 +120,11 @@ func screenTrustRootPrincipalsHelp(readOnly bool) string {
 }
 
 // renderDeleteOverlay renders the delete confirmation prompt.
-func renderDeleteOverlay(target string) string {
+func renderDeleteOverlay(subject, target string) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF0000")).
 		Bold(true).
-		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+		Render(fmt.Sprintf("Delete %s %q? [y/n]", subject, target))
 }
 
 // View renders the TUI.
@@ -139,7 +139,7 @@ func (m model) View() string {
 	case screenPolicyRules:
 		overlay := ""
 		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+			overlay = "\n" + renderDeleteOverlay("Rule", m.deleteTarget) + "\n"
 		}
 		hint := ""
 		if !m.readOnly {
@@ -153,7 +153,7 @@ func (m model) View() string {
 	case screenTrustGlobalRules:
 		overlay := ""
 		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+			overlay = "\n" + renderDeleteOverlay("Global Rule", m.deleteTarget) + "\n"
 		}
 		hint := ""
 		if !m.readOnly {
@@ -175,11 +175,14 @@ func (m model) View() string {
 	case screenTrustRootPrincipals:
 		overlay := ""
 		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+			overlay = "\n" + renderDeleteOverlay("Root Principal", m.deleteTarget) + "\n"
 		}
-		hint := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-			"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
-		)
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
+			)
+		}
 		return m.renderListScreen(m.rootPrincipalList,
 			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
 		)

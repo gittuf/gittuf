@@ -326,3 +326,55 @@ func TestListPrincipals(t *testing.T) {
 		assert.Nil(t, principals)
 	})
 }
+
+func TestListRootPrincipals(t *testing.T) {
+	t.Run("principal trusted for root and policy roles", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		rootKey := tufv02.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		targetsKey := tufv02.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+		principals, err := repo.ListRootPrincipals(testCtx, policy.PolicyRef)
+		assert.Nil(t, err)
+
+		rootPrincipalWithRoles, has := principals[rootKey.KeyID]
+		assert.True(t, has)
+		assert.True(t, rootPrincipalWithRoles.IsRoot)
+		assert.False(t, rootPrincipalWithRoles.IsPrimaryRuleFileRole)
+
+		targetsPrincipalWithRoles, has := principals[targetsKey.KeyID]
+		assert.True(t, has)
+		assert.False(t, targetsPrincipalWithRoles.IsRoot)
+		assert.True(t, targetsPrincipalWithRoles.IsPrimaryRuleFileRole)
+	})
+
+	t.Run("principal present but trusted for neither root nor policy roles", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedKeyBytes)
+		assert.Nil(t, err)
+		appKey := tufv02.NewKeyFromSSLibKey(gpgKeyR)
+
+		err = repo.AddGitHubApp(testCtx, rootSigner, "github-app", appKey, false)
+		assert.Nil(t, err)
+
+		principals, err := repo.ListRootPrincipals(testCtx, policy.PolicyStagingRef)
+		assert.Nil(t, err)
+
+		principalWithRoles, has := principals[appKey.KeyID]
+		assert.True(t, has)
+		assert.False(t, principalWithRoles.IsRoot)
+		assert.False(t, principalWithRoles.IsPrimaryRuleFileRole)
+	})
+
+	t.Run("returns error when root metadata cannot be loaded", func(t *testing.T) {
+		repo := createTestRepositoryWithRoot(t, "")
+
+		principals, err := repo.ListRootPrincipals(testCtx, "does-not-exist")
+		assert.Error(t, err)
+		assert.Nil(t, principals)
+	})
+}
