@@ -167,15 +167,15 @@ func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	currPrincipals := make([]rootPrincipal, len(principalsWithRoles))
+	currPrincipals := make([]rootPrincipal, 0, len(principalsWithRoles))
 	for _, id := range ids {
-		principalsWithRoles := principalsWithRoles[id]
+		principalWithRoles := principalsWithRoles[id]
 
 		roles := []string{}
-		if principalsWithRoles.IsRoot {
+		if principalWithRoles.IsRoot {
 			roles = append(roles, "root")
 		}
-		if principalsWithRoles.IsPrimaryRuleFileRole {
+		if principalWithRoles.IsPrimaryRuleFileRole {
 			roles = append(roles, "policy")
 		}
 		if len(roles) == 0 {
@@ -184,7 +184,7 @@ func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
 		currPrincipals = append(currPrincipals, rootPrincipal{
 			principalID: id,
 			roles:       strings.Join(roles, ", "),
-			keyCount:    len(principalsWithRoles.Principal.Keys()),
+			keyCount:    len(principalWithRoles.Principal.Keys()),
 		})
 	}
 	return currPrincipals

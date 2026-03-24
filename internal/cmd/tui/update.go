@@ -171,7 +171,8 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 m.initGlobalRuleInputs()
                 m.screen = screenTrustAddGlobalRule
             case screenTrustRootPrincipals:
-                m.footer = "Root principal actions will be implemented in step 4."
+                m.initRootPrincipalInputs()
+				m.screen = screenTrustAddRootPrincipal
             }
             return m, nil
 
@@ -199,8 +200,15 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                     }
                 }
             case screenTrustRootPrincipals:
-                m.footer = "Root principal actions will be implemented in step 4."
-                return m, nil
+               if sel, ok := m.rootPrincipalList.SelectedItem().(item); ok {
+					for _, rp := range m.rootPrincipals {
+						if rp.principalID == sel.title {
+							m.initRootPrincipalInputsPrefilled(rp)
+							m.screen = screenTrustEditRootPrincipal
+							return m, nil
+						}
+					}
+				}
             }
 
         // delete rule
@@ -218,9 +226,14 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                     m.deleteTarget = sel.title
                     return m, nil
                 }
-            case screenTrustRootPrincipals:
-                m.footer = "Root principal actions will be implemented in step 4."
-                return m, nil
+            case screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
+				if msg.String() == "enter" {
+					return m.handleRootPrincipalFormSubmit()
+				}
+				if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
+					m.cycleFocus(msg.String())
+					return m, nil
+				}
             }
 
 		// reorder up
@@ -268,6 +281,28 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 				m.footer = "Global rule removed!"
 				m.refreshGlobalRules()
 			}
+		case screenTrustRootPrincipals:
+			var selected *rootPrincipal
+			for i := range m.rootPrincipals {
+				if m.rootPrincipals[i].principalID == m.deleteTarget {
+					selected = &m.rootPrincipals[i]
+					break
+				}
+			}
+			if selected == nil {
+				m.errorMsg = "Error removing root principal: not found"
+				break
+			}
+		
+			for _, role := range splitAndTrim(selected.roles) {
+				if err := repoRemoveRootPrincipal(m.ctx, m.options, role, selected.principalID); err != nil {
+					m.errorMsg = fmt.Sprintf("Error removing root principal: %v", err)
+					return m, nil
+				}
+			}
+		
+			m.footer = "Root principal removed!"
+			m.refreshRootPrincipals()
 		}
 	}
 	m.confirmDelete = false
@@ -383,6 +418,44 @@ func (m model) handleReorderDown() (tea.Model, tea.Cmd) {
 		m.footer = "Rules reordered successfully!"
 	}
 	return m, nil
+}
+
+// handleRootPrincipalFormSubmit handles enter on root principal add/edit form screens.
+func (m model) handleRootPrincipalFormSubmit() (tea.Model, tea.Cmd) {
+    if m.focusIndex < len(m.inputs)-1 {
+        m.cycleFocus("tab")
+        return m, nil
+    }
+
+    var err error
+    switch m.screen {
+    case screenTrustAddRootPrincipal:
+        role := m.inputs[0].Value()
+        source := m.inputs[1].Value()
+        err = repoAddRootPrincipal(m.ctx, m.options, role, source)
+    case screenTrustEditRootPrincipal:
+        oldID := m.inputs[0].Value()
+        role := m.inputs[1].Value()
+        newSource := m.inputs[2].Value()
+
+        if err = repoRemoveRootPrincipal(m.ctx, m.options, role, oldID); err == nil {
+            err = repoAddRootPrincipal(m.ctx, m.options, role, newSource)
+        }
+    }
+
+    if err != nil {
+        m.errorMsg = fmt.Sprintf("Error: %v", err)
+        return m, nil
+    }
+
+    m.refreshRootPrincipals()
+    if m.screen == screenTrustAddRootPrincipal {
+        m.footer = "Root principal added!"
+    } else {
+        m.footer = "Root principal updated!"
+    }
+    m.screen = screenTrustRootPrincipals
+    return m, nil
 }
 
 // cycleFocus moves focus (the cursor) between input fields in form screens.

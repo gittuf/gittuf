@@ -282,3 +282,28 @@ func (m *model) updateGlobalRuleList() {
 	}
 	m.globalRuleList.SetItems(items)
 }
+
+func (m *model) initRootPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"root or policy", "Role:"},
+		{"Path/gpg/fulcio principal (e.g. key.pub, gpg:<fingerprint>)", "Principal Source:"},
+	})
+	m.inputs[1].CharLimit = 256
+	m.focusIndex = 0
+}
+
+func (m *model) initRootPrincipalInputsPrefilled(rp rootPrincipal) {
+    m.inputs = initInputs([]inputField{
+        {"Existing principal ID", "Existing Principal ID:"},
+        {"root or policy", "Role:"},
+        {"New principal source", "New Principal Source:"},
+    })
+    m.inputs[0].SetValue(rp.principalID)
+
+    roles := splitAndTrim(rp.roles)
+    if len(roles) > 0 {
+        m.inputs[1].SetValue(roles[0])
+    }
+    m.inputs[2].CharLimit = 256
+    m.focusIndex = 0
+}
