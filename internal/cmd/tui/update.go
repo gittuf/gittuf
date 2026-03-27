@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -18,6 +19,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case initDoneMsg:
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("Initialization failed: %v", msg.err)
+			// Stay on the loading screen so the error is visible; user can press q to quit.
+			return m, nil
+		}
+		m.repo = msg.repo
+		m.signer = msg.signer
+		m.rules = msg.rules
+		m.globalRules = msg.globalRules
+		m.readOnly = msg.readOnly
+		m.footer = msg.footer
+		m.updateRuleList()
+		m.updateGlobalRuleList()
+		m.screen = screenChoice
+		return m, nil
+
+	case spinner.TickMsg:
+		if m.screen == screenLoading {
+			m.spinner, cmd = m.spinner.Update(msg)
+			return m, cmd
+		}
+
 	case tea.WindowSizeMsg:
 		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 		m.choiceList.SetSize(msg.Width-h, msg.Height-v)

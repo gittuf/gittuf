@@ -63,13 +63,10 @@ func New(persistent *persistent.Options) *cobra.Command {
 
 // startTUI intitializes a new model for the TUI
 func startTUI(ctx context.Context, o *options) error {
-	m, err := initialModel(ctx, o)
-	if err != nil {
-		return err
-	}
+	m := initialModel(ctx, o)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	_, err = p.Run()
+	_, err := p.Run()
 
 	return err
 }
