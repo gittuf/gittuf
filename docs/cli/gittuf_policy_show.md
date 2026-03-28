@@ -1,20 +1,21 @@
-## gittuf trust list-global-rules
+## gittuf policy show
 
-List global rules for the current state
+Show policy metadata
 
 ### Synopsis
 
-This command allows users to list the currently defined global rules for the root of trust. The output is sorted by global rule type.
+This command displays gittuf's policy metadata for the specified policy file.
 
 ```
-gittuf trust list-global-rules [flags]
+gittuf policy show [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                help for list-global-rules
-      --target-ref string   specify which policy ref should be inspected (default "policy")
+  -h, --help                 help for show
+      --policy-name string   specify rule file to list principals for (default "targets")
+      --target-ref string    specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands
@@ -31,5 +32,5 @@ gittuf trust list-global-rules [flags]
 
 ### SEE ALSO
 
-* [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
+* [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 
