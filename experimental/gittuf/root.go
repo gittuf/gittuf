@@ -1387,6 +1387,65 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.Ro
 	return rootMetadata, nil
 }
 
+// ListRootPrincipals returns the principals trusted for root operations.
+func (r *Repository) ListRootPrincipals(ctx context.Context, targetRef string) (map[string]tuf.Principal, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, err
+	}
+
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	principals := make(map[string]tuf.Principal, len(rootPrincipals))
+	for _, principal := range rootPrincipals {
+		principals[principal.ID()] = principal
+	}
+
+	return principals, nil
+}
+
+// ListPrimaryRuleFilePrincipals returns the principals trusted for the primary
+// rule file operations.
+func (r *Repository) ListPrimaryRuleFilePrincipals(ctx context.Context, targetRef string) (map[string]tuf.Principal, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, err
+	}
+
+	primaryRuleFilePrincipals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		return nil, err
+	}
+
+	principals := make(map[string]tuf.Principal, len(primaryRuleFilePrincipals))
+	for _, principal := range primaryRuleFilePrincipals {
+		principals[principal.ID()] = principal
+	}
+
+	return principals, nil
+}
+
 func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, createRSLEntry, signCommit bool) error {
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {

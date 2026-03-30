@@ -197,65 +197,6 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
-// ListRootPrincipals returns the principals trusted for root operations.
-func (r *Repository) ListRootPrincipals(ctx context.Context, targetRef string) (map[string]tuf.Principal, error) {
-	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
-		targetRef = "refs/gittuf/" + targetRef
-	}
-
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
-	if err != nil {
-		return nil, err
-	}
-
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-
-	rootPrincipals, err := rootMetadata.GetRootPrincipals()
-	if err != nil {
-		return nil, err
-	}
-
-	principals := make(map[string]tuf.Principal, len(rootPrincipals))
-	for _, principal := range rootPrincipals {
-		principals[principal.ID()] = principal
-	}
-
-	return principals, nil
-}
-
-// ListPrimaryRuleFilePrincipals returns the principals trusted for the primary
-// rule file operations.
-func (r *Repository) ListPrimaryRuleFilePrincipals(ctx context.Context, targetRef string) (map[string]tuf.Principal, error) {
-	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
-		targetRef = "refs/gittuf/" + targetRef
-	}
-
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
-	if err != nil {
-		return nil, err
-	}
-
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-
-	primaryRuleFilePrincipals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
-	if err != nil {
-		return nil, err
-	}
-
-	principals := make(map[string]tuf.Principal, len(primaryRuleFilePrincipals))
-	for _, principal := range primaryRuleFilePrincipals {
-		principals[principal.ID()] = principal
-	}
-
-	return principals, nil
-}
-
 // ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
 func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
 	if !strings.HasPrefix(targetRef, "refs/gittuf/") {

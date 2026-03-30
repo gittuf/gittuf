@@ -27,7 +27,7 @@ const (
 	screenPolicyAddRule                // Form: add a new policy rule
 	screenPolicyEditRule               // Form: edit selected rule (prefilled)
 	screenTrust                        // Menu for Trust operations
-	screenTrustGlobalRules
+	screenTrustGlobalRules        // Global rule management screen
 	screenTrustRootPrincipals    // Root principal management screen
 	screenTrustAddGlobalRule     // Form: add a new global rule
 	screenTrustEditGlobalRule    // Form: edit selected global rule (prefilled)
