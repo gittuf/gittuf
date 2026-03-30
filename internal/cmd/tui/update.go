@@ -141,16 +141,16 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.refreshRules()
 		}
 	case screenTrust:
-        if i, ok := m.trustScreenList.SelectedItem().(item); ok {
-            switch i.title {
-            case "View Global Rules":
-                m.screen = screenTrustGlobalRules
-                m.refreshGlobalRules()
-            case "View Root Principals":
-                m.screen = screenTrustRootPrincipals
-                m.refreshRootPrincipals()
-            }
-        }
+		if i, ok := m.trustScreenList.SelectedItem().(item); ok {
+			switch i.title {
+			case "View Global Rules":
+				m.screen = screenTrustGlobalRules
+				m.refreshGlobalRules()
+			case "View Root Principals":
+				m.screen = screenTrustRootPrincipals
+				m.refreshRootPrincipals()
+			}
+		}
 	}
 	return m, nil
 }
@@ -290,14 +290,14 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 				m.errorMsg = "Error removing root principal: not found"
 				break
 			}
-		
+
 			for _, role := range splitAndTrim(selected.roles) {
 				if err := repoRemoveRootPrincipal(m.ctx, m.options, role, selected.principalID); err != nil {
 					m.errorMsg = fmt.Sprintf("Error removing root principal: %v", err)
 					return m, nil
 				}
 			}
-		
+
 			m.footer = "Root principal removed!"
 			m.refreshRootPrincipals()
 		}
@@ -419,40 +419,40 @@ func (m model) handleReorderDown() (tea.Model, tea.Cmd) {
 
 // handleRootPrincipalFormSubmit handles enter on root principal add/edit form screens.
 func (m model) handleRootPrincipalFormSubmit() (tea.Model, tea.Cmd) {
-    if m.focusIndex < len(m.inputs)-1 {
-        m.cycleFocus("tab")
-        return m, nil
-    }
+	if m.focusIndex < len(m.inputs)-1 {
+		m.cycleFocus("tab")
+		return m, nil
+	}
 
-    var err error
-    switch m.screen {
-    case screenTrustAddRootPrincipal:
-        role := m.inputs[0].Value()
-        source := m.inputs[1].Value()
-        err = repoAddRootPrincipal(m.ctx, m.options, role, source)
-    case screenTrustEditRootPrincipal:
-        oldID := m.inputs[0].Value()
-        role := m.inputs[1].Value()
-        newSource := m.inputs[2].Value()
+	var err error
+	switch m.screen {
+	case screenTrustAddRootPrincipal:
+		role := m.inputs[0].Value()
+		source := m.inputs[1].Value()
+		err = repoAddRootPrincipal(m.ctx, m.options, role, source)
+	case screenTrustEditRootPrincipal:
+		oldID := m.inputs[0].Value()
+		role := m.inputs[1].Value()
+		newSource := m.inputs[2].Value()
 
-        if err = repoRemoveRootPrincipal(m.ctx, m.options, role, oldID); err == nil {
-            err = repoAddRootPrincipal(m.ctx, m.options, role, newSource)
-        }
-    }
+		if err = repoRemoveRootPrincipal(m.ctx, m.options, role, oldID); err == nil {
+			err = repoAddRootPrincipal(m.ctx, m.options, role, newSource)
+		}
+	}
 
-    if err != nil {
-        m.errorMsg = fmt.Sprintf("Error: %v", err)
-        return m, nil
-    }
+	if err != nil {
+		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		return m, nil
+	}
 
-    m.refreshRootPrincipals()
-    if m.screen == screenTrustAddRootPrincipal {
-        m.footer = "Root principal added!"
-    } else {
-        m.footer = "Root principal updated!"
-    }
-    m.screen = screenTrustRootPrincipals
-    return m, nil
+	m.refreshRootPrincipals()
+	if m.screen == screenTrustAddRootPrincipal {
+		m.footer = "Root principal added!"
+	} else {
+		m.footer = "Root principal updated!"
+	}
+	m.screen = screenTrustRootPrincipals
+	return m, nil
 }
 
 // cycleFocus moves focus (the cursor) between input fields in form screens.

@@ -187,9 +187,9 @@ func (m model) View() string {
 			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
 		)
 	case screenTrustAddRootPrincipal:
-    	return m.renderFormScreen("Add Root Principal")
+		return m.renderFormScreen("Add Root Principal")
 	case screenTrustEditRootPrincipal:
-    	return m.renderFormScreen("Edit Root Principal")
+		return m.renderFormScreen("Edit Root Principal")
 	default:
 		return "Unknown screen"
 	}

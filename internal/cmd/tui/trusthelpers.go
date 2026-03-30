@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -23,8 +23,8 @@ type globalRule struct {
 
 type rootPrincipal struct {
 	principalID string
-	roles 	    string
-	keyCount	int
+	roles       string
+	keyCount    int
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
@@ -243,4 +243,4 @@ func repoRemoveRootPrincipal(ctx context.Context, o *options, role, principalID 
 	default:
 		return fmt.Errorf("unknown role %q (expected 'root' or 'policy')", role)
 	}
-} 
+}

@@ -21,18 +21,18 @@ import (
 type screen int
 
 const (
-	screenChoice              screen = iota // Initial menu
-	screenPolicy                            // Menu for Policy operations
-	screenPolicyRules                       // Rule management screen
-	screenPolicyAddRule                     // Form: add a new policy rule
-	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
-	screenTrust                             // Menu for Trust operations
+	screenChoice         screen = iota // Initial menu
+	screenPolicy                       // Menu for Policy operations
+	screenPolicyRules                  // Rule management screen
+	screenPolicyAddRule                // Form: add a new policy rule
+	screenPolicyEditRule               // Form: edit selected rule (prefilled)
+	screenTrust                        // Menu for Trust operations
 	screenTrustGlobalRules
-	screenTrustRootPrincipals               // Root principal management screen
-	screenTrustAddGlobalRule                // Form: add a new global rule
-	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
-	screenTrustAddRootPrincipal             // Form: add a new root principal
-	screenTrustEditRootPrincipal            // Form: edit selected root principal (prefilled)
+	screenTrustRootPrincipals    // Root principal management screen
+	screenTrustAddGlobalRule     // Form: add a new global rule
+	screenTrustEditGlobalRule    // Form: edit selected global rule (prefilled)
+	screenTrustAddRootPrincipal  // Form: add a new root principal
+	screenTrustEditRootPrincipal // Form: edit selected root principal (prefilled)
 )
 
 type item struct {
@@ -50,29 +50,29 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx              context.Context
-	screen           screen
-	choiceList       list.Model
-	policyScreenList list.Model
-	trustScreenList  list.Model
-	rules            []rule
-	ruleList         list.Model
-	globalRules      []globalRule
-	globalRuleList   list.Model
-	rootPrincipals   []rootPrincipal
+	ctx               context.Context
+	screen            screen
+	choiceList        list.Model
+	policyScreenList  list.Model
+	trustScreenList   list.Model
+	rules             []rule
+	ruleList          list.Model
+	globalRules       []globalRule
+	globalRuleList    list.Model
+	rootPrincipals    []rootPrincipal
 	rootPrincipalList list.Model
-	inputs           []textinput.Model
-	focusIndex       int
-	cursorMode       cursor.Mode
-	repo             *gittuf.Repository
-	signer           dsse.SignerVerifier
-	policyName       string
-	options          *options
-	footer           string
-	errorMsg         string
-	readOnly         bool
-	confirmDelete    bool
-	deleteTarget     string
+	inputs            []textinput.Model
+	focusIndex        int
+	cursorMode        cursor.Mode
+	repo              *gittuf.Repository
+	signer            dsse.SignerVerifier
+	policyName        string
+	options           *options
+	footer            string
+	errorMsg          string
+	readOnly          bool
+	confirmDelete     bool
+	deleteTarget      string
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -152,18 +152,18 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 	delegate := newDelegate()
 
 	m := model{
-		ctx:         ctx,
-		screen:      screenChoice,
-		cursorMode:  cursor.CursorBlink,
-		repo:        repo,
-		signer:      signer,
-		policyName:  o.policyName,
-		rules:       getCurrRules(ctx, o),
-		globalRules: getGlobalRules(ctx, o),
+		ctx:            ctx,
+		screen:         screenChoice,
+		cursorMode:     cursor.CursorBlink,
+		repo:           repo,
+		signer:         signer,
+		policyName:     o.policyName,
+		rules:          getCurrRules(ctx, o),
+		globalRules:    getGlobalRules(ctx, o),
 		rootPrincipals: getRootPrincipals(ctx, o),
-		options:     o,
-		readOnly:    readOnly,
-		footer:      footer,
+		options:        o,
+		readOnly:       readOnly,
+		footer:         footer,
 
 		choiceList: newMenuList("gittuf TUI", []list.Item{
 			item{title: "Policy", desc: "View and manage gittuf Policy"},
@@ -176,8 +176,8 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 			item{title: "View Root Principals", desc: "View and manage root principals and keys"},
 		}, delegate),
-		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
-		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		ruleList:          newMenuList("Policy Rules", []list.Item{}, delegate),
+		globalRuleList:    newMenuList("Global Rules", []list.Item{}, delegate),
 		rootPrincipalList: newMenuList("Root Principals", []list.Item{}, delegate),
 	}
 
@@ -293,17 +293,17 @@ func (m *model) initRootPrincipalInputs() {
 }
 
 func (m *model) initRootPrincipalInputsPrefilled(rp rootPrincipal) {
-    m.inputs = initInputs([]inputField{
-        {"Existing principal ID", "Existing Principal ID:"},
-        {"root or policy", "Role:"},
-        {"New principal source", "New Principal Source:"},
-    })
-    m.inputs[0].SetValue(rp.principalID)
+	m.inputs = initInputs([]inputField{
+		{"Existing principal ID", "Existing Principal ID:"},
+		{"root or policy", "Role:"},
+		{"New principal source", "New Principal Source:"},
+	})
+	m.inputs[0].SetValue(rp.principalID)
 
-    roles := splitAndTrim(rp.roles)
-    if len(roles) > 0 {
-        m.inputs[1].SetValue(roles[0])
-    }
-    m.inputs[2].CharLimit = 256
-    m.focusIndex = 0
+	roles := splitAndTrim(rp.roles)
+	if len(roles) > 0 {
+		m.inputs[1].SetValue(roles[0])
+	}
+	m.inputs[2].CharLimit = 256
+	m.focusIndex = 0
 }
