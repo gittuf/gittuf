@@ -2,6 +2,10 @@
 
 Version of gittuf
 
+### Synopsis
+
+The 'version' command displays the current version of gittuf.
+
 ```
 gittuf version [flags]
 ```

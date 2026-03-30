@@ -29,6 +29,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "log",
 		Short:             "Display the repository's Reference State Log",
+		Long:              "The 'log' command displays the repository's RSL. It is used to view the history of reference state changes and inspect prior entries in the RSL.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

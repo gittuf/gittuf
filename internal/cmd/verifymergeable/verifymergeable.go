@@ -60,6 +60,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "verify-mergeable",
 		Short:             "Tools for verifying mergeability using gittuf policies",
+		Long:              "The 'verify-mergeable' command evaluates whether a feature branch can be merged into a base branch under the repository's gittuf policies. It is used to check policy compliance for a proposed merge by comparing the specified base and feature branches, optionally bypassing the RSL when determining the current state.",
 		Args:              cobra.ExactArgs(0),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

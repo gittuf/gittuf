@@ -77,6 +77,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-network-repository",
 		Short:             `Add a network repository`,
+		Long:              "The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to add and configure a network repository, including its name, location, and initial root principals.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

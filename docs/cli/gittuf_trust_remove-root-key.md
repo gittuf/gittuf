@@ -2,6 +2,10 @@
 
 Remove Root key from gittuf root of trust
 
+### Synopsis
+
+The 'remove-root-key' command removes a root key from the repository's root of trust. It is used to revoke trust for an existing root key, identified by its ID.
+
 ```
 gittuf trust remove-root-key [flags]
 ```

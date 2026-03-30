@@ -34,6 +34,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "version",
 		Short:             "Version of gittuf",
+		Long:              "The 'version' command displays the current version of gittuf.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

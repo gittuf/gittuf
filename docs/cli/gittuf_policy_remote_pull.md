@@ -2,6 +2,10 @@
 
 Pull policy from the specified remote
 
+### Synopsis
+
+The 'pull' command retrieves policy updates from the specified remote and applies them to the local repository.
+
 ```
 gittuf policy remote pull <remote> [flags]
 ```

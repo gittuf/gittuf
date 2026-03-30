@@ -26,6 +26,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "discard",
 		Short:             "Discard the currently staged changes to policy",
+		Long:              "The 'discard' command removes any currently staged policy changes. It is used to revert pending policy updates before they are applied to the repository.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

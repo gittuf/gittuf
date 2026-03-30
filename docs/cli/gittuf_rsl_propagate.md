@@ -2,6 +2,10 @@
 
 Propagate contents of remote repositories into local repository
 
+### Synopsis
+
+The 'propagate' command propagates RSL contents from remote repositories defined in propagation directives into the local repository. It is used to record a snapshot of the propagated RSL and repository contents locally.
+
 ```
 gittuf rsl propagate [flags]
 ```
