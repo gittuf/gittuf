@@ -29,6 +29,10 @@ type RootMetadata struct {
 	Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
 	MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
 	Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
+	
+	// UnrecognizedFields stores any fields not recognized by this client version
+	// This ensures forward compatibility when new fields are added to the metadata
+	UnrecognizedFields map[string]json.RawMessage `json:"-"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -340,6 +344,44 @@ func (r *RootMetadata) GetGitHubAppPrincipals(appName string) ([]tuf.Principal, 
 }
 
 func (r *RootMetadata) UnmarshalJSON(data []byte) error {
+	// First, unmarshal into a generic map to detect all fields
+	var rawData map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawData); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	// Define known fields for this version
+	knownFields := map[string]bool{
+		"type":               true,
+		"schemaVersion":      true,
+		"expires":            true,
+		"repositoryLocation": true,
+		"principals":         true,
+		"roles":              true,
+		"githubApps":         true,
+		"globalRules":        true,
+		"propagations":       true,
+		"multiRepository":    true,
+		"hooks":              true,
+	}
+
+	// Identify unrecognized fields
+	r.UnrecognizedFields = make(map[string]json.RawMessage)
+	var unrecognizedFieldNames []string
+	for fieldName, fieldValue := range rawData {
+		if !knownFields[fieldName] {
+			r.UnrecognizedFields[fieldName] = fieldValue
+			unrecognizedFieldNames = append(unrecognizedFieldNames, fieldName)
+		}
+	}
+
+	// Warn about unrecognized fields
+	if len(unrecognizedFieldNames) > 0 {
+		fmt.Printf("Warning: Found unrecognized fields in root metadata: %v\n", unrecognizedFieldNames)
+		fmt.Printf("These fields will be preserved but may indicate this client version cannot perform all verification steps.\n")
+		fmt.Printf("Consider updating to a newer gittuf version.\n")
+	}
+
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage in place of tuf interfaces
 	type tempType struct {
@@ -445,6 +487,63 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	r.Hooks = temp.Hooks
 
 	return nil
+}
+
+// MarshalJSON implements custom JSON marshaling to preserve unrecognized fields
+func (r *RootMetadata) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct with all known fields
+	type tempType struct {
+		Type               string                     `json:"type"`
+		Version            string                     `json:"schemaVersion"`
+		Expires            string                     `json:"expires"`
+		RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
+		Principals         map[string]tuf.Principal   `json:"principals"`
+		Roles              map[string]Role            `json:"roles"`
+		GitHubApps         map[string]*GitHubApp      `json:"githubApps,omitempty"`
+		GlobalRules        []tuf.GlobalRule           `json:"globalRules,omitempty"`
+		Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
+		MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
+		Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
+	}
+
+	// Marshal the known fields
+	temp := &tempType{
+		Type:               r.Type,
+		Version:            r.Version,
+		Expires:            r.Expires,
+		RepositoryLocation: r.RepositoryLocation,
+		Principals:         r.Principals,
+		Roles:              r.Roles,
+		GitHubApps:         r.GitHubApps,
+		GlobalRules:        r.GlobalRules,
+		Propagations:       r.Propagations,
+		MultiRepository:    r.MultiRepository,
+		Hooks:              r.Hooks,
+	}
+
+	knownData, err := json.Marshal(temp)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal known fields: %w", err)
+	}
+
+	// If there are no unrecognized fields, return the known data
+	if len(r.UnrecognizedFields) == 0 {
+		return knownData, nil
+	}
+
+	// Merge known fields with unrecognized fields
+	var knownMap map[string]json.RawMessage
+	if err := json.Unmarshal(knownData, &knownMap); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal known data: %w", err)
+	}
+
+	// Add unrecognized fields
+	for fieldName, fieldValue := range r.UnrecognizedFields {
+		knownMap[fieldName] = fieldValue
+	}
+
+	// Marshal the combined data
+	return json.Marshal(knownMap)
 }
 
 // AddGlobalRule adds a new global rule to RootMetadata.

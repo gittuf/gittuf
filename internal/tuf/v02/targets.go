@@ -27,6 +27,10 @@ type TargetsMetadata struct {
 	Expires     string         `json:"expires"`
 	Targets     map[string]any `json:"targets"`
 	Delegations *Delegations   `json:"delegations"`
+	
+	// UnrecognizedFields stores any fields not recognized by this client version
+	// This ensures forward compatibility when new fields are added to the metadata
+	UnrecognizedFields map[string]json.RawMessage `json:"-"`
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
@@ -42,6 +46,108 @@ func NewTargetsMetadata() *TargetsMetadata {
 // in.
 func (t *TargetsMetadata) SetExpires(expires string) {
 	t.Expires = expires
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling to handle unrecognized fields
+func (t *TargetsMetadata) UnmarshalJSON(data []byte) error {
+	// First, unmarshal into a generic map to detect all fields
+	var rawData map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawData); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	// Define known fields for this version
+	knownFields := map[string]bool{
+		"type":          true,
+		"schemaVersion": true,
+		"expires":       true,
+		"targets":       true,
+		"delegations":   true,
+	}
+
+	// Identify unrecognized fields
+	t.UnrecognizedFields = make(map[string]json.RawMessage)
+	var unrecognizedFieldNames []string
+	for fieldName, fieldValue := range rawData {
+		if !knownFields[fieldName] {
+			t.UnrecognizedFields[fieldName] = fieldValue
+			unrecognizedFieldNames = append(unrecognizedFieldNames, fieldName)
+		}
+	}
+
+	// Warn about unrecognized fields
+	if len(unrecognizedFieldNames) > 0 {
+		fmt.Printf("Warning: Found unrecognized fields in targets metadata: %v\n", unrecognizedFieldNames)
+		fmt.Printf("These fields will be preserved but may indicate this client version cannot perform all verification steps.\n")
+		fmt.Printf("Consider updating to a newer gittuf version.\n")
+	}
+
+	// Use a temporary struct for standard unmarshaling
+	type tempType struct {
+		Type        string         `json:"type"`
+		Version     string         `json:"schemaVersion"`
+		Expires     string         `json:"expires"`
+		Targets     map[string]any `json:"targets"`
+		Delegations *Delegations   `json:"delegations"`
+	}
+
+	temp := &tempType{}
+	if err := json.Unmarshal(data, temp); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	t.Type = temp.Type
+	t.Version = temp.Version
+	t.Expires = temp.Expires
+	t.Targets = temp.Targets
+	t.Delegations = temp.Delegations
+
+	return nil
+}
+
+// MarshalJSON implements custom JSON marshaling to preserve unrecognized fields
+func (t *TargetsMetadata) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct with all known fields
+	type tempType struct {
+		Type        string         `json:"type"`
+		Version     string         `json:"schemaVersion"`
+		Expires     string         `json:"expires"`
+		Targets     map[string]any `json:"targets"`
+		Delegations *Delegations   `json:"delegations"`
+	}
+
+	// Marshal the known fields
+	temp := &tempType{
+		Type:        t.Type,
+		Version:     t.Version,
+		Expires:     t.Expires,
+		Targets:     t.Targets,
+		Delegations: t.Delegations,
+	}
+
+	knownData, err := json.Marshal(temp)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal known fields: %w", err)
+	}
+
+	// If there are no unrecognized fields, return the known data
+	if len(t.UnrecognizedFields) == 0 {
+		return knownData, nil
+	}
+
+	// Merge known fields with unrecognized fields
+	var knownMap map[string]json.RawMessage
+	if err := json.Unmarshal(knownData, &knownMap); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal known data: %w", err)
+	}
+
+	// Add unrecognized fields
+	for fieldName, fieldValue := range t.UnrecognizedFields {
+		knownMap[fieldName] = fieldValue
+	}
+
+	// Marshal the combined data
+	return json.Marshal(knownMap)
 }
 
 // SchemaVersion returns the metadata schema version.
@@ -251,9 +357,42 @@ func (t *TargetsMetadata) RemovePrincipal(principalID string) error {
 type Delegations struct {
 	Principals map[string]tuf.Principal `json:"principals"`
 	Roles      []*Delegation            `json:"roles"`
+	
+	// UnrecognizedFields stores any fields not recognized by this client version
+	// This ensures forward compatibility when new fields are added to the metadata
+	UnrecognizedFields map[string]json.RawMessage `json:"-"`
 }
 
 func (d *Delegations) UnmarshalJSON(data []byte) error {
+	// First, unmarshal into a generic map to detect all fields
+	var rawData map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawData); err != nil {
+		return fmt.Errorf("unable to unmarshal json: %w", err)
+	}
+
+	// Define known fields for this version
+	knownFields := map[string]bool{
+		"principals": true,
+		"roles":      true,
+	}
+
+	// Identify unrecognized fields
+	d.UnrecognizedFields = make(map[string]json.RawMessage)
+	var unrecognizedFieldNames []string
+	for fieldName, fieldValue := range rawData {
+		if !knownFields[fieldName] {
+			d.UnrecognizedFields[fieldName] = fieldValue
+			unrecognizedFieldNames = append(unrecognizedFieldNames, fieldName)
+		}
+	}
+
+	// Warn about unrecognized fields
+	if len(unrecognizedFieldNames) > 0 {
+		fmt.Printf("Warning: Found unrecognized fields in delegations metadata: %v\n", unrecognizedFieldNames)
+		fmt.Printf("These fields will be preserved but may indicate this client version cannot perform all verification steps.\n")
+		fmt.Printf("Consider updating to a newer gittuf version.\n")
+	}
+
 	// this type _has_ to be a copy of Delegations, minus the use of
 	// json.RawMessage in place of tuf.Principal
 	type tempType struct {
@@ -301,6 +440,45 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 	d.Roles = temp.Roles
 
 	return nil
+}
+
+// MarshalJSON implements custom JSON marshaling to preserve unrecognized fields
+func (d *Delegations) MarshalJSON() ([]byte, error) {
+	// Create a temporary struct with all known fields
+	type tempType struct {
+		Principals map[string]tuf.Principal `json:"principals"`
+		Roles      []*Delegation            `json:"roles"`
+	}
+
+	// Marshal the known fields
+	temp := &tempType{
+		Principals: d.Principals,
+		Roles:      d.Roles,
+	}
+
+	knownData, err := json.Marshal(temp)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal known fields: %w", err)
+	}
+
+	// If there are no unrecognized fields, return the known data
+	if len(d.UnrecognizedFields) == 0 {
+		return knownData, nil
+	}
+
+	// Merge known fields with unrecognized fields
+	var knownMap map[string]json.RawMessage
+	if err := json.Unmarshal(knownData, &knownMap); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal known data: %w", err)
+	}
+
+	// Add unrecognized fields
+	for fieldName, fieldValue := range d.UnrecognizedFields {
+		knownMap[fieldName] = fieldValue
+	}
+
+	// Marshal the combined data
+	return json.Marshal(knownMap)
 }
 
 // addPrincipal adds a delegations key or person.  v02 supports Key and Person
