@@ -41,7 +41,21 @@ const (
 type item struct {
 	title, desc string
 }
+func (m *model) initRootPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"SSH key path / GPG fingerprint / Fulcio ID (e.g. key.pub, gpg:<fingerprint>)", "Principal Key:"},
+	})
+	m.inputs[0].CharLimit = 256
+	m.focusIndex = 0
+}
 
+func (m *model) initPrimaryPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"SSH key path / GPG fingerprint / Fulcio ID (e.g. key.pub, gpg:<fingerprint>)", "Principal Key:"},
+	})
+	m.inputs[0].CharLimit = 256
+	m.focusIndex = 0
+}
 // Note: virtual methods must be implemented for the item struct
 // Title returns the title of the item.
 func (i item) Title() string { return i.title }
