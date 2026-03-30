@@ -157,34 +157,42 @@ func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
 		return nil
 	}
 
-	principalsWithRoles, err := repo.ListRootPrincipals(ctx, o.targetRef)
+	rootPrincipals, err := repo.ListRootPrincipals(ctx, o.targetRef)
 	if err != nil {
 		return nil
 	}
 
-	ids := make([]string, 0, len(principalsWithRoles))
-	for id := range principalsWithRoles {
+	primaryRuleFilePrincipals, err := repo.ListPrimaryRuleFilePrincipals(ctx, o.targetRef)
+	if err != nil {
+		return nil
+	}
+
+	principalSets := []map[string]tuf.Principal{rootPrincipals, primaryRuleFilePrincipals}
+	principalsByID := map[string]tuf.Principal{}
+	for _, principals := range principalSets {
+		for id, principal := range principals {
+			principalsByID[id] = principal
+		}
+	}
+
+	ids := make([]string, 0, len(principalsByID))
+	for id := range principalsByID {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	currPrincipals := make([]rootPrincipal, 0, len(principalsWithRoles))
+	currPrincipals := make([]rootPrincipal, 0, len(principalsByID))
 	for _, id := range ids {
-		principalWithRoles := principalsWithRoles[id]
-
 		roles := []string{}
-		if principalWithRoles.IsRoot {
+		if _, has := rootPrincipals[id]; has {
 			roles = append(roles, "root")
 		}
-		if principalWithRoles.IsPrimaryRuleFileRole {
+		if _, has := primaryRuleFilePrincipals[id]; has {
 			roles = append(roles, "policy")
-		}
-		if len(roles) == 0 {
-			roles = append(roles, "unscoped")
 		}
 		currPrincipals = append(currPrincipals, rootPrincipal{
 			principalID: id,
 			roles:       strings.Join(roles, ", "),
-			keyCount:    len(principalWithRoles.Principal.Keys()),
+			keyCount:    len(principalsByID[id].Keys()),
 		})
 	}
 	return currPrincipals
