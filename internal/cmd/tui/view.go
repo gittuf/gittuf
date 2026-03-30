@@ -119,6 +119,17 @@ func screenTrustRootPrincipalsHelp(readOnly bool) string {
 	)
 }
 
+func screenTrustPrimaryPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  e: edit  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
 func renderDeleteOverlay(subject, target string) string {
 	return lipgloss.NewStyle().
@@ -186,10 +197,28 @@ func (m model) View() string {
 		return m.renderListScreen(m.rootPrincipalList,
 			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
 		)
+	case screenTrustPrimaryPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay("Primary Policy Principal", m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
+			)
+		}
+		return m.renderListScreen(m.primaryPrincipalList,
+			overlay+screenTrustPrimaryPrincipalsHelp(m.readOnly)+hint,
+		)
 	case screenTrustAddRootPrincipal:
 		return m.renderFormScreen("Add Root Principal")
 	case screenTrustEditRootPrincipal:
 		return m.renderFormScreen("Edit Root Principal")
+	case screenTrustAddPrimaryPrincipal:
+		return m.renderFormScreen("Add Primary Policy Principal")
+	case screenTrustEditPrimaryPrincipal:
+		return m.renderFormScreen("Edit Primary Policy Principal")
 	default:
 		return "Unknown screen"
 	}

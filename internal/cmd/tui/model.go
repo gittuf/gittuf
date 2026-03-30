@@ -21,18 +21,21 @@ import (
 type screen int
 
 const (
-	screenChoice         screen = iota // Initial menu
-	screenPolicy                       // Menu for Policy operations
-	screenPolicyRules                  // Rule management screen
-	screenPolicyAddRule                // Form: add a new policy rule
-	screenPolicyEditRule               // Form: edit selected rule (prefilled)
-	screenTrust                        // Menu for Trust operations
-	screenTrustGlobalRules        // Global rule management screen
-	screenTrustRootPrincipals    // Root principal management screen
-	screenTrustAddGlobalRule     // Form: add a new global rule
-	screenTrustEditGlobalRule    // Form: edit selected global rule (prefilled)
-	screenTrustAddRootPrincipal  // Form: add a new root principal
-	screenTrustEditRootPrincipal // Form: edit selected root principal (prefilled)
+	screenChoice                    screen = iota // Initial menu
+	screenPolicy                                  // Menu for Policy operations
+	screenPolicyRules                             // Rule management screen
+	screenPolicyAddRule                           // Form: add a new policy rule
+	screenPolicyEditRule                          // Form: edit selected rule (prefilled)
+	screenTrust                                   // Menu for Trust operations
+	screenTrustGlobalRules                        // Global rule management screen
+	screenTrustRootPrincipals                     // Root principal management screen
+	screenTrustPrimaryPrincipals                  // Primary policy principal management screen
+	screenTrustAddGlobalRule                      // Form: add a new global rule
+	screenTrustEditGlobalRule                     // Form: edit selected global rule (prefilled)
+	screenTrustAddRootPrincipal                   // Form: add a new root principal
+	screenTrustEditRootPrincipal                  // Form: edit selected root principal (prefilled)
+	screenTrustAddPrimaryPrincipal                // Form: add a new primary policy principal
+	screenTrustEditPrimaryPrincipal               // Form: edit selected primary policy principal (prefilled)
 )
 
 type item struct {
@@ -50,29 +53,31 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx               context.Context
-	screen            screen
-	choiceList        list.Model
-	policyScreenList  list.Model
-	trustScreenList   list.Model
-	rules             []rule
-	ruleList          list.Model
-	globalRules       []globalRule
-	globalRuleList    list.Model
-	rootPrincipals    []rootPrincipal
-	rootPrincipalList list.Model
-	inputs            []textinput.Model
-	focusIndex        int
-	cursorMode        cursor.Mode
-	repo              *gittuf.Repository
-	signer            dsse.SignerVerifier
-	policyName        string
-	options           *options
-	footer            string
-	errorMsg          string
-	readOnly          bool
-	confirmDelete     bool
-	deleteTarget      string
+	ctx                  context.Context
+	screen               screen
+	choiceList           list.Model
+	policyScreenList     list.Model
+	trustScreenList      list.Model
+	rules                []rule
+	ruleList             list.Model
+	globalRules          []globalRule
+	globalRuleList       list.Model
+	rootPrincipals       []rootPrincipal
+	rootPrincipalList    list.Model
+	primaryPrincipals    []rootPrincipal
+	primaryPrincipalList list.Model
+	inputs               []textinput.Model
+	focusIndex           int
+	cursorMode           cursor.Mode
+	repo                 *gittuf.Repository
+	signer               dsse.SignerVerifier
+	policyName           string
+	options              *options
+	footer               string
+	errorMsg             string
+	readOnly             bool
+	confirmDelete        bool
+	deleteTarget         string
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -152,18 +157,19 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 	delegate := newDelegate()
 
 	m := model{
-		ctx:            ctx,
-		screen:         screenChoice,
-		cursorMode:     cursor.CursorBlink,
-		repo:           repo,
-		signer:         signer,
-		policyName:     o.policyName,
-		rules:          getCurrRules(ctx, o),
-		globalRules:    getGlobalRules(ctx, o),
-		rootPrincipals: getRootPrincipals(ctx, o),
-		options:        o,
-		readOnly:       readOnly,
-		footer:         footer,
+		ctx:               ctx,
+		screen:            screenChoice,
+		cursorMode:        cursor.CursorBlink,
+		repo:              repo,
+		signer:            signer,
+		policyName:        o.policyName,
+		rules:             getCurrRules(ctx, o),
+		globalRules:       getGlobalRules(ctx, o),
+		rootPrincipals:    getRootPrincipals(ctx, o),
+		primaryPrincipals: getPrimaryRuleFilePrincipals(ctx, o),
+		options:           o,
+		readOnly:          readOnly,
+		footer:            footer,
 
 		choiceList: newMenuList("gittuf TUI", []list.Item{
 			item{title: "Policy", desc: "View and manage gittuf Policy"},
@@ -174,11 +180,13 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
-			item{title: "View Root Principals", desc: "View and manage root principals and keys"},
+			item{title: "View Root Principals", desc: "View and manage principals trusted for root metadata operations"},
+			item{title: "View Primary Policy Principals", desc: "View and manage principals trusted for primary policy operations"},
 		}, delegate),
-		ruleList:          newMenuList("Policy Rules", []list.Item{}, delegate),
-		globalRuleList:    newMenuList("Global Rules", []list.Item{}, delegate),
-		rootPrincipalList: newMenuList("Root Principals", []list.Item{}, delegate),
+		ruleList:             newMenuList("Policy Rules", []list.Item{}, delegate),
+		globalRuleList:       newMenuList("Global Rules", []list.Item{}, delegate),
+		rootPrincipalList:    newMenuList("Root Principals", []list.Item{}, delegate),
+		primaryPrincipalList: newMenuList("Primary Policy Principals", []list.Item{}, delegate),
 	}
 
 	return m, nil
@@ -248,13 +256,27 @@ func (m *model) refreshRootPrincipals() {
 	m.updateRootPrincipalList()
 }
 
+func (m *model) refreshPrimaryPrincipals() {
+	m.primaryPrincipals = getPrimaryRuleFilePrincipals(m.ctx, m.options)
+	m.updatePrimaryPrincipalList()
+}
+
 func (m *model) updateRootPrincipalList() {
 	items := make([]list.Item, len(m.rootPrincipals))
 	for i, rp := range m.rootPrincipals {
-		desc := fmt.Sprintf("Roles: %s\nKeys: %d", rp.roles, rp.keyCount)
+		desc := fmt.Sprintf("Keys: %d", rp.keyCount)
 		items[i] = item{title: rp.principalID, desc: desc}
 	}
 	m.rootPrincipalList.SetItems(items)
+}
+
+func (m *model) updatePrimaryPrincipalList() {
+	items := make([]list.Item, len(m.primaryPrincipals))
+	for i, rp := range m.primaryPrincipals {
+		desc := fmt.Sprintf("Keys: %d", rp.keyCount)
+		items[i] = item{title: rp.principalID, desc: desc}
+	}
+	m.primaryPrincipalList.SetItems(items)
 }
 
 // updateRuleList updates the rule list within the TUI.
@@ -285,25 +307,36 @@ func (m *model) updateGlobalRuleList() {
 
 func (m *model) initRootPrincipalInputs() {
 	m.inputs = initInputs([]inputField{
-		{"root or policy", "Role:"},
 		{"Path/gpg/fulcio principal (e.g. key.pub, gpg:<fingerprint>)", "Principal Source:"},
 	})
-	m.inputs[1].CharLimit = 256
+	m.inputs[0].CharLimit = 256
 	m.focusIndex = 0
 }
 
 func (m *model) initRootPrincipalInputsPrefilled(rp rootPrincipal) {
 	m.inputs = initInputs([]inputField{
 		{"Existing principal ID", "Existing Principal ID:"},
-		{"root or policy", "Role:"},
 		{"New principal source", "New Principal Source:"},
 	})
 	m.inputs[0].SetValue(rp.principalID)
+	m.inputs[1].CharLimit = 256
+	m.focusIndex = 0
+}
 
-	roles := splitAndTrim(rp.roles)
-	if len(roles) > 0 {
-		m.inputs[1].SetValue(roles[0])
-	}
-	m.inputs[2].CharLimit = 256
+func (m *model) initPrimaryPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Path/gpg/fulcio principal (e.g. key.pub, gpg:<fingerprint>)", "Principal Source:"},
+	})
+	m.inputs[0].CharLimit = 256
+	m.focusIndex = 0
+}
+
+func (m *model) initPrimaryPrincipalInputsPrefilled(rp rootPrincipal) {
+	m.inputs = initInputs([]inputField{
+		{"Existing principal ID", "Existing Principal ID:"},
+		{"New principal source", "New Principal Source:"},
+	})
+	m.inputs[0].SetValue(rp.principalID)
+	m.inputs[1].CharLimit = 256
 	m.focusIndex = 0
 }

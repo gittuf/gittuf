@@ -23,7 +23,6 @@ type globalRule struct {
 
 type rootPrincipal struct {
 	principalID string
-	roles       string
 	keyCount    int
 }
 
@@ -162,37 +161,44 @@ func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
 		return nil
 	}
 
+	ids := make([]string, 0, len(rootPrincipals))
+	for id := range rootPrincipals {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	currPrincipals := make([]rootPrincipal, 0, len(rootPrincipals))
+	for _, id := range ids {
+		currPrincipals = append(currPrincipals, rootPrincipal{
+			principalID: id,
+			keyCount:    len(rootPrincipals[id].Keys()),
+		})
+	}
+	return currPrincipals
+}
+
+func getPrimaryRuleFilePrincipals(ctx context.Context, o *options) []rootPrincipal {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
 	primaryRuleFilePrincipals, err := repo.ListPrimaryRuleFilePrincipals(ctx, o.targetRef)
 	if err != nil {
 		return nil
 	}
 
-	principalSets := []map[string]tuf.Principal{rootPrincipals, primaryRuleFilePrincipals}
-	principalsByID := map[string]tuf.Principal{}
-	for _, principals := range principalSets {
-		for id, principal := range principals {
-			principalsByID[id] = principal
-		}
-	}
-
-	ids := make([]string, 0, len(principalsByID))
-	for id := range principalsByID {
+	ids := make([]string, 0, len(primaryRuleFilePrincipals))
+	for id := range primaryRuleFilePrincipals {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	currPrincipals := make([]rootPrincipal, 0, len(principalsByID))
+
+	currPrincipals := make([]rootPrincipal, 0, len(primaryRuleFilePrincipals))
 	for _, id := range ids {
-		roles := []string{}
-		if _, has := rootPrincipals[id]; has {
-			roles = append(roles, "root")
-		}
-		if _, has := primaryRuleFilePrincipals[id]; has {
-			roles = append(roles, "policy")
-		}
 		currPrincipals = append(currPrincipals, rootPrincipal{
 			principalID: id,
-			roles:       strings.Join(roles, ", "),
-			keyCount:    len(principalsByID[id].Keys()),
+			keyCount:    len(primaryRuleFilePrincipals[id].Keys()),
 		})
 	}
 	return currPrincipals

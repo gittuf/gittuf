@@ -26,6 +26,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
 		m.globalRuleList.SetSize(msg.Width-h, msg.Height-v)
 		m.rootPrincipalList.SetSize(msg.Width-h, msg.Height-v)
+		m.primaryPrincipalList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
 		// Delete confirmation overlay intercepts all keys
@@ -41,7 +42,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenTrustAddRootPrincipal && m.screen != screenTrustEditRootPrincipal {
+				m.screen != screenTrustAddRootPrincipal && m.screen != screenTrustEditRootPrincipal &&
+				m.screen != screenTrustAddPrimaryPrincipal && m.screen != screenTrustEditPrimaryPrincipal {
 				return m, tea.Quit
 			}
 		case "esc":
@@ -61,6 +63,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTrust
 			case screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
 				m.screen = screenTrustRootPrincipals
+			case screenTrustPrimaryPrincipals:
+				m.screen = screenTrust
+			case screenTrustAddPrimaryPrincipal, screenTrustEditPrimaryPrincipal:
+				m.screen = screenTrustPrimaryPrincipals
 			}
 			return m, nil
 		}
@@ -71,7 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
-		case screenPolicyRules, screenTrustGlobalRules, screenTrustRootPrincipals:
+		case screenPolicyRules, screenTrustGlobalRules, screenTrustRootPrincipals, screenTrustPrimaryPrincipals:
 			return m.handleRulesListKey(msg)
 		case screenPolicyAddRule, screenPolicyEditRule:
 			if msg.String() == "enter" {
@@ -97,6 +103,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cycleFocus(msg.String())
 				return m, nil
 			}
+		case screenTrustAddPrimaryPrincipal, screenTrustEditPrimaryPrincipal:
+			if msg.String() == "enter" {
+				return m.handlePrimaryPrincipalFormSubmit()
+			}
+			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
+				m.cycleFocus(msg.String())
+				return m, nil
+			}
 
 		}
 	}
@@ -114,10 +128,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
 	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule,
-		screenTrustAddRootPrincipal, screenTrustEditRootPrincipal:
+		screenTrustAddRootPrincipal, screenTrustEditRootPrincipal,
+		screenTrustAddPrimaryPrincipal, screenTrustEditPrimaryPrincipal:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	case screenTrustRootPrincipals:
 		m.rootPrincipalList, cmd = m.rootPrincipalList.Update(msg)
+	case screenTrustPrimaryPrincipals:
+		m.primaryPrincipalList, cmd = m.primaryPrincipalList.Update(msg)
 	}
 
 	return m, cmd
@@ -149,6 +166,9 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			case "View Root Principals":
 				m.screen = screenTrustRootPrincipals
 				m.refreshRootPrincipals()
+			case "View Primary Policy Principals":
+				m.screen = screenTrustPrimaryPrincipals
+				m.refreshPrimaryPrincipals()
 			}
 		}
 	}
@@ -172,6 +192,9 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			case screenTrustRootPrincipals:
 				m.initRootPrincipalInputs()
 				m.screen = screenTrustAddRootPrincipal
+			case screenTrustPrimaryPrincipals:
+				m.initPrimaryPrincipalInputs()
+				m.screen = screenTrustAddPrimaryPrincipal
 			}
 			return m, nil
 
@@ -208,6 +231,16 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
+			case screenTrustPrimaryPrincipals:
+				if sel, ok := m.primaryPrincipalList.SelectedItem().(item); ok {
+					for _, rp := range m.primaryPrincipals {
+						if rp.principalID == sel.title {
+							m.initPrimaryPrincipalInputsPrefilled(rp)
+							m.screen = screenTrustEditPrimaryPrincipal
+							return m, nil
+						}
+					}
+				}
 			}
 
 		// delete rule
@@ -227,6 +260,12 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			case screenTrustRootPrincipals:
 				if sel, ok := m.rootPrincipalList.SelectedItem().(item); ok {
+					m.confirmDelete = true
+					m.deleteTarget = sel.title
+					return m, nil
+				}
+			case screenTrustPrimaryPrincipals:
+				if sel, ok := m.primaryPrincipalList.SelectedItem().(item); ok {
 					m.confirmDelete = true
 					m.deleteTarget = sel.title
 					return m, nil
@@ -256,6 +295,8 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
 	case screenTrustRootPrincipals:
 		m.rootPrincipalList, cmd = m.rootPrincipalList.Update(msg)
+	case screenTrustPrimaryPrincipals:
+		m.primaryPrincipalList, cmd = m.primaryPrincipalList.Update(msg)
 	}
 	return m, cmd
 }
@@ -291,15 +332,33 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			for _, role := range splitAndTrim(selected.roles) {
-				if err := repoRemoveRootPrincipal(m.ctx, m.options, role, selected.principalID); err != nil {
-					m.errorMsg = fmt.Sprintf("Error removing root principal: %v", err)
-					return m, nil
-				}
+			if err := repoRemoveRootPrincipal(m.ctx, m.options, "root", selected.principalID); err != nil {
+				m.errorMsg = fmt.Sprintf("Error removing root principal: %v", err)
+				return m, nil
 			}
 
 			m.footer = "Root principal removed!"
 			m.refreshRootPrincipals()
+		case screenTrustPrimaryPrincipals:
+			var selected *rootPrincipal
+			for i := range m.primaryPrincipals {
+				if m.primaryPrincipals[i].principalID == m.deleteTarget {
+					selected = &m.primaryPrincipals[i]
+					break
+				}
+			}
+			if selected == nil {
+				m.errorMsg = "Error removing primary policy principal: not found"
+				break
+			}
+
+			if err := repoRemoveRootPrincipal(m.ctx, m.options, "policy", selected.principalID); err != nil {
+				m.errorMsg = fmt.Sprintf("Error removing primary policy principal: %v", err)
+				return m, nil
+			}
+
+			m.footer = "Primary policy principal removed!"
+			m.refreshPrimaryPrincipals()
 		}
 	}
 	m.confirmDelete = false
@@ -427,16 +486,14 @@ func (m model) handleRootPrincipalFormSubmit() (tea.Model, tea.Cmd) {
 	var err error
 	switch m.screen {
 	case screenTrustAddRootPrincipal:
-		role := m.inputs[0].Value()
-		source := m.inputs[1].Value()
-		err = repoAddRootPrincipal(m.ctx, m.options, role, source)
+		source := m.inputs[0].Value()
+		err = repoAddRootPrincipal(m.ctx, m.options, "root", source)
 	case screenTrustEditRootPrincipal:
 		oldID := m.inputs[0].Value()
-		role := m.inputs[1].Value()
-		newSource := m.inputs[2].Value()
+		newSource := m.inputs[1].Value()
 
-		if err = repoRemoveRootPrincipal(m.ctx, m.options, role, oldID); err == nil {
-			err = repoAddRootPrincipal(m.ctx, m.options, role, newSource)
+		if err = repoRemoveRootPrincipal(m.ctx, m.options, "root", oldID); err == nil {
+			err = repoAddRootPrincipal(m.ctx, m.options, "root", newSource)
 		}
 	}
 
@@ -452,6 +509,42 @@ func (m model) handleRootPrincipalFormSubmit() (tea.Model, tea.Cmd) {
 		m.footer = "Root principal updated!"
 	}
 	m.screen = screenTrustRootPrincipals
+	return m, nil
+}
+
+// handlePrimaryPrincipalFormSubmit handles enter on primary policy principal add/edit form screens.
+func (m model) handlePrimaryPrincipalFormSubmit() (tea.Model, tea.Cmd) {
+	if m.focusIndex < len(m.inputs)-1 {
+		m.cycleFocus("tab")
+		return m, nil
+	}
+
+	var err error
+	switch m.screen {
+	case screenTrustAddPrimaryPrincipal:
+		source := m.inputs[0].Value()
+		err = repoAddRootPrincipal(m.ctx, m.options, "policy", source)
+	case screenTrustEditPrimaryPrincipal:
+		oldID := m.inputs[0].Value()
+		newSource := m.inputs[1].Value()
+
+		if err = repoRemoveRootPrincipal(m.ctx, m.options, "policy", oldID); err == nil {
+			err = repoAddRootPrincipal(m.ctx, m.options, "policy", newSource)
+		}
+	}
+
+	if err != nil {
+		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		return m, nil
+	}
+
+	m.refreshPrimaryPrincipals()
+	if m.screen == screenTrustAddPrimaryPrincipal {
+		m.footer = "Primary policy principal added!"
+	} else {
+		m.footer = "Primary policy principal updated!"
+	}
+	m.screen = screenTrustPrimaryPrincipals
 	return m, nil
 }
 
