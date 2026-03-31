@@ -119,6 +119,18 @@ func renderDeleteOverlay(target string) string {
 // View renders the TUI.
 func (m model) View() string {
 	switch m.screen {
+	case screenLoading:
+		if m.errorMsg != "" {
+			return renderWithMargin(
+				titleStyle.Render("gittuf TUI") + "\n\n" +
+					renderErrorMsg(m.errorMsg) + "\n\n" +
+					lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render("Press Q or Ctrl+C to quit."),
+			)
+		}
+		return renderWithMargin(
+			titleStyle.Render("gittuf TUI") + "\n\n" +
+				m.spinner.View() + " Loading, please wait...\n",
+		)
 	case screenChoice:
 		return renderWithMargin(m.choiceList.View() + "\n" + renderFooter(m.footer) + renderErrorMsg(m.errorMsg))
 	case screenPolicy:

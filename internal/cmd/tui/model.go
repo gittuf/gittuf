@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/cursor"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -21,7 +22,8 @@ import (
 type screen int
 
 const (
-	screenChoice              screen = iota // Initial menu
+	screenLoading             screen = iota // Loading screen shown on startup
+	screenChoice                            // Initial menu
 	screenPolicy                            // Menu for Policy operations
 	screenPolicyRules                       // Rule management screen
 	screenPolicyAddRule                     // Form: add a new policy rule
@@ -49,6 +51,7 @@ func (i item) FilterValue() string { return i.title }
 type model struct {
 	ctx              context.Context
 	screen           screen
+	spinner          spinner.Model
 	choiceList       list.Model
 	policyScreenList list.Model
 	trustScreenList  list.Model
@@ -68,6 +71,17 @@ type model struct {
 	readOnly         bool
 	confirmDelete    bool
 	deleteTarget     string
+}
+
+// initDoneMsg carries the result of the asynchronous TUI initialization.
+type initDoneMsg struct {
+	repo        *gittuf.Repository
+	signer      dsse.SignerVerifier
+	rules       []rule
+	globalRules []globalRule
+	readOnly    bool
+	footer      string
+	err         error
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -121,43 +135,21 @@ func initInputs(fields []inputField) []textinput.Model {
 	return inputs
 }
 
-// initialModel returns the initial model for the Terminal UI.
-func initialModel(ctx context.Context, o *options) (model, error) {
-	repo, err := gittuf.LoadRepository(".")
-	if err != nil {
-		return model{}, err
-	}
-
-	// Determine if we are in read-only mode. (read-only mode specified, or no signing key found)
-	readOnly := o.readOnly
-	var signer dsse.SignerVerifier
-	var footer string
-
-	if !readOnly {
-		signer, err = gittuf.LoadSigner(repo, o.p.SigningKey)
-		if err != nil {
-			if !errors.Is(err, gittuf.ErrSigningKeyNotSpecified) {
-				return model{}, fmt.Errorf("failed to load signing key from Git config: %w", err)
-			}
-			readOnly = true
-			footer = "No signing key found in Git config, running in read-only mode."
-		}
-	}
+// initialModel returns a lightweight loading model for the Terminal UI.
+// All heavy work (repo I/O, signing key, rules) is deferred to loadRepoCmd.
+func initialModel(ctx context.Context, o *options) model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
 
 	delegate := newDelegate()
 
 	m := model{
-		ctx:         ctx,
-		screen:      screenChoice,
-		cursorMode:  cursor.CursorBlink,
-		repo:        repo,
-		signer:      signer,
-		policyName:  o.policyName,
-		rules:       getCurrRules(ctx, o),
-		globalRules: getGlobalRules(ctx, o),
-		options:     o,
-		readOnly:    readOnly,
-		footer:      footer,
+		ctx:        ctx,
+		screen:     screenLoading,
+		spinner:    s,
+		cursorMode: cursor.CursorBlink,
+		policyName: o.policyName,
+		options:    o,
 
 		choiceList: newMenuList("gittuf TUI", []list.Item{
 			item{title: "Policy", desc: "View and manage gittuf Policy"},
@@ -173,12 +165,47 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 	}
 
-	return m, nil
+	return m
 }
 
-// Init initializes the input field.
+// loadRepoCmd performs all heavy TUI initialization asynchronously and sends
+// an initDoneMsg back to the program when complete.
+func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
+	return func() tea.Msg {
+		repo, err := gittuf.LoadRepository(".")
+		if err != nil {
+			return initDoneMsg{err: err}
+		}
+
+		readOnly := o.readOnly
+		var signer dsse.SignerVerifier
+		var footer string
+
+		if !readOnly {
+			signer, err = gittuf.LoadSigner(repo, o.p.SigningKey)
+			if err != nil {
+				if !errors.Is(err, gittuf.ErrSigningKeyNotSpecified) {
+					return initDoneMsg{err: fmt.Errorf("failed to load signing key from Git config: %w", err)}
+				}
+				readOnly = true
+				footer = "No signing key found in Git config, running in read-only mode."
+			}
+		}
+
+		return initDoneMsg{
+			repo:        repo,
+			signer:      signer,
+			rules:       getCurrRules(ctx, o),
+			globalRules: getGlobalRules(ctx, o),
+			readOnly:    readOnly,
+			footer:      footer,
+		}
+	}
+}
+
+// Init starts the spinner tick and kicks off async repo loading.
 func (m model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, m.spinner.Tick, loadRepoCmd(m.ctx, m.options))
 }
 
 // initRuleInputs initializes the input fields for (policy) rule forms.
