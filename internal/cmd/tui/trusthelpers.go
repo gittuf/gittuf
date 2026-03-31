@@ -6,6 +6,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
@@ -17,6 +19,11 @@ type globalRule struct {
 	ruleType     string
 	rulePatterns []string
 	threshold    int
+}
+
+type rootPrincipal struct {
+	principalID string
+	keyCount    int
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
@@ -140,5 +147,114 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
+	}
+}
+
+func getRootPrincipals(ctx context.Context, o *options) []rootPrincipal {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
+	rootPrincipals, err := repo.ListRootPrincipals(ctx, o.targetRef)
+	if err != nil {
+		return nil
+	}
+
+	ids := make([]string, 0, len(rootPrincipals))
+	for id := range rootPrincipals {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	currPrincipals := make([]rootPrincipal, 0, len(rootPrincipals))
+	for _, id := range ids {
+		currPrincipals = append(currPrincipals, rootPrincipal{
+			principalID: id,
+			keyCount:    len(rootPrincipals[id].Keys()),
+		})
+	}
+	return currPrincipals
+}
+
+func getPrimaryRuleFilePrincipals(ctx context.Context, o *options) []rootPrincipal {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
+	primaryRuleFilePrincipals, err := repo.ListPrimaryRuleFilePrincipals(ctx, o.targetRef)
+	if err != nil {
+		return nil
+	}
+
+	ids := make([]string, 0, len(primaryRuleFilePrincipals))
+	for id := range primaryRuleFilePrincipals {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	currPrincipals := make([]rootPrincipal, 0, len(primaryRuleFilePrincipals))
+	for _, id := range ids {
+		currPrincipals = append(currPrincipals, rootPrincipal{
+			principalID: id,
+			keyCount:    len(primaryRuleFilePrincipals[id].Keys()),
+		})
+	}
+	return currPrincipals
+}
+
+func repoAddRootPrincipal(ctx context.Context, o *options, role, principalSource string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	principal, err := gittuf.LoadPublicKey(principalSource)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "root":
+		return repo.AddRootKey(ctx, signer, principal, true, opts...)
+	case "policy":
+		return repo.AddTopLevelTargetsKey(ctx, signer, principal, true, opts...)
+	default:
+		return fmt.Errorf("unknown role %q (expected 'root' or 'policy')", role)
+	}
+}
+
+func repoRemoveRootPrincipal(ctx context.Context, o *options, role, principalID string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	id := strings.ToLower(strings.TrimSpace(principalID))
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "root":
+		return repo.RemoveRootKey(ctx, signer, id, true, opts...)
+	case "policy":
+		return repo.RemoveTopLevelTargetsKey(ctx, signer, id, true, opts...)
+	default:
+		return fmt.Errorf("unknown role %q (expected 'root' or 'policy')", role)
 	}
 }

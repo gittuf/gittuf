@@ -108,12 +108,34 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+func screenTrustRootPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  e: edit  d: delete  esc: back  q: quit",
+	)
+}
+
+func screenTrustPrimaryPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  e: edit  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
-func renderDeleteOverlay(target string) string {
+func renderDeleteOverlay(subject, target string) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF0000")).
 		Bold(true).
-		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+		Render(fmt.Sprintf("Delete %s %q? [y/n]", subject, target))
 }
 
 // View renders the TUI.
@@ -128,7 +150,7 @@ func (m model) View() string {
 	case screenPolicyRules:
 		overlay := ""
 		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+			overlay = "\n" + renderDeleteOverlay("Rule", m.deleteTarget) + "\n"
 		}
 		hint := ""
 		if !m.readOnly {
@@ -142,7 +164,7 @@ func (m model) View() string {
 	case screenTrustGlobalRules:
 		overlay := ""
 		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+			overlay = "\n" + renderDeleteOverlay("Global Rule", m.deleteTarget) + "\n"
 		}
 		hint := ""
 		if !m.readOnly {
@@ -161,6 +183,42 @@ func (m model) View() string {
 		return m.renderFormScreen("Add Global Rule")
 	case screenTrustEditGlobalRule:
 		return m.renderFormScreen("Edit Global Rule")
+	case screenTrustRootPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay("Root Principal", m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
+			)
+		}
+		return m.renderListScreen(m.rootPrincipalList,
+			overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint,
+		)
+	case screenTrustPrimaryPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay("Primary Policy Principal", m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the trust metadata.",
+			)
+		}
+		return m.renderListScreen(m.primaryPrincipalList,
+			overlay+screenTrustPrimaryPrincipalsHelp(m.readOnly)+hint,
+		)
+	case screenTrustAddRootPrincipal:
+		return m.renderFormScreen("Add Root Principal")
+	case screenTrustEditRootPrincipal:
+		return m.renderFormScreen("Edit Root Principal")
+	case screenTrustAddPrimaryPrincipal:
+		return m.renderFormScreen("Add Primary Policy Principal")
+	case screenTrustEditPrimaryPrincipal:
+		return m.renderFormScreen("Edit Primary Policy Principal")
 	default:
 		return "Unknown screen"
 	}

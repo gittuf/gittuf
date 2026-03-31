@@ -4,7 +4,14 @@ Start the TUI for managing policies
 
 ### Synopsis
 
-This command starts a terminal-based interface to manage policies. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes.
+This command starts a terminal-based interface to view and/or manage gittuf metadata. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode.
+
+The TUI supports managing:
+- Policy rules
+- Trust global rules
+- Trust root principals and keys
+
+Changes are staged immediately without further confirmation. Run `gittuf policy apply` to apply policy rule changes, and run `gittuf trust apply` to apply trust metadata changes.
 
 ```
 gittuf policy tui [flags]
