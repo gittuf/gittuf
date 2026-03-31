@@ -45,10 +45,6 @@ var (
 )
 
 var HookPrePush = HookType("pre-push")
-var HookPreCommit = HookType("pre-commit")
-var HookPostCommit = HookType("post-commit")
-var HookPreReceive = HookType("pre-receive")
-var HookPostReceive = HookType("post-receive")
 
 // InvokeHooksForStage runs the hooks defined in the specified stage for the
 // user defined by principalID. Upon successful completion of all hooks for the
