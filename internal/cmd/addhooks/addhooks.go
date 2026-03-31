@@ -66,7 +66,7 @@ func installHooks(cmd *cobra.Command, repo *gittuf.Repository, hookTypes []strin
 		}
 
 		script := generateCrossPlatformScript(hookType, string(prePushScript))
-		
+
 		err := repo.UpdateGitHook(gittuf.HookPrePush, script, force)
 		if err != nil {
 			var hookErr *gittuf.ErrHookExists
@@ -85,23 +85,23 @@ func installHooks(cmd *cobra.Command, repo *gittuf.Repository, hookTypes []strin
 			fmt.Fprintf(cmd.OutOrStdout(), "Successfully installed %s hook\n", hookType)
 		}
 	}
-	
+
 	return nil
 }
 
 func listInstalledHooks(cmd *cobra.Command, repo *gittuf.Repository) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "Installed gittuf hooks:\n")
-	
+
 	gitRepo := repo.GetGitRepository()
 	gitDir := gitRepo.GetGitDir()
-	
+
 	hookPath := filepath.Join(gitDir, "hooks", "pre-push")
 	if _, err := os.Stat(hookPath); err == nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "  ✓ pre-push\n")
 	} else {
 		fmt.Fprintf(cmd.OutOrStdout(), "  ✗ pre-push\n")
 	}
-	
+
 	return nil
 }
 

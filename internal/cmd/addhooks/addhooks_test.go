@@ -18,12 +18,12 @@ func TestAddHooks(t *testing.T) {
 	t.Run("install hooks successfully", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		// Change to repo directory
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -31,7 +31,7 @@ func TestAddHooks(t *testing.T) {
 			hookTypes: []string{"pre-push"}, // Set default value manually since we're not parsing flags
 		}
 		cmd := New()
-		
+
 		err = o.Run(cmd, []string{})
 		assert.Nil(t, err)
 
@@ -55,11 +55,11 @@ func TestAddHooks(t *testing.T) {
 	t.Run("list hooks functionality", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -86,11 +86,11 @@ func TestAddHooks(t *testing.T) {
 	t.Run("unsupported hook type", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		_ = gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -98,7 +98,7 @@ func TestAddHooks(t *testing.T) {
 			hookTypes: []string{"unsupported-hook"},
 		}
 		cmd := New()
-		
+
 		err = o.Run(cmd, []string{})
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "unsupported hook type")
@@ -107,11 +107,11 @@ func TestAddHooks(t *testing.T) {
 	t.Run("hook already exists without force", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -127,7 +127,7 @@ func TestAddHooks(t *testing.T) {
 			hookTypes: []string{"pre-push"}, // Set default value manually
 		}
 		cmd := New()
-		
+
 		err = o.Run(cmd, []string{})
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "already exists")
@@ -136,11 +136,11 @@ func TestAddHooks(t *testing.T) {
 	t.Run("force overwrite existing hook", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -156,7 +156,7 @@ func TestAddHooks(t *testing.T) {
 			hookTypes: []string{"pre-push"}, // Set default value manually
 		}
 		cmd := New()
-		
+
 		err = o.Run(cmd, []string{})
 		assert.Nil(t, err)
 
@@ -169,17 +169,17 @@ func TestAddHooks(t *testing.T) {
 
 	t.Run("repository not found", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
 		o := &options{}
 		cmd := New()
-		
+
 		err = o.Run(cmd, []string{})
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "repository")
@@ -190,11 +190,11 @@ func TestInstallHooks(t *testing.T) {
 	t.Run("install pre-push hook", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		_ = gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -209,11 +209,11 @@ func TestInstallHooks(t *testing.T) {
 	t.Run("unsupported hook type", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		_ = gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
@@ -231,11 +231,11 @@ func TestListInstalledHooks(t *testing.T) {
 	t.Run("list hooks", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		_ = gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		
+
 		oldWd, err := os.Getwd()
 		assert.Nil(t, err)
 		defer func() { _ = os.Chdir(oldWd) }()
-		
+
 		err = os.Chdir(tmpDir)
 		assert.Nil(t, err)
 
