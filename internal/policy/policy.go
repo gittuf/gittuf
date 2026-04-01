@@ -53,6 +53,7 @@ var (
 	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
 	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
+	ErrExpectedRootKeysDoNotMatch    = errors.Join(errors.New("initial root keys do not match the expected keys"))
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -165,7 +166,9 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 			threshold:  len(options.InitialRootPrincipals),
 		}
 
-		_, err = verifier.Verify(ctx, nil, state.Metadata.RootEnvelope)
+		if _, err = verifier.Verify(ctx, nil, state.Metadata.RootEnvelope); err != nil {
+			return nil, err
+		}
 		return state, err
 	}
 
@@ -193,8 +196,10 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
-	// We load the very first policy entry with no additional verification,
-	// the root keys are implicitly trusted
+	// We load the very first policy entry here. If the expected initial root
+	// keys are supplied, we verify that they match the signatures on the
+	// envelope, otherwise, with no additional verification, the root keys are
+	// implicitly trusted.
 	initialPolicyState, err := loadStateForEntry(repo, firstPolicyEntry)
 	if err != nil {
 		return nil, err
@@ -260,7 +265,9 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy. It verifies the root of trust for the state starting from the
-// initial policy entry in the RSL.
+// initial policy entry in the RSL. If called with the InitialRootPrincipals
+// option, it verifies that the initial root keys match those supplied,
+// otherwise it assumes the root keys present are trusted.
 func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string, opts ...policyopts.LoadStateOption) (*State, error) {
 	options := &policyopts.LoadStateOptions{}
 	for _, fn := range opts {
@@ -286,7 +293,9 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 }
 
 // LoadFirstState returns the State corresponding to the repository's first
-// active policy. It does not verify the root of trust since it is the initial policy.
+// active policy. If called with the InitialRootPrincipals option, it verifies
+// that the initial root keys match those supplied, otherwise it assumes the
+// root keys present are trusted.
 func LoadFirstState(ctx context.Context, repo *gitinterface.Repository, opts ...policyopts.LoadStateOption) (*State, error) {
 	firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(repo, PolicyRef)
 	if err != nil {

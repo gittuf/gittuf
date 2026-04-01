@@ -13,6 +13,7 @@ import (
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyverifieropts "github.com/gittuf/gittuf/internal/policy/options/verify"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
@@ -58,14 +59,19 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		refName = refNameOverride
 	}
 
+	var verifyOptions []policyverifieropts.PolicyVerifierOption
+	if options.ExpectedRootKeys != nil {
+		verifyOptions = append(verifyOptions, policyverifieropts.WithInitialRootPrincipals(options.ExpectedRootKeys))
+	}
+
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
 
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
+		expectedTip, err = verifier.VerifyRef(ctx, refName, verifyOptions...)
 	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
+		expectedTip, err = verifier.VerifyRefFull(ctx, refName, verifyOptions...)
 	}
 	if err != nil {
 		return err

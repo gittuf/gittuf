@@ -9,11 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
@@ -72,29 +71,9 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	if len(expectedRootKeys) > 0 {
 		slog.Debug("Verifying if root keys are expected root keys...")
 
-		sort.Slice(expectedRootKeys, func(i, j int) bool {
-			return expectedRootKeys[i].ID() < expectedRootKeys[j].ID()
-		})
-
-		state, err := policy.LoadFirstState(ctx, r)
+		_, err := policy.LoadFirstState(ctx, r, policyopts.WithInitialRootPrincipals(expectedRootKeys))
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
-		}
-		rootKeys, err := state.GetRootKeys()
-		if err != nil {
-			return repository, errors.Join(ErrCloningRepository, err)
-		}
-
-		// We sort the root keys so that we can check if the root keys array match's the expected root key array
-		sort.Slice(rootKeys, func(i, j int) bool {
-			return rootKeys[i].ID() < rootKeys[j].ID()
-		})
-
-		if len(rootKeys) != len(expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
-		}
-		if !reflect.DeepEqual(rootKeys, expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
 		}
 	}
 
