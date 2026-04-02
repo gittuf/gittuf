@@ -203,6 +203,27 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 	return rootMetadata.GetGlobalRules(), nil
 }
 
+// ListPropagationDirectives returns propagation directives from the root metadata
+// for the policy state at targetRef.
+func (r *Repository) ListPropagationDirectives(ctx context.Context, targetRef string) ([]tuf.PropagationDirective, error) {
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, err
+	}
+
+	return rootMetadata.GetPropagationDirectives(), nil
+}
+
 func (r *Repository) ListHooks(ctx context.Context, targetRef string) (map[tuf.HookStage][]tuf.Hook, error) {
 	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
 		targetRef = "refs/gittuf/" + targetRef

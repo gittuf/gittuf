@@ -1403,6 +1403,60 @@ func TestRemovePropagationDirective(t *testing.T) {
 	})
 }
 
+func TestListPropagationDirectives(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	r := createTestRepositoryWithRoot(t, "")
+
+	list, err := r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
+	assert.Nil(t, err)
+	assert.Empty(t, list)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	err = r.AddPropagationDirective(testCtx, rootSigner, "pd1", "https://example.com/git/repository", "refs/heads/main", "refs/heads/main", "upstream/", false)
+	require.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	list, err = r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
+	assert.Nil(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, "pd1", list[0].GetName())
+	assert.Equal(t, "https://example.com/git/repository", list[0].GetUpstreamRepository())
+}
+
+func TestUpdatePropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
+	r := createTestRepositoryWithRoot(t, "")
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	err := r.AddPropagationDirective(testCtx, rootSigner, "pd1", "https://old.example/repo", "refs/heads/main", "refs/heads/main", "upstream/", false)
+	require.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	err = r.UpdatePropagationDirective(testCtx, rootSigner, "pd1", "https://new.example/repo", "refs/heads/feature", "refs/heads/main", "downstream/", false)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	require.Nil(t, err)
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	require.Nil(t, err)
+
+	directives := rootMetadata.GetPropagationDirectives()
+	require.Len(t, directives, 1)
+	assert.Equal(t, "https://new.example/repo", directives[0].GetUpstreamRepository())
+	assert.Equal(t, "refs/heads/feature", directives[0].GetUpstreamReference())
+	assert.Equal(t, "downstream/", directives[0].GetDownstreamPath())
+}
+
 func TestAddHook(t *testing.T) {
 	t.Setenv(dev.DevModeKey, "1")
 

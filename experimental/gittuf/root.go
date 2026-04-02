@@ -894,6 +894,63 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// UpdatePropagationDirective replaces an existing propagation directive identified
+// by name with new parameters. It requires developer mode.
+func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Updating propagation directive...")
+	if err := rootMetadata.DeletePropagationDirective(name); err != nil {
+		return err
+	}
+
+	var directive tuf.PropagationDirective
+	switch rootMetadata.(type) {
+	case *tufv01.RootMetadata:
+		directive = tufv01.NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+	case *tufv02.RootMetadata:
+		directive = tufv02.NewPropagationDirective(name, upstreamRepository, upstreamReference, downstreamReference, downstreamPath)
+	}
+
+	if err := rootMetadata.AddPropagationDirective(directive); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Update propagation directive '%s' in root metadata", name)
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // AddHook defines the workflow for adding a file to be executed as a hook. It
 // writes the hook file, populates all fields in the hooks metadata associated
 // with this file and commits it to the root of trust metadata.
