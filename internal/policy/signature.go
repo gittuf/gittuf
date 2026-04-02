@@ -20,7 +20,6 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 type SignatureVerifier struct {
@@ -170,27 +169,6 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 					}
 
 					dsseVerifier = sigstore.NewVerifierFromIdentityAndIssuer(key.KeyVal.Identity, key.KeyVal.Issuer, opts...)
-				case signerverifier.ED25519KeyType:
-					// These are only used to verify old policy metadata signed before the ssh-signer was added
-					slog.Debug(fmt.Sprintf("Found legacy ED25519 key '%s' in custom securesystemslib format...", key.KeyID))
-					dsseVerifier, err = signerverifier.NewED25519SignerVerifierFromSSLibKey(key)
-					if err != nil {
-						return nil, err
-					}
-				case signerverifier.RSAKeyType:
-					// These are only used to verify old policy metadata signed before the ssh-signer was added
-					slog.Debug(fmt.Sprintf("Found legacy RSA key '%s' in custom securesystemslib format...", key.KeyID))
-					dsseVerifier, err = signerverifier.NewRSAPSSSignerVerifierFromSSLibKey(key)
-					if err != nil {
-						return nil, err
-					}
-				case signerverifier.ECDSAKeyType:
-					// These are only used to verify old policy metadata signed before the ssh-signer was added
-					slog.Debug(fmt.Sprintf("Found legacy ECDSA key '%s' in custom securesystemslib format...", key.KeyID))
-					dsseVerifier, err = signerverifier.NewECDSASignerVerifierFromSSLibKey(key)
-					if err != nil {
-						return nil, err
-					}
 				default:
 					return nil, common.ErrUnknownKeyType
 				}
