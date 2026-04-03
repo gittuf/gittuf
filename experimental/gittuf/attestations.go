@@ -311,11 +311,11 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 	}
 
 	for _, pullRequest := range pullRequests {
-		slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", *pullRequest.Number))
-		pullRequestBranch := plumbing.NewBranchReferenceName(*pullRequest.Base.Ref).String()
+		slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequest.GetNumber()))
+		pullRequestBranch := plumbing.NewBranchReferenceName(pullRequest.GetBase().GetRef()).String()
 
 		// pullRequest.Merged is not set on this endpoint for some reason
-		if pullRequest.MergedAt != nil && pullRequestBranch == baseBranch {
+		if !pullRequest.GetMergedAt().IsZero() && pullRequestBranch == baseBranch {
 			return r.addGitHubPullRequestAttestation(ctx, signer, options.GitHubBaseURL, owner, repository, pullRequest, options.CreateRSLEntry, signCommit)
 		}
 	}
@@ -556,18 +556,18 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 		targetCommitID string
 	)
 
-	if pullRequest.MergedAt == nil {
+	if pullRequest.GetMergedAt().IsZero() {
 		// not yet merged
-		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Head.User.Login, *pullRequest.Head.User.ID, *pullRequest.Head.Ref)
-		targetCommitID = *pullRequest.Head.SHA
+		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", pullRequest.GetHead().GetUser().GetLogin(), pullRequest.GetHead().GetUser().GetID(), pullRequest.GetHead().GetRef())
+		targetCommitID = pullRequest.GetHead().GetSHA()
 	} else {
 		// merged
-		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", *pullRequest.Base.User.Login, *pullRequest.Base.User.ID, *pullRequest.Base.Ref)
-		targetCommitID = *pullRequest.MergeCommitSHA
+		targetRef = fmt.Sprintf("%s-%d/refs/heads/%s", pullRequest.GetBase().GetUser().GetLogin(), pullRequest.GetBase().GetUser().GetID(), pullRequest.GetBase().GetRef())
+		targetCommitID = pullRequest.GetMergeCommitSHA()
 	}
 
 	slog.Debug("Creating GitHub pull request attestation...")
-	statement, err := attestations.NewGitHubPullRequestAttestation(owner, repository, *pullRequest.Number, targetCommitID, pullRequest)
+	statement, err := attestations.NewGitHubPullRequestAttestation(owner, repository, pullRequest.GetNumber(), targetCommitID, pullRequest)
 	if err != nil {
 		return err
 	}
@@ -597,7 +597,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add GitHub pull request attestation for '%s' at '%s'\n\nSource: %s/%s/%s/pull/%d\n", targetRef, targetCommitID, strings.TrimSuffix(githubBaseURL, "/"), owner, repository, *pullRequest.Number)
+	commitMessage := fmt.Sprintf("Add GitHub pull request attestation for '%s' at '%s'\n\nSource: %s/%s/%s/pull/%d\n", targetRef, targetCommitID, strings.TrimSuffix(githubBaseURL, "/"), owner, repository, pullRequest.GetNumber())
 
 	slog.Debug("Committing attestations...")
 	return allAttestations.Commit(r.r, commitMessage, createRSLEntry, signCommit)
@@ -672,21 +672,21 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 		return "", "", "", err
 	}
 
-	baseRef := gitinterface.BranchReferenceName(*pullRequest.Base.Ref)
+	baseRef := gitinterface.BranchReferenceName(pullRequest.GetBase().GetRef())
 
 	referenceDetails, _, err := client.Git.GetRef(ctx, owner, repository, baseRef)
 	if err != nil {
 		return "", "", "", err
 	}
-	fromID := *referenceDetails.Object.SHA // current tip of base ref
+	fromID := referenceDetails.GetObject().GetSHA() // current tip of base ref
 
 	// GitHub has already computed a merge commit, use that tree ID as target
 	// tree ID
-	commit, _, err := client.Git.GetCommit(ctx, owner, repository, *pullRequest.MergeCommitSHA)
+	commit, _, err := client.Git.GetCommit(ctx, owner, repository, pullRequest.GetMergeCommitSHA())
 	if err != nil {
 		return "", "", "", err
 	}
-	toID := *commit.Tree.SHA
+	toID := commit.GetTree().GetSHA()
 
 	return baseRef, fromID, toID, nil
 }
