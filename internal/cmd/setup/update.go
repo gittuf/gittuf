@@ -107,20 +107,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.rootCursor < len(m.rootChoices) {
 					m.rootCursor++
 				}
-			case "space", "enter":
+			case " ", "enter":
 				if m.rootCursor == len(m.rootChoices) {
 					// submit response
 					m.screen = screenTransportConfirm
 					return m, tea.Batch(setupMaintainerChoices(m.ctx, m.repo, m.signer, m.rootSelected, m.rootExists))
 				}
-				_, ok := m.rootSelected[m.rootCursor]
-				if ok {
-					if m.rootCursor != 0 || m.rootExists {
+				if m.rootSelected[m.rootCursor] {
+					if m.rootCursor != addToRoot || m.rootExists {
 						// "Add key to root" cannot be deselected when gittuf has not been initialized
-						delete(m.rootSelected, m.rootCursor)
+						m.rootSelected[m.rootCursor] = false
 					}
 				} else {
-					m.rootSelected[m.rootCursor] = false
+					m.rootSelected[m.rootCursor] = true
 				}
 			}
 		}

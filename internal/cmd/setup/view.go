@@ -72,7 +72,7 @@ func (m model) View() string {
 				cursor = ">"
 			}
 			checked := "[ ]"
-			if _, ok := m.rootSelected[i]; ok {
+			if m.rootSelected[i] {
 				checked = "[x]"
 			}
 			content += cursor + checked + " " + item + "\n"
