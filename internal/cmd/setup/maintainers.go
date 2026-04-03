@@ -31,6 +31,16 @@ func checkRootExists(repo *gittuf.Repository) bool {
 	return err == nil
 }
 
+// checkTargetsExists returns true if the top-level targets metadata has been
+// initialized.
+func checkTargetsExists(ctx context.Context, repo *gittuf.Repository) bool {
+	state, err := policy.LoadCurrentState(ctx, repo.GetGitRepository(), policy.PolicyRef)
+	if err != nil {
+		return false
+	}
+	return state.HasTargetsRole(policy.TargetsRoleName)
+}
+
 // setupMaintainerChoices configures the gittuf policy on the repository as
 // desired by the maintainer
 func setupMaintainerChoices(ctx context.Context, repo *gittuf.Repository, signer sslibdsse.SignerVerifier, choices map[int]bool, alreadySetUp bool) tea.Cmd {

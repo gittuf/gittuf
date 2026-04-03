@@ -61,7 +61,7 @@ func (m model) View() string {
 		return m.renderWithMargin("Welcome! This wizard will help you setup gittuf on your repository." + "\n" + m.choiceList.View())
 	case screenMaintainerSelections:
 		content := "Hello maintainer! Let's get you started with gittuf.\n\n"
-		if m.rootExists == true {
+		if m.rootExists {
 			content += "Looks like gittuf is already setup on your repository. Please select where you would like to be added.\n"
 		} else {
 			content += "Looks like gittuf isn't initialized yet. Let's initialize it and add you to the policy.\n"
@@ -84,6 +84,7 @@ func (m model) View() string {
 		} else {
 			content += "  [ Submit ]\n"
 		}
+		content += renderFooter("\n" + m.footer)
 		return m.renderWithMargin(content)
 
 	case screenTransportConfirm:

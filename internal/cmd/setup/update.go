@@ -7,10 +7,13 @@ package setup
 
 import (
 	"fmt"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type clearFooterMsg struct{}
 
 // Update updates the model based on the message received
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -21,7 +24,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 		m.choiceList.SetSize(msg.Width-h, msg.Height-v)
-
+	case clearFooterMsg:
+		m.footer = ""
+		return m, nil
 	case transportDoneMsg:
 		m.transportRunning = false
 		if m.screen != screenTransport {
@@ -58,6 +63,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch i.title {
 					case "Maintainer":
 						m.rootExists = checkRootExists(m.repo)
+						m.targetsExists = checkTargetsExists(m.ctx, m.repo)
 						m.screen = screenMaintainerSelections
 						return m, nil
 					case "Contributor":
@@ -115,11 +121,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if m.rootSelected[m.rootCursor] {
 					if m.rootCursor != addToRoot || m.rootExists {
-						// "Add key to root" cannot be deselected when gittuf has not been initialized
 						m.rootSelected[m.rootCursor] = false
+						// deselecting "Make me a Policy Administrator" should also deselect "Authorize me to default branch"
+						// when targets is not yet initialized
+						if !m.targetsExists && m.rootCursor == addToTargets && m.rootSelected[addToRule] {
+							m.rootSelected[addToRule] = false
+							m.footer = "You must be a policy administrator to set a rule."
+							return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
+						}
+					} else {
+						// "Make me a Root of Trust User" cannot be deselected when gittuf has not been initialized
+						m.footer = "You must authorize a root of trust user to initialize gittuf."
+						return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
 					}
 				} else {
 					m.rootSelected[m.rootCursor] = true
+					// selecting "Authorize me to default branch" should also select "Make me a Policy Administrator"
+					// when targets is not yet initialized
+					if !m.targetsExists && m.rootCursor == addToRule && !m.rootSelected[addToTargets] {
+						m.rootSelected[addToTargets] = true
+						m.footer = "You must be a policy administrator to set a rule."
+						return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
+					}
 				}
 			}
 		}

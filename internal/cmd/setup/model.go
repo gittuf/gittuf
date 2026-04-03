@@ -54,6 +54,7 @@ type model struct {
 	footer           string
 	errorMsg         string
 	rootExists       bool
+	targetsExists    bool
 	rootChoices      []string
 	rootCursor       int
 	rootSelected     map[int]bool

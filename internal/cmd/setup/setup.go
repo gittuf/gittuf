@@ -12,7 +12,7 @@ import (
 
 type options struct{}
 
-func (o *options) AddFlags(cmd *cobra.Command) {
+func (o *options) AddFlags(_ *cobra.Command) {
 
 }
 
