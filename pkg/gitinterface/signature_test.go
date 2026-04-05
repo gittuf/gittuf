@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCanSign(t *testing.T) {
@@ -70,6 +71,171 @@ func TestCanSign(t *testing.T) {
 
 			err := repo.CanSign()
 			assert.Nil(t, err, fmt.Sprintf("unexpected result in test '%s'", name))
+		})
+	}
+
+	t.Run("can sign with gpg format", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("gpg.format", "gpg")
+		require.NoError(t, err)
+
+		err = repo.CanSign()
+		assert.Nil(t, err)
+	})
+
+	t.Run("can sign with x509 format", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("gpg.format", "x509")
+		require.NoError(t, err)
+
+		err = repo.CanSign()
+		assert.Nil(t, err)
+	})
+
+	t.Run("can sign with openpgp format", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("gpg.format", "openpgp")
+		require.NoError(t, err)
+
+		err = repo.CanSign()
+		assert.Nil(t, err)
+	})
+
+	t.Run("ssh without key returns error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("gpg.format", "ssh")
+		require.NoError(t, err)
+
+		err = repo.CanSign()
+		assert.NotNil(t, err)
+		assert.Equal(t, ErrSigningKeyNotSpecified, err)
+	})
+
+	t.Run("ssh with key succeeds", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("gpg.format", "ssh")
+		require.NoError(t, err)
+		err = repo.SetGitConfig("user.signingkey", "/path/to/key.pub")
+		require.NoError(t, err)
+
+		err = repo.CanSign()
+		assert.Nil(t, err)
+	})
+
+	t.Run("default behavior without configuration", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := setupRepository(t, tmpDir, false)
+
+		err := repo.CanSign()
+		assert.Nil(t, err)
+	})
+
+	t.Run("various formats", func(t *testing.T) {
+		formats := []string{"gpg", "ssh", "x509", "openpgp"}
+
+		for _, format := range formats {
+			t.Run(fmt.Sprintf("format_%s", format), func(t *testing.T) {
+				tmpDir := t.TempDir()
+				repo := setupRepository(t, tmpDir, false)
+
+				err := repo.SetGitConfig("gpg.format", format)
+				require.NoError(t, err)
+
+				if format == "ssh" {
+					err = repo.SetGitConfig("user.signingkey", "/path/to/key")
+					require.NoError(t, err)
+				}
+
+				err = repo.CanSign()
+				assert.Nil(t, err)
+			})
+		}
+	})
+}
+
+func TestGetSigningMethod(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]string
+		expected string
+	}{
+		{
+			name:     "default to gpg when not set",
+			config:   map[string]string{},
+			expected: "gpg",
+		},
+		{
+			name:     "explicit gpg",
+			config:   map[string]string{"gpg.format": "gpg"},
+			expected: "gpg",
+		},
+		{
+			name:     "explicit ssh",
+			config:   map[string]string{"gpg.format": "ssh"},
+			expected: "ssh",
+		},
+		{
+			name:     "explicit x509",
+			config:   map[string]string{"gpg.format": "x509"},
+			expected: "x509",
+		},
+		{
+			name:     "explicit openpgp",
+			config:   map[string]string{"gpg.format": "openpgp"},
+			expected: "openpgp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getSigningMethod(tt.config)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetSigningKeyInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   map[string]string
+		expected string
+	}{
+		{
+			name:     "no signing key set",
+			config:   map[string]string{},
+			expected: "",
+		},
+		{
+			name:     "signing key set",
+			config:   map[string]string{"user.signingkey": "my-key-id"},
+			expected: "my-key-id",
+		},
+		{
+			name:     "signing key with path",
+			config:   map[string]string{"user.signingkey": "/path/to/key.pub"},
+			expected: "/path/to/key.pub",
+		},
+		{
+			name:     "signing key with fingerprint",
+			config:   map[string]string{"user.signingkey": "ABCD1234EFGH5678"},
+			expected: "ABCD1234EFGH5678",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getSigningKeyInfo(tt.config)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

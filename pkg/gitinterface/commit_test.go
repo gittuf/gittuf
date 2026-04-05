@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRepositoryCommit(t *testing.T) {
@@ -79,6 +81,161 @@ func TestRepositoryCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, expectedThirdCommitID, refHead.String())
+
+	t.Run("commit with signing enabled", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Signed commit\n", true)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+
+		has := repo.HasObject(commitID)
+		assert.True(t, has)
+	})
+
+	t.Run("commit without parent", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/new-branch", "Initial commit\n", false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+
+		parents, err := repo.GetCommitParentIDs(commitID)
+		assert.Nil(t, err)
+		assert.Nil(t, parents)
+	})
+
+	t.Run("commit to new branch", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/new-feature", "New branch commit\n", false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+
+		has := repo.HasObject(commitID)
+		assert.True(t, has)
+	})
+
+	t.Run("commit with different tree", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+
+		blobID, err := repo.WriteBlob([]byte("test content"))
+		require.Nil(t, err)
+
+		treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file.txt", blobID),
+		})
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(treeID, "refs/heads/with-files", "Commit with files\n", false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+
+		retrievedTreeID, err := repo.GetCommitTreeID(commitID)
+		assert.Nil(t, err)
+		assert.Equal(t, treeID, retrievedTreeID)
+	})
+
+	t.Run("multiple commits in sequence", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		refName := "refs/heads/sequence"
+		var lastCommitID Hash
+
+		for i := 0; i < 5; i++ {
+			commitID, err := repo.Commit(emptyTreeID, refName, fmt.Sprintf("Commit %d\n", i), false)
+			assert.Nil(t, err)
+			assert.False(t, commitID.IsZero())
+
+			if i > 0 {
+				parents, err := repo.GetCommitParentIDs(commitID)
+				assert.Nil(t, err)
+				assert.Equal(t, []Hash{lastCommitID}, parents)
+			}
+
+			lastCommitID = commitID
+		}
+	})
+
+	t.Run("commit to multiple branches", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		branches := []string{"main", "develop", "feature", "hotfix", "release"}
+		commitIDs := make(map[string]Hash)
+
+		for _, branch := range branches {
+			refName := fmt.Sprintf("refs/heads/%s", branch)
+			commitID, err := repo.Commit(emptyTreeID, refName, fmt.Sprintf("Commit to %s\n", branch), false)
+			assert.Nil(t, err)
+			assert.False(t, commitID.IsZero())
+			commitIDs[branch] = commitID
+
+			has := repo.HasObject(commitID)
+			assert.True(t, has)
+
+			refTip, err := repo.GetReference(refName)
+			assert.Nil(t, err)
+			assert.Equal(t, commitID, refTip)
+		}
+
+		for i, branch1 := range branches {
+			for j, branch2 := range branches {
+				if i != j {
+					assert.NotEqual(t, commitIDs[branch1], commitIDs[branch2])
+				}
+			}
+		}
+	})
+
+	t.Run("commit with different trees", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+
+		trees := make([]Hash, 5)
+		for i := range trees {
+			blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("content %d", i)))
+			require.Nil(t, err)
+
+			treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+				NewEntryBlob(fmt.Sprintf("file%d.txt", i), blobID),
+			})
+			require.Nil(t, err)
+			trees[i] = treeID
+		}
+
+		refName := "refs/heads/different-trees"
+		for i, treeID := range trees {
+			commitID, err := repo.Commit(treeID, refName, fmt.Sprintf("Commit %d\n", i), false)
+			assert.Nil(t, err)
+
+			retrievedTreeID, err := repo.GetCommitTreeID(commitID)
+			assert.Nil(t, err)
+			assert.Equal(t, treeID, retrievedTreeID)
+		}
+	})
 }
 
 func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
@@ -304,6 +461,26 @@ func TestKnowsCommit(t *testing.T) {
 		knows, _ := repo.KnowsCommit(unknownCommitID, firstCommitID)
 		assert.False(t, knows)
 	})
+
+	t.Run("error when using non-commit objects", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Test commit\n", false)
+		require.Nil(t, err)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.KnowsCommit(blobID, commitID)
+		assert.NotNil(t, err)
+
+		_, err = repo.KnowsCommit(commitID, blobID)
+		assert.NotNil(t, err)
+	})
 }
 
 func createTestGPGSignedCommit(t *testing.T, repo *Repository) Hash {
@@ -457,6 +634,90 @@ func TestRepositoryGetCommitMessage(t *testing.T) {
 	commitMessage, err := repo.GetCommitMessage(commit)
 	assert.Nil(t, err)
 	assert.Equal(t, message, commitMessage)
+
+	t.Run("error when getting message from non-commit object", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetCommitMessage(blobID)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "is not a commit object")
+	})
+
+	t.Run("commit with multiline message", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		message := "First line\n\nSecond paragraph\nThird line\n"
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/multiline", message, false)
+		require.Nil(t, err)
+
+		retrievedMessage, err := repo.GetCommitMessage(commitID)
+		assert.Nil(t, err)
+		assert.Contains(t, retrievedMessage, "First line")
+		assert.Contains(t, retrievedMessage, "Second paragraph")
+		assert.Contains(t, retrievedMessage, "Third line")
+	})
+
+	t.Run("commit with special characters", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		message := "Commit with special chars: !@#$%^&*()\n"
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/special", message, false)
+		require.Nil(t, err)
+
+		retrievedMessage, err := repo.GetCommitMessage(commitID)
+		assert.Nil(t, err)
+		assert.Contains(t, retrievedMessage, "Commit with special chars: !@#$%^&*()")
+	})
+
+	t.Run("commit with empty message", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		emptyTreeID, err := repo.EmptyTree()
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/test", "", false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+	})
+
+	t.Run("commit with long message", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		emptyTreeID, err := repo.EmptyTree()
+		require.Nil(t, err)
+
+		longMessage := strings.Repeat("This is a very long commit message. ", 100)
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/test", longMessage, false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+	})
+
+	t.Run("commit with special characters in message", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		emptyTreeID, err := repo.EmptyTree()
+		require.Nil(t, err)
+
+		specialMessage := "Test with special chars: \n\t\"'`$\\!@#%^&*()"
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/test", specialMessage, false)
+		assert.Nil(t, err)
+		assert.False(t, commitID.IsZero())
+	})
 }
 
 func TestGetCommitTreeID(t *testing.T) {
@@ -501,6 +762,18 @@ func TestGetCommitTreeID(t *testing.T) {
 	secondCommitTreeID, err := repo.GetCommitTreeID(secondCommitID)
 	assert.Nil(t, err)
 	assert.Equal(t, treeWithContentsID, secondCommitTreeID)
+
+	t.Run("error when getting tree from non-commit object", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetCommitTreeID(blobID)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "is not a commit object")
+	})
 }
 
 func TestGetCommitParentIDs(t *testing.T) {
@@ -537,6 +810,54 @@ func TestGetCommitParentIDs(t *testing.T) {
 	secondCommitParentIDs, err := repo.GetCommitParentIDs(secondCommitID)
 	assert.Nil(t, err)
 	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
+
+	t.Run("error when getting parents from non-commit object", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetCommitParentIDs(blobID)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "is not a commit object")
+	})
+
+	t.Run("various parent scenarios", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commit1, err := repo.Commit(emptyTree, "refs/heads/parent-test", "First\n", false)
+		require.Nil(t, err)
+
+		parents, err := repo.GetCommitParentIDs(commit1)
+		assert.Nil(t, err)
+		assert.Nil(t, parents)
+
+		commit2, err := repo.Commit(emptyTree, "refs/heads/parent-test", "Second\n", false)
+		require.Nil(t, err)
+
+		parents, err = repo.GetCommitParentIDs(commit2)
+		assert.Nil(t, err)
+		assert.Len(t, parents, 1)
+		assert.Equal(t, commit1, parents[0])
+
+		lastCommit := commit2
+		for i := 0; i < 10; i++ {
+			commitID, err := repo.Commit(emptyTree, "refs/heads/parent-test", fmt.Sprintf("Commit %d\n", i), false)
+			require.Nil(t, err)
+
+			parents, err := repo.GetCommitParentIDs(commitID)
+			assert.Nil(t, err)
+			assert.Len(t, parents, 1)
+			assert.Equal(t, lastCommit, parents[0])
+
+			lastCommit = commitID
+		}
+	})
 }
 
 func TestGetCommonAncestor(t *testing.T) {
@@ -577,4 +898,24 @@ func TestGetCommonAncestor(t *testing.T) {
 
 	_, err = repo.GetCommonAncestor(commitDisconnected, commitA)
 	assert.NotNil(t, err)
+
+	t.Run("error when using non-commit objects", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Test commit\n", false)
+		require.Nil(t, err)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetCommonAncestor(blobID, commitID)
+		assert.NotNil(t, err)
+
+		_, err = repo.GetCommonAncestor(commitID, blobID)
+		assert.NotNil(t, err)
+	})
 }

@@ -129,6 +129,19 @@ func TestGetPathIDInTree(t *testing.T) {
 		assert.ErrorIs(t, err, ErrTreeDoesNotHavePath)
 		assert.Nil(t, itemID)
 	})
+
+	t.Run("error with non-existent path", func(t *testing.T) {
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file.txt", blobID),
+		})
+		require.Nil(t, err)
+
+		_, err = repo.GetPathIDInTree("nonexistent.txt", treeID)
+		assert.NotNil(t, err)
+	})
 }
 
 func TestGetTreeItems(t *testing.T) {
@@ -236,6 +249,14 @@ func TestGetTreeItems(t *testing.T) {
 		treeItems, err := repo.GetTreeItems(treeID)
 		assert.Nil(t, err)
 		assert.Equal(t, expectedTreeItems, treeItems)
+	})
+
+	t.Run("error with blob instead of tree", func(t *testing.T) {
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetTreeItems(blobID)
+		assert.NotNil(t, err)
 	})
 }
 
@@ -1099,6 +1120,14 @@ func TestTreeBuilder(t *testing.T) {
 
 		assert.Equal(t, expectedFiles, files)
 	})
+
+	t.Run("error with blob instead of tree", func(t *testing.T) {
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetAllFilesInTree(blobID)
+		assert.NotNil(t, err)
+	})
 }
 
 func TestEnsureIsTree(t *testing.T) {
@@ -1121,4 +1150,17 @@ func TestEnsureIsTree(t *testing.T) {
 
 	err = repo.ensureIsTree(blobID)
 	assert.NotNil(t, err)
+}
+
+func TestEnsureIsTreeError(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, true)
+
+	// Try with a blob instead of tree
+	blobID, err := repo.WriteBlob([]byte("test"))
+	require.Nil(t, err)
+
+	err = repo.ensureIsTree(blobID)
+	assert.NotNil(t, err)
+	assert.Contains(t, err.Error(), "is not a tree object")
 }

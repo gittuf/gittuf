@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
@@ -339,5 +340,166 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("error with blob instead of commit", func(t *testing.T) {
+		blobID, err := repo.WriteBlob([]byte("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = repo.GetFilePathsChangedByCommit(blobID)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "is not a commit object")
+	})
+
+	t.Run("error with non-existent commit", func(t *testing.T) {
+		_, err := repo.GetFilePathsChangedByCommit(ZeroHash)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("commit with no changes", func(t *testing.T) {
+		emptyTree2, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		commit1, err := repo.Commit(emptyTree2, "refs/heads/no-change", "First commit\n", false)
+		require.Nil(t, err)
+
+		commit2, err := repo.Commit(emptyTree2, "refs/heads/no-change", "Second commit\n", false)
+		require.Nil(t, err)
+
+		diffs, err := repo.GetFilePathsChangedByCommit(commit2)
+		assert.Nil(t, err)
+		assert.Nil(t, diffs)
+
+		_, err = repo.GetFilePathsChangedByCommit(commit1)
+		assert.Nil(t, err)
+	})
+
+	t.Run("commit with multiple file changes", func(t *testing.T) {
+		blob1, err := repo.WriteBlob([]byte("content1"))
+		require.Nil(t, err)
+		blob2, err := repo.WriteBlob([]byte("content2"))
+		require.Nil(t, err)
+		blob3, err := repo.WriteBlob([]byte("content3"))
+		require.Nil(t, err)
+
+		tree1, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob1),
+		})
+		require.Nil(t, err)
+
+		tree2, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob2),
+			NewEntryBlob("file2.txt", blob2),
+			NewEntryBlob("file3.txt", blob3),
+		})
+		require.Nil(t, err)
+
+		_, err = repo.Commit(tree1, "refs/heads/multi-change", "First commit\n", false)
+		require.Nil(t, err)
+
+		commit2, err := repo.Commit(tree2, "refs/heads/multi-change", "Second commit\n", false)
+		require.Nil(t, err)
+
+		diffs, err := repo.GetFilePathsChangedByCommit(commit2)
+		assert.Nil(t, err)
+		assert.Len(t, diffs, 3)
+	})
+
+	t.Run("nested directory structure", func(t *testing.T) {
+		blob1, err := repo.WriteBlob([]byte("content1"))
+		require.Nil(t, err)
+
+		blob2, err := repo.WriteBlob([]byte("content2"))
+		require.Nil(t, err)
+
+		tree, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("dir1/file1.txt", blob1),
+			NewEntryBlob("dir1/dir2/file2.txt", blob2),
+		})
+		require.Nil(t, err)
+
+		commitID, err := repo.Commit(tree, "refs/heads/nested", "Nested files\n", false)
+		require.Nil(t, err)
+
+		paths, err := repo.GetFilePathsChangedByCommit(commitID)
+		assert.Nil(t, err)
+		assert.Contains(t, paths, "dir1/file1.txt")
+		assert.Contains(t, paths, "dir1/dir2/file2.txt")
+	})
+
+	t.Run("merge commit with changes", func(t *testing.T) {
+		blob1, err := repo.WriteBlob([]byte("content1"))
+		require.Nil(t, err)
+		blob2, err := repo.WriteBlob([]byte("content2"))
+		require.Nil(t, err)
+		blob3, err := repo.WriteBlob([]byte("content3"))
+		require.Nil(t, err)
+
+		tree1, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob1),
+		})
+		require.Nil(t, err)
+
+		commit1, err := repo.Commit(tree1, "refs/heads/merge-main", "Initial commit\n", false)
+		require.Nil(t, err)
+
+		tree2, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob1),
+			NewEntryBlob("file2.txt", blob2),
+		})
+		require.Nil(t, err)
+
+		commit2, err := repo.Commit(tree2, "refs/heads/merge-branch1", "Add file2\n", false)
+		require.Nil(t, err)
+
+		if err := repo.SetReference("refs/heads/merge-branch2", commit1); err != nil {
+			t.Fatal(err)
+		}
+
+		tree3, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob1),
+			NewEntryBlob("file3.txt", blob3),
+		})
+		require.Nil(t, err)
+
+		commit3, err := repo.Commit(tree3, "refs/heads/merge-branch2", "Add file3\n", false)
+		require.Nil(t, err)
+
+		treeMerge, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("file1.txt", blob1),
+			NewEntryBlob("file2.txt", blob2),
+			NewEntryBlob("file3.txt", blob3),
+		})
+		require.Nil(t, err)
+
+		mergeCommit := repo.commitWithParents(t, treeMerge, []Hash{commit2, commit3}, "Merge branches\n", false)
+
+		paths, err := repo.GetFilePathsChangedByCommit(mergeCommit)
+		assert.Nil(t, err)
+		assert.NotEmpty(t, paths)
+	})
+
+	t.Run("merge commit with no changes from last parent", func(t *testing.T) {
+		blob1, err := repo.WriteBlob([]byte("mc1"))
+		require.Nil(t, err)
+
+		tree1, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
+			NewEntryBlob("f1.txt", blob1),
+		})
+		require.Nil(t, err)
+
+		c1, err := repo.Commit(tree1, "refs/heads/mc-main", "Initial\n", false)
+		require.Nil(t, err)
+
+		c2, err := repo.Commit(tree1, "refs/heads/mc-branch", "Same\n", false)
+		require.Nil(t, err)
+
+		mergeCommitNoChange := repo.commitWithParents(t, tree1, []Hash{c1, c2}, "Merge with no change\n", false)
+
+		paths, err := repo.GetFilePathsChangedByCommit(mergeCommitNoChange)
+		assert.Nil(t, err)
+		assert.Nil(t, paths)
 	})
 }

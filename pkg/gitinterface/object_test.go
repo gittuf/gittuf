@@ -64,6 +64,31 @@ func TestHasObject(t *testing.T) {
 	// Note: This test passes because we control timestamps in
 	// CreateTestGitRepository. So, commit ID in both repos is the same.
 	assert.True(t, repo.HasObject(commitID)) // now repo has it too
+
+	t.Run("zero hash does not exist", func(t *testing.T) {
+		assert.False(t, repo.HasObject(ZeroHash))
+	})
+
+	t.Run("non-existent hash", func(t *testing.T) {
+		nonExistentHash, err := NewHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+		require.Nil(t, err)
+		assert.False(t, repo.HasObject(nonExistentHash))
+	})
+
+	t.Run("different object types", func(t *testing.T) {
+		blob2ID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+		assert.True(t, repo.HasObject(blob2ID))
+
+		treeBuilder := NewTreeBuilder(repo)
+		tree2ID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("f.txt", blob2ID)})
+		require.Nil(t, err)
+		assert.True(t, repo.HasObject(tree2ID))
+
+		commit2ID, err := repo.Commit(tree2ID, "refs/heads/test", "Test\n", false)
+		require.Nil(t, err)
+		assert.True(t, repo.HasObject(commit2ID))
+	})
 }
 
 func TestGetObjectType(t *testing.T) {
@@ -98,6 +123,11 @@ func TestGetObjectType(t *testing.T) {
 	objType, err = repo.GetObjectType(tagID)
 	assert.Nil(t, err)
 	assert.Equal(t, TagObjectType, objType)
+
+	t.Run("error with non-existent object", func(t *testing.T) {
+		_, err := repo.GetObjectType(ZeroHash)
+		assert.NotNil(t, err)
+	})
 }
 
 func TestGetObjectSize(t *testing.T) {
@@ -110,4 +140,51 @@ func TestGetObjectSize(t *testing.T) {
 	objSize, err := repo.GetObjectSize(blobID)
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(6), objSize)
+
+	t.Run("error with non-existent object", func(t *testing.T) {
+		_, err := repo.GetObjectSize(ZeroHash)
+		assert.NotNil(t, err)
+	})
+
+	t.Run("empty blob", func(t *testing.T) {
+		emptyBlobID, err := repo.WriteBlob([]byte{})
+		require.Nil(t, err)
+
+		size, err := repo.GetObjectSize(emptyBlobID)
+		assert.Nil(t, err)
+		assert.Equal(t, uint64(0), size)
+	})
+
+	t.Run("various sizes", func(t *testing.T) {
+		sizes := []int{1, 10, 100, 1000}
+		for _, sz := range sizes {
+			content := make([]byte, sz)
+			for i := range content {
+				content[i] = byte(i % 256)
+			}
+
+			blobID, err := repo.WriteBlob(content)
+			require.Nil(t, err)
+
+			objSize, err := repo.GetObjectSize(blobID)
+			assert.Nil(t, err)
+			assert.Equal(t, uint64(sz), objSize) //nolint:gosec // Test size comparison
+		}
+	})
+
+	t.Run("different object types", func(t *testing.T) {
+		emptyTreeID, err := repo.EmptyTree()
+		require.Nil(t, err)
+
+		size, err := repo.GetObjectSize(emptyTreeID)
+		assert.Nil(t, err)
+		assert.GreaterOrEqual(t, size, uint64(0))
+
+		commitID, err := repo.Commit(emptyTreeID, "refs/heads/size-test", "Test\n", false)
+		require.Nil(t, err)
+
+		size, err = repo.GetObjectSize(commitID)
+		assert.Nil(t, err)
+		assert.Greater(t, size, uint64(0))
+	})
 }

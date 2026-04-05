@@ -913,3 +913,19 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
 	})
 }
+
+func TestCreateRemoteError(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	remoteName := "origin"
+	remoteURL := "git@example.com:repo.git"
+
+	// Add remote
+	err := repo.CreateRemote(remoteName, remoteURL)
+	assert.Nil(t, err)
+
+	// Try to add same remote again - should fail
+	err = repo.CreateRemote(remoteName, remoteURL)
+	assert.NotNil(t, err)
+}

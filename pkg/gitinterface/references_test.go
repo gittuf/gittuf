@@ -30,6 +30,11 @@ func TestGetReference(t *testing.T) {
 	refTip, err := repo.GetReference(refName)
 	assert.Nil(t, err)
 	assert.Equal(t, commitID, refTip)
+
+	t.Run("reference not found", func(t *testing.T) {
+		_, err := repo.GetReference("refs/heads/nonexistent")
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
 }
 
 func TestSetReference(t *testing.T) {
@@ -62,6 +67,16 @@ func TestSetReference(t *testing.T) {
 	refTip, err = repo.GetReference(refName)
 	require.Nil(t, err)
 	assert.Equal(t, firstCommitID, refTip)
+
+	t.Run("set new reference", func(t *testing.T) {
+		newRefName := "refs/heads/feature"
+		err = repo.SetReference(newRefName, firstCommitID)
+		assert.Nil(t, err)
+
+		refTip, err := repo.GetReference(newRefName)
+		assert.Nil(t, err)
+		assert.Equal(t, firstCommitID, refTip)
+	})
 }
 
 func TestCheckAndSetReference(t *testing.T) {
@@ -94,6 +109,15 @@ func TestCheckAndSetReference(t *testing.T) {
 	refTip, err = repo.GetReference(refName)
 	require.Nil(t, err)
 	assert.Equal(t, firstCommitID, refTip)
+
+	t.Run("error when expected value doesn't match", func(t *testing.T) {
+		err = repo.CheckAndSetReference(refName, secondCommitID, secondCommitID)
+		assert.NotNil(t, err)
+
+		refTip, err := repo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, firstCommitID, refTip)
+	})
 }
 
 func TestGetSymbolicReferenceTarget(t *testing.T) {
@@ -116,6 +140,11 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 	head, err := repo.GetSymbolicReferenceTarget("HEAD")
 	assert.Nil(t, err)
 	assert.Equal(t, refName, head)
+
+	t.Run("error with non-symbolic ref", func(t *testing.T) {
+		_, err = repo.GetSymbolicReferenceTarget("refs/heads/main")
+		assert.NotNil(t, err)
+	})
 }
 
 func TestSetSymbolicReference(t *testing.T) {
@@ -144,6 +173,21 @@ func TestSetSymbolicReference(t *testing.T) {
 	head, err = repo.GetSymbolicReferenceTarget("HEAD")
 	require.Nil(t, err)
 	assert.Equal(t, refName, head) // not main anymore
+
+	t.Run("create new symbolic reference", func(t *testing.T) {
+		symRefName := "refs/heads/current"
+		err = repo.SetSymbolicReference(symRefName, refName)
+		assert.Nil(t, err)
+
+		target, err := repo.GetSymbolicReferenceTarget(symRefName)
+		assert.Nil(t, err)
+		assert.Equal(t, refName, target)
+	})
+
+	t.Run("error with invalid target", func(t *testing.T) {
+		err := repo.SetSymbolicReference("HEAD", "")
+		assert.NotNil(t, err)
+	})
 }
 
 func TestRepositoryRefSpec(t *testing.T) {
@@ -359,6 +403,11 @@ func TestDeleteReference(t *testing.T) {
 
 	_, err = repo.GetReference(refName)
 	assert.ErrorIs(t, err, ErrReferenceNotFound)
+
+	t.Run("delete non-existent reference", func(t *testing.T) {
+		err := repo.DeleteReference("refs/heads/nonexistent")
+		assert.Nil(t, err)
+	})
 }
 
 func TestRemoteReferenceName(t *testing.T) {
@@ -387,5 +436,79 @@ func TestRemoteReferenceName(t *testing.T) {
 	for name, test := range tests {
 		referenceName := RemoteReferenceName(test.input)
 		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+	}
+}
+
+func TestCustomReferenceName(t *testing.T) {
+	tests := map[string]struct {
+		input    string
+		expected string
+	}{
+		"adds prefix if missing": {
+			input:    "custom/ref",
+			expected: "refs/custom/ref",
+		},
+		"keeps prefix if already present": {
+			input:    "refs/custom/ref",
+			expected: "refs/custom/ref",
+		},
+		"simple name": {
+			input:    "myref",
+			expected: "refs/myref",
+		},
+	}
+
+	for name, test := range tests {
+		referenceName := CustomReferenceName(test.input)
+		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected custom reference for input %s", name))
+	}
+}
+
+func TestAbsoluteReference(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	_, err = repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	require.Nil(t, err)
+
+	tests := map[string]struct {
+		input    string
+		expected string
+		hasError bool
+	}{
+		"short branch name": {
+			input:    "main",
+			expected: "refs/heads/main",
+		},
+		"full branch reference": {
+			input:    "refs/heads/main",
+			expected: "refs/heads/main",
+		},
+		"HEAD symbolic ref": {
+			input:    "HEAD",
+			expected: "refs/heads/main",
+		},
+		"non-existent ref": {
+			input:    "nonexistent",
+			hasError: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			result, err := repo.AbsoluteReference(test.input)
+			if test.hasError {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, test.expected, result)
+			}
+		})
 	}
 }
