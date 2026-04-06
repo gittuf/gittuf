@@ -20,7 +20,7 @@ require (
 	github.com/sigstore/sigstore-go v1.1.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	github.com/yuin/gopher-lua v1.1.1
+	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/crypto v0.49.0
 	google.golang.org/protobuf v1.36.11
 )
