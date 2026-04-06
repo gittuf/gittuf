@@ -29,10 +29,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.signer = msg.signer
 		m.rules = msg.rules
 		m.globalRules = msg.globalRules
+		m.propagationDirectives = msg.propagationDirectives
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
 		m.updateRuleList()
 		m.updateGlobalRuleList()
+		m.updatePropagationList()
 		m.screen = screenChoice
 		return m, nil
 
@@ -49,6 +51,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trustScreenList.SetSize(msg.Width-h, msg.Height-v)
 		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
 		m.globalRuleList.SetSize(msg.Width-h, msg.Height-v)
+		m.propagationList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
 		// Delete confirmation overlay intercepts all keys
@@ -63,7 +66,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
+				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
+				m.screen != screenTrustAddPropagationDirective && m.screen != screenTrustEditPropagationDirective {
 				return m, tea.Quit
 			}
 		case "esc":
@@ -79,6 +83,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTrust
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.screen = screenTrustGlobalRules
+			case screenTrustPropagationDirectives:
+				m.screen = screenTrust
+			case screenTrustAddPropagationDirective, screenTrustEditPropagationDirective:
+				m.screen = screenTrustPropagationDirectives
 			}
 			return m, nil
 		}
@@ -89,7 +97,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
-		case screenPolicyRules, screenTrustGlobalRules:
+		case screenPolicyRules, screenTrustGlobalRules, screenTrustPropagationDirectives:
 			return m.handleRulesListKey(msg)
 		case screenPolicyAddRule, screenPolicyEditRule:
 			if msg.String() == "enter" {
@@ -102,6 +110,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 			if msg.String() == "enter" {
 				return m.handleGlobalFormSubmit()
+			}
+			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
+				m.cycleFocus(msg.String())
+				return m, nil
+			}
+		case screenTrustAddPropagationDirective, screenTrustEditPropagationDirective:
+			if msg.String() == "enter" {
+				return m.handlePropagationFormSubmit()
 			}
 			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
 				m.cycleFocus(msg.String())
@@ -122,7 +138,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ruleList, cmd = m.ruleList.Update(msg)
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+	case screenTrustPropagationDirectives:
+		m.propagationList, cmd = m.propagationList.Update(msg)
+	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule,
+		screenTrustAddPropagationDirective, screenTrustEditPropagationDirective:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	}
 
@@ -147,9 +166,15 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.refreshRules()
 		}
 	case screenTrust:
-		if _, ok := m.trustScreenList.SelectedItem().(item); ok {
-			m.screen = screenTrustGlobalRules
-			m.refreshGlobalRules()
+		if i, ok := m.trustScreenList.SelectedItem().(item); ok {
+			switch i.title {
+			case "View Global Rules":
+				m.screen = screenTrustGlobalRules
+				m.refreshGlobalRules()
+			case "View Propagation Directives":
+				m.screen = screenTrustPropagationDirectives
+				m.refreshPropagationDirectives()
+			}
 		}
 	}
 	return m, nil
@@ -162,18 +187,23 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// add rule
 		case "a":
-			if m.screen == screenPolicyRules {
+			switch m.screen {
+			case screenPolicyRules:
 				m.initRuleInputs()
 				m.screen = screenPolicyAddRule
-			} else {
+			case screenTrustGlobalRules:
 				m.initGlobalRuleInputs()
 				m.screen = screenTrustAddGlobalRule
+			case screenTrustPropagationDirectives:
+				m.initPropagationInputs()
+				m.screen = screenTrustAddPropagationDirective
 			}
 			return m, nil
 
 		// edit rule
 		case "e":
-			if m.screen == screenPolicyRules {
+			switch m.screen {
+			case screenPolicyRules:
 				if sel, ok := m.ruleList.SelectedItem().(item); ok {
 					for _, r := range m.rules {
 						if r.name == sel.title {
@@ -183,12 +213,22 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-			} else {
+			case screenTrustGlobalRules:
 				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
 					for _, gr := range m.globalRules {
 						if gr.ruleName == sel.title {
 							m.initGlobalRuleInputsPrefilled(gr)
 							m.screen = screenTrustEditGlobalRule
+							return m, nil
+						}
+					}
+				}
+			case screenTrustPropagationDirectives:
+				if sel, ok := m.propagationList.SelectedItem().(item); ok {
+					for _, pd := range m.propagationDirectives {
+						if pd.name == sel.title {
+							m.initPropagationInputsPrefilled(pd)
+							m.screen = screenTrustEditPropagationDirective
 							return m, nil
 						}
 					}
@@ -199,10 +239,13 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "d":
 			var sel item
 			var ok bool
-			if m.screen == screenPolicyRules {
+			switch m.screen {
+			case screenPolicyRules:
 				sel, ok = m.ruleList.SelectedItem().(item)
-			} else {
+			case screenTrustGlobalRules:
 				sel, ok = m.globalRuleList.SelectedItem().(item)
+			case screenTrustPropagationDirectives:
+				sel, ok = m.propagationList.SelectedItem().(item)
 			}
 			if ok {
 				m.confirmDelete = true
@@ -226,10 +269,13 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Delegate unhandled keys to the active list for navigation (up/down arrows, etc.)
 	var cmd tea.Cmd
-	if m.screen == screenPolicyRules {
+	switch m.screen {
+	case screenPolicyRules:
 		m.ruleList, cmd = m.ruleList.Update(msg)
-	} else {
+	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
+	case screenTrustPropagationDirectives:
+		m.propagationList, cmd = m.propagationList.Update(msg)
 	}
 	return m, cmd
 }
@@ -251,6 +297,13 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.footer = "Global rule removed!"
 				m.refreshGlobalRules()
+			}
+		case screenTrustPropagationDirectives:
+			if err := repoRemovePropagationDirective(m.ctx, m.options, m.deleteTarget); err != nil {
+				m.errorMsg = fmt.Sprintf("Error removing propagation directive: %v", err)
+			} else {
+				m.footer = "Propagation directive removed!"
+				m.refreshPropagationDirectives()
 			}
 		}
 	}
@@ -406,4 +459,43 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+// handlePropagationFormSubmit handles enter on propagation directive add/edit form screens.
+func (m model) handlePropagationFormSubmit() (tea.Model, tea.Cmd) {
+	if m.focusIndex < len(m.inputs)-1 {
+		m.cycleFocus("tab")
+		return m, nil
+	}
+
+	pd := propagationDirective{
+		name:                strings.TrimSpace(m.inputs[0].Value()),
+		upstreamRepository:  strings.TrimSpace(m.inputs[1].Value()),
+		upstreamReference:   strings.TrimSpace(m.inputs[2].Value()),
+		upstreamPath:        strings.TrimSpace(m.inputs[3].Value()),
+		downstreamReference: strings.TrimSpace(m.inputs[4].Value()),
+		downstreamPath:      strings.TrimSpace(m.inputs[5].Value()),
+	}
+
+	var err error
+	switch m.screen {
+	case screenTrustAddPropagationDirective:
+		err = repoAddPropagationDirective(m.ctx, m.options, pd)
+	case screenTrustEditPropagationDirective:
+		err = repoUpdatePropagationDirective(m.ctx, m.options, pd)
+	}
+
+	if err != nil {
+		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		return m, nil
+	}
+
+	m.refreshPropagationDirectives()
+	if m.screen == screenTrustAddPropagationDirective {
+		m.footer = "Propagation directive added!"
+	} else {
+		m.footer = "Propagation directive updated!"
+	}
+	m.screen = screenTrustPropagationDirectives
+	return m, nil
 }
