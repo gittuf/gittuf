@@ -17,6 +17,11 @@ type rule struct {
 	threshold int
 }
 
+func repoAddPrincipaltoTargets(ctx context.Context, o *options) error {
+	// call AddPrincipalToTargets
+	return nil
+}
+
 // getCurrRules returns the current rules from the policy file.
 func getCurrRules(ctx context.Context, o *options) []rule {
 	repo, err := gittuf.LoadRepository(".")
