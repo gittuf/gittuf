@@ -1,10 +1,10 @@
 ## gittuf rsl record
 
-Record latest state of a Git reference in the RSL
+Record latest state of a Git reference (e.g., 'main') in the RSL
 
 ### Synopsis
 
-The 'record' command records the latest state of a Git reference in the repository's RSL. It is used to capture and track changes to references over time for auditing and consistency.
+The 'record' command records the latest state of a Git reference in the repository's RSL. The argument must be a valid Git reference (such as 'main', 'HEAD', or a tag name). For example: 'gittuf rsl record --local-only main'. This command is used to capture and track changes to references over time for auditing and consistency.
 
 ```
 gittuf rsl record [flags]
