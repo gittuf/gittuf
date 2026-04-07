@@ -203,12 +203,17 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 			// In protocol v2, this should now go to our parent process
 			// requesting ls-refs
+			hasRefPrefix := false
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
 
+				if bytes.Contains(input, []byte("ref-prefix")) {
+					hasRefPrefix = true
+				}
+
 				// Add ref-prefix refs/gittuf/ to the ls-refs command before
-				// flush
-				if bytes.Equal(input, flushPkt) {
+				// flush, but only if the client sent ref-prefixes
+				if bytes.Equal(input, flushPkt) && hasRefPrefix {
 					log("adding ref-prefix for refs/gittuf/")
 					gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
 					if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {
