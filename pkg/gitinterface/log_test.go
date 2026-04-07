@@ -5,7 +5,6 @@ package gitinterface
 
 import (
 	"fmt"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,11 +39,8 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], allCommits[0])
 		assert.Nil(t, err)
 
+		// Linear history: topo-order is deterministic (newest first)
 		expectedCommits := []Hash{allCommits[4], allCommits[3], allCommits[2], allCommits[1]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
 		assert.Equal(t, expectedCommits, commits)
 	})
 
@@ -109,32 +105,23 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		// Check merge to first commit in main branch (not initial common commit)
 		expectedCommits := append([]Hash{mergeCommit}, mainBranchCommits[1:]...)
 		expectedCommits = append(expectedCommits, featureBranchCommits...)
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
 		commits, err := repo.GetCommitsBetweenRange(mergeCommit, mainBranchCommits[0])
 		assert.Nil(t, err)
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, expectedCommits, commits)
 
 		// Check merge to first commit in feature branch (not initial common commit)
 		expectedCommits = append([]Hash{mergeCommit}, featureBranchCommits[1:]...)
 		expectedCommits = append(expectedCommits, mainBranchCommits...)
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
 		commits, err = repo.GetCommitsBetweenRange(mergeCommit, featureBranchCommits[0])
 		assert.Nil(t, err)
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, expectedCommits, commits)
 
 		// Check merge to initial common commit
 		expectedCommits = append([]Hash{mergeCommit}, mainBranchCommits...)
 		expectedCommits = append(expectedCommits, featureBranchCommits...)
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
 		commits, err = repo.GetCommitsBetweenRange(mergeCommit, commonCommit)
 		assert.Nil(t, err)
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, expectedCommits, commits)
 
 		// Set both branches to merge commit, diverge again
 		if err := repo.SetReference(mainBranch, mergeCommit); err != nil {
@@ -172,22 +159,16 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		// Check range between two merge commits
 		expectedCommits = append([]Hash{newMergeCommit}, mainBranchCommits...)
 		expectedCommits = append(expectedCommits, featureBranchCommits...)
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
 		commits, err = repo.GetCommitsBetweenRange(newMergeCommit, mergeCommit)
 		assert.Nil(t, err)
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, expectedCommits, commits)
 	})
 
 	t.Run("Get all commits", func(t *testing.T) {
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := allCommits
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
+		// Linear history: topo-order is deterministic (newest first)
+		expectedCommits := []Hash{allCommits[4], allCommits[3], allCommits[2], allCommits[1], allCommits[0]}
 		assert.Equal(t, expectedCommits, commits)
 	})
 
@@ -264,65 +245,35 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 		// commit 2 is the first child of commit 1, so only it and commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[1], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := []Hash{commitIDs[1], commitIDs[0]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, []Hash{commitIDs[1], commitIDs[0]}, commits)
 	})
 
 	t.Run("Test commit 3", func(t *testing.T) {
 		// commit 3 is the second child of commit 1, so only it and commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[2], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := []Hash{commitIDs[0], commitIDs[2]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, []Hash{commitIDs[0], commitIDs[2]}, commits)
 	})
 
 	t.Run("Test commit 4", func(t *testing.T) {
 		// commit 4 is the child of commit 2, so only it, commit 2, and commit 2's parent commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[3], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := []Hash{commitIDs[1], commitIDs[0], commitIDs[3]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, []Hash{commitIDs[1], commitIDs[0], commitIDs[3]}, commits)
 	})
 
 	t.Run("Test commit 5, the merge commit", func(t *testing.T) {
 		// commit 5 is the merge commit of commit 2 and commit 3, so it should return commit 5, commit 2, commit 3, and commit 1 (the parent of commit 2 and commit 3)
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[4], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := []Hash{commitIDs[4], commitIDs[1], commitIDs[0], commitIDs[2]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, []Hash{commitIDs[4], commitIDs[1], commitIDs[0], commitIDs[2]}, commits)
 	})
 
 	t.Run("Test commit 6", func(t *testing.T) {
 		// commit 6 is the child of commit 3, so it should return commit 6, commit 3, and commit 1 (the parent of commit 3)
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[5], ZeroHash)
 		assert.Nil(t, err)
-
-		expectedCommits := []Hash{commitIDs[0], commitIDs[5], commitIDs[2]}
-		sort.Slice(expectedCommits, func(i, j int) bool {
-			return expectedCommits[i].String() < expectedCommits[j].String()
-		})
-
-		assert.Equal(t, expectedCommits, commits)
+		assert.ElementsMatch(t, []Hash{commitIDs[0], commitIDs[5], commitIDs[2]}, commits)
 	})
 }
 
