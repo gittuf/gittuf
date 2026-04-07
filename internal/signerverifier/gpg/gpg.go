@@ -24,7 +24,7 @@ import (
 const (
 	KeyType = "gpg"
 
-	defaultGPGProgram = "gpg"
+	DefaultGPGProgram = "gpg"
 )
 
 // Verifier is a dsse.Verifier implementation for GPG keys.
@@ -98,7 +98,7 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 }
 
 func NewSignerFromKeyID(keyID string, opts ...SignerOption) (*Signer, error) {
-	options := &SignerOptions{program: defaultGPGProgram}
+	options := &SignerOptions{program: DefaultGPGProgram}
 	for _, fn := range opts {
 		fn(options)
 	}

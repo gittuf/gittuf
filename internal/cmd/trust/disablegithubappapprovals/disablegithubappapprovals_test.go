@@ -137,7 +137,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -208,7 +208,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		if err != nil {
 			t.Fatal(err)
 		}

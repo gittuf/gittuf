@@ -16,6 +16,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -40,7 +41,7 @@ var (
 
 // LoadPublicKey returns a signerverifier.SSLibKey object for a PGP / Sigstore
 // Fulcio / SSH (on-disk) key for use in gittuf metadata.
-func LoadPublicKey(keyRef string) (tuf.Principal, error) {
+func LoadPublicKey(repo *Repository, keyRef string) (tuf.Principal, error) {
 	var (
 		keyObj *signerverifier.SSLibKey
 		err    error
@@ -50,7 +51,24 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	case strings.HasPrefix(keyRef, GPGKeyPrefix):
 		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(keyRef, GPGKeyPrefix)))
 
-		command := exec.Command("gpg", "--export", "--armor", fingerprint)
+		program := gpg.DefaultGPGProgram
+		var config map[string]string
+		if repo != nil {
+			config, err = gitinterface.GetGitConfig(repo.r.GetGitDir())
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			config, err = gitinterface.GetGitConfig("")
+			if err != nil {
+				return nil, err
+			}
+		}
+		if value, has := config["gpg.program"]; has {
+			program = value
+		}
+
+		command := exec.Command(program, "--export", "--armor", fingerprint) //nolint:gosec
 		stdOut, err := command.Output()
 		if err != nil {
 			return nil, err
@@ -89,7 +107,7 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 // LoadPublicKeyFromGitConfig loads a public key as with LoadPublicKey above,
 // but from the key specified in the Git configuration of the target repository.
 func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
-	config, err := repo.r.GetGitConfig()
+	config, err := gitinterface.GetGitConfig(repo.r.GetGitDir())
 	if err != nil {
 		return nil, err
 	}
@@ -120,17 +138,17 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	case signingMethodGPG:
 		// GPG
 		// Load a GPG signer from the specified key
-		return LoadPublicKey(fmt.Sprintf("%s:%s", "gpg", signingKey))
+		return LoadPublicKey(repo, fmt.Sprintf("%s:%s", "gpg", signingKey))
 	case signingMethodSSH:
 		// SSH
 		// Load an SSH signer from the specified key
-		return LoadPublicKey(signingKey)
+		return LoadPublicKey(repo, signingKey)
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
 		if config["gpg.x509.program"] == "gitsign" {
 			// gitsign
-			return LoadPublicKey(fmt.Sprintf("%s:%s", "fulcio", signingKey))
+			return LoadPublicKey(repo, fmt.Sprintf("%s:%s", "fulcio", signingKey))
 		}
 		return nil, ErrUnsupportedX509Method
 	default:
@@ -152,16 +170,14 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		keyID := strings.TrimPrefix(key, GPGKeyPrefix)
 
-		gitRepo := repo.GetGitRepository()
-		config, err := gitRepo.GetGitConfig()
+		config, err := gitinterface.GetGitConfig(repo.GetGitRepository().GetGitDir())
 		if err != nil {
 			return nil, err
 		}
 
 		return gpg.NewSignerFromKeyID(keyID, getGPGOptions(config)...)
 	case strings.HasPrefix(key, FulcioPrefix):
-		gitRepo := repo.GetGitRepository()
-		config, err := gitRepo.GetGitConfig()
+		config, err := gitinterface.GetGitConfig(repo.GetGitRepository().GetGitDir())
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +191,7 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 // LoadSignerFromGitConfig loads a metadata signer for the signing key specified
 // in the Git configuration of the target repository.
 func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error) {
-	config, err := repo.r.GetGitConfig()
+	config, err := gitinterface.GetGitConfig(repo.r.GetGitDir())
 	if err != nil {
 		return nil, err
 	}
