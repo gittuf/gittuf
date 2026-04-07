@@ -159,7 +159,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 				case sigstore.KeyType:
 					slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
 					opts := []sigstoreverifieropts.Option{}
-					config, err := v.repository.GetGitConfig()
+					config, err := gitinterface.GetGitConfig(v.repository)
 					if err != nil {
 						return nil, err
 					}

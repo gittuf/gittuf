@@ -5,15 +5,30 @@ package gitinterface
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 )
 
-// GetGitConfig reads the applicable Git config for a repository and returns
-// it. The "keys" for each config are normalized to lowercase.
-func (r *Repository) GetGitConfig() (map[string]string, error) {
-	stdOut, err := r.executor("config", "--get-regexp", `.*`).executeString()
-	if err != nil {
-		return nil, fmt.Errorf("unable to read Git config: %w", err)
+// GetGitConfig reads the applicable Git config for a repository and returns it.
+// If the supplied repository is nil, the system or global Git config will be
+// used as per
+// https://github.com/ayuxsh009/gittuf/tree/fix/gpg-program-publickey-path. The
+// "keys" for each config are normalized to lowercase.
+func GetGitConfig(repo *Repository) (map[string]string, error) {
+	var stdOut string
+	var err error
+
+	if repo != nil {
+		stdOut, err = repo.executor("config", "--get-regexp", `.*`).executeString()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read Git config: %w", err)
+		}
+	} else {
+		output, err := exec.Command("config", "--global", "--get-regexp", `.*`).Output()
+		if err != nil {
+			return nil, fmt.Errorf("unable to read Git config: %w", err)
+		}
+		stdOut = string(output)
 	}
 
 	config := map[string]string{}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 type logWriteCloser struct {
@@ -164,7 +165,7 @@ func getSSHCommand(repo *gittuf.Repository) ([]string, error) {
 		return []string{sshCmd}, nil
 	}
 
-	config, err := repo.GetGitRepository().GetGitConfig()
+	config, err := gitinterface.GetGitConfig(repo.GetGitRepository())
 	if err != nil {
 		return nil, err
 	}
