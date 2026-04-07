@@ -38,6 +38,8 @@ var (
 	ErrUnsupportedX509Method    = errors.New("unsupported X509 certificate specified in Git configuration")
 )
 
+const defaultGPGProgram = "gpg"
+
 // LoadPublicKey returns a signerverifier.SSLibKey object for a PGP / Sigstore
 // Fulcio / SSH (on-disk) key for use in gittuf metadata.
 func LoadPublicKey(keyRef string) (tuf.Principal, error) {
@@ -50,7 +52,15 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	case strings.HasPrefix(keyRef, GPGKeyPrefix):
 		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(keyRef, GPGKeyPrefix)))
 
-		command := exec.Command("gpg", "--export", "--armor", fingerprint)
+		program := defaultGPGProgram
+		configCommand := exec.Command("git", "config", "--get", "gpg.program")
+		if stdOut, err := configCommand.Output(); err == nil {
+			if configuredProgram := strings.TrimSpace(string(stdOut)); configuredProgram != "" {
+				program = configuredProgram
+			}
+		}
+
+		command := exec.Command(program, "--export", "--armor", fingerprint) //nolint:gosec
 		stdOut, err := command.Output()
 		if err != nil {
 			return nil, err
