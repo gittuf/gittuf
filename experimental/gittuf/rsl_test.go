@@ -4,6 +4,7 @@
 package gittuf
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1749,5 +1752,184 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("controller repository metadata is propagated", func(t *testing.T) {
+		controllerRepoLocation := t.TempDir()
+		controllerRepo := createTestRepositoryWithRoot(t, controllerRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
+		err := downstreamRepo.AddControllerRepository(testCtx, signer, "controller", controllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		assert.Equal(t, controllerRepoLocation, propagationEntry.UpstreamRepository)
+		assert.Equal(t, policy.PolicyRef, propagationEntry.RefName)
+
+		controllerPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(controllerRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, controllerPolicyEntry.GetID(), propagationEntry.UpstreamEntryID)
+
+		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(controllerPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerMetadataTreeID, err := controllerRepo.r.GetPathIDInTree("metadata", controllerPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(downstreamRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepoLocation))
+		controllerPath := fmt.Sprintf("%s/controller-%s", tuf.GittufControllerPrefix, encodedLocation)
+		propagatedControllerTreeID, err := downstreamRepo.r.GetPathIDInTree(controllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, controllerMetadataTreeID, propagatedControllerTreeID)
+	})
+
+	t.Run("transitive controller repository metadata is resolved and propagated", func(t *testing.T) {
+		leafControllerRepoLocation := t.TempDir()
+		leafControllerRepo := createTestRepositoryWithRoot(t, leafControllerRepoLocation)
+
+		directControllerRepoLocation := t.TempDir()
+		directControllerRepo := createTestRepositoryWithRoot(t, directControllerRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
+		err := directControllerRepo.AddControllerRepository(testCtx, signer, "leaf-controller", leafControllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := directControllerRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := directControllerRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		err = downstreamRepo.AddControllerRepository(testCtx, signer, "direct-controller", directControllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		previousLatestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		propagationEntries := []*rsl.PropagationEntry{}
+		for !latestEntry.GetID().Equal(previousLatestEntry.GetID()) {
+			propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+			if !isPropagationEntry {
+				t.Fatal("unexpected entry type in downstream repo")
+			}
+			propagationEntries = append(propagationEntries, propagationEntry)
+
+			latestEntry, err = rsl.GetParentForEntry(downstreamRepo.r, latestEntry)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		assert.Equal(t, 2, len(propagationEntries))
+		expectedLocations := set.NewSetFromItems(directControllerRepoLocation, leafControllerRepoLocation)
+		for _, propagationEntry := range propagationEntries {
+			expectedLocations.Remove(propagationEntry.UpstreamRepository)
+			assert.Equal(t, policy.PolicyRef, propagationEntry.RefName)
+		}
+		assert.Equal(t, 0, expectedLocations.Len())
+
+		downstreamPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(downstreamRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedDirectControllerLocation := base64.URLEncoding.EncodeToString([]byte(directControllerRepoLocation))
+		directControllerPath := fmt.Sprintf("%s/direct-controller-%s", tuf.GittufControllerPrefix, encodedDirectControllerLocation)
+		_, err = downstreamRepo.r.GetPathIDInTree(directControllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedLeafControllerLocation := base64.URLEncoding.EncodeToString([]byte(leafControllerRepoLocation))
+		leafControllerPath := fmt.Sprintf("%s/leaf-controller-%s", tuf.GittufControllerPrefix, encodedLeafControllerLocation)
+		propagatedLeafControllerTreeID, err := downstreamRepo.r.GetPathIDInTree(leafControllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		leafControllerPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(leafControllerRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(leafControllerPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafControllerMetadataTreeID, err := leafControllerRepo.r.GetPathIDInTree("metadata", leafControllerPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, leafControllerMetadataTreeID, propagatedLeafControllerTreeID)
 	})
 }
