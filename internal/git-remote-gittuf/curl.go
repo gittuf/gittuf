@@ -426,6 +426,9 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 
 					refSpec := strings.TrimPrefix(pushCommandString, "push ")
 					refSpecSplit := strings.Split(refSpec, ":")
+					if len(refSpecSplit) < 2 {
+						return nil, false, fmt.Errorf("invalid refspec %q: expected format src:dst", refSpec)
+					}
 
 					srcRef := refSpecSplit[0]
 					srcRef = strings.TrimPrefix(srcRef, "+") // force push
