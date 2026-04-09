@@ -138,4 +138,48 @@ func TestStatus(t *testing.T) {
 	statuses, err = repo.Status()
 	assert.Nil(t, err)
 	assert.Empty(t, statuses)
+
+	// Rename one of the existing files
+	renamedPath := "baz"
+	if _, err := repo.executor("mv", filename, renamedPath).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		renamedPath: {X: StatusCodeRenamed, Y: StatusCodeUnmodified},
+	}, statuses)
+
+	// Commit the rename
+	if _, err := repo.executor("commit", "-m", "Commit\n").executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Empty(t, statuses)
+
+	// Test that rename is parsed correctly alongside other changes in the same
+	// status output. This validates that the NUL-separated source-path token
+	// for the rename is consumed so subsequent entries are not mis-parsed.
+	renamedPath2 := "quux"
+	newFile := "qux"
+
+	if _, err := repo.executor("mv", renamedPath, renamedPath2).executeString(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newFile, []byte("qux"), 0o644); err != nil { //nolint:gosec
+		t.Fatal(err)
+	}
+	if _, err := repo.executor("add", newFile).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		renamedPath2: {X: StatusCodeRenamed, Y: StatusCodeUnmodified},
+		newFile:      {X: StatusCodeAdded, Y: StatusCodeUnmodified},
+	}, statuses)
 }
