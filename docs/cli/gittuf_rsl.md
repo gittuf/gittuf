@@ -28,7 +28,7 @@ The 'rsl' subcommand provides tools for managing the repository's Reference Stat
 * [gittuf rsl annotate](gittuf_rsl_annotate.md)	 - Annotate prior RSL entries
 * [gittuf rsl log](gittuf_rsl_log.md)	 - Display the repository's Reference State Log
 * [gittuf rsl propagate](gittuf_rsl_propagate.md)	 - Propagate contents of remote repositories into local repository
-* [gittuf rsl record](gittuf_rsl_record.md)	 - Record latest state of a Git reference in the RSL
+* [gittuf rsl record](gittuf_rsl_record.md)	 - Record latest state of a Git reference (e.g., 'main') in the RSL
 * [gittuf rsl remote](gittuf_rsl_remote.md)	 - Tools for managing remote RSLs
 * [gittuf rsl skip-rewritten](gittuf_rsl_skip-rewritten.md)	 - Creates an RSL annotation to skip RSL reference entries that point to commits that do not exist in the specified ref
 
