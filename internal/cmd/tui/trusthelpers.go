@@ -9,6 +9,9 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
+	"github.com/gittuf/gittuf/internal/cmd/tui/trust"
+	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -141,4 +144,113 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+// getRootConfig returns the root configuration state for the TUI.
+func getRootConfig(ctx context.Context, o *options) (trust.Model, error) {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return trust.Model{}, err
+	}
+
+	state, err := policy.LoadCurrentState(ctx, repo.GetGitRepository(), policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return trust.Model{}, err
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return trust.Model{}, err
+	}
+
+	threshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		return trust.Model{}, err
+	}
+
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return trust.Model{}, err
+	}
+
+	principalIDs := make([]string, len(principals))
+	for i, principal := range principals {
+		principalIDs[i] = principal.ID()
+	}
+
+	return trust.InitialModel(rootMetadata.GetRepositoryLocation(), threshold, principalIDs), nil
+}
+
+func repoUpdateRootConfig(ctx context.Context, o *options, updated trust.UpdatedTrustMsg, current trust.Model) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	if updated.Threshold != current.OriginalThreshold {
+		if err := repo.UpdateRootThreshold(ctx, signer, updated.Threshold, true, opts...); err != nil {
+			return err
+		}
+	}
+
+	if updated.RepoPath != current.OriginalRepoPath {
+		if err := repo.SetRepositoryLocation(ctx, signer, updated.RepoPath, true, opts...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func repoAddRootKey(ctx context.Context, o *options, keyRef string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	newRootKey, err := gittuf.LoadPublicKey(keyRef)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.AddRootKey(ctx, signer, newRootKey, true, opts...)
+}
+
+func repoRemoveRootKey(ctx context.Context, o *options, keyID string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.RemoveRootKey(ctx, signer, keyID, true, opts...)
 }

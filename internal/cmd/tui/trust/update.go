@@ -26,6 +26,15 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return UpdatedTrustMsg{Threshold: m.Threshold, RepoPath: m.RepoPath.Value()}
 			}
 
+		case "s":
+			if m.IsEditing {
+				m.IsEditing = false
+				m.RepoPath.Blur()
+			}
+			return m, func() tea.Msg {
+				return UpdatedTrustMsg{Threshold: m.Threshold, RepoPath: m.RepoPath.Value()}
+			}
+
 		case "up", "down":
 			if !m.IsEditing {
 				if msg.String() == "up" {

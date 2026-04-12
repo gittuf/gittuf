@@ -17,10 +17,20 @@ func (m Model) View() string {
 	s += fmt.Sprintf("Threshold: %d (Use ↑/↓ to change)\n", m.Threshold)
 	s += fmt.Sprintf("Repository: %s\n\n", m.RepoPath.View())
 
-	if m.IsEditing {
-		s += styleHint.Render("(Press 'e' to save)")
+	s += "Root Principals:\n"
+	if len(m.Principals) == 0 {
+		s += "  None configured\n\n"
 	} else {
-		s += styleHint.Render("(Press 'e' to edit path, 'q' to quit)")
+		for _, principalID := range m.Principals {
+			s += fmt.Sprintf("  %s\n", principalID)
+		}
+		s += "\n"
+	}
+
+	if m.IsEditing {
+		s += styleHint.Render("(Press 'e' or 's' to save)")
+	} else {
+		s += styleHint.Render("(Press 'e' to edit path, 's' to save changes, 'q' to quit)")
 	}
 
 	return s

@@ -103,6 +103,28 @@ func screenPolicyRulesHelp(readOnly bool) string {
 }
 
 // screenTrustGlobalRulesHelp returns the help bar for the global rules view screen.
+func screenTrustRootConfigHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"p: principals  esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"p: principals  e: edit repo location  s: save changes  ↑/↓: change threshold  esc: back  q: quit",
+	)
+}
+
+func screenTrustRootKeysHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  d: delete  esc: back  q: quit",
+	)
+}
+
 func screenTrustGlobalRulesHelp(readOnly bool) string {
 	if readOnly {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
@@ -171,6 +193,25 @@ func (m model) View() string {
 
 		emptyMsg := "No rules configured. Press 'A' to add one."
 		return m.renderListScreen(m.globalRuleList, overlay+screenTrustGlobalRulesHelp(m.readOnly)+hint, emptyMsg, len(m.globalRules) == 0)
+	case screenTrustRootConfig:
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to root metadata.",
+			)
+		}
+		return renderWithMargin(
+			m.trustConfig.View() + "\n" + screenTrustRootConfigHelp(m.readOnly) + hint + renderErrorMsg(m.errorMsg) + "\n" + renderFooter(m.footer),
+		)
+	case screenTrustRootKeys:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
+		emptyMsg := "No root principals configured. Press 'A' to add one."
+		return m.renderListScreen(m.rootKeyList, overlay+screenTrustRootKeysHelp(m.readOnly), emptyMsg, len(m.trustConfig.Principals) == 0)
+	case screenTrustAddRootKey:
+		return m.renderFormScreen("Add Root Key")
 	case screenPolicyAddRule:
 		return m.renderFormScreen("Add Rule")
 	case screenPolicyEditRule:

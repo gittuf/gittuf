@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gittuf/gittuf/internal/cmd/tui/trust"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -34,6 +35,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateRuleList()
 		m.updateGlobalRuleList()
 		m.screen = screenChoice
+		return m, nil
+
+	case trust.UpdatedTrustMsg:
+		if m.screen == screenTrustRootConfig {
+			if err := repoUpdateRootConfig(m.ctx, m.options, msg, m.trustConfig); err != nil {
+				m.errorMsg = fmt.Sprintf("Error saving root config: %v", err)
+				return m, nil
+			}
+			m.footer = "Root configuration updated!"
+			m.refreshRootConfig()
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -75,6 +87,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenPolicy
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
+			case screenTrustRootConfig, screenTrustRootKeys:
+				m.screen = screenTrust
+			case screenTrustAddRootKey:
+				m.screen = screenTrustRootKeys
 			case screenTrustGlobalRules:
 				m.screen = screenTrust
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -89,8 +105,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
-		case screenPolicyRules, screenTrustGlobalRules:
+		case screenPolicyRules, screenTrustGlobalRules, screenTrustRootKeys:
 			return m.handleRulesListKey(msg)
+		case screenTrustRootConfig:
+			if msg.String() == "p" {
+				m.screen = screenTrustRootKeys
+				m.refreshRootConfig()
+				return m, nil
+			}
+			m.trustConfig, cmd = m.trustConfig.Update(msg)
+			return m, cmd
 		case screenPolicyAddRule, screenPolicyEditRule:
 			if msg.String() == "enter" {
 				return m.handlePolicyFormSubmit()
@@ -102,6 +126,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 			if msg.String() == "enter" {
 				return m.handleGlobalFormSubmit()
+			}
+			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
+				m.cycleFocus(msg.String())
+				return m, nil
+			}
+		case screenTrustAddRootKey:
+			if msg.String() == "enter" {
+				return m.handleRootKeyFormSubmit()
 			}
 			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
 				m.cycleFocus(msg.String())
@@ -122,7 +154,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ruleList, cmd = m.ruleList.Update(msg)
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+	case screenTrustRootKeys:
+		m.rootKeyList, cmd = m.rootKeyList.Update(msg)
+	case screenTrustRootConfig:
+		m.trustConfig, cmd = m.trustConfig.Update(msg)
+	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule, screenTrustAddRootKey:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	}
 
@@ -147,9 +183,15 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.refreshRules()
 		}
 	case screenTrust:
-		if _, ok := m.trustScreenList.SelectedItem().(item); ok {
-			m.screen = screenTrustGlobalRules
-			m.refreshGlobalRules()
+		if sel, ok := m.trustScreenList.SelectedItem().(item); ok {
+			switch sel.title {
+			case "View Root Configuration":
+				m.screen = screenTrustRootConfig
+				m.refreshRootConfig()
+			case "View Global Rules":
+				m.screen = screenTrustGlobalRules
+				m.refreshGlobalRules()
+			}
 		}
 	}
 	return m, nil
@@ -160,14 +202,18 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !m.readOnly {
 		switch msg.String() {
-		// add rule
+		// add rule/root key
 		case "a":
-			if m.screen == screenPolicyRules {
+			switch m.screen {
+			case screenPolicyRules:
 				m.initRuleInputs()
 				m.screen = screenPolicyAddRule
-			} else {
+			case screenTrustGlobalRules:
 				m.initGlobalRuleInputs()
 				m.screen = screenTrustAddGlobalRule
+			case screenTrustRootKeys:
+				m.initRootKeyInputs()
+				m.screen = screenTrustAddRootKey
 			}
 			return m, nil
 
@@ -183,7 +229,7 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-			} else {
+			} else if m.screen == screenTrustGlobalRules {
 				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
 					for _, gr := range m.globalRules {
 						if gr.ruleName == sel.title {
@@ -195,14 +241,17 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		// delete rule
+		// delete rule/root key
 		case "d":
 			var sel item
 			var ok bool
-			if m.screen == screenPolicyRules {
+			switch m.screen {
+			case screenPolicyRules:
 				sel, ok = m.ruleList.SelectedItem().(item)
-			} else {
+			case screenTrustGlobalRules:
 				sel, ok = m.globalRuleList.SelectedItem().(item)
+			case screenTrustRootKeys:
+				sel, ok = m.rootKeyList.SelectedItem().(item)
 			}
 			if ok {
 				m.confirmDelete = true
@@ -226,10 +275,13 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Delegate unhandled keys to the active list for navigation (up/down arrows, etc.)
 	var cmd tea.Cmd
-	if m.screen == screenPolicyRules {
+	switch m.screen {
+	case screenPolicyRules:
 		m.ruleList, cmd = m.ruleList.Update(msg)
-	} else {
+	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
+	case screenTrustRootKeys:
+		m.rootKeyList, cmd = m.rootKeyList.Update(msg)
 	}
 	return m, cmd
 }
@@ -251,6 +303,13 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.footer = "Global rule removed!"
 				m.refreshGlobalRules()
+			}
+		case screenTrustRootKeys:
+			if err := repoRemoveRootKey(m.ctx, m.options, m.deleteTarget); err != nil {
+				m.errorMsg = fmt.Sprintf("Error removing root principal: %v", err)
+			} else {
+				m.footer = "Root principal removed!"
+				m.refreshRootConfig()
 			}
 		}
 	}
@@ -338,6 +397,29 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 		m.footer = "Global rule updated!"
 	}
 	m.screen = screenTrustGlobalRules
+	return m, nil
+}
+
+func (m model) handleRootKeyFormSubmit() (tea.Model, tea.Cmd) {
+	if m.focusIndex < len(m.inputs)-1 {
+		m.cycleFocus("tab")
+		return m, nil
+	}
+
+	keyRef := strings.TrimSpace(m.inputs[0].Value())
+	if keyRef == "" {
+		m.errorMsg = "Principal key reference is required"
+		return m, nil
+	}
+
+	if err := repoAddRootKey(m.ctx, m.options, keyRef); err != nil {
+		m.errorMsg = fmt.Sprintf("Error adding root principal: %v", err)
+		return m, nil
+	}
+
+	m.refreshRootConfig()
+	m.footer = "Root principal added!"
+	m.screen = screenTrustRootKeys
 	return m, nil
 }
 

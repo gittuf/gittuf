@@ -6,20 +6,27 @@ import (
 )
 
 type Model struct {
-	Threshold int
-	RepoPath  textinput.Model
-	IsEditing bool
+	Threshold  int
+	RepoPath   textinput.Model
+	Principals []string
+	IsEditing  bool
+
+	OriginalThreshold int
+	OriginalRepoPath  string
 }
 
-func InitialModel(initialPath string, initialThreshold int) Model {
+func InitialModel(initialPath string, initialThreshold int, principals []string) Model {
 	ti := textinput.New()
 	ti.Placeholder = "Enter repository path..."
 	ti.SetValue(initialPath)
 
 	return Model{
-		Threshold: initialThreshold,
-		RepoPath:  ti,
-		IsEditing: false,
+		Threshold:         initialThreshold,
+		RepoPath:          ti,
+		Principals:        principals,
+		IsEditing:         false,
+		OriginalThreshold: initialThreshold,
+		OriginalRepoPath:  initialPath,
 	}
 }
 

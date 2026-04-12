@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"gittuf/internal/cmd/tui/trust"
+	"github.com/gittuf/gittuf/internal/cmd/tui/trust"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
