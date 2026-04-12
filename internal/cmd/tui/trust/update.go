@@ -12,9 +12,8 @@ type UpdatedTrustMsg struct {
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch keyMsg.String() {
 		case "e":
 			m.IsEditing = !m.IsEditing
 			if m.IsEditing {
@@ -35,14 +34,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return UpdatedTrustMsg{Threshold: m.Threshold, RepoPath: m.RepoPath.Value()}
 			}
 
-		case "up", "down":
+		case "up":
 			if !m.IsEditing {
-				if msg.String() == "up" {
-					m.Threshold++
-				}
-				if msg.String() == "down" && m.Threshold > 1 {
-					m.Threshold--
-				}
+				m.Threshold++
+			}
+		case "down":
+			if !m.IsEditing && m.Threshold > 1 {
+				m.Threshold--
 			}
 		}
 	}
