@@ -35,3 +35,4 @@ gittuf trust add-root-person [flags]
 ### SEE ALSO
 
 * [gittuf trust](gittuf_trust.md)	 - Tools for gittuf's root of trust
+
