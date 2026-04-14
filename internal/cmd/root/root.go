@@ -121,13 +121,17 @@ func New() *cobra.Command {
 	cmd.AddCommand(trust.New())
 	cmd.AddCommand(policy.New())
 	cmd.AddCommand(rsl.New())
-	cmd.AddCommand(setup.New())
 	cmd.AddCommand(sync.New())
 	cmd.AddCommand(verifymergeable.New())
 	cmd.AddCommand(verifynetwork.New())
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
 	cmd.AddCommand(tui.New(&persistent.Options{}))
+
+	// TODO: remove before merge
+	setupCmd := setup.New()
+	setupCmd.Hidden = true
+	cmd.AddCommand(setupCmd)
 
 	return cmd
 }

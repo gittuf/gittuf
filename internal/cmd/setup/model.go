@@ -86,7 +86,7 @@ func newMenuList(title string, items []list.Item, delegate list.DefaultDelegate)
 	return l
 }
 
-// initialModel returns the initial model for the Terminal UI
+// initialModel returns the initial model for the Terminal UI.
 func initialModel(ctx context.Context, o *options) (model, error) {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
@@ -122,7 +122,13 @@ func initialModel(ctx context.Context, o *options) (model, error) {
 	return m, nil
 }
 
-// Init initializes the input field
+// NewModel returns the initial model as a tea.Model. Intended for usage by the
+// main TUI.
+func NewModel(ctx context.Context) (tea.Model, error) {
+	return initialModel(ctx, &options{})
+}
+
+// Init initializes the input field.
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }

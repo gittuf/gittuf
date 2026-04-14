@@ -37,7 +37,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.transportSteps = msg.steps
-		m.footer = "Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation."
+		m.footer = conclusionTxt
 		return m, nil
 	case metadataDoneMsg:
 		if msg.err != nil {

@@ -13,6 +13,11 @@ const (
 	colorFocus       = "#007AFF"
 	colorFooter      = "#11ff00"
 	colorErrorMsg    = "#FF0000"
+
+	conclusionTxt = "Setup complete!" + "\n" +
+		"Please see https://gittuf.dev/ for further documentation.\n" +
+		"run `gittuf tui` again to continue with gittuf operations.\n\n" +
+		"Press Enter or Q to quit."
 )
 
 var (
@@ -108,7 +113,7 @@ func (m model) View() string {
 	case screenAbort:
 		return m.renderWithMargin(renderErrorMsg("gittuf setup has been cancelled. Any changes made to your repository have been reverted."))
 	case screenConclusion:
-		return m.renderWithMargin("Setup complete!" + "\n" + "Please see https://gittuf.dev/ for further documentation.\n\n" + "Press Q to quit.")
+		return m.renderWithMargin(conclusionTxt)
 	default:
 		return "Unknown screen"
 	}
