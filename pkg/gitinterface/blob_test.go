@@ -38,7 +38,6 @@ func TestRepositoryReadBlob(t *testing.T) {
 		treeBuilder := NewTreeBuilder(repo)
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
-		
 		treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{
 			NewEntryBlob("file.txt", blobID),
 		})
