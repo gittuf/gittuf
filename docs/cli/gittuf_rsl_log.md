@@ -13,7 +13,8 @@ gittuf rsl log [flags]
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help              help for log
+      --ref stringArray   only display RSL entries for the specified references
 ```
 
 ### Options inherited from parent commands
