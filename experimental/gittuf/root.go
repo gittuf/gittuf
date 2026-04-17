@@ -202,6 +202,47 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// AddRootPerson is the interface for the user to add an authorized person
+// for the Root role.
+func (r *Repository) AddRootPerson(ctx context.Context, signer sslibdsse.SignerVerifier, newRootPerson tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Adding root person...")
+	if err := rootMetadata.AddRootPrincipal(newRootPerson); err != nil {
+		return err
+	}
+
+	commitMessage := fmt.Sprintf("Add root person '%s' to root", newRootPerson.ID())
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 // RemoveRootKey is the interface for the user to de-authorize a key
 // trusted to sign the Root role.
 func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, keyID string, signCommit bool, opts ...trustpolicyopts.Option) error {
