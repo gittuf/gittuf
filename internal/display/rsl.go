@@ -10,13 +10,31 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
+type options struct {
+	refs *set.Set[string]
+}
+
+type Option func(*options)
+
+func WithReferences(refs []string) Option {
+	return func(o *options) {
+		o.refs = set.NewSetFromItems(refs...)
+	}
+}
+
 // RSLLog implements the display function for `gittuf rsl log`.
-func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
+func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser, opts ...Option) error {
 	defer writer.Close() //nolint:errcheck
+
+	options := &options{refs: set.NewSet[string]()}
+	for _, fn := range opts {
+		fn(options)
+	}
 
 	annotationsMap := make(map[string][]*rsl.AnnotationEntry)
 
@@ -40,6 +58,15 @@ func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
 
 		switch iteratorEntry := iteratorEntry.(type) {
 		case *rsl.ReferenceEntry:
+			if options.refs.Len() != 0 && !options.refs.Has(iteratorEntry.RefName) {
+				// Skip this entry if it's not for the specified ref. Note that
+				// we still want to track annotation entries for this entry (if
+				// there are any) since they may apply to other entries that we
+				// do want to display.
+				slog.Debug(fmt.Sprintf("Skipping reference entry '%s' since it is for ref '%s'...", iteratorEntry.ID.String(), iteratorEntry.RefName))
+				break
+			}
+
 			slog.Debug(fmt.Sprintf("Writing reference entry '%s'...", iteratorEntry.ID.String()))
 			if err := writeRSLReferenceEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
 				// We return nil here to avoid noisy output when the writer is
@@ -59,6 +86,15 @@ func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser) error {
 			}
 
 		case *rsl.PropagationEntry:
+			if options.refs.Len() != 0 && !options.refs.Has(iteratorEntry.RefName) {
+				// Skip this entry if it's not for the specified ref. Note that
+				// we still want to track annotation entries for this entry (if
+				// there are any) since they may apply to other entries that we
+				// do want to display.
+				slog.Debug(fmt.Sprintf("Skipping propagation entry '%s' since it is for ref '%s'...", iteratorEntry.ID.String(), iteratorEntry.RefName))
+				break
+			}
+
 			slog.Debug(fmt.Sprintf("Writing propagation entry '%s'...", iteratorEntry.ID.String()))
 			if err := writeRSLPropagationEntry(writer, iteratorEntry, hasParent); err != nil {
 				// We return nil here to avoid noisy output when
