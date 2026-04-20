@@ -407,7 +407,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return ErrNoGitHubToken
 	}
 
-	baseRef, fromID, toID, err := getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, token, owner, repository, pullRequestNumber, reviewID)
+	baseRef, fromID, toID, err := r.getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, token, owner, repository, pullRequestNumber, reviewID, options.UseGitHubAPI)
 	if err != nil {
 		return err
 	}
@@ -642,7 +642,7 @@ func indexPathToComponents(indexPath string) (string, string, string) {
 	return base, from, to
 }
 
-func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, githubBaseURL, githubToken, owner, repository string, pullRequestNumber int, reviewID int64) (string, string, string, error) {
+func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, githubBaseURL, githubToken, owner, repository string, pullRequestNumber int, reviewID int64, useGitHubAPI bool) (string, string, string, error) {
 	indexPath, has, err := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(githubBaseURL, reviewID)
 	if err != nil {
 		return "", "", "", err
@@ -672,21 +672,56 @@ func getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations 
 		return "", "", "", err
 	}
 
+	// We have to fetch the base ref name via the API response, we don't have a choice
 	baseRef := gitinterface.BranchReferenceName(pullRequest.GetBase().GetRef())
 
-	referenceDetails, _, err := client.Git.GetRef(ctx, owner, repository, baseRef)
-	if err != nil {
-		return "", "", "", err
-	}
-	fromID := referenceDetails.GetObject().GetSHA() // current tip of base ref
+	// For the rest we have a choice. If useGitHubAPI is true, pull all
+	// information from the API. Otherwise, compute it.
 
-	// GitHub has already computed a merge commit, use that tree ID as target
-	// tree ID
-	commit, _, err := client.Git.GetCommit(ctx, owner, repository, pullRequest.GetMergeCommitSHA())
-	if err != nil {
-		return "", "", "", err
+	var fromID, toID string
+
+	if useGitHubAPI {
+		referenceDetails, _, err := client.Git.GetRef(ctx, owner, repository, baseRef)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		fromID = referenceDetails.GetObject().GetSHA() // current tip of base ref
+
+		commit, _, err := client.Git.GetCommit(ctx, owner, repository, pullRequest.GetMergeCommitSHA())
+		if err != nil {
+			return "", "", "", err
+		}
+
+		toID = commit.GetTree().GetSHA()
+	} else {
+		// Check the RSL instead for from ID.
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(baseRef), rsl.IsUnskipped())
+		if err != nil {
+			return "", "", "", err
+		}
+
+		fromID = entry.GetTargetID().String()
+
+		// The API seems not to be outdated for the head commit, but we should
+		// monitor this. For now, use the API to get the head commit ID to avoid
+		// having to fetch the actual ref...
+		headHash, err := gitinterface.NewHash(pullRequest.GetHead().GetSHA())
+		if err != nil {
+			return "", "", "", err
+		}
+		if err := r.r.FetchObject(pullRequest.GetHead().GetRepo().GetCloneURL(), headHash); err != nil {
+			return "", "", "", err
+		}
+
+		// Now compute the merge tree ID
+		mergeTreeID, err := r.r.GetMergeTree(entry.GetTargetID(), headHash)
+		if err != nil {
+			return "", "", "", err
+		}
+
+		toID = mergeTreeID.String()
 	}
-	toID := commit.GetTree().GetSHA()
 
 	return baseRef, fromID, toID, nil
 }

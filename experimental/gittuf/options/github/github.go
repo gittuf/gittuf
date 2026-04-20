@@ -24,6 +24,7 @@ type Options struct {
 	GitHubTokenSource TokenSource
 	GitHubBaseURL     string
 	CreateRSLEntry    bool
+	UseGitHubAPI      bool
 }
 
 var DefaultOptions = &Options{
@@ -52,6 +53,12 @@ func WithGitHubBaseURL(baseURL string) Option {
 func WithRSLEntry() Option {
 	return func(o *Options) {
 		o.CreateRSLEntry = true
+	}
+}
+
+func WithUseGitHubAPI() Option {
+	return func(o *Options) {
+		o.UseGitHubAPI = true
 	}
 }
 
