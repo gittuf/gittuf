@@ -273,6 +273,107 @@ func TestAddRootKey(t *testing.T) {
 	})
 }
 
+func TestAddRootPerson(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	originalKeyID, err := sv.KeyID()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	personKey := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+	person := &tufv02.Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*tufv02.Key{personKey.ID(): personKey},
+	}
+
+	err = r.AddRootPerson(testCtx, sv, person, false)
+	assert.Nil(t, err)
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	assert.Nil(t, err)
+
+	assert.Equal(t, originalKeyID, state.Metadata.RootEnvelope.Signatures[0].KeyID)
+	assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(person.PersonID))
+
+	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
+	assert.Nil(t, err)
+
+	t.Run("unauthorized signer", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		personKey := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+		person := &tufv02.Person{
+			PersonID:   "jane.doe",
+			PublicKeys: map[string]*tufv02.Key{personKey.ID(): personKey},
+		}
+
+		err := r.AddRootPerson(testCtx, unauthorizedSigner, person, false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
+	})
+
+	t.Run("with associated identities and custom metadata", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		personKey := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+		person := &tufv02.Person{
+			PersonID:             "jane.doe",
+			PublicKeys:           map[string]*tufv02.Key{personKey.ID(): personKey},
+			AssociatedIdentities: map[string]string{"github": "janedoe+12345"},
+			Custom:               map[string]string{"team": "security"},
+		}
+
+		err := r.AddRootPerson(testCtx, sv, person, false)
+		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(person.PersonID))
+	})
+
+	t.Run("with signCommit", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		personKey := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+		person := &tufv02.Person{
+			PersonID:   "jane.doe",
+			PublicKeys: map[string]*tufv02.Key{personKey.ID(): personKey},
+		}
+
+		err := r.AddRootPerson(testCtx, sv, person, true)
+		assert.Nil(t, err)
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		assert.Nil(t, err)
+		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(person.PersonID))
+	})
+}
+
 func TestRemoveRootKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
