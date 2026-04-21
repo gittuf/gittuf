@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -869,26 +871,120 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 		controllerRepositories = upstreamControllerRepositories
 	}
 
+	type upstreamRepositoryFetchTask struct {
+		repositoryURL string
+		directives    []tuf.PropagationDirective
+	}
+
+	type upstreamRepositoryFetchResult struct {
+		repositoryURL string
+		directives    []tuf.PropagationDirective
+		repository    *gitinterface.Repository
+		location      string
+		err           error
+	}
+
+	fetchTasks := make([]upstreamRepositoryFetchTask, 0, len(upstreamRepositoryDirectivesMapping))
 	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
-		slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", upstreamRepositoryURL))
-		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(upstreamRepositoryLocation) //nolint:errcheck
+		fetchTasks = append(fetchTasks, upstreamRepositoryFetchTask{
+			repositoryURL: upstreamRepositoryURL,
+			directives:    directives,
+		})
+	}
 
-		fetchReferences := set.NewSetFromItems(rsl.Ref)
-		for _, directive := range directives {
-			fetchReferences.Add(directive.GetUpstreamReference())
+	if len(fetchTasks) == 0 {
+		return nil
+	}
+
+	workerCount := runtime.GOMAXPROCS(0)
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	if workerCount > len(fetchTasks) {
+		workerCount = len(fetchTasks)
+	}
+
+	fetchTaskCh := make(chan upstreamRepositoryFetchTask)
+	fetchResultCh := make(chan upstreamRepositoryFetchResult, len(fetchTasks))
+	var fetchWG sync.WaitGroup
+
+	for range workerCount {
+		fetchWG.Add(1)
+		go func() {
+			defer fetchWG.Done()
+
+			for fetchTask := range fetchTaskCh {
+				upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
+				if err != nil {
+					fetchResultCh <- upstreamRepositoryFetchResult{
+						repositoryURL: fetchTask.repositoryURL,
+						err:           err,
+					}
+					continue
+				}
+
+				fetchReferences := set.NewSetFromItems(rsl.Ref)
+				for _, directive := range fetchTask.directives {
+					fetchReferences.Add(directive.GetUpstreamReference())
+				}
+
+				upstreamRepository, err := gitinterface.CloneAndFetchRepository(fetchTask.repositoryURL, upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
+				if err != nil {
+					_ = os.RemoveAll(upstreamRepositoryLocation)
+
+					// TODO: we see this error when required upstream ref isn't found, handle gracefully?
+					fetchResultCh <- upstreamRepositoryFetchResult{
+						repositoryURL: fetchTask.repositoryURL,
+						err:           fmt.Errorf("unable to fetch upstream repository '%s': %w", fetchTask.repositoryURL, err),
+					}
+					continue
+				}
+
+				fetchResultCh <- upstreamRepositoryFetchResult{
+					repositoryURL: fetchTask.repositoryURL,
+					directives:    fetchTask.directives,
+					repository:    upstreamRepository,
+					location:      upstreamRepositoryLocation,
+				}
+			}
+		}()
+	}
+
+	for _, fetchTask := range fetchTasks {
+		fetchTaskCh <- fetchTask
+	}
+	close(fetchTaskCh)
+
+	fetchWG.Wait()
+	close(fetchResultCh)
+
+	fetchResultsByRepository := map[string]upstreamRepositoryFetchResult{}
+	for fetchResult := range fetchResultCh {
+		fetchResultsByRepository[fetchResult.repositoryURL] = fetchResult
+	}
+
+	for _, fetchResult := range fetchResultsByRepository {
+		if fetchResult.location != "" {
+			defer os.RemoveAll(fetchResult.location) //nolint:errcheck
+		}
+	}
+
+	for _, fetchTask := range fetchTasks {
+		fetchResult, has := fetchResultsByRepository[fetchTask.repositoryURL]
+		if !has {
+			return fmt.Errorf("unable to fetch upstream repository '%s': missing fetch result", fetchTask.repositoryURL)
 		}
 
-		upstreamRepository, err := gitinterface.CloneAndFetchRepository(upstreamRepositoryURL, upstreamRepositoryLocation, "", fetchReferences.Contents(), true)
-		if err != nil {
-			// TODO: we see this error when required upstream ref isn't found, handle gracefully?
-			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
+		if fetchResult.err != nil {
+			return fetchResult.err
 		}
+	}
 
-		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+	for _, fetchTask := range fetchTasks {
+		fetchResult := fetchResultsByRepository[fetchTask.repositoryURL]
+		slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", fetchResult.repositoryURL))
+
+		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, fetchResult.repository, fetchResult.directives, sign); err != nil {
 			// TODO: atomic? abort?
 			return err
 		}

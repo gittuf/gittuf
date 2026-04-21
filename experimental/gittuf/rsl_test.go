@@ -1750,4 +1750,85 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
 	})
+
+	t.Run("multiple upstream repos, one fetch failure aborts propagation", func(t *testing.T) {
+		upstreamRepoLocation := t.TempDir()
+		upstreamRepo := createTestRepositoryWithRoot(t, upstreamRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		refName := "refs/heads/main"
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-valid", upstreamRepoLocation, refName, "", refName, "upstream", false); err != nil {
+			t.Fatal(err)
+		}
+
+		invalidUpstreamRepoLocation := filepath.Join(t.TempDir(), "missing-upstream")
+		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test-missing", invalidUpstreamRepoLocation, refName, "", refName, "missing", false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamBlobID, err := upstreamRepo.r.WriteBlob([]byte("upstream"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("upstream.txt", upstreamBlobID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := upstreamRepo.r.Commit(upstreamRootTreeID, refName, "Initial upstream commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := upstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamBlobID, err := downstreamRepo.r.WriteBlob([]byte("downstream"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("downstream.txt", downstreamBlobID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := downstreamRepo.r.Commit(downstreamRootTreeID, refName, "Initial downstream commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		entryBeforePropagation, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		assert.ErrorContains(t, err, "unable to fetch upstream repository")
+
+		entryAfterPropagation, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, entryBeforePropagation.GetID(), entryAfterPropagation.GetID())
+	})
 }
