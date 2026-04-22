@@ -4,6 +4,7 @@
 ![Build and Tests (CI)](https://github.com/gittuf/gittuf/actions/workflows/ci.yml/badge.svg)
 [![Coverage Status](https://coveralls.io/repos/github/gittuf/gittuf/badge.svg)](https://coveralls.io/github/gittuf/gittuf)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/7789/badge)](https://www.bestpractices.dev/projects/7789)
+[![OpenSSF Baseline](https://www.bestpractices.dev/projects/7789/baseline)](https://www.bestpractices.dev/projects/7789)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/gittuf/gittuf/badge)](https://scorecard.dev/viewer/?uri=github.com/gittuf/gittuf)
 
 gittuf is a platform-agnostic Git security system. The maintainers of a Git
