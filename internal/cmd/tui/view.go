@@ -114,6 +114,7 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+// screenPolicyPrincipalsHelp returns the help bar for the principals view screen.
 func screenPolicyPrincipalsHelp(readOnly bool) string {
 	if readOnly {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(

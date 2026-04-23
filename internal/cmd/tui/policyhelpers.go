@@ -23,7 +23,7 @@ type principal struct {
 	keysSummary string
 }
 
-// START HERE
+// repoAddPrincipalToTargets adds a principal to the policy file.
 func repoAddPrincipalToTargets(ctx context.Context, o *options, keyRef string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
@@ -39,10 +39,11 @@ func repoAddPrincipalToTargets(ctx context.Context, o *options, keyRef string) e
 	if err != nil {
 		return err
 	}
-	// call AddPrincipalToTargets
+
 	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{p}, true)
 }
 
+// getCurrPrincipals returns the current targets principals from the policy file.
 func getCurrPrincipals(ctx context.Context, o *options) []principal {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
@@ -69,6 +70,7 @@ func getCurrPrincipals(ctx context.Context, o *options) []principal {
 	return currPrincipals
 }
 
+// repoRemovePrincipalFromTargets removes a principal from the targets policy file.
 func repoRemovePrincipalFromTargets(ctx context.Context, o *options, principalID string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {

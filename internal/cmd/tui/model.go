@@ -296,11 +296,13 @@ func (m *model) updateGlobalRuleList() {
 	m.globalRuleList.SetItems(items)
 }
 
+// refreshPrincipals re-fetches principals from the repo and rebuilds the list.
 func (m *model) refreshPrincipals() {
 	m.principals = getCurrPrincipals(m.ctx, m.options)
 	m.updatePrincipalList()
 }
 
+// updatePrincipalList rebuilds the principalList items from m.principals.
 func (m *model) updatePrincipalList() {
 	items := make([]list.Item, len(m.principals))
 	for i, p := range m.principals {
@@ -309,6 +311,7 @@ func (m *model) updatePrincipalList() {
 	m.principalList.SetItems(items)
 }
 
+// initPrincipalInputs initializes the input field for the add-principal form.
 func (m *model) initPrincipalInputs() {
 	m.inputs = initInputs([]inputField{
 		{"Path to public key, gpg:<fingerprint>, or fulcio:<id>::<issuer>", "Key Ref:"},

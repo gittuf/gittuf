@@ -442,6 +442,7 @@ func splitAndTrim(s string) []string {
 	return parts
 }
 
+// handlePrincipalListKey handles keybindings on the principals list screen.
 func (m model) handlePrincipalListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if !m.readOnly {
 		switch msg.String() {
@@ -463,6 +464,7 @@ func (m model) handlePrincipalListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// handlePrincipalFormSubmit handles enter on the add-principal form screen.
 func (m model) handlePrincipalFormSubmit() (tea.Model, tea.Cmd) {
 	keyRef := strings.TrimSpace(m.inputs[0].Value())
 	if keyRef == "" {
