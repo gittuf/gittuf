@@ -5,10 +5,14 @@ package tui
 
 import (
 	"context"
+	"errors"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/setup"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
 
@@ -61,12 +65,28 @@ func New(persistent *persistent.Options) *cobra.Command {
 	return cmd
 }
 
-// startTUI intitializes a new model for the TUI
+// startTUI initializes a new model for the TUI. If gittuf has not been set up
+// on the repository yet, the setup TUI runs instead.
 func startTUI(ctx context.Context, o *options) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	_, err = repo.GetGitRepository().GetReference(policy.PolicyRef)
+	if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+		// run setup TUI
+		setupModel, err := setup.NewModel(ctx)
+		if err != nil {
+			return err
+		}
+		if _, err = tea.NewProgram(setupModel, tea.WithAltScreen()).Run(); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	m := initialModel(ctx, o)
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	_, err := p.Run()
-
+	_, err = tea.NewProgram(m, tea.WithAltScreen()).Run()
 	return err
 }

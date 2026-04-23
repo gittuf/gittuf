@@ -17,6 +17,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/profile"
 	"github.com/gittuf/gittuf/internal/cmd/rsl"
+	"github.com/gittuf/gittuf/internal/cmd/setup"
 	"github.com/gittuf/gittuf/internal/cmd/sync"
 	"github.com/gittuf/gittuf/internal/cmd/trust"
 	"github.com/gittuf/gittuf/internal/cmd/tui"
@@ -126,6 +127,11 @@ func New() *cobra.Command {
 	cmd.AddCommand(verifyref.New())
 	cmd.AddCommand(version.New())
 	cmd.AddCommand(tui.New(&persistent.Options{}))
+
+	// TODO: remove before merge
+	setupCmd := setup.New()
+	setupCmd.Hidden = true
+	cmd.AddCommand(setupCmd)
 
 	return cmd
 }

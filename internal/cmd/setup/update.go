@@ -1,0 +1,160 @@
+// Copyright The gittuf Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// This file handles TUI input handling.
+
+package setup
+
+import (
+	"fmt"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+type clearFooterMsg struct{}
+
+// Update updates the model based on the message received
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+		m.choiceList.SetSize(msg.Width-h, msg.Height-v)
+	case clearFooterMsg:
+		m.footer = ""
+		return m, nil
+	case transportDoneMsg:
+		m.transportRunning = false
+		if m.screen != screenTransport {
+			return m, nil // user escapes screen before done
+		}
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
+		m.transportSteps = msg.steps
+		m.footer = conclusionTxt
+		return m, nil
+	case metadataDoneMsg:
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("error: %v", msg.err)
+			return m, nil
+		}
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "esc":
+			m.footer = ""
+			switch m.screen {
+			case screenMaintainerSelections, screenTransport:
+				m.screen = screenChoice
+			}
+			return m, nil
+		case "enter":
+			switch m.screen {
+			case screenChoice:
+				i, ok := m.choiceList.SelectedItem().(item)
+				if ok {
+					switch i.title {
+					case "Maintainer":
+						m.rootExists = checkRootExists(m.repo)
+						m.targetsExists = checkTargetsExists(m.ctx, m.repo)
+						m.screen = screenMaintainerSelections
+						return m, nil
+					case "Contributor":
+						exists, err := checkTransportExists(m.repo)
+						m.transportExists = exists
+						if err != nil {
+							m.errorMsg = err.Error()
+						}
+						if !m.transportExists {
+							m.screen = screenTransportConfirm
+							return m, nil
+						}
+						m.screen = screenAbort
+					}
+				}
+			case screenTransport:
+				if !m.transportRunning {
+					return m, tea.Quit
+				}
+
+			case screenAbort, screenConclusion:
+				return m, tea.Quit
+			}
+		case "tab", "shift+tab", "up", "down":
+		}
+
+		// root screen-specific input handling
+		switch m.screen {
+		case screenTransportConfirm:
+			switch msg.String() {
+			case "y", "Y":
+				m.transportRunning = true
+				m.screen = screenTransport
+				return m, tea.Batch(runTransportSetup(m.repo), m.spinner.Tick)
+			case "n", "N":
+				m.screen = screenConclusion
+				return m, nil
+			}
+
+		case screenMaintainerSelections:
+			switch msg.String() {
+			case "up", "k":
+				if m.rootCursor > 0 {
+					m.rootCursor--
+				}
+			case "down", "j":
+				if m.rootCursor < len(m.rootChoices) {
+					m.rootCursor++
+				}
+			case " ", "enter":
+				if m.rootCursor == len(m.rootChoices) {
+					// submit response
+					m.screen = screenTransportConfirm
+					return m, tea.Batch(setupMaintainerChoices(m.ctx, m.repo, m.signer, m.rootSelected, m.rootExists))
+				}
+				if m.rootSelected[m.rootCursor] {
+					if m.rootCursor != addToRoot || m.rootExists {
+						m.rootSelected[m.rootCursor] = false
+						// deselecting "Make me a Policy Administrator" should also deselect "Authorize me to default branch"
+						// when targets is not yet initialized
+						if !m.targetsExists && m.rootCursor == addToTargets && m.rootSelected[addToRule] {
+							m.rootSelected[addToRule] = false
+							m.footer = "You must be a policy administrator to set a rule."
+							return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
+						}
+					} else {
+						// "Make me a Root of Trust User" cannot be deselected when gittuf has not been initialized
+						m.footer = "You must authorize a root of trust user to initialize gittuf."
+						return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
+					}
+				} else {
+					m.rootSelected[m.rootCursor] = true
+					// selecting "Authorize me to default branch" should also select "Make me a Policy Administrator"
+					// when targets is not yet initialized
+					if !m.targetsExists && m.rootCursor == addToRule && !m.rootSelected[addToTargets] {
+						m.rootSelected[addToTargets] = true
+						m.footer = "You must be a policy administrator to set a rule."
+						return m, tea.Tick(time.Second*2, func(_ time.Time) tea.Msg { return clearFooterMsg{} })
+					}
+				}
+			}
+		}
+	}
+
+	switch m.screen {
+	case screenChoice:
+		m.choiceList, cmd = m.choiceList.Update(msg)
+	case screenTransport:
+		if m.transportRunning {
+			m.spinner, cmd = m.spinner.Update(msg)
+		}
+	}
+	return m, cmd
+}
