@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 type rule struct {
@@ -17,9 +18,69 @@ type rule struct {
 	threshold int
 }
 
-func repoAddPrincipaltoTargets(ctx context.Context, o *options) error {
+type principal struct {
+	id          string
+	keysSummary string
+}
+
+// START HERE
+func repoAddPrincipalToTargets(ctx context.Context, o *options, keyRef string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	p, err := gittuf.LoadPublicKey(keyRef)
+	if err != nil {
+		return err
+	}
 	// call AddPrincipalToTargets
-	return nil
+	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{p}, true)
+}
+
+func getCurrPrincipals(ctx context.Context, o *options) []principal {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
+	principalsMap, err := repo.ListPrincipals(ctx, o.targetRef, o.policyName)
+	if err != nil {
+		return nil
+	}
+
+	currPrincipals := make([]principal, 0, len(principalsMap))
+	for _, p := range principalsMap {
+		keyIDs := make([]string, 0, len(p.Keys()))
+		for _, k := range p.Keys() {
+			keyIDs = append(keyIDs, k.KeyID)
+		}
+		currPrincipals = append(currPrincipals, principal{
+			id:          p.ID(),
+			keysSummary: strings.Join(keyIDs, ", "),
+		})
+	}
+
+	return currPrincipals
+}
+
+func repoRemovePrincipalFromTargets(ctx context.Context, o *options, principalID string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+
+	return repo.RemovePrincipalFromTargets(ctx, signer, o.policyName, principalID, true)
 }
 
 // getCurrRules returns the current rules from the policy file.

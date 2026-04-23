@@ -114,12 +114,23 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+func screenPolicyPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
 func renderDeleteOverlay(target string) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF0000")).
 		Bold(true).
-		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+		Render(fmt.Sprintf("Delete %q? [y/n]", target))
 }
 
 // View renders the TUI.
@@ -179,6 +190,22 @@ func (m model) View() string {
 		return m.renderFormScreen("Add Global Rule")
 	case screenTrustEditGlobalRule:
 		return m.renderFormScreen("Edit Global Rule")
+	case screenPolicyPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf policy apply` to apply staged changes.",
+			)
+		}
+		return m.renderListScreen(m.principalList,
+			overlay+screenPolicyPrincipalsHelp(m.readOnly)+hint,
+		)
+	case screenPolicyAddPrincipal:
+		return m.renderFormScreen("Add Principal")
 	default:
 		return "Unknown screen"
 	}
