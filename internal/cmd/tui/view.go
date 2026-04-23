@@ -202,9 +202,8 @@ func (m model) View() string {
 				"Run `gittuf policy apply` to apply staged changes.",
 			)
 		}
-		return m.renderListScreen(m.principalList,
-			overlay+screenPolicyPrincipalsHelp(m.readOnly)+hint,
-		)
+		emptyMsg := "No principals configured. Press 'a' to add one."
+		return m.renderListScreen(m.principalList, overlay+screenPolicyPrincipalsHelp(m.readOnly)+hint, emptyMsg, len(m.principals) == 0)
 	case screenPolicyAddPrincipal:
 		return m.renderFormScreen("Add Principal")
 	default:
