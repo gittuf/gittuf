@@ -61,6 +61,7 @@ var (
 	ErrMissingRules                                    = errors.New("some rules are missing")
 	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
 	ErrCannotMeetThreshold                             = errors.New("insufficient keys to meet threshold")
+	ErrInvalidThreshold                                = errors.New("threshold must be a positive integer")
 	ErrUnknownGlobalRuleType                           = errors.New("unknown global rule type")
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 	ErrGlobalRuleNotFound                              = errors.New("global rule not found")

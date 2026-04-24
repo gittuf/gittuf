@@ -659,7 +659,11 @@ func TestGlobalRules(t *testing.T) {
 
 	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
 
-	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
+	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("invalid-threshold", []string{"git:refs/heads/main"}, 0))
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+	assert.Nil(t, rootMetadata.GlobalRules)
+
+	err = rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.Nil(t, err)
 	err = rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.ErrorIs(t, err, tuf.ErrGlobalRuleAlreadyExists)
@@ -689,6 +693,14 @@ func TestGlobalRules(t *testing.T) {
 	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
 	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
+	invalidThresholdGlobalRule := &GlobalRuleThreshold{
+		Name:      "threshold-2-main",
+		Paths:     []string{"git:refs/heads/main"},
+		Threshold: 0,
+	}
+	err = rootMetadata.UpdateGlobalRule(invalidThresholdGlobalRule)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 
 	updatedThresholdGlobalRule := &GlobalRuleThreshold{
 		Name:      "threshold-2-main",
