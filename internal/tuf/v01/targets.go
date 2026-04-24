@@ -64,6 +64,10 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		}
 	}
 
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
+	}
+
 	if len(authorizedPrincipalIDs) < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -97,6 +101,10 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		if _, has := t.Delegations.Keys[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
 		}
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if len(authorizedPrincipalIDs) < threshold {

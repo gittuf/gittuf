@@ -361,6 +361,12 @@ func (r *RootMetadata) GetGitHubAppPrincipals(appName string) ([]tuf.Principal, 
 
 // AddGlobalRule adds a new global rule to RootMetadata.
 func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	if allGlobalRules == nil {
 		allGlobalRules = []tuf.GlobalRule{}
@@ -402,6 +408,12 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 
 // UpdateGlobalRule updates the specified global rule from the RootMetadata.
 func (r *RootMetadata) UpdateGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	updatedGlobalRules := []tuf.GlobalRule{}
 	found := false
