@@ -98,6 +98,9 @@ func TestGetObjectType(t *testing.T) {
 	objType, err = repo.GetObjectType(tagID)
 	assert.Nil(t, err)
 	assert.Equal(t, TagObjectType, objType)
+
+	_, err = repo.GetObjectType(ZeroHash)
+	assert.ErrorContains(t, err, "unable to inspect object type")
 }
 
 func TestGetObjectSize(t *testing.T) {
@@ -110,4 +113,7 @@ func TestGetObjectSize(t *testing.T) {
 	objSize, err := repo.GetObjectSize(blobID)
 	assert.Nil(t, err)
 	assert.Equal(t, uint64(6), objSize)
+
+	_, err = repo.GetObjectSize(ZeroHash)
+	assert.ErrorContains(t, err, "unable to inspect object size")
 }

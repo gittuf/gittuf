@@ -32,7 +32,16 @@ func TestRepositoryReadBlob(t *testing.T) {
 
 	t.Run("read non-existing blob", func(t *testing.T) {
 		_, err := repo.ReadBlob(ZeroHash)
-		assert.NotNil(t, err)
+		assert.ErrorContains(t, err, "unable to inspect if object is blob")
+	})
+
+	t.Run("read non-blob object", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
+		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		_, err = repo.ReadBlob(treeID)
+		assert.ErrorContains(t, err, "is not a blob object")
 	})
 }
 

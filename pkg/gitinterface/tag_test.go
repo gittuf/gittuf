@@ -12,7 +12,9 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTagTarget(t *testing.T) {
@@ -40,6 +42,11 @@ func TestGetTagTarget(t *testing.T) {
 	targetID, err := repo.GetTagTarget(tagID)
 	assert.Nil(t, err)
 	assert.Equal(t, commitID, targetID)
+
+	t.Run("non-existent tag", func(t *testing.T) {
+		_, err := repo.GetTagTarget(ZeroHash)
+		assert.ErrorContains(t, err, "unable to resolve tag's target ID")
+	})
 }
 
 func TestRepositoryVerifyTag(t *testing.T) {
@@ -92,4 +99,31 @@ func TestRepositoryVerifyTag(t *testing.T) {
 		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
 		assert.Nil(t, err)
 	})
+
+	t.Run("unknown signing method", func(t *testing.T) {
+		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
+		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
+		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+	})
+}
+
+func TestEnsureIsTag(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+	require.Nil(t, err)
+
+	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+	require.Nil(t, err)
+
+	err = repo.ensureIsTag(tagID)
+	assert.Nil(t, err)
+
+	err = repo.ensureIsTag(commitID)
+	assert.ErrorContains(t, err, "is not a tag object")
 }

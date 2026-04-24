@@ -139,3 +139,85 @@ func TestStatus(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Empty(t, statuses)
 }
+
+func TestStatusError(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, true) // bare repo
+
+	_, err := repo.Status()
+	assert.ErrorContains(t, err, "unable to check status of repository")
+}
+func TestNewStatusCodeFromByte(t *testing.T) {
+	t.Run("invalid status code", func(t *testing.T) {
+		_, err := NewStatusCodeFromByte('X')
+		assert.ErrorIs(t, err, ErrInvalidStatusCode)
+	})
+
+	t.Run("valid status codes", func(t *testing.T) {
+		testCases := []struct {
+			input    byte
+			expected StatusCode
+		}{
+			{' ', StatusCodeUnmodified},
+			{'M', StatusCodeModified},
+			{'T', StatusCodeTypeChanged},
+			{'A', StatusCodeAdded},
+			{'D', StatusCodeDeleted},
+			{'C', StatusCodeCopied},
+			{'U', StatusCodeUpdatedUnmerged},
+			{'?', StatusCodeUntracked},
+			{'!', StatusCodeIgnored},
+		}
+
+		for _, tc := range testCases {
+			code, err := NewStatusCodeFromByte(tc.input)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expected, code)
+		}
+	})
+}
+
+func TestStatusCodeString(t *testing.T) {
+	t.Run("invalid status code", func(t *testing.T) {
+		assert.Equal(t, "invalid-code", StatusCode(999).String())
+	})
+
+	t.Run("valid status codes", func(t *testing.T) {
+		testCases := []struct {
+			code     StatusCode
+			expected string
+		}{
+			{StatusCodeUnmodified, " "},
+			{StatusCodeModified, "M"},
+			{StatusCodeTypeChanged, "T"},
+			{StatusCodeAdded, "A"},
+			{StatusCodeDeleted, "D"},
+			{StatusCodeRenamed, "R"},
+			{StatusCodeCopied, "C"},
+			{StatusCodeUpdatedUnmerged, "U"},
+			{StatusCodeUntracked, "?"},
+			{StatusCodeIgnored, "!"},
+		}
+
+		for _, tc := range testCases {
+			assert.Equal(t, tc.expected, tc.code.String())
+		}
+	})
+}
+
+func TestFileStatusUntracked(t *testing.T) {
+	t.Run("untracked when X is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeUntracked, Y: StatusCodeUnmodified}
+		assert.True(t, fs.Untracked())
+	})
+
+	t.Run("untracked when Y is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeUnmodified, Y: StatusCodeUntracked}
+		assert.True(t, fs.Untracked())
+	})
+
+	t.Run("not untracked when neither is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeModified, Y: StatusCodeUnmodified}
+		assert.False(t, fs.Untracked())
+	})
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -388,4 +389,75 @@ func TestRemoteReferenceName(t *testing.T) {
 		referenceName := RemoteReferenceName(test.input)
 		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
 	}
+}
+
+func TestAbsoluteReference(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+	require.Nil(t, err)
+
+	_, err = repo.TagUsingSpecificKey(commitID, "v1.0", "v1.0\n", artifacts.SSHED25519Private)
+	require.Nil(t, err)
+
+	err = repo.SetReference("refs/custom/myref", commitID)
+	require.Nil(t, err)
+
+	err = repo.SetReference("refs/remotes/origin/main", commitID)
+	require.Nil(t, err)
+
+	err = repo.SetSymbolicReference("refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	require.Nil(t, err)
+
+	t.Run("symbolic ref HEAD", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("HEAD")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/heads/main", ref)
+	})
+
+	t.Run("fully qualified branch", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("refs/heads/main")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/heads/main", ref)
+	})
+
+	t.Run("short branch name", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("main")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/heads/main", ref)
+	})
+
+	t.Run("tag name", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("v1.0")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/tags/v1.0", ref)
+	})
+
+	t.Run("custom ref", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("custom/myref")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/custom/myref", ref)
+	})
+
+	t.Run("remote tracking ref", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("origin/main")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/remotes/origin/main", ref)
+	})
+
+	t.Run("remote HEAD", func(t *testing.T) {
+		ref, err := repo.AbsoluteReference("origin")
+		assert.Nil(t, err)
+		assert.Equal(t, "refs/remotes/origin/HEAD", ref)
+	})
+
+	t.Run("non-existent ref", func(t *testing.T) {
+		_, err := repo.AbsoluteReference("nonexistent")
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
 }
