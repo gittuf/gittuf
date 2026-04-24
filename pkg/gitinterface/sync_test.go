@@ -153,6 +153,14 @@ func TestPushRefSpecRepository(t *testing.T) {
 		err = localRepo.PushRefSpec(remoteName, []string{refSpecs})
 		assert.Nil(t, err)
 	})
+
+	t.Run("push to non-existent remote", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+
+		err := localRepo.PushRefSpec("nonexistent", []string{refSpecs})
+		assert.ErrorContains(t, err, "unable to push")
+	})
 }
 
 func TestPushRepository(t *testing.T) {
@@ -293,6 +301,22 @@ func TestPushRepository(t *testing.T) {
 		// Push again; nothing to push
 		err = localRepo.Push(remoteName, []string{refName})
 		assert.Nil(t, err)
+	})
+
+	t.Run("push to non-existent remote", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+
+		err := localRepo.Push("nonexistent", []string{refName})
+		assert.ErrorContains(t, err, "unable to push")
+	})
+
+	t.Run("push with invalid ref", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, false)
+
+		err := localRepo.Push("origin", []string{"nonexistent-ref"})
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
 	})
 }
 
@@ -443,6 +467,14 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, localRef, newLocalRef)
 	})
+
+	t.Run("fetch from non-existent remote", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+
+		err := localRepo.FetchRefSpec("nonexistent", []string{refSpecs})
+		assert.ErrorContains(t, err, "unable to fetch")
+	})
 }
 
 func TestFetchRepository(t *testing.T) {
@@ -591,6 +623,27 @@ func TestFetchRepository(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, localRef, newLocalRef)
 	})
+
+	t.Run("fetch from non-existent remote", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+
+		err := localRepo.Fetch("nonexistent", []string{refName}, true)
+		assert.ErrorContains(t, err, "unable to fetch")
+	})
+
+	t.Run("fetch with invalid ref", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		_ = CreateTestGitRepository(t, remoteTmpDir, false)
+
+		err := localRepo.CreateRemote(remoteName, remoteTmpDir)
+		require.Nil(t, err)
+
+		err = localRepo.Fetch(remoteName, []string{"nonexistent-ref"}, true)
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
 }
 
 func TestFetchObject(t *testing.T) {
@@ -617,6 +670,11 @@ func TestFetchObject(t *testing.T) {
 
 	has = downstreamRepo.HasObject(commitID)
 	assert.True(t, has)
+
+	t.Run("fetch from non-existent remote", func(t *testing.T) {
+		err := downstreamRepo.FetchObject("nonexistent", ZeroHash)
+		assert.ErrorContains(t, err, "unable to fetch object")
+	})
 }
 
 func TestCloneAndFetchRepository(t *testing.T) {
@@ -912,4 +970,14 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		}
 		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
 	})
+}
+
+func TestCreateRemote(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+	err := repo.CreateRemote("origin", tmpDir)
+	assert.Nil(t, err)
+
+	err = repo.CreateRemote("origin", tmpDir)
+	assert.ErrorContains(t, err, "unable to add remote")
 }
