@@ -71,6 +71,8 @@ func NewStatusCodeFromByte(s byte) (StatusCode, error) {
 		return StatusCodeAdded, nil
 	case 'D':
 		return StatusCodeDeleted, nil
+	case 'R':
+		return StatusCodeRenamed, nil
 	case 'C':
 		return StatusCodeCopied, nil
 	case 'U':

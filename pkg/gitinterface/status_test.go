@@ -163,6 +163,7 @@ func TestNewStatusCodeFromByte(t *testing.T) {
 			{'T', StatusCodeTypeChanged},
 			{'A', StatusCodeAdded},
 			{'D', StatusCodeDeleted},
+			{'R', StatusCodeRenamed},
 			{'C', StatusCodeCopied},
 			{'U', StatusCodeUpdatedUnmerged},
 			{'?', StatusCodeUntracked},
