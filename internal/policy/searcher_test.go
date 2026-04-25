@@ -212,6 +212,62 @@ func TestRegularSearcher(t *testing.T) {
 		assert.ErrorIs(t, err, attestations.ErrAttestationsNotFound)
 		assert.Nil(t, attestationsEntry)
 	})
+
+	t.Run("latest policy", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newRegularSearcher(repo)
+		policyEntry, err := searcher.FindLatestPolicyEntry()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
+	})
+
+	t.Run("latest policy, no policy", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newRegularSearcher(repo)
+		_, err := searcher.FindLatestPolicyEntry()
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
+	})
+
+	t.Run("latest attestations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		currentAttestations := &attestations.Attestations{}
+		if err := currentAttestations.Commit(repo, "Initial attestations\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedAttestationsEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newRegularSearcher(repo)
+		attestationsEntry, err := searcher.FindLatestAttestationsEntry()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
+	})
+
+	t.Run("latest attestations, no attestations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		searcher := newRegularSearcher(repo)
+		_, err := searcher.FindLatestAttestationsEntry()
+		assert.ErrorIs(t, err, attestations.ErrAttestationsNotFound)
+	})
 }
 
 func TestCacheSearcher(t *testing.T) {
@@ -374,6 +430,49 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Equal(t, expectedPolicyEntries, policyEntries)
 	})
 
+	t.Run("latest policy", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
+
+		if err := cache.PopulatePersistentCache(repo); err != nil {
+			t.Fatal(err)
+		}
+		persistentCache, err := cache.LoadPersistentCache(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newCacheSearcher(repo, persistentCache)
+		policyEntry, err := searcher.FindLatestPolicyEntry()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
+	})
+
+	t.Run("latest policy, no policy entries", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := cache.PopulatePersistentCache(repo); err != nil {
+			t.Fatal(err)
+		}
+		persistentCache, err := cache.LoadPersistentCache(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newCacheSearcher(repo, persistentCache)
+		_, err = searcher.FindLatestPolicyEntry()
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
+	})
+
 	t.Run("attestations exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -463,5 +562,54 @@ func TestCacheSearcher(t *testing.T) {
 		attestationsEntry, err := searcher.FindAttestationsEntryFor(entry)
 		assert.ErrorIs(t, err, attestations.ErrAttestationsNotFound)
 		assert.Nil(t, attestationsEntry)
+	})
+
+	t.Run("latest attestations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		currentAttestations := &attestations.Attestations{}
+		if err := currentAttestations.Commit(repo, "Initial attestations\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedAttestationsEntry, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := cache.PopulatePersistentCache(repo); err != nil {
+			t.Fatal(err)
+		}
+		persistentCache, err := cache.LoadPersistentCache(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newCacheSearcher(repo, persistentCache)
+		attestationsEntry, err := searcher.FindLatestAttestationsEntry()
+		assert.Nil(t, err)
+		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
+	})
+
+	t.Run("latest attestations, no attestations", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := cache.PopulatePersistentCache(repo); err != nil {
+			t.Fatal(err)
+		}
+		persistentCache, err := cache.LoadPersistentCache(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		searcher := newCacheSearcher(repo, persistentCache)
+		_, err = searcher.FindLatestAttestationsEntry()
+		assert.ErrorIs(t, err, attestations.ErrAttestationsNotFound)
 	})
 }
