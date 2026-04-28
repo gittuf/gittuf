@@ -28,6 +28,9 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 	url = strings.TrimPrefix(url, "ssh+git://")
 
 	urlSplit := strings.Split(url, ":") // 0 is the connection [user@]host, 1 is the repo
+	if len(urlSplit) < 2 {
+		return nil, false, fmt.Errorf("invalid SSH URL %q: expected format [user@]host:repository", url)
+	}
 	host := urlSplit[0]
 	repository := urlSplit[1]
 
@@ -249,7 +252,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					}
 
 					refAdSplit := strings.Split(refAd, " ")
-					if strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
+					if len(refAdSplit) >= 2 && strings.HasPrefix(refAdSplit[1], gittufRefPrefix) {
 						gittufRefsTips[refAdSplit[1]] = refAdSplit[0]
 					}
 				}
@@ -472,6 +475,9 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					refAd = strings.TrimSpace(refAd)
 
 					refAdSplit := strings.Split(refAd, " ")
+					if len(refAdSplit) < 2 {
+						continue
+					}
 					ref := refAdSplit[1]
 					if i := strings.IndexByte(ref, '\x00'); i > 0 {
 						ref = ref[:i] // remove config string passed after null byte
@@ -528,6 +534,9 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			dstRefs := set.NewSet[string]()
 			for i, refSpec := range pushRefSpecs {
 				refSpecSplit := strings.Split(refSpec, ":")
+				if len(refSpecSplit) < 2 {
+					return nil, false, fmt.Errorf("invalid refspec %q: expected format src:dst", refSpec)
+				}
 
 				srcRef := refSpecSplit[0]
 				srcRef = strings.TrimPrefix(srcRef, "+")
