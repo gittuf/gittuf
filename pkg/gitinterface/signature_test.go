@@ -4,10 +4,12 @@
 package gitinterface
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCanSign(t *testing.T) {
@@ -20,7 +22,8 @@ func TestCanSign(t *testing.T) {
 	// :(
 
 	tests := map[string]struct {
-		config map[string]string
+		config        map[string]string
+		expectedError error
 	}{
 		"explicit gpg, no key": {
 			config: map[string]string{
@@ -43,6 +46,12 @@ func TestCanSign(t *testing.T) {
 				"gpg.format":      "ssh",
 				"user.signingkey": "ssh/key/path",
 			},
+		},
+		"explicit ssh, no key": {
+			config: map[string]string{
+				"gpg.format": "ssh",
+			},
+			expectedError: ErrSigningKeyNotSpecified,
 		},
 		"explicit x509, no key": {
 			config: map[string]string{
@@ -69,7 +78,20 @@ func TestCanSign(t *testing.T) {
 			}
 
 			err := repo.CanSign()
-			assert.Nil(t, err, fmt.Sprintf("unexpected result in test '%s'", name))
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected result in test '%s'", name))
 		})
 	}
+}
+
+func TestVerifySignature(t *testing.T) {
+	t.Run("not a commit or a tag", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		err = repo.VerifySignature(context.Background(), blobID, nil)
+		assert.ErrorIs(t, err, ErrNotCommitOrTag)
+	})
 }
