@@ -57,12 +57,19 @@ func TestSetReference(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, secondCommitID, refTip)
 
-	err = repo.SetReference(refName, firstCommitID)
-	assert.Nil(t, err)
+	t.Run("success", func(t *testing.T) {
+		err = repo.SetReference(refName, firstCommitID)
+		assert.Nil(t, err)
 
-	refTip, err = repo.GetReference(refName)
-	require.Nil(t, err)
-	assert.Equal(t, firstCommitID, refTip)
+		refTip, err = repo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, firstCommitID, refTip)
+	})
+
+	t.Run("invalid ref name", func(t *testing.T) {
+		err = repo.SetReference("invalid ref name", firstCommitID)
+		assert.ErrorContains(t, err, "unable to set Git reference")
+	})
 }
 
 func TestCheckAndSetReference(t *testing.T) {
@@ -89,12 +96,22 @@ func TestCheckAndSetReference(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, secondCommitID, refTip)
 
-	err = repo.CheckAndSetReference(refName, firstCommitID, secondCommitID)
-	assert.Nil(t, err)
+	t.Run("success", func(t *testing.T) {
+		err = repo.CheckAndSetReference(refName, firstCommitID, secondCommitID)
+		assert.Nil(t, err)
 
-	refTip, err = repo.GetReference(refName)
-	require.Nil(t, err)
-	assert.Equal(t, firstCommitID, refTip)
+		refTip, err = repo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, firstCommitID, refTip)
+	})
+
+	t.Run("error when old value mismatches", func(t *testing.T) {
+		err = repo.SetReference(refName, secondCommitID)
+		require.Nil(t, err)
+
+		err = repo.CheckAndSetReference(refName, firstCommitID, firstCommitID)
+		assert.ErrorContains(t, err, "unable to set Git reference")
+	})
 }
 
 func TestGetSymbolicReferenceTarget(t *testing.T) {
@@ -292,6 +309,11 @@ func TestRepositoryRefSpec(t *testing.T) {
 		assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
 		assert.Equal(t, test.expectedRefSpec, refSpec, fmt.Sprintf("unexpected refspec returned in test '%s'", name))
 	}
+
+	t.Run("nonexistent ref", func(t *testing.T) {
+		_, err := repo.RefSpec("nonexistent", "", false)
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
 }
 
 func TestBranchReferenceName(t *testing.T) {
@@ -355,11 +377,18 @@ func TestDeleteReference(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, commitID, refTip)
 
-	err = repo.DeleteReference(refName)
-	assert.Nil(t, err)
+	t.Run("success", func(t *testing.T) {
+		err = repo.DeleteReference(refName)
+		assert.Nil(t, err)
 
-	_, err = repo.GetReference(refName)
-	assert.ErrorIs(t, err, ErrReferenceNotFound)
+		_, err = repo.GetReference(refName)
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
+
+	t.Run("invalid ref name", func(t *testing.T) {
+		err = repo.DeleteReference("invalid ref name")
+		assert.ErrorContains(t, err, "unable to delete Git reference")
+	})
 }
 
 func TestRemoteReferenceName(t *testing.T) {
