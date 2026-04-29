@@ -228,6 +228,10 @@ func (r *RootMetadata) UpdateRootThreshold(threshold int) error {
 		return tuf.ErrInvalidRootMetadata
 	}
 
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
+	}
+
 	if rootRole.PrincipalIDs.Len() < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -242,6 +246,10 @@ func (r *RootMetadata) UpdatePrimaryRuleFileThreshold(threshold int) error {
 	targetsRole, ok := r.Roles[tuf.TargetsRoleName]
 	if !ok {
 		return tuf.ErrPrimaryRuleFileInformationNotFoundInRoot
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if targetsRole.PrincipalIDs.Len() < threshold {

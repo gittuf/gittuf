@@ -450,6 +450,9 @@ func TestUpdateAndGetRootThreshold(t *testing.T) {
 
 	err = rootMetadata.UpdateRootThreshold(3)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	err = rootMetadata.UpdateRootThreshold(-1)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 }
 
 func TestUpdateAndGetPrimaryRuleFileThreshold(t *testing.T) {
@@ -482,6 +485,9 @@ func TestUpdateAndGetPrimaryRuleFileThreshold(t *testing.T) {
 
 	err = rootMetadata.UpdatePrimaryRuleFileThreshold(3)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	err = rootMetadata.UpdatePrimaryRuleFileThreshold(-1)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 }
 
 func TestGetRootPrincipals(t *testing.T) {
