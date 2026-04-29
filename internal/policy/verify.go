@@ -20,6 +20,8 @@ import (
 	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/policy/options/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
+	verifyopts "github.com/gittuf/gittuf/internal/policy/options/verify"
 	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -70,7 +72,7 @@ func NewPolicyVerifier(repo *gitinterface.Repository) *PolicyVerifier {
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string, opts ...verifyopts.PolicyVerifierOption) (gitinterface.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
@@ -78,13 +80,13 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinter
 		return gitinterface.ZeroHash, err
 	}
 
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target, opts...)
 }
 
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string, opts ...verifyopts.PolicyVerifierOption) (gitinterface.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
 	var (
@@ -121,7 +123,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	}
 
 	slog.Debug("Verifying all entries...")
-	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target)
+	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, firstEntry, latestEntry, target, opts...)
 }
 
 // VerifyRefFromEntry performs verification for the reference from a specific
@@ -446,12 +448,23 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 // VerifyRelativeForRef verifies the RSL between specified start and end entries
 // using the provided policy entry for the first entry.
-func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string) error {
+func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, lastEntry rsl.ReferenceUpdaterEntry, target string, opts ...verifyopts.PolicyVerifierOption) error {
 	/*
 		require firstEntry != nil
 		require lastEntry != nil
 		require target != ""
 	*/
+
+	options := &verifyopts.PolicyVerifierOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	var loadStateOpts []policyopts.LoadStateOption
+
+	if options.InitialRootPrincipals != nil {
+		loadStateOpts = append(loadStateOpts, policyopts.WithInitialRootPrincipals(options.InitialRootPrincipals))
+	}
 
 	if v.persistentCacheEnabled {
 		defer v.persistentCache.Commit(v.repo) //nolint:errcheck
@@ -467,7 +480,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.GetID().String()))
 	initialPolicyEntry, err := v.searcher.FindPolicyEntryFor(firstEntry)
 	if err == nil {
-		state, err := LoadState(ctx, v.repo, initialPolicyEntry)
+		state, err := LoadState(ctx, v.repo, initialPolicyEntry, loadStateOpts...)
 		if err != nil {
 			return err
 		}

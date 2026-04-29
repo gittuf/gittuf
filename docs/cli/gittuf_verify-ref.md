@@ -13,6 +13,7 @@ gittuf verify-ref [flags]
   -h, --help                     help for verify-ref
       --latest-only              perform verification against latest entry in the RSL
       --remote-ref-name string   name of remote reference, if it differs from the local name
+      --root-key public-keys     set of initial root of trust keys for the repository (supported values: paths to SSH keys, GPG key fingerprints, Sigstore/Fulcio identities)
 ```
 
 ### Options inherited from parent commands
