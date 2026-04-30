@@ -97,7 +97,21 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 			return repository, ErrExpectedRootKeysDoNotMatch
 		}
 	}
-
 	slog.Debug("Verifying HEAD...")
-	return repository, repository.VerifyRef(ctx, head)
+	if err := repository.VerifyRef(ctx, head); err != nil {
+		return repository, err
+	}
+
+	// enable and populate the persistent cache by default after cloning
+	// this is a non-fatal operation - if it fails, we log and continue
+	if repository.IsCacheEnabled() {
+		slog.Debug("Enabling persistent cache after clone...")
+		if err := repository.EnableCacheConfig(); err != nil {
+			slog.Debug("Warning: could not enable cache config", "error", err)
+		} else if err := repository.PopulateCache(); err != nil {
+			slog.Debug("Warning: could not populate cache", "error", err)
+		}
+	}
+
+	return repository, nil
 }

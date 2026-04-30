@@ -26,6 +26,15 @@ type searcher interface {
 }
 
 func newSearcher(repo *gitinterface.Repository) searcher {
+	// Check if the user has disabled the cache via git config.
+	gitConfig, err := repo.GetGitConfig()
+	if err == nil {
+		if val, exists := gitConfig["gittuf.cache"]; exists && val == "false" {
+			slog.Debug("Persistent cache disabled by git config, using regular RSL searcher...")
+			return newRegularSearcher(repo)
+		}
+	}
+
 	persistentCache, err := cache.LoadPersistentCache(repo)
 	if err == nil {
 		slog.Debug("Persistent cache found, loading cache RSL searcher...")
