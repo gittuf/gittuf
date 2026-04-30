@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/charmbracelet/x/exp/teatest v0.0.0-20260430013151-79116d1f37bd
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
 	github.com/go-git/go-git/v5 v5.18.0
 	github.com/google/go-github/v61 v61.0.0
@@ -26,6 +27,11 @@ require (
 )
 
 require github.com/oklog/ulid/v2 v2.1.1 // indirect
+
+require (
+	github.com/aymanbagabas/go-udiff v0.3.1 // indirect
+	github.com/charmbracelet/x/exp/golden v0.0.0-20241011142426-46044092ad91 // indirect
+)
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
