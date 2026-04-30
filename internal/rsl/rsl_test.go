@@ -1889,6 +1889,97 @@ func TestPropagateChangesFromUpstreamRepository(t *testing.T) {
 	assert.Equal(t, propagationEntry.GetID(), latestEntry.GetID())
 }
 
+func TestPropagateChangesFromUpstreamRepositoryAtomicity(t *testing.T) {
+	// Set up an upstream repo with two branches.
+	upstreamRepoDir := t.TempDir()
+	upstreamRepo := gitinterface.CreateTestGitRepository(t, upstreamRepoDir, true)
+
+	blobID, err := upstreamRepo.WriteBlob([]byte("content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo)
+	upstreamTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("file", blobID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamMainCommitID, err := upstreamRepo.Commit(upstreamTreeID, "refs/heads/main", "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewReferenceEntry("refs/heads/main", upstreamMainCommitID).Commit(upstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamFeatureCommitID, err := upstreamRepo.Commit(upstreamTreeID, "refs/heads/feature", "Feature commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewReferenceEntry("refs/heads/feature", upstreamFeatureCommitID).Commit(upstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Set up a downstream repo with only refs/heads/main.
+	downstreamRepoDir := t.TempDir()
+	downstreamRepo := gitinterface.CreateTestGitRepository(t, downstreamRepoDir, true)
+
+	downstreamBlobID, err := downstreamRepo.WriteBlob([]byte("downstream"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo)
+	downstreamTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("file", downstreamBlobID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	downstreamMainCommitID, err := downstreamRepo.Commit(downstreamTreeID, "refs/heads/main", "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewReferenceEntry("refs/heads/main", downstreamMainCommitID).Commit(downstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Record the RSL tip before propagation.
+	rslTipBefore, err := GetLatestEntry(downstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Two directives: the first targets refs/heads/main (valid), the second
+	// targets refs/heads/feature which does not exist in the downstream repo
+	// and will fail during Phase 1.
+	directives := []tuf.PropagationDirective{
+		&tufv01.PropagationDirective{
+			UpstreamReference:   "refs/heads/main",
+			UpstreamRepository:  upstreamRepoDir,
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream-main",
+		},
+		&tufv01.PropagationDirective{
+			UpstreamReference:   "refs/heads/feature",
+			UpstreamRepository:  upstreamRepoDir,
+			DownstreamReference: "refs/heads/feature",
+			DownstreamPath:      "upstream-feature",
+		},
+	}
+
+	err = PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo, directives, false)
+	assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+	// The RSL must be unchanged — no partial entries must have been written.
+	rslTipAfter, err := GetLatestEntry(downstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, rslTipBefore.GetID(), rslTipAfter.GetID())
+}
+
 func TestAnnotationEntryRefersTo(t *testing.T) {
 	// We use these as stand-ins for actual RSL IDs that have the same data type
 	tempDir := t.TempDir()
