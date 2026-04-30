@@ -142,3 +142,97 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 		return tuf.ErrUnknownGlobalRuleType
 	}
 }
+
+type propagationDirective struct {
+	name                string
+	upstreamRepository  string
+	upstreamReference   string
+	upstreamPath        string
+	downstreamReference string
+	downstreamPath      string
+}
+
+// getPropagationDirectives returns a slice of propagationDirective for the TUI.
+func getPropagationDirectives(ctx context.Context, o *options) []propagationDirective {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil
+	}
+
+	directives, err := repo.ListPropagationDirectives(ctx, o.targetRef)
+	if err != nil {
+		return nil
+	}
+
+	out := make([]propagationDirective, len(directives))
+	for i, d := range directives {
+		out[i] = propagationDirective{
+			name:                d.GetName(),
+			upstreamRepository:  d.GetUpstreamRepository(),
+			upstreamReference:   d.GetUpstreamReference(),
+			upstreamPath:        d.GetUpstreamPath(),
+			downstreamReference: d.GetDownstreamReference(),
+			downstreamPath:      d.GetDownstreamPath(),
+		}
+	}
+	return out
+}
+
+// repoAddPropagationDirective adds a propagation directive.
+func repoAddPropagationDirective(ctx context.Context, o *options, pd propagationDirective) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.AddPropagationDirective(
+		ctx, signer,
+		pd.name, pd.upstreamRepository, pd.upstreamReference, pd.upstreamPath, pd.downstreamReference, pd.downstreamPath,
+		true, opts...,
+	)
+}
+
+// repoRemovePropagationDirective removes a propagation directive by name.
+func repoRemovePropagationDirective(ctx context.Context, o *options, name string) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.RemovePropagationDirective(ctx, signer, name, true, opts...)
+}
+
+// repoUpdatePropagationDirective updates an existing propagation directive.
+func repoUpdatePropagationDirective(ctx context.Context, o *options, pd propagationDirective) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	var opts []trustpolicyopts.Option
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.UpdatePropagationDirective(
+		ctx, signer,
+		pd.name, pd.upstreamRepository, pd.upstreamReference, pd.upstreamPath, pd.downstreamReference, pd.downstreamPath,
+		true, opts...,
+	)
+}

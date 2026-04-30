@@ -114,6 +114,18 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+// screenTrustPropagationDirectivesHelp returns the help bar for the propagation directives view screen.
+func screenTrustPropagationDirectivesHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  e: edit  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
 func renderDeleteOverlay(target string) string {
 	return lipgloss.NewStyle().
@@ -179,6 +191,24 @@ func (m model) View() string {
 		return m.renderFormScreen("Add Global Rule")
 	case screenTrustEditGlobalRule:
 		return m.renderFormScreen("Edit Global Rule")
+	case screenTrustPropagationDirectives:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes.",
+			)
+		}
+
+		emptyMsg := "No propagation directives configured. Press 'A' to add one."
+		return m.renderListScreen(m.propagationList, overlay+screenTrustPropagationDirectivesHelp(m.readOnly)+hint, emptyMsg, len(m.propagationDirectives) == 0)
+	case screenTrustAddPropagationDirective:
+		return m.renderFormScreen("Add Propagation Directive")
+	case screenTrustEditPropagationDirective:
+		return m.renderFormScreen("Edit Propagation Directive")
 	default:
 		return "Unknown screen"
 	}
