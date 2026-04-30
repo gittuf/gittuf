@@ -32,6 +32,8 @@ const (
 	screenTrustGlobalRules                  // Global rule management screen
 	screenTrustAddGlobalRule                // Form: add a new global rule
 	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
+	screenPolicyPrincipals                  // Principal list screen
+	screenPolicyAddPrincipal                // Form: add a new principal
 )
 
 type item struct {
@@ -59,6 +61,8 @@ type model struct {
 	ruleList         list.Model
 	globalRules      []globalRule
 	globalRuleList   list.Model
+	principals       []principal
+	principalList    list.Model
 	inputs           []textinput.Model
 	focusIndex       int
 	cursorMode       cursor.Mode
@@ -79,6 +83,7 @@ type initDoneMsg struct {
 	signer      dsse.SignerVerifier
 	rules       []rule
 	globalRules []globalRule
+	principals  []principal
 	readOnly    bool
 	footer      string
 	err         error
@@ -157,12 +162,14 @@ func initialModel(ctx context.Context, o *options) model {
 		}, delegate),
 		policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 			item{title: "View Rules", desc: "View and manage policy rules"},
+			item{title: "View Principals", desc: "View and manage policy principals"},
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 		}, delegate),
 		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
 		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		principalList:  newMenuList("Policy Principals", []list.Item{}, delegate),
 	}
 
 	return m
@@ -197,6 +204,7 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 			signer:      signer,
 			rules:       getCurrRules(ctx, o),
 			globalRules: getGlobalRules(ctx, o),
+			principals:  getCurrPrincipals(ctx, o),
 			readOnly:    readOnly,
 			footer:      footer,
 		}
@@ -286,4 +294,27 @@ func (m *model) updateGlobalRuleList() {
 		items[i] = item{title: gr.ruleName, desc: desc}
 	}
 	m.globalRuleList.SetItems(items)
+}
+
+// refreshPrincipals re-fetches principals from the repo and rebuilds the list.
+func (m *model) refreshPrincipals() {
+	m.principals = getCurrPrincipals(m.ctx, m.options)
+	m.updatePrincipalList()
+}
+
+// updatePrincipalList rebuilds the principalList items from m.principals.
+func (m *model) updatePrincipalList() {
+	items := make([]list.Item, len(m.principals))
+	for i, p := range m.principals {
+		items[i] = item{title: p.id, desc: fmt.Sprintf("Keys: %s", p.keysSummary)}
+	}
+	m.principalList.SetItems(items)
+}
+
+// initPrincipalInputs initializes the input field for the add-principal form.
+func (m *model) initPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Path to public key, gpg:<fingerprint>, or fulcio:<id>::<issuer>", "Key Ref:"},
+	})
+	m.focusIndex = 0
 }

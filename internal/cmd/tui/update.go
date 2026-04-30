@@ -29,10 +29,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.signer = msg.signer
 		m.rules = msg.rules
 		m.globalRules = msg.globalRules
+		m.principals = msg.principals
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
 		m.updateRuleList()
 		m.updateGlobalRuleList()
+		m.updatePrincipalList()
 		m.screen = screenChoice
 		return m, nil
 
@@ -49,6 +51,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trustScreenList.SetSize(msg.Width-h, msg.Height-v)
 		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
 		m.globalRuleList.SetSize(msg.Width-h, msg.Height-v)
+		m.principalList.SetSize(msg.Width-h, msg.Height-v)
 
 	case tea.KeyMsg:
 		// Delete confirmation overlay intercepts all keys
@@ -63,7 +66,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
+				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
+				m.screen != screenPolicyAddPrincipal {
 				return m, tea.Quit
 			}
 		case "esc":
@@ -79,6 +83,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTrust
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.screen = screenTrustGlobalRules
+			case screenPolicyPrincipals:
+				m.screen = screenPolicy
+			case screenPolicyAddPrincipal:
+				m.screen = screenPolicyPrincipals
 			}
 			return m, nil
 		}
@@ -107,6 +115,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cycleFocus(msg.String())
 				return m, nil
 			}
+		case screenPolicyPrincipals:
+			return m.handlePrincipalListKey(msg)
+
+		case screenPolicyAddPrincipal:
+			if msg.String() == "enter" {
+				return m.handlePrincipalFormSubmit()
+			}
+			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
+				m.cycleFocus(msg.String())
+				return m, nil
+			}
 		}
 	}
 
@@ -122,8 +141,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ruleList, cmd = m.ruleList.Update(msg)
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule, screenPolicyAddPrincipal:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
+	case screenPolicyPrincipals:
+		m.principalList, cmd = m.principalList.Update(msg)
 	}
 
 	return m, cmd
@@ -142,9 +163,15 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			}
 		}
 	case screenPolicy:
-		if _, ok := m.policyScreenList.SelectedItem().(item); ok {
-			m.screen = screenPolicyRules
-			m.refreshRules()
+		if i, ok := m.policyScreenList.SelectedItem().(item); ok {
+			switch i.title {
+			case "View Rules":
+				m.screen = screenPolicyRules
+				m.refreshRules()
+			case "View Principals":
+				m.screen = screenPolicyPrincipals
+				m.refreshPrincipals()
+			}
 		}
 	case screenTrust:
 		if _, ok := m.trustScreenList.SelectedItem().(item); ok {
@@ -251,6 +278,13 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 			} else {
 				m.footer = "Global rule removed!"
 				m.refreshGlobalRules()
+			}
+		case screenPolicyPrincipals:
+			if err := repoRemovePrincipalFromTargets(m.ctx, m.options, m.deleteTarget); err != nil {
+				m.errorMsg = fmt.Sprintf("Error removing principal: %v", err)
+			} else {
+				m.footer = "Principals removed successfully!"
+				m.refreshPrincipals()
 			}
 		}
 	}
@@ -417,4 +451,45 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+// handlePrincipalListKey handles keybindings on the principals list screen.
+func (m model) handlePrincipalListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if !m.readOnly {
+		switch msg.String() {
+		case "a":
+			m.initPrincipalInputs()
+			m.screen = screenPolicyAddPrincipal
+			return m, nil
+		case "d":
+			if sel, ok := m.principalList.SelectedItem().(item); ok {
+				m.confirmDelete = true
+				m.deleteTarget = sel.title
+				return m, nil
+			}
+		}
+	}
+
+	var cmd tea.Cmd
+	m.principalList, cmd = m.principalList.Update(msg)
+	return m, cmd
+}
+
+// handlePrincipalFormSubmit handles enter on the add-principal form screen.
+func (m model) handlePrincipalFormSubmit() (tea.Model, tea.Cmd) {
+	keyRef := strings.TrimSpace(m.inputs[0].Value())
+	if keyRef == "" {
+		m.errorMsg = "Key ref cannot be empty."
+		return m, nil
+	}
+
+	if err := repoAddPrincipalToTargets(m.ctx, m.options, keyRef); err != nil {
+		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		return m, nil
+	}
+
+	m.refreshPrincipals()
+	m.footer = "Principal added successfully!"
+	m.screen = screenPolicyPrincipals
+	return m, nil
 }
