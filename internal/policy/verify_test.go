@@ -1373,6 +1373,73 @@ func TestVerifyMergeable(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
+
+	t.Run("base commit zero, global threshold not met with single approval", func(t *testing.T) {
+		refName := "refs/heads/main"
+		featureRefName := "refs/heads/feature"
+
+		repo, _ := createTestRepository(t, func(t *testing.T) *State {
+			state := createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t)
+
+			rootMetadata, err := state.GetRootMetadata(false)
+			require.NoError(t, err)
+			require.NoError(t, rootMetadata.AddGlobalRule(
+				tufv01.NewGlobalRuleThreshold("global-threshold-3", []string{"git:refs/heads/main"}, 3),
+			))
+
+			signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+			rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+			require.NoError(t, err)
+			rootEnv, err = dsse.SignEnvelope(testCtx, rootEnv, signer)
+			require.NoError(t, err)
+
+			state.Metadata.RootEnvelope = rootEnv
+			require.NoError(t, state.preprocess())
+			return state
+		})
+
+		// Align worktree for older Git versions
+		pwd, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(filepath.Join(repo.GetGitDir(), "..")))
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(featureRefName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		require.NoError(t, err)
+
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(
+			refName, gitinterface.ZeroHash.String(), commitTreeID.String(),
+			[]string{"john.doe"}, nil,
+		)
+		require.NoError(t, err)
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		require.NoError(t, err)
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		require.NoError(t, err)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		require.NoError(t, err)
+		require.NoError(t, currentAttestations.SetGitHubPullRequestApprovalAttestation(
+			repo, env, "https://github.com", 1, tuf.GitHubAppRoleName,
+			refName, gitinterface.ZeroHash.String(), commitTreeID.String(),
+		))
+		require.NoError(t, currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false))
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
+
+		// Expected after fix: error because global threshold is not met.
+		// Buggy code: returns nil (false positive).
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+		assert.False(t, rslSignatureRequired)
+	})
 }
 
 func TestVerifyMergeableForCommit(t *testing.T) {
@@ -2005,6 +2072,69 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
 		assert.Nil(t, err)
+		assert.False(t, rslSignatureRequired)
+	})
+
+	t.Run("base commit zero, global threshold not met with single approval (commit API)", func(t *testing.T) {
+		refName := "refs/heads/main"
+		featureRefName := "refs/heads/feature"
+
+		repo, _ := createTestRepository(t, func(t *testing.T) *State {
+			state := createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t)
+
+			rootMetadata, err := state.GetRootMetadata(false)
+			require.NoError(t, err)
+			require.NoError(t, rootMetadata.AddGlobalRule(
+				tufv01.NewGlobalRuleThreshold("global-threshold-3", []string{"git:refs/heads/main"}, 3),
+			))
+
+			signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+			rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+			require.NoError(t, err)
+			rootEnv, err = dsse.SignEnvelope(testCtx, rootEnv, signer)
+			require.NoError(t, err)
+
+			state.Metadata.RootEnvelope = rootEnv
+			require.NoError(t, state.preprocess())
+			return state
+		})
+
+		// Align worktree for older Git versions
+		pwd, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(filepath.Join(repo.GetGitDir(), "..")))
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
+		featureID := commitIDs[0]
+
+		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		require.NoError(t, err)
+
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(
+			refName, gitinterface.ZeroHash.String(), commitTreeID.String(),
+			[]string{"john.doe"}, nil,
+		)
+		require.NoError(t, err)
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		env, err := dsse.CreateEnvelope(githubAppApproval)
+		require.NoError(t, err)
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		require.NoError(t, err)
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		require.NoError(t, err)
+		require.NoError(t, currentAttestations.SetGitHubPullRequestApprovalAttestation(
+			repo, env, "https://github.com", 1, tuf.GitHubAppRoleName,
+			refName, gitinterface.ZeroHash.String(), commitTreeID.String(),
+		))
+		require.NoError(t, currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false))
+
+		verifier := NewPolicyVerifier(repo)
+		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
+
+		assert.ErrorIs(t, err, ErrVerificationFailed)
 		assert.False(t, rslSignatureRequired)
 	})
 }
