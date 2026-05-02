@@ -24,6 +24,9 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 	// Set same expires
 	newRootMetadata.Expires = rootMetadata.Expires
 
+	// Set same version number
+	newRootMetadata.Version = rootMetadata.Version
+
 	// Set repository location
 	newRootMetadata.RepositoryLocation = rootMetadata.RepositoryLocation
 
@@ -89,6 +92,9 @@ func MigrateTargetsMetadataV01ToV02(targetsMetadata *tufv01.TargetsMetadata) *tu
 
 	// Set same expires
 	newTargetsMetadata.Expires = targetsMetadata.Expires
+
+	// Set same version number
+	newTargetsMetadata.Version = targetsMetadata.Version
 
 	// Set delegations
 	newTargetsMetadata.Delegations = &tufv02.Delegations{

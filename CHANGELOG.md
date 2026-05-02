@@ -2,6 +2,33 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.14.0
+
+This release improves our testing coverage, makes various improvements across
+the codebase, and removes support for the legacy securesystemslib key format.
+This release also fixes security vulnerabilities, see the advisories on GitHub
+for more information. 
+
+### Added
+
+- Added support for filtering the RSL by target reference of entries
+- Added testing for gittuf in CI on FreeBSD
+- Added fixes to prevent policy rollback attacks via RSL
+- Added missing validation when loading first policy state 
+
+### Updated
+
+- Improved checks for invalid thresholds
+- Improved reliability of integration with the gittuf GitHub app
+- Improved CLI documentation
+- Increased testing coverage significantly across multiple packages
+- Updated various dependencies and CI workflows
+
+### Removed
+
+- Removed support for legacy securesystemslib key formats, used in early alpha
+  builds of gittuf
+
 ## v0.13.1
 
 This release is a follow-up to v0.13.0 to fix our releasing pipeline. Starting

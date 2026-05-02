@@ -22,6 +22,7 @@ const (
 type RootMetadata struct {
 	Type               string                     `json:"type"`
 	Expires            string                     `json:"expires"`
+	Version            uint64                     `json:"version"`
 	RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
 	Keys               map[string]*Key            `json:"keys"`
 	Roles              map[string]Role            `json:"roles"`
@@ -35,7 +36,8 @@ type RootMetadata struct {
 // NewRootMetadata returns a new instance of RootMetadata.
 func NewRootMetadata() *RootMetadata {
 	return &RootMetadata{
-		Type: "root",
+		Type:    "root",
+		Version: 1,
 	}
 }
 
@@ -44,9 +46,19 @@ func (r *RootMetadata) SetExpires(expires string) {
 	r.Expires = expires
 }
 
-// SchemaVersion returns the metadata schema version.
-func (r *RootMetadata) SchemaVersion() string {
+// GetSchemaVersion returns the metadata schema version.
+func (r *RootMetadata) GetSchemaVersion() string {
 	return rootVersion
+}
+
+// GetVersion returns the version number of the metadata.
+func (r *RootMetadata) GetVersion() uint64 {
+	return r.Version
+}
+
+// IncrementVersion increments the metadata version number by 1.
+func (r *RootMetadata) IncrementVersion() {
+	r.Version++
 }
 
 // GetRepositoryLocation returns the canonical location of the Git repository.
@@ -229,6 +241,10 @@ func (r *RootMetadata) UpdateRootThreshold(threshold int) error {
 		return tuf.ErrInvalidRootMetadata
 	}
 
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
+	}
+
 	if rootRole.KeyIDs.Len() < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -243,6 +259,10 @@ func (r *RootMetadata) UpdatePrimaryRuleFileThreshold(threshold int) error {
 	targetsRole, ok := r.Roles[tuf.TargetsRoleName]
 	if !ok {
 		return tuf.ErrPrimaryRuleFileInformationNotFoundInRoot
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if targetsRole.KeyIDs.Len() < threshold {
@@ -361,6 +381,12 @@ func (r *RootMetadata) GetGitHubAppPrincipals(appName string) ([]tuf.Principal, 
 
 // AddGlobalRule adds a new global rule to RootMetadata.
 func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	if allGlobalRules == nil {
 		allGlobalRules = []tuf.GlobalRule{}
@@ -402,6 +428,12 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 
 // UpdateGlobalRule updates the specified global rule from the RootMetadata.
 func (r *RootMetadata) UpdateGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	updatedGlobalRules := []tuf.GlobalRule{}
 	found := false

@@ -71,6 +71,8 @@ func NewStatusCodeFromByte(s byte) (StatusCode, error) {
 		return StatusCodeAdded, nil
 	case 'D':
 		return StatusCodeDeleted, nil
+	case 'R':
+		return StatusCodeRenamed, nil
 	case 'C':
 		return StatusCodeCopied, nil
 	case 'U':
@@ -114,22 +116,26 @@ func (r *Repository) Status() (map[string]FileStatus, error) {
 
 	statuses := map[string]FileStatus{}
 
-	lines := strings.Split(output, string('\000'))
-	for _, line := range lines {
-		if len(line) == 0 {
+	// `git status --porcelain=1 -z` emits NUL-separated tokens.
+	// For rename/copy records, the source path is emitted as an additional
+	// token after the main status token.
+	tokens := strings.Split(output, string('\000'))
+	for i := 0; i < len(tokens); i++ {
+		token := tokens[i]
+		if len(token) == 0 {
 			continue
 		}
 
 		// first two characters are status codes, find the corresponding
 		// statuses
-		xb := line[0]
-		yb := line[1]
+		xb := token[0]
+		yb := token[1]
 		// Note: we identify the status after inspecting the path so we can
 		// provide better error messages
 
 		// then, we have a single space followed by the path, ignore space and
 		// read in the rest as the filepath
-		filePath := strings.TrimSpace(line[2:])
+		filePath := strings.TrimSpace(token[2:])
 
 		xStatus, err := NewStatusCodeFromByte(xb)
 		if err != nil {
@@ -144,6 +150,16 @@ func (r *Repository) Status() (map[string]FileStatus, error) {
 		status := FileStatus{X: xStatus, Y: yStatus}
 
 		statuses[filePath] = status
+
+		// After splitting on NUL, rename/copy records have an additional token
+		// for the source path immediately after the main token.
+		if xStatus == StatusCodeRenamed || xStatus == StatusCodeCopied ||
+			yStatus == StatusCodeRenamed || yStatus == StatusCodeCopied {
+			if i+1 >= len(tokens) || len(tokens[i+1]) == 0 {
+				return nil, fmt.Errorf("unable to parse rename/copy status for path '%s': missing source path", filePath)
+			}
+			i++
+		}
 	}
 
 	return statuses, nil

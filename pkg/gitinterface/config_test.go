@@ -71,4 +71,12 @@ func TestSetGitConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "", config["gpg.format"])
 	})
+
+	t.Run("invalid key", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		err := repo.SetGitConfig("", "value")
+		assert.ErrorContains(t, err, "unable to set")
+	})
 }

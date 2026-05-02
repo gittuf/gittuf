@@ -4002,6 +4002,48 @@ func TestStateVerifyNewState(t *testing.T) {
 		err = currentPolicy.VerifyNewState(testCtx, newPolicy)
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
+
+	t.Run("rollback attack", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithOnlyRoot(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
+	})
+
+	t.Run("verify new state when transitioning from non numbered to numbered metadata", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithOnlyRootUnnumbered(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
+	})
+
+	t.Run("verify new state when transitioning from non-numbered to numbered metadata with both policy and root", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithPolicyUnnumbered(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
+	})
 }
 
 func getPropagationDirectivesForNetworkRepository(t *testing.T, rootMetadata tuf.RootMetadata) []tuf.PropagationDirective {

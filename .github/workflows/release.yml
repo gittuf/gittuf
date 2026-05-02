@@ -22,7 +22,7 @@ jobs:
           cache: true
       - uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003
       - uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610
-      - uses: goreleaser/goreleaser-action@e24998b8b67b290c2fa8b7c14fcfa7de2c5c9b8c
+      - uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8
         with:
           distribution: goreleaser-pro
           version: latest

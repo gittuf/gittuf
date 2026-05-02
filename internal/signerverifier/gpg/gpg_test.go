@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGPG(t *testing.T) {
@@ -74,11 +76,47 @@ func TestGPG(t *testing.T) {
 }
 
 func TestLoadGPGKeyFromBytes(t *testing.T) {
-	keyBytes := artifacts.GPGKey1Public
+	t.Run("valid", func(t *testing.T) {
+		key, err := LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
+		assert.Nil(t, err)
+		assert.Equal(t, KeyType, key.KeyType)
+		assert.Equal(t, KeyType, key.Scheme)
+		assert.Equal(t, "157507bbe151e378ce8126c1dcfe043cdd2db96e", key.KeyID)
+	})
 
-	key, err := LoadGPGKeyFromBytes(keyBytes)
-	assert.Nil(t, err)
-	assert.Equal(t, KeyType, key.KeyType)
-	assert.Equal(t, KeyType, key.Scheme)
-	assert.Equal(t, "157507bbe151e378ce8126c1dcfe043cdd2db96e", key.KeyID)
+	t.Run("invalid", func(t *testing.T) {
+		_, err := LoadGPGKeyFromBytes([]byte("not a gpg key"))
+		assert.ErrorContains(t, err, "no armored data found")
+	})
+}
+
+func TestNewVerifierFromKey(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		pubKey, err := LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
+		require.Nil(t, err)
+
+		verifier, err := NewVerifierFromKey(pubKey)
+		assert.Nil(t, err)
+		require.NotNil(t, verifier)
+
+		keyID, err := verifier.KeyID()
+		assert.Nil(t, err)
+		assert.Equal(t, pubKey.KeyID, keyID)
+
+		assert.Equal(t, verifier.entity.PrimaryKey.PublicKey, verifier.Public())
+		assert.Equal(t, "DCFE043CDD2DB96E", verifier.entity.PrimaryKey.KeyIdString())
+		assert.Equal(t, pubKey, verifier.MetadataKey())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := NewVerifierFromKey(&signerverifier.SSLibKey{
+			KeyID:   "bad",
+			KeyType: KeyType,
+			Scheme:  KeyType,
+			KeyVal: signerverifier.KeyVal{
+				Public: "invalid",
+			},
+		})
+		assert.ErrorContains(t, err, "failed to parse gpg key")
+	})
 }

@@ -219,9 +219,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	}
 
 	treeHashes := createTestTrees(t, repo, emptyBlobHash, 6)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// creating the first commit
 	commitID := repo.commitWithParents(t, treeHashes[0], nil, fmt.Sprintf("Test commit %v", 1), false)

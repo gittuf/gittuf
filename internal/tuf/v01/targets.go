@@ -21,6 +21,7 @@ const (
 type TargetsMetadata struct {
 	Type        string         `json:"type"`
 	Expires     string         `json:"expires"`
+	Version     uint64         `json:"version"`
 	Targets     map[string]any `json:"targets"`
 	Delegations *Delegations   `json:"delegations"`
 }
@@ -29,6 +30,7 @@ type TargetsMetadata struct {
 func NewTargetsMetadata() *TargetsMetadata {
 	return &TargetsMetadata{
 		Type:        "targets",
+		Version:     1,
 		Delegations: &Delegations{Roles: []*Delegation{AllowRule()}},
 	}
 }
@@ -39,9 +41,19 @@ func (t *TargetsMetadata) SetExpires(expires string) {
 	t.Expires = expires
 }
 
-// SchemaVersion returns the metadata schema version.
-func (t *TargetsMetadata) SchemaVersion() string {
+// GetSchemaVersion returns the metadata schema version.
+func (t *TargetsMetadata) GetSchemaVersion() string {
 	return targetsVersion
+}
+
+// GetVersion returns the version number of the metadata.
+func (t *TargetsMetadata) GetVersion() uint64 {
+	return t.Version
+}
+
+// IncrementVersion increments the metadata version number by 1.
+func (t *TargetsMetadata) IncrementVersion() {
+	t.Version++
 }
 
 // Validate ensures the instance of TargetsMetadata matches gittuf expectations.
@@ -62,6 +74,10 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		if _, has := t.Delegations.Keys[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
 		}
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if len(authorizedPrincipalIDs) < threshold {
@@ -97,6 +113,10 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		if _, has := t.Delegations.Keys[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
 		}
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if len(authorizedPrincipalIDs) < threshold {
