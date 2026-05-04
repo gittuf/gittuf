@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
@@ -136,6 +137,53 @@ func TestHasPolicy(t *testing.T) {
 		hasPolicy, err := repo.HasPolicy()
 		assert.Nil(t, err)
 		assert.False(t, hasPolicy)
+	})
+}
+
+func TestApplyPolicy(t *testing.T) {
+	remoteName := "origin"
+
+	t.Run("successful apply with remote sync", func(t *testing.T) {
+		remoteTmpDir := t.TempDir()
+		remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
+
+		localRepo := createTestRepositoryWithPolicy(t, "")
+		if err := localRepo.r.CreateRemote(remoteName, remoteTmpDir); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := localRepo.PushPolicy(remoteName); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRemoteRSLTip, err := remoteRepo.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gpgKey := tufv02.NewKeyFromSSLibKey(gpgKeyR)
+
+		if err := localRepo.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-feature", []string{gpgKey.KeyID}, []string{"git:refs/heads/feature"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ApplyPolicy(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+
+		currentRemoteRSLTip, err := remoteRepo.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.NotEqual(t, originalRemoteRSLTip, currentRemoteRSLTip)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
+		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
 	})
 }
 
