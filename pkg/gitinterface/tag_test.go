@@ -126,4 +126,17 @@ func TestEnsureIsTag(t *testing.T) {
 
 	err = repo.ensureIsTag(commitID)
 	assert.ErrorContains(t, err, "is not a tag object")
+
+	err = repo.ensureIsTag(ZeroHash)
+	assert.ErrorContains(t, err, "unable to inspect if object is tag")
+}
+
+func TestTagUsingSpecificKey(t *testing.T) {
+	t.Run("invalid target", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false)
+
+		_, err := repo.TagUsingSpecificKey(ZeroHash, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+		assert.ErrorContains(t, err, "not found")
+	})
 }
