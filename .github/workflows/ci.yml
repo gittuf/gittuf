@@ -62,7 +62,5 @@ jobs:
           cache: true
       - name: Install gittuf
         run: make just-install
-      - name: Add Go binary to PATH
-        run: echo "$HOME/go/bin" >> $GITHUB_PATH
       - name: Run e2e tests
         run: bash tests/run_e2e_test.sh
