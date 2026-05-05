@@ -250,7 +250,7 @@ func TestClone(t *testing.T) {
 		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
 		_, err = Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{rootPublicKey, badPublicKey}, true)
-		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+		assert.ErrorIs(t, err, ErrExpectedRootKeysDoNotMatch)
 	})
 
 	t.Run("successful clone without specifying dir, not bare", func(t *testing.T) {
@@ -427,6 +427,6 @@ func TestClone(t *testing.T) {
 		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
 		_, err = Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{rootPublicKey, badPublicKey}, false)
-		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+		assert.ErrorIs(t, err, ErrExpectedRootKeysDoNotMatch)
 	})
 }
