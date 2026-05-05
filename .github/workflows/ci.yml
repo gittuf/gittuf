@@ -63,4 +63,4 @@ jobs:
       - name: Install gittuf
         run: make just-install
       - name: Run e2e tests
-        run: bash tests/run_e2e_test.sh
+        run: bash tests/run_e2e_tests.sh
