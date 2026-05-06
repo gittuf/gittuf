@@ -2,6 +2,21 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.14.1
+
+This release ships some small improvements, and fixes security vulnerabilities
+in dependencies. See the release notes on GitHub for more information.
+
+### Added
+
+- Added unit tests for the TUI
+
+### Updated
+
+- Increased testing coverage for remote policy synchronization and gitinterface
+- Fixed issue with git-remote-gittuf and pruning remote branches
+- Updated various dependencies
+
 ## v0.14.0
 
 This release improves our testing coverage, makes various improvements across
