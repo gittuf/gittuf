@@ -43,9 +43,6 @@ assert_fails "on branch protection rule check" gittuf verify-ref main
 # Rewind main branch and RSL to known good state
 rollback 1
 
-# Switch to unauthorized key
-use_key authorized
-
 # Rewind policy ref temporarily to use gittuf to record the previous hash
 git update-ref refs/gittuf/policy refs/gittuf/policy~1
 git show -s --format='%H' refs/gittuf/policy

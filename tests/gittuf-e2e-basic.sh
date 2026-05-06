@@ -1,4 +1,4 @@
-# gittuf E2E Test: Policy Rollback via RSL
+# gittuf E2E Test: Basic Functionality
 
 . "$(dirname "$0")/lib.sh" # use the lib.sh functions
 
@@ -32,7 +32,7 @@ git commit -m 'Update README.md'
 gittuf rsl record main --local-only
 
 # This will fail as branch protection rule is violated!
-assert_fails "" gittuf verify-ref main 
+assert_fails "branch protection rule should block unauthorized commit" gittuf verify-ref main 
 
 # Rewind to known good state
 rollback 1
@@ -44,7 +44,6 @@ gittuf policy add-rule -k ../keys/targets --rule-name 'protect-readme' --rule-pa
 # Stage and apply policy
 gittuf policy stage --local-only
 gittuf policy apply --local-only
-
 
 # Make change to README.md using unauthorized key
 use_key unauthorized
@@ -58,7 +57,7 @@ use_key authorized
 gittuf rsl record main --local-only
 
 # This will fail as file protection rule is violated!
-assert_fails "" gittuf verify-ref main
+assert_fails "file protection rule should block unauthorized commit" gittuf verify-ref main
 
 # Rewind to known good state
 rollback 1
@@ -79,6 +78,6 @@ git tag v1 -m "Unauthorized release"
 gittuf rsl record v1 --local-only
 
 # This will fail as tag protection rule is violated!
-assert_fails "" gittuf verify-ref --verbose refs/tags/v1 
+assert_fails "tag protection rule should block unauthorized tag" gittuf verify-ref --verbose refs/tags/v1 
 
 print_result
