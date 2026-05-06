@@ -1,9 +1,5 @@
 # gittuf E2E Test: shared helpers for E2E tests
 
-# Exit on nonzero return code
-set -e
-
-
 # Intializes git repo with tuf setups
 init_git_repo(){
     # make a tmp dir with a random name 
@@ -26,6 +22,19 @@ init_git_repo(){
     git config --local user.signingkey ../keys/authorized
     git config --local user.name gittuf-demo
     git config --local user.email gittuf.demo@example.com
+}
+
+setup_basic_repo() {
+    gittuf trust init -k ../keys/root
+    gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/targets.pub
+    gittuf policy init -k ../keys/targets
+
+    # Add trusted person to gittuf policy file
+    gittuf policy add-person -k ../keys/targets --person-ID 'authorized-user' --public-key ../keys/authorized.pub
+
+    # stage and apply
+    gittuf policy stage --local-only
+    gittuf policy apply --local-only
 }
 
 # Counters and assertions
@@ -54,10 +63,10 @@ assert_fails(){ #expects fail
 
     if ! "$@"; then
         PASS=$((PASS+1))
-        echo "PASS: $MSG"
+        echo "PASS: Test passed $MSG"
     else 
         FAIL=$((FAIL+1))
-        echo "FAIL: $MSG (expected failure)"
+        echo "FAIL: Test failed$MSG (expected failure)"
     fi
 }
 
@@ -72,37 +81,6 @@ rollback() { # rollback <iteration>
         git reset --hard HEAD~1
         git update-ref refs/gittuf/reference-state-log refs/gittuf/reference-state-log~1
     done
-}
-
-append_policy(){
-    local ADD=$1
-    local NAME=$2
-    local PATTERN=$3
-    local AUTHORIZE=$4
-    local MODE=$5
-    local APPLY=$6  
-
-    if [ "$ADD" == "add-rule" ];then
-        gittuf policy add-rule -k ../keys/targets \
-            --rule-name "$NAME" \
-            --rule-pattern "$PATTERN" \
-            --authorize "$AUTHORIZE"
-    elif [ "$ADD" == "add-person" ];then
-        gittuf policy add-person -k ../keys/targets \
-        --person-ID "$NAME" \
-        --public-key "$PATTERN"
-    fi
-
-    # stage and apply
-    if [ "$APPLY" = "apply" ]; then
-        if [ "$MODE" = "local" ]; then
-            gittuf policy stage --local-only
-            gittuf policy apply --local-only
-        else
-            gittuf policy stage
-            gittuf policy apply
-        fi
-    fi
 }
 
 use_key() {

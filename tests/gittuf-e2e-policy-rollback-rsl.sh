@@ -10,11 +10,7 @@ init_git_repo
 CONTROLLER_REPOSITORY="$(pwd)"
 CONTROLLER_ROOT_KEY="$CONTROLLER_REPOSITORY/../keys/root"
 
-gittuf trust init -k ../keys/root
-gittuf trust make-controller -k ../keys/root
-gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/targets.pub
-gittuf policy init -k ../keys/targets
-append_policy "add-person" "authorized-user" "../keys/authorized.pub" "" "local" "apply" 
+setup_basic_repo
 
 # Check no violation with "unauthorized" key due to no branch protection rule active
 use_key unauthorized
@@ -29,7 +25,9 @@ assert_passes gittuf verify-ref main
 
 # Add branch protection rule; stage and apply policy
 use_key authorized
-append_policy "add-rule" "protect-main" "git:refs/heads/main" "authorized-user" "local" "apply"
+gittuf policy add-rule -k ../keys/targets --rule-name 'protect-main' --rule-pattern git:refs/heads/main --authorize authorized-user
+gittuf policy stage --local-only
+gittuf policy apply --local-only
 
 # Simulate violation by using unauthorized key
 use_key unauthorized
@@ -40,16 +38,13 @@ git commit -m 'Another commit'
 gittuf rsl record main --local-only
 
 # This will fail as branch protection rule is violated, this is OK.
-assert_fails "Test failed on branch protection rule check" gittuf verify-ref main 
+assert_fails "on branch protection rule check" gittuf verify-ref main 
 
 # Rewind main branch and RSL to known good state
 rollback 1
 
 # Switch to unauthorized key
 use_key authorized
-
-# Dump current policy commit hash
-POLICY_HEAD="$(git show -s --format='%H' refs/gittuf/policy)"
 
 # Rewind policy ref temporarily to use gittuf to record the previous hash
 git update-ref refs/gittuf/policy refs/gittuf/policy~1
@@ -78,16 +73,14 @@ init_git_repo
 DOWNSTREAM_REPOSITORY="$(pwd)"
 
 # Set up repo and add first repo as controller
-gittuf trust init -k ../keys/root
-gittuf trust add-policy-key -k ../keys/root --policy-key ../keys/targets.pub
-gittuf policy init -k ../keys/targets
-append_policy "add-person" "authorized-user" "../keys/authorized.pub" "" "local" "no_apply"
+setup_basic_repo
+
 gittuf trust -k ../keys/root add-controller-repository --location $CONTROLLER_REPOSITORY --name controller-repo --initial-root-principal $CONTROLLER_ROOT_KEY
 
 gittuf policy stage --local-only
 gittuf policy apply --local-only
 
 # This should NOT succeed
-assert_fails "Test failed on controller repository check" gittuf rsl propagate 
+assert_fails "on controller repository check" gittuf rsl propagate 
 
 print_result
