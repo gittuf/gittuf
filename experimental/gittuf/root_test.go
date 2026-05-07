@@ -362,6 +362,15 @@ func TestRemoveRootKey(t *testing.T) {
 		err = r.RemoveRootKey(testCtx, newSigner, rootSigner.MetadataKey().KeyID, true)
 		assert.Nil(t, err)
 	})
+
+	t.Run("lockout prevention: cannot remove the last root key", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		rootKey := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+		err := r.RemoveRootKey(testCtx, signer, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
 }
 
 func TestAddTopLevelTargetsKey(t *testing.T) {
@@ -893,6 +902,14 @@ func TestUpdateRootThreshold(t *testing.T) {
 
 		err = r.UpdateRootThreshold(testCtx, rootSigner, 2, true)
 		assert.Nil(t, err)
+	})
+
+	t.Run("threshold boundary validation: cannot set threshold higher than keys", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.UpdateRootThreshold(testCtx, signer, 2, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
 
@@ -1659,6 +1676,20 @@ func TestUpdateGlobalRule(t *testing.T) {
 
 		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes", []string{"git:refs/heads/*"}, true)
 		require.Nil(t, err)
+	})
+
+	t.Run("global rule type integrity", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleThreshold(testCtx, signer, "valid-threshold", []string{"git:refs/heads/main"}, 1, false)
+		assert.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		assert.Nil(t, err)
+
+		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, signer, "valid-threshold", []string{"git:refs/heads/main"}, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotUpdateGlobalRuleType)
 	})
 }
 
