@@ -23,7 +23,7 @@ const (
 	screenMaintainerSelections
 	screenTransport
 	screenTransportConfirm
-	screenAbort
+	screenTransportDetected
 	screenConclusion
 )
 

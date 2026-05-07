@@ -110,8 +110,8 @@ func (m model) View() string {
 		}
 		content += renderFooter("\n" + m.footer)
 		return m.renderWithMargin(content)
-	case screenAbort:
-		return m.renderWithMargin(renderErrorMsg("gittuf setup has been cancelled. Any changes made to your repository have been reverted."))
+	case screenTransportDetected:
+		return m.renderWithMargin("gittuf transport is already set up on this repository." + "\n\n" + conclusionTxt)
 	case screenConclusion:
 		return m.renderWithMargin(conclusionTxt)
 	default:

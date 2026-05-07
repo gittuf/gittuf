@@ -76,7 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.screen = screenTransportConfirm
 							return m, nil
 						}
-						m.screen = screenAbort
+						m.screen = screenTransportDetected
 					}
 				}
 			case screenTransport:
@@ -84,7 +84,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				}
 
-			case screenAbort, screenConclusion:
+			case screenTransportDetected, screenConclusion:
 				return m, tea.Quit
 			}
 		case "tab", "shift+tab", "up", "down":
