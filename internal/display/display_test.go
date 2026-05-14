@@ -20,10 +20,16 @@ func getPagerTestCat() pager {
 }
 
 func (p *pagerTestCat) getBinary() string {
+	if runtime.GOOS == "windows" {
+		return "findstr"
+	}
 	return "cat"
 }
 
 func (p *pagerTestCat) getFlags() []string {
+	if runtime.GOOS == "windows" {
+		return []string{"/R", "^"}
+	}
 	return nil
 }
 
