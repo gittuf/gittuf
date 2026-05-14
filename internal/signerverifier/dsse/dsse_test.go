@@ -14,6 +14,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -109,8 +110,11 @@ func setupTestECDSAPair(t *testing.T) string {
 	if err := os.WriteFile(privPath, artifacts.SSHECDSAPrivate, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	gitinterface.FixKeyPermissionsForWindows(t, privPath)
+
 	if err := os.WriteFile(privPath+".pub", artifacts.SSHECDSAPublicSSH, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	gitinterface.FixKeyPermissionsForWindows(t, privPath+".pub")
 	return privPath
 }

@@ -10,6 +10,8 @@ import (
 	"path"
 	"strings"
 	"testing"
+
+	"github.com/gittuf/gittuf/internal/common/testutils"
 )
 
 // ResetDueToError reverses a change applied to a ref to the specified target
@@ -70,7 +72,13 @@ func (r *Repository) RestoreWorktree(t *testing.T) {
 	}
 }
 
-// IsNiceGitVersion determines whether the version of git is "nice". Certain Git
+// FixKeyPermissionsForWindows is a test helper to fix file permissions on Windows.
+// It uses icacls to restrict access to the current user.
+func FixKeyPermissionsForWindows(t testing.TB, path string) {
+	t.Helper()
+	testutils.FixKeyPermissionsForWindows(t, path)
+}
+
 // subcommands that gittuf uses were added in newer versions than some common
 // client versions. Instead of using a workaround for all clients, we determine
 // if we can use the newer features or instead need to use workarounds.
