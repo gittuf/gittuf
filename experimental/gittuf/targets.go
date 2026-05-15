@@ -46,7 +46,7 @@ func (r *Repository) InitializeTargets(ctx context.Context, signer sslibdsse.Sig
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (r *Repository) AddDelegation(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (r *Repository) UpdateDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -263,7 +263,7 @@ func (r *Repository) ReorderDelegations(ctx context.Context, signer sslibdsse.Si
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -328,7 +328,7 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -398,7 +398,7 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -538,7 +538,7 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -602,7 +602,7 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}

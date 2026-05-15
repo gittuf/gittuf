@@ -23,7 +23,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	state, err := policy.LoadCurrentState(cmd.Context(), repo.GetGitRepository(), policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(cmd.Context(), repo.GetGitRepository(), policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,15 @@ const (
 	// PolicyRef defines the Git namespace used for gittuf policies.
 	PolicyRef = "refs/gittuf/policy"
 
-	// PolicyStagingRef defines the Git namespace used as a staging area when creating or updating gittuf policies.
+	// PolicyIndexRef defines the Git namespace used as the local scratchpad
+	// for pending policy mutations (the analog of git's index — never pushed).
+	// `gittuf policy stage` promotes envelopes from here into PolicyStagingRef.
+	PolicyIndexRef = "refs/gittuf/policy-index"
+
+	// PolicyStagingRef defines the Git namespace that holds the officially
+	// proposed (and possibly co-signed) policy state. It sits between
+	// PolicyIndexRef (local scratchpad) and PolicyRef (applied), and is
+	// advanced by `gittuf policy stage`.
 	PolicyStagingRef = "refs/gittuf/policy-staging"
 
 	// RootRoleName defines the expected name for the gittuf root of trust.
@@ -484,64 +492,6 @@ func (s *State) Verify(ctx context.Context) error {
 			return err
 		}
 
-		targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
-		if err != nil {
-			return err
-		}
-
-		// Check reachable delegations
-		reachedDelegations := map[string]bool{}
-		for delegatedRoleName := range s.Metadata.DelegationEnvelopes {
-			reachedDelegations[delegatedRoleName] = false
-		}
-
-		delegationsQueue := targetsMetadata.GetRules()
-		delegationKeys := targetsMetadata.GetPrincipals()
-		for len(delegationsQueue) > 1 {
-			// Exit condition: The last entry in the queue is always the allow
-			// rule, which we don't process during DFS
-
-			delegation := delegationsQueue[0]
-			delegationsQueue = delegationsQueue[1:]
-
-			if s.HasTargetsRole(delegation.ID()) {
-				reachedDelegations[delegation.ID()] = true
-
-				env := s.Metadata.DelegationEnvelopes[delegation.ID()]
-
-				principals := []tuf.Principal{}
-				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-					principals = append(principals, delegationKeys[principalID])
-				}
-
-				verifier := &SignatureVerifier{
-					repository: s.repository,
-					name:       delegation.ID(),
-					principals: principals,
-					threshold:  delegation.GetThreshold(),
-				}
-
-				if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
-					return err
-				}
-
-				delegatedMetadata, err := s.GetTargetsMetadata(delegation.ID(), false) // don't migrate: this may be for a write and we don't want to write tufv02 metadata yet
-				if err != nil {
-					return err
-				}
-
-				delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
-				for keyID, key := range delegatedMetadata.GetPrincipals() {
-					delegationKeys[keyID] = key
-				}
-			}
-		}
-
-		for _, reached := range reachedDelegations {
-			if !reached {
-				return ErrDanglingDelegationMetadata
-			}
-		}
 	}
 
 	if s.loadedEntry == nil {
@@ -603,25 +553,23 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy-staging namespace.
-func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
-	if len(commitMessage) == 0 {
-		commitMessage = DefaultCommitMessage
-	}
-
-	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
+// writeTree builds the full policy tree (metadata + controller metadata + hooks)
+// and returns its tree ID. This is the shared tree-building portion of both
+// Commit (which writes to PolicyIndexRef) and commitToRef (which writes to an
+// arbitrary policy ref like PolicyStagingRef or PolicyRef).
+func (s *State) writeTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
 	allTreeEntries := []gitinterface.TreeEntry{}
 
 	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
 
 	for absoluteControllerPath, metadata := range s.ControllerMetadata {
 		stateMetadataTreeID, err := metadata.WriteTree(repo)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath), stateMetadataTreeID))
 	}
@@ -634,44 +582,161 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 	}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	policyRootTreeID, err := treeBuilder.WriteTreeFromEntries(allTreeEntries)
-	if err != nil {
-		return err
-	}
-
-	originalCommitID, err := repo.GetReference(PolicyStagingRef)
-	if err != nil {
-		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-			return err
-		}
-	}
-
-	commitID, err := repo.Commit(policyRootTreeID, PolicyStagingRef, commitMessage, signCommit)
-	if err != nil {
-		return err
-	}
-
-	// We must reset to original policy commit if err != nil from here onwards.
-	if createRSLEntry {
-		if err := rsl.NewReferenceEntry(PolicyStagingRef, commitID).Commit(repo, signCommit); err != nil {
-			if !originalCommitID.IsZero() {
-				return repo.ResetDueToError(err, PolicyStagingRef, originalCommitID)
-			}
-
-			return err
-		}
-	}
-
-	return nil
+	return treeBuilder.WriteTreeFromEntries(allTreeEntries)
 }
 
-// Apply takes valid changes from the policy staging ref, and fast-forward
+// commitToRef writes the State as a new commit on the given ref, optionally
+// creating an RSL entry for it. If the ref already exists and an RSL entry
+// commit fails, the ref is reset to its original tip.
+func (s *State) commitToRef(repo *gitinterface.Repository, ref, commitMessage string, createRSLEntry, signCommit bool) (gitinterface.Hash, error) {
+	if len(commitMessage) == 0 {
+		commitMessage = DefaultCommitMessage
+	}
+
+	policyRootTreeID, err := s.writeTree(repo)
+	if err != nil {
+		return nil, err
+	}
+
+	originalCommitID, err := repo.GetReference(ref)
+	if err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil, err
+		}
+	}
+
+	commitID, err := repo.Commit(policyRootTreeID, ref, commitMessage, signCommit)
+	if err != nil {
+		return nil, err
+	}
+
+	// We must reset to the original commit if RSL entry creation fails from here onwards.
+	if createRSLEntry {
+		if err := rsl.NewReferenceEntry(ref, commitID).Commit(repo, signCommit); err != nil {
+			if !originalCommitID.IsZero() {
+				return nil, repo.ResetDueToError(err, ref, originalCommitID)
+			}
+
+			return nil, err
+		}
+	}
+
+	return commitID, nil
+}
+
+// Commit writes the State to PolicyIndexRef — the local-only scratchpad for
+// pending policy mutations. createRSLEntry must be false: PolicyIndexRef is
+// never recorded in the RSL because it is purely local (the RSL is a shared,
+// pushable log of officially proposed/applied state changes only). Callers
+// passing createRSLEntry=true get an error.
+func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
+	if createRSLEntry {
+		return fmt.Errorf("cannot create RSL entry for %s: it is a local-only scratchpad — run `gittuf policy stage` to promote pending changes into %s, which is what gets recorded in the RSL", PolicyIndexRef, PolicyStagingRef)
+	}
+	_, err := s.commitToRef(repo, PolicyIndexRef, commitMessage, false, signCommit)
+	return err
+}
+
+// BuildOverlayState returns a new *State whose Metadata starts from base and,
+// for each selected target name, replaces the corresponding envelope with the
+// one from source. It performs no validation — neither signature verification
+// nor coupling/reachability checks. The resulting state is verified later at
+// apply time via State.Verify, which catches both signature failures (when
+// thresholds aren't met) and dangling delegation envelopes
+// (ErrDanglingDelegationMetadata).
+//
+// Selectors "root" and "targets" map to RootEnvelope and TargetsEnvelope
+// respectively; any other name maps to DelegationEnvelopes[name]. A selected
+// name absent from source while present in base results in removal of that
+// envelope from the new state.
+func BuildOverlayState(_ context.Context, base, source *State, selected []string) (*State, error) {
+	if base == nil || base.Metadata == nil {
+		return nil, fmt.Errorf("BuildOverlayState: base state has no metadata")
+	}
+	if source == nil || source.Metadata == nil {
+		return nil, fmt.Errorf("BuildOverlayState: source state has no metadata")
+	}
+
+	newMetadata := &StateMetadata{
+		RootEnvelope:    base.Metadata.RootEnvelope,
+		TargetsEnvelope: base.Metadata.TargetsEnvelope,
+	}
+	if base.Metadata.DelegationEnvelopes != nil {
+		newMetadata.DelegationEnvelopes = make(map[string]*sslibdsse.Envelope, len(base.Metadata.DelegationEnvelopes))
+		for k, v := range base.Metadata.DelegationEnvelopes {
+			newMetadata.DelegationEnvelopes[k] = v
+		}
+	}
+
+	for _, name := range selected {
+		switch name {
+		case RootRoleName:
+			if source.Metadata.RootEnvelope == nil {
+				return nil, fmt.Errorf("BuildOverlayState: source has no %q envelope to overlay", name)
+			}
+			newMetadata.RootEnvelope = source.Metadata.RootEnvelope
+		case TargetsRoleName:
+			if source.Metadata.TargetsEnvelope == nil {
+				return nil, fmt.Errorf("BuildOverlayState: source has no %q envelope to overlay", name)
+			}
+			newMetadata.TargetsEnvelope = source.Metadata.TargetsEnvelope
+		default:
+			srcEnv, srcHas := source.Metadata.DelegationEnvelopes[name]
+			_, baseHas := newMetadata.DelegationEnvelopes[name]
+			if !srcHas && !baseHas {
+				return nil, fmt.Errorf("BuildOverlayState: no envelope named %q in either base or source", name)
+			}
+			if !srcHas {
+				delete(newMetadata.DelegationEnvelopes, name)
+				continue
+			}
+			if newMetadata.DelegationEnvelopes == nil {
+				newMetadata.DelegationEnvelopes = map[string]*sslibdsse.Envelope{}
+			}
+			newMetadata.DelegationEnvelopes[name] = srcEnv
+		}
+	}
+
+	return &State{
+		Metadata:           newMetadata,
+		ControllerMetadata: base.ControllerMetadata,
+		Hooks:              base.Hooks,
+		GitHubApps:         base.GitHubApps,
+		repository:         base.repository,
+	}, nil
+}
+
+// StageOverlayCommit commits the given state to PolicyStagingRef and records an
+// RSL entry. If PolicyStagingRef doesn't exist yet, it is initialized from
+// PolicyRef (or the new commit becomes a root commit if PolicyRef is also
+// absent — the initial-policy bootstrap path). Returns the new staged tip.
+func StageOverlayCommit(repo *gitinterface.Repository, state *State, message string, signCommit bool) (gitinterface.Hash, error) {
+	if _, err := repo.GetReference(PolicyStagingRef); err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil, err
+		}
+		// PolicyStagingRef doesn't exist — initialize it from PolicyRef so the
+		// new commit is properly parented. If PolicyRef is also missing
+		// (initial policy bootstrap), commitToRef will produce a root commit.
+		if policyTip, perr := repo.GetReference(PolicyRef); perr == nil {
+			if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return state.commitToRef(repo, PolicyStagingRef, message, true, signCommit)
+}
+
+// Apply takes valid changes from the policy staged ref, and fast-forward
 // merges it into the policy ref. Apply only takes place if the latest state on
-// the policy staging ref is valid. This prevents invalid changes to the policy
-// taking affect, and allowing new changes, that until signed by multiple users
-// would be invalid to be made, by utilizing the policy staging ref.
+// the policy staged ref is valid. This prevents invalid changes to the policy
+// taking effect, and allows new changes that until signed by multiple users
+// would be invalid to be made, by utilizing the policy staged ref.
+//
+// PolicyIndexRef (the local scratchpad) is not consulted here — only
+// PolicyStagingRef (the officially proposed policy) is promoted into PolicyRef.
 func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool) error {
-	// First, reconcile staging with policy
+	// First, reconcile staged and staging with policy
 	if err := ReconcileStaging(repo, signRSLEntry); err != nil {
 		return err
 	}
@@ -711,33 +776,45 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 		// Nothing to check or return here
 	}
 
-	// Get the reference for the PolicyStagingRef
-	policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+	// Get the reference for the PolicyStagingRef — the source of truth for what
+	// Apply promotes. If no staged ref exists (nothing has been staged yet),
+	// fall back to PolicyIndexRef for backward compatibility with the
+	// initial-bootstrap path.
+	stagedRef := PolicyStagingRef
+	policyStagedTip, err := repo.GetReference(stagedRef)
 	if err != nil {
-		return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyStagingRef, err)
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return fmt.Errorf("failed to get policy staged reference %s: %w", stagedRef, err)
+		}
+		// Fall back to staging for bootstrap (initial policy is applied directly
+		// from the staging ref because no stage call has happened yet).
+		stagedRef = PolicyIndexRef
+		policyStagedTip, err = repo.GetReference(stagedRef)
+		if err != nil {
+			return fmt.Errorf("failed to get policy staging reference %s: %w", stagedRef, err)
+		}
 	}
 
-	// Check if the PolicyStagingRef is ahead of PolicyRef (fast-forward)
-
+	// Check if the staged tip is ahead of PolicyRef (fast-forward)
 	if !policyTip.IsZero() {
-		// This check ensures that the policy staging branch is a direct forward progression of the policy branch,
+		// This check ensures that the policy staged branch is a direct forward progression of the policy branch,
 		// preventing any overwrites of policy history and maintaining a linear policy evolution, since a
 		// fast-forward merge does not work with a non-linear history.
 
 		// This is only being checked if there are no problems finding the tip of the policy ref, since if there
-		// is no tip, then it cannot be an ancestor of the tip of the policy staging ref
-		isAncestor, err := repo.KnowsCommit(policyStagingTip, policyTip)
+		// is no tip, then it cannot be an ancestor of the tip of the policy staged ref
+		isAncestor, err := repo.KnowsCommit(policyStagedTip, policyTip)
 		if err != nil {
-			return fmt.Errorf("failed to check if policy commit is ancestor of policy staging commit: %w", err)
+			return fmt.Errorf("failed to check if policy commit is ancestor of policy staged commit: %w", err)
 		}
 		if !isAncestor {
 			return ErrNotAncestor
 		}
 	}
 
-	// using LoadCurrentState to load and verify if the PolicyStagingRef's
+	// using LoadCurrentState to load and verify if the staged ref's
 	// latest state is valid
-	state, err := LoadCurrentState(ctx, repo, PolicyStagingRef)
+	state, err := LoadCurrentState(ctx, repo, stagedRef)
 	if err != nil {
 		return fmt.Errorf("failed to load current state: %w", err)
 	}
@@ -746,11 +823,11 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 	}
 
 	// Update the reference for the base to point to the new commit
-	if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+	if err := repo.SetReference(PolicyRef, policyStagedTip); err != nil {
 		return fmt.Errorf("failed to set new policy reference: %w", err)
 	}
 
-	if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, signRSLEntry); err != nil {
+	if err := rsl.NewReferenceEntry(PolicyRef, policyStagedTip).Commit(repo, signRSLEntry); err != nil {
 		if !policyTip.IsZero() {
 			return repo.ResetDueToError(err, PolicyRef, policyTip)
 		}
@@ -761,205 +838,277 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 	return nil
 }
 
-// Discard resets the policy staging ref, discarding any changes made to the policy staging ref.
+// Discard resets both PolicyStagingRef and PolicyIndexRef to PolicyRef. If
+// PolicyRef does not exist, both staging refs are deleted instead.
 func Discard(repo *gitinterface.Repository) error {
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
-			if err := repo.DeleteReference(PolicyStagingRef); err != nil && !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-				return fmt.Errorf("failed to delete policy staging reference %s: %w", PolicyStagingRef, err)
+			for _, ref := range []string{PolicyStagingRef, PolicyIndexRef} {
+				if err := repo.DeleteReference(ref); err != nil && !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+					return fmt.Errorf("failed to delete %s: %w", ref, err)
+				}
 			}
 			return nil
 		}
 		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
 	}
 
-	// Reset PolicyStagingRef to match the actual policy ref
-	if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
-		return fmt.Errorf("failed to reset policy staging reference %s: %w", PolicyStagingRef, err)
+	for _, ref := range []string{PolicyStagingRef, PolicyIndexRef} {
+		if err := repo.SetReference(ref, policyTip); err != nil {
+			return fmt.Errorf("failed to reset %s: %w", ref, err)
+		}
 	}
-
 	return nil
 }
 
+// ReconcileStaging walks the three-ref topology
+// (PolicyIndexRef ⊇ PolicyStagingRef ⊇ PolicyRef) and brings out-of-date refs
+// back into a fast-forward chain. Each ref rebases against the one directly
+// below it; controller propagations into PolicyRef are absorbed up the chain.
 func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
-	policyFound, stagingFound := false, false
+	// Step 1: Reconcile PolicyStagingRef vs PolicyRef.
+	// Controller propagation can update PolicyRef directly; the staged
+	// proposal may need the same controller changes to remain valid.
+	if err := reconcileRefAgainstBase(repo, PolicyStagingRef, PolicyRef, signCommit); err != nil {
+		return err
+	}
 
-	// Get the reference for the PolicyRef
-	referenceFound := true
+	// Step 2: Auto-stage if there's no pending proposal but PolicyIndexRef
+	// has moved. This preserves the legacy "mutate → apply" workflow: when
+	// PolicyStagingRef equals PolicyRef (no explicit proposal in flight) and
+	// PolicyIndexRef is a strict descendant of PolicyStagingRef, fast-forward
+	// PolicyStagingRef to PolicyIndexRef. When PolicyStagingRef is already
+	// ahead of PolicyRef (i.e., a user did an explicit `gittuf policy stage`,
+	// possibly selective), this is skipped so the proposal is preserved.
+	if err := autoStageIfIndexDescendant(repo, signCommit); err != nil {
+		return err
+	}
+
+	// Step 3: Reconcile PolicyIndexRef vs PolicyStagingRef (fall back to
+	// PolicyRef if no staged ref exists yet — bootstrap case where the
+	// initial-policy mutations go directly to staging without an intermediate
+	// stage call).
+	stagingBase := PolicyStagingRef
+	if _, err := repo.GetReference(PolicyStagingRef); err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return fmt.Errorf("failed to get policy staged reference: %w", err)
+		}
+		stagingBase = PolicyRef
+	}
+
+	return reconcileRefAgainstBase(repo, PolicyIndexRef, stagingBase, signCommit)
+}
+
+// autoStageIfIndexDescendant fast-forwards PolicyStagingRef to
+// PolicyIndexRef when there's no pending proposal (PolicyStagingRef ==
+// PolicyRef) and PolicyIndexRef is a strict descendant of PolicyStagingRef.
+// This preserves the legacy "mutate → apply" workflow without bypassing
+// explicit selective proposals (which produce a divergent PolicyStagingRef).
+func autoStageIfIndexDescendant(repo *gitinterface.Repository, signCommit bool) error {
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
-		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-			return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil
 		}
-		referenceFound = false
+		return err
 	}
 
-	entryFound := true
-	policyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+	stagedTip, err := repo.GetReference(PolicyStagingRef)
 	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return fmt.Errorf("failed to get policy RSL entry: %w", err)
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil
 		}
-
-		entryFound = false
+		return err
 	}
 
-	// case 1: both found -> verify tip matches entry
-	// case 2: only one found -> return error
-	// case 3: neither found -> nothing to verify
-	switch {
-	case referenceFound && entryFound:
-		if !policyEntry.GetTargetID().Equal(policyTip) {
-			slog.Debug("policy entry at tip does not match targetID in RSL entry, aborting.")
-			return ErrInvalidPolicy
-		}
-		policyFound = true
-	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
-		slog.Debug("Only one of policy entry and RSL entry found, aborting.")
-		return ErrInvalidPolicy
-	default:
-		slog.Debug("No prior applied policy found")
-		// Nothing to check or return here
-		policyFound = false
-	}
-
-	// Get the reference for the PolicyStagingRef
-	referenceFound = true
-	policyStagingTip, err := repo.GetReference(PolicyStagingRef)
-	if err != nil {
-		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
-			return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyRef, err)
-		}
-		referenceFound = false
-	}
-
-	entryFound = true
-	policyStagingEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyStagingRef))
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return fmt.Errorf("failed to get policy staging RSL entry: %w", err)
-		}
-
-		entryFound = false
-	}
-
-	// case 1: both found -> verify tip matches entry
-	// case 2: only one found -> return error
-	// case 3: neither found -> nothing to verify
-	switch {
-	case referenceFound && entryFound:
-		if !policyStagingEntry.GetTargetID().Equal(policyStagingTip) {
-			slog.Debug("policy-staging entry at tip does not match targetID in RSL entry, aborting.")
-			return ErrInvalidPolicy
-		}
-		stagingFound = true
-	case (referenceFound && !entryFound) || (!referenceFound && entryFound):
-		slog.Debug("Only one of policy-staging entry and RSL entry found, aborting.")
-		return ErrInvalidPolicy
-	default:
-		slog.Debug("No prior policy-staging entry found")
-		// Nothing to check or return here
-		stagingFound = false
-	}
-
-	switch {
-	case !policyFound && !stagingFound:
-		// If neither policy nor policy staging is found, then return nil, as
-		// there's nothing to reconcile.
-		return nil
-	case !policyFound && stagingFound:
-		// If policy isn't found but policy staging is, then return nil as well.
+	// A pending proposal exists; respect it.
+	if !stagedTip.Equal(policyTip) {
 		return nil
 	}
 
-	// There are a few possible scenarios here.
-	// A) policy = policy-staging -> nothing to do; this is the case when the
-	// last update to the policy related refs were applied
-	// B) policy is behind policy-staging -> nothing to do
-	// C) policy is strictly ahead of policy-staging -> reconciliation is
-	// necessary, and HAS to be because a change landed directly in policy
-	// without going through policy-staging, ff update policy-staging as well
-	// D) policy and policy-staging have diverged -> reconciliation is
-	// necessary, and HAS to be because policy-staging was updated AND policy
-	// was propagated into, meaning they have divergent (but non conflicting
-	// changes), ff update does not suffice
-	// Reconciliation goal: policy-staging must be ff-ahead of policy so Apply()
-	// is not affected by controller propagations
+	stagingTip, err := repo.GetReference(PolicyIndexRef)
+	if err != nil {
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil
+		}
+		return err
+	}
 
-	// Reconciliation overview:
-	// In case C, ff-update policy-staging to include the propagated changes and
-	// record RSL reference entry (not propagation entry).
-	// In case D, "stash" changes in staging, apply policy ref changes over
-	// common ancestor, re-apply stashed changes into policy-staging.
-	// This requires rewriting policy-staging's history on clients, but luckily,
-	// this cannot result in a conflict in the current workflows.
-	// This is because the unapplied changes to policy-staging are necessarily
-	// in the state's metadata (and not in the controller metadata). The changes
-	// in policy that don't exist in policy-staging MUST be due to controller
-	// propagation, i.e., completely different files are updated. We know this
-	// to be true because an update to policy's local repository metadata MUST
-	// have gone through policy-staging and been applied, so propagation is the
-	// only legitimate reason for policy to have a change not seen in
-	// policy-staging.
-
-	if policyTip.Equal(policyStagingTip) {
-		// nothing to do
+	if stagingTip.Equal(stagedTip) {
 		return nil
 	}
 
-	stagingAheadOfPolicy, err := repo.KnowsCommit(policyStagingTip, policyTip)
+	isDescendant, err := repo.KnowsCommit(stagingTip, stagedTip)
 	if err != nil {
 		return err
 	}
-	if stagingAheadOfPolicy {
-		// nothing to do
+	if !isDescendant {
+		// Diverged; defer to the rebase path in reconcileRefAgainstBase.
 		return nil
 	}
 
-	policyAheadOfStaging, err := repo.KnowsCommit(policyTip, policyStagingTip)
+	if err := repo.SetReference(PolicyStagingRef, stagingTip); err != nil {
+		return err
+	}
+	return rsl.NewReferenceEntry(PolicyStagingRef, stagingTip).Commit(repo, signCommit)
+}
+
+// reconcileRefAgainstBase reconciles targetRef against baseRef. The base must
+// have a matching RSL entry (it's the authoritative anchor). The target may
+// exist as a ref alone (e.g. PolicyIndexRef changes that haven't been
+// recorded in the RSL yet); if it has an RSL entry, that entry must match the
+// tip.
+//
+// If the target is ahead of base, nothing to do. If base is ahead, the target
+// fast-forwards. If diverged, the target is rebuilt by overlaying
+// targetState's metadata onto baseState's controller metadata.
+//
+// Returns nil if either ref is missing — nothing to reconcile.
+func reconcileRefAgainstBase(repo *gitinterface.Repository, targetRef, baseRef string, signCommit bool) error {
+	baseTip, baseEntry, baseFound, err := loadRefAndValidateRSLEntry(repo, baseRef)
 	if err != nil {
 		return err
 	}
-	if policyAheadOfStaging {
-		// update staging to match policy
-		if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+	if !baseFound {
+		return nil
+	}
+
+	targetTip, err := repo.GetReference(targetRef)
+	if err != nil {
+		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil
+		}
+		return fmt.Errorf("failed to get reference %s: %w", targetRef, err)
+	}
+
+	// PolicyIndexRef is the local-only scratchpad — it has no RSL entry by
+	// design. Every other ref must have a matching RSL entry if any exists.
+	targetIsIndex := targetRef == PolicyIndexRef
+	if !targetIsIndex {
+		targetEntry, _, entryErr := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(targetRef))
+		if entryErr != nil && !errors.Is(entryErr, rsl.ErrRSLEntryNotFound) {
+			return fmt.Errorf("failed to get RSL entry for %s: %w", targetRef, entryErr)
+		}
+		if entryErr == nil && !targetEntry.GetTargetID().Equal(targetTip) {
+			slog.Debug(fmt.Sprintf("%s tip does not match targetID in RSL entry, aborting.", targetRef))
+			return ErrInvalidPolicy
+		}
+	}
+
+	if baseTip.Equal(targetTip) {
+		return nil
+	}
+
+	targetAhead, err := repo.KnowsCommit(targetTip, baseTip)
+	if err != nil {
+		return err
+	}
+	if targetAhead {
+		// Target is properly ahead of base — done.
+		return nil
+	}
+
+	baseAhead, err := repo.KnowsCommit(baseTip, targetTip)
+	if err != nil {
+		return err
+	}
+	if baseAhead {
+		// Fast-forward target to base.
+		if err := repo.SetReference(targetRef, baseTip); err != nil {
 			return err
 		}
-
-		return rsl.NewReferenceEntry(PolicyStagingRef, policyTip).Commit(repo, signCommit)
+		if targetIsIndex {
+			// Local-only ref — no RSL entry.
+			return nil
+		}
+		return rsl.NewReferenceEntry(targetRef, baseTip).Commit(repo, signCommit)
 	}
 
-	// Diverged
-	// Create new policy-staging that is "rebased"
-	policyState, err := loadStateForEntry(repo, policyEntry)
+	// Diverged — rebase target onto base.
+	// This is safe because the unapplied changes are necessarily in
+	// state.Metadata while propagations affect ControllerMetadata —
+	// non-overlapping by construction.
+	baseState, err := loadStateForEntry(repo, baseEntry)
 	if err != nil {
 		return err
 	}
 
-	policyStagingState, err := loadStateForEntry(repo, policyStagingEntry)
+	// Load target state directly from the commit — the entry may be absent.
+	targetState, err := loadStateFromCommit(repo, targetTip)
 	if err != nil {
 		return err
 	}
 
-	if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
+	if err := repo.SetReference(targetRef, baseTip); err != nil {
 		return err
 	}
-	if err := rsl.NewReferenceEntry(PolicyStagingRef, policyTip).Commit(repo, signCommit); err != nil {
-		return err
+	if !targetIsIndex {
+		if err := rsl.NewReferenceEntry(targetRef, baseTip).Commit(repo, signCommit); err != nil {
+			return err
+		}
 	}
 
-	// TODO: fix RSL entries for staging that are now orphaned
+	// TODO: fix RSL entries for the target that are now orphaned
 
-	// This includes the changes made in staging + the controller changes
-	// propagated into policy
-	newStagingState := &State{
-		Metadata:           policyStagingState.Metadata,
-		ControllerMetadata: policyState.ControllerMetadata,
+	newState := &State{
+		Metadata:           targetState.Metadata,
+		ControllerMetadata: baseState.ControllerMetadata,
 		repository:         repo,
 	}
+	// PolicyIndexRef gets no RSL entry (local-only); other refs get one.
+	_, err = newState.commitToRef(repo, targetRef, fmt.Sprintf("Rebase %s\n", targetRef), !targetIsIndex, signCommit)
+	return err
+}
 
-	return newStagingState.Commit(repo, "Rebase policy staging\n", true, signCommit)
+// loadRefAndValidateRSLEntry returns the tip and latest RSL entry for refName
+// after checking the invariant that the entry's TargetID equals the ref tip.
+// Returns found=false when neither the ref nor an entry exist (valid
+// not-yet-initialized state). Returns ErrInvalidPolicy when exactly one of
+// them exists or when they don't match.
+//
+// PolicyIndexRef is special-cased: as a local-only scratchpad it is never
+// recorded in the RSL, so its tip is returned with a nil entry whenever the
+// ref exists.
+func loadRefAndValidateRSLEntry(repo *gitinterface.Repository, refName string) (gitinterface.Hash, rsl.ReferenceUpdaterEntry, bool, error) {
+	refExists := true
+	tip, err := repo.GetReference(refName)
+	if err != nil {
+		if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+			return nil, nil, false, fmt.Errorf("failed to get reference %s: %w", refName, err)
+		}
+		refExists = false
+	}
+
+	if refName == PolicyIndexRef {
+		if !refExists {
+			return nil, nil, false, nil
+		}
+		return tip, nil, true, nil
+	}
+
+	entryExists := true
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(refName))
+	if err != nil {
+		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+			return nil, nil, false, fmt.Errorf("failed to get RSL entry for %s: %w", refName, err)
+		}
+		entryExists = false
+	}
+
+	switch {
+	case refExists && entryExists:
+		if !entry.GetTargetID().Equal(tip) {
+			slog.Debug(fmt.Sprintf("%s tip does not match targetID in RSL entry, aborting.", refName))
+			return nil, nil, false, ErrInvalidPolicy
+		}
+		return tip, entry, true, nil
+	case (refExists && !entryExists) || (!refExists && entryExists):
+		slog.Debug(fmt.Sprintf("Only one of %s ref and its RSL entry found, aborting.", refName))
+		return nil, nil, false, ErrInvalidPolicy
+	default:
+		return nil, nil, false, nil
+	}
 }
 
 func (s *State) GetRootKeys() ([]tuf.Principal, error) {
@@ -979,6 +1128,7 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 	if err != nil {
 		return nil, err
 	}
+	slog.Debug(fmt.Sprintf("Root metadata payload (%d bytes): %s", len(payloadBytes), string(payloadBytes)))
 	return s.getRootMetadataFromBytes(payloadBytes, migrate)
 }
 
@@ -996,9 +1146,21 @@ func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetada
 }
 
 func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tuf.RootMetadata, error) {
+	slog.Debug(fmt.Sprintf("getRootMetadataFromBytes: received %d bytes", len(metadataBytes)))
+	if len(metadataBytes) > 0 {
+		preview := metadataBytes
+		const previewLimit = 512
+		if len(preview) > previewLimit {
+			preview = preview[:previewLimit]
+		}
+		slog.Debug(fmt.Sprintf("getRootMetadataFromBytes: content preview (first %d bytes): %s", len(preview), string(preview)))
+	} else {
+		slog.Debug("getRootMetadataFromBytes: content is EMPTY — this is why unmarshal will fail with 'unexpected end of JSON input'")
+	}
+
 	inspectRootMetadata := map[string]any{}
 	if err := json.Unmarshal(metadataBytes, &inspectRootMetadata); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		return nil, fmt.Errorf("unable to unmarshal root metadata (%d bytes): %w", len(metadataBytes), err)
 	}
 
 	schemaVersion, hasSchemaVersion := inspectRootMetadata["schemaVersion"]
@@ -1115,6 +1277,7 @@ func (s *State) HasRuleName(name string) bool {
 func (s *State) preprocess() error {
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
+		slog.Debug("Encountered error while getting root metadata during state preprocessing!")
 		return err
 	}
 
@@ -1122,6 +1285,7 @@ func (s *State) preprocess() error {
 
 	hooks, err := rootMetadata.GetHooks(tuf.HookStagePreCommit)
 	if err != nil {
+		slog.Debug("Encountered error while getting pre-commit hooks!")
 		if !errors.Is(err, tuf.ErrNoHooksDefined) {
 			return err
 		}
@@ -1135,6 +1299,7 @@ func (s *State) preprocess() error {
 
 	hooks, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
 	if err != nil {
+		slog.Debug("Encountered error while getting pre-push hooks!")
 		if !errors.Is(err, tuf.ErrNoHooksDefined) {
 			return err
 		}
@@ -1163,6 +1328,7 @@ func (s *State) preprocess() error {
 
 	s.GitHubApps, err = rootMetadata.GetGitHubAppEntries()
 	if err != nil {
+		slog.Debug("Encountered error while getting GitHub App entries!")
 		return err
 	}
 
@@ -1173,6 +1339,7 @@ func (s *State) preprocess() error {
 	s.ruleNames = set.NewSet[string]()
 
 	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false)
+
 	if err != nil {
 		return err
 	}
@@ -1309,7 +1476,7 @@ func (s *State) getTargetsVerifier() (*SignatureVerifier, error) {
 // must be used. The exception is VerifyRelative... which performs root
 // verification between consecutive policy states.
 func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdaterEntry) (*State, error) {
-	if entry.GetRefName() != PolicyRef && entry.GetRefName() != PolicyStagingRef {
+	if entry.GetRefName() != PolicyRef && entry.GetRefName() != PolicyIndexRef && entry.GetRefName() != PolicyStagingRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 

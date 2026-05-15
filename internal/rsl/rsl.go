@@ -34,9 +34,10 @@ const (
 	UpstreamRepositoryKey  = "upstreamRepository"
 	UpstreamEntryIDKey     = "upstreamEntryID"
 
-	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
-	gittufNamespacePrefix  = "refs/gittuf/"
-	gittufPolicyStagingRef = "refs/gittuf/policy-staging"
+	remoteTrackerRef        = "refs/remotes/%s/gittuf/reference-state-log"
+	gittufNamespacePrefix   = "refs/gittuf/"
+	gittufPolicyIndexRef    = "refs/gittuf/policy-index"
+	gittufPolicyStagingRef  = "refs/gittuf/policy-staging"
 )
 
 var (
@@ -1328,7 +1329,11 @@ func isRelevantGittufRef(refName string) bool {
 		return false
 	}
 
-	if refName == gittufPolicyStagingRef {
+	// Neither PolicyStagingRef (local scratchpad) nor PolicyStagedRef
+	// (proposal) are the applied policy; both are excluded from "relevant"
+	// gittuf refs during normal RSL walks. Only PolicyRef advances the live
+	// policy chain.
+	if refName == gittufPolicyIndexRef || refName == gittufPolicyStagingRef {
 		return false
 	}
 

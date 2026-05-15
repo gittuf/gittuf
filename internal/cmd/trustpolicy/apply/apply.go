@@ -39,8 +39,8 @@ func New() *cobra.Command {
 	o := &options{}
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "Validate and apply changes from policy-staging to policy",
-		Long:  "The 'apply' command validates and applies changes from the policy-staging area to the repository's policy. It is used to make staged policy updates effective and can optionally commit the policy change into the RSL locally.",
+		Short: "Validate and apply the staged policy proposal",
+		Long:  "The 'apply' command validates and promotes the proposed policy from policy-staging to the live policy. It is used to make a staged proposal effective. Apply is non-selective — it always promotes the full staged proposal; use `gittuf policy stage --policy-name` beforehand to control which target envelopes are part of the proposal.",
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

@@ -520,8 +520,8 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				continue
 
 			case *rsl.ReferenceEntry:
-				slog.Debug("Checking if entry is for policy staging reference...")
-				if entry.GetRefName() == PolicyStagingRef {
+				slog.Debug("Checking if entry is for policy staging or staged reference...")
+				if entry.GetRefName() == PolicyIndexRef || entry.GetRefName() == PolicyStagingRef {
 					continue
 				}
 				slog.Debug("Checking if entry is for policy reference...")

@@ -54,8 +54,8 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	if _, err := r.r.GetReference(policy.PolicyStagingRef); err == nil {
-		state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if _, err := r.r.GetReference(policy.PolicyIndexRef); err == nil {
+		state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			return err
 		}
@@ -145,7 +145,7 @@ func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -224,7 +224,7 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -306,7 +306,7 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -393,7 +393,7 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,7 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -532,7 +532,7 @@ func (r *Repository) UpdateRootThreshold(ctx context.Context, signer sslibdsse.S
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -573,7 +573,7 @@ func (r *Repository) UpdateTopLevelTargetsThreshold(ctx context.Context, signer 
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -613,7 +613,7 @@ func (r *Repository) AddGlobalRuleThreshold(ctx context.Context, signer sslibdss
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -653,7 +653,7 @@ func (r *Repository) AddGlobalRuleBlockForcePushes(ctx context.Context, signer s
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -698,7 +698,7 @@ func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
 	if err != nil {
 		return err
 	}
@@ -738,7 +738,7 @@ func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signe
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
 	if err != nil {
 		return err
 	}
@@ -783,7 +783,7 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -822,7 +822,7 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -873,7 +873,7 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
 	if err != nil {
 		return err
 	}
@@ -920,7 +920,7 @@ func (r *Repository) RemovePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -996,7 +996,7 @@ func (r *Repository) AddHook(ctx context.Context, signer sslibdsse.SignerVerifie
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1057,7 +1057,7 @@ func (r *Repository) RemoveHook(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1120,7 +1120,7 @@ func (r *Repository) UpdateHook(ctx context.Context, signer sslibdsse.SignerVeri
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1182,7 +1182,7 @@ func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1224,7 +1224,7 @@ func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.Sig
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1265,7 +1265,7 @@ func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibds
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1306,7 +1306,7 @@ func (r *Repository) AddNetworkRepository(ctx context.Context, signer sslibdsse.
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1347,7 +1347,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
