@@ -301,7 +301,14 @@ func (m model) handlePolicyFormSubmit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	thr, _ := strconv.Atoi(m.inputs[3].Value())
+	var err error
+
+	parsedThr, err := strconv.ParseInt(m.inputs[3].Value(), 10, 0)
+	thr := int(parsedThr)
+	if err != nil {
+		m.errorMsg = "Invalid value specified; threshold must be a positive integer."
+		return m, nil
+	}
 	r := rule{
 		name:      m.inputs[0].Value(),
 		pattern:   m.inputs[1].Value(),
@@ -310,7 +317,6 @@ func (m model) handlePolicyFormSubmit() (tea.Model, tea.Cmd) {
 	}
 	authorizedKeys := splitAndTrim(m.inputs[2].Value())
 
-	var err error
 	switch m.screen {
 	case screenPolicyAddRule:
 		err = repoAddRule(m.ctx, m.options, r, authorizedKeys)
@@ -342,8 +348,14 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 
 	parts := splitAndTrim(m.inputs[2].Value())
 	thr := 0
+	var err error
 	if m.inputs[1].Value() == tuf.GlobalRuleThresholdType {
-		thr, _ = strconv.Atoi(m.inputs[3].Value())
+		parsedThr, err := strconv.ParseInt(m.inputs[3].Value(), 10, 0)
+		thr = int(parsedThr)
+		if err != nil {
+			m.errorMsg = "Invalid value specified; threshold must be a positive integer."
+			return m, nil
+		}
 	}
 	gr := globalRule{
 		ruleName:     m.inputs[0].Value(),
@@ -352,7 +364,6 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 		threshold:    thr,
 	}
 
-	var err error
 	switch m.screen {
 	case screenTrustAddGlobalRule:
 		err = repoAddGlobalRule(m.ctx, m.options, gr)

@@ -22,7 +22,7 @@ func TestCreateEnvelope(t *testing.T) {
 	env, err := CreateEnvelope(rootMetadata)
 	assert.Nil(t, err)
 	assert.Equal(t, PayloadType, env.PayloadType)
-	assert.Equal(t, "eyJ0eXBlIjoicm9vdCIsImV4cGlyZXMiOiIiLCJrZXlzIjpudWxsLCJyb2xlcyI6bnVsbH0=", env.Payload)
+	assert.Equal(t, "eyJ0eXBlIjoicm9vdCIsImV4cGlyZXMiOiIiLCJ2ZXJzaW9uIjoxLCJrZXlzIjpudWxsLCJyb2xlcyI6bnVsbH0=", env.Payload)
 }
 
 func TestSignEnvelope(t *testing.T) {

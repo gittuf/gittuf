@@ -123,15 +123,21 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 			// ls-refs is a command to upload-pack. Like list and list
 			// for-push, it enumerates the refs and their states on the remote.
 			// Unlike those commands, this must be passed to upload-pack.
-			// Further, ls-refs must be parametrized with ref-prefixes. We add
+			// Further, ls-refs can be parametrized with ref-prefixes. We add
 			// refs/gittuf/ as a prefix to learn about the gittuf refs on the
-			// remote during fetches.
+			// remote during fetches, but only if the client already has
+			// ref-prefixes set.
+			hasRefPrefix := false
 			for stdInScanner.Scan() {
 				input = stdInScanner.Bytes()
 
+				if bytes.Contains(input, []byte("ref-prefix")) {
+					hasRefPrefix = true
+				}
+
 				// Add ref-prefix refs/gittuf/ to the ls-refs command before
-				// flush
-				if bytes.Equal(input, flushPkt) {
+				// flush, but only if the client sent ref-prefixes
+				if bytes.Equal(input, flushPkt) && hasRefPrefix {
 					log("adding ref-prefix for refs/gittuf/")
 					gittufRefPrefixCommand := fmt.Sprintf("ref-prefix %s\n", gittufRefPrefix)
 					if _, err := helperStdIn.Write(packetEncode(gittufRefPrefixCommand)); err != nil {

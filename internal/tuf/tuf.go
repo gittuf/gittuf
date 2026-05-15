@@ -61,6 +61,7 @@ var (
 	ErrMissingRules                                    = errors.New("some rules are missing")
 	ErrCannotManipulateRulesWithGittufPrefix           = errors.New("cannot add or change rules whose names have the 'gittuf-' prefix")
 	ErrCannotMeetThreshold                             = errors.New("insufficient keys to meet threshold")
+	ErrInvalidThreshold                                = errors.New("threshold must be a positive integer")
 	ErrUnknownGlobalRuleType                           = errors.New("unknown global rule type")
 	ErrGlobalRuleBlockForcePushesOnlyAppliesToGitPaths = errors.New("all patterns for block force pushes global rule must be for Git references")
 	ErrGlobalRuleNotFound                              = errors.New("global rule not found")
@@ -93,8 +94,13 @@ type RootMetadata interface {
 	// unenforced
 	SetExpires(expiry string)
 
-	// SchemaVersion returns the metadata schema version.
-	SchemaVersion() string
+	// GetSchemaVersion returns the metadata schema version.
+	GetSchemaVersion() string
+
+	// GetVersion returns the version number of the metadata.
+	GetVersion() uint64
+	// IncrementVersion increments the version number of the metadata by 1.
+	IncrementVersion()
 
 	// GetRepositoryLocation returns the canonical location of the Git
 	// repository.
@@ -233,8 +239,13 @@ type TargetsMetadata interface {
 	// unenforced
 	SetExpires(expiry string)
 
-	// SchemaVersion returns the metadata schema version.
-	SchemaVersion() string
+	// GetSchemaVersion returns the metadata schema version.
+	GetSchemaVersion() string
+
+	// GetVersion returns the version number of the metadata.
+	GetVersion() uint64
+	// IncrementVersion increments the version number of the metadata by 1.
+	IncrementVersion()
 
 	// GetPrincipals returns all the principals in the rule file.
 	GetPrincipals() map[string]Principal

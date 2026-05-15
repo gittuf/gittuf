@@ -2520,6 +2520,38 @@ func TestUpdateHook(t *testing.T) {
 	})
 }
 
+func TestIncrementRootVersion(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+	require.Nil(t, err)
+
+	oldRootMetadata, err := state.GetRootMetadata(false)
+	require.Nil(t, err)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	err = r.IncrementRootVersion(testCtx, rootSigner, false)
+	require.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newRootMetadata, err := state.GetRootMetadata(false)
+	require.Nil(t, err)
+
+	assert.Equal(t, oldRootMetadata.GetVersion()+1, newRootMetadata.GetVersion())
+
+	// Check that the metadata is the same except for the version number
+	newRootMetadata.(*tufv02.RootMetadata).Version = oldRootMetadata.GetVersion()
+	assert.Equal(t, oldRootMetadata, newRootMetadata)
+}
+
 func TestListPropagationDirectives(t *testing.T) {
 	t.Run("list propagation directives after add and remove", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")

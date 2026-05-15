@@ -112,6 +112,93 @@ func TestLoadState(t *testing.T) {
 		assertStatesEqual(t, state, loadedState)
 	})
 
+	t.Run("fail loading when first targets is signed by wrong key", func(t *testing.T) {
+		// We can't use createTestRepository because we want to bypass the
+		// guardrails in state.Commit and state.Apply.
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		state.repository = repo
+
+		if err := state.Commit(repo, "Initial state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now we have the policy committed bypassing guardrails, where the
+		// first policy has the wrongly signed metadata. Load and ensure we see
+		// an error.
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.Error(t, err)
+		require.Nil(t, loadedState)
+	})
+
+	t.Run("fail loading when targets is signed by invalid metadata", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		rootEnv := state.Metadata.RootEnvelope
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+
+		// Re-sign using wrong key and commit bypassing guardrails to ensure we
+		// validate when loading state
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		require.Nil(t, err)
+
+		// The state creator uses the root key for the primary rule file
+		// Sign with a different key
+		invalidSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		targetsEnv, err = dsse.SignEnvelope(t.Context(), targetsEnv, invalidSigner)
+		require.Nil(t, err)
+
+		newState := &State{
+			Metadata: &StateMetadata{
+				RootEnvelope:    rootEnv,
+				TargetsEnvelope: targetsEnv,
+			},
+		}
+
+		if err := newState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := newState.Commit(repo, "Updated state", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.Error(t, err)
+		require.Nil(t, loadedState)
+	})
+
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)

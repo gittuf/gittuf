@@ -32,6 +32,7 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
+* [gittuf policy increment-version](gittuf_policy_increment-version.md)	 - Increment the integer version of the specified rule file metadata
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
