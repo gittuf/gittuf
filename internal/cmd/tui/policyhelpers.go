@@ -5,10 +5,13 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 )
 
 type rule struct {
@@ -19,12 +22,13 @@ type rule struct {
 }
 
 type principal struct {
-	id          string
-	keysSummary string
+	id             string
+	keys           string
+	customMetadata string
 }
 
-// repoAddPrincipalToTargets adds a principal to the policy file.
-func repoAddPrincipalToTargets(ctx context.Context, o *options, keyRef string) error {
+// repoAddPrincipalToTargets adds a person principal to the targets policy file.
+func repoAddPrincipalToTargets(ctx context.Context, o *options, personID string, PublicKeyRefs []string, associatedIdentities []string, customMetadata []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -35,12 +39,51 @@ func repoAddPrincipalToTargets(ctx context.Context, o *options, keyRef string) e
 		return err
 	}
 
-	p, err := gittuf.LoadPublicKey(keyRef)
-	if err != nil {
-		return err
+	// Build the public keys map — same pattern as addperson.go
+	publicKeys := map[string]*tufv02.Key{}
+	for _, KeyRef := range PublicKeyRefs {
+		key, err := gittuf.LoadPublicKey(KeyRef)
+		if err != nil {
+			return err
+		}
+		publicKeys[key.ID()] = key.(*tufv02.Key)
 	}
 
-	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{p}, true)
+	// Build the associated identities map — split on "::"
+	identities := map[string]string{}
+	for _, identity := range associatedIdentities {
+		split := strings.Split(identity, "::")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid format for associated identity '%s', expected 'providerID::identity'", identity)
+		}
+		identities[split[0]] = split[1]
+	}
+
+	// Build the custom metadata map — split on "="
+	custom := map[string]string{}
+	for _, entry := range customMetadata {
+		split := strings.Split(entry, "=")
+		if len(split) != 2 {
+			return fmt.Errorf("invalid format for associated identity '%s', expected 'KEY=VALUE", entry)
+		}
+		custom[split[0]] = split[1]
+	}
+
+	// Construct the person — same pattern as addperson.go
+	person := &tufv02.Person{
+		PersonID:             personID,
+		PublicKeys:           publicKeys,
+		AssociatedIdentities: identities,
+		Custom:               custom,
+	}
+
+	// Build opts — same pattern as addperson.go
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{person}, true, opts...)
 }
 
 // getCurrPrincipals returns the current targets principals from the policy file.
@@ -62,8 +105,9 @@ func getCurrPrincipals(ctx context.Context, o *options) []principal {
 			keyIDs = append(keyIDs, k.KeyID)
 		}
 		currPrincipals = append(currPrincipals, principal{
-			id:          p.ID(),
-			keysSummary: strings.Join(keyIDs, ", "),
+			id:             p.ID(),
+			keys:           strings.Join(keyIDs, ", "),
+			customMetadata: fmt.Sprintf("%v", p.CustomMetadata()),
 		})
 	}
 
@@ -82,7 +126,12 @@ func repoRemovePrincipalFromTargets(ctx context.Context, o *options, principalID
 		return err
 	}
 
-	return repo.RemovePrincipalFromTargets(ctx, signer, o.policyName, principalID, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.RemovePrincipalFromTargets(ctx, signer, o.policyName, principalID, true, opts...)
 }
 
 // getCurrRules returns the current rules from the policy file.

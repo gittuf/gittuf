@@ -466,13 +466,36 @@ func (m model) handlePrincipalListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handlePrincipalFormSubmit handles enter on the add-principal form screen.
 func (m model) handlePrincipalFormSubmit() (tea.Model, tea.Cmd) {
-	keyRef := strings.TrimSpace(m.inputs[0].Value())
-	if keyRef == "" {
-		m.errorMsg = "Key ref cannot be empty."
+	// Advance focus if not on last field yet
+	if m.focusIndex < len(m.inputs)-1 {
+		m.cycleFocus("tab")
 		return m, nil
 	}
 
-	if err := repoAddPrincipalToTargets(m.ctx, m.options, keyRef); err != nil {
+	personID := strings.TrimSpace(m.inputs[0].Value())
+	if personID == "" {
+		m.errorMsg = "Person ID cannot be empty."
+		return m, nil
+	}
+
+	keyRef := strings.TrimSpace(m.inputs[1].Value())
+	if keyRef == "" {
+		m.errorMsg = "Public key cannot be empty."
+		return m, nil
+	}
+
+	// Optional fields — only include if non-empty
+	var associatedIdentities []string
+	if val := strings.TrimSpace(m.inputs[2].Value()); val != "" {
+		associatedIdentities = []string{val}
+	}
+
+	var customMetadata []string
+	if val := strings.TrimSpace(m.inputs[3].Value()); val != "" {
+		customMetadata = []string{val}
+	}
+
+	if err := repoAddPrincipalToTargets(m.ctx, m.options, personID, []string{keyRef}, associatedIdentities, customMetadata); err != nil {
 		m.errorMsg = fmt.Sprintf("Error: %v", err)
 		return m, nil
 	}

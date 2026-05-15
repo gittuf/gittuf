@@ -306,15 +306,22 @@ func (m *model) refreshPrincipals() {
 func (m *model) updatePrincipalList() {
 	items := make([]list.Item, len(m.principals))
 	for i, p := range m.principals {
-		items[i] = item{title: p.id, desc: fmt.Sprintf("Keys: %s", p.keysSummary)}
+		desc := fmt.Sprintf("Keys: %s", p.keys)
+		if p.customMetadata != "" && p.customMetadata != "map[]" {
+			desc += fmt.Sprintf(" | Custom: %s", p.customMetadata)
+		}
+		items[i] = item{title: p.id, desc: desc}
 	}
 	m.principalList.SetItems(items)
 }
 
-// initPrincipalInputs initializes the input field for the add-principal form.
+// initPrincipalInputs initializes the input fields for the add-principal form.
 func (m *model) initPrincipalInputs() {
 	m.inputs = initInputs([]inputField{
-		{"Path to public key, gpg:<fingerprint>, or fulcio:<id>::<issuer>", "Key Ref:"},
+		{"Enter person ID (e.g. alice)", "Person ID:"},
+		{"Path to public key, gpg:<fingerprint>, or fulcio:<id>::<issuer>", "Public Key:"},
+		{"providerID::identity (optional)", "Associated Identity:"},
+		{"KEY=VALUE (optional)", "Custom Metadata:"},
 	})
 	m.focusIndex = 0
 }
