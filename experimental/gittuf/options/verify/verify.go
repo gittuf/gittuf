@@ -3,9 +3,12 @@
 
 package verify
 
+import "github.com/gittuf/gittuf/internal/tuf"
+
 type Options struct {
-	RefNameOverride string
-	LatestOnly      bool
+	RefNameOverride  string
+	LatestOnly       bool
+	ExpectedRootKeys []tuf.Principal
 }
 
 type Option func(o *Options)
@@ -19,5 +22,11 @@ func WithOverrideRefName(refNameOverride string) Option {
 func WithLatestOnly() Option {
 	return func(o *Options) {
 		o.LatestOnly = true
+	}
+}
+
+func WithExpectedRootKeys(principals []tuf.Principal) Option {
+	return func(o *Options) {
+		o.ExpectedRootKeys = principals
 	}
 }

@@ -12,6 +12,10 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,6 +25,14 @@ func TestVerifyRef(t *testing.T) {
 
 	refName := "refs/heads/main"
 	remoteRefName := "refs/heads/not-main"
+
+	rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+
+	badPublicKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badPublicKey := tufv01.NewKeyFromSSLibKey(badPublicKeyR)
 
 	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
@@ -33,10 +45,11 @@ func TestVerifyRef(t *testing.T) {
 	entry.ID = entryID
 
 	tests := map[string]struct {
-		localRefName  string
-		remoteRefName string
-		latestOnly    bool
-		err           error
+		localRefName    string
+		remoteRefName   string
+		latestOnly      bool
+		initialRootKeys []tuf.Principal
+		err             error
 	}{
 		"absolute ref, not full": {
 			localRefName: refName,
@@ -75,12 +88,27 @@ func TestVerifyRef(t *testing.T) {
 			latestOnly:    false,
 			err:           rsl.ErrRSLEntryNotFound,
 		},
+		"absolute ref, full, specified root keys match": {
+			localRefName:    refName,
+			latestOnly:      false,
+			initialRootKeys: []tuf.Principal{rootPublicKey},
+		},
+		"absolute ref, full, specified root keys do not match": {
+			localRefName:    refName,
+			latestOnly:      false,
+			initialRootKeys: []tuf.Principal{rootPublicKey, badPublicKey},
+			err:             policy.ErrVerifierConditionsUnmet,
+		},
 	}
 
 	for name, test := range tests {
 		options := []verifyopts.Option{verifyopts.WithOverrideRefName(test.remoteRefName)}
 		if test.latestOnly {
 			options = append(options, verifyopts.WithLatestOnly())
+		}
+
+		if len(test.initialRootKeys) > 0 {
+			options = append(options, verifyopts.WithExpectedRootKeys(test.initialRootKeys))
 		}
 
 		err := repo.VerifyRef(testCtx, test.localRefName, options...)
@@ -93,7 +121,7 @@ func TestVerifyRef(t *testing.T) {
 
 	// Add another commit
 	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
-	err := repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
+	err = repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 	err = repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)

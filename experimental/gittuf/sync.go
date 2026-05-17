@@ -9,11 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"reflect"
-	"sort"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
@@ -21,7 +20,7 @@ import (
 var (
 	ErrCloningRepository          = errors.New("unable to clone repository")
 	ErrDirExists                  = errors.New("directory exists")
-	ErrExpectedRootKeysDoNotMatch = errors.Join(ErrCloningRepository, errors.New("cloned root keys do not match the expected keys"))
+	ErrExpectedRootKeysDoNotMatch = errors.New("cloned root keys do not match the expected keys")
 )
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
@@ -72,29 +71,11 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	if len(expectedRootKeys) > 0 {
 		slog.Debug("Verifying if root keys are expected root keys...")
 
-		sort.Slice(expectedRootKeys, func(i, j int) bool {
-			return expectedRootKeys[i].ID() < expectedRootKeys[j].ID()
-		})
-
-		state, err := policy.LoadFirstState(ctx, r)
-		if err != nil {
+		_, err := policy.LoadFirstState(ctx, r, policyopts.WithInitialRootPrincipals(expectedRootKeys))
+		if errors.Is(err, policy.ErrVerifierConditionsUnmet) {
+			return repository, errors.Join(ErrCloningRepository, ErrExpectedRootKeysDoNotMatch)
+		} else if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
-		}
-		rootKeys, err := state.GetRootKeys()
-		if err != nil {
-			return repository, errors.Join(ErrCloningRepository, err)
-		}
-
-		// We sort the root keys so that we can check if the root keys array match's the expected root key array
-		sort.Slice(rootKeys, func(i, j int) bool {
-			return rootKeys[i].ID() < rootKeys[j].ID()
-		})
-
-		if len(rootKeys) != len(expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
-		}
-		if !reflect.DeepEqual(rootKeys, expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
 		}
 	}
 
