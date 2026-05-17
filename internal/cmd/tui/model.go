@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd/tui/trust"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
@@ -29,6 +30,9 @@ const (
 	screenPolicyAddRule                     // Form: add a new policy rule
 	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
 	screenTrust                             // Menu for Trust operations
+	screenTrustRootConfig                   // Root configuration view screen
+	screenTrustRootKeys                     // Root principals list screen
+	screenTrustAddRootKey                   // Form: add a root principal/key
 	screenTrustGlobalRules                  // Global rule management screen
 	screenTrustAddGlobalRule                // Form: add a new global rule
 	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
@@ -71,6 +75,8 @@ type model struct {
 	readOnly         bool
 	confirmDelete    bool
 	deleteTarget     string
+	trustConfig      trust.Model
+	rootKeyList      list.Model
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -159,9 +165,11 @@ func initialModel(ctx context.Context, o *options) model {
 			item{title: "View Rules", desc: "View and manage policy rules"},
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
+			item{title: "View Root Configuration", desc: "View and manage Root metadata"},
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 		}, delegate),
 		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
+		rootKeyList:    newMenuList("Root Principals", []list.Item{}, delegate),
 		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 	}
 
@@ -260,6 +268,33 @@ func (m *model) refreshRules() {
 func (m *model) refreshGlobalRules() {
 	m.globalRules = getGlobalRules(m.ctx, m.options)
 	m.updateGlobalRuleList()
+}
+
+// refreshRootConfig re-fetches root metadata configuration and principal keys.
+func (m *model) refreshRootConfig() {
+	config, err := getRootConfig(m.ctx, m.options)
+	if err != nil {
+		m.errorMsg = fmt.Sprintf("Error loading root configuration: %v", err)
+		return
+	}
+	m.trustConfig = config
+	m.updateRootKeyList()
+}
+
+// updateRootKeyList updates the root principals list within the TUI.
+func (m *model) updateRootKeyList() {
+	items := make([]list.Item, len(m.trustConfig.Principals))
+	for i, keyID := range m.trustConfig.Principals {
+		items[i] = item{title: keyID, desc: ""}
+	}
+	m.rootKeyList.SetItems(items)
+}
+
+func (m *model) initRootKeyInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Enter root principal reference (gpg:<id>, fulcio:<identity>, or file path)", "Principal Key:"},
+	})
+	m.focusIndex = 0
 }
 
 // updateRuleList updates the rule list within the TUI.
