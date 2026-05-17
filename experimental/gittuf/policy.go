@@ -218,7 +218,7 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, targetRef, policyopts.BypassRSL())
 	if err != nil {
 		return nil, err
 	}
@@ -349,9 +349,9 @@ func (r *Repository) StagePolicy(ctx context.Context, remoteName string, selecte
 
 // loadStagingBaseState returns the *policy.State that selective stage should
 // overlay onto. Preference order:
-//   1. PolicyStagingRef (the current staged proposal — most common).
-//   2. PolicyRef (no proposal in flight, base on the applied policy).
-//   3. An empty State (initial bootstrap — neither applied nor proposed yet).
+//  1. PolicyStagingRef (the current staged proposal — most common).
+//  2. PolicyRef (no proposal in flight, base on the applied policy).
+//  3. An empty State (initial bootstrap — neither applied nor proposed yet).
 //
 // Falling through to an empty base lets a user run `gittuf policy stage
 // --policy-name X` in a fresh repo without first having to do a full stage.
@@ -374,4 +374,3 @@ func loadStagingBaseState(ctx context.Context, repo *gitinterface.Repository) (*
 	// overlay just becomes the named envelopes from the index.
 	return &policy.State{Metadata: &policy.StateMetadata{}}, nil
 }
-

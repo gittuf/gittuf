@@ -66,7 +66,10 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", true, false); err != nil {
+		if err := state.Commit(repo, "", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -91,7 +94,10 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", true, false); err != nil {
+		if err := state.Commit(repo, "", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -155,7 +161,10 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", true, false); err != nil {
+		if err := state.Commit(repo, "", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -182,7 +191,10 @@ func TestLoadState(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", true, false); err != nil {
+		if err := state.Commit(repo, "", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -295,7 +307,10 @@ func TestLoadFirstState(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondState.Metadata.TargetsEnvelope = targetsEnv
-	if err := secondState.Commit(repo, "Second state", true, false); err != nil {
+	if err := secondState.Commit(repo, "Second state", false, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := secondState.CommitToStaging(repo, "Second state", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -337,7 +352,9 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -368,7 +385,9 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -399,7 +418,9 @@ func TestLoadStateForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		entry, err := rsl.GetLatestEntry(repo)
@@ -465,7 +486,9 @@ func TestStateVerify(t *testing.T) {
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
 		require.Nil(t, err)
-		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", false, false)
+		require.Nil(t, err)
+		err = controllerState.CommitToStaging(controllerRepository, "Initial policy\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, controllerRepository, false)
 		require.Nil(t, err)
@@ -484,7 +507,9 @@ func TestStateVerify(t *testing.T) {
 		networkState.Metadata.RootEnvelope = networkRootEnv
 		err = networkState.preprocess()
 		require.Nil(t, err)
-		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		err = networkState.Commit(networkRepository, "Initial policy\n", false, false)
+		require.Nil(t, err)
+		err = networkState.CommitToStaging(networkRepository, "Initial policy\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, networkRepository, false)
 		require.Nil(t, err)
@@ -531,7 +556,9 @@ func TestStateVerify(t *testing.T) {
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
 		require.Nil(t, err)
-		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", false, false)
+		require.Nil(t, err)
+		err = controllerState.CommitToStaging(controllerRepository, "Initial policy\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, controllerRepository, false)
 		require.Nil(t, err)
@@ -550,7 +577,9 @@ func TestStateVerify(t *testing.T) {
 		networkState.Metadata.RootEnvelope = networkRootEnv
 		err = networkState.preprocess()
 		require.Nil(t, err)
-		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		err = networkState.Commit(networkRepository, "Initial policy\n", false, false)
+		require.Nil(t, err)
+		err = networkState.CommitToStaging(networkRepository, "Initial policy\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, networkRepository, false)
 		require.Nil(t, err)
@@ -603,7 +632,9 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -649,7 +680,9 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -699,7 +732,9 @@ func TestStateCommit(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, true)
 		state.repository = repo
 
-		err := state.Commit(repo, "Create test state", true, false)
+		err := state.Commit(repo, "Create test state", false, false)
+		assert.Nil(t, err)
+		err = state.CommitToStaging(repo, "Create test state", false)
 		assert.Nil(t, err)
 
 		// The state commit must contain specific paths, search for them
@@ -846,7 +881,10 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -913,7 +951,10 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -946,7 +987,10 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -984,7 +1028,10 @@ func TestApply(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1129,7 +1176,10 @@ func TestReconcileStaging(t *testing.T) {
 
 		state.Metadata.RootEnvelope = rootEnv
 
-		if err := state.Commit(repo, "Added target key to root", true, false); err != nil {
+		if err := state.Commit(repo, "Added target key to root", false, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := state.CommitToStaging(repo, "Added target key to root", false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1314,7 +1364,9 @@ func TestReconcileStaging(t *testing.T) {
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
 		require.Nil(t, err)
-		err = controllerState.Commit(controllerRepository, "Add controller repo global rule\n", true, false)
+		err = controllerState.Commit(controllerRepository, "Add controller repo global rule\n", false, false)
+		require.Nil(t, err)
+		err = controllerState.CommitToStaging(controllerRepository, "Add controller repo global rule\n", false)
 		require.Nil(t, err)
 
 		newNetworkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
@@ -1324,7 +1376,9 @@ func TestReconcileStaging(t *testing.T) {
 		networkState.Metadata.RootEnvelope = newNetworkRootEnv
 		err = networkState.preprocess()
 		require.Nil(t, err)
-		err = networkState.Commit(networkRepository, "Add network repo global rule\n", true, false)
+		err = networkState.Commit(networkRepository, "Add network repo global rule\n", false, false)
+		require.Nil(t, err)
+		err = networkState.CommitToStaging(networkRepository, "Add network repo global rule\n", false)
 		require.Nil(t, err)
 		networkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
@@ -1367,7 +1421,7 @@ func TestReconcileStaging(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Check that the policy-staging tip is different due to reconciliation
-		postReconciliationNetworkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
+		postReconciliationNetworkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
 		require.Nil(t, err)
 		assert.NotEqual(t, networkStagingTip, postReconciliationNetworkStagingTip)
 
@@ -1378,7 +1432,7 @@ func TestReconcileStaging(t *testing.T) {
 		// These should be reconciled now
 		networkPolicyTip, err = networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err = networkRepository.GetReference(PolicyIndexRef)
+		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
 		require.Nil(t, err)
 		assert.Equal(t, networkPolicyTip, networkStagingTip)
 	})
@@ -1419,7 +1473,9 @@ func TestReconcileStaging(t *testing.T) {
 		networkState.Metadata.RootEnvelope = networkRootEnv
 		err = networkState.preprocess()
 		require.Nil(t, err)
-		err = networkState.Commit(networkRepository, "Add network repo global rule two\n", true, false)
+		err = networkState.Commit(networkRepository, "Add network repo global rule two\n", false, false)
+		require.Nil(t, err)
+		err = networkState.CommitToStaging(networkRepository, "Add network repo global rule two\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, networkRepository, false)
 		require.Nil(t, err)
@@ -1437,7 +1493,9 @@ func TestReconcileStaging(t *testing.T) {
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
 		require.Nil(t, err)
-		err = controllerState.Commit(controllerRepository, "Add controller repo global rule two\n", true, false)
+		err = controllerState.Commit(controllerRepository, "Add controller repo global rule two\n", false, false)
+		require.Nil(t, err)
+		err = controllerState.CommitToStaging(controllerRepository, "Add controller repo global rule two\n", false)
 		require.Nil(t, err)
 		err = Apply(testCtx, controllerRepository, false)
 		require.Nil(t, err)
@@ -1520,7 +1578,9 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 	controllerState.Metadata.RootEnvelope = controllerRootEnv
 	err = controllerState.preprocess()
 	require.Nil(t, err)
-	err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+	err = controllerState.Commit(controllerRepository, "Initial policy\n", false, false)
+	require.Nil(t, err)
+	err = controllerState.CommitToStaging(controllerRepository, "Initial policy\n", false)
 	require.Nil(t, err)
 	err = Apply(testCtx, controllerRepository, false)
 	require.Nil(t, err)
@@ -1537,7 +1597,9 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 	networkState.Metadata.RootEnvelope = networkRootEnv
 	err = networkState.preprocess()
 	require.Nil(t, err)
-	err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+	err = networkState.Commit(networkRepository, "Initial policy\n", false, false)
+	require.Nil(t, err)
+	err = networkState.CommitToStaging(networkRepository, "Initial policy\n", false)
 	require.Nil(t, err)
 	err = Apply(testCtx, networkRepository, false)
 	require.Nil(t, err)

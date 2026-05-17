@@ -628,12 +628,25 @@ func (s *State) commitToRef(repo *gitinterface.Repository, ref, commitMessage st
 // pending policy mutations. createRSLEntry must be false: PolicyIndexRef is
 // never recorded in the RSL because it is purely local (the RSL is a shared,
 // pushable log of officially proposed/applied state changes only). Callers
-// passing createRSLEntry=true get an error.
+// that need to promote a mutation directly into the official proposal should
+// also call CommitToStaging on a State independently loaded from
+// PolicyStagingRef.
 func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
 	if createRSLEntry {
-		return fmt.Errorf("cannot create RSL entry for %s: it is a local-only scratchpad — run `gittuf policy stage` to promote pending changes into %s, which is what gets recorded in the RSL", PolicyIndexRef, PolicyStagingRef)
+		return fmt.Errorf("cannot create RSL entry for %s: it is a local-only scratchpad — call CommitToStaging on a State loaded from %s instead", PolicyIndexRef, PolicyStagingRef)
 	}
 	_, err := s.commitToRef(repo, PolicyIndexRef, commitMessage, false, signCommit)
+	return err
+}
+
+// CommitToStaging writes the State to PolicyStagingRef and records a matching
+// RSL entry. Used by mutations that bypass the PolicyIndexRef → stage workflow
+// (typically root-of-trust mutations invoked with WithRSLEntry). The caller
+// must have loaded the State from PolicyStagingRef and applied the mutation
+// against that load — writing a State loaded from PolicyIndexRef would leak
+// any pending index-only mutations into the official proposal.
+func (s *State) CommitToStaging(repo *gitinterface.Repository, commitMessage string, signCommit bool) error {
+	_, err := s.commitToRef(repo, PolicyStagingRef, commitMessage, true, signCommit)
 	return err
 }
 

@@ -698,7 +698,7 @@ func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -738,7 +738,7 @@ func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signe
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -873,7 +873,7 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -1388,6 +1388,41 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.Ro
 }
 
 func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, createRSLEntry, signCommit bool) error {
+	if err := r.signRootMetadataIntoState(ctx, state, signer, rootMetadata); err != nil {
+		return err
+	}
+
+	slog.Debug("Committing policy to PolicyIndexRef...")
+	if err := state.Commit(r.r, commitMessage, false, signCommit); err != nil {
+		return err
+	}
+
+	if !createRSLEntry {
+		return nil
+	}
+
+	// Dual-write: re-apply the same root metadata to a fresh State loaded from
+	// PolicyStagingRef so any pending PolicyIndexRef-only TargetsEnvelope /
+	// DelegationEnvelopes mutations don't leak into the official proposal.
+	// Only the RootEnvelope is what we want to promote; the other envelopes
+	// keep whatever PolicyStagingRef already has.
+	slog.Debug("Loading PolicyStagingRef for dual-write...")
+	stagingState, err := loadStagingBaseState(ctx, r.r)
+	if err != nil {
+		return err
+	}
+	if err := r.signRootMetadataIntoState(ctx, stagingState, signer, rootMetadata); err != nil {
+		return err
+	}
+
+	slog.Debug("Committing policy to PolicyStagingRef with RSL entry...")
+	return stagingState.CommitToStaging(r.r, commitMessage, signCommit)
+}
+
+// signRootMetadataIntoState marshals and signs the provided rootMetadata,
+// replacing state.Metadata.RootEnvelope with the result. It does not write
+// the state to any ref — callers are responsible for committing.
+func (r *Repository) signRootMetadataIntoState(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata) error {
 	rootMetadataBytes, err := json.Marshal(rootMetadata)
 	if err != nil {
 		return err
@@ -1397,14 +1432,11 @@ func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State
 	env.Signatures = []sslibdsse.Signature{}
 	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
-	slog.Debug("Signing updated root metadata...")
-	env, err = dsse.SignEnvelope(ctx, env, signer)
+	slog.Debug("Signing root metadata...")
+	signed, err := dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
 	}
-
-	state.Metadata.RootEnvelope = env
-
-	slog.Debug("Committing policy...")
-	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
+	state.Metadata.RootEnvelope = signed
+	return nil
 }

@@ -44,7 +44,10 @@ func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 	state.repository = repo
 
-	if err := state.Commit(repo, "Create test state", true, false); err != nil {
+	if err := state.Commit(repo, "Create test state", false, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := StageOverlayCommit(repo, state, "Create test state", false); err != nil {
 		t.Fatal(err)
 	}
 	if err := Apply(testCtx, repo, false); err != nil {
@@ -102,7 +105,11 @@ func createControllerAndNetworkRepositories(t *testing.T) (*gitinterface.Reposit
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+	err = controllerState.Commit(controllerRepository, "Initial policy\n", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = controllerState.CommitToStaging(controllerRepository, "Initial policy\n", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +139,11 @@ func createControllerAndNetworkRepositories(t *testing.T) (*gitinterface.Reposit
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+	err = networkState.Commit(networkRepository, "Initial policy\n", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = networkState.CommitToStaging(networkRepository, "Initial policy\n", false)
 	if err != nil {
 		t.Fatal(err)
 	}

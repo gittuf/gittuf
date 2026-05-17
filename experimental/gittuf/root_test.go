@@ -2532,7 +2532,7 @@ func TestListPropagationDirectives(t *testing.T) {
 		err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 
-		directives, err := r.ListPropagationDirectives(testCtx, policy.PolicyIndexRef)
+		directives, err := r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
 		require.Nil(t, err)
 		require.Len(t, directives, 1)
 
@@ -2547,7 +2547,7 @@ func TestListPropagationDirectives(t *testing.T) {
 		err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 
-		directives, err = r.ListPropagationDirectives(testCtx, policy.PolicyIndexRef)
+		directives, err = r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
 		require.Nil(t, err)
 		assert.Empty(t, directives)
 	})
