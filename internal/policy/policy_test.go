@@ -186,7 +186,7 @@ func TestLoadState(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		policyStagingRefTip, err := repo.GetReference(PolicyStagingRef)
+		policyStagingRefTip, err := repo.GetReference(PolicyIndexRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -614,7 +614,7 @@ func TestStateCommit(t *testing.T) {
 			path.Join(controllerPrefix, "root.json"),
 		)
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 
 		treeID, err := repo.GetCommitTreeID(stagingTip)
@@ -664,7 +664,7 @@ func TestStateCommit(t *testing.T) {
 			path.Join(controller2Prefix, "1.json"),
 		)
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 
 		treeID, err := repo.GetCommitTreeID(stagingTip)
@@ -714,7 +714,7 @@ func TestStateCommit(t *testing.T) {
 			path.Join(controller2Prefix, "1.json"),
 		)
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 
 		treeID, err := repo.GetCommitTreeID(stagingTip)
@@ -850,7 +850,7 @@ func TestApply(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		staging, err := LoadCurrentState(testCtx, repo, PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -866,7 +866,7 @@ func TestApply(t *testing.T) {
 		err = Apply(testCtx, repo, false)
 		assert.Nil(t, err)
 
-		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		staging, err = LoadCurrentState(testCtx, repo, PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -950,7 +950,7 @@ func TestApply(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		err = repo.SetReference(PolicyRef, stagingTip)
 		require.Nil(t, err)
@@ -1031,7 +1031,7 @@ func TestDiscard(t *testing.T) {
 
 		state.Metadata.TargetsEnvelope = env
 
-		if err := state.Commit(repo, "", true, false); err != nil {
+		if err := state.Commit(repo, "", false, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1040,7 +1040,7 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1055,7 +1055,7 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		stagingTip, err = repo.GetReference(PolicyStagingRef)
+		stagingTip, err = repo.GetReference(PolicyIndexRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1074,12 +1074,12 @@ func TestDiscard(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitID, err := repo.Commit(emptyTreeHash, PolicyStagingRef, "test commit", false)
+		commitID, err := repo.Commit(emptyTreeHash, PolicyIndexRef, "test commit", false)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		stagingTip, err := repo.GetReference(PolicyIndexRef)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1088,7 +1088,7 @@ func TestDiscard(t *testing.T) {
 		err = Discard(repo)
 		assert.Nil(t, err)
 
-		_, err = repo.GetReference(PolicyStagingRef)
+		_, err = repo.GetReference(PolicyIndexRef)
 		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 }
@@ -1133,7 +1133,7 @@ func TestReconcileStaging(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		staging, err := LoadCurrentState(testCtx, repo, PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1153,7 +1153,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// Load states again and check that ReconcileStaging hasn't changed
 		// anything
-		postReconciliationStaging, err := LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		postReconciliationStaging, err := LoadCurrentState(testCtx, repo, PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1174,7 +1174,7 @@ func TestReconcileStaging(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		staging, err = LoadCurrentState(testCtx, repo, PolicyStagingRef)
+		staging, err = LoadCurrentState(testCtx, repo, PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1240,7 +1240,7 @@ func TestReconcileStaging(t *testing.T) {
 		// policy-staging
 		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
 
@@ -1253,7 +1253,7 @@ func TestReconcileStaging(t *testing.T) {
 		postReconciliationNetworkPolicyTip, err := networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
 		assert.Equal(t, networkPolicyTip, postReconciliationNetworkPolicyTip)
-		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err = networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.Equal(t, postReconciliationNetworkPolicyTip, networkStagingTip)
 
@@ -1326,7 +1326,7 @@ func TestReconcileStaging(t *testing.T) {
 		require.Nil(t, err)
 		err = networkState.Commit(networkRepository, "Add network repo global rule\n", true, false)
 		require.Nil(t, err)
-		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 
 		// 2. Apply the controller's changes and propagate
@@ -1337,7 +1337,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// The network repository's staging ref should not have changed since
 		// the last time, we have not staged any new changes locally
-		newNetworkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		newNetworkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.Equal(t, networkStagingTip, newNetworkStagingTip)
 
@@ -1358,7 +1358,7 @@ func TestReconcileStaging(t *testing.T) {
 		// policy-staging
 		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err = networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
 
@@ -1367,7 +1367,7 @@ func TestReconcileStaging(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Check that the policy-staging tip is different due to reconciliation
-		postReconciliationNetworkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		postReconciliationNetworkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.NotEqual(t, networkStagingTip, postReconciliationNetworkStagingTip)
 
@@ -1378,7 +1378,7 @@ func TestReconcileStaging(t *testing.T) {
 		// These should be reconciled now
 		networkPolicyTip, err = networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err = networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.Equal(t, networkPolicyTip, networkStagingTip)
 	})
@@ -1451,7 +1451,7 @@ func TestReconcileStaging(t *testing.T) {
 		// policy-staging
 		networkPolicyTip, err := networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err := networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err := networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.NotEqual(t, networkPolicyTip, networkStagingTip)
 
@@ -1461,7 +1461,7 @@ func TestReconcileStaging(t *testing.T) {
 		assert.Nil(t, err)
 		networkPolicyTip, err = networkRepository.GetReference(PolicyRef)
 		require.Nil(t, err)
-		networkStagingTip, err = networkRepository.GetReference(PolicyStagingRef)
+		networkStagingTip, err = networkRepository.GetReference(PolicyIndexRef)
 		require.Nil(t, err)
 		assert.Equal(t, networkPolicyTip, networkStagingTip)
 

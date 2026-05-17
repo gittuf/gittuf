@@ -8,6 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
@@ -34,10 +35,10 @@ func TestInitializeTargets(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := r.StagePolicy(testCtx, "", true, false)
+		err := r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -71,7 +72,7 @@ func TestAddDelegation(t *testing.T) {
 		authorizedKeys := []tuf.Principal{targetsPubKey}
 		rulePatterns := []string{"git:branch=main"}
 
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,10 +95,10 @@ func TestAddDelegation(t *testing.T) {
 		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 		assert.Nil(t, err)
 
-		err = r.StagePolicy(testCtx, "", true, false)
+		err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 
-		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,10 +145,10 @@ func TestUpdateDelegation(t *testing.T) {
 	err = r.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,10 +192,10 @@ func TestReorderDelegations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,10 +230,10 @@ func TestRemoveDelegation(t *testing.T) {
 	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,10 +253,10 @@ func TestRemoveDelegation(t *testing.T) {
 	err = r.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +282,7 @@ func TestAddPrincipalToTargets(t *testing.T) {
 
 	authorizedKeysBytes := []tuf.Principal{targetsPubKey, gpgKey}
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,10 +295,10 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,10 +328,10 @@ func TestUpdatePrincipalInTargets(t *testing.T) {
 
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{person}, false)
 	require.Nil(t, err)
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,10 +350,10 @@ func TestUpdatePrincipalInTargets(t *testing.T) {
 
 	err = r.UpdatePrincipalInTargets(testCtx, targetsSigner, policy.TargetsRoleName, person, false)
 	assert.Nil(t, err)
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,10 +381,10 @@ func TestRemovePrincipalFromTargets(t *testing.T) {
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,10 +396,10 @@ func TestRemovePrincipalFromTargets(t *testing.T) {
 	err = r.RemovePrincipalFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, targetsPubKey.ID(), false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
-	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyIndexRef, policyopts.BypassRSL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,7 +425,7 @@ func TestSignTargets(t *testing.T) {
 	err := r.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 
-	err = r.StagePolicy(testCtx, "", true, false)
+	err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 	require.Nil(t, err)
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)

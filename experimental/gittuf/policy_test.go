@@ -12,9 +12,11 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPushPolicy(t *testing.T) {
@@ -40,6 +42,10 @@ func TestPushPolicy(t *testing.T) {
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo, rsl.Ref)
+
+		// PolicyIndexRef is intentionally local-only — should NOT exist on remote.
+		_, err = remoteRepo.GetReference(policy.PolicyIndexRef)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		// No updates, successful push
 		err = localRepo.PushPolicy(remoteName)
@@ -94,7 +100,11 @@ func TestPullPolicy(t *testing.T) {
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, policy.PolicyStagingRef)
 		assertLocalAndRemoteRefsMatch(t, localRepo.r, remoteRepo.r, rsl.Ref)
 
-		// No updates, successful push
+		// PolicyIndexRef is intentionally not fetched — it's local-only.
+		_, err = localRepo.r.GetReference(policy.PolicyIndexRef)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// No updates, successful pull
 		err = localRepo.PullPolicy(remoteName)
 		assert.Nil(t, err)
 	})
@@ -153,7 +163,7 @@ func TestDiscardPolicy(t *testing.T) {
 		err = repo.DiscardPolicy()
 		assert.Nil(t, err)
 
-		stagingRef, err := repo.r.GetReference(policy.PolicyStagingRef)
+		stagingRef, err := repo.r.GetReference(policy.PolicyIndexRef)
 		assert.Nil(t, err)
 		assert.Equal(t, initialPolicyRef, stagingRef)
 	})
@@ -166,7 +176,7 @@ func TestDiscardPolicy(t *testing.T) {
 		err := repo.DiscardPolicy()
 		assert.Nil(t, err)
 
-		_, err = repo.r.GetReference(policy.PolicyStagingRef)
+		_, err = repo.r.GetReference(policy.PolicyIndexRef)
 		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 
@@ -176,17 +186,79 @@ func TestDiscardPolicy(t *testing.T) {
 		initialRef, err := repo.r.GetReference(policy.PolicyRef)
 		assert.Nil(t, err)
 
-		if err := repo.r.SetReference(policy.PolicyStagingRef, gitinterface.ZeroHash); err != nil {
+		if err := repo.r.SetReference(policy.PolicyIndexRef, gitinterface.ZeroHash); err != nil {
 			t.Fatal(err)
 		}
 
 		err = repo.DiscardPolicy()
 		assert.Nil(t, err)
 
-		stagingRef, err := repo.r.GetReference(policy.PolicyStagingRef)
+		stagingRef, err := repo.r.GetReference(policy.PolicyIndexRef)
 		assert.Nil(t, err)
 		assert.Equal(t, initialRef, stagingRef)
 	})
+}
+
+// TestStagePolicy_Selective verifies that selectively staging a subset of
+// target names produces a PolicyStagingRef containing only those envelopes
+// from PolicyIndexRef (with the rest taken from PolicyRef), and that
+// PolicyIndexRef remains untouched.
+func TestStagePolicy_Selective(t *testing.T) {
+	repo := createTestRepositoryWithPolicy(t, "")
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.Nil(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	// Initialize protect-main as a real delegated policy file so we can
+	// later mutate it and verify selective staging keeps the applied version.
+	require.Nil(t, repo.InitializeTargets(testCtx, targetsSigner, "protect-main", false))
+	require.Nil(t, repo.AddPrincipalToTargets(testCtx, targetsSigner, "protect-main", []tuf.Principal{gpgKey}, false))
+
+	// Apply so PolicyRef contains the seeded delegations + protect-main.
+	require.Nil(t, repo.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false))
+	require.Nil(t, policy.Apply(testCtx, repo.r, false))
+
+	// Capture the applied targets envelope blob to detect changes later.
+	policyTip, err := repo.r.GetReference(policy.PolicyRef)
+	require.Nil(t, err)
+	policyTreeID, err := repo.r.GetCommitTreeID(policyTip)
+	require.Nil(t, err)
+	policyRootItems, err := repo.r.GetTreeItems(policyTreeID)
+	require.Nil(t, err)
+	policyMetadataItems, err := repo.r.GetTreeItems(policyRootItems["metadata"])
+	require.Nil(t, err)
+	appliedTargetsBlob := policyMetadataItems["targets.json"]
+	appliedProtectMainBlob := policyMetadataItems["protect-main.json"]
+
+	// Mutate the top-level targets envelope (adds a new rule referencing protect-release).
+	require.Nil(t, repo.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-release", []string{gpgKey.KeyID}, []string{"git:refs/heads/release"}, 1, false))
+	// Also mutate the protect-main delegated policy file so the assertion
+	// below has something to actually distinguish: PolicyRef's protect-main
+	// vs. the divergent PolicyIndexRef version.
+	require.Nil(t, repo.AddDelegation(testCtx, targetsSigner, "protect-main", "protect-main-sub-rule", []string{gpgKey.KeyID}, []string{"file:src/main/*"}, 1, false))
+
+	// Selectively stage only the targets envelope.
+	require.Nil(t, repo.StagePolicy(testCtx, "", []string{policy.TargetsRoleName}, true, false))
+
+	// PolicyStagingRef should now have the new targets envelope but the
+	// untouched protect-main envelope (no targets metadata file was created
+	// for the new "protect-release" rule — it's a leaf rule).
+	stagedTip, err := repo.r.GetReference(policy.PolicyStagingRef)
+	require.Nil(t, err)
+	stagedTreeID, err := repo.r.GetCommitTreeID(stagedTip)
+	require.Nil(t, err)
+	stagedRootItems, err := repo.r.GetTreeItems(stagedTreeID)
+	require.Nil(t, err)
+	stagedMetadataItems, err := repo.r.GetTreeItems(stagedRootItems["metadata"])
+	require.Nil(t, err)
+
+	assert.NotEqual(t, appliedTargetsBlob.String(), stagedMetadataItems["targets.json"].String(),
+		"targets envelope should have been replaced by the PolicyIndexRef version in PolicyStagingRef")
+	// protect-main wasn't modified in PolicyIndexRef, so it should match PolicyRef's version.
+	assert.Equal(t, appliedProtectMainBlob.String(), stagedMetadataItems["protect-main.json"].String(),
+		"protect-main envelope should be carried over from PolicyRef (not the PolicyIndexRef version)")
 }
 
 func TestListRules(t *testing.T) {

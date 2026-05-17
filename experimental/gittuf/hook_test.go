@@ -113,7 +113,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := r.StagePolicy(testCtx, "", true, false)
+		err := r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		require.Nil(t, err)
@@ -141,7 +141,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := r.StagePolicy(testCtx, "", true, false)
+		err := r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		require.Nil(t, err)
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		require.Nil(t, err)
@@ -187,7 +187,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = r.StagePolicy(testCtx, "", true, false)
+		err = r.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false)
 		assert.Nil(t, err)
 		err = r.ApplyPolicy(testCtx, "", true, false)
 		assert.Nil(t, err)

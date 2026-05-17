@@ -1084,7 +1084,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err := downstreamRepo.AddPropagationDirective(testCtx, signer, "test", upstreamRepoLocation, refName, "", refName, localPath, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+		if err := downstreamRepo.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
@@ -1223,7 +1223,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+		if err := downstreamRepo.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
@@ -1388,7 +1388,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+		if err := downstreamRepo.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
@@ -1573,7 +1573,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+		if err := downstreamRepo.StagePolicy(testCtx, "", []string{StageAllSentinel}, true, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
