@@ -2,6 +2,10 @@
 
 Add a network repository
 
+### Synopsis
+
+The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to add and configure a network repository, including its name, location, and initial root principals.
+
 ```
 gittuf trust add-network-repository [flags]
 ```

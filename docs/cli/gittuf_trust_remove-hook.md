@@ -2,6 +2,10 @@
 
 Remove a gittuf hook specified in the policy (developer mode only, set GITTUF_DEV=1)
 
+### Synopsis
+
+The 'remove-hook' command removes a configured gittuf hook from the repository's root of trust. It is used to delete an existing hook from the policy. It requires developer mode to be enabled by setting the environment variable GITTUF_DEV=1.
+
 ```
 gittuf trust remove-hook [flags]
 ```

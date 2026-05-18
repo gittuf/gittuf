@@ -2,6 +2,10 @@
 
 Add a controller repository
 
+### Synopsis
+
+The 'add-controller-repository' command registers a controller repository in the repository's root of trust. It is used to add and configure a controller repository, including its name, location, and initial root principals.
+
 ```
 gittuf trust add-controller-repository [flags]
 ```

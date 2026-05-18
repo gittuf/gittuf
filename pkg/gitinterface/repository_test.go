@@ -53,4 +53,15 @@ func TestRepository(t *testing.T) {
 		require.Nil(t, err)
 		assert.Equal(t, expectedPath, actualPath)
 	})
+
+	t.Run("empty path", func(t *testing.T) {
+		_, err := LoadRepository("")
+		assert.ErrorIs(t, err, ErrRepositoryPathNotSpecified)
+	})
+
+	t.Run("invalid path", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		_, err := LoadRepository(tmpDir)
+		assert.ErrorContains(t, err, "unable to identify git directory for repository")
+	})
 }

@@ -2,6 +2,10 @@
 
 Validate and apply changes from policy-staging to policy
 
+### Synopsis
+
+The 'apply' command validates and applies changes from the policy-staging area to the repository's policy. It is used to make staged policy updates effective and can optionally commit the policy change into the RSL locally.
+
 ```
 gittuf policy apply [flags]
 ```

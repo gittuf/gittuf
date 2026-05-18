@@ -23,9 +23,27 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Go
-      uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
     - name: Test
       run: go test -race -timeout 20m ./...
+  test-freebsd:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+    - name: Test in FreeBSD
+      id: test
+      uses: vmactions/freebsd-vm@d1e65811565151536c0c894fff74f06351ed26e6
+      with:
+        usesh: true
+        prepare: |
+        run: |
+          pkg update -f
+          pkg install -y git wget
+
+          wget https://go.dev/dl/go1.26.1.freebsd-amd64.tar.gz
+          tar -C /usr/local -xzf go1.26.1.freebsd-amd64.tar.gz
+
+          /usr/local/go/bin/go test -race -timeout 20m ./...

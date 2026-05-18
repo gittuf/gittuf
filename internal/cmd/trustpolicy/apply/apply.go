@@ -40,6 +40,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "apply",
 		Short: "Validate and apply changes from policy-staging to policy",
+		Long:  "The 'apply' command validates and applies changes from the policy-staging area to the repository's policy. It is used to make staged policy updates effective and can optionally commit the policy change into the RSL locally.",
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

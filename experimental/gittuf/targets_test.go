@@ -434,3 +434,35 @@ func TestSignTargets(t *testing.T) {
 
 	assert.Equal(t, 2, len(state.Metadata.TargetsEnvelope.Signatures))
 }
+
+func TestIncrementTargetsVersion(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyRef)
+	require.Nil(t, err)
+
+	oldTargetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.Nil(t, err)
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+	err = r.IncrementTargetsVersion(testCtx, targetsSigner, policy.TargetsRoleName, false)
+	assert.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newTargetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.Nil(t, err)
+
+	assert.Equal(t, oldTargetsMetadata.GetVersion()+1, newTargetsMetadata.GetVersion())
+
+	// Check that the metadata is the same except for the version number
+	newTargetsMetadata.(*tufv02.TargetsMetadata).Version = oldTargetsMetadata.GetVersion()
+	assert.Equal(t, oldTargetsMetadata, newTargetsMetadata)
+}

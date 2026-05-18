@@ -53,8 +53,8 @@ func TestRootMetadata(t *testing.T) {
 		assert.True(t, rootMetadata.Roles["targets"].PrincipalIDs.Has(key.KeyID))
 	})
 
-	t.Run("test SchemaVersion", func(t *testing.T) {
-		schemaVersion := rootMetadata.SchemaVersion()
+	t.Run("test GetSchemaVersion", func(t *testing.T) {
+		schemaVersion := rootMetadata.GetSchemaVersion()
 		assert.Equal(t, RootVersion, schemaVersion)
 	})
 
@@ -504,6 +504,9 @@ func TestUpdateAndGetRootThreshold(t *testing.T) {
 
 	err = rootMetadata.UpdateRootThreshold(3)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	err = rootMetadata.UpdateRootThreshold(-1)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 }
 
 func TestUpdateAndGetPrimaryRuleFileThreshold(t *testing.T) {
@@ -536,6 +539,9 @@ func TestUpdateAndGetPrimaryRuleFileThreshold(t *testing.T) {
 
 	err = rootMetadata.UpdatePrimaryRuleFileThreshold(3)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	err = rootMetadata.UpdatePrimaryRuleFileThreshold(-1)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 }
 
 func TestGetRootPrincipals(t *testing.T) {
@@ -661,7 +667,11 @@ func TestGlobalRules(t *testing.T) {
 
 	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
 
-	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
+	err := rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("invalid-threshold", []string{"git:refs/heads/main"}, 0))
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+	assert.Nil(t, rootMetadata.GlobalRules)
+
+	err = rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.Nil(t, err)
 	err = rootMetadata.AddGlobalRule(NewGlobalRuleThreshold("threshold-2-main", []string{"git:refs/heads/main"}, 2))
 	assert.ErrorIs(t, err, tuf.ErrGlobalRuleAlreadyExists)
@@ -691,6 +701,14 @@ func TestGlobalRules(t *testing.T) {
 	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
 	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
+	invalidThresholdGlobalRule := &GlobalRuleThreshold{
+		Name:      "threshold-2-main",
+		Paths:     []string{"git:refs/heads/main"},
+		Threshold: 0,
+	}
+	err = rootMetadata.UpdateGlobalRule(invalidThresholdGlobalRule)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
 
 	updatedThresholdGlobalRule := &GlobalRuleThreshold{
 		Name:      "threshold-2-main",

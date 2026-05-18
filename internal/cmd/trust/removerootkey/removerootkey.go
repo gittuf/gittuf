@@ -50,6 +50,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-root-key",
 		Short:             "Remove Root key from gittuf root of trust",
+		Long:              "The 'remove-root-key' command removes a root key from the repository's root of trust. It is used to revoke trust for an existing root key, identified by its ID.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

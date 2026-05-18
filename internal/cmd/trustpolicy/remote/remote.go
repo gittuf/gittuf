@@ -13,6 +13,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remote",
 		Short:             "Tools for managing remote policies",
+		Long:              "The 'remote' subcommand provides tools for managing gittuf interactions with remote repositories.",
 		DisableAutoGenTag: true,
 	}
 

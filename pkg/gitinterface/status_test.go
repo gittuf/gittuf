@@ -142,5 +142,149 @@ func TestStatus(t *testing.T) {
 		statuses, err = repo.Status()
 		assert.Nil(t, err)
 		assert.Empty(t, statuses)
+	if err := os.Symlink(filename, filename2); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{filename2: {X: StatusCodeTypeChanged, Y: StatusCodeUnmodified}}, statuses)
+
+	// Add and commit
+	if _, err := repo.executor("add", filename2).executeString(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.executor("commit", "-m", "Commit\n").executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Empty(t, statuses)
+
+	// Rename one of the existing files
+	renamedPath := "baz"
+	if _, err := repo.executor("mv", filename, renamedPath).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		renamedPath: {X: StatusCodeRenamed, Y: StatusCodeUnmodified},
+	}, statuses)
+
+	// Commit the rename
+	if _, err := repo.executor("commit", "-m", "Commit\n").executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Empty(t, statuses)
+
+	// Test that rename is parsed correctly alongside other changes in the same
+	// status output. This validates that the NUL-separated source-path token
+	// for the rename is consumed so subsequent entries are not mis-parsed.
+	renamedPath2 := "quux"
+	newFile := "qux"
+
+	if _, err := repo.executor("mv", renamedPath, renamedPath2).executeString(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newFile, []byte("qux"), 0o644); err != nil { //nolint:gosec
+		t.Fatal(err)
+	}
+	if _, err := repo.executor("add", newFile).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		renamedPath2: {X: StatusCodeRenamed, Y: StatusCodeUnmodified},
+		newFile:      {X: StatusCodeAdded, Y: StatusCodeUnmodified},
+	}, statuses)
+}
+
+func TestStatusError(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, true) // bare repo
+
+	_, err := repo.Status()
+	assert.ErrorContains(t, err, "unable to check status of repository")
+}
+func TestNewStatusCodeFromByte(t *testing.T) {
+	t.Run("invalid status code", func(t *testing.T) {
+		_, err := NewStatusCodeFromByte('X')
+		assert.ErrorIs(t, err, ErrInvalidStatusCode)
+	})
+
+	t.Run("valid status codes", func(t *testing.T) {
+		testCases := []struct {
+			input    byte
+			expected StatusCode
+		}{
+			{' ', StatusCodeUnmodified},
+			{'M', StatusCodeModified},
+			{'T', StatusCodeTypeChanged},
+			{'A', StatusCodeAdded},
+			{'D', StatusCodeDeleted},
+			{'C', StatusCodeCopied},
+			{'U', StatusCodeUpdatedUnmerged},
+			{'?', StatusCodeUntracked},
+			{'!', StatusCodeIgnored},
+		}
+
+		for _, tc := range testCases {
+			code, err := NewStatusCodeFromByte(tc.input)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expected, code)
+		}
+	})
+}
+
+func TestStatusCodeString(t *testing.T) {
+	t.Run("invalid status code", func(t *testing.T) {
+		assert.Equal(t, "invalid-code", StatusCode(999).String())
+	})
+
+	t.Run("valid status codes", func(t *testing.T) {
+		testCases := []struct {
+			code     StatusCode
+			expected string
+		}{
+			{StatusCodeUnmodified, " "},
+			{StatusCodeModified, "M"},
+			{StatusCodeTypeChanged, "T"},
+			{StatusCodeAdded, "A"},
+			{StatusCodeDeleted, "D"},
+			{StatusCodeRenamed, "R"},
+			{StatusCodeCopied, "C"},
+			{StatusCodeUpdatedUnmerged, "U"},
+			{StatusCodeUntracked, "?"},
+			{StatusCodeIgnored, "!"},
+		}
+
+		for _, tc := range testCases {
+			assert.Equal(t, tc.expected, tc.code.String())
+		}
+	})
+}
+
+func TestFileStatusUntracked(t *testing.T) {
+	t.Run("untracked when X is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeUntracked, Y: StatusCodeUnmodified}
+		assert.True(t, fs.Untracked())
+	})
+
+	t.Run("untracked when Y is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeUnmodified, Y: StatusCodeUntracked}
+		assert.True(t, fs.Untracked())
+	})
+
+	t.Run("not untracked when neither is untracked", func(t *testing.T) {
+		fs := FileStatus{X: StatusCodeModified, Y: StatusCodeUnmodified}
+		assert.False(t, fs.Untracked())
 	})
 }

@@ -2,6 +2,10 @@
 
 Tools for managing remote policies
 
+### Synopsis
+
+The 'remote' subcommand provides tools for managing gittuf interactions with remote repositories.
+
 ### Options
 
 ```

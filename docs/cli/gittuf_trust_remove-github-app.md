@@ -2,6 +2,10 @@
 
 Remove GitHub app from gittuf root of trust
 
+### Synopsis
+
+The 'remove-github-app' command removes a GitHub app from the repository's root of trust. It is used to revoke trust for a previously registered GitHub app, identified by its name.
+
 ```
 gittuf trust remove-github-app [flags]
 ```
