@@ -4,8 +4,10 @@
 package gitinterface
 
 import (
+	"errors"
 	"os"
 	"runtime"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -125,7 +127,13 @@ func TestStatus(t *testing.T) {
 			// On Windows, symlink creation may require elevated privileges
 			// Skip this part of the test if it fails with privilege error
 			if runtime.GOOS == "windows" {
-				t.Skipf("Skipping symlink status test on Windows: %v", err)
+				if errors.Is(err, syscall.Errno(1314)) {
+					// Restore filename2 so the parent test doesn't have an uncommitted deletion
+					if err := os.WriteFile(filename2, []byte("foo"), 0o644); err != nil { //nolint:gosec
+						t.Fatal(err)
+					}
+					t.Skipf("Skipping symlink status test on Windows: %v", err)
+				}
 			}
 			t.Fatal(err)
 		}
@@ -142,25 +150,7 @@ func TestStatus(t *testing.T) {
 		statuses, err = repo.Status()
 		assert.Nil(t, err)
 		assert.Empty(t, statuses)
-	if err := os.Symlink(filename, filename2); err != nil {
-		t.Fatal(err)
-	}
-
-	statuses, err = repo.Status()
-	assert.Nil(t, err)
-	assert.Equal(t, map[string]FileStatus{filename2: {X: StatusCodeTypeChanged, Y: StatusCodeUnmodified}}, statuses)
-
-	// Add and commit
-	if _, err := repo.executor("add", filename2).executeString(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := repo.executor("commit", "-m", "Commit\n").executeString(); err != nil {
-		t.Fatal(err)
-	}
-
-	statuses, err = repo.Status()
-	assert.Nil(t, err)
-	assert.Empty(t, statuses)
+	})
 
 	// Rename one of the existing files
 	renamedPath := "baz"
