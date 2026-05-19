@@ -41,7 +41,13 @@ func CreateTestGitRepository(t *testing.T, dir string, bare bool) *Repository {
 	}
 
 	// Set up signing via SSH key
-	keysDir := t.TempDir()
+	keysDir, err := os.MkdirTemp("", "gittuf-keys-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(keysDir)
+	})
 	setupSigningKeys(t, keysDir)
 
 	if err := repo.SetGitConfig("user.signingkey", filepath.Join(keysDir, "key.pub")); err != nil {
@@ -73,7 +79,7 @@ func setupRepository(t *testing.T, dir string, bare bool) *Repository {
 		t.Fatal(err)
 	}
 
-	return &Repository{gitDirPath: gitDirPath, clock: testClock}
+	return &Repository{gitDirPath: gitDirPath, worktreePath: dir, clock: testClock}
 }
 
 func setupSigningKeys(t *testing.T, dir string) {

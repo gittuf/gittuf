@@ -5,7 +5,6 @@ package gitinterface
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -47,19 +46,6 @@ func RemoteRef(refName, remoteName string) string {
 // for support with older Git versions.
 func (r *Repository) RestoreWorktree(t *testing.T) {
 	t.Helper()
-
-	worktree := r.gitDirPath
-	if !r.IsBare() {
-		worktree = strings.TrimSuffix(worktree, ".git") // TODO: this doesn't support detached git dir
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(worktree); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(cwd) //nolint:errcheck
 
 	if _, err := r.executor("restore", "--staged", ".").executeString(); err != nil {
 		t.Fatal(err)

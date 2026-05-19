@@ -9,7 +9,6 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -115,12 +114,17 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 func NewKeyFromBytes(t *testing.T, keyB []byte) *signerverifier.SSLibKey {
 	t.Helper()
 
-	testName := strings.ReplaceAll(t.Name(), " ", "__")
-	testName = strings.ReplaceAll(testName, "/", "__")
-	testName = strings.ReplaceAll(testName, "\\", "__")
-	hash := sha256.Sum256(keyB)
-	keyName := fmt.Sprintf("%s-%s", testName, hex.EncodeToString(hash[:]))
-	keyPath := filepath.Join(t.TempDir(), keyName)
+	keyDir, err := os.MkdirTemp("", "gittuf-ssh-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(keyDir)
+	})
+	testNameHash := sha256.Sum256([]byte(t.Name()))
+	keyHash := sha256.Sum256(keyB)
+	keyName := fmt.Sprintf("key-%x-%x", testNameHash[:8], keyHash[:8])
+	keyPath := filepath.Join(keyDir, keyName)
 
 	if err := os.WriteFile(keyPath, keyB, 0o600); err != nil {
 		t.Fatal(err)

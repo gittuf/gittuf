@@ -29,8 +29,9 @@ var ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath string
-	clock      clockwork.Clock
+	gitDirPath  string
+	worktreePath string
+	clock       clockwork.Clock
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
@@ -63,16 +64,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, ErrRepositoryPathNotSpecified
 	}
 
-	repo := &Repository{clock: clockwork.NewRealClock()}
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	if err = os.Chdir(repositoryPath); err != nil {
-		return nil, err
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
+	repo := &Repository{clock: clockwork.NewRealClock(), worktreePath: repositoryPath}
 
 	slog.Debug("Identifying git directory for repository...")
 	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
@@ -91,7 +83,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 
 	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
 	// the final path _including_ symlink follows.
-	absPath, err := filepath.Abs(strings.TrimSpace(string(stdOutContents)))
+	absPath, err := filepath.Abs(filepath.Join(repositoryPath, strings.TrimSpace(string(stdOutContents))))
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +162,9 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
 	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
+	if e.r.worktreePath != "" {
+		cmd.Dir = e.r.worktreePath
+	}
 
 	var (
 		stdOut bytes.Buffer
