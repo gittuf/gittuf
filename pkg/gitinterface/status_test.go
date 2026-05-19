@@ -4,8 +4,10 @@
 package gitinterface
 
 import (
+	"errors"
 	"os"
 	"runtime"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,10 +123,10 @@ func TestStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filename, filename2); err != nil {
-		// On Windows, symlink creation may require elevated privileges
-		// Skip this part of the test if it fails with privilege error
-		if runtime.GOOS == "windows" {
-			t.Skipf("Skipping symlink status test on Windows: %v", err)
+		// On Windows, symlink creation may require elevated privileges.
+		// Only skip for permission or privilege-related failures; surface all other errors.
+		if runtime.GOOS == "windows" && (os.IsPermission(err) || errors.Is(err, syscall.Errno(1314))) {
+			t.Skipf("Skipping symlink status test on Windows due to symlink permission requirements: %v", err)
 		}
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,8 +14,8 @@ import (
 )
 
 func TestCanSign(t *testing.T) {
-	t.Setenv("GIT_CONFIG_GLOBAL", "NUL")
-	t.Setenv("GIT_CONFIG_SYSTEM", "NUL")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	// Note: This is currently not testing the one scenario where CanSign
 	// returns an error: when gpg.format=ssh but user.signingkey is undefined.

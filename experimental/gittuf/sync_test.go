@@ -19,7 +19,6 @@ import (
 )
 
 func TestClone(t *testing.T) {
-
 	remoteTmpDir := t.TempDir()
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)

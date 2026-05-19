@@ -29,9 +29,9 @@ var ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath  string
+	gitDirPath   string
 	worktreePath string
-	clock       clockwork.Clock
+	clock        clockwork.Clock
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
@@ -81,8 +81,8 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
 	}
 
-	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
-	// the final path _including_ symlink follows.
+	// git rev-parse --git-dir may return a local path, so filepath.Abs converts
+	// it into an absolute path. This does not resolve or follow symlinks.
 	absPath, err := filepath.Abs(filepath.Join(repositoryPath, strings.TrimSpace(string(stdOutContents))))
 	if err != nil {
 		return nil, err
