@@ -13,6 +13,7 @@ import (
 )
 
 func TestNewHash(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		hash          string
 		expectedError error
@@ -48,16 +49,21 @@ func TestNewHash(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		hash, err := NewHash(test.hash)
-		if test.expectedError == nil {
-			expectedHash, secErr := hex.DecodeString(test.hash)
-			require.Nil(t, secErr)
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			hash, err := NewHash(test.hash)
+			if test.expectedError == nil {
+				expectedHash, secErr := hex.DecodeString(test.hash)
+				require.Nil(t, secErr)
 
-			assert.Equal(t, Hash(expectedHash), hash)
-			assert.Equal(t, test.hash, hash.String())
-			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-		} else {
-			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
-		}
+				assert.Equal(t, Hash(expectedHash), hash)
+				assert.Equal(t, test.hash, hash.String())
+				assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+			} else {
+				assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
+			}
+		})
 	}
 }

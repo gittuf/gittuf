@@ -11,6 +11,7 @@ import (
 )
 
 func TestRepositoryReadBlob(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -25,17 +26,20 @@ func TestRepositoryReadBlob(t *testing.T) {
 	assert.Equal(t, expectedBlobID, blobID)
 
 	t.Run("read existing blob", func(t *testing.T) {
+		t.Parallel()
 		readContents, err := repo.ReadBlob(blobID)
 		assert.Nil(t, err)
 		assert.Equal(t, contents, readContents)
 	})
 
 	t.Run("read non-existing blob", func(t *testing.T) {
+		t.Parallel()
 		_, err := repo.ReadBlob(ZeroHash)
 		assert.ErrorContains(t, err, "unable to inspect if object is blob")
 	})
 
 	t.Run("read non-blob object", func(t *testing.T) {
+		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
@@ -46,6 +50,7 @@ func TestRepositoryReadBlob(t *testing.T) {
 }
 
 func TestRepositoryWriteBlob(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 

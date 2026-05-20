@@ -11,6 +11,7 @@ import (
 )
 
 func TestGetGitConfig(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -22,7 +23,9 @@ func TestGetGitConfig(t *testing.T) {
 }
 
 func TestSetGitConfig(t *testing.T) {
+	t.Parallel()
 	t.Run("basic sets", func(t *testing.T) {
+		t.Parallel()
 		const name = "John Doe"
 		const email = "john.doe@example.com"
 
@@ -40,6 +43,7 @@ func TestSetGitConfig(t *testing.T) {
 		assert.Equal(t, email, config["user.email"])
 	})
 	t.Run("empty set", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -54,6 +58,7 @@ func TestSetGitConfig(t *testing.T) {
 		assert.Equal(t, "", config["user.email"])
 	})
 	t.Run("gpg.format special case", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -73,6 +78,7 @@ func TestSetGitConfig(t *testing.T) {
 	})
 
 	t.Run("invalid key", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 

@@ -13,6 +13,7 @@ import (
 )
 
 func TestGetReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -34,6 +35,7 @@ func TestGetReference(t *testing.T) {
 }
 
 func TestSetReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -73,6 +75,7 @@ func TestSetReference(t *testing.T) {
 }
 
 func TestCheckAndSetReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -115,6 +118,7 @@ func TestCheckAndSetReference(t *testing.T) {
 }
 
 func TestGetSymbolicReferenceTarget(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -137,6 +141,7 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 }
 
 func TestSetSymbolicReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -165,6 +170,7 @@ func TestSetSymbolicReference(t *testing.T) {
 }
 
 func TestRepositoryRefSpec(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -305,9 +311,14 @@ func TestRepositoryRefSpec(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		refSpec, err := test.repo.RefSpec(test.refName, test.remoteName, test.fastForwardOnly)
-		assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
-		assert.Equal(t, test.expectedRefSpec, refSpec, fmt.Sprintf("unexpected refspec returned in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			refSpec, err := test.repo.RefSpec(test.refName, test.remoteName, test.fastForwardOnly)
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
+			assert.Equal(t, test.expectedRefSpec, refSpec, fmt.Sprintf("unexpected refspec returned in test '%s'", name))
+		})
 	}
 
 	t.Run("nonexistent ref", func(t *testing.T) {
@@ -317,6 +328,7 @@ func TestRepositoryRefSpec(t *testing.T) {
 }
 
 func TestBranchReferenceName(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		branchName            string
 		expectedReferenceName string
@@ -332,12 +344,18 @@ func TestBranchReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := BranchReferenceName(test.branchName)
-		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected branch reference received in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			referenceName := BranchReferenceName(test.branchName)
+			assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected branch reference received in test '%s'", name))
+		})
 	}
 }
 
 func TestTagReferenceName(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		tagName               string
 		expectedReferenceName string
@@ -353,12 +371,18 @@ func TestTagReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := TagReferenceName(test.tagName)
-		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			referenceName := TagReferenceName(test.tagName)
+			assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
+		})
 	}
 }
 
 func TestDeleteReference(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -392,6 +416,7 @@ func TestDeleteReference(t *testing.T) {
 }
 
 func TestRemoteReferenceName(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		input    string
 		expected string
@@ -415,12 +440,18 @@ func TestRemoteReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := RemoteReferenceName(test.input)
-		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			referenceName := RemoteReferenceName(test.input)
+			assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+		})
 	}
 }
 
 func TestAbsoluteReference(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 	treeBuilder := NewTreeBuilder(repo)

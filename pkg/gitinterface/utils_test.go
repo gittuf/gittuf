@@ -10,6 +10,7 @@ import (
 )
 
 func TestResetDueToError(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -21,12 +22,14 @@ func TestResetDueToError(t *testing.T) {
 	require.Nil(t, err)
 
 	t.Run("successful reset", func(t *testing.T) {
+		t.Parallel()
 		cause := assert.AnError
 		err := repo.ResetDueToError(cause, "refs/heads/main", commitID)
 		assert.ErrorIs(t, err, cause)
 	})
 
 	t.Run("invalid ref name", func(t *testing.T) {
+		t.Parallel()
 		cause := assert.AnError
 		err := repo.ResetDueToError(cause, "invalid ref with spaces", commitID)
 		assert.ErrorContains(t, err, "unable to reset")
