@@ -15,6 +15,7 @@ import (
 )
 
 func TestLoadCurrentAttestations(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
@@ -31,6 +32,8 @@ func TestLoadCurrentAttestations(t *testing.T) {
 	}
 
 	t.Run("no RSL entry", func(t *testing.T) {
+		t.Parallel()
+
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -40,6 +43,8 @@ func TestLoadCurrentAttestations(t *testing.T) {
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
+		t.Parallel()
+
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -62,6 +67,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 }
 
 func TestLoadAttestationsForEntry(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
@@ -78,6 +84,8 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 	}
 
 	t.Run("with RSL entry and no an attestation", func(t *testing.T) {
+		t.Parallel()
+
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -99,6 +107,8 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 	})
 
 	t.Run("with RSL entry and with an attestation", func(t *testing.T) {
+		t.Parallel()
+
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
@@ -126,6 +136,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 }
 
 func TestAttestationsCommit(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 	testAttestation, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
