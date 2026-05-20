@@ -74,6 +74,8 @@ func TestCanSign(t *testing.T) {
 	}
 
 	for name, test := range tests {
+		name := name
+		test := test
 		t.Run(name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			repo := setupRepository(t, tmpDir, false) // explicitly not using CreateTestGitRepository as that includes signing configurations
@@ -91,7 +93,9 @@ func TestCanSign(t *testing.T) {
 }
 
 func TestVerifySignature(t *testing.T) {
+	t.Parallel()
 	t.Run("not a commit or a tag", func(t *testing.T) {
+		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
