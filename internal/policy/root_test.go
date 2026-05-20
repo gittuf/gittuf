@@ -13,6 +13,8 @@ import (
 )
 
 func TestInitializeRootMetadata(t *testing.T) {
+	t.Parallel()
+
 	key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 
 	rootMetadata, err := InitializeRootMetadata(key)
