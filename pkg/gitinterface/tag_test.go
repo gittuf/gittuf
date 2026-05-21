@@ -95,20 +95,20 @@ func TestRepositoryVerifyTag(t *testing.T) {
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
 		t.Parallel()
-		err = repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
+		err := repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
 		t.Parallel()
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
+		err := repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		t.Parallel()
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
+		err := repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
 		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
 	})
 }
