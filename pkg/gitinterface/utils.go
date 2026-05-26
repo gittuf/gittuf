@@ -6,7 +6,6 @@ package gitinterface
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 	"testing"
@@ -68,31 +67,6 @@ func (r *Repository) RestoreWorktree(t *testing.T) {
 	if _, err := r.executor("restore", ".").executeString(); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// IsNiceGitVersion determines whether the version of git is "nice". Certain Git
-// subcommands that gittuf uses were added in newer versions than some common
-// client versions. Instead of using a workaround for all clients, we determine
-// if we can use the newer features or instead need to use workarounds.
-func isNiceGitVersion() (bool, error) {
-	cmd := exec.Command("git", "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		return false, err
-	}
-
-	versionString := strings.TrimPrefix(strings.TrimSpace(string(output)), "git version ")
-
-	var major, minor, patch int
-	_, err = fmt.Sscanf(versionString, "%d.%d.%d", &major, &minor, &patch)
-	if err != nil {
-		return false, err
-	}
-
-	if major >= 2 && minor >= 38 {
-		return true, nil
-	}
-	return false, nil
 }
 
 func testNameToRefName(testName string) string {
