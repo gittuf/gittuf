@@ -6,6 +6,7 @@ package v02
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -18,6 +19,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,6 +58,16 @@ func TestRootMetadata(t *testing.T) {
 	t.Run("test GetSchemaVersion", func(t *testing.T) {
 		schemaVersion := rootMetadata.GetSchemaVersion()
 		assert.Equal(t, RootVersion, schemaVersion)
+	})
+
+	t.Run("test GetVersion and IncrementVersion", func(t *testing.T) {
+		version := rootMetadata.GetVersion()
+		assert.Equal(t, uint64(1), version)
+
+		rootMetadata.IncrementVersion()
+
+		version = rootMetadata.GetVersion()
+		assert.Equal(t, uint64(2), version)
 	})
 
 	t.Run("test GetPrincipals", func(t *testing.T) {
@@ -132,6 +144,12 @@ func TestRootMetadata(t *testing.T) {
 		isController := rootMetadata.IsController()
 		assert.False(t, isController)
 
+		controllers := rootMetadata.GetControllerRepositories()
+		assert.Nil(t, controllers)
+
+		networkRepositories := rootMetadata.GetNetworkRepositories()
+		assert.Nil(t, networkRepositories)
+
 		name := "test"
 		location := "http://git.example.com/repository"
 		initialRootPrincipals := []tuf.Principal{key, person}
@@ -169,6 +187,9 @@ func TestRootMetadata(t *testing.T) {
 		err = rootMetadata.EnableController()
 		assert.Nil(t, err)
 
+		isController = rootMetadata.IsController()
+		assert.True(t, isController)
+
 		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
 		assert.Nil(t, err)
 
@@ -193,7 +214,7 @@ func TestRootMetadata(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.NetworkRepositories))
 
-		networkRepositories := rootMetadata.GetNetworkRepositories()
+		networkRepositories = rootMetadata.GetNetworkRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, networkRepositories)
 
 		err = rootMetadata.DisableController()
@@ -204,7 +225,7 @@ func TestRootMetadata(t *testing.T) {
 	})
 }
 
-func TestRootMetadataWithSSHKey(t *testing.T) {
+func TestRootMetadataUnmarshalling(t *testing.T) {
 	// Setup test key pair
 	keys := []struct {
 		name string
@@ -230,6 +251,27 @@ func TestRootMetadataWithSSHKey(t *testing.T) {
 	// Create TUF root and add test key
 	rootMetadata := NewRootMetadata()
 	if err := rootMetadata.addPrincipal(sslibKey); err != nil {
+		t.Fatal(err)
+	}
+
+	globalRuleThreshold := tufv01.NewGlobalRuleThreshold("gr-threshold", []string{"git:refs/heads/main"}, 1)
+
+	if err := rootMetadata.AddGlobalRule(globalRuleThreshold); err != nil {
+		t.Fatal(err)
+	}
+
+	globalRuleBlockForcePushes, err := tufv01.NewGlobalRuleBlockForcePushes("gr-blockforcepushes", []string{"git:refs/heads/main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddGlobalRule(globalRuleBlockForcePushes); err != nil {
+		t.Fatal(err)
+	}
+
+	propagationDirective := NewPropagationDirective("pd", "upstream", "main", "example.com", "main", "example.com")
+
+	if err := rootMetadata.AddPropagationDirective(propagationDirective); err != nil {
 		t.Fatal(err)
 	}
 
@@ -317,6 +359,14 @@ func TestAddRootPrincipal(t *testing.T) {
 		assert.Equal(t, person, rootMetadata.Principals[person.PersonID])
 		assert.Equal(t, set.NewSetFromItems(person.PersonID, key.KeyID), rootMetadata.Roles[tuf.RootRoleName].PrincipalIDs)
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		rootMetadata := initialTestRootMetadata(t)
+
+		// Test nil principal check
+		err := rootMetadata.AddRootPrincipal(nil)
+		assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+	})
 }
 
 func TestDeleteRootPrincipal(t *testing.T) {
@@ -350,6 +400,14 @@ func TestDeleteRootPrincipal(t *testing.T) {
 
 	err = rootMetadata.DeleteRootPrincipal(key.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+
+		// Test non-existent root role check
+		err := rootMetadata.DeleteRootPrincipal("")
+		assert.ErrorIs(t, err, tuf.ErrInvalidRootMetadata)
+	})
 }
 
 func TestAddPrimaryRuleFilePrincipal(t *testing.T) {
@@ -415,6 +473,14 @@ func TestDeletePrimaryRuleFilePrincipal(t *testing.T) {
 
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey2.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+
+		// Test non-existent primary rule file info check
+		err := rootMetadata.DeletePrimaryRuleFilePrincipal("bob")
+		assert.ErrorIs(t, err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot)
+	})
 }
 
 func TestAddGitHubAppPrincipal(t *testing.T) {
@@ -433,6 +499,10 @@ func TestAddGitHubAppPrincipal(t *testing.T) {
 
 func TestDeleteGitHubAppPrincipal(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
+
+	// Cover nil check
+	rootMetadata.DeleteGitHubAppPrincipal("")
+	assert.Nil(t, rootMetadata.GitHubApps)
 
 	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
@@ -470,6 +540,24 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 
 	rootMetadata.DisableGitHubAppApprovals(appName)
 	assert.False(t, rootMetadata.GitHubApps[appName].Trusted)
+}
+
+func TestGetGitHubAppEntries(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+
+	entries, err := rootMetadata.GetGitHubAppEntries()
+	assert.Nil(t, err)
+	assert.Nil(t, entries)
+
+	appName := "github-app"
+	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	err = rootMetadata.AddGitHubAppPrincipal(appName, appKey)
+	require.Nil(t, err)
+
+	entries, err = rootMetadata.GetGitHubAppEntries()
+	assert.Nil(t, err)
+	assert.Len(t, entries, 1)
 }
 
 func TestUpdateAndGetRootThreshold(t *testing.T) {
@@ -661,6 +749,129 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 }
 
 func TestGlobalRules(t *testing.T) {
+	t.Run("matches", func(t *testing.T) {
+		tests := map[string]struct {
+			patterns []string
+			target   string
+			expected bool
+		}{
+			"full path, matches": {
+				patterns: []string{"foo"},
+				target:   "foo",
+				expected: true,
+			},
+			"artifact in directory, matches": {
+				patterns: []string{"foo/*"},
+				target:   "foo/bar",
+				expected: true,
+			},
+			"artifact in directory, does not match": {
+				patterns: []string{"foo/*.txt"},
+				target:   "foo/bar.tgz",
+				expected: false,
+			},
+			"artifact in directory, one pattern matches": {
+				patterns: []string{"foo/*.txt", "foo/*.tgz"},
+				target:   "foo/bar.tgz",
+				expected: true,
+			},
+			"artifact in subdirectory, matches": {
+				patterns: []string{"foo/*"},
+				target:   "foo/bar/foobar",
+				expected: true,
+			},
+			"artifact in subdirectory with specified extension, matches": {
+				patterns: []string{"foo/*.tgz"},
+				target:   "foo/bar/foobar.tgz",
+				expected: true,
+			},
+			"pattern with single character selector, matches": {
+				patterns: []string{"foo/?.tgz"},
+				target:   "foo/a.tgz",
+				expected: true,
+			},
+			"pattern with character sequence, matches": {
+				patterns: []string{"foo/[abc].tgz"},
+				target:   "foo/a.tgz",
+				expected: true,
+			},
+			"pattern with character sequence, does not match": {
+				patterns: []string{"foo/[abc].tgz"},
+				target:   "foo/x.tgz",
+				expected: false,
+			},
+			"pattern with negative character sequence, matches": {
+				patterns: []string{"foo/[!abc].tgz"},
+				target:   "foo/x.tgz",
+				expected: true,
+			},
+			"pattern with negative character sequence, does not match": {
+				patterns: []string{"foo/[!abc].tgz"},
+				target:   "foo/a.tgz",
+				expected: false,
+			},
+			"artifact in arbitrary directory, matches": {
+				patterns: []string{"*/*.txt"},
+				target:   "foo/bar/foobar.txt",
+				expected: true,
+			},
+			"artifact with specific name in arbitrary directory, matches": {
+				patterns: []string{"*/foobar.txt"},
+				target:   "foo/bar/foobar.txt",
+				expected: true,
+			},
+			"artifact with arbitrary subdirectories, matches": {
+				patterns: []string{"foo/*/foobar.txt"},
+				target:   "foo/bar/baz/foobar.txt",
+				expected: true,
+			},
+			"artifact in arbitrary directory, does not match": {
+				patterns: []string{"*.txt"},
+				target:   "foo/bar/foobar.txtfile",
+				expected: false,
+			},
+			"arbitrary directory, does not match": {
+				patterns: []string{"*_test"},
+				target:   "foo/bar_test/foobar",
+				expected: false,
+			},
+			"no patterns": {
+				patterns: nil,
+				target:   "foo",
+				expected: false,
+			},
+			"pattern with multiple consecutive wildcards, matches": {
+				patterns: []string{"foo/*/*/*.txt"},
+				target:   "foo/bar/baz/qux.txt",
+				expected: true,
+			},
+			"pattern with multiple non-consecutive wildcards, matches": {
+				patterns: []string{"foo/*/baz/*.txt"},
+				target:   "foo/bar/baz/qux.txt",
+				expected: true,
+			},
+			"pattern with gittuf git prefix, matches": {
+				patterns: []string{"git:refs/heads/*"},
+				target:   "git:refs/heads/main",
+				expected: true,
+			},
+			"pattern with gittuf file prefix for all recursive contents, matches": {
+				patterns: []string{"file:src/signatures/*"},
+				target:   "file:src/signatures/rsa/rsa.go",
+				expected: true,
+			},
+		}
+
+		for name, test := range tests {
+			thresholdRule := GlobalRuleThreshold{Paths: test.patterns}
+			blockForcePushesRule := GlobalRuleBlockForcePushes{Paths: test.patterns}
+			got := thresholdRule.Matches(test.target)
+			assert.Equal(t, test.expected, got, fmt.Sprintf("unexpected result in test '%s'", name))
+			got = blockForcePushesRule.Matches(test.target)
+			assert.Equal(t, test.expected, got, fmt.Sprintf("unexpected result in test '%s'", name))
+		}
+	})
+
 	rootMetadata := initialTestRootMetadata(t)
 
 	assert.Nil(t, rootMetadata.GlobalRules) // no global rule yet
@@ -802,34 +1013,15 @@ func TestAddHookAndGetHooks(t *testing.T) {
 	assert.Equal(t, 1, len((prePushHooks)))
 }
 
-func TestRemoveHook(t *testing.T) {
-	rootMetadata := initialTestRootMetadata(t)
-
-	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
-
-	_, err := rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
-	require.Nil(t, err)
-	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
-
-	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
-	require.Nil(t, err)
-	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
-
-	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook")
-	assert.Nil(t, err)
-	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
-
-	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook")
-	assert.Nil(t, err)
-	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
-}
-
 func TestUpdateHook(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
+	err := rootMetadata.UpdateHook(nil, "", nil, nil, tuf.HookEnvironmentLua, 0)
+	assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
+
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	_, err := rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
 	require.Nil(t, err)
 	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
 
@@ -840,6 +1032,9 @@ func TestUpdateHook(t *testing.T) {
 	err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": "newhash"}, tuf.HookEnvironmentLua, 200)
 	require.Nil(t, err)
 	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	err = rootMetadata.UpdateHook([]tuf.HookStage{tuf.HookStagePreCommit}, "nonexistent-hook", []string{key.KeyID}, map[string]string{"sha1": "newhash"}, tuf.HookEnvironmentLua, 200)
+	assert.ErrorIs(t, err, tuf.ErrHookNotFound)
 
 	preCommitHook := rootMetadata.Hooks[tuf.HookStagePreCommit][0]
 	assert.Equal(t, "test-hook", preCommitHook.Name)
@@ -858,4 +1053,38 @@ func TestUpdateHook(t *testing.T) {
 	assert.Equal(t, map[string]string{"sha1": gitinterface.ZeroHash.String(), "sha256": "anotherhash"}, prePushHook.Hashes)
 	assert.Equal(t, tuf.HookEnvironmentLua, prePushHook.Environment)
 	assert.Equal(t, 150, prePushHook.Timeout)
+}
+
+func TestRemoveHook(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+
+	err := rootMetadata.RemoveHook(nil, "")
+	assert.ErrorIs(t, err, tuf.ErrNoHooksDefined)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	// Add additional hook to test hook search loop later
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook-2", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	require.Nil(t, err)
+	assert.Equal(t, 2, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	_, err = rootMetadata.AddHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook", []string{key.KeyID}, map[string]string{"sha1": gitinterface.ZeroHash.String()}, tuf.HookEnvironmentLua, 100)
+	require.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
+
+	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook")
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook-2")
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePreCommit]))
+
+	err = rootMetadata.RemoveHook([]tuf.HookStage{tuf.HookStagePrePush}, "test-hook")
+	assert.Nil(t, err)
+	assert.Equal(t, 0, len(rootMetadata.Hooks[tuf.HookStagePrePush]))
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,6 +57,21 @@ func TestInitializeTargets(t *testing.T) {
 
 		err := r.InitializeTargets(testCtx, targetsSigner, policy.RootRoleName, false)
 		assert.ErrorIs(t, err, ErrInvalidPolicyName)
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
 
@@ -123,6 +139,21 @@ func TestAddDelegation(t *testing.T) {
 		err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, policy.RootRoleName, nil, nil, 1, false)
 		assert.ErrorIs(t, err, ErrInvalidPolicyName)
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "", nil, nil, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestUpdateDelegation(t *testing.T) {
@@ -163,6 +194,21 @@ func TestUpdateDelegation(t *testing.T) {
 		Paths:       []string{"git:refs/heads/main"},
 		Terminating: false,
 		Role:        tufv02.Role{PrincipalIDs: set.NewSetFromItems(gpgKey.KeyID, targetsKey.KeyID), Threshold: 1},
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdateDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID, targetsKey.KeyID}, []string{"git:refs/heads/main"}, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
 
@@ -210,6 +256,21 @@ func TestReorderDelegations(t *testing.T) {
 	expectedFinalOrder := append([]string{}, newOrder...)
 	expectedFinalOrder = append(expectedFinalOrder, tuf.AllowRuleName)
 	assert.Equal(t, expectedFinalOrder, finalOrder)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ReorderDelegations(testCtx, targetsSigner, policy.TargetsRoleName, newOrder, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestRemoveDelegation(t *testing.T) {
@@ -265,6 +326,21 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
 	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestAddPrincipalToTargets(t *testing.T) {
@@ -305,6 +381,21 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestUpdatePrincipalInTargets(t *testing.T) {
@@ -361,6 +452,21 @@ func TestUpdatePrincipalInTargets(t *testing.T) {
 
 	assert.Equal(t, targetsMetadata.GetPrincipals()["jane.doe"], person)
 	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdatePrincipalInTargets(testCtx, targetsSigner, policy.TargetsRoleName, person, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestRemovePrincipalFromTargets(t *testing.T) {
@@ -407,6 +513,21 @@ func TestRemovePrincipalFromTargets(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(targetsMetadata.GetPrincipals()))
 	assert.Contains(t, targetsMetadata.GetPrincipals(), gpgKey.KeyID)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RemovePrincipalFromTargets(testCtx, targetsSigner, policy.TargetsRoleName, targetsPubKey.ID(), true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestSignTargets(t *testing.T) {
@@ -433,6 +554,21 @@ func TestSignTargets(t *testing.T) {
 	}
 
 	assert.Equal(t, 2, len(state.Metadata.TargetsEnvelope.Signatures))
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.SignTargets(testCtx, rootSigner, policy.TargetsRoleName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestIncrementTargetsVersion(t *testing.T) {
@@ -465,4 +601,19 @@ func TestIncrementTargetsVersion(t *testing.T) {
 	// Check that the metadata is the same except for the version number
 	newTargetsMetadata.(*tufv02.TargetsMetadata).Version = oldTargetsMetadata.GetVersion()
 	assert.Equal(t, oldTargetsMetadata, newTargetsMetadata)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.IncrementTargetsVersion(testCtx, targetsSigner, policy.TargetsRoleName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }

@@ -15,6 +15,12 @@ import (
 )
 
 func TestLoadRepository(t *testing.T) {
+	t.Run("load with no repo specified, unsuccessful", func(t *testing.T) {
+		repository, err := LoadRepository("")
+		assert.ErrorIs(t, err, gitinterface.ErrRepositoryPathNotSpecified)
+		assert.Nil(t, repository)
+	})
+
 	t.Run("load with no repo, unsuccessful", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()

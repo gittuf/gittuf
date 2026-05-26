@@ -23,6 +23,21 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Equal(t, "1995-10-26T09:00:00Z", targetsMetadata.Expires)
 	})
 
+	t.Run("test GetSchemaVersion", func(t *testing.T) {
+		version := targetsMetadata.GetSchemaVersion()
+		assert.Equal(t, "http://gittuf.dev/policy/rule-file/v0.2", version)
+	})
+
+	t.Run("test GetVersion and IncrementVersion", func(t *testing.T) {
+		version := targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(1), version)
+
+		targetsMetadata.IncrementVersion()
+
+		version = targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(2), version)
+	})
+
 	t.Run("test Validate", func(t *testing.T) {
 		err := targetsMetadata.Validate()
 		assert.Nil(t, err)
@@ -286,6 +301,26 @@ func TestAddRuleAndGetRules(t *testing.T) {
 	rules := targetsMetadata.GetRules()
 	assert.Equal(t, 2, len(rules))
 	assert.Equal(t, []tuf.Rule{rule, AllowRule()}, rules)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.AddRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"), nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		// Test non-existent principal
+		err = targetsMetadata.AddRule(("rule"), []string{"bob"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test insufficient principals for threshold
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.AddRule(("rule"), []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
 }
 
 func TestUpdateDelegation(t *testing.T) {
@@ -330,6 +365,26 @@ func TestUpdateDelegation(t *testing.T) {
 		Terminating: false,
 		Role:        Role{PrincipalIDs: set.NewSetFromItems(key1.KeyID, key2.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.UpdateRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"), nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		// Test non-existent principal
+		err = targetsMetadata.UpdateRule(("rule"), []string{"bob"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test insufficient principals for threshold
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.UpdateRule(("rule"), []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
 }
 
 func TestReorderRules(t *testing.T) {
@@ -429,6 +484,14 @@ func TestRemoveRule(t *testing.T) {
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.RemoveRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"))
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+	})
 }
 
 func TestUpdatePrincipal(t *testing.T) {

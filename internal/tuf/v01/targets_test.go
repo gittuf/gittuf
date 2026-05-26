@@ -23,6 +23,21 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Equal(t, "1995-10-26T09:00:00Z", targetsMetadata.Expires)
 	})
 
+	t.Run("test GetSchemaVersion", func(t *testing.T) {
+		version := targetsMetadata.GetSchemaVersion()
+		assert.Equal(t, "http://gittuf.dev/policy/rule-file/v0.1", version)
+	})
+
+	t.Run("test GetVersion and IncrementVersion", func(t *testing.T) {
+		version := targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(1), version)
+
+		targetsMetadata.IncrementVersion()
+
+		version = targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(2), version)
+	})
+
 	t.Run("test Validate", func(t *testing.T) {
 		err := targetsMetadata.Validate()
 		assert.Nil(t, err)

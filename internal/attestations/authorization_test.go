@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetReferenceAuthorization(t *testing.T) {
@@ -52,6 +53,26 @@ func TestSetReferenceAuthorization(t *testing.T) {
 		err := attestations.SetReferenceAuthorization(repo, tagApproval, tagRef, testID, testID)
 		assert.Nil(t, err)
 		assert.Contains(t, attestations.referenceAuthorizations, ReferenceAuthorizationPath(tagRef, testID, testID))
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		attestations := &Attestations{}
+
+		// Test invalid base64
+		garbageEnv := &sslibdsse.Envelope{
+			PayloadType: "invalid",
+			Payload:     "invalid",
+			Signatures:  nil,
+		}
+		err := attestations.SetReferenceAuthorization(nil, garbageEnv, "", "", "")
+		assert.ErrorContains(t, err, "unable to base64 decode payload (is payload in the right format?)")
+
+		// Test invalid JSON data
+		garbageEnv, err = dsse.CreateEnvelope("invalid")
+		require.Nil(t, err)
+
+		err = attestations.SetReferenceAuthorization(nil, garbageEnv, "", "", "")
+		assert.ErrorContains(t, err, "json: cannot unmarshal string into Go value of type map[string]interface {}")
 	})
 }
 
