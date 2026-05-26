@@ -4,16 +4,21 @@
 package gittuf
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
+	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -21,10 +26,14 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	gogithub "github.com/google/go-github/v61/github"
+	gogithubmock "github.com/migueleliasweb/go-github-mock/src/mock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplyAttestations(t *testing.T) {
+	remoteName := "origin"
 	testDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, testDir, false)
 	repo := &Repository{r: r}
@@ -78,6 +87,21 @@ func TestApplyAttestations(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Len(t, env.Signatures, 1)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ApplyAttestations(testCtx, remoteName, false, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
@@ -282,6 +306,486 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddReferenceAuthorization(testCtx, nil, "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		err = nr.RemoveReferenceAuthorization(testCtx, nil, "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test nonexistent target ref
+		err = nr.AddReferenceAuthorization(testCtx, nil, "nonexistent", "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		err = nr.RemoveReferenceAuthorization(testCtx, targetsSigner, "nonexistent", "", "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+	})
+}
+
+func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestAttestationForCommit(testCtx, nil, "", "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestAttestationForCommit(testCtx, nil, "", "", "", "", false)
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+
+	t.Setenv("GITTUF_DEV", "1")
+
+	t.Run("test mocked API", func(t *testing.T) {
+		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposCommitsPullsByOwnerByRepoByCommitSha,
+				[]gogithub.PullRequest{
+					{
+						ID: gogithub.Int64(1),
+						Base: &gogithub.PullRequestBranch{
+							Ref: gogithub.String("main"),
+							SHA: gogithub.String("a"),
+						},
+						MergedAt: &gogithub.Timestamp{
+							Time: time.Now(),
+						},
+					},
+				},
+			),
+		)
+
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		repo := &Repository{r: r}
+
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
+
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create feature branch with two Git commits
+		// Add two commits
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create signer
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = repo.AddGitHubPullRequestAttestationForCommit(context.Background(), signer, "exampleorg", "example", "aa", "main", false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		assert.Nil(t, err)
+
+		// TODO: Check attestation
+	})
+}
+
+func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, true, githubopts.WithMockedGitHubAPIClient(nil))
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, false, githubopts.WithMockedGitHubAPIClient(nil))
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+
+	t.Setenv("GITTUF_DEV", "1")
+
+	t.Run("test mocked API", func(t *testing.T) {
+		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
+				gogithub.PullRequest{
+					ID: gogithub.Int64(1),
+					Base: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("main"),
+						SHA: gogithub.String("a"),
+					},
+					MergedAt: &gogithub.Timestamp{
+						Time: time.Now(),
+					},
+				},
+			),
+		)
+
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		repo := &Repository{r: r}
+
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
+
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create feature branch with two Git commits
+		// Add two commits
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create signer
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = repo.AddGitHubPullRequestAttestationForNumber(context.Background(), signer, "exampleorg", "example", 1, false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		assert.Nil(t, err)
+
+		// TODO: Check attestation
+	})
+}
+
+func TestAddGitHubPullRequestApprover(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestApprover(testCtx, nil, "", "", 1, 1, "", true, githubopts.WithMockedGitHubAPIClient(nil))
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestApprover(testCtx, targetsSigner, "", "", 1, 1, "", false, githubopts.WithMockedGitHubAPIClient(nil))
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+
+	t.Setenv("GITTUF_DEV", "1")
+
+	t.Run("test mocked API", func(t *testing.T) {
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		repo := &Repository{r: r}
+
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
+
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create feature branch with two Git commits
+		// Add two commits
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
+		featureHeadCommitID := featureCommitIDs[1]
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		pr := gogithub.PullRequest{
+			ID: gogithub.Int64(1),
+			Base: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("main"),
+				SHA: gogithub.String(initialCommitID.String()),
+			},
+			Head: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("feature"),
+				SHA: gogithub.String(featureHeadCommitID.String()),
+				Repo: &gogithub.Repository{
+					CloneURL: gogithub.String(testDir),
+				},
+			},
+			MergedAt: &gogithub.Timestamp{
+				Time: time.Now(),
+			},
+		}
+
+		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
+				pr, pr,
+			),
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
+				gogithub.PullRequestReview{},
+			),
+		)
+
+		// Create signer
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = repo.AddGitHubPullRequestAttestationForNumber(context.Background(), signer, "exampleorg", "example", 1, false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		assert.Nil(t, err)
+
+		err = repo.AddGitHubPullRequestApprover(context.Background(), signer, "exampleorg", "example", 1, 123, "bob", false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		assert.Nil(t, err)
+
+		// TODO: Check attestation
+	})
+}
+
+func TestDismissGitHubPullRequestApprover(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.DismissGitHubPullRequestApprover(testCtx, nil, 1, "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent review
+		err = nr.DismissGitHubPullRequestApprover(testCtx, targetsSigner, 1, "", false)
+		assert.ErrorIs(t, err, github.ErrGitHubReviewIDNotFound)
+	})
+
+	t.Setenv("GITTUF_DEV", "1")
+
+	t.Run("test mocked API", func(t *testing.T) {
+		testDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, testDir, false)
+
+		// We need to change the directory for this test because we `checkout`
+		// for older Git versions, modifying the worktree. This chdir ensures
+		// that the temporary directory is used as the worktree.
+		pwd, err := os.Getwd()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(testDir); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Chdir(pwd) //nolint:errcheck
+
+		repo := &Repository{r: r}
+
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
+
+		// Create common base for main and feature branches
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := repo.r.Commit(emptyTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		_ = common.AddNTestCommitsToSpecifiedRef(t, r, absTargetRef, 1, gpgKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create feature branch with two Git commits
+		// Add two commits
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, r, absFeatureRef, 2, gpgKeyBytes)
+		featureHeadCommitID := featureCommitIDs[1]
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
+				gogithub.PullRequest{
+					ID: gogithub.Int64(1),
+					Base: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("main"),
+						SHA: gogithub.String(initialCommitID.String()),
+					},
+					Head: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("feature"),
+						SHA: gogithub.String(featureHeadCommitID.String()),
+					},
+					MergedAt: &gogithub.Timestamp{
+						Time: time.Now(),
+					},
+				},
+				gogithub.PullRequest{
+					ID: gogithub.Int64(1),
+					Base: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("main"),
+						SHA: gogithub.String(initialCommitID.String()),
+					},
+					Head: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("feature"),
+						SHA: gogithub.String(featureHeadCommitID.String()),
+					},
+					MergedAt: &gogithub.Timestamp{
+						Time: time.Now(),
+					},
+				},
+			),
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
+				gogithub.PullRequestReview{
+					ID: gogithub.Int64(123),
+				},
+			),
+		)
+
+		// Create signer
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err = repo.AddGitHubPullRequestAttestationForNumber(context.Background(), signer, "exampleorg", "example", 1, false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		require.Nil(t, err)
+
+		err = repo.AddGitHubPullRequestApprover(context.Background(), signer, "exampleorg", "example", 1, 123, "bob", false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		require.Nil(t, err)
+
+		err = repo.ApplyAttestations(testCtx, "", true, false)
+		assert.Nil(t, err)
+
+		err = repo.DismissGitHubPullRequestApprover(context.Background(), signer, 123, "bob", false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient))
+		require.Nil(t, err)
+
+		// TODO: Check attestation
+	})
 }
 
 func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
@@ -408,4 +912,49 @@ func TestIndexPathToComponents(t *testing.T) {
 		assert.Equal(t, test.from, from, fmt.Sprintf("unexpected 'from' in test '%s'", name))
 		assert.Equal(t, test.to, to, fmt.Sprintf("unexpected 'to' in test '%s'", name))
 	}
+}
+
+func TestGetGitHubClient(t *testing.T) {
+	t.Run("default baseURL keeps github.com endpoints", func(t *testing.T) {
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		// Default go-github BaseURL is api.github.com
+		assert.Equal(t, "https://api.github.com/", client.BaseURL.String())
+		assert.Equal(t, "https://uploads.github.com/", client.UploadURL.String())
+	})
+
+	t.Run("enterprise baseURL gets /api/v3 and /api/uploads paths", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.acme.internal", "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.acme.internal/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("trailing slash in baseURL is normalized", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.acme.internal/", "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		// Should produce the same paths as the no-trailing-slash case
+		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.acme.internal/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("invalid baseURL returns error", func(t *testing.T) {
+		_, err := getGitHubClient("://no-scheme", "test-token")
+		var urlErr *url.Error
+		assert.ErrorAs(t, err, &urlErr)
+	})
+
+	t.Run("empty token still produces a usable client", func(t *testing.T) {
+		// getGitHubClient itself doesn't enforce non-empty token;
+		// callers do (via ErrNoGitHubToken). This documents that behavior.
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+	})
 }
