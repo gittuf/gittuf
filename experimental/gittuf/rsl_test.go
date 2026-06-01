@@ -123,6 +123,70 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.NotEqual(t, currentEntryID, entry.GetID())
 	assert.Equal(t, newCommitID, entry.TargetID)
 	assert.Equal(t, "refs/heads/not-main", entry.RefName)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false)
+	assert.ErrorIs(t, err, ErrRemoteNotSpecified)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordRemote("origin"), rslopts.WithRecordLocalOnly())
+	assert.ErrorIs(t, err, ErrCannotUseRemoteAndLocalOnly)
+
+	t.Run("sync with remote", func(t *testing.T) {
+		remoteName := "origin"
+		refName := "refs/heads/main"
+
+		remoteTmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		err = remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly())
+		assert.Nil(t, err)
+
+		localTmpDir := t.TempDir()
+		localR, err := gitinterface.CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		blobID, err := localR.WriteBlob([]byte("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		localTreeBuilder := gitinterface.NewTreeBuilder(localR)
+		treeID, err := localTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("test.txt", blobID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommitID, err := localR.Commit(treeID, refName, "Local commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordRemote(remoteName))
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(remoteR, rsl.ForReference(refName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, refName, entry.GetRefName())
+		assert.Equal(t, newCommitID, entry.GetTargetID())
+	})
 }
 
 func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
