@@ -4,6 +4,7 @@
 package v02
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -76,6 +77,48 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.False(t, exists)
 
 		assert.Empty(t, delegations.Principals)
+	})
+}
+
+func TestDelegationsUnmarshalJSON(t *testing.T) {
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	person := &Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*Key{key.KeyID: key},
+	}
+
+	t.Run("key and person principals", func(t *testing.T) {
+		delegations := &Delegations{
+			Principals: map[string]tuf.Principal{
+				key.KeyID:       key,
+				person.PersonID: person,
+			},
+			Roles: []*Delegation{AllowRule()},
+		}
+
+		data, err := json.Marshal(delegations)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got := &Delegations{}
+		err = json.Unmarshal(data, got)
+		assert.Nil(t, err)
+		assert.Equal(t, delegations, got)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := json.Unmarshal([]byte(`{`), delegations)
+		assert.ErrorContains(t, err, "unexpected end of JSON input")
+	})
+
+	t.Run("unrecognized principal", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := json.Unmarshal([]byte(`{"principals":{"unknown":{"name":"unknown"}}}`), delegations)
+		assert.ErrorContains(t, err, "unrecognized principal type")
 	})
 }
 
