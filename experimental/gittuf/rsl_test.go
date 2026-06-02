@@ -717,6 +717,55 @@ func TestSync(t *testing.T) {
 		assert.Empty(t, divergedRefs)
 	})
 
+	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		if err := localR.RemoveRemote(remoteName); err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		_, err = localR.GetRemoteURL(fmt.Sprintf("check-remote-%s", remoteName))
+		assert.ErrorContains(t, err, "No such remote")
+
+		remoteURL, err := localR.GetRemoteURL(remoteName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, gittufTransportPrefix+tmpDir, remoteURL)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+	})
+
 	t.Run("local is strictly ahead of remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
