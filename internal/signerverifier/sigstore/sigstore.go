@@ -169,15 +169,14 @@ func (v *Verifier) ExpectedExtensionKind() string {
 }
 
 type Signer struct {
-	issuerURL     string
-	clientID      string
-	redirectURL   string
-	fulcioURL     string
-	rekorURL      string
-	token         string
-	idTokenGetter oauthflow.TokenGetter
-	fulcio        sign.CertificateProvider
-	rekor         sign.Transparency
+	issuerURL   string
+	clientID    string
+	redirectURL string
+	fulcioURL   string
+	rekorURL    string
+	token       string
+	fulcio      sign.CertificateProvider
+	rekor       sign.Transparency
 	*Verifier
 }
 
@@ -188,14 +187,13 @@ func NewSigner(opts ...signeropts.Option) *Signer {
 	}
 
 	return &Signer{
-		issuerURL:     options.IssuerURL,
-		clientID:      options.ClientID,
-		redirectURL:   options.RedirectURL,
-		fulcioURL:     options.FulcioURL,
-		rekorURL:      options.RekorURL,
-		idTokenGetter: options.IDTokenGetter,
-		fulcio:        options.Fulcio,
-		rekor:         options.Rekor,
+		issuerURL:   options.IssuerURL,
+		clientID:    options.ClientID,
+		redirectURL: options.RedirectURL,
+		fulcioURL:   options.FulcioURL,
+		rekorURL:    options.RekorURL,
+		fulcio:      options.Fulcio,
+		rekor:       options.Rekor,
 		Verifier: &Verifier{
 			rekorURL:    options.RekorURL,
 			trustedRoot: options.TrustedRoot,
@@ -283,13 +281,14 @@ func (s *Signer) MetadataKey() (*signerverifier.SSLibKey, error) {
 
 func (s *Signer) getIDToken() (string, error) {
 	if s.token == "" {
-		idTokenGetter := s.idTokenGetter
-		if idTokenGetter == nil {
-			idTokenGetter = oauthflow.DefaultIDTokenGetter
-		}
-
 		// TODO: support client secret?
-		token, err := oauthflow.OIDConnect(s.issuerURL, s.clientID, "", s.redirectURL, idTokenGetter)
+		token, err := oauthflow.OIDConnect(
+			s.issuerURL,
+			s.clientID,
+			"",
+			s.redirectURL,
+			oauthflow.DefaultIDTokenGetter,
+		)
 		if err != nil {
 			return "", err
 		}

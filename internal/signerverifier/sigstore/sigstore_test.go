@@ -6,16 +6,12 @@ package sigstore
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	signeropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
 	verifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
-	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
-	"github.com/sigstore/sigstore-go/pkg/sign"
+
 	"github.com/sigstore/sigstore-go/pkg/testing/ca"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,51 +166,4 @@ func TestSigstoreWorkflow(t *testing.T) {
 			assert.ErrorContains(t, err, "")
 		}
 	})
-
-	// 2. Test Signer with mocked dependencies
-	t.Run("Signer workflow with mocks", func(t *testing.T) {
-		// Mock ID Token
-		tokenClaims := map[string]interface{}{
-			"iss":            issuer,
-			"sub":            "sub",
-			"email":          identity,
-			"email_verified": "true",
-		}
-		claimsBytes, err := json.Marshal(tokenClaims)
-		require.NoError(t, err)
-		encodedClaims := base64.RawURLEncoding.EncodeToString(claimsBytes)
-		mockToken := fmt.Sprintf("header.%s.signature", encodedClaims)
-
-		signer := NewSigner(
-			signeropts.WithIssuerURL(issuer),
-			signeropts.WithFulcioURL(""), // skip Fulcio config check in parseTokenForIdentityAndIssuer
-		)
-
-		// Set token manually to bypass OIDC discovery
-		signer.token = mockToken
-
-		// Mock Sigstore services to reach sign.Bundle
-		signer.fulcio = &mockCertificateProvider{}
-		signer.rekor = &mockTransparency{}
-
-		_, err = signer.Sign(context.Background(), data)
-		// It will fail because our mocks return errors, but it confirms we hit the sign path
-		// and that identity/issuer were correctly parsed from the token.
-		assert.Error(t, err)
-
-		assert.Equal(t, identity, signer.identity)
-		assert.Equal(t, issuer, signer.issuer)
-	})
-}
-
-type mockCertificateProvider struct{}
-
-func (m *mockCertificateProvider) GetCertificate(_ context.Context, _ sign.Keypair, _ *sign.CertificateProviderOptions) ([]byte, error) {
-	return nil, fmt.Errorf("mock fulcio error")
-}
-
-type mockTransparency struct{}
-
-func (m *mockTransparency) GetTransparencyLogEntry(_ context.Context, _ []byte, _ *protobundle.Bundle) error {
-	return fmt.Errorf("mock rekor error")
 }

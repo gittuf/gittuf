@@ -6,7 +6,6 @@ package signer
 import (
 	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
-	"github.com/sigstore/sigstore/pkg/oauthflow"
 )
 
 const (
@@ -17,15 +16,16 @@ const (
 )
 
 type Options struct {
-	IssuerURL     string
-	ClientID      string
-	RedirectURL   string
-	FulcioURL     string
-	RekorURL      string
-	IDTokenGetter oauthflow.TokenGetter
-	Fulcio        sign.CertificateProvider
-	Rekor         sign.Transparency
-	TrustedRoot   root.TrustedMaterial
+	IssuerURL   string
+	ClientID    string
+	RedirectURL string
+	FulcioURL   string
+	RekorURL    string
+	// Fulcio overrides FulcioURL when provided.
+	Fulcio sign.CertificateProvider
+	// Rekor overrides RekorURL when provided.
+	Rekor       sign.Transparency
+	TrustedRoot root.TrustedMaterial
 }
 
 var DefaultOptions = &Options{
@@ -64,12 +64,6 @@ func WithFulcioURL(fulcioURL string) Option {
 func WithRekorURL(rekorURL string) Option {
 	return func(o *Options) {
 		o.RekorURL = rekorURL
-	}
-}
-
-func WithIDTokenGetter(idTokenGetter oauthflow.TokenGetter) Option {
-	return func(o *Options) {
-		o.IDTokenGetter = idTokenGetter
 	}
 }
 
