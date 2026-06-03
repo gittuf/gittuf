@@ -610,37 +610,28 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		pr := gogithub.PullRequest{
+			ID: gogithub.Int64(1),
+			Base: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("main"),
+				SHA: gogithub.String(initialCommitID.String()),
+			},
+			Head: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("feature"),
+				SHA: gogithub.String(featureHeadCommitID.String()),
+				Repo: &gogithub.Repository{
+					CloneURL: gogithub.String(testDir),
+				},
+			},
+			MergedAt: &gogithub.Timestamp{
+				Time: time.Now(),
+			},
+		}
+
 		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(initialCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-				},
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(initialCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-				},
+				pr, pr,
 			),
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
