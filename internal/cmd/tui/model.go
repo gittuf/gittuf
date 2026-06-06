@@ -22,16 +22,19 @@ import (
 type screen int
 
 const (
-	screenLoading             screen = iota // Loading screen shown on startup
-	screenChoice                            // Initial menu
-	screenPolicy                            // Menu for Policy operations
-	screenPolicyRules                       // Rule management screen
-	screenPolicyAddRule                     // Form: add a new policy rule
-	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
-	screenTrust                             // Menu for Trust operations
-	screenTrustGlobalRules                  // Global rule management screen
-	screenTrustAddGlobalRule                // Form: add a new global rule
-	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
+	screenLoading                       screen = iota // Loading screen shown on startup
+	screenChoice                                      // Initial menu
+	screenPolicy                                      // Menu for Policy operations
+	screenPolicyRules                                 // Rule management screen
+	screenPolicyAddRule                               // Form: add a new policy rule
+	screenPolicyEditRule                              // Form: edit selected rule (prefilled)
+	screenTrust                                       // Menu for Trust operations
+	screenTrustGlobalRules                            // Global rule management screen
+	screenTrustAddGlobalRule                          // Form: add a new global rule
+	screenTrustEditGlobalRule                         // Form: edit selected global rule (prefilled)
+	screenTrustPropagationDirectives                  // Propagation directive management screen
+	screenTrustAddPropagationDirective                // Form: add a new propagation directive
+	screenTrustEditPropagationDirective               // Form: edit selected propagation directive (prefilled)
 )
 
 type item struct {
@@ -49,39 +52,42 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx              context.Context
-	screen           screen
-	spinner          spinner.Model
-	choiceList       list.Model
-	policyScreenList list.Model
-	trustScreenList  list.Model
-	rules            []rule
-	ruleList         list.Model
-	globalRules      []globalRule
-	globalRuleList   list.Model
-	inputs           []textinput.Model
-	focusIndex       int
-	cursorMode       cursor.Mode
-	repo             *gittuf.Repository
-	signer           dsse.SignerVerifier
-	policyName       string
-	options          *options
-	footer           string
-	errorMsg         string
-	readOnly         bool
-	confirmDelete    bool
-	deleteTarget     string
+	ctx                   context.Context
+	screen                screen
+	spinner               spinner.Model
+	choiceList            list.Model
+	policyScreenList      list.Model
+	trustScreenList       list.Model
+	rules                 []rule
+	ruleList              list.Model
+	globalRules           []globalRule
+	globalRuleList        list.Model
+	propagationDirectives []propagationDirective
+	propagationList       list.Model
+	inputs                []textinput.Model
+	focusIndex            int
+	cursorMode            cursor.Mode
+	repo                  *gittuf.Repository
+	signer                dsse.SignerVerifier
+	policyName            string
+	options               *options
+	footer                string
+	errorMsg              string
+	readOnly              bool
+	confirmDelete         bool
+	deleteTarget          string
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
 type initDoneMsg struct {
-	repo        *gittuf.Repository
-	signer      dsse.SignerVerifier
-	rules       []rule
-	globalRules []globalRule
-	readOnly    bool
-	footer      string
-	err         error
+	repo                  *gittuf.Repository
+	signer                dsse.SignerVerifier
+	rules                 []rule
+	globalRules           []globalRule
+	propagationDirectives []propagationDirective
+	readOnly              bool
+	footer                string
+	err                   error
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -160,9 +166,11 @@ func initialModel(ctx context.Context, o *options) model {
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
+			item{title: "View Propagation Directives", desc: "View and manage propagation directives"},
 		}, delegate),
-		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
-		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		ruleList:        newMenuList("Policy Rules", []list.Item{}, delegate),
+		globalRuleList:  newMenuList("Global Rules", []list.Item{}, delegate),
+		propagationList: newMenuList("Propagation Directives", []list.Item{}, delegate),
 	}
 
 	return m
@@ -193,12 +201,13 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 		}
 
 		return initDoneMsg{
-			repo:        repo,
-			signer:      signer,
-			rules:       getCurrRules(ctx, o),
-			globalRules: getGlobalRules(ctx, o),
-			readOnly:    readOnly,
-			footer:      footer,
+			repo:                  repo,
+			signer:                signer,
+			rules:                 getCurrRules(ctx, o),
+			globalRules:           getGlobalRules(ctx, o),
+			propagationDirectives: getPropagationDirectives(ctx, o),
+			readOnly:              readOnly,
+			footer:                footer,
 		}
 	}
 }
@@ -286,4 +295,50 @@ func (m *model) updateGlobalRuleList() {
 		items[i] = item{title: gr.ruleName, desc: desc}
 	}
 	m.globalRuleList.SetItems(items)
+}
+
+// initPropagationInputs initializes the input fields for propagation directive forms.
+func (m *model) initPropagationInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Enter directive name", "Name:"},
+		{"Enter upstream repository URL or path", "From Repository:"},
+		{"Enter upstream reference (e.g. refs/heads/main)", "From Reference:"},
+		{"Enter upstream path (optional)", "From Path:"},
+		{"Enter downstream reference", "Into Reference:"},
+		{"Enter downstream path", "Into Path:"},
+	})
+	m.focusIndex = 0
+}
+
+// initPropagationInputsPrefilled initializes propagation inputs prefilled with existing values.
+func (m *model) initPropagationInputsPrefilled(pd propagationDirective) {
+	m.initPropagationInputs()
+	m.inputs[0].SetValue(pd.name)
+	m.inputs[1].SetValue(pd.upstreamRepository)
+	m.inputs[2].SetValue(pd.upstreamReference)
+	m.inputs[3].SetValue(pd.upstreamPath)
+	m.inputs[4].SetValue(pd.downstreamReference)
+	m.inputs[5].SetValue(pd.downstreamPath)
+}
+
+// refreshPropagationDirectives re-fetches propagation directives and rebuilds the list.
+func (m *model) refreshPropagationDirectives() {
+	m.propagationDirectives = getPropagationDirectives(m.ctx, m.options)
+	m.updatePropagationList()
+}
+
+// updatePropagationList updates the propagation directive list within the TUI.
+func (m *model) updatePropagationList() {
+	items := make([]list.Item, len(m.propagationDirectives))
+	for i, pd := range m.propagationDirectives {
+		desc := fmt.Sprintf(
+			"From: %s @ %s\nInto: %s at %s",
+			pd.upstreamRepository,
+			pd.upstreamReference,
+			pd.downstreamReference,
+			pd.downstreamPath,
+		)
+		items[i] = item{title: pd.name, desc: desc}
+	}
+	m.propagationList.SetItems(items)
 }
