@@ -28,7 +28,7 @@ jobs:
       with:
         drive-size: 4GB
         drive-format: ReFS
-        workspace-copy: true
+        workspace-copy: false
 
     - name: Configure Go cache on Dev Drive
       if: runner.os == 'Windows'
