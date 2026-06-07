@@ -39,6 +39,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	// in a previous test
 
 	t.Run("modify single file", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -65,6 +67,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("rename single file", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -91,6 +95,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("swap two files around", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0]), NewEntryBlob("b", blobIDs[1])})
 		if err != nil {
 			t.Fatal(err)
@@ -117,6 +123,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("create new file", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -143,6 +151,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("delete file", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0]), NewEntryBlob("b", blobIDs[1])})
 		if err != nil {
 			t.Fatal(err)
@@ -169,6 +179,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("modify file and create new file", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -195,6 +207,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("no parent", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -211,6 +225,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with commit matching parent", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -252,6 +268,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with no matching parent", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -298,6 +316,8 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
+		t.Parallel()
+		treeBuilder := NewTreeBuilder(repo)
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
 			t.Fatal(err)
@@ -344,6 +364,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	})
 
 	t.Run("non-commit object", func(t *testing.T) {
+		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 

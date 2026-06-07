@@ -22,20 +22,29 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       with:
         persist-credentials: false
+    - name: Setup Windows Dev Drive
+      if: runner.os == 'Windows'
+      uses: samypr100/setup-dev-drive@v3
+      with:
+        drive-size: 4GB
+        drive-format: ReFS
+        workspace-copy: true
+
+    - name: Configure Go cache on Dev Drive
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: |
+        New-Item -ItemType Directory -Force "${{ env.DEV_DRIVE }}\gopath"
+        New-Item -ItemType Directory -Force "${{ env.DEV_DRIVE }}\gocache"
+        echo "GOPATH=${{ env.DEV_DRIVE }}\gopath" >> $env:GITHUB_ENV
+        echo "GOCACHE=${{ env.DEV_DRIVE }}\gocache" >> $env:GITHUB_ENV
+        echo "GOMODCACHE=${{ env.DEV_DRIVE }}\gopath\pkg\mod" >> $env:GITHUB_ENV
+
     - name: Install Go
       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
-    - name: Move Go cache to D drive
-      if: runner.os == 'Windows'
-      shell: powershell
-      run: |
-        New-Item -ItemType Directory -Force -Path "D:\gopath"
-        New-Item -ItemType Directory -Force -Path "D:\gocache"
-        echo "GOPATH=D:\gopath" >> $env:GITHUB_ENV
-        echo "GOCACHE=D:\gocache" >> $env:GITHUB_ENV
-        Write-Host "Go paths moved to D drive successfully"
     - name: Test
       run: go test -race -timeout 20m ./...
   test-freebsd:
