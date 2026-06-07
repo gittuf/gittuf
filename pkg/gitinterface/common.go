@@ -94,8 +94,10 @@ func setupSigningKeys(t *testing.T, dir string) {
 	if err := os.WriteFile(privateKeyPath, sshPrivateKey, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	FixKeyPermissionsForWindows(t, privateKeyPath)
 
 	if err := os.WriteFile(publicKeyPath, sshPublicKey, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	FixKeyPermissionsForWindows(t, publicKeyPath)
 }

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/testutils"
 	"github.com/hiddeco/sshsig"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"golang.org/x/crypto/ssh"
@@ -129,6 +130,7 @@ func NewKeyFromBytes(t *testing.T, keyB []byte) *signerverifier.SSLibKey {
 	if err := os.WriteFile(keyPath, keyB, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	testutils.FixKeyPermissionsForWindows(t, keyPath)
 	defer os.Remove(keyPath) //nolint:errcheck
 
 	key, err := NewKeyFromFile(keyPath)
