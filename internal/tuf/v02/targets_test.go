@@ -474,6 +474,49 @@ func TestRemoveRule(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
 }
 
+func TestRemovePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	person := &Person{
+		PersonID: "jane.doe",
+		PublicKeys: map[string]*Key{
+			key.KeyID: key,
+		},
+	}
+
+	err := targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	err = targetsMetadata.AddPrincipal(key)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
+
+	err = targetsMetadata.AddPrincipal(person)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Principals, person.PersonID)
+
+	err = targetsMetadata.RemovePrincipal("")
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalStillInUse)
+
+	err = targetsMetadata.RemovePrincipal(person.PersonID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Principals, person.PersonID)
+
+	err = targetsMetadata.RemoveRule("test-rule")
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Principals, key.KeyID)
+}
+
 func TestUpdatePrincipal(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 

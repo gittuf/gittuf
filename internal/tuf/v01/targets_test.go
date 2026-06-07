@@ -400,6 +400,32 @@ func TestRemoveRule(t *testing.T) {
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
 }
 
+func TestRemovePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	err := targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	err = targetsMetadata.AddPrincipal(key)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalStillInUse)
+
+	err = targetsMetadata.RemoveRule("test-rule")
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+}
+
 func TestUpdatePrincipal(t *testing.T) {
 	targetsMetadata := initialTestTargetsMetadata(t)
 
