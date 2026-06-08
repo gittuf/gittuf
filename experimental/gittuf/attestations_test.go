@@ -6,6 +6,7 @@ package gittuf
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -945,7 +946,8 @@ func TestGetGitHubClient(t *testing.T) {
 
 	t.Run("invalid baseURL returns error", func(t *testing.T) {
 		_, err := getGitHubClient("://no-scheme", "test-token")
-		require.NotNil(t, err)
+		var urlErr *url.Error
+		assert.ErrorAs(t, err, &urlErr)
 	})
 
 	t.Run("empty token still produces a usable client", func(t *testing.T) {
