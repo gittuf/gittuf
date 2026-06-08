@@ -916,8 +916,8 @@ func TestIndexPathToComponents(t *testing.T) {
 func TestGetGitHubClient(t *testing.T) {
 	t.Run("default baseURL keeps github.com endpoints", func(t *testing.T) {
 		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "test-token")
-		require.Nil(t, err)
-		require.NotNil(t, client)
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
 
 		// Default go-github BaseURL is api.github.com
 		assert.Equal(t, "https://api.github.com/", client.BaseURL.String())
@@ -926,8 +926,8 @@ func TestGetGitHubClient(t *testing.T) {
 
 	t.Run("enterprise baseURL gets /api/v3 and /api/uploads paths", func(t *testing.T) {
 		client, err := getGitHubClient("https://github.acme.internal", "test-token")
-		require.Nil(t, err)
-		require.NotNil(t, client)
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
 
 		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
 		assert.Equal(t, "https://github.acme.internal/api/uploads/", client.UploadURL.String())
@@ -935,8 +935,8 @@ func TestGetGitHubClient(t *testing.T) {
 
 	t.Run("trailing slash in baseURL is normalized", func(t *testing.T) {
 		client, err := getGitHubClient("https://github.acme.internal/", "test-token")
-		require.Nil(t, err)
-		require.NotNil(t, client)
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
 
 		// Should produce the same paths as the no-trailing-slash case
 		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
@@ -952,7 +952,7 @@ func TestGetGitHubClient(t *testing.T) {
 		// getGitHubClient itself doesn't enforce non-empty token;
 		// callers do (via ErrNoGitHubToken). This documents that behavior.
 		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "")
-		require.Nil(t, err)
-		require.NotNil(t, client)
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
 	})
 }
