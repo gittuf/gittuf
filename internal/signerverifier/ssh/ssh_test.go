@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/testutils"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,7 @@ func TestSSH(t *testing.T) {
 		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		testutils.FixKeyPermissionsForWindows(t, keyPath)
 	}
 
 	data := []byte("DATA")

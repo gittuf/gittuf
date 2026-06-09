@@ -34,9 +34,11 @@ func TestLoadSigner(t *testing.T) {
 		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		gitinterface.FixKeyPermissionsForWindows(t, keyPath)
 		if err := os.WriteFile(keyPath+".pub", test.publicKeyBytes, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		gitinterface.FixKeyPermissionsForWindows(t, keyPath+".pub")
 
 		signer, err := LoadSigner(nil, keyPath)
 		assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
