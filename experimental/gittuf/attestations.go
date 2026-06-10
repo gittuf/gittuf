@@ -727,8 +727,10 @@ func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, curr
 		if err != nil {
 			return "", "", "", err
 		}
-		if err := r.r.FetchObject(pullRequest.GetHead().GetRepo().GetCloneURL(), headHash); err != nil {
-			return "", "", "", err
+		if !r.r.HasObject(headHash) {
+			if err := r.r.FetchObject(pullRequest.GetHead().GetRepo().GetCloneURL(), headHash); err != nil {
+				return "", "", "", err
+			}
 		}
 
 		// Now compute the merge tree ID

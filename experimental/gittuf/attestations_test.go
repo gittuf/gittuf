@@ -6,6 +6,7 @@ package gittuf
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -610,37 +611,28 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		pr := gogithub.PullRequest{
+			ID: gogithub.Int64(1),
+			Base: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("main"),
+				SHA: gogithub.String(initialCommitID.String()),
+			},
+			Head: &gogithub.PullRequestBranch{
+				Ref: gogithub.String("feature"),
+				SHA: gogithub.String(featureHeadCommitID.String()),
+				Repo: &gogithub.Repository{
+					CloneURL: gogithub.String(testDir),
+				},
+			},
+			MergedAt: &gogithub.Timestamp{
+				Time: time.Now(),
+			},
+		}
+
 		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(initialCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-				},
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(initialCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-				},
+				pr, pr,
 			),
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
@@ -920,4 +912,49 @@ func TestIndexPathToComponents(t *testing.T) {
 		assert.Equal(t, test.from, from, fmt.Sprintf("unexpected 'from' in test '%s'", name))
 		assert.Equal(t, test.to, to, fmt.Sprintf("unexpected 'to' in test '%s'", name))
 	}
+}
+
+func TestGetGitHubClient(t *testing.T) {
+	t.Run("default baseURL keeps github.com endpoints", func(t *testing.T) {
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		// Default go-github BaseURL is api.github.com
+		assert.Equal(t, "https://api.github.com/", client.BaseURL.String())
+		assert.Equal(t, "https://uploads.github.com/", client.UploadURL.String())
+	})
+
+	t.Run("enterprise baseURL gets /api/v3 and /api/uploads paths", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.acme.internal", "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.acme.internal/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("trailing slash in baseURL is normalized", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.acme.internal/", "test-token")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+
+		// Should produce the same paths as the no-trailing-slash case
+		assert.Equal(t, "https://github.acme.internal/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.acme.internal/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("invalid baseURL returns error", func(t *testing.T) {
+		_, err := getGitHubClient("://no-scheme", "test-token")
+		var urlErr *url.Error
+		assert.ErrorAs(t, err, &urlErr)
+	})
+
+	t.Run("empty token still produces a usable client", func(t *testing.T) {
+		// getGitHubClient itself doesn't enforce non-empty token;
+		// callers do (via ErrNoGitHubToken). This documents that behavior.
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "")
+		assert.Nil(t, err)
+		assert.NotNil(t, client)
+	})
 }
