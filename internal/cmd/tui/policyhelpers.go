@@ -28,7 +28,7 @@ type principal struct {
 }
 
 // repoAddPrincipalToTargets adds a person principal to the targets policy file.
-func repoAddPrincipalToTargets(ctx context.Context, o *options, personID string, PublicKeyRefs []string, associatedIdentities []string, customMetadata []string) error {
+func repoAddPrincipalToTargets(ctx context.Context, o *options, personID string, publicKeyRefs []string, associatedIdentities []string, customMetadata []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func repoAddPrincipalToTargets(ctx context.Context, o *options, personID string,
 
 	// Build the public keys map — same pattern as addperson.go
 	publicKeys := map[string]*tufv02.Key{}
-	for _, KeyRef := range PublicKeyRefs {
+	for _, KeyRef := range publicKeyRefs {
 		key, err := gittuf.LoadPublicKey(KeyRef)
 		if err != nil {
 			return err
