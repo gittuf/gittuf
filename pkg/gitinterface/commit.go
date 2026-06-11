@@ -65,7 +65,7 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 // developer mode. In standard workflows, Commit() must be used instead which
 // infers the signing key from the user's Git config.
 func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message string, signingKeyPEMBytes []byte) (Hash, error) {
-	gitConfig, err := r.GetGitConfig()
+	gitConfig, err := GetGitConfig(r)
 	if err != nil {
 		return ZeroHash, err
 	}
