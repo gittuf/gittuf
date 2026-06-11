@@ -37,6 +37,27 @@ func getPagerTestNone() pager {
 	return nil
 }
 
+func TestPagerResolution(t *testing.T) {
+	pagerVar := newPagerEnvVar()
+	assert.Equal(t, &pagerEnvVar{}, pagerVar)
+	t.Setenv("PAGER", "less")
+
+	pager := getPagerReal()
+	assert.Equal(t, "less", pager.getBinary())
+	assert.Equal(t, []string{}, pager.getFlags())
+
+	pager = newPagerLess()
+	assert.Equal(t, "less", pager.getBinary())
+	assert.Equal(t, []string{"-F", "-R", "-X"}, pager.getFlags())
+
+	t.Setenv("LESS", "A")
+	assert.Equal(t, []string{"-A"}, pager.getFlags())
+
+	pager = newPagerMore()
+	assert.Equal(t, "more", pager.getBinary())
+	assert.Len(t, pager.getFlags(), 0)
+}
+
 func TestNewDisplayWriter(t *testing.T) {
 	tests := map[string]struct {
 		contents []byte
