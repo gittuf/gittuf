@@ -1206,36 +1206,6 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 					},
 					MergeCommitSHA: gogithub.String(string(mergeCommitID.String())),
 				},
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(initialCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-					MergeCommitSHA: gogithub.String(string(mergeCommitID.String())),
-				},
-				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
-					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String(targetHeadCommitID.String()),
-					},
-					Head: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("feature"),
-						SHA: gogithub.String(featureHeadCommitID.String()),
-					},
-					MergedAt: &gogithub.Timestamp{
-						Time: time.Now(),
-					},
-					MergeCommitSHA: gogithub.String(string(mergeCommitID.String())),
-				},
 			),
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
