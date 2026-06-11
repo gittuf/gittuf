@@ -1113,11 +1113,11 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		attestations, err := attestations.LoadCurrentAttestations(repo.r)
 		assert.Nil(t, err)
 
-		baseRef, fromId, toId, err := repo.getGitHubPullRequestReviewDetails(testCtx, attestations, mockedGoGitHubClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, true)
+		baseRef, fromID, toID, err := repo.getGitHubPullRequestReviewDetails(testCtx, attestations, mockedGoGitHubClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, true)
 		assert.Nil(t, err)
 
 		assert.Equal(t, "refs/heads/main", baseRef)
-		assert.Equal(t, toId, mergeTreeID.String())
-		assert.Equal(t, fromId, targetHeadCommitID.String())
+		assert.Equal(t, toID, mergeTreeID.String())
+		assert.Equal(t, fromID, targetHeadCommitID.String())
 	})
 }
