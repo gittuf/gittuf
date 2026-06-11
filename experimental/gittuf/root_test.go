@@ -13,6 +13,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -133,27 +134,6 @@ func TestInitializeRoot(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	t.Run("with signCommit", func(t *testing.T) {
-		tempDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
-		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.InitializeRoot(testCtx, signer, true)
-		assert.Nil(t, err)
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		require.Nil(t, err)
-
-		rootMetadata, err := state.GetRootMetadata(false)
-		require.Nil(t, err)
-		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(signer.MetadataKey().KeyID))
-	})
-}
-
-func TestPreventReinitializeRoot(t *testing.T) {
 	t.Run("fails when root already applied (policy ref exists)", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -173,6 +153,22 @@ func TestPreventReinitializeRoot(t *testing.T) {
 
 		err = r.InitializeRoot(testCtx, signer, false)
 		assert.ErrorIs(t, err, ErrCannotReinitialize)
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		r := &Repository{r: repo}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = r.InitializeRoot(testCtx, signer, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
 
@@ -196,20 +192,31 @@ func TestSetRepositoryLocation(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, location, rootMetadata.GetRepositoryLocation())
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-
-		err := r.SetRepositoryLocation(testCtx, unauthorizedSigner, "https://example.com/unauthorized", false)
-		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		r := &Repository{r: repo}
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		err := r.SetRepositoryLocation(testCtx, rootSigner, "https://example.com/new-location", true)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = r.SetRepositoryLocation(testCtx, rootSigner, "https://example.com/new-location", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.SetRepositoryLocation(testCtx, unauthorizedSigner, "https://example.com/unauthorized", false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }
 
@@ -243,33 +250,32 @@ func TestAddRootKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		r := &Repository{r: repo}
 
-		err := r.AddRootKey(testCtx, unauthorizedSigner, newRootKey, false)
-		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-
-		err := r.AddRootKey(testCtx, sv, newRootKey, true)
-		assert.Nil(t, err)
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		rootMetadata, err := state.GetRootMetadata(false)
-		assert.Nil(t, err)
-		assert.True(t, getRootPrincipalIDs(t, rootMetadata).Has(newRootKey.KeyID))
+		err = r.AddRootKey(testCtx, sv, newRootKey, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = r.AddRootKey(testCtx, sv, newRootKey, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		newRootKey = tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+
+		err = r.AddRootKey(testCtx, unauthorizedSigner, newRootKey, false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }
 
@@ -350,17 +356,36 @@ func TestRemoveRootKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{newSigner}, 1)
 	assert.Nil(t, err)
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		r := &Repository{r: repo}
 
-		err := r.AddRootKey(testCtx, rootSigner, newRootKey, true)
-		require.Nil(t, err)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		newSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-		err = r.RemoveRootKey(testCtx, newSigner, rootSigner.MetadataKey().KeyID, true)
-		assert.Nil(t, err)
+		err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = r.RemoveRootKey(testCtx, newSigner, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		newRootKey = tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+
+		err = r.RemoveRootKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
+
+		// Test error with removing key
+		err = r.RemoveRootKey(testCtx, originalSigner, newRootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
 
@@ -389,12 +414,28 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(unauthorizedSigner.MetadataKey())
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddTopLevelTargetsKey(testCtx, unauthorizedSigner, key, false)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddTopLevelTargetsKey(testCtx, sv, key, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.AddTopLevelTargetsKey(testCtx, sv, key, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.AddTopLevelTargetsKey(testCtx, unauthorizedSigner, key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }
@@ -458,20 +499,33 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		rootKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
-		err := r.AddTopLevelTargetsKey(testCtx, rootSigner, rootKey, true)
-		require.Nil(t, err)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		secondaryTargetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-		err = r.AddTopLevelTargetsKey(testCtx, rootSigner, secondaryTargetsKey, true)
-		require.Nil(t, err)
+		err = nr.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
-		err = r.RemoveTopLevelTargetsKey(testCtx, rootSigner, rootKey.KeyID, true)
-		assert.Nil(t, err)
+		// Test non-existent policy
+		err = nr.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.RemoveTopLevelTargetsKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
+
+		// Test error with removing key
+		err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
 
@@ -503,22 +557,31 @@ func TestAddGitHubApp(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err := nr.AddGitHubApp(testCtx, sv, "github-app", key, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.AddGitHubApp(testCtx, sv, "github-app", key, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
 		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 		key := tufv01.NewKeyFromSSLibKey(unauthorizedSigner.MetadataKey())
 
-		err := r.AddGitHubApp(testCtx, unauthorizedSigner, "github-app", key, false)
+		err = r.AddGitHubApp(testCtx, unauthorizedSigner, "github-app", key, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
-
-		err := r.AddGitHubApp(testCtx, rootSigner, "github-app", key, true)
-		assert.Nil(t, err)
 	})
 
 	t.Run("default app name", func(t *testing.T) {
@@ -600,16 +663,29 @@ func TestRemoveGitHubApp(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddGitHubApp(testCtx, sv, "github-app", key, true)
-		require.Nil(t, err)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RemoveGitHubApp(testCtx, sv, "github-app", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.RemoveGitHubApp(testCtx, sv, "github-app", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = r.RemoveGitHubApp(testCtx, sv, "github-app", true)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
 	t.Run("default app name", func(t *testing.T) {
@@ -678,24 +754,29 @@ func TestTrustGitHubApp(t *testing.T) {
 	err = r.TrustGitHubApp(testCtx, sv, "github-app", false)
 	assert.Nil(t, err)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.TrustGitHubApp(testCtx, unauthorizedSigner, "github-app", false)
-		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+		err = nr.TrustGitHubApp(testCtx, sv, "github-app", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
-		err := r.AddGitHubApp(testCtx, sv, "github-app", key, true)
-		require.Nil(t, err)
+		// Test non-existent policy
+		err = nr.TrustGitHubApp(testCtx, sv, "github-app", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = r.TrustGitHubApp(testCtx, sv, "github-app", true)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
 	t.Run("default app name with trusted no-op", func(t *testing.T) {
@@ -778,19 +859,29 @@ func TestUntrustGitHubApp(t *testing.T) {
 	_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{sv}, 1)
 	assert.Nil(t, err)
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddGitHubApp(testCtx, sv, "github-app", key, true)
-		require.Nil(t, err)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		err = r.TrustGitHubApp(testCtx, sv, "github-app", true)
-		require.Nil(t, err)
+		err = nr.UntrustGitHubApp(testCtx, sv, "github-app", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.UntrustGitHubApp(testCtx, sv, "github-app", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = r.UntrustGitHubApp(testCtx, sv, "github-app", true)
-		assert.Nil(t, err)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 
 	t.Run("default app name with untrusted no-op", func(t *testing.T) {
@@ -875,24 +966,31 @@ func TestUpdateRootThreshold(t *testing.T) {
 	}
 	assert.Equal(t, 2, rootThreshold)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.UpdateRootThreshold(testCtx, unauthorizedSigner, 2, false)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdateRootThreshold(testCtx, nil, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.UpdateRootThreshold(testCtx, signer, 1, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.UpdateRootThreshold(testCtx, sv, 1, true)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-
-		err := r.AddRootKey(testCtx, rootSigner, newRootKey, true)
-		require.Nil(t, err)
-
-		err = r.UpdateRootThreshold(testCtx, rootSigner, 2, true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -957,28 +1055,31 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	}
 	assert.Equal(t, 2, targetsThreshold)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.UpdateTopLevelTargetsThreshold(testCtx, unauthorizedSigner, 2, false)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdateTopLevelTargetsThreshold(testCtx, nil, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.UpdateTopLevelTargetsThreshold(testCtx, sv, 1, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		sv = setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.UpdateTopLevelTargetsThreshold(testCtx, sv, 1, true)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		firstTargetsKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
-		err := r.AddTopLevelTargetsKey(testCtx, rootSigner, firstTargetsKey, true)
-		require.Nil(t, err)
-
-		secondTargetsKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-		err = r.AddTopLevelTargetsKey(testCtx, rootSigner, secondTargetsKey, true)
-		require.Nil(t, err)
-
-		err = r.UpdateTopLevelTargetsThreshold(testCtx, rootSigner, 2, true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -1009,19 +1110,23 @@ func TestSignRoot(t *testing.T) {
 
 	assert.Equal(t, 2, len(state.Metadata.RootEnvelope.Signatures))
 
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		secondKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		err := r.AddRootKey(testCtx, rootSigner, secondKey, false)
-		require.Nil(t, err)
+		err = nr.SignRoot(testCtx, nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
-		secondSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-
-		err = r.SignRoot(testCtx, secondSigner, true)
-		assert.Nil(t, err)
+		// Test non-existent policy
+		err = nr.SignRoot(testCtx, rootSigner, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 }
 
@@ -1068,20 +1173,31 @@ func TestAddGlobalRuleThreshold(t *testing.T) {
 	err = r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
 	assert.ErrorIs(t, err, tuf.ErrGlobalRuleAlreadyExists)
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddGlobalRuleThreshold(testCtx, unauthorizedSigner, "unauthorized-rule", []string{"git:refs/heads/main"}, 1, false)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGlobalRuleThreshold(testCtx, nil, "", nil, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.AddGlobalRuleThreshold(testCtx, rootSigner, "", nil, 1, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.AddGlobalRuleThreshold(testCtx, sv, "", nil, 1, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approvals", []string{"git:refs/heads/main"}, 1, true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -1124,20 +1240,31 @@ func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
 	assert.Equal(t, "block-force-pushes-for-main", globalRules[0].GetName())
 	assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleBlockForcePushes).GetProtectedNamespaces())
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddGlobalRuleBlockForcePushes(testCtx, unauthorizedSigner, "unauthorized-force-push-rule", []string{"git:refs/heads/main"}, false)
+		// Test signCommit
+		err = repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGlobalRuleBlockForcePushes(testCtx, nil, "", nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		err = nr.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "", nil, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r = createTestRepositoryWithRoot(t, "")
+
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = r.AddGlobalRuleBlockForcePushes(testCtx, sv, "", nil, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes", []string{"git:refs/heads/main"}, true)
-		assert.Nil(t, err)
 	})
 }
 func TestRemoveGlobalRule(t *testing.T) {
@@ -1251,38 +1378,32 @@ func TestRemoveGlobalRule(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.RemoveGlobalRule(testCtx, unauthorizedSigner, "any-rule", false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RemoveGlobalRule(testCtx, nil, "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.RemoveGlobalRule(testCtx, sv, "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.RemoveGlobalRule(testCtx, sv, "", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("remove rules with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approvals", []string{"git:refs/heads/main"}, 1, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approvals", true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes", []string{"git:refs/heads/main"}, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.RemoveGlobalRule(testCtx, rootSigner, "block-force-pushes", true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -1624,41 +1745,40 @@ func TestUpdateGlobalRule(t *testing.T) {
 		assert.Equal(t, []string{"git:refs/heads/main"}, globalRules[0].(tuf.GlobalRuleBlockForcePushes).GetProtectedNamespaces())
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.UpdateGlobalRuleThreshold(testCtx, unauthorizedSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 2, false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdateGlobalRuleThreshold(testCtx, nil, "", nil, 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		err = nr.UpdateGlobalRuleBlockForcePushes(testCtx, nil, "", nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.UpdateGlobalRuleThreshold(testCtx, sv, "", nil, 1, false)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+
+		err = nr.UpdateGlobalRuleBlockForcePushes(testCtx, sv, "", nil, false)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.UpdateGlobalRuleThreshold(testCtx, sv, "", nil, 1, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 
-		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, unauthorizedSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
+		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, sv, "", nil, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approvals", []string{"git:refs/heads/main"}, 1, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.UpdateGlobalRuleThreshold(testCtx, rootSigner, "require-approvals", []string{"git:refs/heads/*"}, 2, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes", []string{"git:refs/heads/main"}, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes", []string{"git:refs/heads/*"}, true)
-		require.Nil(t, err)
 	})
 }
 
@@ -1763,20 +1883,31 @@ func TestAddPropagationDirective(t *testing.T) {
 		assert.Equal(t, tufv02.NewPropagationDirective("test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/"), directives[0])
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddPropagationDirective(testCtx, unauthorizedSigner, "test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddPropagationDirective(testCtx, nil, "", "", "", "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.AddPropagationDirective(testCtx, sv, "", "", "", "", "", "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.AddPropagationDirective(testCtx, sv, "", "", "", "", "", "", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddPropagationDirective(testCtx, rootSigner, "sync-main", "https://example.com/upstream", "refs/heads/main", "", "refs/heads/main", "upstream/", true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -1873,29 +2004,31 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		assert.Equal(t, tufv02.NewPropagationDirective("test", "https://newexample.com/git/repository", "refs/newheads/main", "upstreamPath/", "refs/newheads/main", "newupstream/"), directives[0])
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.UpdatePropagationDirective(testCtx, unauthorizedSigner, "test", "https://example.com/newexample", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.UpdatePropagationDirective(testCtx, nil, "", "", "", "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.UpdatePropagationDirective(testCtx, sv, "", "", "", "", "", "", false)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.UpdatePropagationDirective(testCtx, sv, "", "", "", "", "", "", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddPropagationDirective(testCtx, rootSigner, "sync-main", "https://example.com/upstream", "refs/heads/main", "", "refs/heads/main", "upstream/", true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.UpdatePropagationDirective(testCtx, rootSigner, "sync-main", "https://example.com/new-upstream", "refs/heads/new-main", "", "refs/heads/new-main", "new-upstream/", true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -2022,26 +2155,31 @@ func TestRemovePropagationDirective(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.RemovePropagationDirective(testCtx, unauthorizedSigner, "test", false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RemovePropagationDirective(testCtx, nil, "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.RemovePropagationDirective(testCtx, sv, "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.RemovePropagationDirective(testCtx, sv, "", false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddPropagationDirective(testCtx, rootSigner, "sync-main", "https://example.com/upstream", "refs/heads/main", "", "refs/heads/main", "upstream/", true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.RemovePropagationDirective(testCtx, rootSigner, "sync-main", true)
-		assert.Nil(t, err)
 	})
 }
 
@@ -2550,6 +2688,33 @@ func TestIncrementRootVersion(t *testing.T) {
 	// Check that the metadata is the same except for the version number
 	newRootMetadata.(*tufv02.RootMetadata).Version = oldRootMetadata.GetVersion()
 	assert.Equal(t, oldRootMetadata, newRootMetadata)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.IncrementRootVersion(testCtx, nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.IncrementRootVersion(testCtx, sv, false)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.IncrementRootVersion(testCtx, sv, false)
+		assert.ErrorIs(t, err, ErrUnauthorizedKey)
+	})
 }
 
 func TestListPropagationDirectives(t *testing.T) {
@@ -2636,30 +2801,31 @@ func TestEnableController(t *testing.T) {
 	require.Nil(t, err)
 	assert.True(t, rootMetadata.IsController())
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.EnableController(testCtx, unauthorizedSigner, false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.EnableController(testCtx, nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.EnableController(testCtx, sv, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.EnableController(testCtx, sv, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.EnableController(testCtx, rootSigner, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		require.Nil(t, err)
-
-		rootMetadata, err := state.GetRootMetadata(false)
-		require.Nil(t, err)
-		assert.True(t, rootMetadata.IsController())
 	})
 }
 
@@ -2686,36 +2852,31 @@ func TestDisableController(t *testing.T) {
 	require.Nil(t, err)
 	assert.False(t, rootMetadata.IsController())
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.DisableController(testCtx, unauthorizedSigner, false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.DisableController(testCtx, nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.DisableController(testCtx, sv, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.DisableController(testCtx, sv, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.EnableController(testCtx, rootSigner, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		err = r.DisableController(testCtx, rootSigner, true)
-		require.Nil(t, err)
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		require.Nil(t, err)
-
-		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-		require.Nil(t, err)
-
-		rootMetadata, err := state.GetRootMetadata(false)
-		require.Nil(t, err)
-		assert.False(t, rootMetadata.IsController())
 	})
 }
 
@@ -2741,22 +2902,31 @@ func TestAddControllerRepository(t *testing.T) {
 	assert.Equal(t, "controller-repo", controllerRepos[0].GetName())
 	assert.Equal(t, "https://example.com/controller", controllerRepos[0].GetLocation())
 
-	t.Run("unauthorized signer", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-		rootPrincipal := tufv01.NewKeyFromSSLibKey(unauthorizedSigner.MetadataKey())
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
 
-		err := r.AddControllerRepository(testCtx, unauthorizedSigner, "controller-repo", "https://example.com/controller", []tuf.Principal{rootPrincipal}, false)
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddControllerRepository(testCtx, nil, "", "", nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.AddControllerRepository(testCtx, sv, "", "", nil, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
+		r := createTestRepositoryWithRoot(t, "")
+
+		err = r.AddControllerRepository(testCtx, sv, "", "", nil, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		rootPrincipal := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
-
-		err := r.AddControllerRepository(testCtx, rootSigner, "controller-repo", "https://example.com/controller", []tuf.Principal{rootPrincipal}, true)
-		require.Nil(t, err)
 	})
 }
 
@@ -2794,29 +2964,31 @@ func TestAddNetworkRepository(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrNotAControllerRepository)
 	})
 
-	t.Run("unauthorized signer", func(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddNetworkRepository(testCtx, nil, "", "", nil, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent policy
+		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		err = nr.AddNetworkRepository(testCtx, sv, "", "", nil, false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		unauthorizedSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
-		rootPrincipal := tufv01.NewKeyFromSSLibKey(unauthorizedSigner.MetadataKey())
 
-		err := r.EnableController(testCtx, rootSigner, false)
-		require.Nil(t, err)
-
-		err = r.AddNetworkRepository(testCtx, unauthorizedSigner, "network-repo", "https://example.com/network", []tuf.Principal{rootPrincipal}, false)
+		err = r.AddNetworkRepository(testCtx, sv, "", "", nil, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
-	})
-
-	t.Run("with signCommit", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-		rootPrincipal := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
-
-		err := r.EnableController(testCtx, rootSigner, true)
-		require.Nil(t, err)
-
-		err = r.AddNetworkRepository(testCtx, rootSigner, "network-repo", "https://example.com/network", []tuf.Principal{rootPrincipal}, true)
-		require.Nil(t, err)
 	})
 }
 
