@@ -173,7 +173,6 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		err = localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordRemote(remoteName))
 		assert.Nil(t, err)
 
@@ -186,6 +185,21 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		}
 		assert.Equal(t, refName, entry.GetRefName())
 		assert.Equal(t, newCommitID, entry.GetTargetID())
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLEntryForReference(testCtx, "refs/heads/main", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
 
@@ -334,6 +348,21 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.Equal(t, "skip annotation", annotation.Message)
 	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.True(t, annotation.Skip)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestReconcileLocalRSLWithRemote(t *testing.T) {
@@ -742,6 +771,21 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// Neither RSL should have changed
 		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
 		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ReconcileLocalRSLWithRemote(testCtx, remoteName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
 
