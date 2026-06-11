@@ -1233,19 +1233,131 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 			),
 		)
 
-		// signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
 		mockedGoGitHubClient := gogithub.NewClient(mockedHTTPClient)
-
-		// err = repo.AddGitHubPullRequestAttestationForNumber(testCtx, signer, "owner", "repo", 1, false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient), githubopts.WithRSLEntry())
-		// assert.Nil(t, err)
-		// err = repo.AddGitHubPullRequestApprover(testCtx, signer, "owner", "repo", 1, 123, "bob", false, githubopts.WithMockedGitHubAPIClient(mockedHTTPClient), githubopts.WithRSLEntry())
-		// assert.Nil(t, err)
 
 		attestations, err := attestations.LoadCurrentAttestations(repo.r)
 		assert.Nil(t, err)
 
 		baseRef, fromID, toID, err := repo.getGitHubPullRequestReviewDetails(testCtx, attestations, mockedGoGitHubClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, true)
+		assert.Nil(t, err)
+
+		assert.Equal(t, "refs/heads/main", baseRef)
+		assert.Equal(t, toID, mergeTreeID.String())
+		assert.Equal(t, fromID, targetHeadCommitID.String())
+	})
+
+	t.Run("Test the case where the review is not in attestations state and useGitHubAPI is false but head hash is not locally found", func(t *testing.T) {
+		remoteDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, remoteDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		localDir := t.TempDir()
+		localR := gitinterface.CreateTestGitRepository(t, localDir, false)
+		localRepo := &Repository{r: localR}
+
+		targetRef := "main"
+		absTargetRef := "refs/heads/main"
+		featureRef := "feature"
+		absFeatureRef := "refs/heads/feature"
+
+		// Create common base for main and feature branches
+		// remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.r)
+		// localTreeBuilder := gitinterface.NewTreeBuilder(localRepo.r)
+		remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.r)
+
+		emptyRemoteTreeID, err := remoteTreeBuilder.WriteTreeFromEntries(nil)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		initialCommitID, err := remoteRepo.r.Commit(emptyRemoteTreeID, absTargetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.r.SetReference(absFeatureRef, initialCommitID); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create main branch as the target branch with a Git commit
+		// Add a single commit
+		targetCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, remoteR, absTargetRef, 1, gpgKeyBytes)
+		targetHeadCommitID := targetCommitIDs[0]
+
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.r.FetchObject(remoteDir, targetHeadCommitID)
+		assert.Nil(t, err)
+
+		err = localRepo.r.SetReference(absTargetRef, targetHeadCommitID)
+		assert.Nil(t, err)
+
+		err = localRepo.r.FetchObject(remoteDir, initialCommitID)
+		assert.Nil(t, err)
+
+		err = localRepo.r.SetReference(absFeatureRef, initialCommitID)
+		assert.Nil(t, err)
+
+		if err := localRepo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := localRepo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create feature branch with two Git commits
+		// Add two commits
+		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, remoteR, absFeatureRef, 1, gpgKeyBytes)
+		featureHeadCommitID := featureCommitIDs[0]
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		mergeTreeID, err := remoteR.GetMergeTree(targetHeadCommitID, featureHeadCommitID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Setenv("GITTUF_DEV", "1")
+
+		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
+				gogithub.PullRequest{
+					ID: gogithub.Int64(1),
+					Base: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("main"),
+						SHA: gogithub.String(initialCommitID.String()),
+					},
+					Head: &gogithub.PullRequestBranch{
+						Ref: gogithub.String("feature"),
+						SHA: gogithub.String(featureHeadCommitID.String()),
+						Repo: &gogithub.Repository{
+							CloneURL: gogithub.String(remoteDir),
+							// ... other fields
+						},
+					},
+					MergedAt: &gogithub.Timestamp{
+						Time: time.Now(),
+					},
+				},
+			),
+			gogithubmock.WithRequestMatch(
+				gogithubmock.GetReposPullsReviewsByOwnerByRepoByPullNumberByReviewId,
+				gogithub.PullRequestReview{
+					ID: gogithub.Int64(123),
+				},
+			),
+		)
+
+		mockedGoGitHubClient := gogithub.NewClient(mockedHTTPClient)
+
+		attestations, err := attestations.LoadCurrentAttestations(localRepo.r)
+		assert.Nil(t, err)
+
+		baseRef, fromID, toID, err := localRepo.getGitHubPullRequestReviewDetails(testCtx, attestations, mockedGoGitHubClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, false)
 		assert.Nil(t, err)
 
 		assert.Equal(t, "refs/heads/main", baseRef)
