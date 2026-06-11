@@ -1026,6 +1026,8 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		err = r.SetReference(absTargetRef, mergeCommitID)
 		assert.Nil(t, err)
 
+		t.Setenv("GITTUF_DEV", "1")
+
 		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
