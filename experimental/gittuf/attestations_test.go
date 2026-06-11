@@ -1080,9 +1080,6 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 				gogithub.PullRequestReview{
 					ID: gogithub.Int64(123),
 				},
-				gogithub.PullRequestReview{
-					ID: gogithub.Int64(123),
-				},
 			),
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposGitRefByOwnerByRepoByRef,
