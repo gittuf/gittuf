@@ -5,7 +5,6 @@ package gitinterface
 
 import (
 	"fmt"
-	"os/exec"
 	"path"
 	"strings"
 	"testing"
@@ -63,30 +62,6 @@ func (r *Repository) RestoreWorktree(t *testing.T) {
 func FixKeyPermissionsForWindows(t testing.TB, path string) {
 	t.Helper()
 	testutils.FixKeyPermissionsForWindows(t, path)
-}
-
-// subcommands that gittuf uses were added in newer versions than some common
-// client versions. Instead of using a workaround for all clients, we determine
-// if we can use the newer features or instead need to use workarounds.
-func isNiceGitVersion() (bool, error) {
-	cmd := exec.Command("git", "--version")
-	output, err := cmd.Output()
-	if err != nil {
-		return false, err
-	}
-
-	versionString := strings.TrimPrefix(strings.TrimSpace(string(output)), "git version ")
-
-	var major, minor, patch int
-	_, err = fmt.Sscanf(versionString, "%d.%d.%d", &major, &minor, &patch)
-	if err != nil {
-		return false, err
-	}
-
-	if major >= 2 && minor >= 38 {
-		return true, nil
-	}
-	return false, nil
 }
 
 func testNameToRefName(testName string) string {

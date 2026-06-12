@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"testing"
 
+	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
+	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
@@ -193,4 +197,116 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	// Verifying from violating entry tells us unauthorized signature
 	err = repo.VerifyRefFromEntry(testCtx, refName, violatingEntryID.String())
 	assert.ErrorIs(t, err, policy.ErrVerificationFailed)
+}
+
+func TestVerifyMergeable(t *testing.T) {
+	targetRef := "refs/heads/main"
+	featureRef := "refs/heads/feature"
+
+	t.Run("not mergeable without approval", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseCommitID, err := repo.r.Commit(emptyTreeID, targetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
+			t.Fatal(err)
+		}
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		needsSignature, err := repo.VerifyMergeable(testCtx, targetRef, featureRef)
+		assert.ErrorIs(t, err, policy.ErrVerificationFailed)
+		assert.False(t, needsSignature)
+	})
+
+	t.Run("mergeable with approval", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseCommitID, err := repo.r.Commit(emptyTreeID, targetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
+			t.Fatal(err)
+		}
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
+		approverSigner, err := gpg.NewSignerFromKeyID("157507bbe151e378ce8126c1dcfe043cdd2db96e")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.AddReferenceAuthorization(testCtx, approverSigner, targetRef, featureRef, false, attestopts.WithRSLEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		needsSignature, err := repo.VerifyMergeable(testCtx, targetRef, featureRef)
+		assert.Nil(t, err)
+		assert.False(t, needsSignature)
+	})
+
+	t.Run("mergeable with approval and feature RSL bypass", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseCommitID, err := repo.r.Commit(emptyTreeID, targetRef, "Initial commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.RecordRSLEntryForReference(testCtx, targetRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
+			t.Fatal(err)
+		}
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
+		approverSigner, err := gpg.NewSignerFromKeyID("157507bbe151e378ce8126c1dcfe043cdd2db96e")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := repo.AddReferenceAuthorization(testCtx, approverSigner, targetRef, featureRef, false, attestopts.WithRSLEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		needsSignature, err := repo.VerifyMergeable(testCtx, targetRef, featureRef, verifymergeableopts.WithBypassRSLForFeatureRef())
+		assert.Nil(t, err)
+		assert.False(t, needsSignature)
+	})
 }

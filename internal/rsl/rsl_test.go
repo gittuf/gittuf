@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
@@ -69,6 +70,56 @@ func TestNewReferenceEntry(t *testing.T) {
 	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Contains(t, parentIDs, currentTip)
+}
+
+func TestCommitUsingSpecificKey(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	signingKeyBytes := artifacts.SSHED25519Private
+	refName := "refs/heads/main"
+	upstreamRepository := "http://git.example.com/repository"
+
+	referenceEntry := NewReferenceEntry(refName, gitinterface.ZeroHash)
+	err := referenceEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
+	assert.Nil(t, err)
+
+	referenceEntryID, err := repo.GetReference(Ref)
+	require.Nil(t, err)
+	entry, err := GetEntry(repo, referenceEntryID)
+	assert.Nil(t, err)
+	referenceEntry = entry.(*ReferenceEntry)
+	assert.Equal(t, refName, referenceEntry.RefName)
+	assert.Equal(t, gitinterface.ZeroHash, referenceEntry.TargetID)
+	assert.Equal(t, uint64(1), referenceEntry.Number)
+
+	annotationEntry := NewAnnotationEntry([]gitinterface.Hash{referenceEntryID}, true, annotationMessage)
+	err = annotationEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
+	assert.Nil(t, err)
+
+	annotationEntryID, err := repo.GetReference(Ref)
+	require.Nil(t, err)
+	entry, err = GetEntry(repo, annotationEntryID)
+	assert.Nil(t, err)
+	annotationEntry = entry.(*AnnotationEntry)
+	assert.Equal(t, []gitinterface.Hash{referenceEntryID}, annotationEntry.RSLEntryIDs)
+	assert.True(t, annotationEntry.Skip)
+	assert.Equal(t, annotationMessage, annotationEntry.Message)
+	assert.Equal(t, uint64(2), annotationEntry.Number)
+
+	propagationEntry := NewPropagationEntry(refName, gitinterface.ZeroHash, upstreamRepository, referenceEntryID)
+	err = propagationEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
+	assert.Nil(t, err)
+
+	propagationEntryID, err := repo.GetReference(Ref)
+	require.Nil(t, err)
+	entry, err = GetEntry(repo, propagationEntryID)
+	assert.Nil(t, err)
+	propagationEntry = entry.(*PropagationEntry)
+	assert.Equal(t, refName, propagationEntry.RefName)
+	assert.Equal(t, gitinterface.ZeroHash, propagationEntry.TargetID)
+	assert.Equal(t, upstreamRepository, propagationEntry.UpstreamRepository)
+	assert.Equal(t, referenceEntryID, propagationEntry.UpstreamEntryID)
+	assert.Equal(t, uint64(3), propagationEntry.Number)
 }
 
 func TestReferenceUpdaterEntry(t *testing.T) {

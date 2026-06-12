@@ -123,6 +123,84 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.NotEqual(t, currentEntryID, entry.GetID())
 	assert.Equal(t, newCommitID, entry.TargetID)
 	assert.Equal(t, "refs/heads/not-main", entry.RefName)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false)
+	assert.ErrorIs(t, err, ErrRemoteNotSpecified)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordRemote("origin"), rslopts.WithRecordLocalOnly())
+	assert.ErrorIs(t, err, ErrCannotUseRemoteAndLocalOnly)
+
+	t.Run("sync with remote", func(t *testing.T) {
+		remoteName := "origin"
+		refName := "refs/heads/main"
+
+		remoteTmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		err = remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly())
+		assert.Nil(t, err)
+
+		localTmpDir := t.TempDir()
+		localR, err := gitinterface.CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		blobID, err := localR.WriteBlob([]byte("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		localTreeBuilder := gitinterface.NewTreeBuilder(localR)
+		treeID, err := localTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("test.txt", blobID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommitID, err := localR.Commit(treeID, refName, "Local commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordRemote(remoteName))
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(remoteR, rsl.ForReference(refName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, refName, entry.GetRefName())
+		assert.Equal(t, newCommitID, entry.GetTargetID())
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLEntryForReference(testCtx, "refs/heads/main", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
@@ -270,6 +348,21 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.Equal(t, "skip annotation", annotation.Message)
 	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.True(t, annotation.Skip)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestReconcileLocalRSLWithRemote(t *testing.T) {
@@ -332,6 +425,75 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// Local RSL must now be updated to match remote
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.RemoveRemote(remoteName); err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+
+		_, err = localR.GetRemoteURL(fmt.Sprintf("check-remote-%s", remoteName))
+		assert.ErrorContains(t, err, "No such remote")
+
+		remoteURL, err := localR.GetRemoteURL(remoteName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, gittufTransportPrefix+tmpDir, remoteURL)
 	})
 
 	t.Run("remote has no updates for local", func(t *testing.T) {
@@ -610,6 +772,21 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
 		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ReconcileLocalRSLWithRemote(testCtx, remoteName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestSync(t *testing.T) {
@@ -651,6 +828,55 @@ func TestSync(t *testing.T) {
 		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
 		assert.Nil(t, err)
 		assert.Empty(t, divergedRefs)
+	})
+
+	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		if err := localR.RemoveRemote(remoteName); err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		_, err = localR.GetRemoteURL(fmt.Sprintf("check-remote-%s", remoteName))
+		assert.ErrorContains(t, err, "No such remote")
+
+		remoteURL, err := localR.GetRemoteURL(remoteName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, gittufTransportPrefix+tmpDir, remoteURL)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 	})
 
 	t.Run("local is strictly ahead of remote", func(t *testing.T) {
