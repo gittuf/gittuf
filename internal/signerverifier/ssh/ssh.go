@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common/testutils"
@@ -91,12 +92,22 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	return output, nil
 }
 
+var newKeyCache sync.Map
+
 // NewKeyFromFile imports an ssh SSlibKey from the passed path.
 // The path can point to a public or private, encrypted or plaintext, rsa,
 // ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
+	fileBytes, err := os.ReadFile(path)
+	if err == nil {
+		hash := sha256.Sum256(fileBytes)
+		if cached, ok := newKeyCache.Load(hash); ok {
+			return cached.(*signerverifier.SSLibKey), nil
+		}
+	}
+
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -107,7 +118,13 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 		return nil, fmt.Errorf("failed to parse SSH2 key: %w", err)
 	}
 
-	return newSSHKey(sshPub, ""), nil
+	key := newSSHKey(sshPub, "")
+	if err == nil {
+		hash := sha256.Sum256(fileBytes)
+		newKeyCache.Store(hash, key)
+	}
+
+	return key, nil
 }
 
 // NewKeyFromBytes returns an ssh SSLibKey from the passed bytes. It's meant to

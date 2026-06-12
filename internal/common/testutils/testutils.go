@@ -15,13 +15,9 @@ import (
 func FixKeyPermissionsForWindows(t testing.TB, path string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
-		output, err := exec.Command("icacls", path, "/inheritance:r").CombinedOutput() //nolint:gosec
+		output, err := exec.Command("icacls", path, "/inheritance:r", "/grant:r", os.Getenv("USERNAME")+":F").CombinedOutput() //nolint:gosec
 		if err != nil {
-			t.Fatalf("failed to disable inheritance on %q with icacls: %v\noutput: %s", path, err, output)
-		}
-		output, err = exec.Command("icacls", path, "/grant:r", os.Getenv("USERNAME")+":F").CombinedOutput() //nolint:gosec
-		if err != nil {
-			t.Fatalf("failed to grant access on %q with icacls: %v\noutput: %s", path, err, output)
+			t.Fatalf("failed to fix key permissions on %q with icacls: %v\noutput: %s", path, err, output)
 		}
 	}
 }
