@@ -38,7 +38,6 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	// Commit1 <- Commit2 <- Commit3 <- Commit4 <- Commit5
 
 	t.Run("Check range between commits 1 and 5", func(t *testing.T) {
-		t.Parallel()
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], allCommits[0])
 		assert.Nil(t, err)
 
@@ -51,14 +50,12 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	})
 
 	t.Run("Pass in wrong order", func(t *testing.T) {
-		t.Parallel()
 		commits, err := repo.GetCommitsBetweenRange(allCommits[0], allCommits[4])
 		assert.Nil(t, err)
 		assert.Empty(t, commits)
 	})
 
 	t.Run("Check range in separate branches", func(t *testing.T) {
-		t.Parallel()
 		//     7
 		//    ↙ ↘
 		//   5   6
@@ -185,7 +182,6 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	})
 
 	t.Run("Get all commits", func(t *testing.T) {
-		t.Parallel()
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
 		assert.Nil(t, err)
 
@@ -197,13 +193,11 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	})
 
 	t.Run("Get commits from invalid range", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetCommitsBetweenRange(ZeroHash, ZeroHash)
 		assert.NotNil(t, err)
 	})
 
 	t.Run("Get commits from non-existent commit", func(t *testing.T) {
-		t.Parallel()
 		nonExistentHash, err := repo.WriteBlob([]byte{})
 		assert.Nil(t, err)
 
@@ -258,7 +252,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	//            └─► commit 1 ◄─┘
 
 	t.Run("Test commit 1", func(t *testing.T) {
-		t.Parallel()
 		// commit 1 is the first commit, so it should be the only commit returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[0], ZeroHash)
 		assert.Nil(t, err)
@@ -267,7 +260,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	})
 
 	t.Run("Test commit 2", func(t *testing.T) {
-		t.Parallel()
 		// commit 2 is the first child of commit 1, so only it and commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[1], ZeroHash)
 		assert.Nil(t, err)
@@ -281,7 +273,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	})
 
 	t.Run("Test commit 3", func(t *testing.T) {
-		t.Parallel()
 		// commit 3 is the second child of commit 1, so only it and commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[2], ZeroHash)
 		assert.Nil(t, err)
@@ -295,7 +286,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	})
 
 	t.Run("Test commit 4", func(t *testing.T) {
-		t.Parallel()
 		// commit 4 is the child of commit 2, so only it, commit 2, and commit 2's parent commit 1 should be returned
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[3], ZeroHash)
 		assert.Nil(t, err)
@@ -309,7 +299,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	})
 
 	t.Run("Test commit 5, the merge commit", func(t *testing.T) {
-		t.Parallel()
 		// commit 5 is the merge commit of commit 2 and commit 3, so it should return commit 5, commit 2, commit 3, and commit 1 (the parent of commit 2 and commit 3)
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[4], ZeroHash)
 		assert.Nil(t, err)
@@ -323,7 +312,6 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	})
 
 	t.Run("Test commit 6", func(t *testing.T) {
-		t.Parallel()
 		// commit 6 is the child of commit 3, so it should return commit 6, commit 3, and commit 1 (the parent of commit 3)
 		commits, err := repo.GetCommitsBetweenRange(commitIDs[5], ZeroHash)
 		assert.Nil(t, err)

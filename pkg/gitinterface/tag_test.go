@@ -45,7 +45,6 @@ func TestGetTagTarget(t *testing.T) {
 	assert.Equal(t, commitID, targetID)
 
 	t.Run("non-existent tag", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetTagTarget(ZeroHash)
 		assert.ErrorContains(t, err, "unable to resolve tag's target ID")
 	})
@@ -94,19 +93,16 @@ func TestRepositoryVerifyTag(t *testing.T) {
 	}
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
-		t.Parallel()
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
 		err := repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
 		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
@@ -141,7 +137,6 @@ func TestEnsureIsTag(t *testing.T) {
 func TestTagUsingSpecificKey(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid target", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 

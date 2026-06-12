@@ -20,7 +20,6 @@ func TestPushRefSpecRepository(t *testing.T) {
 	refSpecs := fmt.Sprintf("%s:%s", refName, refName)
 
 	t.Run("assert remote repo does not have object until it is pushed", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -63,7 +62,6 @@ func TestPushRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -109,7 +107,6 @@ func TestPushRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("assert no error when there are no updates to push", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -159,7 +156,6 @@ func TestPushRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("push to non-existent remote", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, false)
 
@@ -174,7 +170,6 @@ func TestPushRepository(t *testing.T) {
 	refName := "refs/heads/main"
 
 	t.Run("assert remote repo does not have object until it is pushed", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -217,7 +212,6 @@ func TestPushRepository(t *testing.T) {
 	})
 
 	t.Run("assert after push that src and dst refs match", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -263,7 +257,6 @@ func TestPushRepository(t *testing.T) {
 	})
 
 	t.Run("assert no error when there are no updates to push", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -313,7 +306,6 @@ func TestPushRepository(t *testing.T) {
 	})
 
 	t.Run("push to non-existent remote", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, false)
 
@@ -322,7 +314,6 @@ func TestPushRepository(t *testing.T) {
 	})
 
 	t.Run("push with invalid ref", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, false)
 
@@ -338,7 +329,6 @@ func TestFetchRefSpecRepository(t *testing.T) {
 	refSpecs := fmt.Sprintf("+%s:%s", refName, refName)
 
 	t.Run("assert local repo does not have object until fetched", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -382,7 +372,6 @@ func TestFetchRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -429,7 +418,6 @@ func TestFetchRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -484,7 +472,6 @@ func TestFetchRefSpecRepository(t *testing.T) {
 	})
 
 	t.Run("fetch from non-existent remote", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, true)
 
@@ -499,7 +486,6 @@ func TestFetchRepository(t *testing.T) {
 	refName := "refs/heads/main"
 
 	t.Run("assert local repo does not have object until fetched", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -543,7 +529,6 @@ func TestFetchRepository(t *testing.T) {
 	})
 
 	t.Run("assert after fetch that both refs match", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -590,7 +575,6 @@ func TestFetchRepository(t *testing.T) {
 	})
 
 	t.Run("assert no error when there are no updates to fetch", func(t *testing.T) {
-		t.Parallel()
 		// Create local and remote repositories
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
@@ -645,7 +629,6 @@ func TestFetchRepository(t *testing.T) {
 	})
 
 	t.Run("fetch from non-existent remote", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, true)
 
@@ -654,7 +637,6 @@ func TestFetchRepository(t *testing.T) {
 	})
 
 	t.Run("fetch with invalid ref", func(t *testing.T) {
-		t.Parallel()
 		localTmpDir := t.TempDir()
 		remoteTmpDir := t.TempDir()
 		localRepo := CreateTestGitRepository(t, localTmpDir, true)
@@ -695,7 +677,6 @@ func TestFetchObject(t *testing.T) {
 	assert.True(t, has)
 
 	t.Run("fetch from non-existent remote", func(t *testing.T) {
-		t.Parallel()
 		err := downstreamRepo.FetchObject("nonexistent", ZeroHash)
 		assert.ErrorContains(t, err, "unable to fetch object")
 	})
@@ -707,7 +688,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	anotherRefName := "refs/heads/feature"
 
 	t.Run("clone and fetch remote repository, verify refs match, not bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -759,7 +739,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match, not bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -811,7 +790,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository with only one ref, verify refs match, not bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -855,7 +833,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository, verify refs match, bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -907,7 +884,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository without specifying initial branch, verify refs match, bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 
@@ -959,7 +935,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	})
 
 	t.Run("clone and fetch remote repository with only one ref, verify refs match, bare", func(t *testing.T) {
-		t.Parallel()
 		remoteTmpDir := t.TempDir()
 		localTmpDir := t.TempDir()
 

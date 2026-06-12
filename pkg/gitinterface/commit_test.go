@@ -87,7 +87,6 @@ func TestRepositoryCommit(t *testing.T) {
 func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
 	t.Parallel()
 	t.Run("success", func(t *testing.T) {
-		t.Parallel()
 		tempDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -136,7 +135,6 @@ func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
 	})
 
 	t.Run("invalid key", func(t *testing.T) {
-		t.Parallel()
 		tempDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -251,37 +249,31 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	}
 
 	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gpg signed commit, verify with gpg key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed commit, verify with ssh key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
-		t.Parallel()
 		err := repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
-		t.Parallel()
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
 		err := repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
 		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
@@ -319,21 +311,18 @@ func TestKnowsCommit(t *testing.T) {
 	}
 
 	t.Run("check if second commit knows first", func(t *testing.T) {
-		t.Parallel()
 		knows, err := repo.KnowsCommit(secondCommitID, firstCommitID)
 		assert.Nil(t, err)
 		assert.True(t, knows)
 	})
 
 	t.Run("check that first commit does not know second", func(t *testing.T) {
-		t.Parallel()
 		knows, err := repo.KnowsCommit(firstCommitID, secondCommitID)
 		assert.Nil(t, err)
 		assert.False(t, knows)
 	})
 
 	t.Run("check that both commits know themselves", func(t *testing.T) {
-		t.Parallel()
 		knows, err := repo.KnowsCommit(firstCommitID, firstCommitID)
 		assert.Nil(t, err)
 		assert.True(t, knows)
@@ -344,13 +333,11 @@ func TestKnowsCommit(t *testing.T) {
 	})
 
 	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
-		t.Parallel()
 		knows, _ := repo.KnowsCommit(unknownCommitID, firstCommitID)
 		assert.False(t, knows)
 	})
 
 	t.Run("non-commit object as first arg", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -359,7 +346,6 @@ func TestKnowsCommit(t *testing.T) {
 	})
 
 	t.Run("non-commit object as second arg", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -522,7 +508,6 @@ func TestRepositoryGetCommitMessage(t *testing.T) {
 	assert.Equal(t, message, commitMessage)
 
 	t.Run("non-commit object", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -576,7 +561,6 @@ func TestGetCommitTreeID(t *testing.T) {
 	assert.Equal(t, treeWithContentsID, secondCommitTreeID)
 
 	t.Run("non-commit object", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -668,7 +652,6 @@ func TestGetCommonAncestor(t *testing.T) {
 	assert.NotNil(t, err)
 
 	t.Run("non-commit object as first arg", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -677,7 +660,6 @@ func TestGetCommonAncestor(t *testing.T) {
 	})
 
 	t.Run("non-commit object as second arg", func(t *testing.T) {
-		t.Parallel()
 		blobID, err := repo.WriteBlob([]byte("test"))
 		require.Nil(t, err)
 
@@ -702,19 +684,16 @@ func TestEnsureIsCommit(t *testing.T) {
 	require.Nil(t, err)
 
 	t.Run("valid commit", func(t *testing.T) {
-		t.Parallel()
 		err := repo.ensureIsCommit(commitID)
 		assert.Nil(t, err)
 	})
 
 	t.Run("non-commit object", func(t *testing.T) {
-		t.Parallel()
 		err := repo.ensureIsCommit(blobID)
 		assert.ErrorContains(t, err, "is not a commit object")
 	})
 
 	t.Run("non-existent object", func(t *testing.T) {
-		t.Parallel()
 		err := repo.ensureIsCommit(ZeroHash)
 		assert.ErrorContains(t, err, "unable to inspect if object is commit")
 	})

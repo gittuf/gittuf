@@ -42,7 +42,6 @@ func TestGetPathIDInTree(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
@@ -56,7 +55,6 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("no subdirectories", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("a", blobAID),
@@ -74,7 +72,6 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
@@ -92,7 +89,6 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("multiple levels", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/bar/foobar/a", blobAID),
@@ -140,13 +136,11 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("blob id", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetPathIDInTree("a", blobAID)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetPathIDInTree("a", ZeroHash)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
@@ -170,7 +164,6 @@ func TestGetTreeItems(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
@@ -184,7 +177,6 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("no subdirectories", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("a", blobAID),
@@ -207,7 +199,6 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
@@ -235,7 +226,6 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("one file in foo tree, one file in bar", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
@@ -268,13 +258,11 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("blob id", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetTreeItems(blobAID)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		t.Parallel()
 		_, err := repo.GetTreeItems(ZeroHash)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
@@ -527,7 +515,6 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 	t.Parallel()
 
 	t.Run("subtree into HEAD", func(t *testing.T) {
-		t.Parallel()
 		tmpDir1 := t.TempDir()
 		downstreamRepository := CreateTestGitRepository(t, tmpDir1, false)
 
@@ -823,8 +810,6 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 			name := name
 			test := test
 			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-
 				tmpDir1 := t.TempDir()
 				downstreamRepository := CreateTestGitRepository(t, tmpDir1, false)
 
@@ -958,7 +943,6 @@ func TestTreeBuilder(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no blobs", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		assert.Nil(t, err)
@@ -970,7 +954,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("both blobs in the root directory", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		input := []TreeEntry{
@@ -994,7 +977,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("both blobs in same subdirectory", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		input := []TreeEntry{
@@ -1019,7 +1001,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("same blobs in the multiple directories", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		input := []TreeEntry{
@@ -1052,7 +1033,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("both blobs in different subdirectories", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		input := []TreeEntry{
@@ -1077,7 +1057,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("blobs in mix of root directory and subdirectories", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		input := []TreeEntry{
@@ -1102,7 +1081,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("build tree from intermediate tree", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		intermediateTreeInput := []TreeEntry{
@@ -1134,7 +1112,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("build tree from nested intermediate tree", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		intermediateTreeInput := []TreeEntry{
@@ -1166,7 +1143,6 @@ func TestTreeBuilder(t *testing.T) {
 	})
 
 	t.Run("build tree from nested multi-level intermediate tree", func(t *testing.T) {
-		t.Parallel()
 		treeBuilder := NewTreeBuilder(repo)
 
 		intermediateTreeInput := []TreeEntry{
@@ -1227,7 +1203,6 @@ func TestEnsureIsTree(t *testing.T) {
 func TestGetAllFilesInTree(t *testing.T) {
 	t.Parallel()
 	t.Run("error cases", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
