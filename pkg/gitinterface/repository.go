@@ -37,7 +37,7 @@ type Repository struct {
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
-	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: true})
+	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: !r.IsBare()})
 }
 
 // GetGitDir returns the GIT_DIR path for the repository.
@@ -68,27 +68,41 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 
 	slog.Debug("Identifying git directory for repository...")
 	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
+	stdOutContents, _ := io.ReadAll(stdOut)
+	stdErrContents, _ := io.ReadAll(stdErr)
+
 	if err != nil {
-		errContents, newErr := io.ReadAll(stdErr)
-		if newErr != nil {
-			return nil, fmt.Errorf("unable to read original err '%w' when loading repository: %w", err, newErr)
-		}
-		return nil, fmt.Errorf("unable to identify git directory for repository: %w: %s", err, strings.TrimSpace(string(errContents)))
+		return nil, fmt.Errorf("unable to identify git directory for repository: %w: %s", err, strings.TrimSpace(string(stdErrContents)))
 	}
 
-	stdOutContents, err := io.ReadAll(stdOut)
-	if err != nil {
-		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
+	gitDir := strings.TrimSpace(string(stdOutContents))
+	var absPath string
+	if filepath.IsAbs(gitDir) {
+		absPath, err = filepath.Abs(gitDir)
+	} else {
+		absPath, err = filepath.Abs(filepath.Join(repositoryPath, gitDir))
 	}
-
-	// git rev-parse --git-dir may return a local path, so filepath.Abs converts
-	// it into an absolute path. This does not resolve or follow symlinks.
-	absPath, err := filepath.Abs(filepath.Join(repositoryPath, strings.TrimSpace(string(stdOutContents))))
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
-	repo.gitDirPath = absPath
+
+	absRepoPath, err := filepath.Abs(repositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	cleanAbsPath := filepath.Clean(absPath)
+	cleanAbsRepoPath := filepath.Clean(absRepoPath)
+
+	lowerAbsPath := strings.ToLower(cleanAbsPath)
+	lowerAbsRepoPath := strings.ToLower(cleanAbsRepoPath)
+
+	if lowerAbsPath != lowerAbsRepoPath && !strings.HasPrefix(lowerAbsPath, lowerAbsRepoPath+string(filepath.Separator)) {
+		return nil, fmt.Errorf("unable to identify git directory for repository: detected git dir %s is outside repository path %s", absPath, absRepoPath)
+	}
+
+	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", cleanAbsPath))
+	repo.gitDirPath = cleanAbsPath
 
 	return repo, nil
 }

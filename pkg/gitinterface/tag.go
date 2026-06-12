@@ -88,12 +88,26 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 
 // GetTagTarget returns the ID of the Git object a tag points to.
 func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
-	targetID, err := r.executor("rev-list", "-n", "1", tagID.String()).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
 	}
 
-	hash, err := NewHash(targetID)
+	tag, err := goGitRepo.TagObject(plumbing.NewHash(tagID.String()))
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
+	}
+
+	currHash := tag.Target
+	for {
+		nextTag, err := goGitRepo.TagObject(currHash)
+		if err != nil {
+			break
+		}
+		currHash = nextTag.Target
+	}
+
+	hash, err := NewHash(currHash.String())
 	if err != nil {
 		return ZeroHash, fmt.Errorf("invalid format for target ID: %w", err)
 	}
@@ -151,10 +165,17 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *si
 }
 
 func (r *Repository) ensureIsTag(tagID Hash) error {
-	objType, err := r.executor("cat-file", "-t", tagID.String()).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return fmt.Errorf("unable to inspect if object is tag: %w", err)
-	} else if objType != "tag" {
+	}
+
+	obj, err := goGitRepo.Object(plumbing.AnyObject, plumbing.NewHash(tagID.String()))
+	if err != nil {
+		return fmt.Errorf("unable to inspect if object is tag: %w", err)
+	}
+
+	if obj.Type() != plumbing.TagObject {
 		return fmt.Errorf("requested Git ID '%s' is not a tag object", tagID.String())
 	}
 

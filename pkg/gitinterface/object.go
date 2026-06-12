@@ -6,7 +6,8 @@ package gitinterface
 import (
 	"errors"
 	"fmt"
-	"strconv"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 type ObjectType uint
@@ -23,24 +24,32 @@ var ErrInvalidObjectType = errors.New("unknown Git object type")
 // HasObject returns true if an object with the specified Git ID exists in the
 // repository.
 func (r *Repository) HasObject(objectID Hash) bool {
-	_, err := r.executor("cat-file", "-e", objectID.String()).executeString()
+	repo, err := r.GetGoGitRepository()
+	if err != nil {
+		return false
+	}
+	_, err = repo.Storer.EncodedObject(plumbing.AnyObject, plumbing.NewHash(objectID.String()))
 	return err == nil
 }
 
 func (r *Repository) GetObjectType(objectID Hash) (ObjectType, error) {
-	objType, err := r.executor("cat-file", "-t", objectID.String()).executeString()
+	repo, err := r.GetGoGitRepository()
+	if err != nil {
+		return 0, fmt.Errorf("unable to inspect object type: %w", err)
+	}
+	obj, err := repo.Storer.EncodedObject(plumbing.AnyObject, plumbing.NewHash(objectID.String()))
 	if err != nil {
 		return 0, fmt.Errorf("unable to inspect object type: %w", err)
 	}
 
-	switch objType {
-	case "blob":
+	switch obj.Type() {
+	case plumbing.BlobObject:
 		return BlobObjectType, nil
-	case "tree":
+	case plumbing.TreeObject:
 		return TreeObjectType, nil
-	case "commit":
+	case plumbing.CommitObject:
 		return CommitObjectType, nil
-	case "tag":
+	case plumbing.TagObject:
 		return TagObjectType, nil
 	default:
 		return 0, ErrInvalidObjectType
@@ -49,14 +58,13 @@ func (r *Repository) GetObjectType(objectID Hash) (ObjectType, error) {
 
 // GetObjectSize returns the size of the object with the specified Git ID.
 func (r *Repository) GetObjectSize(objectID Hash) (uint64, error) {
-	stdOut, err := r.executor("cat-file", "-s", objectID.String()).executeString()
+	repo, err := r.GetGoGitRepository()
 	if err != nil {
 		return 0, fmt.Errorf("unable to inspect object size: %w", err)
 	}
-
-	objSize, err := strconv.ParseUint(stdOut, 10, 64)
+	obj, err := repo.Storer.EncodedObject(plumbing.AnyObject, plumbing.NewHash(objectID.String()))
 	if err != nil {
-		return 0, fmt.Errorf("unable to convert output to integer: %w", err)
+		return 0, fmt.Errorf("unable to inspect object size: %w", err)
 	}
-	return objSize, nil
+	return uint64(obj.Size()), nil
 }
