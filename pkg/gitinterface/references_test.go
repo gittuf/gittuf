@@ -13,7 +13,6 @@ import (
 )
 
 func TestGetReference(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -35,8 +34,6 @@ func TestGetReference(t *testing.T) {
 }
 
 func TestSetReference(t *testing.T) {
-	t.Parallel()
-
 	refName := "refs/heads/main"
 
 	t.Run("success", func(t *testing.T) {
@@ -67,8 +64,6 @@ func TestSetReference(t *testing.T) {
 }
 
 func TestCheckAndSetReference(t *testing.T) {
-	t.Parallel()
-
 	refName := "refs/heads/main"
 
 	t.Run("success", func(t *testing.T) {
@@ -105,7 +100,6 @@ func TestCheckAndSetReference(t *testing.T) {
 }
 
 func TestGetSymbolicReferenceTarget(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -128,7 +122,6 @@ func TestGetSymbolicReferenceTarget(t *testing.T) {
 }
 
 func TestSetSymbolicReference(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -157,7 +150,6 @@ func TestSetSymbolicReference(t *testing.T) {
 }
 
 func TestRepositoryRefSpec(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -314,7 +306,6 @@ func TestRepositoryRefSpec(t *testing.T) {
 }
 
 func TestBranchReferenceName(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		branchName            string
 		expectedReferenceName string
@@ -340,7 +331,6 @@ func TestBranchReferenceName(t *testing.T) {
 }
 
 func TestTagReferenceName(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		tagName               string
 		expectedReferenceName string
@@ -366,8 +356,6 @@ func TestTagReferenceName(t *testing.T) {
 }
 
 func TestDeleteReference(t *testing.T) {
-	t.Parallel()
-
 	refName := "refs/heads/main"
 
 	t.Run("success", func(t *testing.T) {
@@ -395,7 +383,6 @@ func TestDeleteReference(t *testing.T) {
 }
 
 func TestRemoteReferenceName(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		input    string
 		expected string
@@ -429,7 +416,6 @@ func TestRemoteReferenceName(t *testing.T) {
 }
 
 func TestAbsoluteReference(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 	treeBuilder := NewTreeBuilder(repo)

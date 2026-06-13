@@ -193,7 +193,6 @@ func TestStatus(t *testing.T) {
 }
 
 func TestStatusError(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, true) // bare repo
 
@@ -201,15 +200,12 @@ func TestStatusError(t *testing.T) {
 	assert.ErrorContains(t, err, "unable to check status of repository")
 }
 func TestNewStatusCodeFromByte(t *testing.T) {
-	t.Parallel()
 	t.Run("invalid status code", func(t *testing.T) {
-		t.Parallel()
 		_, err := NewStatusCodeFromByte('X')
 		assert.ErrorIs(t, err, ErrInvalidStatusCode)
 	})
 
 	t.Run("valid status codes", func(t *testing.T) {
-		t.Parallel()
 		testCases := []struct {
 			input    byte
 			expected StatusCode
@@ -234,14 +230,11 @@ func TestNewStatusCodeFromByte(t *testing.T) {
 }
 
 func TestStatusCodeString(t *testing.T) {
-	t.Parallel()
 	t.Run("invalid status code", func(t *testing.T) {
-		t.Parallel()
 		assert.Equal(t, "invalid-code", StatusCode(999).String())
 	})
 
 	t.Run("valid status codes", func(t *testing.T) {
-		t.Parallel()
 		testCases := []struct {
 			code     StatusCode
 			expected string
@@ -265,21 +258,17 @@ func TestStatusCodeString(t *testing.T) {
 }
 
 func TestFileStatusUntracked(t *testing.T) {
-	t.Parallel()
 	t.Run("untracked when X is untracked", func(t *testing.T) {
-		t.Parallel()
 		fs := FileStatus{X: StatusCodeUntracked, Y: StatusCodeUnmodified}
 		assert.True(t, fs.Untracked())
 	})
 
 	t.Run("untracked when Y is untracked", func(t *testing.T) {
-		t.Parallel()
 		fs := FileStatus{X: StatusCodeUnmodified, Y: StatusCodeUntracked}
 		assert.True(t, fs.Untracked())
 	})
 
 	t.Run("not untracked when neither is untracked", func(t *testing.T) {
-		t.Parallel()
 		fs := FileStatus{X: StatusCodeModified, Y: StatusCodeUnmodified}
 		assert.False(t, fs.Untracked())
 	})

@@ -14,7 +14,6 @@ import (
 )
 
 func TestPushRefSpecRepository(t *testing.T) {
-	t.Parallel()
 	remoteName := "origin"
 	refName := "refs/heads/main"
 	refSpecs := fmt.Sprintf("%s:%s", refName, refName)
@@ -165,7 +164,6 @@ func TestPushRefSpecRepository(t *testing.T) {
 }
 
 func TestPushRepository(t *testing.T) {
-	t.Parallel()
 	remoteName := "origin"
 	refName := "refs/heads/main"
 
@@ -323,7 +321,6 @@ func TestPushRepository(t *testing.T) {
 }
 
 func TestFetchRefSpecRepository(t *testing.T) {
-	t.Parallel()
 	remoteName := "origin"
 	refName := "refs/heads/main"
 	refSpecs := fmt.Sprintf("+%s:%s", refName, refName)
@@ -481,7 +478,6 @@ func TestFetchRefSpecRepository(t *testing.T) {
 }
 
 func TestFetchRepository(t *testing.T) {
-	t.Parallel()
 	remoteName := "origin"
 	refName := "refs/heads/main"
 
@@ -651,7 +647,6 @@ func TestFetchRepository(t *testing.T) {
 }
 
 func TestFetchObject(t *testing.T) {
-	t.Parallel()
 	tmpDir1 := t.TempDir()
 	upstreamRepo := CreateTestGitRepository(t, tmpDir1, true)
 	err := upstreamRepo.SetGitConfig("uploadpack.allowReachableSHA1InWant", "true")
@@ -683,7 +678,6 @@ func TestFetchObject(t *testing.T) {
 }
 
 func TestCloneAndFetchRepository(t *testing.T) {
-	t.Parallel()
 	refName := "refs/heads/main"
 	anotherRefName := "refs/heads/feature"
 
@@ -984,7 +978,6 @@ func TestCloneAndFetchRepository(t *testing.T) {
 }
 
 func TestCreateRemote(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 	err := repo.CreateRemote("origin", tmpDir)

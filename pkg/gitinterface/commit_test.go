@@ -24,7 +24,6 @@ import (
 )
 
 func TestRepositoryCommit(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -85,7 +84,6 @@ func TestRepositoryCommit(t *testing.T) {
 }
 
 func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
-	t.Parallel()
 	t.Run("success", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tempDir, false)
@@ -153,7 +151,6 @@ func TestRepositoryCommitUsingSpecificKey(t *testing.T) {
 }
 
 func TestCommitUsingSpecificKey(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -211,7 +208,6 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 }
 
 func TestRepositoryVerifyCommit(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -281,7 +277,6 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 }
 
 func TestKnowsCommit(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -484,7 +479,6 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 }
 
 func TestRepositoryGetCommitMessage(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -517,7 +511,6 @@ func TestRepositoryGetCommitMessage(t *testing.T) {
 }
 
 func TestGetCommitTreeID(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -570,7 +563,6 @@ func TestGetCommitTreeID(t *testing.T) {
 }
 
 func TestGetCommitParentIDs(t *testing.T) {
-	t.Parallel()
 	// TODO: test with merge commit
 
 	tempDir := t.TempDir()
@@ -612,7 +604,6 @@ func TestGetCommitParentIDs(t *testing.T) {
 }
 
 func TestGetCommonAncestor(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -669,7 +660,6 @@ func TestGetCommonAncestor(t *testing.T) {
 }
 
 func TestEnsureIsCommit(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 	treeBuilder := NewTreeBuilder(repo)

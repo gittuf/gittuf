@@ -66,5 +66,9 @@ func (r *Repository) GetObjectSize(objectID Hash) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("unable to inspect object size: %w", err)
 	}
-	return uint64(obj.Size()), nil
+	size := obj.Size()
+	if size < 0 {
+		return 0, fmt.Errorf("invalid object size: %d", size)
+	}
+	return uint64(size), nil
 }

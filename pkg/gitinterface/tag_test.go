@@ -18,7 +18,6 @@ import (
 )
 
 func TestGetTagTarget(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -51,7 +50,6 @@ func TestGetTagTarget(t *testing.T) {
 }
 
 func TestRepositoryVerifyTag(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -110,7 +108,6 @@ func TestRepositoryVerifyTag(t *testing.T) {
 }
 
 func TestEnsureIsTag(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 	treeBuilder := NewTreeBuilder(repo)
@@ -135,7 +132,6 @@ func TestEnsureIsTag(t *testing.T) {
 }
 
 func TestTagUsingSpecificKey(t *testing.T) {
-	t.Parallel()
 	t.Run("invalid target", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)

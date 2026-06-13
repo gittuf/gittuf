@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/jonboulle/clockwork"
@@ -101,6 +102,12 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 		return nil, fmt.Errorf("target directory must be specified")
 	}
 
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	dir = absDir
+
 	repo := &Repository{clock: clockwork.NewRealClock()}
 
 	args := []string{"clone", remoteURL}
@@ -112,14 +119,20 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 
 	if bare {
 		args = append(args, "--bare")
-		repo.gitDirPath = dir
-	} else {
-		repo.gitDirPath = path.Join(dir, ".git")
 	}
 
 	_, stdErr, err := repo.executor(args...).execute()
 	if err != nil {
-		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
+		// Include err in the error message for better debugging
+		return nil, fmt.Errorf("unable to clone repository: %s, %w", stdErr, err)
+	}
+
+	if bare {
+		repo.gitDirPath = dir
+		// bare repositories do not have a worktree
+	} else {
+		repo.gitDirPath = path.Join(dir, ".git")
+		repo.worktreePath = dir
 	}
 
 	return repo, repo.Fetch(DefaultRemoteName, refs, true)

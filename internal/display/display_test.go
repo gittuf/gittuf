@@ -40,7 +40,7 @@ func getPagerTestNone() pager {
 func TestPagerResolution(t *testing.T) {
 	pagerVar := newPagerEnvVar()
 	assert.Equal(t, &pagerEnvVar{}, pagerVar)
-	
+
 	expectedBinary := "cat"
 	if runtime.GOOS == "windows" {
 		expectedBinary = "more"

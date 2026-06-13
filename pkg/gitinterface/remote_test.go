@@ -11,7 +11,6 @@ import (
 )
 
 func TestRemote(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 

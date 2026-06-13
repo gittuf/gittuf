@@ -93,9 +93,7 @@ func TestCanSign(t *testing.T) {
 }
 
 func TestVerifySignature(t *testing.T) {
-	t.Parallel()
 	t.Run("not a commit or a tag", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 

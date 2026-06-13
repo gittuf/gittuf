@@ -13,7 +13,6 @@ import (
 )
 
 func TestNewHash(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		hash          string
 		expectedError error
@@ -52,7 +51,6 @@ func TestNewHash(t *testing.T) {
 		name := name
 		test := test
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			hash, err := NewHash(test.hash)
 			if test.expectedError == nil {
 				expectedHash, secErr := hex.DecodeString(test.hash)

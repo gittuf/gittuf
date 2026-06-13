@@ -11,7 +11,6 @@ import (
 )
 
 func TestRepositoryReadBlob(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -47,7 +46,6 @@ func TestRepositoryReadBlob(t *testing.T) {
 }
 
 func TestRepositoryWriteBlob(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 

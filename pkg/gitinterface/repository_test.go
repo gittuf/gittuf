@@ -12,18 +12,14 @@ import (
 )
 
 func TestRepository(t *testing.T) {
-	t.Parallel()
 	t.Run("repository.isBare", func(t *testing.T) {
-		t.Parallel()
 		t.Run("bare=true", func(t *testing.T) {
-			t.Parallel()
 			tmpDir := t.TempDir()
 			repo := CreateTestGitRepository(t, tmpDir, true)
 			assert.True(t, repo.IsBare())
 		})
 
 		t.Run("bare=false", func(t *testing.T) {
-			t.Parallel()
 			tmpDir := t.TempDir()
 			repo := CreateTestGitRepository(t, tmpDir, false)
 			assert.False(t, repo.IsBare())
@@ -31,7 +27,6 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("with specified path, not bare", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 
 		_ = CreateTestGitRepository(t, tmpDir, false)
@@ -46,7 +41,6 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("with specified path, is bare", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 
 		_ = CreateTestGitRepository(t, tmpDir, true)
@@ -61,13 +55,11 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("empty path", func(t *testing.T) {
-		t.Parallel()
 		_, err := LoadRepository("")
 		assert.ErrorIs(t, err, ErrRepositoryPathNotSpecified)
 	})
 
 	t.Run("invalid path", func(t *testing.T) {
-		t.Parallel()
 		tmpDir := t.TempDir()
 		_, err := LoadRepository(tmpDir)
 		assert.ErrorContains(t, err, "unable to identify git directory for repository")

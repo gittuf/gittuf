@@ -12,7 +12,6 @@ import (
 )
 
 func TestHasObject(t *testing.T) {
-	t.Parallel()
 	tempDir1 := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir1, true)
 
@@ -68,7 +67,6 @@ func TestHasObject(t *testing.T) {
 }
 
 func TestGetObjectType(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
@@ -106,7 +104,6 @@ func TestGetObjectType(t *testing.T) {
 }
 
 func TestGetObjectSize(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
 

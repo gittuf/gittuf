@@ -97,8 +97,13 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	lowerAbsPath := strings.ToLower(cleanAbsPath)
 	lowerAbsRepoPath := strings.ToLower(cleanAbsRepoPath)
 
-	if lowerAbsPath != lowerAbsRepoPath && !strings.HasPrefix(lowerAbsPath, lowerAbsRepoPath+string(filepath.Separator)) {
-		return nil, fmt.Errorf("unable to identify git directory for repository: detected git dir %s is outside repository path %s", absPath, absRepoPath)
+	isBare := lowerAbsPath == lowerAbsRepoPath
+	if !isBare {
+		worktreePath := filepath.Dir(cleanAbsPath)
+		lowerWorktreePath := strings.ToLower(worktreePath)
+		if lowerAbsRepoPath != lowerWorktreePath && !strings.HasPrefix(lowerAbsRepoPath, lowerWorktreePath+string(filepath.Separator)) {
+			return nil, fmt.Errorf("unable to identify git directory for repository: detected git dir %s is outside repository path %s", absPath, absRepoPath)
+		}
 	}
 
 	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", cleanAbsPath))
@@ -135,12 +140,6 @@ func (e *executor) withEnv(env ...string) *executor {
 // executed command.
 func (e *executor) withoutGitDir() *executor {
 	e.unsetGitDir = true
-	return e
-}
-
-// withStdIn sets the contents of stdin to be passed in to the command.
-func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
-	e.stdIn = stdIn
 	return e
 }
 

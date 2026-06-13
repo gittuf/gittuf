@@ -12,7 +12,6 @@ import (
 )
 
 func TestRepositoryEmptyTree(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -25,7 +24,6 @@ func TestRepositoryEmptyTree(t *testing.T) {
 }
 
 func TestGetPathIDInTree(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -147,7 +145,6 @@ func TestGetPathIDInTree(t *testing.T) {
 }
 
 func TestGetTreeItems(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -512,8 +509,6 @@ func TestGetMergeTree(t *testing.T) {
 }
 
 func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
-	t.Parallel()
-
 	t.Run("subtree into HEAD", func(t *testing.T) {
 		tmpDir1 := t.TempDir()
 		downstreamRepository := CreateTestGitRepository(t, tmpDir1, false)
@@ -583,8 +578,6 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 	})
 
 	t.Run("various other subtree scenarios", func(t *testing.T) {
-		t.Parallel()
-
 		tests := map[string]struct {
 			upstreamPath     string
 			localPath        string
@@ -926,7 +919,6 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 }
 
 func TestTreeBuilder(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -1175,7 +1167,6 @@ func TestTreeBuilder(t *testing.T) {
 }
 
 func TestEnsureIsTree(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, true)
 
@@ -1201,7 +1192,6 @@ func TestEnsureIsTree(t *testing.T) {
 }
 
 func TestGetAllFilesInTree(t *testing.T) {
-	t.Parallel()
 	t.Run("error cases", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)

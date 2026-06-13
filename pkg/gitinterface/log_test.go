@@ -13,7 +13,6 @@ import (
 )
 
 func TestGetCommitsBetweenRangeRepository(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -208,7 +207,6 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 }
 
 func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
-	t.Parallel()
 	// Creating a tree with merge commits
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
