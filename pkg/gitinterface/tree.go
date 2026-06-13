@@ -174,57 +174,9 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 		return ZeroHash, err
 	}
 
-	niceGit, err := isNiceGitVersion()
+	stdOut, err := r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
 	if err != nil {
-		return ZeroHash, err
-	}
-
-	var stdOut string
-	if !niceGit {
-		// Older Git versions do not support merge-tree, and, as such, require
-		// quite a long workaround to find what the merge tree is. This
-		// workaround boils down to:
-		// Create new branch > Merge into said branch > Extract tree hash
-		currentBranch, err := r.executor("branch", "--show-current").executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to determine current branch: %w", err)
-		}
-
-		if currentBranch == "" {
-			return ZeroHash, fmt.Errorf("currently in detached HEAD state, please switch to a branch")
-		}
-
-		_, err = r.executor("checkout", commitAID.String()).executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to enter detached HEAD state: %w", err)
-		}
-
-		_, err = r.executor("merge", "-m", "Computing merge tree", commitBID.String()).executeString()
-		if err != nil {
-			// Attempt to abort the merge in all cases as a failsafe
-			_, abrtErr := r.executor("merge", "--abort").executeString()
-			if abrtErr != nil {
-				return ZeroHash, fmt.Errorf("unable to perform merge, and unable to abort merge: %w, %w", err, abrtErr)
-			}
-
-			return ZeroHash, fmt.Errorf("unable to perform merge: %w", err)
-		}
-
-		stdOut, err = r.executor("show", "-s", "--format=%T").executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to extract tree hash of merge commit: %w", err)
-		}
-
-		// Switch back to the branch the user was on
-		_, err = r.executor("checkout", currentBranch).executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to switch back to original branch: %w", err)
-		}
-	} else {
-		stdOut, err = r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
-		if err != nil {
-			return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
-		}
+		return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
 	}
 
 	treeHash, err := NewHash(stdOut)
