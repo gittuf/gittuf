@@ -41,10 +41,11 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 	stdOutWriter := &logWriteCloser{name: "git-remote-gittuf stdout", writeCloser: os.Stdout}
 
 	var (
-		helperStdOut   io.ReadCloser
-		helperStdIn    io.WriteCloser
-		gittufRefsTips = map[string]string{}
-		remoteRefTips  = map[string]string{}
+		helperStdOut       io.ReadCloser
+		helperStdIn        io.WriteCloser
+		gittufRefsTips     = map[string]string{}
+		remoteRefTips      = map[string]string{}
+		serverCapabilities = set.NewSet[string]()
 	)
 
 	for stdInScanner.Scan() {
@@ -485,7 +486,13 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					}
 					ref := refAdSplit[1]
 					if i := strings.IndexByte(ref, '\x00'); i > 0 {
-						ref = ref[:i] // remove config string passed after null byte
+						for _, cap := range strings.Fields(ref[i+1:]) {
+							serverCapabilities.Add(cap)
+						}
+						for _, cap := range refAdSplit[2:] {
+							serverCapabilities.Add(cap)
+						}
+						ref = ref[:i] // remove capabilities string passed after null byte
 					}
 					tip := refAdSplit[0]
 
@@ -584,7 +591,12 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// Note: we explicitly don't use the sideband here
 					// because of inconsistencies between receive-pack
 					// implementations in sending status messages.
-					// TODO: check that server advertises all of these
+					// Verify the server advertises the capabilities we require.
+					for _, cap := range []string{"report-status-v2", "atomic", "object-format=sha1"} {
+						if !serverCapabilities.Has(cap) {
+							return nil, false, fmt.Errorf("server does not advertise required capability %q", cap)
+						}
+					}
 					pushCmd = fmt.Sprintf("%s%s report-status-v2 atomic object-format=sha1 agent=git/%s", pushCmd, string('\x00'), gitVersion)
 				}
 				pushCmd += "\n"
