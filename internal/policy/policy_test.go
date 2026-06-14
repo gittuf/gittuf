@@ -14,6 +14,7 @@ import (
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
@@ -968,6 +969,30 @@ func TestStateHasFileRule(t *testing.T) {
 		hasFileRule := state.hasFileRule
 		assert.False(t, hasFileRule)
 	})
+}
+
+func TestStateGetAllPrincipals(t *testing.T) {
+	t.Parallel()
+	state := createTestStateWithPolicy(t)
+
+	rootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.Nil(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	principals := state.GetAllPrincipals()
+	assert.Len(t, principals, 2)
+	assert.Contains(t, principals, rootKey.ID())
+	assert.Contains(t, principals, gpgKey.ID())
+}
+
+func TestStateHasRuleName(t *testing.T) {
+	t.Parallel()
+	state := createTestStateWithPolicy(t)
+
+	assert.True(t, state.HasRuleName("protect-main"))
+	assert.True(t, state.HasRuleName("protect-files-1-and-2"))
+	assert.False(t, state.HasRuleName("missing-rule"))
 }
 
 func TestApply(t *testing.T) {
