@@ -34,82 +34,67 @@ func TestGetReference(t *testing.T) {
 }
 
 func TestSetReference(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
 	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
-
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
-	require.Nil(t, err)
-
-	// Create second commit with tree
-	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
-	require.Nil(t, err)
-
-	refTip, err := repo.GetReference(refName)
-	require.Nil(t, err)
-	require.Equal(t, secondCommitID, refTip)
 
 	t.Run("success", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+		firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+		require.Nil(t, err)
+		_, err = repo.Commit(emptyTreeID, refName, "Add README\n", false)
+		require.Nil(t, err)
+
 		err = repo.SetReference(refName, firstCommitID)
 		assert.Nil(t, err)
 
-		refTip, err = repo.GetReference(refName)
+		refTip, err := repo.GetReference(refName)
 		require.Nil(t, err)
 		assert.Equal(t, firstCommitID, refTip)
 	})
 
 	t.Run("invalid ref name", func(t *testing.T) {
-		err = repo.SetReference("invalid ref name", firstCommitID)
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		err := repo.SetReference("invalid ref name", ZeroHash)
 		assert.ErrorContains(t, err, "unable to set Git reference")
 	})
 }
 
 func TestCheckAndSetReference(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
 	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
-
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
-	require.Nil(t, err)
-
-	// Create second commit with tree
-	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
-	require.Nil(t, err)
-
-	refTip, err := repo.GetReference(refName)
-	require.Nil(t, err)
-	require.Equal(t, secondCommitID, refTip)
 
 	t.Run("success", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+		firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+		require.Nil(t, err)
+		secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
+		require.Nil(t, err)
+
 		err = repo.CheckAndSetReference(refName, firstCommitID, secondCommitID)
 		assert.Nil(t, err)
 
-		refTip, err = repo.GetReference(refName)
+		refTip, err := repo.GetReference(refName)
 		require.Nil(t, err)
 		assert.Equal(t, firstCommitID, refTip)
 	})
 
 	t.Run("error when old value mismatches", func(t *testing.T) {
-		err = repo.SetReference(refName, secondCommitID)
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+		firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
 		require.Nil(t, err)
 
-		err = repo.CheckAndSetReference(refName, firstCommitID, firstCommitID)
+		err = repo.CheckAndSetReference(refName, firstCommitID, ZeroHash)
 		assert.ErrorContains(t, err, "unable to set Git reference")
 	})
 }
@@ -305,9 +290,13 @@ func TestRepositoryRefSpec(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		refSpec, err := test.repo.RefSpec(test.refName, test.remoteName, test.fastForwardOnly)
-		assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
-		assert.Equal(t, test.expectedRefSpec, refSpec, fmt.Sprintf("unexpected refspec returned in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			refSpec, err := test.repo.RefSpec(test.refName, test.remoteName, test.fastForwardOnly)
+			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("unexpected error in test '%s'", name))
+			assert.Equal(t, test.expectedRefSpec, refSpec, fmt.Sprintf("unexpected refspec returned in test '%s'", name))
+		})
 	}
 
 	t.Run("nonexistent ref", func(t *testing.T) {
@@ -332,8 +321,12 @@ func TestBranchReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := BranchReferenceName(test.branchName)
-		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected branch reference received in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			referenceName := BranchReferenceName(test.branchName)
+			assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected branch reference received in test '%s'", name))
+		})
 	}
 }
 
@@ -353,31 +346,27 @@ func TestTagReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := TagReferenceName(test.tagName)
-		assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			referenceName := TagReferenceName(test.tagName)
+			assert.Equal(t, test.expectedReferenceName, referenceName, fmt.Sprintf("unexpected tag reference received in test '%s'", name))
+		})
 	}
 }
 
 func TestDeleteReference(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
 	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
-
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
-	require.Nil(t, err)
-
-	refTip, err := repo.GetReference(refName)
-	require.Nil(t, err)
-	require.Equal(t, commitID, refTip)
 
 	t.Run("success", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		treeBuilder := NewTreeBuilder(repo)
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+		_, err = repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+		require.Nil(t, err)
+
 		err = repo.DeleteReference(refName)
 		assert.Nil(t, err)
 
@@ -386,7 +375,9 @@ func TestDeleteReference(t *testing.T) {
 	})
 
 	t.Run("invalid ref name", func(t *testing.T) {
-		err = repo.DeleteReference("invalid ref name")
+		tempDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tempDir, false)
+		err := repo.DeleteReference("invalid ref name")
 		assert.ErrorContains(t, err, "unable to delete Git reference")
 	})
 }
@@ -415,8 +406,12 @@ func TestRemoteReferenceName(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		referenceName := RemoteReferenceName(test.input)
-		assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			referenceName := RemoteReferenceName(test.input)
+			assert.Equal(t, test.expected, referenceName, fmt.Sprintf("unexpected remote reference for input %s", name))
+		})
 	}
 }
 

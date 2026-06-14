@@ -233,8 +233,10 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 		if err := os.WriteFile(keyPath, key.data, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		gitinterface.FixKeyPermissionsForWindows(t, keyPath)
 	}
 	keyPath := filepath.Join(tmpDir, "rsa")
+
 	sslibKeyO, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
 		t.Fatal()

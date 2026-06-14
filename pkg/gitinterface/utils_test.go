@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//nolint:tparallel
 func TestResetDueToError(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)

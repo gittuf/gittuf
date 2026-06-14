@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 const (
@@ -24,19 +26,34 @@ var (
 
 // GetReference returns the tip of the specified Git reference.
 func (r *Repository) GetReference(refName string) (Hash, error) {
-	refTipID, err := r.executor("rev-parse", refName).executeString()
+	repo, err := r.GetGoGitRepository()
 	if err != nil {
-		if strings.Contains(err.Error(), "unknown revision or path not in the working tree") {
+		return ZeroHash, err
+	}
+
+	// Try exact reference first to avoid peeling tags (e.g. refs/tags/v1.0)
+	ref, err := repo.Reference(plumbing.ReferenceName(refName), true)
+	if err == nil {
+		hash, err := NewHash(ref.Hash().String())
+		if err != nil {
+			return ZeroHash, err
+		}
+		return hash, nil
+	}
+
+	// Fallback to ResolveRevision for short names like "main" or "HEAD"
+	hashPtr, err := repo.ResolveRevision(plumbing.Revision(refName))
+	if err != nil {
+		if strings.Contains(err.Error(), "reference not found") || errors.Is(err, plumbing.ErrReferenceNotFound) {
 			return ZeroHash, ErrReferenceNotFound
 		}
 		return ZeroHash, fmt.Errorf("unable to read reference '%s': %w", refName, err)
 	}
 
-	hash, err := NewHash(refTipID)
+	hash, err := NewHash(hashPtr.String())
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid Git ID for reference '%s': %w", refName, err)
+		return ZeroHash, err
 	}
-
 	return hash, nil
 }
 

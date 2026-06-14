@@ -26,7 +26,6 @@ func TestRepositoryEmptyTree(t *testing.T) {
 func TestGetPathIDInTree(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
-	treeBuilder := NewTreeBuilder(repo)
 
 	blobAID, err := repo.WriteBlob([]byte("a"))
 	if err != nil {
@@ -41,6 +40,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -53,6 +53,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("no subdirectories", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("a", blobAID),
 			NewEntryBlob("b", blobBID),
@@ -69,6 +70,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
 			NewEntryBlob("b", blobBID),
@@ -85,6 +87,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("multiple levels", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/bar/foobar/a", blobAID),
 			NewEntryBlob("foobar/foo/bar/b", blobBID),
@@ -144,7 +147,6 @@ func TestGetPathIDInTree(t *testing.T) {
 func TestGetTreeItems(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
-	treeBuilder := NewTreeBuilder(repo)
 
 	blobAID, err := repo.WriteBlob([]byte("a"))
 	if err != nil {
@@ -159,6 +161,7 @@ func TestGetTreeItems(t *testing.T) {
 	emptyTreeID := "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 	t.Run("no items", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		treeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -171,6 +174,7 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("no subdirectories", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("a", blobAID),
 			NewEntryBlob("b", blobBID),
@@ -192,6 +196,7 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
 			NewEntryBlob("b", blobBID),
@@ -218,6 +223,7 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("one file in foo tree, one file in bar", func(t *testing.T) {
+		treeBuilder := NewTreeBuilder(repo)
 		exhaustiveItems := []TreeEntry{
 			NewEntryBlob("foo/a", blobAID),
 			NewEntryBlob("bar/b", blobBID),
@@ -572,56 +578,6 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 	})
 
 	t.Run("various other subtree scenarios", func(t *testing.T) {
-		tmpDir1 := t.TempDir()
-		downstreamRepository := CreateTestGitRepository(t, tmpDir1, false)
-
-		blobAID, err := downstreamRepository.WriteBlob([]byte("a"))
-		require.Nil(t, err)
-
-		blobBID, err := downstreamRepository.WriteBlob([]byte("b"))
-		require.Nil(t, err)
-
-		downstreamTreeBuilder := NewTreeBuilder(downstreamRepository)
-
-		// The downstream tree (if set as exists in test below) is:
-		// oof/a -> blobA
-		// b     -> blobB
-		downstreamTreeEntries := []TreeEntry{
-			NewEntryBlob("oof/a", blobAID),
-			NewEntryBlob("b", blobBID),
-		}
-		downstreamTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries(downstreamTreeEntries)
-		require.Nil(t, err)
-
-		tmpDir2 := t.TempDir()
-		upstreamRepository := CreateTestGitRepository(t, tmpDir2, true)
-
-		_, err = upstreamRepository.WriteBlob([]byte("a"))
-		require.Nil(t, err)
-
-		_, err = upstreamRepository.WriteBlob([]byte("b"))
-		require.Nil(t, err)
-
-		upstreamTreeBuilder := NewTreeBuilder(upstreamRepository)
-
-		// The upstream tree is:
-		// a                -> blobA
-		// foo/a            -> blobA
-		// foo/b            -> blobB
-		// foobar/foo/bar/b -> blobB
-
-		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]TreeEntry{
-			NewEntryBlob("a", blobAID),
-			NewEntryBlob("foo/a", blobAID),
-			NewEntryBlob("foo/b", blobBID),
-			NewEntryBlob("foobar/foo/bar/b", blobBID),
-		})
-		require.Nil(t, err)
-
-		upstreamRef := "refs/heads/main"
-		upstreamCommitID, err := upstreamRepository.Commit(upstreamRootTreeID, upstreamRef, "Initial commit\n", false)
-		require.Nil(t, err)
-
 		tests := map[string]struct {
 			upstreamPath     string
 			localPath        string
@@ -844,7 +800,59 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 		}
 
 		for name, test := range tests {
+			name := name
+			test := test
 			t.Run(name, func(t *testing.T) {
+				tmpDir1 := t.TempDir()
+				downstreamRepository := CreateTestGitRepository(t, tmpDir1, false)
+
+				blobAID, err := downstreamRepository.WriteBlob([]byte("a"))
+				require.Nil(t, err)
+
+				blobBID, err := downstreamRepository.WriteBlob([]byte("b"))
+				require.Nil(t, err)
+
+				downstreamTreeBuilder := NewTreeBuilder(downstreamRepository)
+
+				// The downstream tree (if set as exists in test below) is:
+				// oof/a -> blobA
+				// b     -> blobB
+				downstreamTreeEntries := []TreeEntry{
+					NewEntryBlob("oof/a", blobAID),
+					NewEntryBlob("b", blobBID),
+				}
+				downstreamTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries(downstreamTreeEntries)
+				require.Nil(t, err)
+
+				tmpDir2 := t.TempDir()
+				upstreamRepository := CreateTestGitRepository(t, tmpDir2, true)
+
+				_, err = upstreamRepository.WriteBlob([]byte("a"))
+				require.Nil(t, err)
+
+				_, err = upstreamRepository.WriteBlob([]byte("b"))
+				require.Nil(t, err)
+
+				upstreamTreeBuilder := NewTreeBuilder(upstreamRepository)
+
+				// The upstream tree is:
+				// a                -> blobA
+				// foo/a            -> blobA
+				// foo/b            -> blobB
+				// foobar/foo/bar/b -> blobB
+
+				upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]TreeEntry{
+					NewEntryBlob("a", blobAID),
+					NewEntryBlob("foo/a", blobAID),
+					NewEntryBlob("foo/b", blobBID),
+					NewEntryBlob("foobar/foo/bar/b", blobBID),
+				})
+				require.Nil(t, err)
+
+				upstreamRef := "refs/heads/main"
+				upstreamCommitID, err := upstreamRepository.Commit(upstreamRootTreeID, upstreamRef, "Initial commit\n", false)
+				require.Nil(t, err)
+
 				require.False(t, test.refExists && test.priorPropagation, "refExists and priorPropagation can't both be true")
 
 				downstreamRef := testNameToRefName(name)

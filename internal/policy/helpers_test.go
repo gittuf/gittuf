@@ -1104,9 +1104,12 @@ func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh
 	if err := os.WriteFile(privKeyPath, privateBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	gitinterface.FixKeyPermissionsForWindows(t, privKeyPath)
+
 	if err := os.WriteFile(pubKeyPath, publicBytes, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	gitinterface.FixKeyPermissionsForWindows(t, pubKeyPath)
 
 	signer, err := ssh.NewSignerFromFile(privKeyPath)
 	if err != nil {
