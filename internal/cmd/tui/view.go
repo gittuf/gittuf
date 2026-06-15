@@ -114,12 +114,24 @@ func screenTrustGlobalRulesHelp(readOnly bool) string {
 	)
 }
 
+// screenTrustRootPrincipalsHelp returns the help bar for the root principals view screen.
+func screenTrustRootPrincipalsHelp(readOnly bool) string {
+	if readOnly {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+			"esc: back  q: quit",
+		)
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render(
+		"a: add  d: delete  esc: back  q: quit",
+	)
+}
+
 // renderDeleteOverlay renders the delete confirmation prompt.
 func renderDeleteOverlay(target string) string {
 	return lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF0000")).
 		Bold(true).
-		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+		Render(fmt.Sprintf("Delete %q? [y/n]", target))
 }
 
 // View renders the TUI.
@@ -143,6 +155,20 @@ func (m model) View() string {
 		return renderWithMargin(m.policyScreenList.View() + "\n" + renderFooter(m.footer) + renderErrorMsg(m.errorMsg))
 	case screenTrust:
 		return renderWithMargin(m.trustScreenList.View() + "\n" + renderFooter(m.footer) + renderErrorMsg(m.errorMsg))
+	case screenTrustRootPrincipals:
+		overlay := ""
+		if m.confirmDelete {
+			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
+		}
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
+			)
+		}
+
+		emptyMsg := "No root principals configured. Press 'A' to add one."
+		return m.renderListScreen(m.rootPrincipalList, overlay+screenTrustRootPrincipalsHelp(m.readOnly)+hint, emptyMsg, len(m.rootPrincipals) == 0)
 	case screenPolicyRules:
 		overlay := ""
 		if m.confirmDelete {
@@ -179,6 +205,8 @@ func (m model) View() string {
 		return m.renderFormScreen("Add Global Rule")
 	case screenTrustEditGlobalRule:
 		return m.renderFormScreen("Edit Global Rule")
+	case screenTrustAddRootPrincipal:
+		return m.renderFormScreen("Add Root Principal")
 	default:
 		return "Unknown screen"
 	}

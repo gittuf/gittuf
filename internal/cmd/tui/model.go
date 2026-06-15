@@ -22,16 +22,18 @@ import (
 type screen int
 
 const (
-	screenLoading             screen = iota // Loading screen shown on startup
-	screenChoice                            // Initial menu
-	screenPolicy                            // Menu for Policy operations
-	screenPolicyRules                       // Rule management screen
-	screenPolicyAddRule                     // Form: add a new policy rule
-	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
-	screenTrust                             // Menu for Trust operations
-	screenTrustGlobalRules                  // Global rule management screen
-	screenTrustAddGlobalRule                // Form: add a new global rule
-	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
+	screenLoading               screen = iota // Loading screen shown on startup
+	screenChoice                              // Initial menu
+	screenPolicy                              // Menu for Policy operations
+	screenPolicyRules                         // Rule management screen
+	screenPolicyAddRule                       // Form: add a new policy rule
+	screenPolicyEditRule                      // Form: edit selected rule (prefilled)
+	screenTrust                               // Menu for Trust operations
+	screenTrustRootPrincipals                 // Root principal management screen
+	screenTrustAddRootPrincipal               // Form: add a new root principal
+	screenTrustGlobalRules                    // Global rule management screen
+	screenTrustAddGlobalRule                  // Form: add a new global rule
+	screenTrustEditGlobalRule                 // Form: edit selected global rule (prefilled)
 )
 
 type item struct {
@@ -49,39 +51,42 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx              context.Context
-	screen           screen
-	spinner          spinner.Model
-	choiceList       list.Model
-	policyScreenList list.Model
-	trustScreenList  list.Model
-	rules            []rule
-	ruleList         list.Model
-	globalRules      []globalRule
-	globalRuleList   list.Model
-	inputs           []textinput.Model
-	focusIndex       int
-	cursorMode       cursor.Mode
-	repo             *gittuf.Repository
-	signer           dsse.SignerVerifier
-	policyName       string
-	options          *options
-	footer           string
-	errorMsg         string
-	readOnly         bool
-	confirmDelete    bool
-	deleteTarget     string
+	ctx               context.Context
+	screen            screen
+	spinner           spinner.Model
+	choiceList        list.Model
+	policyScreenList  list.Model
+	trustScreenList   list.Model
+	rootPrincipals    []rootPrincipal
+	rootPrincipalList list.Model
+	rules             []rule
+	ruleList          list.Model
+	globalRules       []globalRule
+	globalRuleList    list.Model
+	inputs            []textinput.Model
+	focusIndex        int
+	cursorMode        cursor.Mode
+	repo              *gittuf.Repository
+	signer            dsse.SignerVerifier
+	policyName        string
+	options           *options
+	footer            string
+	errorMsg          string
+	readOnly          bool
+	confirmDelete     bool
+	deleteTarget      string
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
 type initDoneMsg struct {
-	repo        *gittuf.Repository
-	signer      dsse.SignerVerifier
-	rules       []rule
-	globalRules []globalRule
-	readOnly    bool
-	footer      string
-	err         error
+	repo           *gittuf.Repository
+	signer         dsse.SignerVerifier
+	rootPrincipals []rootPrincipal
+	rules          []rule
+	globalRules    []globalRule
+	readOnly       bool
+	footer         string
+	err            error
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -159,10 +164,12 @@ func initialModel(ctx context.Context, o *options) model {
 			item{title: "View Rules", desc: "View and manage policy rules"},
 		}, delegate),
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
+			item{title: "View Root Principals", desc: "View and manage root principals/keys"},
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 		}, delegate),
-		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
-		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		rootPrincipalList: newMenuList("Root Principals", []list.Item{}, delegate),
+		ruleList:          newMenuList("Policy Rules", []list.Item{}, delegate),
+		globalRuleList:    newMenuList("Global Rules", []list.Item{}, delegate),
 	}
 
 	return m
@@ -193,12 +200,13 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 		}
 
 		return initDoneMsg{
-			repo:        repo,
-			signer:      signer,
-			rules:       getCurrRules(ctx, o),
-			globalRules: getGlobalRules(ctx, o),
-			readOnly:    readOnly,
-			footer:      footer,
+			repo:           repo,
+			signer:         signer,
+			rootPrincipals: getRootPrincipals(ctx, o),
+			rules:          getCurrRules(ctx, o),
+			globalRules:    getGlobalRules(ctx, o),
+			readOnly:       readOnly,
+			footer:         footer,
 		}
 	}
 }
@@ -250,6 +258,21 @@ func (m *model) initGlobalRuleInputsPrefilled(gr globalRule) {
 	}
 }
 
+// initRootPrincipalInputs initializes the input field for root principal add form.
+func (m *model) initRootPrincipalInputs() {
+	m.inputs = initInputs([]inputField{
+		{"Enter Public Key Path Here", "Root Key Path:"},
+	})
+	m.inputs[0].CharLimit = 256
+	m.focusIndex = 0
+}
+
+// refreshRootPrincipals re-fetches root principals from the repo and rebuilds the list.
+func (m *model) refreshRootPrincipals() {
+	m.rootPrincipals = getRootPrincipals(m.ctx, m.options)
+	m.updateRootPrincipalList()
+}
+
 // refreshRules re-fetches rules from the repo and rebuilds the list.
 func (m *model) refreshRules() {
 	m.rules = getCurrRules(m.ctx, m.options)
@@ -260,6 +283,15 @@ func (m *model) refreshRules() {
 func (m *model) refreshGlobalRules() {
 	m.globalRules = getGlobalRules(m.ctx, m.options)
 	m.updateGlobalRuleList()
+}
+
+// updateRootPrincipalList updates the root principal list within the TUI.
+func (m *model) updateRootPrincipalList() {
+	items := make([]list.Item, len(m.rootPrincipals))
+	for i, principal := range m.rootPrincipals {
+		items[i] = item{title: principal.id, desc: principal.desc}
+	}
+	m.rootPrincipalList.SetItems(items)
 }
 
 // updateRuleList updates the rule list within the TUI.
