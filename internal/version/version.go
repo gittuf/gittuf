@@ -21,3 +21,8 @@ func GetVersion() string {
 
 	return buildInfo.Main.Version
 }
+
+// SetGitVersionForTest is used in tests to override the basic version information.
+func SetGitVersionForTest(v string) {
+	gitVersion = v
+}
