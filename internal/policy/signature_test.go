@@ -154,18 +154,23 @@ func TestSignatureVerifier(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		verifier := &SignatureVerifier{
-			repository: repo,
-			name:       "test-verifier",
-			principals: test.principals,
-			threshold:  test.threshold,
-		}
+		name := name
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			verifier := &SignatureVerifier{
+				repository: repo,
+				name:       "test-verifier",
+				principals: test.principals,
+				threshold:  test.threshold,
+			}
 
-		_, err := verifier.Verify(testCtx, test.gitObjectID, test.attestation)
-		if test.expectedError == nil {
-			assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
-		} else {
-			assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("incorrect error received in test '%s'", name))
-		}
+			_, err := verifier.Verify(testCtx, test.gitObjectID, test.attestation)
+			if test.expectedError == nil {
+				assert.Nil(t, err, fmt.Sprintf("unexpected error in test '%s'", name))
+			} else {
+				assert.ErrorIs(t, err, test.expectedError, fmt.Sprintf("incorrect error received in test '%s'", name))
+			}
+		})
 	}
 }

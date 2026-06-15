@@ -660,7 +660,10 @@ func TestStateVerify(t *testing.T) {
 }
 
 func TestStateCommit(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no controller metadata", func(t *testing.T) {
+		t.Parallel()
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 		// Commit and Apply are called by the helper
 
@@ -679,6 +682,7 @@ func TestStateCommit(t *testing.T) {
 	})
 
 	t.Run("with single controller metadata", func(t *testing.T) {
+		t.Parallel()
 		// Create a state for controller repo, let's get the metadata from this
 		// state and embed into another
 		controllerState := createTestStateWithOnlyRoot(t)
@@ -719,6 +723,7 @@ func TestStateCommit(t *testing.T) {
 	})
 
 	t.Run("with multiple controller metadata", func(t *testing.T) {
+		t.Parallel()
 		// Create states for controller repos, let's get the metadata from these
 		// states and embed into another
 		controller1State := createTestStateWithOnlyRoot(t)
@@ -769,6 +774,7 @@ func TestStateCommit(t *testing.T) {
 	})
 
 	t.Run("with nested controller metadata", func(t *testing.T) {
+		t.Parallel()
 		// Create states for controller repos, let's get the metadata from these
 		// states and embed into another
 		controller1State := createTestStateWithOnlyRoot(t)
@@ -996,7 +1002,10 @@ func TestStateHasRuleName(t *testing.T) {
 }
 
 func TestApply(t *testing.T) {
+	t.Parallel()
+
 	t.Run("regular apply", func(t *testing.T) {
+		t.Parallel()
 		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))

@@ -11,6 +11,8 @@ import (
 )
 
 func TestInitializeTargetsMetadata(t *testing.T) {
+	t.Parallel()
+
 	targetsMetadata := InitializeTargetsMetadata()
 
 	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())

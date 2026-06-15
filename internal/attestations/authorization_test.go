@@ -18,7 +18,10 @@ import (
 )
 
 func TestSetReferenceAuthorization(t *testing.T) {
+	t.Parallel()
 	t.Run("for commit", func(t *testing.T) {
+		t.Parallel()
+
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
 		testID := gitinterface.ZeroHash.String()
@@ -44,6 +47,8 @@ func TestSetReferenceAuthorization(t *testing.T) {
 	})
 
 	t.Run("for tag", func(t *testing.T) {
+		t.Parallel()
+
 		tagRef := "refs/tags/v1"
 		testID := gitinterface.ZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
@@ -109,7 +114,10 @@ func TestSetReferenceAuthorization(t *testing.T) {
 }
 
 func TestRemoveReferenceAuthorization(t *testing.T) {
+	t.Parallel()
 	t.Run("for commit", func(t *testing.T) {
+		t.Parallel()
+
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
 		testID := gitinterface.ZeroHash.String()
@@ -147,6 +155,8 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 	})
 
 	t.Run("for tag", func(t *testing.T) {
+		t.Parallel()
+
 		tagRef := "refs/tags/v1"
 		testID := gitinterface.ZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
@@ -169,7 +179,10 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 }
 
 func TestGetReferenceAuthorizationFor(t *testing.T) {
+	t.Parallel()
 	t.Run("for commit", func(t *testing.T) {
+		t.Parallel()
+
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
 		testID := gitinterface.ZeroHash.String()
@@ -200,6 +213,8 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 	})
 
 	t.Run("for tag", func(t *testing.T) {
+		t.Parallel()
+
 		tagRef := "refs/tags/v1"
 		testID := gitinterface.ZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
