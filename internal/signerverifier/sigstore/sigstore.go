@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"log/slog"
@@ -44,10 +45,11 @@ const (
 )
 
 type Verifier struct {
-	rekorURL string
-	issuer   string
-	identity string
-	ext      *structpb.Struct
+	rekorURL  string
+	issuer    string
+	identity  string
+	ext       *structpb.Struct
+	publicKey crypto.PublicKey
 }
 
 func NewVerifierFromIdentityAndIssuer(identity, issuer string, opts ...verifieropts.Option) *Verifier {
@@ -119,6 +121,8 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 		return err
 	}
 
+	v.publicKey, _ = publicKeyFromVerificationMaterial(verificationMaterial)
+
 	expectedIdentity, err := verify.NewShortCertificateIdentity(v.issuer, "", v.identity, "")
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Unable to create expected identity constraint: %v", err))
@@ -146,12 +150,39 @@ func (v *Verifier) KeyID() (string, error) {
 }
 
 func (v *Verifier) Public() crypto.PublicKey {
-	// TODO
-	return nil
+	return v.publicKey
 }
 
 func (v *Verifier) SetExtension(ext *structpb.Struct) {
 	v.ext = ext
+}
+
+func publicKeyFromVerificationMaterial(verif *protobundle.VerificationMaterial) (crypto.PublicKey, error) {
+	if verif == nil {
+		return nil, nil
+	}
+
+	if cert := verif.GetCertificate(); cert != nil {
+		x509Cert, err := x509.ParseCertificate(cert.GetRawBytes())
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse Sigstore certificate: %w", err)
+		}
+		return x509Cert.PublicKey, nil
+	}
+
+	if chain := verif.GetX509CertificateChain(); chain != nil {
+		certs := chain.GetCertificates()
+		if len(certs) == 0 {
+			return nil, nil
+		}
+		x509Cert, err := x509.ParseCertificate(certs[0].GetRawBytes())
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse Sigstore certificate chain: %w", err)
+		}
+		return x509Cert.PublicKey, nil
+	}
+
+	return nil, nil
 }
 
 func (v *Verifier) ExpectedExtensionKind() string {
