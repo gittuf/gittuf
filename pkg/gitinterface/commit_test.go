@@ -563,8 +563,6 @@ func TestGetCommitTreeID(t *testing.T) {
 }
 
 func TestGetCommitParentIDs(t *testing.T) {
-	// TODO: test with merge commit
-
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 
@@ -597,6 +595,12 @@ func TestGetCommitParentIDs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
 
+	// Create merge commit
+	mergeCommitID := repo.commitWithParents(t, emptyTreeID, []Hash{initialCommitID, secondCommitID}, "Merge commit\n", false)
+
+	mergeCommitParentIDs, err := repo.GetCommitParentIDs(mergeCommitID)
+	assert.Nil(t, err)
+	assert.Equal(t, []Hash{initialCommitID, secondCommitID}, mergeCommitParentIDs)
 	blobID, err := repo.WriteBlob([]byte("test"))
 	require.Nil(t, err)
 	_, err = repo.GetCommitParentIDs(blobID)
