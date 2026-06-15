@@ -2,6 +2,10 @@
 
 Pull RSL from the specified remote
 
+### Synopsis
+
+The 'pull' command retrieves updates to the RSL from the specified remote repository and updates the local RSL. It is used to synchronize the local RSL with the remote to ensure consistency.
+
 ```
 gittuf rsl remote pull <remote> [flags]
 ```

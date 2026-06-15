@@ -25,6 +25,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "push <remote>",
 		Short:             "Push RSL to the specified remote",
+		Long:              "The 'push' command sends new entries in the local RSL to the specified remote repository. It is used to publish local RSL updates so they are available for other users to pull down.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

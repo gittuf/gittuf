@@ -2,6 +2,10 @@
 
 Display the repository's Reference State Log
 
+### Synopsis
+
+The 'log' command displays the repository's RSL. It is used to view the history of reference state changes and inspect prior entries in the RSL.
+
 ```
 gittuf rsl log [flags]
 ```
@@ -9,7 +13,8 @@ gittuf rsl log [flags]
 ### Options
 
 ```
-  -h, --help   help for log
+  -h, --help              help for log
+      --ref stringArray   only display RSL entries for the specified references
 ```
 
 ### Options inherited from parent commands

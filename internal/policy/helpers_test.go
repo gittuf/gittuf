@@ -171,6 +171,42 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	}
 }
 
+func createTestStateWithOnlyRootUnnumbered(t *testing.T) *State {
+	// This is a clone of createTestStateWithOnlyRoot but with the version of
+	// the root metadata overridden to be 0 (unnumbered). This allows us to test
+	// the behavior of transitioning from unnumbered to numbered metadata, which
+	// is relevant for repositories that had existing metadata before gittuf was
+	// introduced.
+
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Override the version to be 0
+	rootMetadata.(*tufv02.RootMetadata).Version = 0
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &State{
+		Metadata: &StateMetadata{
+			RootEnvelope: rootEnv,
+		},
+	}
+}
+
 func createTestStateWithPolicy(t *testing.T) *State {
 	t.Helper()
 
@@ -218,6 +254,147 @@ func createTestStateWithPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
+	}
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func createTestStateWithPolicyUnnumbered(t *testing.T) *State {
+	// This is a clone of createTestStateWithPolicy but with the version of the
+	// metadata overridden to be 0 (unnumbered). This allows us to test the
+	// behavior of transitioning from unnumbered to numbered metadata, which is
+	// relevant for repositories that had existing metadata before gittuf was
+	// introduced.
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Override the version to be 0
+	rootMetadata.(*tufv02.RootMetadata).Version = 0
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override the version to be 0
+	targetsMetadata.(*tufv02.TargetsMetadata).Version = 0
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
+	}
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
+func createTestStateWithPolicyTargetsSignedByWrongKey(t *testing.T) *State {
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, rootSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	targetsSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+	if err := targetsMetadata.AddRule("protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1); err != nil {
+		t.Fatal(err)
+	}
+	// Add a file protection rule. When used with common.AddNTestCommitsToSpecifiedRef, we have files with names 1, 2, 3,...n.
+	if err := targetsMetadata.AddRule("protect-files-1-and-2", []string{gpgKey.KeyID}, []string{"file:1", "file:2"}, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, targetsSigner)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
@@ -339,5 +340,13 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("non-commit object", func(t *testing.T) {
+		blobID, err := repo.WriteBlob([]byte("test"))
+		require.Nil(t, err)
+
+		_, err = repo.GetFilePathsChangedByCommit(blobID)
+		assert.ErrorContains(t, err, "is not a commit object")
 	})
 }

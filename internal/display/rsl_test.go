@@ -14,50 +14,51 @@ import (
 )
 
 func TestRSLLog(t *testing.T) {
-	tmpDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+	t.Run("without filtering refs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	// add first entry
-	if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// add first entry
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// skip annotation
-	if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// skip annotation
+		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	// add another entry
-	if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// add another entry
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	// add another entry
-	if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// add another entry
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	entry, _, err = rsl.GetLatestReferenceUpdaterEntry(repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+		entry, _, err = rsl.GetLatestReferenceUpdaterEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	// skip annotation
-	if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// skip annotation
+		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	// non-skip annotation
-	if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
-		t.Fatal(err)
-	}
+		// non-skip annotation
+		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
 
-	expectedOutput := `entry 2d21a6b9fb1f3e432e0776eac63acdc23a57b538 (skipped)
+		expectedOutput := `entry 2d21a6b9fb1f3e432e0776eac63acdc23a57b538 (skipped)
 
   Ref:    refs/heads/main
   Target: 0000000000000000000000000000000000000000
@@ -94,11 +95,67 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
       msg
 `
 
-	output := &bytes.Buffer{}
-	writer := &noopwritecloser{writer: output}
-	err = RSLLog(repo, writer)
-	assert.Nil(t, err)
-	assert.Equal(t, expectedOutput, output.String())
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		err = RSLLog(repo, writer)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("with filtering refs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		// add first entry
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// skip annotation
+		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// add another entry -- not for main
+		if err := rsl.NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// add another entry
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		expectedOutput := `entry 916d8f11c106d58ac48143cfb2cd4ff43ec82dd7
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 4
+
+entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+    Annotation ID: f79156492abec45bb2e1dbc518999a83b31a069c
+    Skip:          yes
+    Number:        2
+    Message:
+      msg
+`
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		err = RSLLog(repo, writer, WithReferences([]string{"refs/heads/main"}))
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
 }
 
 func TestWriteRSLReferenceEntry(t *testing.T) {

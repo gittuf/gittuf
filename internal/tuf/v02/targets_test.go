@@ -4,6 +4,7 @@
 package v02
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -21,6 +22,21 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		d := time.Date(1995, time.October, 26, 9, 0, 0, 0, time.UTC)
 		targetsMetadata.SetExpires(d.Format(time.RFC3339))
 		assert.Equal(t, "1995-10-26T09:00:00Z", targetsMetadata.Expires)
+	})
+
+	t.Run("test GetSchemaVersion", func(t *testing.T) {
+		version := targetsMetadata.GetSchemaVersion()
+		assert.Equal(t, "http://gittuf.dev/policy/rule-file/v0.2", version)
+	})
+
+	t.Run("test GetVersion and IncrementVersion", func(t *testing.T) {
+		version := targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(1), version)
+
+		targetsMetadata.IncrementVersion()
+
+		version = targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(2), version)
 	})
 
 	t.Run("test Validate", func(t *testing.T) {
@@ -76,6 +92,48 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.False(t, exists)
 
 		assert.Empty(t, delegations.Principals)
+	})
+}
+
+func TestDelegationsUnmarshalJSON(t *testing.T) {
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	person := &Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*Key{key.KeyID: key},
+	}
+
+	t.Run("key and person principals", func(t *testing.T) {
+		delegations := &Delegations{
+			Principals: map[string]tuf.Principal{
+				key.KeyID:       key,
+				person.PersonID: person,
+			},
+			Roles: []*Delegation{AllowRule()},
+		}
+
+		data, err := json.Marshal(delegations)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got := &Delegations{}
+		err = json.Unmarshal(data, got)
+		assert.Nil(t, err)
+		assert.Equal(t, delegations, got)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := json.Unmarshal([]byte(`{`), delegations)
+		assert.ErrorContains(t, err, "unexpected end of JSON input")
+	})
+
+	t.Run("unrecognized principal", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := json.Unmarshal([]byte(`{"principals":{"unknown":{"name":"unknown"}}}`), delegations)
+		assert.ErrorContains(t, err, "unrecognized principal type")
 	})
 }
 
@@ -262,7 +320,10 @@ func TestAddRuleAndGetRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID, key2.KeyID, person.PersonID}, []string{"test/"}, 1)
+	err := targetsMetadata.AddRule("invalid-threshold-rule", []string{key1.KeyID, key2.KeyID, person.PersonID}, []string{"test/"}, 0)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key1.KeyID, key2.KeyID, person.PersonID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Principals[key1.KeyID])
@@ -283,6 +344,26 @@ func TestAddRuleAndGetRules(t *testing.T) {
 	rules := targetsMetadata.GetRules()
 	assert.Equal(t, 2, len(rules))
 	assert.Equal(t, []tuf.Rule{rule, AllowRule()}, rules)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.AddRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"), nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		// Test non-existent principal
+		err = targetsMetadata.AddRule(("rule"), []string{"bob"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test insufficient principals for threshold
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.AddRule(("rule"), []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
 }
 
 func TestUpdateDelegation(t *testing.T) {
@@ -311,6 +392,9 @@ func TestUpdateDelegation(t *testing.T) {
 	if err := targetsMetadata.AddPrincipal(key2); err != nil {
 		t.Fatal(err)
 	}
+	err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 0)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+
 	err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key1.KeyID)
@@ -324,6 +408,26 @@ func TestUpdateDelegation(t *testing.T) {
 		Terminating: false,
 		Role:        Role{PrincipalIDs: set.NewSetFromItems(key1.KeyID, key2.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.UpdateRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"), nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		// Test non-existent principal
+		err = targetsMetadata.UpdateRule(("rule"), []string{"bob"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test insufficient principals for threshold
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.UpdateRule(("rule"), []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
 }
 
 func TestReorderRules(t *testing.T) {
@@ -423,6 +527,57 @@ func TestRemoveRule(t *testing.T) {
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		// Test check for manipulating rules with gittuf prefix
+		err = targetsMetadata.RemoveRule(fmt.Sprintf("%s%s", tuf.GittufPrefix, "rule"))
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+	})
+}
+
+func TestRemovePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	person := &Person{
+		PersonID: "jane.doe",
+		PublicKeys: map[string]*Key{
+			key.KeyID: key,
+		},
+	}
+
+	err := targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	err = targetsMetadata.AddPrincipal(key)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Principals, key.KeyID)
+
+	err = targetsMetadata.AddPrincipal(person)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Principals, person.PersonID)
+
+	err = targetsMetadata.RemovePrincipal("")
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalStillInUse)
+
+	err = targetsMetadata.RemovePrincipal(person.PersonID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Principals, person.PersonID)
+
+	err = targetsMetadata.RemoveRule("test-rule")
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Principals, key.KeyID)
 }
 
 func TestUpdatePrincipal(t *testing.T) {

@@ -2,6 +2,10 @@
 
 Push RSL to the specified remote
 
+### Synopsis
+
+The 'push' command sends new entries in the local RSL to the specified remote repository. It is used to publish local RSL updates so they are available for other users to pull down.
+
 ```
 gittuf rsl remote push <remote> [flags]
 ```

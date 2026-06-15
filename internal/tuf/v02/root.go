@@ -19,8 +19,9 @@ const (
 // RootMetadata defines the schema of TUF's Root role.
 type RootMetadata struct {
 	Type               string                     `json:"type"`
-	Version            string                     `json:"schemaVersion"`
+	SchemaVersion      string                     `json:"schemaVersion"`
 	Expires            string                     `json:"expires"`
+	Version            uint64                     `json:"version"`
 	RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
 	Principals         map[string]tuf.Principal   `json:"principals"`
 	Roles              map[string]Role            `json:"roles"`
@@ -34,8 +35,9 @@ type RootMetadata struct {
 // NewRootMetadata returns a new instance of RootMetadata.
 func NewRootMetadata() *RootMetadata {
 	return &RootMetadata{
-		Type:    "root",
-		Version: RootVersion,
+		Type:          "root",
+		SchemaVersion: RootVersion,
+		Version:       1,
 	}
 }
 
@@ -44,9 +46,19 @@ func (r *RootMetadata) SetExpires(expires string) {
 	r.Expires = expires
 }
 
-// SchemaVersion returns the metadata schema version.
-func (r *RootMetadata) SchemaVersion() string {
+// GetSchemaVersion returns the metadata schema version.
+func (r *RootMetadata) GetSchemaVersion() string {
+	return r.SchemaVersion
+}
+
+// GetVersion returns the metadata version number.
+func (r *RootMetadata) GetVersion() uint64 {
 	return r.Version
+}
+
+// IncrementVersion increments the metadata version number by 1.
+func (r *RootMetadata) IncrementVersion() {
+	r.Version++
 }
 
 // GetRepositoryLocation returns the canonical location of the Git repository.
@@ -228,6 +240,10 @@ func (r *RootMetadata) UpdateRootThreshold(threshold int) error {
 		return tuf.ErrInvalidRootMetadata
 	}
 
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
+	}
+
 	if rootRole.PrincipalIDs.Len() < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -242,6 +258,10 @@ func (r *RootMetadata) UpdatePrimaryRuleFileThreshold(threshold int) error {
 	targetsRole, ok := r.Roles[tuf.TargetsRoleName]
 	if !ok {
 		return tuf.ErrPrimaryRuleFileInformationNotFoundInRoot
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if targetsRole.PrincipalIDs.Len() < threshold {
@@ -344,8 +364,9 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// json.RawMessage in place of tuf interfaces
 	type tempType struct {
 		Type               string                     `json:"type"`
-		Version            string                     `json:"schemaVersion"`
+		SchemaVersion      string                     `json:"schemaVersion"`
 		Expires            string                     `json:"expires"`
+		Version            uint64                     `json:"version"`
 		RepositoryLocation string                     `json:"repositoryLocation,omitempty"`
 		Principals         map[string]json.RawMessage `json:"principals"`
 		Roles              map[string]Role            `json:"roles"`
@@ -362,8 +383,9 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.Type = temp.Type
-	r.Version = temp.Version
+	r.SchemaVersion = temp.SchemaVersion
 	r.Expires = temp.Expires
+	r.Version = temp.Version
 	r.RepositoryLocation = temp.RepositoryLocation
 
 	r.Principals = make(map[string]tuf.Principal)
@@ -449,6 +471,12 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 
 // AddGlobalRule adds a new global rule to RootMetadata.
 func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	if allGlobalRules == nil {
 		allGlobalRules = []tuf.GlobalRule{}
@@ -486,6 +514,12 @@ func (r *RootMetadata) DeleteGlobalRule(ruleName string) error {
 
 // UpdateGlobalRule updates the specified global rule from the RootMetadata.
 func (r *RootMetadata) UpdateGlobalRule(globalRule tuf.GlobalRule) error {
+	if thresholdRule, ok := globalRule.(tuf.GlobalRuleThreshold); ok {
+		if thresholdRule.GetThreshold() <= 0 {
+			return tuf.ErrInvalidThreshold
+		}
+	}
+
 	allGlobalRules := r.GlobalRules
 	updatedGlobalRules := []tuf.GlobalRule{}
 	found := false

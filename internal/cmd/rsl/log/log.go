@@ -11,9 +11,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct{}
+type options struct {
+	refs []string
+}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	cmd.Flags().StringArrayVar(
+		&o.refs,
+		"ref",
+		nil,
+		"only display RSL entries for the specified references",
+	)
+}
 
 func (o *options) Run(_ *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository(".")
@@ -21,7 +30,7 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(os.Stdout))
+	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(os.Stdout), display.WithReferences(o.refs))
 }
 
 func New() *cobra.Command {
@@ -29,6 +38,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "log",
 		Short:             "Display the repository's Reference State Log",
+		Long:              "The 'log' command displays the repository's RSL. It is used to view the history of reference state changes and inspect prior entries in the RSL.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -38,6 +38,7 @@ var (
 	ErrCannotVerifyMergeableForTagRef                    = errors.New("cannot verify mergeable into tag reference")
 	ErrNetworkRepositoryDoesNotDeclareRequiredController = errors.New("network repository does not declare required controller repository")
 	ErrNetworkRepositoryHasStaleControllerMetadata       = errors.New("network repository has not fetched latest controller metadata")
+	ErrMetadataRollbackDetected                          = errors.New("gittuf policy metadata rollback detected")
 )
 
 // PolicyVerifier implements various gittuf verification workflows.
@@ -734,6 +735,80 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	return nil
 }
 
+func (s *StateMetadata) VerifyNewStateMetadata(_ context.Context, newStateMetadata *StateMetadata) error {
+	// Check new state's root version number is >= current state's root version number
+	currentRootMetadata, err := s.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+	newRootMetadata, err := newStateMetadata.GetRootMetadata(false)
+	if err != nil {
+		return err
+	}
+	if newRootMetadata.GetVersion() < currentRootMetadata.GetVersion() {
+		return fmt.Errorf("%w: new policy root version is older than current policy root version, %d < %d", ErrMetadataRollbackDetected, newRootMetadata.GetVersion(), currentRootMetadata.GetVersion())
+	}
+
+	// Check new state's rule files have version numbers >= current state's rule file version numbers
+
+	// First off, compare the primary rule file
+	currentTargetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, false)
+	if err != nil {
+		if errors.Is(err, ErrMetadataNotFound) {
+			// If the current state doesn't have a primary rule file, we can
+			// return early as there is no risk of rollback with the rule files
+			// in the new state.
+			return nil
+		}
+
+		return err
+	}
+	newTargetsMetadata, err := newStateMetadata.GetTargetsMetadata(TargetsRoleName, false)
+	if err != nil {
+		// At this point, we know the current state has a primary rule file, so
+		// if the new state doesn't have one, it's a rollback. This MAY change
+		// when we support deleting rule files, though maybe we don't allow that
+		// for primary rule files.
+		if errors.Is(err, ErrMetadataNotFound) {
+			return fmt.Errorf("%w: new policy is missing primary rule file", ErrMetadataRollbackDetected)
+		}
+
+		return err
+	}
+	if newTargetsMetadata.GetVersion() < currentTargetsMetadata.GetVersion() {
+		return fmt.Errorf("%w: new policy primary rule file version is older than current policy primary rule file version, %d < %d", ErrMetadataRollbackDetected, newTargetsMetadata.GetVersion(), currentTargetsMetadata.GetVersion())
+	}
+
+	// Then compare all delegated rule files.
+	// We need to check that the rule files in the new state with the same name
+	// as a rule file in the current state have greater or equal version numbers.
+	// The new state may have a rule file added that doesn't exist in the
+	// current state, but it shouldn't have any removed rule files compared to
+	// the current state as we don't yet support deleting rule files.
+	for name := range s.DelegationEnvelopes {
+		currentDelegatedTargetsMetadata, err := s.GetTargetsMetadata(name, true)
+		if err != nil {
+			return err
+		}
+		newDelegatedTargetsMetadata, err := newStateMetadata.GetTargetsMetadata(name, true)
+		if err != nil {
+			// At this point, we know the current state has this delegated rule
+			// file, so if the new state doesn't have it, it's a rollback.
+			// This will change once we support deleting rule files.
+			if errors.Is(err, ErrMetadataNotFound) {
+				return fmt.Errorf("%w: new policy is missing delegated rule file '%s'", ErrMetadataRollbackDetected, name)
+			}
+
+			return err
+		}
+		if newDelegatedTargetsMetadata.GetVersion() < currentDelegatedTargetsMetadata.GetVersion() {
+			return fmt.Errorf("%w: new policy delegated rule file '%s' version is older than current policy delegated rule file version, %d < %d", ErrMetadataRollbackDetected, name, newDelegatedTargetsMetadata.GetVersion(), currentDelegatedTargetsMetadata.GetVersion())
+		}
+	}
+
+	return nil
+}
+
 // VerifyNewState ensures that when a new policy is encountered, its root role
 // is signed by keys trusted in the current policy.
 func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
@@ -742,8 +817,29 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 		return err
 	}
 
-	_, err = rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.Metadata.RootEnvelope)
-	return err
+	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.Metadata.RootEnvelope); err != nil {
+		return err
+	}
+
+	// Verify state metadata to protect against rollback attacks
+	if err := s.Metadata.VerifyNewStateMetadata(ctx, newPolicy.Metadata); err != nil {
+		return err
+	}
+
+	// Verify controller state metadata to protect against rollback attacks upstream
+	for name, controllerMetadata := range s.ControllerMetadata {
+		newControllerMetadata, hasController := newPolicy.ControllerMetadata[name]
+		if !hasController {
+			slog.Debug(fmt.Sprintf("new policy does not have metadata for the controller '%s', skipping check for rollback of its metadata...", name))
+			continue
+		}
+
+		if err := controllerMetadata.VerifyNewStateMetadata(ctx, newControllerMetadata); err != nil {
+			return fmt.Errorf("controller '%s' metadata failed new state metadata verification: %w", name, err)
+		}
+	}
+
+	return nil
 }
 
 // verifyEntry is a helper to verify an entry's signature using the specified

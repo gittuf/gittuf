@@ -22,19 +22,21 @@ var ErrTargetsNotEmpty = errors.New("`targets` field in gittuf Targets metadata 
 
 // TargetsMetadata defines the schema of TUF's Targets role.
 type TargetsMetadata struct {
-	Type        string         `json:"type"`
-	Version     string         `json:"schemaVersion"`
-	Expires     string         `json:"expires"`
-	Targets     map[string]any `json:"targets"`
-	Delegations *Delegations   `json:"delegations"`
+	Type          string         `json:"type"`
+	SchemaVersion string         `json:"schemaVersion"`
+	Expires       string         `json:"expires"`
+	Version       uint64         `json:"version"`
+	Targets       map[string]any `json:"targets"`
+	Delegations   *Delegations   `json:"delegations"`
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
 func NewTargetsMetadata() *TargetsMetadata {
 	return &TargetsMetadata{
-		Type:        "targets",
-		Version:     TargetsVersion,
-		Delegations: &Delegations{Roles: []*Delegation{AllowRule()}},
+		Type:          "targets",
+		SchemaVersion: TargetsVersion,
+		Version:       1,
+		Delegations:   &Delegations{Roles: []*Delegation{AllowRule()}},
 	}
 }
 
@@ -44,9 +46,19 @@ func (t *TargetsMetadata) SetExpires(expires string) {
 	t.Expires = expires
 }
 
-// SchemaVersion returns the metadata schema version.
-func (t *TargetsMetadata) SchemaVersion() string {
+// GetSchemaVersion returns the metadata schema version.
+func (t *TargetsMetadata) GetSchemaVersion() string {
+	return t.SchemaVersion
+}
+
+// GetVersion returns the metadata version number.
+func (t *TargetsMetadata) GetVersion() uint64 {
 	return t.Version
+}
+
+// IncrementVersion increments the metadata version number by 1.
+func (t *TargetsMetadata) IncrementVersion() {
+	t.Version++
 }
 
 // Validate ensures the instance of TargetsMetadata matches gittuf expectations.
@@ -67,6 +79,10 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		if _, has := t.Delegations.Principals[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
 		}
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if len(authorizedPrincipalIDs) < threshold {
@@ -102,6 +118,10 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		if _, has := t.Delegations.Principals[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
 		}
+	}
+
+	if threshold <= 0 {
+		return tuf.ErrInvalidThreshold
 	}
 
 	if len(authorizedPrincipalIDs) < threshold {

@@ -162,3 +162,66 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 
 	// We can't test sigstore due to it being online...
 }
+
+func TestLoadPublicKey(t *testing.T) {
+	t.Run("sigstore", func(t *testing.T) {
+		t.Run("fulcio valid", func(t *testing.T) {
+			keyRef := "fulcio:test@email.com::issuer"
+
+			key, err := LoadPublicKey(keyRef)
+			require.Nil(t, err)
+			require.NotNil(t, key)
+
+			assert.Equal(t, "test@email.com::issuer", key.ID())
+		})
+		t.Run("fulcio invalid", func(t *testing.T) {
+			_, err := LoadPublicKey("fulcio:invalid")
+			assert.ErrorContains(t, err, "incorrect format for fulcio identity")
+		})
+	})
+
+	t.Run("gpg", func(t *testing.T) {
+		t.Run("invalid key", func(t *testing.T) {
+			_, err := LoadPublicKey("gpg:nonexistentkey123")
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("ssh", func(t *testing.T) {
+		t.Run("invalid path", func(t *testing.T) {
+			_, err := LoadPublicKey("/non/existent/path")
+			assert.Error(t, err)
+		})
+	})
+}
+
+func TestGetSigstoreOptions(t *testing.T) {
+	t.Run("full config", func(t *testing.T) {
+		config := map[string]string{
+			"gitsign.issuer":      "issuer",
+			"gitsign.clientid":    "client",
+			"gitsign.fulcio":      "fulcio-url",
+			"gitsign.rekor":       "rekor-url",
+			"gitsign.redirecturl": "redirect-url",
+		}
+
+		opts := getSigstoreOptions(config)
+		require.Len(t, opts, 5)
+	})
+
+	t.Run("partial config", func(t *testing.T) {
+		config := map[string]string{
+			"gitsign.issuer": "issuer",
+		}
+
+		opts := getSigstoreOptions(config)
+		require.Len(t, opts, 1)
+	})
+
+	t.Run("empty config", func(t *testing.T) {
+		config := map[string]string{}
+
+		opts := getSigstoreOptions(config)
+		assert.Empty(t, opts)
+	})
+}

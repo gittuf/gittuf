@@ -14,6 +14,7 @@ import (
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
@@ -110,6 +111,93 @@ func TestLoadState(t *testing.T) {
 		}
 
 		assertStatesEqual(t, state, loadedState)
+	})
+
+	t.Run("fail loading when first targets is signed by wrong key", func(t *testing.T) {
+		// We can't use createTestRepository because we want to bypass the
+		// guardrails in state.Commit and state.Apply.
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		state.repository = repo
+
+		if err := state.Commit(repo, "Initial state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Now we have the policy committed bypassing guardrails, where the
+		// first policy has the wrongly signed metadata. Load and ensure we see
+		// an error.
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.Error(t, err)
+		require.Nil(t, loadedState)
+	})
+
+	t.Run("fail loading when targets is signed by invalid metadata", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithPolicy)
+
+		rootEnv := state.Metadata.RootEnvelope
+
+		targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+
+		// Re-sign using wrong key and commit bypassing guardrails to ensure we
+		// validate when loading state
+		targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		require.Nil(t, err)
+
+		// The state creator uses the root key for the primary rule file
+		// Sign with a different key
+		invalidSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		targetsEnv, err = dsse.SignEnvelope(t.Context(), targetsEnv, invalidSigner)
+		require.Nil(t, err)
+
+		newState := &State{
+			Metadata: &StateMetadata{
+				RootEnvelope:    rootEnv,
+				TargetsEnvelope: targetsEnv,
+			},
+		}
+
+		if err := newState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := newState.Commit(repo, "Updated state", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.Error(t, err)
+		require.Nil(t, loadedState)
 	})
 
 	t.Run("fail loading while verifying multiple states, bad sig", func(t *testing.T) {
@@ -731,6 +819,22 @@ func TestStateCommit(t *testing.T) {
 	})
 }
 
+func TestStateGetRootKeys(t *testing.T) {
+	t.Parallel()
+	state := createTestStateWithOnlyRoot(t)
+
+	rootMetadata, err := state.GetRootMetadata(true)
+	require.Nil(t, err)
+
+	rootPrincipals, err := rootMetadata.GetRootPrincipals()
+	require.Nil(t, err)
+
+	rootKeys, err := state.GetRootKeys()
+	assert.Nil(t, err)
+
+	assert.ElementsMatch(t, rootPrincipals, rootKeys)
+}
+
 func TestStateGetRootMetadata(t *testing.T) {
 	t.Parallel()
 	state := createTestStateWithOnlyRoot(t)
@@ -741,6 +845,55 @@ func TestStateGetRootMetadata(t *testing.T) {
 	rootPrincipals, err := rootMetadata.GetRootPrincipals()
 	assert.Nil(t, err)
 	assert.Equal(t, "SHA256:ESJezAOo+BsiEpddzRXS6+wtF16FID4NCd+3gj96rFo", rootPrincipals[0].ID())
+
+	t.Run("no schema version", func(t *testing.T) {
+		t.Parallel()
+		rootMetadata = tufv01.NewRootMetadata()
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state = &State{
+			Metadata: &StateMetadata{
+				RootEnvelope: rootEnv,
+			},
+		}
+
+		_, err = state.GetRootMetadata(false)
+		assert.Nil(t, err)
+	})
+}
+
+func TestStateGetTargetsMetadata(t *testing.T) {
+	t.Run("no schema version", func(t *testing.T) {
+		targetsMetadata := tufv01.NewTargetsMetadata()
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+
+		rootEnv, err := dsse.CreateEnvelope(targetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := &State{
+			Metadata: &StateMetadata{
+				TargetsEnvelope: rootEnv,
+			},
+		}
+
+		_, err = state.GetTargetsMetadata(TargetsRoleName, false)
+		assert.Nil(t, err)
+	})
 }
 
 func TestStateFindVerifiersForPath(t *testing.T) {
@@ -816,6 +969,30 @@ func TestStateHasFileRule(t *testing.T) {
 		hasFileRule := state.hasFileRule
 		assert.False(t, hasFileRule)
 	})
+}
+
+func TestStateGetAllPrincipals(t *testing.T) {
+	t.Parallel()
+	state := createTestStateWithPolicy(t)
+
+	rootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.Nil(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	principals := state.GetAllPrincipals()
+	assert.Len(t, principals, 2)
+	assert.Contains(t, principals, rootKey.ID())
+	assert.Contains(t, principals, gpgKey.ID())
+}
+
+func TestStateHasRuleName(t *testing.T) {
+	t.Parallel()
+	state := createTestStateWithPolicy(t)
+
+	assert.True(t, state.HasRuleName("protect-main"))
+	assert.True(t, state.HasRuleName("protect-files-1-and-2"))
+	assert.False(t, state.HasRuleName("missing-rule"))
 }
 
 func TestApply(t *testing.T) {

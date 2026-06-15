@@ -80,6 +80,112 @@ type StateMetadata struct {
 	DelegationEnvelopes map[string]*sslibdsse.Envelope
 }
 
+func (s *StateMetadata) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
+	payloadBytes, err := s.RootEnvelope.DecodeB64Payload()
+	if err != nil {
+		return nil, err
+	}
+	return s.getRootMetadataFromBytes(payloadBytes, migrate)
+}
+
+func (s *StateMetadata) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tuf.RootMetadata, error) {
+	inspectRootMetadata := map[string]any{}
+	if err := json.Unmarshal(metadataBytes, &inspectRootMetadata); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+	}
+
+	schemaVersion, hasSchemaVersion := inspectRootMetadata["schemaVersion"]
+	switch {
+	case !hasSchemaVersion:
+		// this is tufv01
+		// Something that's not tufv01 may also lack the schemaVersion field and
+		// enter this code path. At that point, we're relying on the unmarshal
+		// to return something that's close to tufv01. We may see strange bugs
+		// if this happens, but it's also likely someone trying to submit
+		// incorrect metadata / trigger a version rollback, which we do want to
+		// be aware of.
+		rootMetadata := &tufv01.RootMetadata{}
+		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		}
+
+		if migrate {
+			return migrations.MigrateRootMetadataV01ToV02(rootMetadata), nil
+		}
+
+		return rootMetadata, nil
+
+	case schemaVersion == tufv02.RootVersion:
+		rootMetadata := &tufv02.RootMetadata{}
+		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
+		}
+
+		return rootMetadata, nil
+
+	default:
+		return nil, tuf.ErrUnknownRootMetadataVersion
+	}
+}
+
+func (s *StateMetadata) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMetadata, error) {
+	e := s.TargetsEnvelope
+	if roleName != TargetsRoleName {
+		env, ok := s.DelegationEnvelopes[roleName]
+		if !ok {
+			return nil, ErrMetadataNotFound
+		}
+		e = env
+	}
+
+	if e == nil {
+		return nil, ErrMetadataNotFound
+	}
+
+	payloadBytes, err := e.DecodeB64Payload()
+	if err != nil {
+		return nil, err
+	}
+
+	inspectTargetsMetadata := map[string]any{}
+	if err := json.Unmarshal(payloadBytes, &inspectTargetsMetadata); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+	}
+
+	schemaVersion, hasSchemaVersion := inspectTargetsMetadata["schemaVersion"]
+	switch {
+	case !hasSchemaVersion:
+		// this is tufv01
+		// Something that's not tufv01 may also lack the schemaVersion field and
+		// enter this code path. At that point, we're relying on the unmarshal
+		// to return something that's close to tufv01. We may see strange bugs
+		// if this happens, but it's also likely someone trying to submit
+		// incorrect metadata / trigger a version rollback, which we do want to
+		// be aware of.
+		targetsMetadata := &tufv01.TargetsMetadata{}
+		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+		}
+
+		if migrate {
+			return migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata), nil
+		}
+
+		return targetsMetadata, nil
+
+	case schemaVersion == tufv02.TargetsVersion:
+		targetsMetadata := &tufv02.TargetsMetadata{}
+		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
+		}
+
+		return targetsMetadata, nil
+
+	default:
+		return nil, tuf.ErrUnknownTargetsMetadataVersion
+	}
+}
+
 func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
 	metadata := map[string]*sslibdsse.Envelope{}
 	metadata[RootRoleName] = s.RootEnvelope
@@ -150,6 +256,10 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		state, err := loadStateForEntry(repo, requestedEntry)
 		if err != nil {
 			return nil, err
+		}
+
+		if err := state.Verify(ctx); err != nil {
+			return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 		}
 
 		if len(options.InitialRootPrincipals) == 0 {
@@ -975,11 +1085,7 @@ func (s *State) GetRootKeys() ([]tuf.Principal, error) {
 // The `migrate` parameter determines if the schema must be converted to a newer
 // version.
 func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
-	payloadBytes, err := s.Metadata.RootEnvelope.DecodeB64Payload()
-	if err != nil {
-		return nil, err
-	}
-	return s.getRootMetadataFromBytes(payloadBytes, migrate)
+	return s.Metadata.GetRootMetadata(migrate)
 }
 
 func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetadata, error) {
@@ -988,112 +1094,14 @@ func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetada
 		return nil, fmt.Errorf("%w: '%s'", ErrControllerMetadataNotFound, controllerName)
 	}
 
-	payloadBytes, err := metadata.RootEnvelope.DecodeB64Payload()
-	if err != nil {
-		return nil, err
-	}
-	return s.getRootMetadataFromBytes(payloadBytes, false) // never migrate
-}
-
-func (s *State) getRootMetadataFromBytes(metadataBytes []byte, migrate bool) (tuf.RootMetadata, error) {
-	inspectRootMetadata := map[string]any{}
-	if err := json.Unmarshal(metadataBytes, &inspectRootMetadata); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
-	}
-
-	schemaVersion, hasSchemaVersion := inspectRootMetadata["schemaVersion"]
-	switch {
-	case !hasSchemaVersion:
-		// this is tufv01
-		// Something that's not tufv01 may also lack the schemaVersion field and
-		// enter this code path. At that point, we're relying on the unmarshal
-		// to return something that's close to tufv01. We may see strange bugs
-		// if this happens, but it's also likely someone trying to submit
-		// incorrect metadata / trigger a version rollback, which we do want to
-		// be aware of.
-		rootMetadata := &tufv01.RootMetadata{}
-		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
-		}
-
-		if migrate {
-			return migrations.MigrateRootMetadataV01ToV02(rootMetadata), nil
-		}
-
-		return rootMetadata, nil
-
-	case schemaVersion == tufv02.RootVersion:
-		rootMetadata := &tufv02.RootMetadata{}
-		if err := json.Unmarshal(metadataBytes, rootMetadata); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal root metadata: %w", err)
-		}
-
-		return rootMetadata, nil
-
-	default:
-		return nil, tuf.ErrUnknownRootMetadataVersion
-	}
+	return metadata.GetRootMetadata(false) // never migrate controller metadata
 }
 
 // GetTargetsMetadata returns the deserialized payload of the State's
 // TargetsEnvelope for the specified `roleName`.  The `migrate` parameter
 // determines if the schema must be converted to a newer version.
 func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMetadata, error) {
-	e := s.Metadata.TargetsEnvelope
-	if roleName != TargetsRoleName {
-		env, ok := s.Metadata.DelegationEnvelopes[roleName]
-		if !ok {
-			return nil, ErrMetadataNotFound
-		}
-		e = env
-	}
-
-	if e == nil {
-		return nil, ErrMetadataNotFound
-	}
-
-	payloadBytes, err := e.DecodeB64Payload()
-	if err != nil {
-		return nil, err
-	}
-
-	inspectTargetsMetadata := map[string]any{}
-	if err := json.Unmarshal(payloadBytes, &inspectTargetsMetadata); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
-	}
-
-	schemaVersion, hasSchemaVersion := inspectTargetsMetadata["schemaVersion"]
-	switch {
-	case !hasSchemaVersion:
-		// this is tufv01
-		// Something that's not tufv01 may also lack the schemaVersion field and
-		// enter this code path. At that point, we're relying on the unmarshal
-		// to return something that's close to tufv01. We may see strange bugs
-		// if this happens, but it's also likely someone trying to submit
-		// incorrect metadata / trigger a version rollback, which we do want to
-		// be aware of.
-		targetsMetadata := &tufv01.TargetsMetadata{}
-		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
-		}
-
-		if migrate {
-			return migrations.MigrateTargetsMetadataV01ToV02(targetsMetadata), nil
-		}
-
-		return targetsMetadata, nil
-
-	case schemaVersion == tufv02.TargetsVersion:
-		targetsMetadata := &tufv02.TargetsMetadata{}
-		if err := json.Unmarshal(payloadBytes, targetsMetadata); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal rule file metadata: %w", err)
-		}
-
-		return targetsMetadata, nil
-
-	default:
-		return nil, tuf.ErrUnknownTargetsMetadataVersion
-	}
+	return s.Metadata.GetTargetsMetadata(roleName, migrate)
 }
 
 func (s *State) HasTargetsRole(roleName string) bool {

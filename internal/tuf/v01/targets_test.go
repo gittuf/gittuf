@@ -23,6 +23,21 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		assert.Equal(t, "1995-10-26T09:00:00Z", targetsMetadata.Expires)
 	})
 
+	t.Run("test GetSchemaVersion", func(t *testing.T) {
+		version := targetsMetadata.GetSchemaVersion()
+		assert.Equal(t, "http://gittuf.dev/policy/rule-file/v0.1", version)
+	})
+
+	t.Run("test GetVersion and IncrementVersion", func(t *testing.T) {
+		version := targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(1), version)
+
+		targetsMetadata.IncrementVersion()
+
+		version = targetsMetadata.GetVersion()
+		assert.Equal(t, uint64(2), version)
+	})
+
 	t.Run("test Validate", func(t *testing.T) {
 		err := targetsMetadata.Validate()
 		assert.Nil(t, err)
@@ -233,7 +248,10 @@ func TestAddRuleAndGetRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
+	err := targetsMetadata.AddRule("invalid-threshold-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 0)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Keys[key1.KeyID])
@@ -280,6 +298,9 @@ func TestUpdateDelegation(t *testing.T) {
 	if err := targetsMetadata.AddPrincipal(key2); err != nil {
 		t.Fatal(err)
 	}
+	err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 0)
+	assert.ErrorIs(t, err, tuf.ErrInvalidThreshold)
+
 	err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID, key2.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key1.KeyID)
@@ -392,6 +413,32 @@ func TestRemoveRule(t *testing.T) {
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+}
+
+func TestRemovePrincipal(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	err := targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+	err = targetsMetadata.AddPrincipal(key)
+	assert.Nil(t, err)
+	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+
+	err = targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalStillInUse)
+
+	err = targetsMetadata.RemoveRule("test-rule")
+	assert.Nil(t, err)
+
+	err = targetsMetadata.RemovePrincipal(key.KeyID)
+	assert.Nil(t, err)
+	assert.NotContains(t, targetsMetadata.Delegations.Keys, key.KeyID)
 }
 
 func TestUpdatePrincipal(t *testing.T) {

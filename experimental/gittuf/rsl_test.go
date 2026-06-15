@@ -4,6 +4,7 @@
 package gittuf
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/tuf"
+	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,6 +123,84 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	assert.NotEqual(t, currentEntryID, entry.GetID())
 	assert.Equal(t, newCommitID, entry.TargetID)
 	assert.Equal(t, "refs/heads/not-main", entry.RefName)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false)
+	assert.ErrorIs(t, err, ErrRemoteNotSpecified)
+
+	err = repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordRemote("origin"), rslopts.WithRecordLocalOnly())
+	assert.ErrorIs(t, err, ErrCannotUseRemoteAndLocalOnly)
+
+	t.Run("sync with remote", func(t *testing.T) {
+		remoteName := "origin"
+		refName := "refs/heads/main"
+
+		remoteTmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Initial commit\n", false); err != nil {
+			t.Fatal(err)
+		}
+		err = remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly())
+		assert.Nil(t, err)
+
+		localTmpDir := t.TempDir()
+		localR, err := gitinterface.CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		blobID, err := localR.WriteBlob([]byte("test"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		localTreeBuilder := gitinterface.NewTreeBuilder(localR)
+		treeID, err := localTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+			gitinterface.NewEntryBlob("test.txt", blobID),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		newCommitID, err := localR.Commit(treeID, refName, "Local commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = localRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordRemote(remoteName))
+		assert.Nil(t, err)
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(remoteR, rsl.ForReference(refName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, refName, entry.GetRefName())
+		assert.Equal(t, newCommitID, entry.GetTargetID())
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLEntryForReference(testCtx, "refs/heads/main", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
@@ -267,6 +348,21 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.Equal(t, "skip annotation", annotation.Message)
 	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.True(t, annotation.Skip)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestReconcileLocalRSLWithRemote(t *testing.T) {
@@ -329,6 +425,75 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		// Local RSL must now be updated to match remote
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		// TODO: this should be handled by the Repository package
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.RemoveRemote(remoteName); err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		// Simulate more remote actions
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		currentRSLTip, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+
+		_, err = localR.GetRemoteURL(fmt.Sprintf("check-remote-%s", remoteName))
+		assert.ErrorContains(t, err, "No such remote")
+
+		remoteURL, err := localR.GetRemoteURL(remoteName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, gittufTransportPrefix+tmpDir, remoteURL)
 	})
 
 	t.Run("remote has no updates for local", func(t *testing.T) {
@@ -607,6 +772,21 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		assert.Equal(t, originalRemoteRSLTip, currentRemoteRSLTip)
 		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ReconcileLocalRSLWithRemote(testCtx, remoteName, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestSync(t *testing.T) {
@@ -648,6 +828,55 @@ func TestSync(t *testing.T) {
 		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
 		assert.Nil(t, err)
 		assert.Empty(t, divergedRefs)
+	})
+
+	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		if err := localR.RemoveRemote(remoteName); err != nil {
+			t.Fatal(err)
+		}
+		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
+			t.Fatal(err)
+		}
+		localRepo := &Repository{r: localR}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		_, err = localR.GetRemoteURL(fmt.Sprintf("check-remote-%s", remoteName))
+		assert.ErrorContains(t, err, "No such remote")
+
+		remoteURL, err := localR.GetRemoteURL(remoteName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, gittufTransportPrefix+tmpDir, remoteURL)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 	})
 
 	t.Run("local is strictly ahead of remote", func(t *testing.T) {
@@ -1749,5 +1978,184 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 		assert.Equal(t, propagationEntry2.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("controller repository metadata is propagated", func(t *testing.T) {
+		controllerRepoLocation := t.TempDir()
+		controllerRepo := createTestRepositoryWithRoot(t, controllerRepoLocation)
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
+		err := downstreamRepo.AddControllerRepository(testCtx, signer, "controller", controllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+		if !isPropagationEntry {
+			t.Fatal("unexpected entry type in downstream repo")
+		}
+		assert.Equal(t, controllerRepoLocation, propagationEntry.UpstreamRepository)
+		assert.Equal(t, policy.PolicyRef, propagationEntry.RefName)
+
+		controllerPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(controllerRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, controllerPolicyEntry.GetID(), propagationEntry.UpstreamEntryID)
+
+		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(controllerPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerMetadataTreeID, err := controllerRepo.r.GetPathIDInTree("metadata", controllerPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(downstreamRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepoLocation))
+		controllerPath := fmt.Sprintf("%s/controller-%s", tuf.GittufControllerPrefix, encodedLocation)
+		propagatedControllerTreeID, err := downstreamRepo.r.GetPathIDInTree(controllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, controllerMetadataTreeID, propagatedControllerTreeID)
+	})
+
+	t.Run("transitive controller repository metadata is resolved and propagated", func(t *testing.T) {
+		leafControllerRepoLocation := t.TempDir()
+		leafControllerRepo := createTestRepositoryWithRoot(t, leafControllerRepoLocation)
+
+		directControllerRepoLocation := t.TempDir()
+		directControllerRepo := createTestRepositoryWithRoot(t, directControllerRepoLocation)
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
+		err := directControllerRepo.AddControllerRepository(testCtx, signer, "leaf-controller", leafControllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := directControllerRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := directControllerRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		downstreamRepoLocation := t.TempDir()
+		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
+
+		err = downstreamRepo.AddControllerRepository(testCtx, signer, "direct-controller", directControllerRepoLocation, initialRootPrincipals, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := downstreamRepo.ApplyPolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		previousLatestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = downstreamRepo.PropagateChangesFromUpstreamRepositories(testCtx, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := rsl.GetLatestEntry(downstreamRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		propagationEntries := []*rsl.PropagationEntry{}
+		for !latestEntry.GetID().Equal(previousLatestEntry.GetID()) {
+			propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+			if !isPropagationEntry {
+				t.Fatal("unexpected entry type in downstream repo")
+			}
+			propagationEntries = append(propagationEntries, propagationEntry)
+
+			latestEntry, err = rsl.GetParentForEntry(downstreamRepo.r, latestEntry)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		assert.Equal(t, 2, len(propagationEntries))
+		expectedLocations := set.NewSetFromItems(directControllerRepoLocation, leafControllerRepoLocation)
+		for _, propagationEntry := range propagationEntries {
+			expectedLocations.Remove(propagationEntry.UpstreamRepository)
+			assert.Equal(t, policy.PolicyRef, propagationEntry.RefName)
+		}
+		assert.Equal(t, 0, expectedLocations.Len())
+
+		downstreamPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(downstreamRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedDirectControllerLocation := base64.URLEncoding.EncodeToString([]byte(directControllerRepoLocation))
+		directControllerPath := fmt.Sprintf("%s/direct-controller-%s", tuf.GittufControllerPrefix, encodedDirectControllerLocation)
+		_, err = downstreamRepo.r.GetPathIDInTree(directControllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		encodedLeafControllerLocation := base64.URLEncoding.EncodeToString([]byte(leafControllerRepoLocation))
+		leafControllerPath := fmt.Sprintf("%s/leaf-controller-%s", tuf.GittufControllerPrefix, encodedLeafControllerLocation)
+		propagatedLeafControllerTreeID, err := downstreamRepo.r.GetPathIDInTree(leafControllerPath, downstreamPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		leafControllerPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(leafControllerRepo.r, rsl.ForReference(policy.PolicyRef), rsl.IsUnskipped())
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(leafControllerPolicyEntry.GetTargetID())
+		if err != nil {
+			t.Fatal(err)
+		}
+		leafControllerMetadataTreeID, err := leafControllerRepo.r.GetPathIDInTree("metadata", leafControllerPolicyTreeID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, leafControllerMetadataTreeID, propagatedLeafControllerTreeID)
 	})
 }

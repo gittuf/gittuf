@@ -14,6 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
+	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
@@ -64,10 +65,30 @@ func TestVerifyRefFull(t *testing.T) {
 	currentTip, err := verifier.VerifyRefFull(testCtx, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, commitIDs[0], currentTip)
+
+	t.Run("with persistent cache", func(t *testing.T) {
+		err = cache.PopulatePersistentCache(repo)
+		require.Nil(t, err)
+
+		verifier = NewPolicyVerifier(repo)
+
+		currentTip, err := verifier.VerifyRefFull(testCtx, refName)
+		assert.Nil(t, err)
+		assert.Equal(t, commitIDs[0], currentTip)
+	})
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
-	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+	// Test no RSL
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	verifier := NewPolicyVerifier(repo)
+
+	_, err := verifier.VerifyRefFromEntry(testCtx, "main", gitinterface.ZeroHash)
+	assert.ErrorContains(t, err, rsl.ErrRSLEntryNotFound.Error())
+
+	repo, _ = createTestRepository(t, createTestStateWithPolicy)
 	refName := "refs/heads/main"
 
 	// Policy violation
@@ -85,7 +106,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 	entry = rsl.NewReferenceEntry(refName, commitIDs[1])
 	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 
-	verifier := NewPolicyVerifier(repo)
+	verifier = NewPolicyVerifier(repo)
 
 	// Verification passes because it's from a non-violating state only
 	currentTip, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
@@ -4001,6 +4022,48 @@ func TestStateVerifyNewState(t *testing.T) {
 
 		err = currentPolicy.VerifyNewState(testCtx, newPolicy)
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("rollback attack", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithOnlyRoot(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
+	})
+
+	t.Run("verify new state when transitioning from non numbered to numbered metadata", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithOnlyRootUnnumbered(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
+	})
+
+	t.Run("verify new state when transitioning from non-numbered to numbered metadata with both policy and root", func(t *testing.T) {
+		t.Parallel()
+
+		oldPolicy := createTestStateWithPolicyUnnumbered(t)
+		newPolicy := createTestStateWithPolicy(t)
+
+		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
+		assert.Nil(t, err)
+
+		// The reverse should fail
+		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
+		assert.ErrorIs(t, err, ErrMetadataRollbackDetected)
 	})
 }
 

@@ -2,6 +2,10 @@
 
 Initialize gittuf root of trust for repository
 
+### Synopsis
+
+The 'init' command initializes the gittuf root of trust for a repository. It is used to initialize gittuf metadata with the user invoking the command trusted for root operations, and must be run before any other gittuf metadata command can be run.
+
 ```
 gittuf trust init [flags]
 ```

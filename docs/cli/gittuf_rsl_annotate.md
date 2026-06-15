@@ -2,6 +2,10 @@
 
 Annotate prior RSL entries
 
+### Synopsis
+
+The 'annotate' command adds annotations to prior RSL entries in the repository's RSL. It is used to add a message to an entry for additional context or mark an entry to be skipped, in cases where RSL recovery or reconciliation is needed.
+
 ```
 gittuf rsl annotate [flags]
 ```

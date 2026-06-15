@@ -75,9 +75,15 @@ func (m model) renderFormScreen(title string) string {
 }
 
 // renderListScreen renders a list with help text and footer.
-func (m model) renderListScreen(l list.Model, helpText string) string {
+func (m model) renderListScreen(l list.Model, helpText string, emptyMsg string, isEmpty bool) string {
+	listView := l.View()
+	if isEmpty {
+		emptyMsgStyled := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(emptyMsg)
+		listView = l.Title + "\n\n" + emptyMsgStyled
+	}
+
 	return renderWithMargin(
-		l.View() + "\n\n" +
+		listView + "\n\n" +
 			renderFooter(m.footer) +
 			renderErrorMsg(m.errorMsg) +
 			"\n" + helpText,
@@ -119,6 +125,18 @@ func renderDeleteOverlay(target string) string {
 // View renders the TUI.
 func (m model) View() string {
 	switch m.screen {
+	case screenLoading:
+		if m.errorMsg != "" {
+			return renderWithMargin(
+				titleStyle.Render("gittuf TUI") + "\n\n" +
+					renderErrorMsg(m.errorMsg) + "\n\n" +
+					lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render("Press Q or Ctrl+C to quit."),
+			)
+		}
+		return renderWithMargin(
+			titleStyle.Render("gittuf TUI") + "\n\n" +
+				m.spinner.View() + " Loading, please wait...\n",
+		)
 	case screenChoice:
 		return renderWithMargin(m.choiceList.View() + "\n" + renderFooter(m.footer) + renderErrorMsg(m.errorMsg))
 	case screenPolicy:
@@ -136,9 +154,9 @@ func (m model) View() string {
 				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
 			)
 		}
-		return m.renderListScreen(m.ruleList,
-			overlay+screenPolicyRulesHelp(m.readOnly)+hint,
-		)
+
+		emptyMsg := "No rules configured. Press 'A' to add one."
+		return m.renderListScreen(m.ruleList, overlay+screenPolicyRulesHelp(m.readOnly)+hint, emptyMsg, len(m.rules) == 0)
 	case screenTrustGlobalRules:
 		overlay := ""
 		if m.confirmDelete {
@@ -150,9 +168,9 @@ func (m model) View() string {
 				"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
 			)
 		}
-		return m.renderListScreen(m.globalRuleList,
-			overlay+screenTrustGlobalRulesHelp(m.readOnly)+hint,
-		)
+
+		emptyMsg := "No rules configured. Press 'A' to add one."
+		return m.renderListScreen(m.globalRuleList, overlay+screenTrustGlobalRulesHelp(m.readOnly)+hint, emptyMsg, len(m.globalRules) == 0)
 	case screenPolicyAddRule:
 		return m.renderFormScreen("Add Rule")
 	case screenPolicyEditRule:

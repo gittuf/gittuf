@@ -86,6 +86,58 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	return tufv01.NewKeyFromSSLibKey(keyObj), nil
 }
 
+// LoadPublicKeyFromGitConfig loads a public key as with LoadPublicKey above,
+// but from the key specified in the Git configuration of the target repository.
+func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
+	config, err := repo.r.GetGitConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// Attempt to determine what type of key is specified by the user's Git
+	// config
+	var keyType signingMethod
+	switch config["gpg.format"] {
+	case "gpg", "":
+		// GPG is assumed if "gpg" is specified, or if nothing is specified
+		keyType = signingMethodGPG
+	case "ssh":
+		keyType = signingMethodSSH
+	case "x509":
+		keyType = signingMethodX509
+	default:
+		// If some other format specified, return error
+		return nil, ErrUnsupportedSigningMethod
+	}
+
+	// Get the path to the signing key, required if using an SSH or GPG key
+	signingKey := config["user.signingkey"]
+	if signingKey == "" && (keyType == signingMethodSSH || keyType == signingMethodGPG) {
+		return nil, ErrSigningKeyNotSpecified
+	}
+
+	switch keyType {
+	case signingMethodGPG:
+		// GPG
+		// Load a GPG signer from the specified key
+		return LoadPublicKey(fmt.Sprintf("%s:%s", "gpg", signingKey))
+	case signingMethodSSH:
+		// SSH
+		// Load an SSH signer from the specified key
+		return LoadPublicKey(signingKey)
+	case signingMethodX509:
+		// X.509
+		// We only support sigstore X.509, so check that gitsign is specified
+		if config["gpg.x509.program"] == "gitsign" {
+			// gitsign
+			return LoadPublicKey(fmt.Sprintf("%s:%s", "fulcio", signingKey))
+		}
+		return nil, ErrUnsupportedX509Method
+	default:
+		return nil, ErrSigningKeyNotSpecified
+	}
+}
+
 // LoadSigner loads a metadata signer for the specified key bytes. The signer
 // must be for a GPG key (in which case the `key` is the GPG key ID), an SSH key
 // (in which case the `key` is a path to the private key) or for signing with

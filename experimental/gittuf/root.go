@@ -6,9 +6,7 @@ package gittuf
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -900,6 +898,41 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+func (r *Repository) IncrementRootVersion(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		err := r.r.CanSign()
+		if err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	rootKeyID, err := signer.KeyID()
+	if err != nil {
+		return err
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	if err != nil {
+		return err
+	}
+
+	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
+	if err != nil {
+		return err
+	}
+
+	// Just pass it to updateRootMetadata as it will increment the version
+	commitMessage := "Increment root version"
+	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
 func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -1388,14 +1421,12 @@ func (r *Repository) loadRootMetadata(state *policy.State, keyID string) (tuf.Ro
 }
 
 func (r *Repository) updateRootMetadata(ctx context.Context, state *policy.State, signer sslibdsse.SignerVerifier, rootMetadata tuf.RootMetadata, commitMessage string, createRSLEntry, signCommit bool) error {
-	rootMetadataBytes, err := json.Marshal(rootMetadata)
+	rootMetadata.IncrementVersion()
+
+	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
 		return err
 	}
-
-	env := state.Metadata.RootEnvelope
-	env.Signatures = []sslibdsse.Signature{}
-	env.Payload = base64.StdEncoding.EncodeToString(rootMetadataBytes)
 
 	slog.Debug("Signing updated root metadata...")
 	env, err = dsse.SignEnvelope(ctx, env, signer)
