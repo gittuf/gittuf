@@ -36,14 +36,16 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		remoteName = args[0]
 	}
 
+	stdOut := cmd.OutOrStdout()
+
 	divergedRefs, err := repo.Sync(cmd.Context(), remoteName, o.overwriteLocalRefs, true)
 	switch {
 	case errors.Is(err, gittuf.ErrDivergedRefs):
-		fmt.Println("References have diverged:")
+		fmt.Fprintln(stdOut, "References have diverged:")
 		for _, refName := range divergedRefs {
-			fmt.Println(refName)
+			fmt.Fprintln(stdOut, refName)
 		}
-		fmt.Println("To apply upstream changes locally, rerun the command with --overwrite. WARNING: this operation may result in the loss of local work!")
+		fmt.Fprintln(stdOut, "To apply upstream changes locally, rerun the command with --overwrite. WARNING: this operation may result in the loss of local work!")
 		return nil
 	default:
 		return err
