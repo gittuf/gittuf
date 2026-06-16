@@ -966,6 +966,14 @@ func TestUpdateRootThreshold(t *testing.T) {
 	}
 	assert.Equal(t, 2, rootThreshold)
 
+	t.Run("threshold boundary validation: cannot set threshold higher than keys", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.UpdateRootThreshold(testCtx, signer, 2, false)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
