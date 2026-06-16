@@ -1072,7 +1072,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 					MergedAt: &gogithub.Timestamp{
 						Time: time.Now(),
 					},
-					MergeCommitSHA: gogithub.String(string(mergeCommitID.String())),
+					MergeCommitSHA: gogithub.String(mergeCommitID.String()),
 				},
 			),
 			gogithubmock.WithRequestMatch(
@@ -1204,7 +1204,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 					MergedAt: &gogithub.Timestamp{
 						Time: time.Now(),
 					},
-					MergeCommitSHA: gogithub.String(string(mergeCommitID.String())),
+					MergeCommitSHA: gogithub.String(mergeCommitID.String()),
 				},
 			),
 			gogithubmock.WithRequestMatch(
