@@ -15,6 +15,8 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
@@ -2158,4 +2160,125 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 		assert.Equal(t, leafControllerMetadataTreeID, propagatedLeafControllerTreeID)
 	})
+}
+
+func TestRecordRSLEntryForReferenceWithSigningKeyBytes(t *testing.T) {
+	// signCommit=true with no per-repo signing config would normally fail in
+	// CanSign(). WithRecordSigningKeyBytes skips CanSign and signs the RSL
+	// entry commit with the supplied PEM key directly, the same path
+	// CommitUsingSpecificKey takes.
+	tempDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	repo := &Repository{r: r}
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+	require.NoError(t, err)
+
+	err = repo.RecordRSLEntryForReference(
+		testCtx,
+		"refs/heads/main",
+		true,
+		rslopts.WithRecordLocalOnly(),
+		rslopts.WithRecordSigningKeyBytes(artifacts.SSHED25519Private),
+	)
+	require.NoError(t, err)
+
+	entryT, err := rsl.GetLatestEntry(repo.r)
+	require.NoError(t, err)
+	entry, ok := entryT.(*rsl.ReferenceEntry)
+	require.True(t, ok)
+	assert.Equal(t, "refs/heads/main", entry.RefName)
+
+	keyPath := filepath.Join(tempDir, "ssh-key.pub")
+	require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
+	publicKey, err := ssh.NewKeyFromFile(keyPath)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.r.VerifySignature(testCtx, entry.GetID(), publicKey))
+}
+
+func TestRecordRSLAnnotationWithSigningKeyBytes(t *testing.T) {
+	// Mirror the entry test for annotations.
+	tempDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	repo := &Repository{r: r}
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.RecordRSLEntryForReference(
+		testCtx,
+		"refs/heads/main",
+		false,
+		rslopts.WithRecordLocalOnly(),
+	))
+	entryT, err := rsl.GetLatestEntry(repo.r)
+	require.NoError(t, err)
+	entryID := entryT.GetID()
+
+	err = repo.RecordRSLAnnotation(
+		testCtx,
+		[]string{entryID.String()},
+		false,
+		"test annotation",
+		true,
+		rslopts.WithAnnotateLocalOnly(),
+		rslopts.WithAnnotateSigningKeyBytes(artifacts.SSHED25519Private),
+	)
+	require.NoError(t, err)
+
+	annT, err := rsl.GetLatestEntry(repo.r)
+	require.NoError(t, err)
+	ann, ok := annT.(*rsl.AnnotationEntry)
+	require.True(t, ok)
+	assert.Equal(t, "test annotation", ann.Message)
+
+	keyPath := filepath.Join(tempDir, "ssh-key.pub")
+	require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
+	publicKey, err := ssh.NewKeyFromFile(keyPath)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.r.VerifySignature(testCtx, ann.GetID(), publicKey))
+}
+
+func TestRecordRSLEntryForReferenceSigningKeyBytesIgnoredWhenUnsigned(t *testing.T) {
+	// signCommit=false is the master switch: passing SigningKeyBytes alongside
+	// it leaves the entry unsigned. This keeps the API contract aligned with
+	// the existing flag rather than letting key presence silently override it.
+	tempDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	repo := &Repository{r: r}
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.RecordRSLEntryForReference(
+		testCtx,
+		"refs/heads/main",
+		false,
+		rslopts.WithRecordLocalOnly(),
+		rslopts.WithRecordSigningKeyBytes(artifacts.SSHED25519Private),
+	))
+
+	entryT, err := rsl.GetLatestEntry(repo.r)
+	require.NoError(t, err)
+	entry, ok := entryT.(*rsl.ReferenceEntry)
+	require.True(t, ok)
+
+	keyPath := filepath.Join(tempDir, "ssh-key.pub")
+	require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
+	publicKey, err := ssh.NewKeyFromFile(keyPath)
+	require.NoError(t, err)
+
+	err = repo.r.VerifySignature(testCtx, entry.GetID(), publicKey)
+	assert.Error(t, err, "entry must not be signed when signCommit=false")
 }
