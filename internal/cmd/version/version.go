@@ -15,15 +15,16 @@ type options struct{}
 
 func (o *options) AddFlags(_ *cobra.Command) {}
 
-func (o *options) Run(_ *cobra.Command, _ []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	v := version.GetVersion()
 	if v[0] == 'v' {
 		v = v[1:]
 	}
-	fmt.Printf("gittuf version %s\n", v)
+	stdOut := cmd.OutOrStdout()
+	fmt.Fprintf(stdOut, "gittuf version %s\n", v)
 
 	if dev.InDevMode() {
-		fmt.Printf("gittuf is operating in developer mode. Override by setting %s=0.\n", dev.DevModeKey)
+		fmt.Fprintf(stdOut, "gittuf is operating in developer mode. Override by setting %s=0.\n", dev.DevModeKey)
 	}
 
 	return nil
