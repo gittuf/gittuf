@@ -724,14 +724,14 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 
 	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
 	if err != nil {
-		return nil
+		return err
 	}
 	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
 
 	for absoluteControllerPath, metadata := range s.ControllerMetadata {
 		stateMetadataTreeID, err := metadata.WriteTree(repo)
 		if err != nil {
-			return nil
+			return err
 		}
 		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath), stateMetadataTreeID))
 	}
