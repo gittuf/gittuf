@@ -13,9 +13,9 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/storage/memory"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -67,7 +67,7 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 	if err != nil {
 		return ZeroHash, err
 	}
-	tag.PGPSignature = signature
+	tag.Signature = signature
 
 	obj := goGitRepo.Storer.NewEncodedObject()
 	if err := tag.Encode(obj); err != nil {
@@ -126,7 +126,7 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *si
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
-		tagSignature := []byte(tag.PGPSignature)
+		tagSignature := []byte(tag.Signature)
 
 		if err := verifySSHKeySignature(ctx, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
@@ -138,7 +138,7 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *si
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
-		tagSignature := []byte(tag.PGPSignature)
+		tagSignature := []byte(tag.Signature)
 
 		if err := verifyGitsignSignature(ctx, r, key, tagContents, tagSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)

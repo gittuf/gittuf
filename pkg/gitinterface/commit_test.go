@@ -16,8 +16,8 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -390,7 +390,7 @@ func createTestGPGSignedCommit(t *testing.T, repo *Repository) Hash {
 	if err := openpgp.ArmoredDetachSign(sig, keyring[0], r, nil); err != nil {
 		t.Fatal(err)
 	}
-	testCommit.PGPSignature = sig.String()
+	testCommit.Signature = sig.String()
 
 	// Re-encode with the signature
 	commitEncoded = goGitRepo.Storer.NewEncodedObject()
@@ -430,7 +430,7 @@ func createTestSigstoreSignedCommit(t *testing.T, repo *Repository) Hash {
 			Email: "aditya@saky.in",
 			When:  time.Date(2023, time.August, 1, 15, 44, 23, 0, time.FixedZone("", -4*3600)),
 		},
-		PGPSignature: `-----BEGIN SIGNED MESSAGE-----
+		Signature: `-----BEGIN SIGNED MESSAGE-----
 MIIEMAYJKoZIhvcNAQcCoIIEITCCBB0CAQExDTALBglghkgBZQMEAgEwCwYJKoZI
 hvcNAQcBoIIC0DCCAswwggJToAMCAQICFHIJCrBVHxoHlGos++k1xJxcElGaMAoG
 CCqGSM49BAMDMDcxFTATBgNVBAoTDHNpZ3N0b3JlLmRldjEeMBwGA1UEAxMVc2ln
