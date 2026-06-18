@@ -335,7 +335,7 @@ func (a *AnnotationEntry) setEntryNumber(repo *gitinterface.Repository) error {
 		}
 	}
 
-	return err
+	return nil
 }
 
 func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error) {
