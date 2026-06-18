@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v6"
 	"github.com/jonboulle/clockwork"
 )
 

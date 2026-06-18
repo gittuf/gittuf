@@ -15,9 +15,9 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage/memory"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
+	"github.com/go-git/go-git/v6/storage/memory"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -102,7 +102,7 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 	if err != nil {
 		return ZeroHash, err
 	}
-	commit.PGPSignature = signature
+	commit.Signature = signature
 
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
@@ -182,7 +182,7 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		if err != nil {
 			return errors.Join(ErrVerifyingSSHSignature, err)
 		}
-		commitSignature := []byte(commit.PGPSignature)
+		commitSignature := []byte(commit.Signature)
 
 		if err := verifySSHKeySignature(ctx, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
@@ -194,7 +194,7 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
-		commitSignature := []byte(commit.PGPSignature)
+		commitSignature := []byte(commit.Signature)
 
 		if err := verifyGitsignSignature(ctx, r, key, commitContents, commitSignature); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
