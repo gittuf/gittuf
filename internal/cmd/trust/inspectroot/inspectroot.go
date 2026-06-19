@@ -5,7 +5,6 @@ package inspectroot
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/policy"
@@ -15,7 +14,9 @@ import (
 
 type options struct{}
 
-func (o *options) AddFlags(_ *cobra.Command) {}
+func (o *options) AddFlags(cmd *cobra.Command) {
+	_ = cmd
+}
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository(".")
@@ -38,7 +39,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	fmt.Println(string(prettyJSON))
+	cmd.Println(string(prettyJSON))
 	return nil
 }
 
