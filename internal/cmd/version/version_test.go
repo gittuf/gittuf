@@ -11,13 +11,23 @@ import (
 )
 
 func TestVersion(t *testing.T) {
-	t.Run("run", func(t *testing.T) {
-		_, stdOut, _, err := cmd.ExecuteCommandC(New(), "version")
-		if err != nil {
-			t.Fatal(err)
-		}
+	t.Run("default (no dev mode env var)", func(t *testing.T) {
+		_, stdOut, _, err := cmd.ExecuteCommandC(New())
+		assert.NoError(t, err)
 
-		expected := "gittuf version"
-		assert.Contains(t, stdOut.String(), expected)
+		output := stdOut.String()
+		assert.Contains(t, output, "gittuf version")
+		assert.NotContains(t, output, "gittuf is operating in developer mode")
+	})
+
+	t.Run("dev mode active", func(t *testing.T) {
+		t.Setenv("GITTUF_DEV", "1")
+
+		_, stdOut, _, err := cmd.ExecuteCommandC(New())
+		assert.NoError(t, err)
+
+		output := stdOut.String()
+		assert.Contains(t, output, "gittuf version")
+		assert.Contains(t, output, "gittuf is operating in developer mode")
 	})
 }
