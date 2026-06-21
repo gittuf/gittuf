@@ -177,7 +177,7 @@ func TestUpdateHook(t *testing.T) {
 			"--principal-ID", "test-principal",
 			"--is-pre-commit",
 		)
-		assert.ErrorContains(t, err, "no such file or directory")
+		assert.ErrorIs(t, err, os.ErrNotExist)
 	})
 
 	t.Run("success pre-commit", func(t *testing.T) {
