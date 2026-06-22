@@ -43,8 +43,13 @@ func (h Hash) IsZero() bool {
 }
 
 // Equal compares the hash to another provided Hash to see if they're equal.
-func (h Hash) Equal(other Hash) bool {
+func (h Hash) Equal(other []byte) bool {
 	return bytes.Equal(h[:], other[:])
+}
+
+// Bytes returns the raw bytes of the hash.
+func (h Hash) Bytes() []byte {
+	return h.Bytes()
 }
 
 // ZeroHash represents an empty Hash.
