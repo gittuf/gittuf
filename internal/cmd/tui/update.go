@@ -10,7 +10,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -22,17 +21,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case initDoneMsg:
 		if msg.err != nil {
 			m.errorMsg = fmt.Sprintf("Initialization failed: %v", msg.err)
-			// Stay on the loading screen so the error is visible; user can press q to quit.
 			return m, nil
 		}
 		m.repo = msg.repo
 		m.signer = msg.signer
+		m.signerError = msg.signerError
 		m.rules = msg.rules
 		m.globalRules = msg.globalRules
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
 		m.updateRuleList()
 		m.updateGlobalRuleList()
+		// Resize all lists now that readOnly/signerError are known — the earlier
+		// WindowSizeMsg fired before these flags were set, so sizes must be corrected.
+		m.resizeLists()
 		m.screen = screenChoice
 		return m, nil
 
@@ -43,12 +45,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-		m.choiceList.SetSize(msg.Width-h, msg.Height-v)
-		m.policyScreenList.SetSize(msg.Width-h, msg.Height-v)
-		m.trustScreenList.SetSize(msg.Width-h, msg.Height-v)
-		m.ruleList.SetSize(msg.Width-h, msg.Height-v)
-		m.globalRuleList.SetSize(msg.Width-h, msg.Height-v)
+		m.width = msg.Width
+		m.height = msg.Height
+		m.resizeLists()
+		return m, nil
 
 	case tea.KeyMsg:
 		// Delete confirmation overlay intercepts all keys
@@ -66,6 +66,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
 				return m, tea.Quit
 			}
+		case "h":
+			// Toggle help screen if not in form mode
+			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
+				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
+				if m.screen == screenHelp {
+					// Toggle back
+					m.screen = m.previousScreen
+					return m, nil
+				}
+				// Go to help screen
+				m.previousScreen = m.screen
+				m.screen = screenHelp
+				return m, nil
+			}
 		case "esc":
 			m.footer = ""
 			switch m.screen {
@@ -79,6 +93,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTrust
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.screen = screenTrustGlobalRules
+			case screenHelp:
+				m.screen = m.previousScreen
 			}
 			return m, nil
 		}
@@ -267,14 +283,7 @@ func (m model) handlePolicyFormSubmit() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var err error
-
-	parsedThr, err := strconv.ParseInt(m.inputs[3].Value(), 10, 0)
-	thr := int(parsedThr)
-	if err != nil {
-		m.errorMsg = "Invalid value specified; threshold must be a positive integer."
-		return m, nil
-	}
+	thr, _ := strconv.Atoi(m.inputs[3].Value())
 	r := rule{
 		name:      m.inputs[0].Value(),
 		pattern:   m.inputs[1].Value(),
@@ -283,6 +292,7 @@ func (m model) handlePolicyFormSubmit() (tea.Model, tea.Cmd) {
 	}
 	authorizedKeys := splitAndTrim(m.inputs[2].Value())
 
+	var err error
 	switch m.screen {
 	case screenPolicyAddRule:
 		err = repoAddRule(m.ctx, m.options, r, authorizedKeys)
@@ -314,14 +324,8 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 
 	parts := splitAndTrim(m.inputs[2].Value())
 	thr := 0
-	var err error
 	if m.inputs[1].Value() == tuf.GlobalRuleThresholdType {
-		parsedThr, err := strconv.ParseInt(m.inputs[3].Value(), 10, 0)
-		thr = int(parsedThr)
-		if err != nil {
-			m.errorMsg = "Invalid value specified; threshold must be a positive integer."
-			return m, nil
-		}
+		thr, _ = strconv.Atoi(m.inputs[3].Value())
 	}
 	gr := globalRule{
 		ruleName:     m.inputs[0].Value(),
@@ -330,6 +334,7 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 		threshold:    thr,
 	}
 
+	var err error
 	switch m.screen {
 	case screenTrustAddGlobalRule:
 		err = repoAddGlobalRule(m.ctx, m.options, gr)
