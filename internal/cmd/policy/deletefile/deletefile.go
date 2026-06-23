@@ -4,7 +4,6 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
-	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +16,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&o.policyName,
 		"policy-name",
-		policy.TargetsRoleName,
+		"",
 		"name of delegated policy file to delete",
 	)
 }
