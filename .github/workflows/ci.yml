@@ -41,7 +41,7 @@ jobs:
         prepare: |
         run: |
           pkg update -f
-          pkg install -y git wget
+          pkg install -y git wget gnupg
 
           wget https://go.dev/dl/go1.26.1.freebsd-amd64.tar.gz
           tar -C /usr/local -xzf go1.26.1.freebsd-amd64.tar.gz
