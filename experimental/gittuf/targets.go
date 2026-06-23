@@ -19,6 +19,8 @@ import (
 )
 
 var ErrInvalidPolicyName = errors.New("invalid rule or policy file name, cannot be 'root'")
+var ErrCannotDeletePrimaryPolicyFile = errors.New("cannot delete primary policy file")
+var ErrCannotDeleteReachablePolicyFile = errors.New("cannot delete reachable delegated policy file")
 
 // InitializeTargets is the interface for the user to create the specified
 // policy file.
@@ -273,6 +275,46 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
 	return r.updateTargetsMetadata(ctx, state, signer, targetsRoleName, targetsMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+func (r *Repository) DeletePolicyFile(ctx context.Context, targetsRoleName string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if targetsRoleName == policy.RootRoleName || targetsRoleName == policy.TargetsRoleName {
+		return ErrCannotDeletePrimaryPolicyFile
+	}
+
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		if err := r.r.CanSign(); err != nil {
+			return err
+		}
+	}
+
+	options := &trustpolicyopts.Options{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	if err != nil {
+		return err
+	}
+	if !state.HasTargetsRole(targetsRoleName) {
+		return policy.ErrMetadataNotFound
+	}
+
+	referenced, err := state.Metadata.HasRuleFileReference(targetsRoleName)
+	if err != nil {
+		return err
+	}
+	if referenced {
+		return ErrCannotDeleteReachablePolicyFile
+	}
+
+	delete(state.Metadata.DelegationEnvelopes, targetsRoleName)
+
+	commitMessage := fmt.Sprintf("Delete policy '%s'", targetsRoleName)
+	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
 // AddPrincipalToTargets is the interface for a user to add a trusted principal
