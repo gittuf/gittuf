@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -1007,21 +1006,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmd := exec.Command(
-			"git",
-			"-C", testDir,
-			"commit-tree",
-			"-m", "Merge feature into main\n",
-			"-p", targetHeadCommitID.String(),
-			"-p", featureHeadCommitID.String(),
-			mergeTreeID.String(),
-		)
-
-		out, err := cmd.Output()
-		assert.Nil(t, err)
-
-		mergeCommitID, err := gitinterface.NewHash(strings.TrimSpace(string(out)))
-		assert.Nil(t, err)
+		mergeCommitID := r.CommitWithParents(t, mergeTreeID, []gitinterface.Hash{targetHeadCommitID, featureHeadCommitID}, "Merge feature into main", false)
 
 		err = r.SetReference(absTargetRef, mergeCommitID)
 		assert.Nil(t, err)
@@ -1167,21 +1152,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		cmd := exec.Command(
-			"git",
-			"-C", testDir,
-			"commit-tree",
-			"-m", "Merge feature into main\n",
-			"-p", targetHeadCommitID.String(),
-			"-p", featureHeadCommitID.String(),
-			mergeTreeID.String(),
-		)
-
-		out, err := cmd.Output()
-		assert.Nil(t, err)
-
-		mergeCommitID, err := gitinterface.NewHash(strings.TrimSpace(string(out)))
-		assert.Nil(t, err)
+		mergeCommitID := r.CommitWithParents(t, mergeTreeID, []gitinterface.Hash{targetHeadCommitID, featureHeadCommitID}, "Merge feature into main", false)
 
 		err = r.SetReference(absTargetRef, mergeCommitID)
 		assert.Nil(t, err)
