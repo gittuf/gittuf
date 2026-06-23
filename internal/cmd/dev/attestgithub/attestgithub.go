@@ -9,25 +9,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type options struct {
-	signingKey string
-}
-
-func (o *options) AddFlags(cmd *cobra.Command) {
+func New() *cobra.Command {
+	p := &persistent.Options{WithRSLEntry: true}
+	cmd := pullrequest.New(p)
 	cmd.Flags().StringVarP(
-		&o.signingKey,
+		&p.SigningKey,
 		"signing-key",
 		"k",
 		"",
 		"specify key to sign attestation with",
 	)
 	cmd.MarkFlagRequired("signing-key") //nolint:errcheck
-}
-
-func New() *cobra.Command {
-	o := &options{}
-	cmd := pullrequest.New(&persistent.Options{SigningKey: o.signingKey, WithRSLEntry: true})
-	o.AddFlags(cmd)
 	cmd.Deprecated = "switch to \"gittuf attest github pull-request\""
 	return cmd
 }
