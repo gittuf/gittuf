@@ -796,6 +796,14 @@ func (s *StateMetadata) VerifyNewStateMetadata(_ context.Context, newStateMetada
 			// file, so if the new state doesn't have it, it's a rollback.
 			// This will change once we support deleting rule files.
 			if errors.Is(err, ErrMetadataNotFound) {
+				referenced, refErr := newStateMetadata.HasRuleFileReference(name)
+				if refErr != nil {
+					return refErr
+				}
+				if !referenced {
+					continue
+				}
+
 				return fmt.Errorf("%w: new policy is missing delegated rule file '%s'", ErrMetadataRollbackDetected, name)
 			}
 
