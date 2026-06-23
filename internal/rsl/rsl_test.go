@@ -21,6 +21,39 @@ import (
 
 const annotationMessage = "test annotation"
 
+func TestRemoteTrackerRef(t *testing.T) {
+	assert.Equal(t, "refs/remotes/origin/gittuf/reference-state-log", RemoteTrackerRef("origin"))
+	assert.Equal(t, "refs/remotes/upstream/gittuf/reference-state-log", RemoteTrackerRef("upstream"))
+}
+
+func TestIsRelevantGittufRef(t *testing.T) {
+	tests := map[string]struct {
+		refName  string
+		expected bool
+	}{
+		"non gittuf ref": {
+			refName:  "refs/heads/main",
+			expected: false,
+		},
+		"policy staging ref": {
+			refName:  gittufPolicyStagingRef,
+			expected: false,
+		},
+		"policy ref": {
+			refName:  "refs/gittuf/policy",
+			expected: true,
+		},
+		"rsl ref": {
+			refName:  Ref,
+			expected: true,
+		},
+	}
+
+	for name, test := range tests {
+		assert.Equal(t, test.expected, isRelevantGittufRef(test.refName), fmt.Sprintf("unexpected result in test '%s'", name))
+	}
+}
+
 func TestNewReferenceEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
