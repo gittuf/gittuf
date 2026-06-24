@@ -313,7 +313,7 @@ func (r *Repository) DeletePolicyFile(ctx context.Context, targetsRoleName strin
 
 	delete(state.Metadata.DelegationEnvelopes, targetsRoleName)
 
-	commitMessage := fmt.Sprintf("Delete policy '%s'", targetsRoleName)
+	commitMessage := fmt.Sprintf("Delete policy file '%s'", targetsRoleName)
 	return state.Commit(r.r, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
