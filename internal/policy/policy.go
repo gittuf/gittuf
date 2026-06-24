@@ -872,7 +872,7 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 }
 
 // Discard resets the policy staging ref, discarding any changes made to the policy staging ref.
-func Discard(repo *gitinterface.Repository) error {
+func Discard(repo *gitinterface.Repository, signCommit bool) error {
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
@@ -884,9 +884,27 @@ func Discard(repo *gitinterface.Repository) error {
 		return fmt.Errorf("failed to get policy reference %s: %w", PolicyRef, err)
 	}
 
+	// If the staging ref already matches policy, there is nothing to discard,
+	// so avoid recording a redundant RSL entry.
+	policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+	if err != nil && !errors.Is(err, gitinterface.ErrReferenceNotFound) {
+		return fmt.Errorf("failed to get policy staging reference %s: %w", PolicyStagingRef, err)
+	}
+	if err == nil && policyStagingTip.Equal(policyTip) {
+		return nil
+	}
+
 	// Reset PolicyStagingRef to match the actual policy ref
 	if err := repo.SetReference(PolicyStagingRef, policyTip); err != nil {
 		return fmt.Errorf("failed to reset policy staging reference %s: %w", PolicyStagingRef, err)
+	}
+
+	// Record an RSL entry for the reset so the staging ref stays in sync with
+	// its latest RSL entry. Without this, the staging ref points at policyTip
+	// while the latest staging RSL entry still references the discarded commit,
+	// causing ReconcileStaging/Apply to fail with ErrInvalidPolicy.
+	if err := rsl.NewReferenceEntry(PolicyStagingRef, policyTip).Commit(repo, signCommit); err != nil {
+		return fmt.Errorf("failed to record RSL entry for discarded policy staging reference %s: %w", PolicyStagingRef, err)
 	}
 
 	return nil
