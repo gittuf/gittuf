@@ -14,7 +14,10 @@ import (
 )
 
 func TestRegularSearcher(t *testing.T) {
+	t.Parallel()
 	t.Run("policy exists", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
@@ -61,6 +64,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("policy does not exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -81,6 +86,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("first policy", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
@@ -95,6 +102,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("policies in range", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		latestEntry, err := rsl.GetLatestEntry(repo)
@@ -141,6 +150,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("attestations exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -194,6 +205,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("attestations do not exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -214,6 +227,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("latest policy", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		expectedPolicyEntry, err := rsl.GetLatestEntry(repo)
@@ -228,6 +243,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("latest policy, no policy", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -241,6 +258,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("latest attestations", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -261,6 +280,8 @@ func TestRegularSearcher(t *testing.T) {
 	})
 
 	t.Run("latest attestations, no attestations", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -271,7 +292,10 @@ func TestRegularSearcher(t *testing.T) {
 }
 
 func TestCacheSearcher(t *testing.T) {
+	t.Parallel()
 	t.Run("policy exists", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		if err := cache.PopulatePersistentCache(repo); err != nil {
@@ -326,6 +350,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("policy does not exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -355,6 +381,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("first policy", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		if err := cache.PopulatePersistentCache(repo); err != nil {
@@ -377,6 +405,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("policies in range", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		if err := cache.PopulatePersistentCache(repo); err != nil {
@@ -431,6 +461,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("latest policy", func(t *testing.T) {
+		t.Parallel()
+
 		repo, _ := createTestRepository(t, createTestStateWithOnlyRoot)
 
 		if err := cache.PopulatePersistentCache(repo); err != nil {
@@ -453,6 +485,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("latest policy, no policy entries", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -474,6 +508,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("attestations exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -536,6 +572,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("attestations do not exist", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -565,6 +603,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("latest attestations", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -593,6 +633,8 @@ func TestCacheSearcher(t *testing.T) {
 	})
 
 	t.Run("latest attestations, no attestations", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
