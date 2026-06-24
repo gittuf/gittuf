@@ -5,6 +5,7 @@ package listglobalrules
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -33,9 +34,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	stdOut := cmd.OutOrStdout()
+
 	rules, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
 	if len(rules) == 0 {
-		fmt.Println("No global rules are currently defined.")
+		fmt.Fprintln(stdOut, "No global rules are currently defined.")
 	}
 	if err != nil {
 		return err
@@ -53,16 +56,16 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	for _, curRule := range thresholdRules {
-		fmt.Printf("Global Rule: %v\n", curRule.GetName())
-		fmt.Println(indentString + "Type: " + tuf.GlobalRuleThresholdType)
-		printNamespaces(curRule.GetProtectedNamespaces())
-		fmt.Printf(indentString+"Threshold: %d\n", curRule.GetThreshold())
+		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
+		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+		fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
 	}
 
 	for _, curRule := range blockForcePushesRules {
-		fmt.Printf("Global Rule: %v\n", curRule.GetName())
-		fmt.Println(indentString + "Type: " + tuf.GlobalRuleBlockForcePushesType)
-		printNamespaces(curRule.GetProtectedNamespaces())
+		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
+		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
 	}
 
 	return nil
@@ -82,7 +85,7 @@ func New() *cobra.Command {
 	return cmd
 }
 
-func printNamespaces(namespaces []string) {
+func printNamespaces(stdOut io.Writer, namespaces []string) {
 	gitpaths, filepaths := []string{}, []string{}
 	for _, path := range namespaces {
 		if strings.HasPrefix(path, "git:") {
@@ -92,15 +95,15 @@ func printNamespaces(namespaces []string) {
 		}
 	}
 	if len(filepaths) > 0 {
-		fmt.Println(indentString + "Paths affected:")
+		fmt.Fprintln(stdOut, indentString+"Paths affected:")
 		for _, path := range filepaths {
-			fmt.Println(strings.Repeat(indentString, 2) + path)
+			fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path)
 		}
 	}
 	if len(gitpaths) > 0 {
-		fmt.Println(indentString + "Refs affected:")
+		fmt.Fprintln(stdOut, indentString+"Refs affected:")
 		for _, path := range gitpaths {
-			fmt.Println(strings.Repeat(indentString, 2) + path)
+			fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path)
 		}
 	}
 }
