@@ -4,12 +4,16 @@
 package gitinterface
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
+
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 var (
@@ -440,32 +444,51 @@ func (t *TreeBuilder) writeTrees(parent string, tree *entryTree) (Hash, error) {
 	return t.writeTree(tree.entries)
 }
 
-// writeTree creates a tree in the repository for the specified entries. It
-// only supports a typical blob with permission 0o644 and a subtree. This is
-// because it is only intended for use with gittuf specific metadata and tests.
-// Generic tree creation is left to invocations of the Git binary by the user.
 func (t *TreeBuilder) writeTree(entries []TreeEntry) (Hash, error) {
-	input := ""
-	for _, entry := range entries {
-		// this is very opinionated about the modes right now because the plan
-		// is to use it for gittuf metadata, which requires regular files and
-		// subdirectories
-		switch entry := entry.(type) {
-		case *entryTree:
-			input += "040000 tree " + entry.gitID.String() + "\t" + entry.name
-		case *entryBlob:
-			// TODO: support entryBlob's permissions here
-			input += "100644 blob " + entry.gitID.String() + "\t" + entry.name
-		}
-		input += "\n"
-	}
-
-	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input)).executeString()
+	repo, err := t.repo.GetGoGitRepository()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
 	}
 
-	treeID, err := NewHash(stdOut)
+	tree := &object.Tree{}
+	for _, entry := range entries {
+		var mode int
+		switch entry.(type) {
+		case *entryTree:
+			mode = 0040000 // tree
+		case *entryBlob:
+			mode = 0100644 // blob
+		}
+		hash := plumbing.NewHash(entry.getID().String())
+		tree.Entries = append(tree.Entries, object.TreeEntry{
+			Name: entry.getName(),
+			Mode: filemode.FileMode(mode),
+			Hash: hash,
+		})
+	}
+
+	sort.Slice(tree.Entries, func(i, j int) bool {
+		nameI := tree.Entries[i].Name
+		if tree.Entries[i].Mode == filemode.Dir {
+			nameI += "/"
+		}
+		nameJ := tree.Entries[j].Name
+		if tree.Entries[j].Mode == filemode.Dir {
+			nameJ += "/"
+		}
+		return nameI < nameJ
+	})
+
+	obj := repo.Storer.NewEncodedObject()
+	if err := tree.Encode(obj); err != nil {
+		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
+	}
+	hash, err := repo.Storer.SetEncodedObject(obj)
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
+	}
+
+	treeID, err := NewHash(hash.String())
 	if err != nil {
 		return ZeroHash, fmt.Errorf("invalid tree ID: %w", err)
 	}
@@ -535,10 +558,17 @@ func NewEntryBlobWithPermissions(name string, gitID Hash, permissions os.FileMod
 // ensureIsTree is a helper to check that the ID represents a Git tree
 // object.
 func (r *Repository) ensureIsTree(treeID Hash) error {
-	objType, err := r.executor("cat-file", "-t", treeID.String()).executeString()
+	repo, err := r.GetGoGitRepository()
 	if err != nil {
 		return fmt.Errorf("unable to inspect if object is tree: %w", err)
-	} else if objType != "tree" {
+	}
+
+	obj, err := repo.Object(plumbing.AnyObject, plumbing.NewHash(treeID.String()))
+	if err != nil {
+		return fmt.Errorf("unable to inspect if object is tree: %w", err)
+	}
+
+	if obj.Type() != plumbing.TreeObject {
 		return fmt.Errorf("requested Git ID '%s' is not a tree object", treeID.String())
 	}
 

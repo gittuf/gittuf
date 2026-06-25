@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,9 @@ import (
 )
 
 func TestCanSign(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
 	// Note: This is currently not testing the one scenario where CanSign
 	// returns an error: when gpg.format=ssh but user.signingkey is undefined.
 	// This is because on developer machines, there's a very good chance
@@ -27,7 +31,8 @@ func TestCanSign(t *testing.T) {
 	}{
 		"explicit gpg, no key": {
 			config: map[string]string{
-				"gpg.format": "gpg",
+				"gpg.format":      "gpg",
+				"user.signingkey": "",
 			},
 		},
 		"explicit gpg, explicit key": {
@@ -49,13 +54,15 @@ func TestCanSign(t *testing.T) {
 		},
 		"explicit ssh, no key": {
 			config: map[string]string{
-				"gpg.format": "ssh",
+				"gpg.format":      "ssh",
+				"user.signingkey": "",
 			},
 			expectedError: ErrSigningKeyNotSpecified,
 		},
 		"explicit x509, no key": {
 			config: map[string]string{
-				"gpg.format": "x509",
+				"gpg.format":      "x509",
+				"user.signingkey": "",
 			},
 		},
 		"explicit x509, explicit key": {
@@ -67,6 +74,8 @@ func TestCanSign(t *testing.T) {
 	}
 
 	for name, test := range tests {
+		name := name
+		test := test
 		t.Run(name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			repo := setupRepository(t, tmpDir, false) // explicitly not using CreateTestGitRepository as that includes signing configurations

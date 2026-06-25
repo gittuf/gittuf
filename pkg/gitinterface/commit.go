@@ -65,14 +65,19 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 // developer mode. In standard workflows, Commit() must be used instead which
 // infers the signing key from the user's Git config.
 func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message string, signingKeyPEMBytes []byte) (Hash, error) {
-	gitConfig, err := r.GetGitConfig()
+	goGitRepo, err := r.GetGoGitRepository()
+	if err != nil {
+		return ZeroHash, err
+	}
+
+	cfg, err := goGitRepo.Config()
 	if err != nil {
 		return ZeroHash, err
 	}
 
 	commitMetadata := object.Signature{
-		Name:  gitConfig["user.name"],
-		Email: gitConfig["user.email"],
+		Name:  cfg.User.Name,
+		Email: cfg.User.Email,
 		When:  r.clock.Now(),
 	}
 
@@ -103,11 +108,6 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 		return ZeroHash, err
 	}
 	commit.Signature = signature
-
-	goGitRepo, err := r.GetGoGitRepository()
-	if err != nil {
-		return ZeroHash, err
-	}
 
 	obj := goGitRepo.Storer.NewEncodedObject()
 	if err := commit.Encode(obj); err != nil {
@@ -212,12 +212,17 @@ func (r *Repository) GetCommitMessage(commitID Hash) (string, error) {
 		return "", err
 	}
 
-	commitMessage, err := r.executor("show", "-s", "--format=%B", commitID.String()).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return "", fmt.Errorf("unable to identify message for commit '%s': %w", commitID.String(), err)
 	}
 
-	return commitMessage, nil
+	commit, err := goGitRepo.CommitObject(plumbing.NewHash(commitID.String()))
+	if err != nil {
+		return "", fmt.Errorf("unable to identify message for commit '%s': %w", commitID.String(), err)
+	}
+
+	return strings.TrimSpace(commit.Message), nil
 }
 
 // GetCommitTreeID returns the commit's Git tree ID.
@@ -226,12 +231,17 @@ func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
 		return ZeroHash, err
 	}
 
-	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^{tree}", commitID.String())).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
 	}
 
-	hash, err := NewHash(stdOut)
+	commit, err := goGitRepo.CommitObject(plumbing.NewHash(commitID.String()))
+	if err != nil {
+		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
+	}
+
+	hash, err := NewHash(commit.TreeHash.String())
 	if err != nil {
 		return ZeroHash, fmt.Errorf("invalid tree for commit ID '%s': %w", commitID, err)
 	}
@@ -244,32 +254,27 @@ func (r *Repository) GetCommitParentIDs(commitID Hash) ([]Hash, error) {
 		return nil, err
 	}
 
-	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^@", commitID.String())).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
 	}
 
-	commitIDSplit := strings.Split(stdOut, "\n")
-	if len(commitIDSplit) == 0 {
+	commit, err := goGitRepo.CommitObject(plumbing.NewHash(commitID.String()))
+	if err != nil {
+		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
+	}
+
+	if len(commit.ParentHashes) == 0 {
 		return nil, nil
 	}
 
-	commitIDs := []Hash{}
-	for _, commitID := range commitIDSplit {
-		if commitID == "" {
-			continue
-		}
-
-		hash, err := NewHash(commitID)
+	commitIDs := make([]Hash, 0, len(commit.ParentHashes))
+	for _, h := range commit.ParentHashes {
+		hash, err := NewHash(h.String())
 		if err != nil {
-			return nil, fmt.Errorf("invalid parent commit ID '%s': %w", commitID, err)
+			return nil, fmt.Errorf("invalid parent commit ID '%s': %w", h.String(), err)
 		}
-
 		commitIDs = append(commitIDs, hash)
-	}
-
-	if len(commitIDs) == 0 {
-		return nil, nil
 	}
 
 	return commitIDs, nil
@@ -315,10 +320,17 @@ func (r *Repository) GetCommonAncestor(commitAID, commitBID Hash) (Hash, error) 
 // ensureIsCommit is a helper to check that the ID represents a Git commit
 // object.
 func (r *Repository) ensureIsCommit(commitID Hash) error {
-	objType, err := r.executor("cat-file", "-t", commitID.String()).executeString()
+	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
 		return fmt.Errorf("unable to inspect if object is commit: %w", err)
-	} else if objType != "commit" {
+	}
+
+	obj, err := goGitRepo.Object(plumbing.AnyObject, plumbing.NewHash(commitID.String()))
+	if err != nil {
+		return fmt.Errorf("unable to inspect if object is commit: %w", err)
+	}
+
+	if obj.Type() != plumbing.CommitObject {
 		return fmt.Errorf("requested Git ID '%s' is not a commit object", commitID.String())
 	}
 

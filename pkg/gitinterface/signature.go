@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
@@ -46,6 +47,14 @@ var (
 	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
 	ErrVerifyingSSHSignature      = errors.New("unable to verify SSH signature")
 	ErrInvalidSignature           = errors.New("unable to parse signature / signature has unexpected header")
+)
+
+var (
+	gpgKeyringCache      = make(map[string]openpgp.EntityList)
+	gpgKeyringCacheMutex sync.RWMutex
+
+	sshSignerCache      = make(map[string]ssh.Signer)
+	sshSignerCacheMutex sync.RWMutex
 )
 
 // CanSign inspects the Git configuration to determine if commit / tag signing
@@ -107,9 +116,20 @@ func signGitObjectUsingKey(contents, pemKeyBytes []byte) (string, error) {
 func signGitObjectUsingGPGKey(contents, pemKeyBytes []byte) (string, error) {
 	reader := bytes.NewReader(contents)
 
-	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(pemKeyBytes))
-	if err != nil {
-		return "", err
+	keyStr := string(pemKeyBytes)
+	gpgKeyringCacheMutex.RLock()
+	keyring, ok := gpgKeyringCache[keyStr]
+	gpgKeyringCacheMutex.RUnlock()
+
+	if !ok {
+		var err error
+		keyring, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(pemKeyBytes))
+		if err != nil {
+			return "", err
+		}
+		gpgKeyringCacheMutex.Lock()
+		gpgKeyringCache[keyStr] = keyring
+		gpgKeyringCacheMutex.Unlock()
 	}
 
 	sig := new(strings.Builder)
@@ -121,9 +141,20 @@ func signGitObjectUsingGPGKey(contents, pemKeyBytes []byte) (string, error) {
 }
 
 func signGitObjectUsingSSHKey(contents, pemKeyBytes []byte) (string, error) {
-	signer, err := ssh.ParsePrivateKey(pemKeyBytes)
-	if err != nil {
-		return "", err
+	keyStr := string(pemKeyBytes)
+	sshSignerCacheMutex.RLock()
+	signer, ok := sshSignerCache[keyStr]
+	sshSignerCacheMutex.RUnlock()
+
+	if !ok {
+		var err error
+		signer, err = ssh.ParsePrivateKey(pemKeyBytes)
+		if err != nil {
+			return "", err
+		}
+		sshSignerCacheMutex.Lock()
+		sshSignerCache[keyStr] = signer
+		sshSignerCacheMutex.Unlock()
 	}
 
 	sshSig, err := sshsig.Sign(bytes.NewReader(contents), signer, sshsig.HashSHA512, namespaceSSHSignature)

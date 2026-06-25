@@ -9,14 +9,15 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common/testutils"
 	"github.com/hiddeco/sshsig"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"golang.org/x/crypto/ssh"
@@ -91,12 +92,22 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 	return output, nil
 }
 
+var newKeyCache sync.Map
+
 // NewKeyFromFile imports an ssh SSlibKey from the passed path.
 // The path can point to a public or private, encrypted or plaintext, rsa,
 // ecdsa or ed25519 key file in a format supported by "ssh-keygen". This aligns
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
+	fileBytes, err := os.ReadFile(path)
+	if err == nil {
+		hash := sha256.Sum256(fileBytes)
+		if cached, ok := newKeyCache.Load(hash); ok {
+			return cached.(*signerverifier.SSLibKey), nil
+		}
+	}
+
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -107,7 +118,13 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 		return nil, fmt.Errorf("failed to parse SSH2 key: %w", err)
 	}
 
-	return newSSHKey(sshPub, ""), nil
+	key := newSSHKey(sshPub, "")
+	if err == nil {
+		hash := sha256.Sum256(fileBytes)
+		newKeyCache.Store(hash, key)
+	}
+
+	return key, nil
 }
 
 // NewKeyFromBytes returns an ssh SSLibKey from the passed bytes. It's meant to
@@ -115,16 +132,22 @@ func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 func NewKeyFromBytes(t *testing.T, keyB []byte) *signerverifier.SSLibKey {
 	t.Helper()
 
-	testName := strings.ReplaceAll(t.Name(), " ", "__")
-	testName = strings.ReplaceAll(testName, "/", "__")
-	testName = strings.ReplaceAll(testName, "\\", "__")
-	hash := sha256.Sum256(keyB)
-	keyName := fmt.Sprintf("%s-%s", testName, hex.EncodeToString(hash[:]))
-	keyPath := filepath.Join(t.TempDir(), keyName)
+	keyDir, err := os.MkdirTemp("", "gittuf-ssh-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(keyDir)
+	})
+	testNameHash := sha256.Sum256([]byte(t.Name()))
+	keyHash := sha256.Sum256(keyB)
+	keyName := fmt.Sprintf("key-%x-%x", testNameHash[:8], keyHash[:8])
+	keyPath := filepath.Join(keyDir, keyName)
 
 	if err := os.WriteFile(keyPath, keyB, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	testutils.FixKeyPermissionsForWindows(t, keyPath)
 	defer os.Remove(keyPath) //nolint:errcheck
 
 	key, err := NewKeyFromFile(keyPath)

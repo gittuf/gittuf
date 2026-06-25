@@ -29,14 +29,15 @@ var ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath string
-	clock      clockwork.Clock
+	gitDirPath   string
+	worktreePath string
+	clock        clockwork.Clock
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
-	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: true})
+	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: !r.IsBare()})
 }
 
 // GetGitDir returns the GIT_DIR path for the repository.
@@ -63,40 +64,50 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, ErrRepositoryPathNotSpecified
 	}
 
-	repo := &Repository{clock: clockwork.NewRealClock()}
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	if err = os.Chdir(repositoryPath); err != nil {
-		return nil, err
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
+	repo := &Repository{clock: clockwork.NewRealClock(), worktreePath: repositoryPath}
 
 	slog.Debug("Identifying git directory for repository...")
 	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
+	stdOutContents, _ := io.ReadAll(stdOut)
+	stdErrContents, _ := io.ReadAll(stdErr)
+
 	if err != nil {
-		errContents, newErr := io.ReadAll(stdErr)
-		if newErr != nil {
-			return nil, fmt.Errorf("unable to read original err '%w' when loading repository: %w", err, newErr)
-		}
-		return nil, fmt.Errorf("unable to identify git directory for repository: %w: %s", err, strings.TrimSpace(string(errContents)))
+		return nil, fmt.Errorf("unable to identify git directory for repository: %w: %s", err, strings.TrimSpace(string(stdErrContents)))
 	}
 
-	stdOutContents, err := io.ReadAll(stdOut)
-	if err != nil {
-		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
+	gitDir := strings.TrimSpace(string(stdOutContents))
+	var absPath string
+	if filepath.IsAbs(gitDir) {
+		absPath, err = filepath.Abs(gitDir)
+	} else {
+		absPath, err = filepath.Abs(filepath.Join(repositoryPath, gitDir))
 	}
-
-	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
-	// the final path _including_ symlink follows.
-	absPath, err := filepath.Abs(strings.TrimSpace(string(stdOutContents)))
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
-	repo.gitDirPath = absPath
+
+	absRepoPath, err := filepath.Abs(repositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	cleanAbsPath := filepath.Clean(absPath)
+	cleanAbsRepoPath := filepath.Clean(absRepoPath)
+
+	lowerAbsPath := strings.ToLower(cleanAbsPath)
+	lowerAbsRepoPath := strings.ToLower(cleanAbsRepoPath)
+
+	isBare := lowerAbsPath == lowerAbsRepoPath
+	if !isBare {
+		worktreePath := filepath.Dir(cleanAbsPath)
+		lowerWorktreePath := strings.ToLower(worktreePath)
+		if lowerAbsRepoPath != lowerWorktreePath && !strings.HasPrefix(lowerAbsRepoPath, lowerWorktreePath+string(filepath.Separator)) {
+			return nil, fmt.Errorf("unable to identify git directory for repository: detected git dir %s is outside repository path %s", absPath, absRepoPath)
+		}
+	}
+
+	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", cleanAbsPath))
+	repo.gitDirPath = cleanAbsPath
 
 	return repo, nil
 }
@@ -132,12 +143,6 @@ func (e *executor) withoutGitDir() *executor {
 	return e
 }
 
-// withStdIn sets the contents of stdin to be passed in to the command.
-func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
-	e.stdIn = stdIn
-	return e
-}
-
 // executeString runs the constructed Git command and returns the contents of
 // stdout.  Leading and trailing spaces and newlines are removed. This function
 // should be used almost every time; the only exception is when the output is
@@ -170,6 +175,9 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
 	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
+	if e.r.worktreePath != "" {
+		cmd.Dir = e.r.worktreePath
+	}
 
 	var (
 		stdOut bytes.Buffer

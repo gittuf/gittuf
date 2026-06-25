@@ -245,33 +245,33 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	}
 
 	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
+		err := repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
+		err := repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gpg signed commit, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, gpgKey)
+		err := repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, sshKey)
+		err := repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
+		err := repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
+		err := repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
 		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
 	})
 }
