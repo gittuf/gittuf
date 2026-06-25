@@ -1144,167 +1144,287 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 }
 
 func parseRSLEntryText(id gitinterface.Hash, text string) (Entry, error) {
+	// Each parser returns a concrete pointer type. Assign to a local and return
+	// an explicit nil interface on error: returning the typed nil pointer
+	// directly would yield a non-nil Entry wrapping a nil pointer.
 	switch {
 	case strings.HasPrefix(text, ReferenceEntryHeader):
-		return parseReferenceEntryText(id, text)
+		entry, err := parseReferenceEntryText(id, text)
+		if err != nil {
+			return nil, err
+		}
+		return entry, nil
 	case strings.HasPrefix(text, AnnotationEntryHeader):
-		return parseAnnotationEntryText(id, text)
+		entry, err := parseAnnotationEntryText(id, text)
+		if err != nil {
+			return nil, err
+		}
+		return entry, nil
 	case strings.HasPrefix(text, PropagationEntryHeader):
-		return parsePropagationEntryText(id, text)
+		entry, err := parsePropagationEntryText(id, text)
+		if err != nil {
+			return nil, err
+		}
+		return entry, nil
 	default:
 		return nil, ErrInvalidRSLEntry
 	}
 }
 
+// parseReferenceEntryText parses a reference entry as a state machine. The
+// fields must appear in the order ref, targetID, number, each at most once;
+// number is optional and trailing. Out-of-order fields and duplicates are
+// rejected. Unknown keys are ignored for forward compatibility.
 func parseReferenceEntryText(id gitinterface.Hash, text string) (*ReferenceEntry, error) {
-	lines := strings.Split(text, "\n")
-	if len(lines) < 4 {
-		return nil, ErrInvalidRSLEntry
+	body, err := entryBody(text, ReferenceEntryHeader)
+	if err != nil {
+		return nil, err
 	}
-	lines = lines[2:]
+
+	const (
+		expectRef = iota
+		expectTargetID
+		expectNumber
+		done
+	)
 
 	entry := &ReferenceEntry{ID: id}
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-
-		ls := strings.Split(l, ":")
-		if len(ls) < 2 {
+	state := expectRef
+	for _, line := range body {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
 			return nil, ErrInvalidRSLEntry
 		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
-		switch strings.TrimSpace(ls[0]) {
+		switch key {
 		case RefKey:
-			entry.RefName = strings.TrimSpace(ls[1])
+			if state != expectRef {
+				return nil, ErrInvalidRSLEntry
+			}
+			entry.RefName = value
+			state = expectTargetID
 
 		case TargetIDKey:
-			targetHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
-			if err != nil {
+			if state != expectTargetID {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setHash(&entry.TargetID, value); err != nil {
 				return nil, err
 			}
-
-			entry.TargetID = targetHash
+			state = expectNumber
 
 		case NumberKey:
-			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
-			if err != nil {
+			if state != expectNumber {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setNumber(&entry.Number, value); err != nil {
 				return nil, err
 			}
-
-			entry.Number = number
+			state = done
 		}
 	}
 
+	if state < expectNumber {
+		// ref and/or targetID were not seen.
+		return nil, ErrInvalidRSLEntry
+	}
 	return entry, nil
 }
 
+// parseAnnotationEntryText parses an annotation entry as a state machine. One or
+// more entryID fields come first, followed by skip, then an optional number,
+// then an optional PEM message block. The message is decoded separately, so the
+// state machine stops at its begin marker.
 func parseAnnotationEntryText(id gitinterface.Hash, text string) (*AnnotationEntry, error) {
 	annotation := &AnnotationEntry{
 		ID:          id,
 		RSLEntryIDs: []gitinterface.Hash{},
 	}
 
-	messageBlock, _ := pem.Decode([]byte(text)) // rest doesn't seem to work when the PEM block is at the end of text, see: https://go.dev/play/p/oZysAfemA-v
-	if messageBlock != nil {
-		annotation.Message = string(messageBlock.Bytes)
+	body, err := entryBody(text, AnnotationEntryHeader)
+	if err != nil {
+		return nil, err
 	}
 
-	lines := strings.Split(text, "\n")
-	if len(lines) < 4 {
-		return nil, ErrInvalidRSLEntry
+	// Only attempt to decode a message when the begin marker is present; most
+	// annotations carry no message, so this avoids copying the text and running
+	// the PEM scanner for them.
+	if strings.Contains(text, BeginMessage) {
+		messageBlock, _ := pem.Decode([]byte(text)) // rest doesn't seem to work when the PEM block is at the end of text, see: https://go.dev/play/p/oZysAfemA-v
+		if messageBlock != nil {
+			annotation.Message = string(messageBlock.Bytes)
+		}
 	}
-	lines = lines[2:]
 
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-		if l == BeginMessage {
+	const (
+		expectEntryID = iota // one or more entryIDs, then skip
+		expectNumber         // entryIDs and skip seen; optional number
+		done
+	)
+
+	state := expectEntryID
+	for _, line := range body {
+		line = strings.TrimSpace(line)
+		if line == BeginMessage {
 			break
 		}
 
-		ls := strings.Split(l, ":")
-		if len(ls) < 2 {
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
 			return nil, ErrInvalidRSLEntry
 		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
-		switch strings.TrimSpace(ls[0]) {
+		switch key {
 		case EntryIDKey:
-			hash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
+			if state != expectEntryID {
+				return nil, ErrInvalidRSLEntry
+			}
+			hash, err := gitinterface.NewHash(value)
 			if err != nil {
 				return nil, err
 			}
-
 			annotation.RSLEntryIDs = append(annotation.RSLEntryIDs, hash)
 
 		case SkipKey:
-			if strings.TrimSpace(ls[1]) == "true" {
-				annotation.Skip = true
-			} else {
-				annotation.Skip = false
+			if state != expectEntryID || len(annotation.RSLEntryIDs) == 0 {
+				return nil, ErrInvalidRSLEntry
 			}
+			switch value {
+			case "true":
+				annotation.Skip = true
+			case "false":
+				annotation.Skip = false
+			default:
+				return nil, ErrInvalidRSLEntry
+			}
+			state = expectNumber
 
 		case NumberKey:
-			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
-			if err != nil {
+			if state != expectNumber {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setNumber(&annotation.Number, value); err != nil {
 				return nil, err
 			}
-
-			annotation.Number = number
+			state = done
 		}
 	}
 
+	if state < expectNumber {
+		// entryID(s) and/or skip were not seen.
+		return nil, ErrInvalidRSLEntry
+	}
 	return annotation, nil
 }
 
+// parsePropagationEntryText parses a propagation entry as a state machine. The
+// fields must appear in the order ref, targetID, upstreamRepository,
+// upstreamEntryID, number, each at most once; number is optional and trailing.
 func parsePropagationEntryText(id gitinterface.Hash, text string) (*PropagationEntry, error) {
-	lines := strings.Split(text, "\n")
-	if len(lines) < 6 {
-		return nil, ErrInvalidRSLEntry
+	body, err := entryBody(text, PropagationEntryHeader)
+	if err != nil {
+		return nil, err
 	}
-	lines = lines[2:]
+
+	const (
+		expectRef = iota
+		expectTargetID
+		expectUpstreamRepository
+		expectUpstreamEntryID
+		expectNumber
+		done
+	)
 
 	entry := &PropagationEntry{ID: id}
-	for _, l := range lines {
-		l = strings.TrimSpace(l)
-
-		ls := strings.Split(l, ":")
-		if len(ls) < 2 {
+	state := expectRef
+	for _, line := range body {
+		key, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if !ok {
 			return nil, ErrInvalidRSLEntry
 		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
 
-		switch strings.TrimSpace(ls[0]) {
+		switch key {
 		case RefKey:
-			entry.RefName = strings.TrimSpace(ls[1])
+			if state != expectRef {
+				return nil, ErrInvalidRSLEntry
+			}
+			entry.RefName = value
+			state = expectTargetID
 
 		case TargetIDKey:
-			targetHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
-			if err != nil {
+			if state != expectTargetID {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setHash(&entry.TargetID, value); err != nil {
 				return nil, err
 			}
-
-			entry.TargetID = targetHash
+			state = expectUpstreamRepository
 
 		case UpstreamRepositoryKey:
-			// The location may also have `:`, so we need to handle all items in ls
-			entry.UpstreamRepository = strings.TrimSpace(strings.Join(ls[1:], ":"))
+			if state != expectUpstreamRepository {
+				return nil, ErrInvalidRSLEntry
+			}
+			// The location may also contain ':', so value retains everything
+			// after the first separator.
+			entry.UpstreamRepository = value
+			state = expectUpstreamEntryID
 
 		case UpstreamEntryIDKey:
-			upstreamEntryIDHash, err := gitinterface.NewHash(strings.TrimSpace(ls[1]))
-			if err != nil {
+			if state != expectUpstreamEntryID {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setHash(&entry.UpstreamEntryID, value); err != nil {
 				return nil, err
 			}
-
-			entry.UpstreamEntryID = upstreamEntryIDHash
+			state = expectNumber
 
 		case NumberKey:
-			number, err := strconv.ParseUint(strings.TrimSpace(ls[1]), 10, 64)
-			if err != nil {
+			if state != expectNumber {
+				return nil, ErrInvalidRSLEntry
+			}
+			if err := setNumber(&entry.Number, value); err != nil {
 				return nil, err
 			}
-
-			entry.Number = number
+			state = done
 		}
 	}
 
+	if state < expectNumber {
+		// A required field before number was not seen.
+		return nil, ErrInvalidRSLEntry
+	}
 	return entry, nil
+}
+
+// entryBody validates the entry's header line and the mandatory blank line that
+// follows it, returning the remaining body lines for the state machine.
+func entryBody(text, header string) ([]string, error) {
+	lines := strings.Split(text, "\n")
+	if len(lines) < 2 || lines[0] != header || strings.TrimSpace(lines[1]) != "" {
+		return nil, ErrInvalidRSLEntry
+	}
+	return lines[2:], nil
+}
+
+func setHash(dst *gitinterface.Hash, value string) error {
+	hash, err := gitinterface.NewHash(value)
+	if err != nil {
+		return err
+	}
+	*dst = hash
+	return nil
+}
+
+func setNumber(dst *uint64, value string) error {
+	number, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return err
+	}
+	*dst = number
+	return nil
 }
 
 func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID gitinterface.Hash) []*AnnotationEntry {
