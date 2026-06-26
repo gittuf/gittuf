@@ -1375,7 +1375,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			if trustedUsedPrincipalIDs.Len() >= verifier.Threshold()-1 {
 				slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', policies can be met if the merge is by authorized person!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
 				verifiedUsing = verifier.Name()
-				acceptedPrincipalIDs = trustedPrincipalIDs
+				acceptedPrincipalIDs = trustedUsedPrincipalIDs
 				rslEntrySignatureNeededForThreshold = true
 				break
 			}
