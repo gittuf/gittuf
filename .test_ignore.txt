@@ -1,6 +1,7 @@
 github.com/gittuf/gittuf/docs/cli
 github.com/gittuf/gittuf/docs/sandbox
-github.com/gittuf/gittuf/internal/cmd
+github.com/gittuf/gittuf/internal/cmd/dev
+github.com/gittuf/gittuf/internal/cmd/tui
 github.com/gittuf/gittuf/internal/common/test_helpers.go
 github.com/gittuf/gittuf/internal/dev
 github.com/gittuf/gittuf/internal/git-remote-gittuf
