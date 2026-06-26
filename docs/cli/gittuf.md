@@ -23,7 +23,6 @@ gittuf is a security layer for Git repositories, powered by TUF. The CLI provide
 * [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
 * [gittuf cache](gittuf_cache.md)	 - Manage gittuf's caching functionality
 * [gittuf clone](gittuf_clone.md)	 - Clone repository and its gittuf references
-* [gittuf dev](gittuf_dev.md)	 - Developer mode commands
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log
 * [gittuf sync](gittuf_sync.md)	 - Synchronize local references with remote references based on RSL
