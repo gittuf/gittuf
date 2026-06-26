@@ -15,4 +15,9 @@ jobs:
           sleep 10s
           gittuf clone https://github.com/${{ github.repository }}
           cd gittuf
+          echo "RSL:            $(git show --oneline refs/gittuf/reference-state-log)"
+          echo "Policy:         $(git show --oneline refs/gittuf/policy)"
+          echo "Policy staging: $(git show --oneline refs/gittuf/policy-staging)"
+          echo "Attestations:   $(git show --oneline refs/gittuf/attestations)"
+          echo "Main:           $(git show --oneline refs/heads/main)"
           gittuf verify-ref main --verbose
