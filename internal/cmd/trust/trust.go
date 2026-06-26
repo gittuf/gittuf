@@ -16,7 +16,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/enablegithubappapprovals"
 	"github.com/gittuf/gittuf/internal/cmd/trust/incrementversion"
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
-	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listpropagationdirectives"
@@ -64,7 +63,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(disablegithubappapprovals.New(o))
 	cmd.AddCommand(enablegithubappapprovals.New(o))
 	cmd.AddCommand(incrementversion.New(o))
-	cmd.AddCommand(inspectroot.New())
 	cmd.AddCommand(listglobalrules.New())
 	cmd.AddCommand(listhooks.New())
 	cmd.AddCommand(listpropagationdirectives.New())
