@@ -168,7 +168,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -227,7 +227,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -283,7 +283,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

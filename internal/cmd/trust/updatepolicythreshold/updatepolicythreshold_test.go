@@ -102,7 +102,7 @@ func TestUpdatePolicyThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestUpdatePolicyThreshold(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

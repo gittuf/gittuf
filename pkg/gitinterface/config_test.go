@@ -15,7 +15,7 @@ func TestGetGitConfig(t *testing.T) {
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
 	// CreateTestGitRepository sets our test config
-	config, err := repo.GetGitConfig()
+	config, err := GetGitConfig(repo.gitDirPath)
 	assert.Nil(t, err)
 	assert.Equal(t, testName, config["user.name"])
 	assert.Equal(t, testEmail, config["user.email"])
@@ -34,7 +34,7 @@ func TestSetGitConfig(t *testing.T) {
 		err = repo.SetGitConfig("user.email", email)
 		require.NoError(t, err)
 
-		config, err := repo.GetGitConfig()
+		config, err := GetGitConfig(repo.gitDirPath)
 		require.NoError(t, err)
 		assert.Equal(t, name, config["user.name"])
 		assert.Equal(t, email, config["user.email"])
@@ -48,7 +48,7 @@ func TestSetGitConfig(t *testing.T) {
 		err = repo.SetGitConfig("user.email", "")
 		require.NoError(t, err)
 
-		config, err := repo.GetGitConfig()
+		config, err := GetGitConfig(repo.gitDirPath)
 		require.NoError(t, err)
 		assert.Equal(t, "", config["user.name"])
 		assert.Equal(t, "", config["user.email"])
@@ -60,14 +60,14 @@ func TestSetGitConfig(t *testing.T) {
 		err := repo.SetGitConfig("gpg.format", "gpg")
 		require.NoError(t, err)
 
-		config, err := repo.GetGitConfig()
+		config, err := GetGitConfig(repo.gitDirPath)
 		require.NoError(t, err)
 		assert.Equal(t, "gpg", config["gpg.format"])
 
 		err = repo.SetGitConfig("gpg.format", "")
 		require.NoError(t, err)
 
-		config, err = repo.GetGitConfig()
+		config, err = GetGitConfig(repo.gitDirPath)
 		require.NoError(t, err)
 		assert.Equal(t, "", config["gpg.format"])
 	})
