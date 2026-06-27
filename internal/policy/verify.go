@@ -782,9 +782,10 @@ func (s *StateMetadata) VerifyNewStateMetadata(_ context.Context, newStateMetada
 	// Then compare all delegated rule files.
 	// We need to check that the rule files in the new state with the same name
 	// as a rule file in the current state have greater or equal version numbers.
-	// The new state may have a rule file added that doesn't exist in the
-	// current state, but it shouldn't have any removed rule files compared to
-	// the current state as we don't yet support deleting rule files.
+	// The new state may add delegated rule files that do not exist in the
+	// current state. It may also remove delegated rule files, but only when the
+	// new delegation graph no longer references the removed role. If the removed
+	// role is still referenced, treat the missing metadata as rollback.
 	for name := range s.DelegationEnvelopes {
 		currentDelegatedTargetsMetadata, err := s.GetTargetsMetadata(name, true)
 		if err != nil {
@@ -793,9 +794,18 @@ func (s *StateMetadata) VerifyNewStateMetadata(_ context.Context, newStateMetada
 		newDelegatedTargetsMetadata, err := newStateMetadata.GetTargetsMetadata(name, true)
 		if err != nil {
 			// At this point, we know the current state has this delegated rule
-			// file, so if the new state doesn't have it, it's a rollback.
-			// This will change once we support deleting rule files.
+			// file. Missing metadata in the new state is allowed only when the
+			// new delegation graph no longer references the role; otherwise,
+			// the missing file is a rollback signal.
 			if errors.Is(err, ErrMetadataNotFound) {
+				referenced, refErr := newStateMetadata.HasRuleFileReference(name)
+				if refErr != nil {
+					return refErr
+				}
+				if !referenced {
+					continue
+				}
+
 				return fmt.Errorf("%w: new policy is missing delegated rule file '%s'", ErrMetadataRollbackDetected, name)
 			}
 
