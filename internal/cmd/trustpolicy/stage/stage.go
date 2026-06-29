@@ -17,7 +17,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.localOnly,
 		"local-only",
 		false,
-		"indicate that the policy must be committed into the RSL locally",
+		"stage policy changes locally without pushing to a remote repository",
 	)
 }
 
@@ -40,7 +40,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stage",
 		Short: "Stage and push local policy-staging changes to remote repository",
-		Long:  "The 'stage' command stages local policy changes from the policy-staging reference and optionally pushes them to a remote repository. It is used to prepare policy updates so they can be reviewed and signed by other users if needed. Changes can optionally be committed the to the RSL locally.",
+		Long:  "The 'stage' command stages local policy changes and records them in the RSL. It optionally pushes the staged changes to a remote repository. It is used to prepare policy updates so they can be reviewed and signed by other users if needed.",
 		RunE:  o.Run,
 	}
 	o.AddFlags(cmd)

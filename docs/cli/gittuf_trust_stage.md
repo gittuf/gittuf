@@ -4,7 +4,7 @@ Stage and push local policy-staging changes to remote repository
 
 ### Synopsis
 
-The 'stage' command stages local policy changes from the policy-staging reference and optionally pushes them to a remote repository. It is used to prepare policy updates so they can be reviewed and signed by other users if needed. Changes can optionally be committed the to the RSL locally.
+The 'stage' command stages local policy changes and records them in the RSL. It optionally pushes the staged changes to a remote repository. It is used to prepare policy updates so they can be reviewed and signed by other users if needed.
 
 ```
 gittuf trust stage [flags]
@@ -14,7 +14,7 @@ gittuf trust stage [flags]
 
 ```
   -h, --help         help for stage
-      --local-only   indicate that the policy must be committed into the RSL locally
+      --local-only   stage policy changes locally without pushing to a remote repository
 ```
 
 ### Options inherited from parent commands
