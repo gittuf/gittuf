@@ -4,7 +4,7 @@ Validate and apply changes from policy-staging to policy
 
 ### Synopsis
 
-The 'apply' command validates and applies changes from the policy-staging area to the repository's policy. It is used to make staged policy updates effective and can optionally commit the policy change into the RSL locally.
+The 'apply' command validates and applies changes from the policy-staging area to the repository's policy. It is used to make staged policy updates effective and records the change in the RSL. Pass '--local-only' to apply without pushing upstream. Otherwise, supply the remote name as the first positional argument.
 
 ```
 gittuf policy apply [flags]
@@ -14,7 +14,7 @@ gittuf policy apply [flags]
 
 ```
   -h, --help         help for apply
-      --local-only   indicate that the policy must be committed into the RSL locally
+      --local-only   apply policy changes locally without pushing to a remote repository
 ```
 
 ### Options inherited from parent commands
