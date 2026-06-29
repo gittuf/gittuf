@@ -17,7 +17,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Go
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
           go-version: '1.26'
       - name: Build gittuf
@@ -27,7 +27,7 @@ jobs:
         with:
           repository: gittuf/demo
       - name: Install Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.14'
       - name: Run demo script

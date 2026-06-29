@@ -23,7 +23,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Install Go
-      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
@@ -35,7 +35,7 @@ jobs:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@b84ab5559b5a1bb4b8ee2737d2506a16e1737636
+      uses: vmactions/freebsd-vm@5a72679103d223925653750faa878a143340fbd0
       with:
         usesh: true
         prepare: |
