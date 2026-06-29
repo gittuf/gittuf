@@ -24,7 +24,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "reconcile <remote>",
 		Short:             "Reconcile local RSL with remote RSL",
-		Long:              `This command checks the local RSL against the specified remote and reconciles the local RSL if needed. If the local RSL doesn't exist or is strictly behind the remote RSL, then the local RSL is updated to match the remote RSL. If the local RSL is ahead of the remote RSL, nothing is updated. Finally, if the local and remote RSLs have diverged, then the local only RSL entries are reapplied over the latest entries in the remote if the local only RSL entries and remote only entries are for different Git references.`,
+		Long:              "The 'reconcile' command checks the local RSL against the specified remote and reconciles the local RSL if needed. It is used to bring the local RSL back in line with the remote after the two diverge. If the local RSL does not exist or is strictly behind the remote, it is updated to match the remote; if it is ahead, nothing is updated; and if the two have diverged, the local-only entries are reapplied over the latest remote entries when the local-only and remote-only entries are for different Git references.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

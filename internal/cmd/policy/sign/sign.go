@@ -48,7 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "sign",
 		Short:             "Sign policy file",
-		Long:              `Sign the specified policy file with the provided signing key. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'sign' command adds a signature to a gittuf policy file using the supplied signing key. It is used to meet a policy file's signature threshold when multiple keys are required to approve it.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

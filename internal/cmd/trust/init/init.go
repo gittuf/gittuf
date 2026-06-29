@@ -20,7 +20,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.location,
 		"location",
 		"",
-		"location of repository",
+		"canonical location of the repository to record in the root of trust",
 	)
 }
 

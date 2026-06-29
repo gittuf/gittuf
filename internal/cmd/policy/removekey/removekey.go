@@ -57,7 +57,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-key",
 		Short:             "Remove a key from a policy file",
-		Long:              `The 'remove-key' command removes the specified public key from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'remove-key' command removes a public key from a gittuf policy file. The key must first be removed from all rules that reference it before this command will succeed.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

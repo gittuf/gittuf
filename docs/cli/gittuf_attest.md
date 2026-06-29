@@ -11,7 +11,7 @@ The 'attest' command provides tools for attesting to code contributions. It incl
 ```
       --create-rsl-entry     create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
   -h, --help                 help for attest
-  -k, --signing-key string   signing key to use to sign attestation
+  -k, --signing-key string   signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
 ```
 
 ### Options inherited from parent commands

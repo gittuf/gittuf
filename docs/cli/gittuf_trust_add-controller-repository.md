@@ -4,7 +4,7 @@ Add a controller repository
 
 ### Synopsis
 
-The 'add-controller-repository' command registers a controller repository in the repository's root of trust. It is used to add and configure a controller repository, including its name, location, and initial root principals.
+The 'add-controller-repository' command adds a controller repository to the repository's root of trust. It is used to designate a repository whose global rules this repository inherits.
 
 ```
 gittuf trust add-controller-repository [flags]
@@ -14,7 +14,7 @@ gittuf trust add-controller-repository [flags]
 
 ```
   -h, --help                                 help for add-controller-repository
-      --initial-root-principal stringArray   initial root principals of controller repository
+      --initial-root-principal stringArray   initial root principals of the controller repository (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
       --location string                      location of controller repository
       --name string                          name of controller repository
 ```
@@ -27,7 +27,7 @@ gittuf trust add-controller-repository [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

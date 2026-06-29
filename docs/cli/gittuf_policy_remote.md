@@ -4,7 +4,7 @@ Tools for managing remote policies
 
 ### Synopsis
 
-The 'remote' subcommand provides tools for managing gittuf interactions with remote repositories.
+The 'remote' subcommand provides tools for pulling and pushing gittuf policy to and from remote repositories.
 
 ### Options
 
@@ -20,7 +20,7 @@ The 'remote' subcommand provides tools for managing gittuf interactions with rem
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

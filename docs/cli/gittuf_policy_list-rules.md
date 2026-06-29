@@ -4,7 +4,7 @@ List rules for the current state
 
 ### Synopsis
 
-The 'list-rules' command displays all policy rules defined in the current gittuf policy. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'list-rules' command lists the rules defined in a gittuf policy, shown as a tree in evaluation order. It is used to review which principals are authorized over which namespaces.
 
 ```
 gittuf policy list-rules [flags]
@@ -25,7 +25,7 @@ gittuf policy list-rules [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

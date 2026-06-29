@@ -103,7 +103,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-rule",
 		Short:             "Add a new rule to a policy file",
-		Long:              `The 'add-rule' command adds a new rule to a gittuf policy file. Each rule contains a name ('--rule-name') for the rule, one or more principals ('--authorize') who are allowed to sign within the scope of the rule, a set of rule patterns ('--rule-pattern') defining the namespaces or paths the rule governs, and a signature threshold ('--threshold'), which is the minimum number of valid signatures required to satisfy the rule. Principals can be specified by their principal IDs. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'add-rule' command adds a new rule to a gittuf policy file. It is used to authorize a set of principals to sign changes to the namespaces the rule protects, subject to a signature threshold.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -14,7 +14,7 @@ gittuf trust init [flags]
 
 ```
   -h, --help              help for init
-      --location string   location of repository
+      --location string   canonical location of the repository to record in the root of trust
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +25,7 @@ gittuf trust init [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

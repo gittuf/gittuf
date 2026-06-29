@@ -4,7 +4,7 @@ Pull policy from the specified remote
 
 ### Synopsis
 
-The 'pull' command retrieves policy updates from the specified remote and applies them to the local repository.
+The 'pull' command fetches updates to the gittuf policy from the specified remote into the local repository.
 
 ```
 gittuf trust remote pull <remote> [flags]
@@ -24,7 +24,7 @@ gittuf trust remote pull <remote> [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

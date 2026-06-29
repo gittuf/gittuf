@@ -28,7 +28,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().Var(
 		&o.expectedRootKeys,
 		"root-key",
-		"set of initial root of trust keys for the repository (supported values: paths to SSH keys, GPG key fingerprints, Sigstore/Fulcio identities)",
+		"set of initial root of trust keys for the repository (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 
 	cmd.Flags().BoolVar(
@@ -65,7 +65,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "clone",
 		Short:             "Clone repository and its gittuf references",
-		Long:              `The 'clone' command clones a gittuf-enabled Git repository along with its associated gittuf metadata. This command can also ensure the repository's trust root is established correctly by using specified root keys, optionally supplied using the --root-key flag. You may also specify a particular branch to check out with --branch and choose whether to create a bare repository using --bare.`,
+		Long:              "The 'clone' command clones a gittuf-enabled Git repository along with its associated gittuf metadata. It is used to obtain a repository and verify its RSL and policy against the provided root of trust keys.",
 		Args:              cobra.RangeArgs(1, 2),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

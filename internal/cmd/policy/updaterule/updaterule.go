@@ -26,7 +26,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"name of policy file to add rule to",
+		"name of policy file to update rule in",
 	)
 
 	cmd.Flags().StringVar(
@@ -103,7 +103,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-rule",
 		Short:             "Update an existing rule in a policy file",
-		Long:              `Update an existing rule in the specified policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'update-rule' command updates an existing rule in a gittuf policy file. It is used to change the principals, patterns, or signature threshold that the rule enforces.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

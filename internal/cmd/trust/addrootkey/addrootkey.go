@@ -20,7 +20,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.newRootKey,
 		"root-key",
 		"",
-		"root key to add to root of trust",
+		"root key to add (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("root-key") //nolint:errcheck
 }
@@ -53,7 +53,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-root-key",
 		Short:             "Add Root key to gittuf root of trust",
-		Long:              `The 'add-root-key' command allows users to add a new root key to the repository's root of trust. This command facilitates the addition of an extra root key to the existing trusted root keys, enabling multiple root keys or key rotation. It requires a public key file or Sigstore identity via --root-key and a signing key via --signing-key. Optionally, the change can be recorded in the RSL.`,
+		Long:              "The 'add-root-key' command adds a new root key to the repository's root of trust. It is used to add additional trusted root keys or to facilitate key rotation.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

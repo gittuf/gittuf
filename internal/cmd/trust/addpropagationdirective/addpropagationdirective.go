@@ -92,7 +92,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-propagation-directive",
 		Short:             `Add propagation directive into gittuf root of trust`,
-		Long:              "The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are propagated into a downstream repository by specifying source and destination references and paths.",
+		Long:              "The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

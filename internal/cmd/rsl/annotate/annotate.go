@@ -38,14 +38,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.remoteName,
 		"remote-name",
 		"",
-		"remote name",
+		"name of the remote to push the annotation to",
 	)
 
 	cmd.Flags().BoolVar(
 		&o.localOnly,
 		"local-only",
 		false,
-		"local only",
+		"perform this operation locally without pushing to a remote repository",
 	)
 
 	cmd.MarkFlagsOneRequired("remote-name", "local-only")

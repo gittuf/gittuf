@@ -35,14 +35,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.remoteName,
 		"remote-name",
 		"",
-		"remote name",
+		"name of the remote to push the RSL entry to",
 	)
 
 	cmd.Flags().BoolVar(
 		&o.localOnly,
 		"local-only",
 		false,
-		"local only",
+		"perform this operation locally without pushing to a remote repository",
 	)
 
 	cmd.MarkFlagsOneRequired("remote-name", "local-only")
@@ -74,7 +74,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "record",
 		Short:             "Record latest state of a Git reference (e.g., 'main') in the RSL",
-		Long:              `The 'record' command records the latest state of a Git reference in the repository's RSL. The argument must be a valid Git reference (such as 'main', 'HEAD', or a tag name). For example: 'gittuf rsl record --local-only main'. This command is used to capture and track changes to references over time for auditing and consistency.`,
+		Long:              "The 'record' command records the latest state of a Git reference in the repository's RSL. It is used to capture and track changes to references over time so they can be audited and verified. The argument must be a valid Git reference, such as 'main', 'HEAD', or a tag name.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

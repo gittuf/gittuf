@@ -4,7 +4,7 @@ Update an existing rule in a policy file
 
 ### Synopsis
 
-Update an existing rule in the specified policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'update-rule' command updates an existing rule in a gittuf policy file. It is used to change the principals, patterns, or signature threshold that the rule enforces.
 
 ```
 gittuf policy update-rule [flags]
@@ -15,7 +15,7 @@ gittuf policy update-rule [flags]
 ```
       --authorize stringArray      authorize the principal IDs for the rule
   -h, --help                       help for update-rule
-      --policy-name string         name of policy file to add rule to (default "targets")
+      --policy-name string         name of policy file to update rule in (default "targets")
       --rule-name string           name of rule
       --rule-pattern stringArray   patterns used to identify namespaces rule applies to
       --threshold int              threshold of required valid signatures (default 1)
@@ -29,7 +29,7 @@ gittuf policy update-rule [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

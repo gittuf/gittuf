@@ -81,7 +81,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-rules",
 		Short:             "List rules for the current state",
-		Long:              `The 'list-rules' command displays all policy rules defined in the current gittuf policy. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'list-rules' command lists the rules defined in a gittuf policy, shown as a tree in evaluation order. It is used to review which principals are authorized over which namespaces.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

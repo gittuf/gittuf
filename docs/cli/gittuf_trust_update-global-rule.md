@@ -4,7 +4,7 @@ Update an existing global rule in the root of trust
 
 ### Synopsis
 
-This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified. Note that a global rule may only be updated with the same type of global rule, and changes to the type require removing and adding it again.
+The 'update-global-rule' command updates an existing global rule in the repository's root of trust. It is used to adjust a repository-wide constraint, such as its patterns or signature threshold. A global rule can only be updated with the same rule type; changing the type requires removing and adding the rule again.
 
 ```
 gittuf trust update-global-rule [flags]
@@ -28,7 +28,7 @@ gittuf trust update-global-rule [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

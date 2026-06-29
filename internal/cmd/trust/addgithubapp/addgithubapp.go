@@ -64,7 +64,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-github-app",
 		Short:             "Add GitHub app to gittuf root of trust",
-		Long:              `This command allows users to add a trusted key for the special GitHub app role. This key is used to verify signatures on GitHub pull request approval attestations. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Long:              "The 'add-github-app' command adds a trusted key for the special GitHub app role to the repository's root of trust. It is used to verify signatures on GitHub pull request approval attestations.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -96,7 +96,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-global-rule",
 		Short:             `Add a new global rule to root of trust`,
-		Long:              "This command allows a user to add a new global rule to the root of trust. The user must specify the name, type, and rule pattern for the rule.",
+		Long:              "The 'add-global-rule' command adds a new global rule to the repository's root of trust. It is used to enforce repository-wide constraints, such as requiring a signature threshold or blocking force pushes on matching namespaces.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

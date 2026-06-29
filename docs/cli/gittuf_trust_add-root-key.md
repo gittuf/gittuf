@@ -4,7 +4,7 @@ Add Root key to gittuf root of trust
 
 ### Synopsis
 
-The 'add-root-key' command allows users to add a new root key to the repository's root of trust. This command facilitates the addition of an extra root key to the existing trusted root keys, enabling multiple root keys or key rotation. It requires a public key file or Sigstore identity via --root-key and a signing key via --signing-key. Optionally, the change can be recorded in the RSL.
+The 'add-root-key' command adds a new root key to the repository's root of trust. It is used to add additional trusted root keys or to facilitate key rotation.
 
 ```
 gittuf trust add-root-key [flags]
@@ -14,7 +14,7 @@ gittuf trust add-root-key [flags]
 
 ```
   -h, --help              help for add-root-key
-      --root-key string   root key to add to root of trust
+      --root-key string   root key to add (path to SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +25,7 @@ gittuf trust add-root-key [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

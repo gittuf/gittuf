@@ -45,7 +45,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.publicKeys,
 		"public-key",
 		[]string{},
-		"public keys for person",
+		"public keys for the person (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -127,7 +127,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-person",
 		Short:             "Update a person in a policy file",
-		Long:              `This command allows users to update a person's information in the specified policy file. By default, the main policy file is selected. The command replaces the person's existing information with the new values provided. If a field is not specified, its existing value is not preserved.`,
+		Long:              "The 'update-person' command updates a trusted person's definition in a gittuf policy file. It is used to change a person's keys, associated identities, or custom metadata. The update replaces the person entirely, so any field not provided is cleared rather than preserved.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -21,7 +21,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.appName,
 		"app-name",
 		tuf.GitHubAppRoleName,
-		"name of app to add to root of trust",
+		"name of the app whose approvals to mark trusted",
 	)
 }
 
@@ -48,7 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "enable-github-app-approvals",
 		Short:             "Mark GitHub app approvals as trusted henceforth",
-		Long:              `The 'enable-github-app-approvals' command marks a GitHub App as trusted, allowing it to approve protected operations under the repository's trust policy.`,
+		Long:              "The 'enable-github-app-approvals' command marks a GitHub app's approvals as trusted in the repository's root of trust. It is used to honor new pull request approval attestations issued by the app.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

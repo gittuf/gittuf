@@ -4,7 +4,7 @@ Add a new global rule to root of trust
 
 ### Synopsis
 
-This command allows a user to add a new global rule to the root of trust. The user must specify the name, type, and rule pattern for the rule.
+The 'add-global-rule' command adds a new global rule to the repository's root of trust. It is used to enforce repository-wide constraints, such as requiring a signature threshold or blocking force pushes on matching namespaces.
 
 ```
 gittuf trust add-global-rule [flags]
@@ -28,7 +28,7 @@ gittuf trust add-global-rule [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

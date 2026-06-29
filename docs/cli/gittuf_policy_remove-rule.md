@@ -4,7 +4,7 @@ Remove rule from a policy file
 
 ### Synopsis
 
-The 'remove-rule' command deletes the specified rule from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'remove-rule' command removes a rule from a gittuf policy file. It is used to stop protecting a namespace or to remove an authorization that is no longer needed.
 
 ```
 gittuf policy remove-rule [flags]
@@ -26,7 +26,7 @@ gittuf policy remove-rule [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

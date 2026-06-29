@@ -94,7 +94,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-global-rule",
 		Short:             `Update an existing global rule in the root of trust`,
-		Long:              "This command allows users to update an existing global rule in the root of trust. The name of the global rule must be specified. Note that a global rule may only be updated with the same type of global rule, and changes to the type require removing and adding it again.",
+		Long:              "The 'update-global-rule' command updates an existing global rule in the repository's root of trust. It is used to adjust a repository-wide constraint, such as its patterns or signature threshold. A global rule can only be updated with the same rule type; changing the type requires removing and adding the rule again.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

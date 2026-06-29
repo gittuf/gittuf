@@ -4,7 +4,7 @@ Initialize policy file
 
 ### Synopsis
 
-This command initializes a new gittuf policy file with the specified policy name. The user must provide a valid signing key.
+The 'init' command initializes a new gittuf policy file in the repository. It is used to create a policy file that can then define the principals and rules governing changes to protected namespaces.
 
 ```
 gittuf policy init [flags]
@@ -25,7 +25,7 @@ gittuf policy init [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

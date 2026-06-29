@@ -39,7 +39,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.initialRootPrincipals,
 		"initial-root-principal",
 		[]string{},
-		"initial root principals of network repository",
+		"initial root principals of the network repository (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("initial-root-principal") //nolint:errcheck
 }
@@ -77,7 +77,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-network-repository",
 		Short:             `Add a network repository`,
-		Long:              "The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to add and configure a network repository, including its name, location, and initial root principals.",
+		Long:              "The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

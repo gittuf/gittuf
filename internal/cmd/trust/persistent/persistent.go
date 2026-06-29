@@ -21,7 +21,7 @@ func (o *Options) AddPersistentFlags(cmd *cobra.Command) {
 		"signing-key",
 		"k",
 		"",
-		fmt.Sprintf("signing key to use to sign root of trust (path to SSH key, \"%s\" for Sigstore)", gittuf.FulcioPrefix),
+		fmt.Sprintf("signing key to use to sign root of trust (path to SSH key, \"%s<fingerprint>\" for GPG, \"%s\" for Sigstore)", gittuf.GPGKeyPrefix, gittuf.FulcioPrefix),
 	)
 
 	cmd.PersistentFlags().BoolVar(

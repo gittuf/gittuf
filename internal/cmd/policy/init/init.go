@@ -48,7 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "init",
 		Short:             "Initialize policy file",
-		Long:              "This command initializes a new gittuf policy file with the specified policy name. The user must provide a valid signing key.",
+		Long:              "The 'init' command initializes a new gittuf policy file in the repository. It is used to create a policy file that can then define the principals and rules governing changes to protected namespaces.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -4,7 +4,7 @@ Add a trusted key to a policy file
 
 ### Synopsis
 
-The 'add-key' command adds one or more trusted public keys to a gittuf policy file. This command is used to define which keys are authorized to sign commits or policy changes according to the repository's trust model. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'add-key' command adds one or more trusted public keys to a gittuf policy file. It is used to make keys available for use in policy rules. A key must be added to at least one rule before it can be used to authorize changes.
 
 ```
 gittuf policy add-key [flags]
@@ -15,7 +15,7 @@ gittuf policy add-key [flags]
 ```
   -h, --help                     help for add-key
       --policy-name string       name of policy file to add key to (default "targets")
-      --public-key stringArray   authorized public key
+      --public-key stringArray   authorized public key (path to SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
 ```
 
 ### Options inherited from parent commands
@@ -26,7 +26,7 @@ gittuf policy add-key [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

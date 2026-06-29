@@ -60,7 +60,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"hook-name",
 		"n",
 		"",
-		"Name of the hook",
+		"name of the hook",
 	)
 	cmd.MarkFlagRequired("hook-name") //nolint:errcheck
 
@@ -141,7 +141,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-hook",
 		Short:             fmt.Sprintf("Add a script to be run as a gittuf hook, specify when and where to run it (developer mode only, set %s=1)", dev.DevModeKey),
-		Long:              fmt.Sprintf("Add a script to be run as a gittuf hook, specify when and which environment to run it in. The only currently supported environment is 'lua' (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:              fmt.Sprintf("The 'add-hook' command adds a script to be run as a gittuf hook, recording which stage and environment it runs in. It is used to enforce automated checks during Git operations such as commit and push. The only currently supported environment is 'lua' (developer mode only, set %s=1)", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

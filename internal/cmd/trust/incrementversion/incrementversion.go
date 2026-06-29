@@ -37,7 +37,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "increment-version",
 		Short:             "Increment the integer version of the root metadata",
-		Long:              `The 'increment-version' command increments the integer version of the root metadata without making any other changes.`,
+		Long:              `The 'increment-version' command increments the integer version of the root of trust metadata without making any other changes. This is normally only needed when upgrading gittuf metadata created with versions older than v0.14.0.`,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

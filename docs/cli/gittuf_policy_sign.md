@@ -4,7 +4,7 @@ Sign policy file
 
 ### Synopsis
 
-Sign the specified policy file with the provided signing key. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'sign' command adds a signature to a gittuf policy file using the supplied signing key. It is used to meet a policy file's signature threshold when multiple keys are required to approve it.
 
 ```
 gittuf policy sign [flags]
@@ -25,7 +25,7 @@ gittuf policy sign [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

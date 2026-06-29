@@ -44,14 +44,14 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"is-pre-commit",
 		"",
 		false,
-		"update the hook to the pre-commit stage",
+		"update the hook in the pre-commit stage",
 	)
 	cmd.Flags().BoolVarP(
 		&o.isPrePush,
 		"is-pre-push",
 		"",
 		false,
-		"update the hook to the pre-push stage",
+		"update the hook in the pre-push stage",
 	)
 	cmd.MarkFlagsOneRequired("is-pre-commit", "is-pre-push")
 
@@ -60,7 +60,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"hook-name",
 		"n",
 		"",
-		"Name of the hook",
+		"name of the hook",
 	)
 	cmd.MarkFlagRequired("hook-name") //nolint:errcheck
 
@@ -141,7 +141,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-hook",
 		Short:             fmt.Sprintf("Modify the parameters of an existing gittuf hook (developer mode only, set %s=1)", dev.DevModeKey),
-		Long:              fmt.Sprintf("Modify the parameters of an existing gittuf hook. Specify the name of the hook to update and provide all parameters with their updated values. You can specify multiple stages where the hook is defined. Note that all parameters required to add the hook must also be provided. If a hook exists in multiple stages, only the specified stage(s) will be updated. If a hook does not exist in the specified stage, it won't be updated; you should add a new hook to that stage instead. Currently, only the 'lua' environment is supported (developer mode only, set %s=1)", dev.DevModeKey),
+		Long:              fmt.Sprintf("The 'update-hook' command modifies the parameters of an existing gittuf hook in the repository's root of trust. It is used to change a hook's script, environment, principals, or timeout. All parameters must be provided as when adding the hook, and only the stages given are updated; a stage where the hook does not already exist is left unchanged. The only currently supported environment is 'lua' (developer mode only, set %s=1)", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
