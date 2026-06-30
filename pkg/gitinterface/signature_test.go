@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,13 +14,12 @@ import (
 )
 
 func TestCanSign(t *testing.T) {
-	// Note: This is currently not testing the one scenario where CanSign
-	// returns an error: when gpg.format=ssh but user.signingkey is undefined.
-	// This is because on developer machines, there's a very good chance
-	// user.signingkey is set globally, which gets picked up during the test.
-	// This also means we can't reliably test the case when no signing specific
-	// configuration is set (which defaults to gpg + the default key).
-	// :(
+	// Isolate from the developer's global and system git config so a host
+	// with user.signingkey or gpg.format set in ~/.gitconfig does not leak
+	// into the temp repos through scoped config lookups. os.DevNull resolves
+	// to the platform-appropriate null device (NUL on Windows).
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	tests := map[string]struct {
 		config        map[string]string
