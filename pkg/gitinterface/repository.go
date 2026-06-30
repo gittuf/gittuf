@@ -64,18 +64,9 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 
 	repo := &Repository{clock: clockwork.NewRealClock()}
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-
-	if err = os.Chdir(repositoryPath); err != nil {
-		return nil, err
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
 
 	slog.Debug("Identifying git directory for repository...")
-	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
+	stdOut, stdErr, err := repo.executor("rev-parse", "--absolute-git-dir").withoutGitDir().withDir(repositoryPath).execute()
 	if err != nil {
 		errContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
@@ -89,9 +80,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
 	}
 
-	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
-	// the final path _including_ symlink follows.
-	absPath, err := filepath.Abs(strings.TrimSpace(string(stdOutContents)))
+	absPath, err := filepath.EvalSymlinks(strings.TrimSpace(string(stdOutContents)))
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +98,7 @@ type executor struct {
 	args        []string
 	env         []string
 	stdIn       io.Reader
+	dir         string
 	unsetGitDir bool
 }
 
@@ -129,6 +119,14 @@ func (e *executor) withEnv(env ...string) *executor {
 // executed command.
 func (e *executor) withoutGitDir() *executor {
 	e.unsetGitDir = true
+	return e
+}
+
+// withDir runs the command with the given working directory instead of the
+// process's. Use this for worktree-relative commands (status, restore) so the
+// process-global os.Chdir is never touched.
+func (e *executor) withDir(dir string) *executor {
+	e.dir = dir
 	return e
 }
 
@@ -170,6 +168,9 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
 	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
+	if e.dir != "" {
+		cmd.Dir = e.dir
+	}
 
 	var (
 		stdOut bytes.Buffer
