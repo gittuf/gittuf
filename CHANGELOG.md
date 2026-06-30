@@ -2,6 +2,30 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.15.0
+
+This release contains performance and significant testing improvements across
+the codebase, and includes improvements for the gittuf transport. A new TUI is
+also included, and is a work-in-progress.
+
+### Added
+
+- The TUI has been refreshed with a new coat of paint
+- go-git has been upgraded to v6
+
+### Updated
+
+- Improved bounds checking for git-remote-gittuf
+- Improved RSL entry parsing
+- Increased testing coverage across multiple packages
+- Fixed test various failures on Windows
+- Fixed Git config issues in various tests
+- Updated various dependencies and CI workflows
+
+### Removed
+
+- Removed `gittuf dev` CLI commands
+
 ## v0.14.1
 
 This release ships some small improvements, and fixes security vulnerabilities
