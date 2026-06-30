@@ -47,6 +47,10 @@ func TestLoadSigner(t *testing.T) {
 }
 
 func TestLoadSignerFromGitConfig(t *testing.T) {
+	// Prevent developer Git config from leaking through
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
 	t.Run("gpg", func(t *testing.T) {
 		// Make a test GPG keyring in tempdir to use for tests
 		gpg.SetupTestGPGHomeDir(t, artifacts.GPGKey1Private, artifacts.GPGKey2Private)
