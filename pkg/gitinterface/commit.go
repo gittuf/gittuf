@@ -126,10 +126,10 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 	return commitIDHash, r.CheckAndSetReference(targetRef, commitIDHash, refTip)
 }
 
-// commitWithParents creates a new commit in the repo but does not update any
+// CommitWithParents creates a new commit in the repo but does not update any
 // references. It is only meant to be used for tests, and therefore accepts
 // specific parent commit IDs.
-func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Hash, message string, sign bool) Hash { //nolint:unparam
+func (r *Repository) CommitWithParents(t *testing.T, treeID Hash, parentIDs []Hash, message string, sign bool) Hash { //nolint:unparam
 	args := []string{"commit-tree", "-m", message}
 
 	for _, commitID := range parentIDs {

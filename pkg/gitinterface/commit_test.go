@@ -596,7 +596,7 @@ func TestGetCommitParentIDs(t *testing.T) {
 	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
 
 	// Create merge commit
-	mergeCommitID := repo.commitWithParents(t, emptyTreeID, []Hash{initialCommitID, secondCommitID}, "Merge commit\n", false)
+	mergeCommitID := repo.CommitWithParents(t, emptyTreeID, []Hash{initialCommitID, secondCommitID}, "Merge commit\n", false)
 
 	mergeCommitParentIDs, err := repo.GetCommitParentIDs(mergeCommitID)
 	assert.Nil(t, err)
@@ -634,7 +634,7 @@ func TestGetCommonAncestor(t *testing.T) {
 	}
 
 	// Add child commit B
-	commitB := repo.commitWithParents(t, emptyTreeID, []Hash{initialCommitID}, "Second commit B\n", false)
+	commitB := repo.CommitWithParents(t, emptyTreeID, []Hash{initialCommitID}, "Second commit B\n", false)
 
 	// Test commits, ensure we get back initial commit
 	commonAncestor, err := repo.GetCommonAncestor(commitA, commitB)
@@ -642,7 +642,7 @@ func TestGetCommonAncestor(t *testing.T) {
 	assert.Equal(t, initialCommitID, commonAncestor)
 
 	// Test with disjoint commit histories
-	commitDisconnected := repo.commitWithParents(t, emptyTreeID, nil, "Disconnected initial commit\n", false)
+	commitDisconnected := repo.CommitWithParents(t, emptyTreeID, nil, "Disconnected initial commit\n", false)
 
 	_, err = repo.GetCommonAncestor(commitDisconnected, commitA)
 	assert.NotNil(t, err)
