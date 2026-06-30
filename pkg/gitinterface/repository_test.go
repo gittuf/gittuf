@@ -64,4 +64,34 @@ func TestRepository(t *testing.T) {
 		_, err := LoadRepository(tmpDir)
 		assert.ErrorContains(t, err, "unable to identify git directory for repository")
 	})
+
+	t.Run("GetGoGitRepository", func(t *testing.T) {
+		for _, bare := range []bool{false, true} {
+			name := "worktree"
+			if bare {
+				name = "bare"
+			}
+			t.Run(name, func(t *testing.T) {
+				tmpDir := t.TempDir()
+				repo := CreateTestGitRepository(t, tmpDir, bare)
+				ggr, err := repo.GetGoGitRepository()
+				require.NoError(t, err, "GetGoGitRepository on %s repo", name)
+				_, err = ggr.Head()
+				// Empty repo: ErrReferenceNotFound is fine; what matters is the
+				// repo opened. Anything else (esp. ErrRepositoryNotExists) is a
+				// failure to open the storage.
+				if err != nil {
+					assert.ErrorContains(t, err, "reference not found")
+				}
+			})
+		}
+	})
+
+	t.Run("GetGoGitRepository on .git-suffixed bare repo", func(t *testing.T) {
+		// Forge-style bare repos are conventionally named <name>.git.
+		dir := filepath.Join(t.TempDir(), "demo.git")
+		repo := CreateTestGitRepository(t, dir, true)
+		_, err := repo.GetGoGitRepository()
+		require.NoError(t, err)
+	})
 }
