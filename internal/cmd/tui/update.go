@@ -101,7 +101,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Screen-specific input handling
 		switch m.screen {
-		case screenChoice, screenPolicy, screenTrust:
+		case screenChoice, screenTrust:
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
@@ -131,7 +131,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenChoice:
 		m.choiceList, cmd = m.choiceList.Update(msg)
 	case screenPolicy:
-		m.policyScreenList, cmd = m.policyScreenList.Update(msg)
+		return m.policyScreen.Update(msg, &m)
 	case screenTrust:
 		m.trustScreenList, cmd = m.trustScreenList.Update(msg)
 	case screenPolicyRules:
@@ -156,11 +156,6 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			case "Trust":
 				m.screen = screenTrust
 			}
-		}
-	case screenPolicy:
-		if _, ok := m.policyScreenList.SelectedItem().(item); ok {
-			m.screen = screenPolicyRules
-			m.refreshRules()
 		}
 	case screenTrust:
 		if _, ok := m.trustScreenList.SelectedItem().(item); ok {

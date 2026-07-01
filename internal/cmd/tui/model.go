@@ -50,33 +50,33 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx              context.Context
-	screen           screen
-	spinner          spinner.Model
-	choiceList       list.Model
-	policyScreenList list.Model
-	trustScreenList  list.Model
-	rules            []rule
-	ruleList         list.Model
-	globalRules      []globalRule
-	globalRuleList   list.Model
-	inputs           []textinput.Model
-	focusIndex       int
-	cursorMode       cursor.Mode
-	repo             *gittuf.Repository
-	signer           dsse.SignerVerifier
-	policyName       string
-	options          *options
-	footer           string
-	errorMsg         string
-	readOnly         bool
-	width            int
-	height           int
-	confirmDelete    bool
-	deleteTarget     string
-	showHelp         bool
-	signerError      string
-	previousScreen   screen
+	ctx             context.Context
+	screen          screen
+	spinner         spinner.Model
+	choiceList      list.Model
+	policyScreen    policyScreen
+	trustScreenList list.Model
+	rules           []rule
+	ruleList        list.Model
+	globalRules     []globalRule
+	globalRuleList  list.Model
+	inputs          []textinput.Model
+	focusIndex      int
+	cursorMode      cursor.Mode
+	repo            *gittuf.Repository
+	signer          dsse.SignerVerifier
+	policyName      string
+	options         *options
+	footer          string
+	errorMsg        string
+	readOnly        bool
+	width           int
+	height          int
+	confirmDelete   bool
+	deleteTarget    string
+	showHelp        bool
+	signerError     string
+	previousScreen  screen
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -162,9 +162,11 @@ func initialModel(ctx context.Context, o *options) model {
 			item{title: "Policy", desc: "View and manage gittuf Policy"},
 			item{title: "Trust", desc: "View and manage gittuf Root of Trust"},
 		}, delegate),
-		policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
-			item{title: "View Rules", desc: "View and manage policy rules"},
-		}, delegate),
+		policyScreen: policyScreen{
+			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
+				item{title: "View Rules", desc: "View and manage policy rules"},
+			}, delegate),
+		},
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 		}, delegate),
@@ -211,7 +213,7 @@ func (m *model) resizeLists() {
 	}
 
 	m.choiceList.SetSize(innerWidth, innerHeight)
-	m.policyScreenList.SetSize(innerWidth, innerHeight)
+	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
 	m.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.ruleList.SetSize(innerWidth, innerHeight)
 	m.globalRuleList.SetSize(innerWidth, innerHeight)
