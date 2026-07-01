@@ -50,33 +50,32 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx             context.Context
-	screen          screen
-	spinner         spinner.Model
-	choiceList      list.Model
-	policyScreen    policyScreen
-	trustScreenList list.Model
-	rules           []rule
-	ruleList        list.Model
-	globalRules     []globalRule
-	globalRuleList  list.Model
-	inputs          []textinput.Model
-	focusIndex      int
-	cursorMode      cursor.Mode
-	repo            *gittuf.Repository
-	signer          dsse.SignerVerifier
-	policyName      string
-	options         *options
-	footer          string
-	errorMsg        string
-	readOnly        bool
-	width           int
-	height          int
-	confirmDelete   bool
-	deleteTarget    string
-	showHelp        bool
-	signerError     string
-	previousScreen  screen
+	ctx               context.Context
+	screen            screen
+	spinner           spinner.Model
+	choiceList        list.Model
+	policyScreen      policyScreen
+	trustScreenList   list.Model
+	policyRulesScreen policyRulesScreen
+	globalRules       []globalRule
+	globalRuleList    list.Model
+	inputs            []textinput.Model
+	focusIndex        int
+	cursorMode        cursor.Mode
+	repo              *gittuf.Repository
+	signer            dsse.SignerVerifier
+	policyName        string
+	options           *options
+	footer            string
+	errorMsg          string
+	readOnly          bool
+	width             int
+	height            int
+	confirmDelete     bool
+	deleteTarget      string
+	showHelp          bool
+	signerError       string
+	previousScreen    screen
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -170,7 +169,9 @@ func initialModel(ctx context.Context, o *options) model {
 		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 			item{title: "View Global Rules", desc: "View and manage global rules"},
 		}, delegate),
-		ruleList:       newMenuList("Policy Rules", []list.Item{}, delegate),
+		policyRulesScreen: policyRulesScreen{
+			ruleList: newMenuList("Policy Rules", []list.Item{}, delegate),
+		},
 		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 	}
 
@@ -215,7 +216,7 @@ func (m *model) resizeLists() {
 	m.choiceList.SetSize(innerWidth, innerHeight)
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
 	m.trustScreenList.SetSize(innerWidth, innerHeight)
-	m.ruleList.SetSize(innerWidth, innerHeight)
+	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.globalRuleList.SetSize(innerWidth, innerHeight)
 }
 
@@ -264,26 +265,6 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, m.spinner.Tick, loadRepoCmd(m.ctx, m.options))
 }
 
-// initRuleInputs initializes the input fields for (policy) rule forms.
-func (m *model) initRuleInputs() {
-	m.inputs = initInputs([]inputField{
-		{"Enter Rule Name Here", "Rule Name:"},
-		{"Enter Rule Pattern Here", " Rule Pattern:"},
-		{"Enter Principal IDs Here (comma-separated)", "Authorized Principals:"},
-		{"Enter Threshold", "Threshold:"},
-	})
-	m.focusIndex = 0
-}
-
-// initRuleInputsPrefilled initializes rule inputs prefilled with an existing rule's values.
-func (m *model) initRuleInputsPrefilled(r rule) {
-	m.initRuleInputs()
-	m.inputs[0].SetValue(r.name)
-	m.inputs[1].SetValue(r.pattern)
-	m.inputs[2].SetValue(r.key)
-	m.inputs[3].SetValue(fmt.Sprintf("%d", r.threshold))
-}
-
 // initGlobalRuleInputs initializes the input fields for global rule forms.
 func (m *model) initGlobalRuleInputs() {
 	m.inputs = initInputs([]inputField{
@@ -306,25 +287,10 @@ func (m *model) initGlobalRuleInputsPrefilled(gr globalRule) {
 	}
 }
 
-// refreshRules re-fetches rules from the repo and rebuilds the list.
-func (m *model) refreshRules() {
-	m.rules = getCurrRules(m.ctx, m.options)
-	m.updateRuleList()
-}
-
 // refreshGlobalRules re-fetches global rules from the repo and rebuilds the list.
 func (m *model) refreshGlobalRules() {
 	m.globalRules = getGlobalRules(m.ctx, m.options)
 	m.updateGlobalRuleList()
-}
-
-// updateRuleList updates the rule list within the TUI.
-func (m *model) updateRuleList() {
-	items := make([]list.Item, len(m.rules))
-	for i, rule := range m.rules {
-		items[i] = item{title: rule.name, desc: fmt.Sprintf("Pattern: %s, Key: %s, Threshold: %d", rule.pattern, rule.key, rule.threshold)}
-	}
-	m.ruleList.SetItems(items)
 }
 
 // updateGlobalRuleList updates the global rule list within the TUI.

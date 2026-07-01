@@ -26,11 +26,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.repo = msg.repo
 		m.signer = msg.signer
 		m.signerError = msg.signerError
-		m.rules = msg.rules
+		m.policyRulesScreen.rules = msg.rules
 		m.globalRules = msg.globalRules
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
-		m.updateRuleList()
+		m.policyRulesScreen.updateRuleList()
 		m.updateGlobalRuleList()
 		// Resize all lists now that readOnly/signerError are known — the earlier
 		// WindowSizeMsg fired before these flags were set, so sizes must be corrected.
@@ -86,7 +86,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenPolicy, screenTrust:
 				m.screen = screenChoice
 			case screenPolicyRules:
-				m.screen = screenPolicy
+				if m.policyRulesScreen.confirmDelete {
+					m.policyRulesScreen.confirmDelete = false
+					m.policyRulesScreen.deleteTarget = ""
+				} else {
+					m.screen = screenPolicy
+				}
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
 			case screenTrustGlobalRules:
@@ -105,16 +110,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
-		case screenPolicyRules, screenTrustGlobalRules:
+		case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
+			return m.policyRulesScreen.Update(msg, &m)
+		case screenTrustGlobalRules:
 			return m.handleRulesListKey(msg)
-		case screenPolicyAddRule, screenPolicyEditRule:
-			if msg.String() == "enter" {
-				return m.handlePolicyFormSubmit()
-			}
-			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
-				m.cycleFocus(msg.String())
-				return m, nil
-			}
 		case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 			if msg.String() == "enter" {
 				return m.handleGlobalFormSubmit()
@@ -134,11 +133,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.policyScreen.Update(msg, &m)
 	case screenTrust:
 		m.trustScreenList, cmd = m.trustScreenList.Update(msg)
-	case screenPolicyRules:
-		m.ruleList, cmd = m.ruleList.Update(msg)
+	case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
+		return m.policyRulesScreen.Update(msg, &m)
 	case screenTrustGlobalRules:
 		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenPolicyAddRule, screenPolicyEditRule, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+	case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
 	}
 
@@ -173,35 +172,18 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		// add rule
 		case "a":
-			if m.screen == screenPolicyRules {
-				m.initRuleInputs()
-				m.screen = screenPolicyAddRule
-			} else {
-				m.initGlobalRuleInputs()
-				m.screen = screenTrustAddGlobalRule
-			}
+			m.initGlobalRuleInputs()
+			m.screen = screenTrustAddGlobalRule
 			return m, nil
 
 		// edit rule
 		case "e":
-			if m.screen == screenPolicyRules {
-				if sel, ok := m.ruleList.SelectedItem().(item); ok {
-					for _, r := range m.rules {
-						if r.name == sel.title {
-							m.initRuleInputsPrefilled(r)
-							m.screen = screenPolicyEditRule
-							return m, nil
-						}
-					}
-				}
-			} else {
-				if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
-					for _, gr := range m.globalRules {
-						if gr.ruleName == sel.title {
-							m.initGlobalRuleInputsPrefilled(gr)
-							m.screen = screenTrustEditGlobalRule
-							return m, nil
-						}
+			if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
+				for _, gr := range m.globalRules {
+					if gr.ruleName == sel.title {
+						m.initGlobalRuleInputsPrefilled(gr)
+						m.screen = screenTrustEditGlobalRule
+						return m, nil
 					}
 				}
 			}
@@ -210,53 +192,25 @@ func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "d":
 			var sel item
 			var ok bool
-			if m.screen == screenPolicyRules {
-				sel, ok = m.ruleList.SelectedItem().(item)
-			} else {
-				sel, ok = m.globalRuleList.SelectedItem().(item)
-			}
+			sel, ok = m.globalRuleList.SelectedItem().(item)
 			if ok {
 				m.confirmDelete = true
 				m.deleteTarget = sel.title
 				return m, nil
-			}
-
-		// reorder up
-		case "k":
-			if m.screen == screenPolicyRules {
-				return m.handleReorderUp()
-			}
-
-		// reorder down
-		case "j":
-			if m.screen == screenPolicyRules {
-				return m.handleReorderDown()
 			}
 		}
 	}
 
 	// Delegate unhandled keys to the active list for navigation (up/down arrows, etc.)
 	var cmd tea.Cmd
-	if m.screen == screenPolicyRules {
-		m.ruleList, cmd = m.ruleList.Update(msg)
-	} else {
-		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	}
+	m.globalRuleList, cmd = m.globalRuleList.Update(msg)
 	return m, cmd
 }
 
 // handleDeleteConfirm handles the delete confirmation overlay.
 func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 	if key == "y" {
-		switch m.screen {
-		case screenPolicyRules:
-			if err := repoRemoveRule(m.ctx, m.options, rule{name: m.deleteTarget}); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing rule: %v", err)
-			} else {
-				m.footer = "Rule removed successfully!"
-				m.refreshRules()
-			}
-		case screenTrustGlobalRules:
+		if m.screen == screenTrustGlobalRules {
 			if err := repoRemoveGlobalRule(m.ctx, m.options, globalRule{ruleName: m.deleteTarget}); err != nil {
 				m.errorMsg = fmt.Sprintf("Error removing global rule: %v", err)
 			} else {
@@ -267,46 +221,6 @@ func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
 	}
 	m.confirmDelete = false
 	m.deleteTarget = ""
-	return m, nil
-}
-
-// handlePolicyFormSubmit handles enter on policy add/edit form screens.
-func (m model) handlePolicyFormSubmit() (tea.Model, tea.Cmd) {
-	if m.focusIndex < len(m.inputs)-1 {
-		// Not on last field yet - just advance focus
-		m.cycleFocus("tab")
-		return m, nil
-	}
-
-	thr, _ := strconv.Atoi(m.inputs[3].Value())
-	r := rule{
-		name:      m.inputs[0].Value(),
-		pattern:   m.inputs[1].Value(),
-		key:       m.inputs[2].Value(),
-		threshold: thr,
-	}
-	authorizedKeys := splitAndTrim(m.inputs[2].Value())
-
-	var err error
-	switch m.screen {
-	case screenPolicyAddRule:
-		err = repoAddRule(m.ctx, m.options, r, authorizedKeys)
-	case screenPolicyEditRule:
-		err = repoUpdateRule(m.ctx, m.options, r, authorizedKeys)
-	}
-
-	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
-		return m, nil
-	}
-
-	m.refreshRules()
-	if m.screen == screenPolicyAddRule {
-		m.footer = "Rule added successfully!"
-	} else {
-		m.footer = "Rule updated successfully!"
-	}
-	m.screen = screenPolicyRules
 	return m, nil
 }
 
@@ -349,34 +263,6 @@ func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
 		m.footer = "Global rule updated!"
 	}
 	m.screen = screenTrustGlobalRules
-	return m, nil
-}
-
-// handleReorderUp moves the selected rule up in the list.
-func (m model) handleReorderUp() (tea.Model, tea.Cmd) {
-	if i := m.ruleList.Index(); i > 0 {
-		m.rules[i], m.rules[i-1] = m.rules[i-1], m.rules[i]
-		if err := repoReorderRules(m.ctx, m.options, m.rules); err != nil {
-			m.errorMsg = fmt.Sprintf("Error reordering rules: %v", err)
-			return m, nil
-		}
-		m.updateRuleList()
-		m.footer = "Rules reordered successfully!"
-	}
-	return m, nil
-}
-
-// handleReorderDown moves the selected rule down in the list.
-func (m model) handleReorderDown() (tea.Model, tea.Cmd) {
-	if i := m.ruleList.Index(); i < len(m.rules)-1 {
-		m.rules[i], m.rules[i+1] = m.rules[i+1], m.rules[i]
-		if err := repoReorderRules(m.ctx, m.options, m.rules); err != nil {
-			m.errorMsg = fmt.Sprintf("Error reordering rules: %v", err)
-			return m, nil
-		}
-		m.updateRuleList()
-		m.footer = "Rules reordered successfully!"
-	}
 	return m, nil
 }
 
