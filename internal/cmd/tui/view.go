@@ -357,7 +357,7 @@ func (m model) View() string {
 		return m.renderScreen("Home", m.choiceList.View(), renderActionHints(m.readOnly))
 
 	case screenPolicy:
-		return m.renderScreen("Home › Policy", m.policyScreenList.View(), renderActionHints(m.readOnly))
+		return m.policyScreen.View(&m)
 
 	case screenTrust:
 		return m.renderScreen("Home › Trust", m.trustScreenList.View(), renderActionHints(m.readOnly))
