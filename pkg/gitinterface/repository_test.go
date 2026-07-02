@@ -65,3 +65,27 @@ func TestRepository(t *testing.T) {
 		assert.ErrorContains(t, err, "unable to identify git directory for repository")
 	})
 }
+
+func TestRepositoryObjectFormat(t *testing.T) {
+	t.Run("sha1", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false, WithObjectFormat(ObjectFormatSHA1))
+		assert.Equal(t, ObjectFormatSHA1, repo.GetObjectFormat())
+		assert.Equal(t, "0000000000000000000000000000000000000000", repo.ZeroHash().String())
+
+		loaded, err := LoadRepository(tmpDir)
+		require.Nil(t, err)
+		assert.Equal(t, ObjectFormatSHA1, loaded.GetObjectFormat())
+	})
+
+	t.Run("sha256", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false, WithSHA256Format())
+		assert.Equal(t, ObjectFormatSHA256, repo.GetObjectFormat())
+		assert.Equal(t, "0000000000000000000000000000000000000000000000000000000000000000", repo.ZeroHash().String())
+
+		loaded, err := LoadRepository(tmpDir)
+		require.Nil(t, err)
+		assert.Equal(t, ObjectFormatSHA256, loaded.GetObjectFormat())
+	})
+}

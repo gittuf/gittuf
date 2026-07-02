@@ -24,13 +24,39 @@ const (
 	authorTimeKey    = "GIT_AUTHOR_DATE"
 )
 
-var ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
+var (
+	ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
+	ErrUnknownObjectFormat        = errors.New("unknown object format")
+)
 
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath string
-	clock      clockwork.Clock
+	gitDirPath   string
+	objectFormat ObjectFormat
+	clock        clockwork.Clock
+}
+
+// GetObjectFormat returns the hash algorithm the repository uses for its object
+// IDs.
+func (r *Repository) GetObjectFormat() ObjectFormat {
+	return r.objectFormat
+}
+
+// readObjectFormat queries Git for the repository's object format (hash
+// algorithm).
+func (r *Repository) readObjectFormat() (ObjectFormat, error) {
+	stdOut, err := r.executor("rev-parse", "--show-object-format").executeString()
+	if err != nil {
+		return "", fmt.Errorf("unable to read object format: %w", err)
+	}
+
+	switch format := ObjectFormat(stdOut); format {
+	case ObjectFormatSHA1, ObjectFormatSHA256:
+		return format, nil
+	default:
+		return "", fmt.Errorf("%w: %s", ErrUnknownObjectFormat, stdOut)
+	}
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
@@ -97,6 +123,12 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
 	repo.gitDirPath = absPath
+
+	objectFormat, err := repo.readObjectFormat()
+	if err != nil {
+		return nil, err
+	}
+	repo.objectFormat = objectFormat
 
 	return repo, nil
 }

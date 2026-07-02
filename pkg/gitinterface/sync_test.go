@@ -6,12 +6,20 @@ package gitinterface
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWithFetchDepth(t *testing.T) {
+	options := &FetchOptions{}
+	WithFetchDepth(1)(options)
+
+	assert.Equal(t, 1, options.Depth)
+}
 
 func TestPushRefSpecRepository(t *testing.T) {
 	remoteName := "origin"
@@ -161,6 +169,43 @@ func TestPushRefSpecRepository(t *testing.T) {
 		err := localRepo.PushRefSpec("nonexistent", []string{refSpecs})
 		assert.ErrorContains(t, err, "unable to push")
 	})
+}
+
+func TestPushRepositorySHA256(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	localTmpDir := t.TempDir()
+	remoteTmpDir := t.TempDir()
+
+	localRepo := CreateTestGitRepository(t, localTmpDir, false, WithSHA256Format())
+	remoteRepo := CreateTestGitRepository(t, remoteTmpDir, true, WithSHA256Format())
+
+	if err := localRepo.CreateRemote(remoteName, remoteTmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	emptyBlobHash, err := localRepo.WriteBlob(nil)
+	require.Nil(t, err)
+	tree, err := NewTreeBuilder(localRepo).WriteTreeFromEntries([]TreeEntry{NewEntryBlob("foo", emptyBlobHash)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := localRepo.Commit(tree, refName, "Test commit\n", false); err != nil {
+		t.Fatal(err)
+	}
+
+	err = localRepo.Push(remoteName, []string{refName})
+	assert.Nil(t, err)
+
+	localRef, err := localRepo.GetReference(refName)
+	require.Nil(t, err)
+	remoteRef, err := remoteRepo.GetReference(refName)
+	require.Nil(t, err)
+
+	assert.Equal(t, localRef, remoteRef)
+	assert.Len(t, localRef.String(), 64)
 }
 
 func TestPushRepository(t *testing.T) {
@@ -475,6 +520,28 @@ func TestFetchRefSpecRepository(t *testing.T) {
 		err := localRepo.FetchRefSpec("nonexistent", []string{refSpecs})
 		assert.ErrorContains(t, err, "unable to fetch")
 	})
+
+	t.Run("fetch with depth", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+		remoteTmpDir := t.TempDir()
+
+		localRepo := CreateTestGitRepository(t, localTmpDir, true)
+		remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false)
+
+		require.Nil(t, localRepo.CreateRemote(remoteName, remoteTmpDir))
+
+		tree, err := NewTreeBuilder(remoteRepo).WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+		remoteRef, err := remoteRepo.Commit(tree, refName, "Test commit\n", false)
+		require.Nil(t, err)
+
+		err = localRepo.FetchRefSpec(remoteName, []string{refSpecs}, WithFetchDepth(1))
+		require.Nil(t, err)
+
+		localRef, err := localRepo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, remoteRef, localRef)
+	})
 }
 
 func TestFetchRepository(t *testing.T) {
@@ -675,6 +742,32 @@ func TestFetchObject(t *testing.T) {
 		err := downstreamRepo.FetchObject("nonexistent", ZeroHash)
 		assert.ErrorContains(t, err, "unable to fetch object")
 	})
+}
+
+func TestCloneAndFetchRepositoryObjectFormat(t *testing.T) {
+	for _, objectFormat := range []ObjectFormat{ObjectFormatSHA1, ObjectFormatSHA256} {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			remoteTmpDir := t.TempDir()
+			localTmpDir := t.TempDir()
+
+			remoteRepo := CreateTestGitRepository(t, remoteTmpDir, false, WithObjectFormat(objectFormat))
+
+			emptyBlobHash, err := remoteRepo.WriteBlob(nil)
+			require.Nil(t, err)
+			tree, err := NewTreeBuilder(remoteRepo).WriteTreeFromEntries([]TreeEntry{NewEntryBlob("foo", emptyBlobHash)})
+			require.Nil(t, err)
+
+			if _, err := remoteRepo.Commit(tree, "refs/heads/main", "Commit to main\n", false); err != nil {
+				t.Fatal(err)
+			}
+
+			localRepo, err := CloneAndFetchRepository(remoteTmpDir, localTmpDir, "refs/heads/main", nil, false)
+			require.Nil(t, err)
+
+			assert.Equal(t, objectFormat, localRepo.GetObjectFormat())
+			assert.Equal(t, remoteRepo.ZeroHash(), localRepo.ZeroHash())
+		})
+	}
 }
 
 func TestCloneAndFetchRepository(t *testing.T) {
@@ -974,6 +1067,9 @@ func TestCloneAndFetchRepository(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		_, err := CloneAndFetchRepository("", "", "", nil, false)
 		assert.ErrorContains(t, err, "target directory must be specified")
+
+		_, err = CloneAndFetchRepository(filepath.Join(t.TempDir(), "missing"), t.TempDir(), "", nil, false)
+		assert.ErrorContains(t, err, "unable to clone repository")
 	})
 }
 

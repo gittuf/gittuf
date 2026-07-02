@@ -69,7 +69,7 @@ func TestCanSign(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := setupRepository(t, tmpDir, false) // explicitly not using CreateTestGitRepository as that includes signing configurations
+			repo := setupRepository(t, tmpDir, false, ObjectFormatSHA1) // explicitly not using CreateTestGitRepository as that includes signing configurations
 
 			for key, value := range test.config {
 				if err := repo.SetGitConfig(key, value); err != nil {

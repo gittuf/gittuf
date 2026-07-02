@@ -152,48 +152,54 @@ func TestInvokeHooksForStage(t *testing.T) {
 	})
 
 	t.Run("pre-push hook", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		for _, objectFormat := range testObjectFormats {
+			t.Run(string(objectFormat), func(t *testing.T) {
+				tmpDir := t.TempDir()
+				repo := gitinterface.CreateTestGitRepository(t, tmpDir, false, gitinterface.WithObjectFormat(objectFormat))
 
-		treeBuilder := gitinterface.NewTreeBuilder(repo)
-		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
-		if err != nil {
-			t.Fatal(err)
+				treeBuilder := gitinterface.NewTreeBuilder(repo)
+				emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// The remote does not have refs/heads/main, so the hook
+				// receives the repository's zero hash as the remote tip.
+				remoteTmpDir := t.TempDir()
+				_ = gitinterface.CreateTestGitRepository(t, remoteTmpDir, false, gitinterface.WithObjectFormat(objectFormat))
+
+				if err := repo.CreateRemote("origin", remoteTmpDir); err != nil {
+					t.Fatal(err)
+				}
+
+				r := &Repository{r: repo}
+
+				hookStage := tuf.HookStagePrePush
+				hookName := "test-hook"
+				environment := tuf.HookEnvironmentLua
+				timeout := 100
+				principals := []string{rootKey.KeyID}
+
+				if err := r.InitializeRoot(testCtx, rootSigner, false); err != nil {
+					t.Fatal(err)
+				}
+				if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, false); err != nil {
+					t.Fatal(err)
+				}
+
+				err = r.StagePolicy(testCtx, "", true, false)
+				assert.Nil(t, err)
+				err = r.ApplyPolicy(testCtx, "", true, false)
+				assert.Nil(t, err)
+
+				codes, err := r.InvokeHooksForStage(testCtx, rootSigner, hookStage, hookopts.WithPrePush("origin", remoteTmpDir, []string{"refs/heads/main:refs/heads/main"}))
+				assert.Nil(t, err)
+				assert.Len(t, codes, 1)
+			})
 		}
-		_, err = repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		remoteTmpDir := t.TempDir()
-		_ = gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
-
-		if err := repo.CreateRemote("origin", remoteTmpDir); err != nil {
-			t.Fatal(err)
-		}
-
-		r := &Repository{r: repo}
-
-		hookStage := tuf.HookStagePrePush
-		hookName := "test-hook"
-		environment := tuf.HookEnvironmentLua
-		timeout := 100
-		principals := []string{rootKey.KeyID}
-
-		if err := r.InitializeRoot(testCtx, rootSigner, false); err != nil {
-			t.Fatal(err)
-		}
-		if err := r.AddHook(testCtx, rootSigner, []tuf.HookStage{hookStage}, hookName, hookBytes, environment, principals, timeout, false); err != nil {
-			t.Fatal(err)
-		}
-
-		err = r.StagePolicy(testCtx, "", true, false)
-		assert.Nil(t, err)
-		err = r.ApplyPolicy(testCtx, "", true, false)
-		assert.Nil(t, err)
-
-		codes, err := r.InvokeHooksForStage(testCtx, rootSigner, hookStage, hookopts.WithPrePush("origin", remoteTmpDir, []string{"refs/heads/main:refs/heads/main"}))
-		assert.Nil(t, err)
-		assert.Len(t, codes, 1)
 	})
 }

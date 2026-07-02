@@ -102,7 +102,14 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 	if err != nil {
 		return ZeroHash, err
 	}
-	commit.Signature = signature
+	// SHA-256 repositories store the signature under the `gpgsig-sha256`
+	// header (go-git's SignatureSHA256), matching Git's own behavior, so it
+	// can be read back during verification.
+	if r.GetObjectFormat() == ObjectFormatSHA256 {
+		commit.SignatureSHA256 = signature
+	} else {
+		commit.Signature = signature
+	}
 
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
@@ -170,33 +177,36 @@ func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, k
 		return fmt.Errorf("unable to load commit object: %w", err)
 	}
 
+	commitContents, err := getCommitBytesWithoutSignature(commit)
+	if err != nil {
+		return fmt.Errorf("unable to encode commit contents for verification: %w", err)
+	}
+
+	commitSignature := signatureForObjectID(commitID, commit.Signature, commit.SignatureSHA256)
+
+	if signatureBlockCount(commitSignature) > 1 {
+		return errors.Join(ErrIncorrectVerificationKey, ErrMultipleSignatures)
+	}
+
 	switch key.KeyType {
 	case gpg.KeyType:
-		if _, err := commit.Verify(key.KeyVal.Public); err != nil {
+		verifier, err := gpg.NewVerifierFromKey(key)
+		if err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+		if err := verifier.Verify(ctx, commitContents, []byte(commitSignature)); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
 	case ssh.KeyType:
-		commitContents, err := getCommitBytesWithoutSignature(commit)
-		if err != nil {
-			return errors.Join(ErrVerifyingSSHSignature, err)
-		}
-		commitSignature := []byte(commit.Signature)
-
-		if err := verifySSHKeySignature(ctx, key, commitContents, commitSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, commitContents, []byte(commitSignature)); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
 		return nil
 	case sigstore.KeyType:
-		commitContents, err := getCommitBytesWithoutSignature(commit)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-		commitSignature := []byte(commit.Signature)
-
-		if err := verifyGitsignSignature(ctx, r, key, commitContents, commitSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, commitContents, []byte(commitSignature)); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

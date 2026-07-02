@@ -46,6 +46,7 @@ var (
 	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
 	ErrVerifyingSSHSignature      = errors.New("unable to verify SSH signature")
 	ErrInvalidSignature           = errors.New("unable to parse signature / signature has unexpected header")
+	ErrMultipleSignatures         = errors.New("object has multiple signatures")
 )
 
 // CanSign inspects the Git configuration to determine if commit / tag signing
@@ -259,4 +260,32 @@ func getSigningKeyInfo(gitConfig map[string]string) string {
 		return ""
 	}
 	return keyInfo
+}
+
+// signatureForObjectID selects the signature stored for a Git commit based on
+// its hash algorithm, identified by the OID length. SHA-256 commits store
+// their signature under the `gpgsig-sha256` header (go-git's SignatureSHA256),
+// SHA-1 commits under `gpgsig` (Signature). Tags are not covered here: Git
+// appends tag signatures to the tag payload regardless of the object format.
+func signatureForObjectID(objectID Hash, signature, signatureSHA256 string) string {
+	if objectID.IsSHA256() {
+		return signatureSHA256
+	}
+	return signature
+}
+
+// signatureBlockCount reports how many armored signature blocks appear in a
+// signature. Verification rejects values carrying more than one block, which
+// are ambiguous.
+func signatureBlockCount(signature string) int {
+	count := 0
+	for line := range strings.SplitSeq(signature, "\n") {
+		switch strings.TrimSpace(line) {
+		case "-----BEGIN PGP SIGNATURE-----",
+			"-----BEGIN PGP MESSAGE-----",
+			"-----BEGIN SSH SIGNATURE-----":
+			count++
+		}
+	}
+	return count
 }

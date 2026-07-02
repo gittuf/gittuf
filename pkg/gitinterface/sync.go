@@ -122,6 +122,12 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
 	}
 
+	objectFormat, err := repo.readObjectFormat()
+	if err != nil {
+		return nil, err
+	}
+	repo.objectFormat = objectFormat
+
 	return repo, repo.Fetch(DefaultRemoteName, refs, true)
 }
 

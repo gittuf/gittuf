@@ -179,7 +179,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 	case err == nil:
 		fromID = targetEntry.GetTargetID()
 	case errors.Is(err, rsl.ErrRSLEntryNotFound):
-		fromID = gitinterface.ZeroHash
+		fromID = v.repo.ZeroHash()
 	default:
 		return false, err
 	}
@@ -219,7 +219,7 @@ func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef
 	case err == nil:
 		fromID = targetEntry.GetTargetID()
 	case errors.Is(err, rsl.ErrRSLEntryNotFound):
-		fromID = gitinterface.ZeroHash
+		fromID = v.repo.ZeroHash()
 	default:
 		return false, err
 	}
@@ -951,7 +951,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo *gitinterface.Rep
 		firstEntry = true
 	}
 
-	fromID := gitinterface.ZeroHash
+	fromID := repo.ZeroHash()
 	if !firstEntry {
 		fromID = priorRefEntry.GetTargetID()
 	}

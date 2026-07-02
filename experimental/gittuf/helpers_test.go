@@ -32,9 +32,13 @@ var (
 	ecdsaKeyBytes           = artifacts.SSHECDSAPrivate
 
 	testCtx = context.Background()
+
+	// testObjectFormats enumerates the Git object formats that behavioral test
+	// suites are run against.
+	testObjectFormats = []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256}
 )
 
-func createTestRepositoryWithRoot(t *testing.T, location string) *Repository {
+func createTestRepositoryWithRoot(t *testing.T, location string, opts ...gitinterface.TestRepositoryOption) *Repository {
 	t.Helper()
 
 	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
@@ -42,9 +46,9 @@ func createTestRepositoryWithRoot(t *testing.T, location string) *Repository {
 	var repo *gitinterface.Repository
 	if location == "" {
 		tempDir := t.TempDir()
-		repo = gitinterface.CreateTestGitRepository(t, tempDir, false)
+		repo = gitinterface.CreateTestGitRepository(t, tempDir, false, opts...)
 	} else {
-		repo = gitinterface.CreateTestGitRepository(t, location, false)
+		repo = gitinterface.CreateTestGitRepository(t, location, false, opts...)
 	}
 
 	r := &Repository{r: repo}
@@ -63,10 +67,10 @@ func createTestRepositoryWithRoot(t *testing.T, location string) *Repository {
 	return r
 }
 
-func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
+func createTestRepositoryWithPolicy(t *testing.T, location string, opts ...gitinterface.TestRepositoryOption) *Repository {
 	t.Helper()
 
-	r := createTestRepositoryWithRoot(t, location)
+	r := createTestRepositoryWithRoot(t, location, opts...)
 
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -92,6 +96,48 @@ func createTestRepositoryWithPolicy(t *testing.T, location string) *Repository {
 	}
 
 	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gpgKey.KeyID}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := policy.Apply(testCtx, r.r, false); err != nil {
+		t.Fatalf("failed to apply policy staging changes into policy, err = %s", err)
+	}
+
+	return r
+}
+
+// createTestRepositoryWithPolicyAuthorizingGitSigningKey sets up a repository
+// whose policy authorizes the SSH key configured as the repository's Git
+// signing key (see setupSigningKeys). This allows RSL entries created through
+// gittuf's standard, Git-signed workflow (RecordRSLEntryForReference) to be
+// verified.
+func createTestRepositoryWithPolicyAuthorizingGitSigningKey(t *testing.T, opts ...gitinterface.TestRepositoryOption) *Repository {
+	t.Helper()
+
+	r := createTestRepositoryWithRoot(t, "", opts...)
+
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	if err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsPubKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.InitializeTargets(testCtx, targetsSigner, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	// The repository signs commits and RSL entries with the RSA SSH key (see
+	// setupSigningKeys), so authorize that key for the protected reference.
+	gitSigningKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gitSigningKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-main", []string{gitSigningKey.KeyID}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
 		t.Fatal(err)
 	}
 

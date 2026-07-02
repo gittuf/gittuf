@@ -2917,15 +2917,19 @@ func TestVerifyEntry(t *testing.T) {
 	refName := "refs/heads/main"
 
 	t.Run("successful verification", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithPolicy)
+		for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+			t.Run(string(objectFormat), func(t *testing.T) {
+				repo, state := createTestRepository(t, createTestStateWithPolicy, gitinterface.WithObjectFormat(objectFormat))
 
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
-		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-		entry.ID = entryID
+				commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+				entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+				entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+				entry.ID = entryID
 
-		err := verifyEntry(testCtx, repo, state, nil, entry)
-		assert.Nil(t, err)
+				err := verifyEntry(testCtx, repo, state, nil, entry)
+				assert.Nil(t, err)
+			})
+		}
 	})
 
 	t.Run("successful verification using persons", func(t *testing.T) {
@@ -2997,56 +3001,63 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification with higher threshold using latest reference authorization", func(t *testing.T) {
-		repo, state := createTestRepository(t, createTestStateWithThresholdPolicy)
+		for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+			t.Run(string(objectFormat), func(t *testing.T) {
+				repo, state := createTestRepository(t, createTestStateWithThresholdPolicy, gitinterface.WithObjectFormat(objectFormat))
 
-		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
-		if err != nil {
-			t.Fatal(err)
+				currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+				commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Create authorization for this change
+				// This uses the latest reference authorization version. The
+				// from revision is the repository's zero hash, matching what
+				// gittuf writes when attesting a reference's first entry.
+				fromID := repo.ZeroHash().String()
+				authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, fromID, commitTreeID.String())
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+				env, err := dsse.CreateEnvelope(authorization)
+				if err != nil {
+					t.Fatal(err)
+				}
+				env, err = dsse.SignEnvelope(testCtx, env, signer)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, fromID, commitTreeID.String()); err != nil {
+					t.Fatal(err)
+				}
+				if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+					t.Fatal(err)
+				}
+
+				currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+				entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+				entry.ID = entryID
+
+				err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+				assert.Nil(t, err)
+			})
 		}
-
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
-
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Create authorization for this change
-		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
-
-		env, err := dsse.CreateEnvelope(authorization)
-		if err != nil {
-			t.Fatal(err)
-		}
-		env, err = dsse.SignEnvelope(testCtx, env, signer)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
-			t.Fatal(err)
-		}
-		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
-			t.Fatal(err)
-		}
-
-		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
-		entry.ID = entryID
-
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
 	})
 
 	t.Run("successful verification with higher threshold but using GitHub approval", func(t *testing.T) {
