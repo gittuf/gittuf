@@ -72,11 +72,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
 				if m.screen == screenHelp {
 					// Toggle back
-					m.screen = m.previousScreen
+					m.screen = m.helpScreen.previousScreen
 					return m, nil
 				}
 				// Go to help screen
-				m.previousScreen = m.screen
+				m.helpScreen.previousScreen = m.screen
 				m.screen = screenHelp
 				return m, nil
 			}
@@ -99,7 +99,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.screen = screenTrustGlobalRules
 			case screenHelp:
-				m.screen = m.previousScreen
+				m.screen = m.helpScreen.previousScreen
 			}
 			return m, nil
 		}
@@ -108,6 +108,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case screenChoice:
 			return m.homeScreen.Update(msg, &m)
+		case screenHelp:
+			return m.helpScreen.Update(msg, &m)
 		case screenTrust:
 			if msg.String() == "enter" {
 				return m.handleEnter()
@@ -131,6 +133,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenChoice:
 		return m.homeScreen.Update(msg, &m)
+	case screenHelp:
+		return m.helpScreen.Update(msg, &m)
 	case screenPolicy:
 		return m.policyScreen.Update(msg, &m)
 	case screenTrust:
