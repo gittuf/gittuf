@@ -970,6 +970,11 @@ func TestCloneAndFetchRepository(t *testing.T) {
 		}
 		assert.Equal(t, "FETCH_HEAD", dirEntries[0].Name())
 	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		_, err := CloneAndFetchRepository("", "", "", nil, false)
+		assert.ErrorContains(t, err, "target directory must be specified")
+	})
 }
 
 func TestCreateRemote(t *testing.T) {

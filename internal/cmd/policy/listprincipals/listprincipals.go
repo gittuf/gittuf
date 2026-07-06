@@ -46,24 +46,26 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	stdOut := cmd.OutOrStdout()
+
 	count := 0
 	for _, principal := range principals {
-		fmt.Printf("Principal %s:\n", principal.ID())
+		fmt.Fprintf(stdOut, "Principal %s:\n", principal.ID())
 
-		fmt.Printf(indentString + "Keys:\n")
+		fmt.Fprintf(stdOut, indentString+"Keys:\n")
 		for _, key := range principal.Keys() {
-			fmt.Printf(strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType)
+			fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType)
 		}
 
 		customMetadata := principal.CustomMetadata()
 		if len(customMetadata) > 0 {
-			fmt.Printf(indentString + "Custom Metadata:\n")
+			fmt.Fprintf(stdOut, indentString+"Custom Metadata:\n")
 			for key, value := range principal.CustomMetadata() {
-				fmt.Printf(strings.Repeat(indentString, 2)+"%s: %s\n", key, value)
+				fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, value)
 			}
 		}
 		if count < len(principals)-1 {
-			fmt.Println()
+			fmt.Fprintln(stdOut)
 		}
 		count++
 	}

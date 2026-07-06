@@ -17,11 +17,68 @@ import (
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/rsl"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestApplyAttestations(t *testing.T) {
+	testDir := t.TempDir()
+	r := gitinterface.CreateTestGitRepository(t, testDir, false)
+	repo := &Repository{r: r}
+
+	fromRef := "refs/heads/main"
+	targetTagRef := "refs/tags/v1"
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialCommitID, err := repo.r.Commit(emptyTreeID, fromRef, "Initial commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.RecordRSLEntryForReference(testCtx, fromRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+		t.Fatal(err)
+	}
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	if err := repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false); err != nil {
+		t.Fatal(err)
+	}
+
+	attestationsCommitID, err := repo.r.GetReference(attestations.Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err = rsl.GetLatestReferenceUpdaterEntry(repo.r, rsl.ForReference(attestations.Ref))
+	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+
+	err = repo.ApplyAttestations(testCtx, "", true, false)
+	assert.Nil(t, err)
+
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo.r, rsl.ForReference(attestations.Ref))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, attestations.Ref, entry.GetRefName())
+	assert.Equal(t, attestationsCommitID, entry.GetTargetID())
+
+	allAttestations, err := attestations.LoadCurrentAttestations(repo.r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Len(t, env.Signatures, 1)
+}
 
 func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {

@@ -40,7 +40,6 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust enable-github-app-approvals](gittuf_trust_enable-github-app-approvals.md)	 - Mark GitHub app approvals as trusted henceforth
 * [gittuf trust increment-version](gittuf_trust_increment-version.md)	 - Increment the integer version of the root metadata
 * [gittuf trust init](gittuf_trust_init.md)	 - Initialize gittuf root of trust for repository
-* [gittuf trust inspect-root](gittuf_trust_inspect-root.md)	 - Inspect root metadata
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust list-hooks](gittuf_trust_list-hooks.md)	 - List gittuf hooks for the current policy state
 * [gittuf trust list-propagation-directives](gittuf_trust_list-propagation-directives.md)	 - Lists propagation directives in the gittuf root of trust

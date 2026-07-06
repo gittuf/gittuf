@@ -10,7 +10,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
-	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v6/config"
 	"github.com/jonboulle/clockwork"
 )
 
@@ -22,8 +22,9 @@ const (
 var (
 	TestGitConfig = &config.Config{
 		User: struct {
-			Name  string
-			Email string
+			Name       string
+			Email      string
+			SigningKey string
 		}{
 			Name:  testName,
 			Email: testEmail,

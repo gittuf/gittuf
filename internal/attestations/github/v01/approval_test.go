@@ -8,6 +8,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
@@ -20,6 +21,18 @@ const (
 	fromRevisionIDKey = "fromRevisionID"
 	targetTreeIDKey   = "targetTreeID"
 )
+
+func TestGetters(t *testing.T) {
+	approvers := set.NewSetFromItems("jane.doe@example.com")
+
+	authorization := PullRequestApprovalAttestation{
+		Approvers:          approvers,
+		DismissedApprovers: approvers,
+	}
+
+	assert.Equal(t, approvers.Contents(), authorization.GetApprovers())
+	assert.Equal(t, approvers.Contents(), authorization.GetDismissedApprovers())
+}
 
 func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"

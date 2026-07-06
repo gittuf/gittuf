@@ -164,6 +164,12 @@ func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string
 }
 
 func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, signCommit bool) error {
+	if signCommit {
+		if err := r.r.CanSign(); err != nil {
+			return err
+		}
+	}
+
 	return rsl.SkipAllInvalidReferenceEntriesForRef(r.r, targetRef, signCommit)
 }
 

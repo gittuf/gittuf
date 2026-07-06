@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -64,9 +65,25 @@ func TestVerifyEnvelope(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acceptedKeys, err := VerifyEnvelope(context.Background(), env, []sslibdsse.Verifier{signer.Verifier}, 1)
+	acceptedKeys, err := VerifyEnvelope(t.Context(), env, []sslibdsse.Verifier{signer.Verifier}, 1)
 	assert.Nil(t, err)
 	assert.Equal(t, keyID, acceptedKeys[0].KeyID)
+
+	t.Run("invalid threshold", func(t *testing.T) {
+		env := &sslibdsse.Envelope{}
+
+		acceptedKeys, err := VerifyEnvelope(t.Context(), env, nil, 0)
+
+		assert.Nil(t, acceptedKeys)
+		assert.ErrorIs(t, err, common.ErrInvalidThreshold)
+	})
+
+	t.Run("threshold not met", func(t *testing.T) {
+		acceptedKeys, err := VerifyEnvelope(t.Context(), env, []sslibdsse.Verifier{signer.Verifier}, 2)
+
+		assert.Len(t, acceptedKeys, 1)
+		assert.ErrorContains(t, err, "accepted signatures do not match threshold")
+	})
 }
 
 func loadSSHSigner(keyPath string) (*ssh.Signer, error) {

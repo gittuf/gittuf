@@ -9,10 +9,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@da8c392f92d2f7f2e50db8457951395bfb593e15
+        uses: gittuf/gittuf-installer@b31d2ba4f494f30fbc44371da67ad87cca6569f9
       - name: Checkout and verify repository
         run: |
           sleep 10s
           gittuf clone https://github.com/${{ github.repository }}
           cd gittuf
+          echo "RSL:            $(git show --oneline refs/gittuf/reference-state-log)"
+          echo "Policy:         $(git show --oneline refs/gittuf/policy)"
+          echo "Policy staging: $(git show --oneline refs/gittuf/policy-staging)"
+          echo "Attestations:   $(git show --oneline refs/gittuf/attestations)"
+          echo "Main:           $(git show --oneline refs/heads/main)"
           gittuf verify-ref main --verbose

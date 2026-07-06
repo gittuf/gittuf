@@ -11,10 +11,16 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	lipgloss.SetColorProfile(termenv.Ascii)
+}
 
 func TestTUI(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -67,7 +73,7 @@ func TestTUI(t *testing.T) {
 
 		// Now we should be on the Policy Operations screen.
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "gittuf Policy Operations")
+			return strings.Contains(string(out), "Home › Policy")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 
 		// Select "View Rules" (already selected by default)
@@ -77,7 +83,7 @@ func TestTUI(t *testing.T) {
 		// We check for the "Policy Rules" title OR the screen-specific empty-state message.
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 			content := string(out)
-			return strings.Contains(content, "Policy Rules") || strings.Contains(content, "No rules configured. Press 'A' to add one.")
+			return strings.Contains(content, "Home › Policy › Rules") || strings.Contains(content, "No rules configured")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 
 		// Send "q" to quit
