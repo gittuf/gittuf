@@ -1,7 +1,6 @@
 # gittuf E2E Test: Policy Rollback via RSL
 
-. "$(dirname "$0")/lib.sh" # use the lib.sh functions
-
+. "$(dirname "$0")/lib.sh"
 
 # Part 1: Test on a single repository
 
@@ -24,7 +23,7 @@ gittuf rsl record main --local-only
 assert_passes gittuf verify-ref main
 
 # Add branch protection rule; stage and apply policy
-use_key authorized
+use_key authorized1
 gittuf policy add-rule -k ../keys/targets --rule-name 'protect-main' --rule-pattern git:refs/heads/main --authorize authorized-user
 gittuf policy stage --local-only
 gittuf policy apply --local-only
@@ -37,15 +36,18 @@ git add README.md
 git commit -m 'Another commit'
 gittuf rsl record main --local-only
 
-# This will fail as branch protection rule is violated, this is OK.
-assert_fails "on branch protection rule check" gittuf verify-ref main 
+# This will fail as branch protection rule is violated
+assert_fails "branch protection rule check" gittuf verify-ref main
 
 # Rewind main branch and RSL to known good state
 rollback 1
+use_key authorized1
 
-# Rewind policy ref temporarily to use gittuf to record the previous hash
+# Dump current policy commit hash
+POLICY_HEAD="$(git show -s --format='%H' refs/gittuf/policy)"
+
+# Rewind policy ref temporarily to record the previous hash
 git update-ref refs/gittuf/policy refs/gittuf/policy~1
-git show -s --format='%H' refs/gittuf/policy
 
 # Record RSL entry with this previous policy
 gittuf rsl record refs/gittuf/policy --local-only
@@ -56,12 +58,10 @@ git update-ref refs/gittuf/policy $POLICY_HEAD
 echo 'Hello, world!!!' > README.md
 git add README.md
 git commit -m 'Evil commit'
-
-# Record commit to RSL
 gittuf rsl record main --local-only
 
 # This should NOT succeed
-assert_fails "branch protection rule should block unauthorized commit" gittuf verify-ref main 
+assert_fails "policy rollback should be detected" gittuf verify-ref main
 
 # Part 2: Test with a downstream repository
 
@@ -78,6 +78,6 @@ gittuf policy stage --local-only
 gittuf policy apply --local-only
 
 # This should NOT succeed
-assert_fails "on controller repository check" gittuf rsl propagate 
+assert_fails "controller repository check should fail without valid policy" gittuf rsl propagate
 
 print_result
