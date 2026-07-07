@@ -271,6 +271,10 @@ func (r *Repository) RemoveDelegation(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
+	if err := pruneUnreachableDelegationMetadata(state, targetsRoleName, targetsMetadata); err != nil {
+		return err
+	}
+
 	commitMessage := fmt.Sprintf("Remove rule '%s' from policy '%s'", ruleName, targetsRoleName)
 	return r.updateTargetsMetadata(ctx, state, signer, targetsRoleName, targetsMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
@@ -518,4 +522,54 @@ func (r *Repository) updateTargetsMetadata(ctx context.Context, state *policy.St
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
+}
+
+func pruneUnreachableDelegationMetadata(state *policy.State, updatedRoleName string, updatedTargetsMetadata tuf.TargetsMetadata) error {
+	if len(state.Metadata.DelegationEnvelopes) == 0 {
+		return nil
+	}
+
+	reachableRoles := map[string]bool{}
+	rolesToVisit := []string{policy.TargetsRoleName}
+	visitedRoles := map[string]bool{}
+
+	for len(rolesToVisit) > 0 {
+		roleName := rolesToVisit[0]
+		rolesToVisit = rolesToVisit[1:]
+
+		if visitedRoles[roleName] {
+			continue
+		}
+		visitedRoles[roleName] = true
+
+		currentMetadata := updatedTargetsMetadata
+		if roleName != updatedRoleName {
+			var err error
+			currentMetadata, err = state.GetTargetsMetadata(roleName, true)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, delegation := range currentMetadata.GetRules() {
+			if delegation.ID() == tuf.AllowRuleName {
+				continue
+			}
+
+			if !state.HasTargetsRole(delegation.ID()) {
+				continue
+			}
+
+			reachableRoles[delegation.ID()] = true
+			rolesToVisit = append(rolesToVisit, delegation.ID())
+		}
+	}
+
+	for roleName := range state.Metadata.DelegationEnvelopes {
+		if !reachableRoles[roleName] {
+			delete(state.Metadata.DelegationEnvelopes, roleName)
+		}
+	}
+
+	return nil
 }
