@@ -18,7 +18,7 @@ func (s *policyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" {
 			if _, ok := s.policyScreenList.SelectedItem().(item); ok {
 				m.screen = screenPolicyRules
-				m.refreshRules()
+				m.policyRulesScreen.refreshRules(m.ctx, m.options)
 			}
 			return *m, nil
 		}

@@ -363,21 +363,7 @@ func (m model) View() string {
 		return m.renderScreen("Home › Trust", m.trustScreenList.View(), renderActionHints(m.readOnly))
 
 	case screenPolicyRules:
-		overlay := ""
-		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-			)
-		}
-
-		listView := m.renderListOrEmpty(m.ruleList, len(m.rules), "No rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
-
-		return m.renderScreen("Home › Policy › Rules", listView, overlays)
+		return m.policyRulesScreen.View(&m)
 
 	case screenTrustGlobalRules:
 		overlay := ""
@@ -396,11 +382,8 @@ func (m model) View() string {
 
 		return m.renderScreen("Home › Trust › Global Rules", listView, overlays)
 
-	case screenPolicyAddRule:
-		return m.renderFormScreen("Add Rule", "Home › Policy › Rules › Add")
-
-	case screenPolicyEditRule:
-		return m.renderFormScreen("Edit Rule", "Home › Policy › Rules › Edit")
+	case screenPolicyAddRule, screenPolicyEditRule:
+		return m.policyRulesScreen.View(&m)
 
 	case screenTrustAddGlobalRule:
 		return m.renderFormScreen("Add Global Rule", "Home › Trust › Global Rules › Add")
