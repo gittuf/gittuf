@@ -24,9 +24,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -36,7 +34,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 			SigningKey: "dummy-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://github.com/foo/bar")
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://example.com/repository/location")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -48,9 +46,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -60,7 +56,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 			SigningKey: "non-existent-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://github.com/foo/bar")
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://example.com/repository/location")
 		assert.Error(t, err)
 	})
 
@@ -80,9 +76,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -106,7 +100,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 			SigningKey: keyPath,
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://github.com/foo/bar")
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://example.com/repository/location")
 		assert.NoError(t, err)
 	})
 
@@ -126,9 +120,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -153,7 +145,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 			WithRSLEntry: true,
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://github.com/foo/bar")
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--location", "https://example.com/repository/location")
 		assert.NoError(t, err)
 	})
 }

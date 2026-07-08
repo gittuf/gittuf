@@ -24,9 +24,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -47,9 +45,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -78,9 +74,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
@@ -123,9 +117,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		defer os.Chdir(cwd) //nolint:errcheck
 
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)

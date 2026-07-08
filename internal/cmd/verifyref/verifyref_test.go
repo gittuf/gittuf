@@ -23,9 +23,7 @@ func TestVerifyRef(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "refs/heads/main")
 		assert.ErrorContains(t, err, "unable to identify git directory")
@@ -40,9 +38,7 @@ func TestVerifyRef(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -61,9 +57,7 @@ func TestVerifyRef(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -82,9 +76,7 @@ func TestVerifyRef(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -102,9 +94,7 @@ func TestVerifyRef(t *testing.T) {
 		if err := os.Chdir(tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
