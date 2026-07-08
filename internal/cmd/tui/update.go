@@ -106,7 +106,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Screen-specific input handling
 		switch m.screen {
-		case screenChoice, screenTrust:
+		case screenChoice:
+			return m.homeScreen.Update(msg, &m)
+		case screenTrust:
 			if msg.String() == "enter" {
 				return m.handleEnter()
 			}
@@ -128,7 +130,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Delegate to active bubbles component per screen
 	switch m.screen {
 	case screenChoice:
-		m.choiceList, cmd = m.choiceList.Update(msg)
+		return m.homeScreen.Update(msg, &m)
 	case screenPolicy:
 		return m.policyScreen.Update(msg, &m)
 	case screenTrust:
@@ -146,17 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleEnter handles the enter key press on selection menu screens.
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
-	switch m.screen {
-	case screenChoice:
-		if i, ok := m.choiceList.SelectedItem().(item); ok {
-			switch i.title {
-			case "Policy":
-				m.screen = screenPolicy
-			case "Trust":
-				m.screen = screenTrust
-			}
-		}
-	case screenTrust:
+	if m.screen == screenTrust {
 		if _, ok := m.trustScreenList.SelectedItem().(item); ok {
 			m.screen = screenTrustGlobalRules
 			m.refreshGlobalRules()

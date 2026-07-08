@@ -53,7 +53,7 @@ type model struct {
 	ctx               context.Context
 	screen            screen
 	spinner           spinner.Model
-	choiceList        list.Model
+	homeScreen        homeScreen
 	policyScreen      policyScreen
 	trustScreenList   list.Model
 	policyRulesScreen policyRulesScreen
@@ -157,10 +157,12 @@ func initialModel(ctx context.Context, o *options) model {
 		policyName: o.policyName,
 		options:    o,
 
-		choiceList: newMenuList("gittuf TUI", []list.Item{
-			item{title: "Policy", desc: "View and manage gittuf Policy"},
-			item{title: "Trust", desc: "View and manage gittuf Root of Trust"},
-		}, delegate),
+		homeScreen: homeScreen{
+			choiceList: newMenuList("gittuf TUI", []list.Item{
+				item{title: "Policy", desc: "View and manage gittuf Policy"},
+				item{title: "Trust", desc: "View and manage gittuf Root of Trust"},
+			}, delegate),
+		},
 		policyScreen: policyScreen{
 			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 				item{title: "View Rules", desc: "View and manage policy rules"},
@@ -213,7 +215,7 @@ func (m *model) resizeLists() {
 		innerHeight = 0
 	}
 
-	m.choiceList.SetSize(innerWidth, innerHeight)
+	m.homeScreen.choiceList.SetSize(innerWidth, innerHeight)
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
 	m.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
