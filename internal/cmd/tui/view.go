@@ -392,28 +392,7 @@ func (m model) View() string {
 		return m.renderFormScreen("Edit Global Rule", "Home › Trust › Global Rules › Edit")
 
 	case screenHelp:
-		h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-		boxWidth := m.width - h - 2
-		boxHeight := m.height - v - 8
-		if boxWidth < 0 {
-			boxWidth = 0
-		}
-		if boxHeight < 0 {
-			boxHeight = 0
-		}
-
-		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorFocus)).Render("Help")
-		helpContent := title + "\n\n" +
-			"- ↑ ↓ : Navigate\n" +
-			"- Enter : Select\n" +
-			"- a : Add rule\n" +
-			"- e : Edit\n" +
-			"- d : Delete\n" +
-			"- esc : Back\n" +
-			"- q : Quit\n"
-
-		centeredContent := lipgloss.Place(boxWidth, boxHeight, lipgloss.Center, lipgloss.Center, helpContent)
-		return m.renderScreen("Help", centeredContent, "")
+		return m.helpScreen.View(&m)
 
 	default:
 		return "Unknown screen"

@@ -54,6 +54,7 @@ type model struct {
 	screen            screen
 	spinner           spinner.Model
 	homeScreen        homeScreen
+	helpScreen        helpScreen
 	policyScreen      policyScreen
 	trustScreenList   list.Model
 	policyRulesScreen policyRulesScreen
@@ -75,7 +76,6 @@ type model struct {
 	deleteTarget      string
 	showHelp          bool
 	signerError       string
-	previousScreen    screen
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
