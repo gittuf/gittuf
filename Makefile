@@ -32,6 +32,9 @@ else
 	CGO_ENABLED=0 go install -trimpath -ldflags "$(LDFLAGS)" github.com/gittuf/gittuf/internal/git-remote-gittuf
 endif
 
+e2e: 
+	./tests/run_e2e_tests.sh 
+
 test :
 	go test -race -timeout 20m -v ./...
 
