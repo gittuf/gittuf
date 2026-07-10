@@ -352,6 +352,12 @@ func (m model) View() string {
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		return m.trustGlobalRulesScreen.View(&m)
 
+	case screenPolicyPrincipals:
+		return m.policyPrincipalsScreen.View(&m)
+
+	case screenPolicyPrincipalsForm:
+		return m.policyPrincipalsFormScreen.View(&m)
+
 	case screenPolicyAddRule, screenPolicyEditRule:
 		return m.policyRulesScreen.View(&m)
 

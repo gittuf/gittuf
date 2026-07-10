@@ -56,13 +56,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q":
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
+				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
+				m.screen != screenPolicyPrincipalsForm {
 				return m, tea.Quit
 			}
 		case "h":
 			// Toggle help screen if not in form mode
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule {
+				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
+				m.screen != screenPolicyPrincipalsForm {
 				if m.screen == screenHelp {
 					// Toggle back
 					m.screen = m.helpScreen.previousScreen
@@ -87,6 +89,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
+			case screenPolicyPrincipalsForm:
+				m.screen = screenPolicyPrincipals
+			case screenPolicyPrincipals:
+				m.screen = screenPolicy
 			case screenHelp:
 				m.screen = m.helpScreen.previousScreen
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -107,6 +113,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.policyRulesScreen.Update(msg, &m)
 		case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 			return m.trustGlobalRulesScreen.Update(msg, &m)
+		case screenPolicyPrincipals:
+			return m.policyPrincipalsScreen.Update(msg, &m)
+		case screenPolicyPrincipalsForm:
+			return m.policyPrincipalsFormScreen.Update(msg, &m)
 		}
 	}
 
@@ -124,6 +134,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.policyRulesScreen.Update(msg, &m)
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		return m.trustGlobalRulesScreen.Update(msg, &m)
+	case screenPolicyPrincipals:
+		return m.policyPrincipalsScreen.Update(msg, &m)
+	case screenPolicyPrincipalsForm:
+		return m.policyPrincipalsFormScreen.Update(msg, &m)
 	}
 
 	return m, cmd

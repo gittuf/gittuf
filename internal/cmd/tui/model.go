@@ -21,17 +21,19 @@ import (
 type screen int
 
 const (
-	screenLoading             screen = iota // Loading screen shown on startup
-	screenChoice                            // Initial menu
-	screenPolicy                            // Menu for Policy operations
-	screenPolicyRules                       // Rule management screen
-	screenPolicyAddRule                     // Form: add a new policy rule
-	screenPolicyEditRule                    // Form: edit selected rule (prefilled)
-	screenTrust                             // Menu for Trust operations
-	screenTrustGlobalRules                  // Global rule management screen
-	screenTrustAddGlobalRule                // Form: add a new global rule
-	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
-	screenHelp                              // Generic Help screen displaying keybindings
+	screenLoading              screen = iota // Loading screen shown on startup
+	screenChoice                             // Initial menu
+	screenPolicy                             // Menu for Policy operations
+	screenPolicyRules                        // Rule management screen
+	screenPolicyAddRule                      // Form: add a new policy rule
+	screenPolicyEditRule                     // Form: edit selected rule (prefilled)
+	screenPolicyPrincipals                   // Principals management screen
+	screenPolicyPrincipalsForm               // Form: Add/Edit principal or add key
+	screenTrust                              // Menu for Trust operations
+	screenTrustGlobalRules                   // Global rule management screen
+	screenTrustAddGlobalRule                 // Form: add a new global rule
+	screenTrustEditGlobalRule                // Form: edit selected global rule (prefilled)
+	screenHelp                               // Generic Help screen displaying keybindings
 )
 
 type item struct {
@@ -49,27 +51,29 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx                    context.Context
-	screen                 screen
-	spinner                spinner.Model
-	homeScreen             homeScreen
-	helpScreen             helpScreen
-	policyScreen           policyScreen
-	trustScreen            trustScreen
-	policyRulesScreen      policyRulesScreen
-	trustGlobalRulesScreen trustGlobalRulesScreen
-	cursorMode             cursor.Mode
-	repo                   *gittuf.Repository
-	signer                 dsse.SignerVerifier
-	policyName             string
-	options                *options
-	footer                 string
-	errorMsg               string
-	readOnly               bool
-	width                  int
-	height                 int
-	showHelp               bool
-	signerError            string
+	ctx                        context.Context
+	screen                     screen
+	spinner                    spinner.Model
+	homeScreen                 homeScreen
+	helpScreen                 helpScreen
+	policyScreen               policyScreen
+	trustScreen                trustScreen
+	policyRulesScreen          policyRulesScreen
+	trustGlobalRulesScreen     trustGlobalRulesScreen
+	policyPrincipalsScreen     policyPrincipalsScreen
+	policyPrincipalsFormScreen policyPrincipalsFormScreen
+	cursorMode                 cursor.Mode
+	repo                       *gittuf.Repository
+	signer                     dsse.SignerVerifier
+	policyName                 string
+	options                    *options
+	footer                     string
+	errorMsg                   string
+	readOnly                   bool
+	width                      int
+	height                     int
+	showHelp                   bool
+	signerError                string
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -91,8 +95,9 @@ type inputField struct {
 }
 
 // newDelegate creates a styled list delegate for use in all list.Model instances.
-func newDelegate() list.DefaultDelegate {
+func newDelegate(height int) list.DefaultDelegate {
 	d := list.NewDefaultDelegate()
+	d.SetHeight(height)
 	d.Styles.SelectedTitle = selectedItemStyle
 	d.Styles.SelectedDesc = selectedItemStyle
 	d.Styles.NormalTitle = itemStyle
@@ -118,7 +123,7 @@ func initInputs(fields []inputField) []textinput.Model {
 	for i, f := range fields {
 		t := textinput.New()
 		t.Cursor.Style = cursorStyle
-		t.CharLimit = 64
+		t.CharLimit = 0
 		t.Placeholder = f.placeholder
 		t.Prompt = f.prompt
 		if i == 0 {
@@ -141,7 +146,8 @@ func initialModel(ctx context.Context, o *options) model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 
-	delegate := newDelegate()
+	delegate := newDelegate(2)
+	delegateMultiline := newDelegate(4)
 
 	m := model{
 		ctx:        ctx,
@@ -160,6 +166,7 @@ func initialModel(ctx context.Context, o *options) model {
 		policyScreen: policyScreen{
 			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 				item{title: "View Rules", desc: "View and manage policy rules"},
+				item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
 			}, delegate),
 		},
 		trustScreen: trustScreen{
@@ -172,6 +179,9 @@ func initialModel(ctx context.Context, o *options) model {
 		},
 		trustGlobalRulesScreen: trustGlobalRulesScreen{
 			globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		},
+		policyPrincipalsScreen: policyPrincipalsScreen{
+			list: newMenuList("Policy Principals", []list.Item{}, delegateMultiline),
 		},
 	}
 
@@ -218,6 +228,7 @@ func (m *model) resizeLists() {
 	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
+	m.policyPrincipalsScreen.list.SetSize(innerWidth, innerHeight)
 }
 
 // loadRepoCmd performs all heavy TUI initialization asynchronously and sends

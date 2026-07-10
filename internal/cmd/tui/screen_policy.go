@@ -16,9 +16,15 @@ func (s *policyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if msg.String() == "enter" {
-			if _, ok := s.policyScreenList.SelectedItem().(item); ok {
-				m.screen = screenPolicyRules
-				m.policyRulesScreen.refreshRules(m.ctx, m.options)
+			if i, ok := s.policyScreenList.SelectedItem().(item); ok {
+				switch i.title {
+				case "View Rules":
+					m.screen = screenPolicyRules
+					m.policyRulesScreen.refreshRules(m.ctx, m.options)
+				case "Manage Principals":
+					m.screen = screenPolicyPrincipals
+					m.policyPrincipalsScreen.refreshPrincipals(m.ctx, m.options)
+				}
 			}
 			return *m, nil
 		}
