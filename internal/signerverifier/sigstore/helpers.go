@@ -55,6 +55,8 @@ func parseTokenForIdentityAndIssuer(token, fulcioURL string) (string, string, er
 			return "", "", fmt.Errorf("unable to query Fulcio instance '%s': %w", fulcioURL, err)
 		}
 
+		defer response.Body.Close()
+
 		responseData, err := io.ReadAll(response.Body)
 		if err != nil {
 			return "", "", fmt.Errorf("unable to query Fulcio instance '%s': %w", fulcioURL, err)
