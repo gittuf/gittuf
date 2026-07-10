@@ -30,7 +30,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.policyName,
 		"policy-name",
 		policy.TargetsRoleName,
-		"name of policy file to add key to",
+		"name of policy file to add person to",
 	)
 
 	cmd.Flags().StringVar(
@@ -45,9 +45,9 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.publicKeys,
 		"public-key",
 		[]string{},
-		"authorized public key for person",
+		"authorized public key for the person (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
-	cmd.MarkFlagRequired("authorize-key") //nolint:errcheck
+	cmd.MarkFlagRequired("public-key") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.associatedIdentities,
@@ -122,7 +122,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-person",
 		Short:             "Add a trusted person to a policy file",
-		Long:              `The 'add-person' command adds a trusted person to a gittuf policy file. In gittuf, a person definition consists of a unique identifier ('--person-ID'), one or more authorized public keys ('--public-key'), optional associated identities ('--associated-identity') on external platforms (e.g., GitHub, GitLab), and optional custom metadata ('--custom') for tracking additional attributes. Note that the keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'add-person' command adds a trusted person to a gittuf policy file. It is used to define a person, along with their authorized keys and platform identities, who can then be named in policy rules.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

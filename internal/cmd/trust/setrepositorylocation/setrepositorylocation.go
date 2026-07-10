@@ -20,7 +20,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.location,
 		"location",
 		"",
-		"location of repository",
+		"canonical location of the repository to record in the root of trust",
 	)
 	cmd.MarkFlagRequired("location") //nolint:errcheck
 }
@@ -48,7 +48,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "set-repository-location",
 		Short:             "Set repository location",
-		Long:              "The 'set-repository-location' command updates the canonical location of a repository in the repository's root of trust. It is used to encode the canonical location of the repository inside gittuf metadata.",
+		Long:              "The 'set-repository-location' command records the canonical location of the repository in its root of trust. It is used to tell other repositories in a gittuf network where to fetch this repository from.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

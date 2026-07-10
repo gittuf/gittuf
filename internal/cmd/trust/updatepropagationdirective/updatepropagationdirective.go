@@ -94,7 +94,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "update-propagation-directive",
 		Short:             fmt.Sprintf("Update propagation directive in the root of trust (developer mode only, set %s=1)", dev.DevModeKey),
-		Long:              "The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to update how content is propagated between repositories by changing the source, destination, or associated parameters of a directive.",
+		Long:              fmt.Sprintf("The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to change how content is propagated between repositories. It requires developer mode to be enabled by setting the environment variable %s=1.", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

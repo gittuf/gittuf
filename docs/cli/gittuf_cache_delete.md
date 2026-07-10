@@ -4,7 +4,7 @@ Delete the local persistent cache
 
 ### Synopsis
 
-The 'delete' command deletes the local persistent cache used by gittuf.
+The 'delete' command deletes the local persistent cache used by gittuf. It is used to reclaim space or clear a stale cache. The cache must be reinitialized manually with 'gittuf cache init' before it can be used again.
 
 ```
 gittuf cache delete [flags]

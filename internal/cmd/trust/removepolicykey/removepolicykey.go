@@ -22,7 +22,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.targetsKeyID,
 		"policy-key-ID",
 		"",
-		"ID of Policy key to be removed from root of trust",
+		"ID of the policy key to remove from the root of trust",
 	)
 	cmd.MarkFlagRequired("policy-key-ID") //nolint:errcheck
 }
@@ -50,7 +50,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-policy-key",
 		Short:             "Remove Policy key from gittuf root of trust",
-		Long:              "This command allows users to remove a policy key from the gittuf root of trust. The policy key ID must be specified.",
+		Long:              "The 'remove-policy-key' command removes a trusted key for the primary policy file from the repository's root of trust. It is used to revoke a key's authorization to sign policy metadata.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -39,7 +39,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "sign",
 		Short:             "Sign root of trust",
-		Long:              "This command allows users to add their signature to the root of trust file.",
+		Long:              "The 'sign' command adds a signature to the repository's root of trust using the supplied signing key. It is used to meet the root of trust's signature threshold when multiple root keys are required.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

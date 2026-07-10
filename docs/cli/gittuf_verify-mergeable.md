@@ -4,7 +4,7 @@ Tools for verifying mergeability using gittuf policies
 
 ### Synopsis
 
-The 'verify-mergeable' command evaluates whether a feature branch can be merged into a base branch under the repository's gittuf policies. It is used to check policy compliance for a proposed merge by comparing the specified base and feature branches, optionally bypassing the RSL when determining the current state.
+The 'verify-mergeable' command evaluates whether a feature branch can be merged into a base branch under the repository's gittuf policies. It is used to check, before performing a merge, that the proposed merge would satisfy policy such as required approval thresholds.
 
 ```
 gittuf verify-mergeable [flags]

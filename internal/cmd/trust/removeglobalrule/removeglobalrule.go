@@ -49,7 +49,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-global-rule",
 		Short:             `Remove a global rule from root of trust`,
-		Long:              "This command allows users to remove an existing global rule from the root of trust. The name of the global rule must be specified.",
+		Long:              "The 'remove-global-rule' command removes an existing global rule from the repository's root of trust. It is used to lift a repository-wide constraint that is no longer needed.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

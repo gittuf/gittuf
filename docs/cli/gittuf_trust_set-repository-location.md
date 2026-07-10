@@ -4,7 +4,7 @@ Set repository location
 
 ### Synopsis
 
-The 'set-repository-location' command updates the canonical location of a repository in the repository's root of trust. It is used to encode the canonical location of the repository inside gittuf metadata.
+The 'set-repository-location' command records the canonical location of the repository in its root of trust. It is used to tell other repositories in a gittuf network where to fetch this repository from.
 
 ```
 gittuf trust set-repository-location [flags]
@@ -14,7 +14,7 @@ gittuf trust set-repository-location [flags]
 
 ```
   -h, --help              help for set-repository-location
-      --location string   location of repository
+      --location string   canonical location of the repository to record in the root of trust
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +25,7 @@ gittuf trust set-repository-location [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

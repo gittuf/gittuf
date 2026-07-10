@@ -14,9 +14,9 @@ gittuf rsl annotate [flags]
 
 ```
   -h, --help                 help for annotate
-      --local-only           local only
+      --local-only           perform this operation locally without pushing to a remote repository
   -m, --message string       annotation message
-      --remote-name string   remote name
+      --remote-name string   name of the remote to push the annotation to
   -s, --skip                 mark annotated entries as to be skipped
 ```
 

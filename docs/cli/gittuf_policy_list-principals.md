@@ -4,7 +4,7 @@ List principals for the current policy in the specified rule file
 
 ### Synopsis
 
-The 'list-principals' command lists all trusted principals defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'list-principals' command lists the trusted principals defined in a gittuf policy file. It is used to review which keys and persons are recognized before referencing them in rules.
 
 ```
 gittuf policy list-principals [flags]
@@ -26,7 +26,7 @@ gittuf policy list-principals [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

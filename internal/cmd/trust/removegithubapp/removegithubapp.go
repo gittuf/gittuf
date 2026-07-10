@@ -21,7 +21,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.appName,
 		"app-name",
 		tuf.GitHubAppRoleName,
-		"name of app to add to root of trust",
+		"name of the app to remove from the root of trust",
 	)
 }
 

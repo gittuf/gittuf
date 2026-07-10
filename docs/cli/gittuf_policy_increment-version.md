@@ -1,10 +1,10 @@
 ## gittuf policy increment-version
 
-Increment the integer version of the specified rule file metadata
+Increment the integer version of the specified policy file metadata
 
 ### Synopsis
 
-The 'increment-version' command increments the integer version of the specified rule file metadata without making any other changes.
+The 'increment-version' command increments the integer version of the specified policy file metadata without making any other changes. This is normally only needed when upgrading gittuf metadata created with versions older than v0.14.0.
 
 ```
 gittuf policy increment-version [flags]
@@ -25,7 +25,7 @@ gittuf policy increment-version [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

@@ -4,7 +4,7 @@ Mark GitHub app approvals as trusted henceforth
 
 ### Synopsis
 
-The 'enable-github-app-approvals' command marks a GitHub App as trusted, allowing it to approve protected operations under the repository's trust policy.
+The 'enable-github-app-approvals' command marks a GitHub app's approvals as trusted in the repository's root of trust. It is used to honor new pull request approval attestations issued by the app.
 
 ```
 gittuf trust enable-github-app-approvals [flags]
@@ -13,7 +13,7 @@ gittuf trust enable-github-app-approvals [flags]
 ### Options
 
 ```
-      --app-name string   name of app to add to root of trust (default "https://gittuf.dev/github-app")
+      --app-name string   name of the app whose approvals to mark trusted (default "https://gittuf.dev/github-app")
   -h, --help              help for enable-github-app-approvals
 ```
 
@@ -25,7 +25,7 @@ gittuf trust enable-github-app-approvals [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

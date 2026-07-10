@@ -4,7 +4,7 @@ Update a person in a policy file
 
 ### Synopsis
 
-This command allows users to update a person's information in the specified policy file. By default, the main policy file is selected. The command replaces the person's existing information with the new values provided. If a field is not specified, its existing value is not preserved.
+The 'update-person' command updates a trusted person's definition in a gittuf policy file. It is used to change a person's keys, associated identities, or custom metadata. The update replaces the person entirely, so any field not provided is cleared rather than preserved.
 
 ```
 gittuf policy update-person [flags]
@@ -18,7 +18,7 @@ gittuf policy update-person [flags]
   -h, --help                              help for update-person
       --person-ID string                  person ID to update
       --policy-name string                name of policy file to update person in (default "targets")
-      --public-key stringArray            public keys for person
+      --public-key stringArray            public keys for the person (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
 ```
 
 ### Options inherited from parent commands
@@ -29,7 +29,7 @@ gittuf policy update-person [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

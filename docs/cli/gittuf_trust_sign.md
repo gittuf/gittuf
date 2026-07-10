@@ -4,7 +4,7 @@ Sign root of trust
 
 ### Synopsis
 
-This command allows users to add their signature to the root of trust file.
+The 'sign' command adds a signature to the repository's root of trust using the supplied signing key. It is used to meet the root of trust's signature threshold when multiple root keys are required.
 
 ```
 gittuf trust sign [flags]
@@ -24,7 +24,7 @@ gittuf trust sign [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

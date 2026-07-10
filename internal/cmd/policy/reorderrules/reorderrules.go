@@ -51,7 +51,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "reorder-rules",
 		Short:             "Reorder rules in the specified policy file",
-		Long:              `The 'reorder-rules' command reorders rules in the specified policy file based on the order of rule names provided as arguments. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'reorder-rules' command reorders the rules in a gittuf policy file to match the sequence of rule names given as arguments. It is used to change the order in which rules are evaluated, since earlier rules take precedence.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

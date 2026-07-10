@@ -57,7 +57,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "remove-rule",
 		Short:             "Remove rule from a policy file",
-		Long:              `The 'remove-rule' command deletes the specified rule from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'remove-rule' command removes a rule from a gittuf policy file. It is used to stop protecting a namespace or to remove an authorization that is no longer needed.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

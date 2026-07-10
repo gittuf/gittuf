@@ -47,8 +47,8 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "increment-version",
-		Short:             "Increment the integer version of the specified rule file metadata",
-		Long:              `The 'increment-version' command increments the integer version of the specified rule file metadata without making any other changes.`,
+		Short:             "Increment the integer version of the specified policy file metadata",
+		Long:              `The 'increment-version' command increments the integer version of the specified policy file metadata without making any other changes. This is normally only needed when upgrading gittuf metadata created with versions older than v0.14.0.`,
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

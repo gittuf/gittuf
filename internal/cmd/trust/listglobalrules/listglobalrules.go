@@ -76,7 +76,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-global-rules",
 		Short:             "List global rules for the current state",
-		Long:              "This command allows users to list the currently defined global rules for the root of trust. The output is sorted by global rule type.",
+		Long:              "The 'list-global-rules' command lists the global rules currently defined in the repository's root of trust. It is used to review the repository-wide constraints in effect, with output grouped by rule type.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

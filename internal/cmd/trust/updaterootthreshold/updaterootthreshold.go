@@ -46,10 +46,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
-		Use:   "update-root-threshold",
-		Short: "Update Root threshold in the gittuf root of trust",
-		Long:  "This command allows users to update the threshold of valid signatures required for the root of trust.",
-		RunE:  o.Run,
+		Use:               "update-root-threshold",
+		Short:             "Update Root threshold in the gittuf root of trust",
+		Long:              "The 'update-root-threshold' command updates the number of signatures required to sign the repository's root of trust.",
+		RunE:              o.Run,
+		DisableAutoGenTag: true,
 	}
 	o.AddFlags(cmd)
 

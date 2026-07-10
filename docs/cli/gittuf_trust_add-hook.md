@@ -4,7 +4,7 @@ Add a script to be run as a gittuf hook, specify when and where to run it (devel
 
 ### Synopsis
 
-Add a script to be run as a gittuf hook, specify when and which environment to run it in. The only currently supported environment is 'lua' (developer mode only, set GITTUF_DEV=1)
+The 'add-hook' command adds a script to be run as a gittuf hook, recording which stage and environment it runs in. It is used to enforce automated checks during Git operations such as commit and push. The only currently supported environment is 'lua' (developer mode only, set GITTUF_DEV=1)
 
 ```
 gittuf trust add-hook [flags]
@@ -16,7 +16,7 @@ gittuf trust add-hook [flags]
   -e, --env string                 environment which the hook must run in (default "lua")
   -f, --file-path string           path of the script to be run as a hook
   -h, --help                       help for add-hook
-  -n, --hook-name string           Name of the hook
+  -n, --hook-name string           name of the hook
       --is-pre-commit              add the hook to the pre-commit stage
       --is-pre-push                add the hook to the pre-push stage
       --principal-ID stringArray   principal IDs which must run this hook
@@ -31,7 +31,7 @@ gittuf trust add-hook [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

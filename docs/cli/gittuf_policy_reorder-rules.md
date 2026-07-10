@@ -4,7 +4,7 @@ Reorder rules in the specified policy file
 
 ### Synopsis
 
-The 'reorder-rules' command reorders rules in the specified policy file based on the order of rule names provided as arguments. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'reorder-rules' command reorders the rules in a gittuf policy file to match the sequence of rule names given as arguments. It is used to change the order in which rules are evaluated, since earlier rules take precedence.
 
 ```
 gittuf policy reorder-rules [flags]
@@ -25,7 +25,7 @@ gittuf policy reorder-rules [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

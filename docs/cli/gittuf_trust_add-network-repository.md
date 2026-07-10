@@ -4,7 +4,7 @@ Add a network repository
 
 ### Synopsis
 
-The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to add and configure a network repository, including its name, location, and initial root principals.
+The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified.
 
 ```
 gittuf trust add-network-repository [flags]
@@ -14,7 +14,7 @@ gittuf trust add-network-repository [flags]
 
 ```
   -h, --help                                 help for add-network-repository
-      --initial-root-principal stringArray   initial root principals of network repository
+      --initial-root-principal stringArray   initial root principals of the network repository (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
       --location string                      location of network repository
       --name string                          name of network repository
 ```
@@ -27,7 +27,7 @@ gittuf trust add-network-repository [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

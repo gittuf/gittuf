@@ -4,7 +4,7 @@ Add Policy key to gittuf root of trust
 
 ### Synopsis
 
-This command allows users to add a new trusted key for the main policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".
+The 'add-policy-key' command adds a new trusted key for the primary policy file to the repository's root of trust. It is used to authorize additional keys to sign the main policy metadata.
 
 ```
 gittuf trust add-policy-key [flags]
@@ -14,7 +14,7 @@ gittuf trust add-policy-key [flags]
 
 ```
   -h, --help                help for add-policy-key
-      --policy-key string   policy key to add to root of trust
+      --policy-key string   policy key to add (path to SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
 ```
 
 ### Options inherited from parent commands
@@ -25,7 +25,7 @@ gittuf trust add-policy-key [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

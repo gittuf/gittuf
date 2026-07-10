@@ -20,7 +20,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.targetsKey,
 		"policy-key",
 		"",
-		"policy key to add to root of trust",
+		"policy key to add (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("policy-key") //nolint:errcheck
 }
@@ -53,7 +53,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-policy-key",
 		Short:             "Add Policy key to gittuf root of trust",
-		Long:              `This command allows users to add a new trusted key for the main policy file. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>".`,
+		Long:              "The 'add-policy-key' command adds a new trusted key for the primary policy file to the repository's root of trust. It is used to authorize additional keys to sign the main policy metadata.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

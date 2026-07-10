@@ -39,7 +39,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.initialRootPrincipals,
 		"initial-root-principal",
 		[]string{},
-		"initial root principals of controller repository",
+		"initial root principals of the controller repository (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("initial-root-principal") //nolint:errcheck
 }
@@ -77,7 +77,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-controller-repository",
 		Short:             `Add a controller repository`,
-		Long:              "The 'add-controller-repository' command registers a controller repository in the repository's root of trust. It is used to add and configure a controller repository, including its name, location, and initial root principals.",
+		Long:              "The 'add-controller-repository' command adds a controller repository to the repository's root of trust. It is used to designate a repository whose global rules this repository inherits.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

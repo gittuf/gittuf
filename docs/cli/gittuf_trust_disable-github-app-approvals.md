@@ -4,7 +4,7 @@ Mark GitHub app approvals as untrusted henceforth
 
 ### Synopsis
 
-The 'disable-github-app-approvals' command revokes a GitHub App's ability to approve changes by marking it untrusted in the trust policy.
+The 'disable-github-app-approvals' command marks a GitHub app's approvals as untrusted in the repository's root of trust. It is used to stop honoring new pull request approval attestations from the app. Previously issued attestations remain valid.
 
 ```
 gittuf trust disable-github-app-approvals [flags]
@@ -13,7 +13,7 @@ gittuf trust disable-github-app-approvals [flags]
 ### Options
 
 ```
-      --app-name string   name of app to add to root of trust (default "https://gittuf.dev/github-app")
+      --app-name string   name of the app whose approvals to mark untrusted (default "https://gittuf.dev/github-app")
   -h, --help              help for disable-github-app-approvals
 ```
 
@@ -25,7 +25,7 @@ gittuf trust disable-github-app-approvals [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

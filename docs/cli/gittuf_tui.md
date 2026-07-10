@@ -4,7 +4,7 @@ Start the TUI for gittuf
 
 ### Synopsis
 
-This command starts a terminal-based interface to view and/or manage gittuf metadata. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes.
+The 'tui' command starts a terminal-based interface to view and manage gittuf policy metadata. It is used to inspect or modify policy files interactively. A signing key must be provided to enable write operations; without one the TUI runs in read-only mode. Changes made in the TUI are staged immediately and require running 'gittuf policy apply' to take effect.
 
 ```
 gittuf tui [flags]
@@ -17,7 +17,7 @@ gittuf tui [flags]
   -h, --help                 help for tui
       --policy-name string   name of policy file to make changes to (default "targets")
       --read-only            interact with the TUI in read-only mode
-  -k, --signing-key string   signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string   signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --target-ref string    specify which policy ref should be inspected (default "policy")
 ```
 

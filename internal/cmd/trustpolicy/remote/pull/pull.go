@@ -25,7 +25,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "pull <remote>",
 		Short:             "Pull policy from the specified remote",
-		Long:              "The 'pull' command retrieves policy updates from the specified remote and applies them to the local repository.",
+		Long:              "The 'pull' command fetches updates to the gittuf policy from the specified remote into the local repository.",
 		Args:              cobra.ExactArgs(1),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,

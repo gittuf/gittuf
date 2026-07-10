@@ -30,7 +30,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.authorizedKeys,
 		"public-key",
 		[]string{},
-		"authorized public key",
+		"authorized public key (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("public-key") //nolint:errcheck
 }
@@ -68,7 +68,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "add-key",
 		Short:             "Add a trusted key to a policy file",
-		Long:              `The 'add-key' command adds one or more trusted public keys to a gittuf policy file. This command is used to define which keys are authorized to sign commits or policy changes according to the repository's trust model. Note that authorized keys can be specified from disk, from the GPG keyring using the "gpg:<fingerprint>" format, or as a Sigstore identity as "fulcio:<identity>::<issuer>". By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'add-key' command adds one or more trusted public keys to a gittuf policy file. It is used to make keys available for use in policy rules. A key must be added to at least one rule before it can be used to authorize changes.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

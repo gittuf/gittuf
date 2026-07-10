@@ -4,7 +4,7 @@ Remove a key from a policy file
 
 ### Synopsis
 
-The 'remove-key' command removes the specified public key from the specified gittuf policy file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.
+The 'remove-key' command removes a public key from a gittuf policy file. The key must first be removed from all rules that reference it before this command will succeed.
 
 ```
 gittuf policy remove-key [flags]
@@ -26,7 +26,7 @@ gittuf policy remove-key [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

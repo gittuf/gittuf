@@ -77,7 +77,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-principals",
 		Short:             "List principals for the current policy in the specified rule file",
-		Long:              `The 'list-principals' command lists all trusted principals defined in a gittuf policy rule file. By default, the main policy file (targets) is used, which can be overridden with the '--policy-name' flag.`,
+		Long:              "The 'list-principals' command lists the trusted principals defined in a gittuf policy file. It is used to review which keys and persons are recognized before referencing them in rules.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

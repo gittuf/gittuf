@@ -4,7 +4,7 @@ Add propagation directive into gittuf root of trust
 
 ### Synopsis
 
-The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are propagated into a downstream repository by specifying source and destination references and paths.
+The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository.
 
 ```
 gittuf trust add-propagation-directive [flags]
@@ -30,7 +30,7 @@ gittuf trust add-propagation-directive [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 

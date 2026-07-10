@@ -51,7 +51,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "tui",
 		Short:             "Start the TUI for gittuf",
-		Long:              "This command starts a terminal-based interface to view and/or manage gittuf metadata. If a signing key is provided, mutating operations are enabled and signed. Without a signing key, the TUI runs in read-only mode. Changes to the policy files in the TUI are staged immediately without further confirmation and users are required to run `gittuf policy apply` to commit the changes.",
+		Long:              "The 'tui' command starts a terminal-based interface to view and manage gittuf policy metadata. It is used to inspect or modify policy files interactively. A signing key must be provided to enable write operations; without one the TUI runs in read-only mode. Changes made in the TUI are staged immediately and require running 'gittuf policy apply' to take effect.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
@@ -61,7 +61,7 @@ func New(persistent *persistent.Options) *cobra.Command {
 	return cmd
 }
 
-// startTUI intitializes a new model for the TUI
+// startTUI initializes a new model for the TUI
 func startTUI(ctx context.Context, o *options) error {
 	m := initialModel(ctx, o)
 

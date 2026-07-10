@@ -4,7 +4,7 @@ Update Policy threshold in the gittuf root of trust
 
 ### Synopsis
 
-This command allows users to update the threshold of valid signatures required for the policy.
+The 'update-policy-threshold' command updates the number of signatures required to sign the primary policy file.
 
 ```
 gittuf trust update-policy-threshold [flags]
@@ -25,7 +25,7 @@ gittuf trust update-policy-threshold [flags]
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "fulcio:" for Sigstore)
+  -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
       --verbose                      enable verbose logging
 ```
 
