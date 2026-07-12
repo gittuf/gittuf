@@ -29,6 +29,8 @@ const (
 	screenPolicyEditRule                     // Form: edit selected rule (prefilled)
 	screenPolicyPrincipals                   // Principals management screen
 	screenPolicyPrincipalsForm               // Form: Add/Edit principal or add key
+	screenPolicyLifecycle                    // Menu for Policy lifecycle operations
+	screenPolicyLifecycleForm                // Form: policy lifecycle operation options
 	screenTrust                              // Menu for Trust operations
 	screenTrustGlobalRules                   // Global rule management screen
 	screenTrustAddGlobalRule                 // Form: add a new global rule
@@ -57,6 +59,7 @@ type model struct {
 	homeScreen                 homeScreen
 	helpScreen                 helpScreen
 	policyScreen               policyScreen
+	policyLifecycleScreen      policyLifecycleScreen
 	trustScreen                trustScreen
 	policyRulesScreen          policyRulesScreen
 	trustGlobalRulesScreen     trustGlobalRulesScreen
@@ -167,6 +170,17 @@ func initialModel(ctx context.Context, o *options) model {
 			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 				item{title: "View Rules", desc: "View and manage policy rules"},
 				item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
+				item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply or discard policy changes"},
+			}, delegate),
+		},
+		policyLifecycleScreen: policyLifecycleScreen{
+			list: newMenuList("Policy Lifecycle", []list.Item{
+				item{title: "Initialize Policy", desc: "Initialize a new gittuf policy file"},
+				item{title: "Increment Version", desc: "Increment the version of the specified rule file metadata"},
+				item{title: "Sign Policy", desc: "Sign the specified policy file"},
+				item{title: "Stage Changes", desc: "Stage local policy changes"},
+				item{title: "Apply Changes", desc: "Apply staged policy changes"},
+				item{title: "Discard Changes", desc: "Discard staged policy changes"},
 			}, delegate),
 		},
 		trustScreen: trustScreen{
@@ -225,6 +239,7 @@ func (m *model) resizeLists() {
 
 	m.homeScreen.choiceList.SetSize(innerWidth, innerHeight)
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
+	m.policyLifecycleScreen.list.SetSize(innerWidth, innerHeight)
 	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)

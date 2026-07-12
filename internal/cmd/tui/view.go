@@ -165,9 +165,11 @@ func renderFooterBox(m model) string {
 	return baseFooter
 }
 
-// renderErrorMsg returns error messages styled in the error color.
 func renderErrorMsg(text string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Render(text)
+	if text == "" {
+		return ""
+	}
+	return "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Render(text)
 }
 
 // renderStatusBar renders the top status bar showing screen name and current mode.
@@ -342,6 +344,9 @@ func (m model) View() string {
 
 	case screenPolicy:
 		return m.policyScreen.View(&m)
+
+	case screenPolicyLifecycle, screenPolicyLifecycleForm:
+		return m.policyLifecycleScreen.View(&m)
 
 	case screenTrust:
 		return m.trustScreen.View(&m)
