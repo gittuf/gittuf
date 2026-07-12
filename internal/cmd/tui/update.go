@@ -109,9 +109,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case screenChoice:
 			return m.homeScreen.Update(msg, &m)
 		case screenTrust:
-			if msg.String() == "enter" {
-				return m.handleEnter()
-			}
+			return m.trustScreen.Update(msg, &m)
 		case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 			return m.policyRulesScreen.Update(msg, &m)
 		case screenTrustGlobalRules:
@@ -134,7 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenPolicy:
 		return m.policyScreen.Update(msg, &m)
 	case screenTrust:
-		m.trustScreenList, cmd = m.trustScreenList.Update(msg)
+		return m.trustScreen.Update(msg, &m)
 	case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 		return m.policyRulesScreen.Update(msg, &m)
 	case screenTrustGlobalRules:
@@ -144,17 +142,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
-}
-
-// handleEnter handles the enter key press on selection menu screens.
-func (m model) handleEnter() (tea.Model, tea.Cmd) {
-	if m.screen == screenTrust {
-		if _, ok := m.trustScreenList.SelectedItem().(item); ok {
-			m.screen = screenTrustGlobalRules
-			m.refreshGlobalRules()
-		}
-	}
-	return m, nil
 }
 
 // handleRulesListKey handles keybindings on rule list screens (rules and global rules).

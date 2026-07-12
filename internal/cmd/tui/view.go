@@ -360,7 +360,7 @@ func (m model) View() string {
 		return m.policyScreen.View(&m)
 
 	case screenTrust:
-		return m.renderScreen("Home › Trust", m.trustScreenList.View(), renderActionHints(m.readOnly))
+		return m.trustScreen.View(&m)
 
 	case screenPolicyRules:
 		return m.policyRulesScreen.View(&m)

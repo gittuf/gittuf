@@ -55,7 +55,7 @@ type model struct {
 	spinner           spinner.Model
 	homeScreen        homeScreen
 	policyScreen      policyScreen
-	trustScreenList   list.Model
+	trustScreen       trustScreen
 	policyRulesScreen policyRulesScreen
 	globalRules       []globalRule
 	globalRuleList    list.Model
@@ -168,9 +168,11 @@ func initialModel(ctx context.Context, o *options) model {
 				item{title: "View Rules", desc: "View and manage policy rules"},
 			}, delegate),
 		},
-		trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
-			item{title: "View Global Rules", desc: "View and manage global rules"},
-		}, delegate),
+		trustScreen: trustScreen{
+			trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
+				item{title: "View Global Rules", desc: "View and manage global rules"},
+			}, delegate),
+		},
 		policyRulesScreen: policyRulesScreen{
 			ruleList: newMenuList("Policy Rules", []list.Item{}, delegate),
 		},
@@ -217,7 +219,7 @@ func (m *model) resizeLists() {
 
 	m.homeScreen.choiceList.SetSize(innerWidth, innerHeight)
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
-	m.trustScreenList.SetSize(innerWidth, innerHeight)
+	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.globalRuleList.SetSize(innerWidth, innerHeight)
 }
