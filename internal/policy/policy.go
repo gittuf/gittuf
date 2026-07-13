@@ -186,6 +186,45 @@ func (s *StateMetadata) GetTargetsMetadata(roleName string, migrate bool) (tuf.T
 	}
 }
 
+func (s *StateMetadata) HasRuleFileReference(roleName string) (bool, error) {
+	targetsMetadata, err := s.GetTargetsMetadata(TargetsRoleName, true)
+	if err != nil {
+		if errors.Is(err, ErrMetadataNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	queue := targetsMetadata.GetRules()
+	seen := map[string]bool{TargetsRoleName: true}
+	for len(queue) > 1 {
+		rule := queue[0]
+		queue = queue[1:]
+
+		if rule.ID() == roleName {
+			return true, nil
+		}
+
+		if seen[rule.ID()] || s.DelegationEnvelopes == nil {
+			continue
+		}
+		if _, ok := s.DelegationEnvelopes[rule.ID()]; !ok {
+			continue
+		}
+
+		// If a rule has a corresponding delegation file, retrieve its metadata,
+		// then add the rules in that metadata to the queue
+		delegatedMetadata, err := s.GetTargetsMetadata(rule.ID(), true)
+		if err != nil {
+			return false, err
+		}
+		seen[rule.ID()] = true
+		queue = append(delegatedMetadata.GetRules(), queue...)
+	}
+
+	return false, nil
+}
+
 func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
 	metadata := map[string]*sslibdsse.Envelope{}
 	metadata[RootRoleName] = s.RootEnvelope

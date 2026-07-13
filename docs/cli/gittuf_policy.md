@@ -31,6 +31,7 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy add-person](gittuf_policy_add-person.md)	 - Add a trusted person to a policy file
 * [gittuf policy add-rule](gittuf_policy_add-rule.md)	 - Add a new rule to a policy file
 * [gittuf policy apply](gittuf_policy_apply.md)	 - Validate and apply changes from policy-staging to policy
+* [gittuf policy delete-file](gittuf_policy_delete-file.md)	 - Delete a delegated policy file
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy increment-version](gittuf_policy_increment-version.md)	 - Increment the integer version of the specified policy file metadata
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
@@ -45,4 +46,3 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy stage](gittuf_policy_stage.md)	 - Stage and push local policy-staging changes to remote repository
 * [gittuf policy update-person](gittuf_policy_update-person.md)	 - Update a person in a policy file
 * [gittuf policy update-rule](gittuf_policy_update-rule.md)	 - Update an existing rule in a policy file
-
