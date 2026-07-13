@@ -62,8 +62,6 @@ func TestTUI(t *testing.T) {
 		m := initialModel(context.Background(), o)
 
 		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
-
-		// Wait for main menu to render
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 			return strings.Contains(string(out), "Policy")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
@@ -87,6 +85,43 @@ func TestTUI(t *testing.T) {
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 
 		// Send "q" to quit
+		tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second*15))
+	})
+
+	t.Run("Trust UI Navigation", func(t *testing.T) {
+		o := &options{
+			readOnly:  true,
+			targetRef: "policy",
+		}
+
+		m := initialModel(context.Background(), o)
+
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// select "Trust" from the main menu (click down arrow to move selection, then press enter to select)
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// select "View Global Rules" (already selected by default)
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		// Now we should end up on the Trust Global Rules screen.
+		// check for the screen title OR the screen-specific empty-state message.
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › Global Rules") || strings.Contains(content, "No global rules configured")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Click "q" to quit
 		tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second*15))
 	})
