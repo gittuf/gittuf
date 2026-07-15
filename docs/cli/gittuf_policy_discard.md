@@ -4,7 +4,7 @@ Discard the currently staged changes to policy
 
 ### Synopsis
 
-The 'discard' command removes any currently staged policy changes. It is used to revert pending policy updates before they are applied to the repository.
+The 'discard' command removes any currently staged policy changes and records the discard in the RSL. It is used to revert pending policy updates before they are applied to the repository.
 
 ```
 gittuf policy discard [flags]
