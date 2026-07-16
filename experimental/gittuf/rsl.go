@@ -37,17 +37,17 @@ var (
 // RecordRSLEntryForReference is the interface for the user to add an RSL entry
 // for the specified Git reference.
 func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName string, signCommit bool, opts ...rslopts.RecordOption) error {
-	if signCommit {
+	options := &rslopts.RecordOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if signCommit && options.SigningKeyBytes == nil {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
-	}
-
-	options := &rslopts.RecordOptions{}
-	for _, fn := range opts {
-		fn(options)
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
@@ -109,7 +109,12 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	if err := rsl.NewReferenceEntry(refName, refTip).Commit(r.r, signCommit); err != nil {
+	entry := rsl.NewReferenceEntry(refName, refTip)
+	if signCommit && options.SigningKeyBytes != nil {
+		if err := entry.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
+			return err
+		}
+	} else if err := entry.Commit(r.r, signCommit); err != nil {
 		return err
 	}
 
@@ -176,18 +181,17 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
 func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool, opts ...rslopts.AnnotateOption) error {
-	// TODO: local only?
-	if signCommit {
+	options := &rslopts.AnnotateOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if signCommit && options.SigningKeyBytes == nil {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
 		if err != nil {
 			return err
 		}
-	}
-
-	options := &rslopts.AnnotateOptions{}
-	for _, fn := range opts {
-		fn(options)
 	}
 
 	if options.RemoteName == "" && !options.LocalOnly {
@@ -216,7 +220,12 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 	// signCommit must be verified for the refNames of the rslEntryIDs.
 
 	slog.Debug("Creating RSL annotation entry...")
-	if err := rsl.NewAnnotationEntry(rslEntryHashes, skip, message).Commit(r.r, signCommit); err != nil {
+	annotation := rsl.NewAnnotationEntry(rslEntryHashes, skip, message)
+	if signCommit && options.SigningKeyBytes != nil {
+		if err := annotation.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
+			return err
+		}
+	} else if err := annotation.Commit(r.r, signCommit); err != nil {
 		return err
 	}
 
