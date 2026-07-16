@@ -9,6 +9,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/addrule"
 	"github.com/gittuf/gittuf/internal/cmd/policy/incrementversion"
 	i "github.com/gittuf/gittuf/internal/cmd/policy/init"
+	"github.com/gittuf/gittuf/internal/cmd/policy/inspect"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listprincipals"
 	"github.com/gittuf/gittuf/internal/cmd/policy/listrules"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
@@ -43,6 +44,7 @@ func New() *cobra.Command {
 	cmd.AddCommand(discard.New())
 	cmd.AddCommand(i.New(o))
 	cmd.AddCommand(incrementversion.New(o))
+	cmd.AddCommand(inspect.New())
 	cmd.AddCommand(listprincipals.New())
 	cmd.AddCommand(listrules.New())
 	cmd.AddCommand(remote.New())
