@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@b31d2ba4f494f30fbc44371da67ad87cca6569f9
+        uses: gittuf/gittuf-installer@a9730b348241599ca1882a8844acb43cd7935bb7
       - name: Checkout and verify repository
         run: |
           sleep 10s
