@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v6"
+	gogitconfig "github.com/go-git/go-git/v6/config"
 	"github.com/jonboulle/clockwork"
 )
 
@@ -25,8 +26,9 @@ const (
 )
 
 var (
-	ErrRepositoryPathNotSpecified = errors.New("repository path not specified")
-	ErrUnknownObjectFormat        = errors.New("unknown object format")
+	ErrRepositoryPathNotSpecified    = errors.New("repository path not specified")
+	ErrUnknownObjectFormat           = errors.New("unknown object format")
+	ErrCompatObjectFormatUnsupported = errors.New("gittuf does not support repositories with extensions.compatObjectFormat enabled")
 )
 
 // Repository is a lightweight wrapper around a Git repository. It stores the
@@ -57,6 +59,95 @@ func (r *Repository) readObjectFormat() (ObjectFormat, error) {
 	default:
 		return "", fmt.Errorf("%w: %s", ErrUnknownObjectFormat, stdOut)
 	}
+}
+
+// ensureNoCompatObjectFormat returns an error if the repository is in dual
+// hash interop mode (extensions.compatObjectFormat). In that mode Git
+// maintains both SHA-1 and SHA-256 representations of every object and stores
+// additional compat signatures under headers gittuf does not process, so
+// signing and verification results would be unreliable. The config file is
+// read directly (without invoking Git) because Git builds without compat
+// support refuse to open such repositories at all.
+func (r *Repository) ensureNoCompatObjectFormat() error {
+	configPath := filepath.Join(r.gitDirPath, "config")
+	configFile, err := os.Open(configPath)
+	if err != nil {
+		return fmt.Errorf("unable to read repository config: %w", err)
+	}
+	defer configFile.Close() //nolint:errcheck
+
+	gitConfig, err := gogitconfig.ReadConfig(configFile)
+	if err != nil {
+		return fmt.Errorf("unable to parse repository config: %w", err)
+	}
+	compatFormat := gitConfig.Raw.Section("extensions").Options.Get("compatObjectFormat")
+	if compatFormat != "" {
+		return fmt.Errorf("%w: compat object format is set to '%s'", ErrCompatObjectFormatUnsupported, compatFormat)
+	}
+
+	return nil
+}
+
+func findGitDirPath(startPath string) (string, bool, error) {
+	currentPath, err := filepath.Abs(startPath)
+	if err != nil {
+		return "", false, err
+	}
+
+	for {
+		gitDirPath := filepath.Join(currentPath, ".git")
+		if fileInfo, err := os.Stat(gitDirPath); err == nil {
+			if fileInfo.IsDir() {
+				return gitDirPath, true, nil
+			}
+
+			resolvedGitDirPath, err := readGitDirFile(gitDirPath, currentPath)
+			if err != nil {
+				return "", false, err
+			}
+			return resolvedGitDirPath, true, nil
+		} else if !os.IsNotExist(err) {
+			return "", false, err
+		}
+
+		if isBareGitDir(currentPath) {
+			return currentPath, true, nil
+		}
+
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			return "", false, nil
+		}
+		currentPath = parentPath
+	}
+}
+
+func readGitDirFile(gitDirFilePath, worktreePath string) (string, error) {
+	contents, err := os.ReadFile(gitDirFilePath)
+	if err != nil {
+		return "", err
+	}
+
+	gitDirPath, has := strings.CutPrefix(strings.TrimSpace(string(contents)), "gitdir:")
+	if !has {
+		return "", fmt.Errorf("invalid gitdir file: %s", gitDirFilePath)
+	}
+	gitDirPath = strings.TrimSpace(gitDirPath)
+	if !filepath.IsAbs(gitDirPath) {
+		gitDirPath = filepath.Join(worktreePath, gitDirPath)
+	}
+
+	return filepath.Abs(gitDirPath)
+}
+
+func isBareGitDir(path string) bool {
+	if fileInfo, err := os.Stat(filepath.Join(path, "config")); err != nil || fileInfo.IsDir() {
+		return false
+	}
+	if fileInfo, err := os.Stat(filepath.Join(path, "HEAD")); err != nil || fileInfo.IsDir() {
+		return false
+	}
+	return true
 }
 
 // GetGoGitRepository returns the go-git representation of a repository. We use
@@ -99,6 +190,17 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, err
 	}
 	defer os.Chdir(currentDir) //nolint:errcheck
+
+	gitDirPath, has, err := findGitDirPath(".")
+	if err != nil {
+		return nil, err
+	}
+	if has {
+		repo.gitDirPath = gitDirPath
+		if err := repo.ensureNoCompatObjectFormat(); err != nil {
+			return nil, err
+		}
+	}
 
 	slog.Debug("Identifying git directory for repository...")
 	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()

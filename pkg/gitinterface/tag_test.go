@@ -317,6 +317,39 @@ func TestVerifyTagSignatureGitCreatedTag(t *testing.T) {
 	}
 }
 
+// A tag message may itself contain an armored signature block (e.g. quoted
+// release notes). Git treats only the trailing block as the tag's signature
+// (parse_signed_buffer in gpg-interface.c returns the last block start) and
+// everything before it as signed payload, so `git verify-tag` accepts such
+// tags. Verification must match and not reject them as multiple signatures.
+func TestVerifyTagSignatureArmorBlockInMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+	require.Nil(t, err)
+
+	messageFile := filepath.Join(t.TempDir(), "message")
+	message := "release notes quoting a signature:\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHZHVtbXk=\n-----END SSH SIGNATURE-----\nend of notes\n"
+	require.Nil(t, os.WriteFile(messageFile, []byte(message), 0o600))
+
+	_, err = repo.executor("tag", "-s", "-F", messageFile, "v1", commitID.String()).executeString()
+	require.Nil(t, err)
+
+	tagID, err := repo.GetReference("refs/tags/v1")
+	require.Nil(t, err)
+
+	keyDir := t.TempDir()
+	keyPath := filepath.Join(keyDir, "ssh-key.pub")
+	require.Nil(t, os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600))
+	sshKey, err := ssh.NewKeyFromFile(keyPath)
+	require.Nil(t, err)
+
+	assert.Nil(t, repo.verifyTagSignature(context.Background(), tagID, sshKey))
+}
+
 func TestEnsureIsTag(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)

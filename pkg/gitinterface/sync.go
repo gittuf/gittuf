@@ -122,6 +122,10 @@ func CloneAndFetchRepository(remoteURL, dir, initialBranch string, refs []string
 		return nil, fmt.Errorf("unable to clone repository: %s", stdErr)
 	}
 
+	if err := repo.ensureNoCompatObjectFormat(); err != nil {
+		return nil, err
+	}
+
 	objectFormat, err := repo.readObjectFormat()
 	if err != nil {
 		return nil, err
