@@ -32,12 +32,12 @@ func (r *Repository) WriteBlob(contents []byte) (Hash, error) {
 	stdInBuf := bytes.NewBuffer(contents)
 	objID, err := r.executor("hash-object", "-t", "blob", "-w", "--stdin").withStdIn(stdInBuf).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to write blob: %w", err)
+		return nil, fmt.Errorf("unable to write blob: %w", err)
 	}
 
 	hash, err := NewHash(objID)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid Git ID for blob: %w", err)
+		return nil, fmt.Errorf("invalid Git ID for blob: %w", err)
 	}
 
 	return hash, nil

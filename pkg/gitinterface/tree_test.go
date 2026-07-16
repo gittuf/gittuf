@@ -148,7 +148,7 @@ func TestGetPathIDInTree(t *testing.T) {
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		_, err := repo.GetPathIDInTree("a", ZeroHash)
+		_, err := repo.GetPathIDInTree("a", repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 }
@@ -266,7 +266,7 @@ func TestGetTreeItems(t *testing.T) {
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		_, err := repo.GetTreeItems(ZeroHash)
+		_, err := repo.GetTreeItems(repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 }
@@ -471,7 +471,7 @@ func TestGetMergeTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		mergeTreeID, err := repo.GetMergeTree(ZeroHash, commitID)
+		mergeTreeID, err := repo.GetMergeTree(repo.ZeroHash(), commitID)
 		assert.Nil(t, err)
 		assert.Equal(t, treeID, mergeTreeID)
 	})
@@ -485,7 +485,7 @@ func TestGetMergeTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = repo.GetMergeTree(ZeroHash, blobID)
+		_, err = repo.GetMergeTree(repo.ZeroHash(), blobID)
 		assert.ErrorContains(t, err, "is not a commit object")
 	})
 
@@ -1191,7 +1191,7 @@ func TestEnsureIsTree(t *testing.T) {
 	err = repo.ensureIsTree(blobID)
 	assert.NotNil(t, err)
 
-	err = repo.ensureIsTree(ZeroHash)
+	err = repo.ensureIsTree(repo.ZeroHash())
 	assert.ErrorContains(t, err, "unable to inspect if object is tree")
 }
 
@@ -1208,7 +1208,7 @@ func TestGetAllFilesInTree(t *testing.T) {
 		_, err = repo.GetAllFilesInTree(blobID)
 		assert.ErrorContains(t, err, "unable to enumerate all files in tree")
 
-		_, err = repo.GetAllFilesInTree(ZeroHash)
+		_, err = repo.GetAllFilesInTree(repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to enumerate all files in tree")
 	})
 }

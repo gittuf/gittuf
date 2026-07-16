@@ -36,10 +36,10 @@ func (h Hash) String() string {
 	return hex.EncodeToString(h[:])
 }
 
-// IsZero compares the hash to see if it's the zero hash for either SHA-1 or
-// SHA-256.
+// IsZero returns true if the hash denotes "no object": a nil / empty value or
+// the zero hash for either SHA-1 or SHA-256.
 func (h Hash) IsZero() bool {
-	return bytes.Equal(h[:], zeroSHA1HashBytes[:]) || bytes.Equal(h[:], zeroSHA256HashBytes[:])
+	return len(h) == 0 || bytes.Equal(h[:], zeroSHA1HashBytes[:]) || bytes.Equal(h[:], zeroSHA256HashBytes[:])
 }
 
 // Equal compares the hash to another provided Hash to see if they're equal.
@@ -52,13 +52,6 @@ func (h Hash) Equal(other Hash) bool {
 func (h Hash) IsSHA256() bool {
 	return len(h) == sha256.Size
 }
-
-// ZeroHash represents an empty SHA-1 Hash. It is safe to use as an
-// error-return sentinel and in comparisons via Hash.IsZero (which matches both
-// SHA-1 and SHA-256 zero hashes). When the value is passed to Git or compared
-// against a Git-produced ID, prefer Repository.ZeroHash, which returns the zero
-// hash matching the repository's object format.
-var ZeroHash = Hash(zeroSHA1HashBytes[:])
 
 // ZeroHash returns the all-zeroes Hash for the repository's object format. Git
 // uses this value to denote, for example, the absence of a previous value when
@@ -74,12 +67,12 @@ func (r *Repository) ZeroHash() Hash {
 // encoded.
 func NewHash(h string) (Hash, error) {
 	if len(h) != (sha1.Size*2) && len(h) != (sha256.Size*2) {
-		return ZeroHash, ErrInvalidHashLength
+		return nil, ErrInvalidHashLength
 	}
 
 	hash, err := hex.DecodeString(h)
 	if err != nil {
-		return ZeroHash, ErrInvalidHashEncoding
+		return nil, ErrInvalidHashEncoding
 	}
 
 	return Hash(hash), nil

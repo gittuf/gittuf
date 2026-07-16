@@ -20,7 +20,7 @@ import (
 func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
+	testID := testZeroHash.String()
 	baseURL := "https://github.com"
 	baseHost := "github.com"
 	appName := "github"
@@ -71,7 +71,7 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
+	testID := testZeroHash.String()
 	baseURL := "https://github.com"
 	appName := "github"
 
@@ -170,7 +170,7 @@ func TestGitHubReviewID(t *testing.T) {
 
 func TestGetGitHubPullRequestApprovalAttestationForReviewID(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := testZeroHash.String()
 	baseURL := "https://github.com"
 	appName := "github"
 
@@ -236,7 +236,7 @@ func TestGetGitHubPullRequestApprovalAttestationForIndexPath(t *testing.T) {
 
 func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := testZeroHash.String()
 	baseURL := "https://github.com"
 	appName := "github"
 	reviewID := int64(123)
@@ -275,7 +275,7 @@ func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
 
 func TestSetGitHubPullRequestAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := testZeroHash.String()
 
 	// Create a simple envelope for testing using the same approach as existing tests
 	approvers := []string{"jane.doe@example.com"}

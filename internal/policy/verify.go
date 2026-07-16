@@ -76,7 +76,7 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinter
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return nil, err
 	}
 
 	return latestEntry.GetTargetID(), v.VerifyRelativeForRef(ctx, latestEntry, latestEntry, target)
@@ -99,7 +99,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 		if entryNumber != 0 {
 			firstEntry, err = loadRSLReferenceUpdaterEntry(v.repo, entryID)
 			if err != nil {
-				return gitinterface.ZeroHash, err
+				return nil, err
 			}
 
 			// break because we've loaded the entry and don't need to fallthrough
@@ -110,7 +110,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	case false:
 		firstEntry, _, err = rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, target)
 		if err != nil {
-			return gitinterface.ZeroHash, err
+			return nil, err
 		}
 	}
 
@@ -118,7 +118,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return nil, err
 	}
 
 	slog.Debug("Verifying all entries...")
@@ -133,21 +133,21 @@ func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, 
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return nil, err
 	}
 
 	fromEntry, isRefEntry := fromEntryT.(*rsl.ReferenceEntry)
 	if !isRefEntry {
 		// TODO: we should instead find the latest reference entry
 		// before the entryID and use that
-		return gitinterface.ZeroHash, fmt.Errorf("starting entry is not an RSL reference entry")
+		return nil, fmt.Errorf("starting entry is not an RSL reference entry")
 	}
 
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
-		return gitinterface.ZeroHash, err
+		return nil, err
 	}
 
 	// Do a relative verify from start entry to the latest entry
@@ -271,7 +271,7 @@ func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, 
 		return false, err
 	}
 
-	_, rslEntrySignatureNeededForThreshold, err := verifyGitObjectAndAttestations(ctx, currentPolicy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef), gitinterface.ZeroHash, authorizationAttestation, withApproverPrincipalIDs(approverIDs), withVerifyMergeable())
+	_, rslEntrySignatureNeededForThreshold, err := verifyGitObjectAndAttestations(ctx, currentPolicy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, targetRef), nil, authorizationAttestation, withApproverPrincipalIDs(approverIDs), withVerifyMergeable())
 	if err != nil {
 		return false, fmt.Errorf("not enough approvals to meet Git namespace policies, %w", ErrVerificationFailed)
 	}
@@ -817,7 +817,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 		return err
 	}
 
-	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, newPolicy.Metadata.RootEnvelope); err != nil {
+	if _, err := rootVerifier.Verify(ctx, nil, newPolicy.Metadata.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -1075,7 +1075,7 @@ func getCommits(repo *gitinterface.Repository, entry *rsl.ReferenceEntry) ([]git
 	}
 
 	if firstEntry {
-		return repo.GetCommitsBetweenRange(entry.TargetID, gitinterface.ZeroHash)
+		return repo.GetCommitsBetweenRange(entry.TargetID, nil)
 	}
 
 	return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.GetTargetID())
@@ -1128,7 +1128,7 @@ func withTagObjectID(objID gitinterface.Hash) verifyGitObjectAndAttestationsOpti
 }
 
 func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
-	options := &verifyGitObjectAndAttestationsOptions{tagObjectID: gitinterface.ZeroHash}
+	options := &verifyGitObjectAndAttestationsOptions{}
 	for _, fn := range opts {
 		fn(options)
 	}

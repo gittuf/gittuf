@@ -22,7 +22,7 @@ func TestRegularSearcher(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -46,7 +46,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
 
 		// Requested entry is policy entry
-		if err := rsl.NewReferenceEntry(PolicyRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -65,7 +65,7 @@ func TestRegularSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -111,7 +111,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedPolicyEntries, policyEntries)
 
-		if err := rsl.NewReferenceEntry(PolicyRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -125,7 +125,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedPolicyEntries, policyEntries)
 
-		if err := rsl.NewReferenceEntry(PolicyStagingRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyStagingRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -155,7 +155,7 @@ func TestRegularSearcher(t *testing.T) {
 		}
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -179,7 +179,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
 
 		// Requested entry is attestations entry
-		if err := rsl.NewReferenceEntry(attestations.Ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(attestations.Ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -198,7 +198,7 @@ func TestRegularSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -231,7 +231,7 @@ func TestRegularSearcher(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -287,7 +287,7 @@ func TestCacheSearcher(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -311,7 +311,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
 
 		// Requested entry is policy entry
-		if err := rsl.NewReferenceEntry(PolicyRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -331,7 +331,7 @@ func TestCacheSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -401,7 +401,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedPolicyEntries, policyEntries)
 
-		if err := rsl.NewReferenceEntry(PolicyRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -415,7 +415,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedPolicyEntries, policyEntries)
 
-		if err := rsl.NewReferenceEntry(PolicyStagingRef, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(PolicyStagingRef, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -456,7 +456,7 @@ func TestCacheSearcher(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -489,7 +489,7 @@ func TestCacheSearcher(t *testing.T) {
 		}
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -521,7 +521,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
 
 		// Requested entry is annotations entry
-		if err := rsl.NewReferenceEntry(attestations.Ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry(attestations.Ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -541,7 +541,7 @@ func TestCacheSearcher(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// Add an entry after
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -596,7 +596,7 @@ func TestCacheSearcher(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 

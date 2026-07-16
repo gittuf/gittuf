@@ -559,7 +559,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.RootEnvelope); err != nil {
+	if _, err := rootVerifier.Verify(ctx, nil, s.Metadata.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -590,7 +590,7 @@ func (s *State) Verify(ctx context.Context) error {
 			return err
 		}
 
-		if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.TargetsEnvelope); err != nil {
+		if _, err := targetsVerifier.Verify(ctx, nil, s.Metadata.TargetsEnvelope); err != nil {
 			return err
 		}
 
@@ -631,7 +631,7 @@ func (s *State) Verify(ctx context.Context) error {
 					threshold:  delegation.GetThreshold(),
 				}
 
-				if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
+				if _, err := verifier.Verify(ctx, nil, env); err != nil {
 					return err
 				}
 
@@ -678,7 +678,7 @@ func (s *State) Verify(ctx context.Context) error {
 
 			// We need to LoadState() the state from which the root is derived
 			// For that, we need to know when it was propagated into this repository
-			upstreamEntryID := gitinterface.ZeroHash
+			var upstreamEntryID gitinterface.Hash
 			if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
 				// Check this entry
 				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {

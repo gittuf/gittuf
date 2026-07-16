@@ -301,7 +301,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 
 	repo := &Repository{r: r}
 
-	err := repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
+	err := repo.RecordRSLAnnotation(testCtx, []string{repo.r.ZeroHash().String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
@@ -1242,7 +1242,7 @@ func TestPushRSL(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		remoteRepoR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
-		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(remoteRepoR, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, remoteRepoR.ZeroHash()).Commit(remoteRepoR, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1291,7 +1291,7 @@ func TestPullRSL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(localRepo.r, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, localRepo.r.ZeroHash()).Commit(localRepo.r, false); err != nil {
 			t.Fatal(err)
 		}
 

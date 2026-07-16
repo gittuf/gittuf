@@ -47,7 +47,7 @@ func TestGetTagTarget(t *testing.T) {
 	assert.Equal(t, commitID, targetID)
 
 	t.Run("non-existent tag", func(t *testing.T) {
-		_, err := repo.GetTagTarget(ZeroHash)
+		_, err := repo.GetTagTarget(repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to resolve tag's target ID")
 	})
 }
@@ -370,7 +370,7 @@ func TestEnsureIsTag(t *testing.T) {
 	err = repo.ensureIsTag(commitID)
 	assert.ErrorContains(t, err, "is not a tag object")
 
-	err = repo.ensureIsTag(ZeroHash)
+	err = repo.ensureIsTag(repo.ZeroHash())
 	assert.ErrorContains(t, err, "unable to inspect if object is tag")
 }
 
@@ -379,7 +379,7 @@ func TestTagUsingSpecificKey(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
-		_, err := repo.TagUsingSpecificKey(ZeroHash, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
+		_, err := repo.TagUsingSpecificKey(repo.ZeroHash(), "test-tag", "test-tag\n", artifacts.SSHED25519Private)
 		assert.ErrorContains(t, err, "not found")
 	})
 }

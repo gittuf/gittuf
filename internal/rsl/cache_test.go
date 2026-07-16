@@ -13,7 +13,7 @@ import (
 func TestRSLCache(t *testing.T) {
 	// Add test entries
 	// Using fake hashes (these are commits in the gittuf repo itself)
-	entry1 := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
+	entry1 := NewReferenceEntry("refs/heads/main", testZeroHash)
 	entry1.Number = 1
 	hash, err := gitinterface.NewHash("4dcd174e182cedf597b8a84f24ea5a53dae7e1e7")
 	if err != nil {
@@ -21,7 +21,7 @@ func TestRSLCache(t *testing.T) {
 	}
 	entry1.ID = hash
 
-	entry2 := NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash)
+	entry2 := NewReferenceEntry("refs/heads/feature", testZeroHash)
 	entry2.Number = 2
 	hash, err = gitinterface.NewHash("5bf80ffecacfde7e6b8281e65223b139a76160e1")
 	if err != nil {
@@ -58,3 +58,5 @@ func TestRSLCache(t *testing.T) {
 	assert.Equal(t, entry1, entry)
 	assert.True(t, has)
 }
+
+var testZeroHash = gitinterface.Hash(make([]byte, 20))

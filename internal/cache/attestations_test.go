@@ -66,7 +66,7 @@ func TestInsertAttestationEntryNumber(t *testing.T) {
 			AttestationEntries: []RSLEntryIndex{},
 		}
 
-		p.InsertAttestationEntryNumber(uint64(0), gitinterface.ZeroHash)
+		p.InsertAttestationEntryNumber(uint64(0), testZeroHash)
 		assert.Equal(t, []RSLEntryIndex{}, p.AttestationEntries) // inserting entry number 0 should result in noop
 	})
 

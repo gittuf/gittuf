@@ -85,7 +85,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 
 	verifier := NewPolicyVerifier(repo)
 
-	_, err := verifier.VerifyRefFromEntry(testCtx, "main", gitinterface.ZeroHash)
+	_, err := verifier.VerifyRefFromEntry(testCtx, "main", repo.ZeroHash())
 	assert.ErrorContains(t, err, rsl.ErrRSLEntryNotFound.Error())
 
 	repo, _ = createTestRepository(t, createTestStateWithPolicy)
@@ -787,7 +787,7 @@ func TestVerifyMergeable(t *testing.T) {
 		}
 
 		// Set up approval attestation with "john.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -810,7 +810,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -854,7 +854,7 @@ func TestVerifyMergeable(t *testing.T) {
 		}
 
 		// Set up approval attestation with "jill.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jill.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -872,12 +872,12 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -894,7 +894,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -934,7 +934,7 @@ func TestVerifyMergeable(t *testing.T) {
 		}
 
 		// Add approval with "jane.doe" and "john.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -957,7 +957,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -997,7 +997,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted identities
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1020,7 +1020,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1424,7 +1424,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		}
 
 		// Set up approval attestation with "john.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1447,7 +1447,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1489,7 +1489,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		}
 
 		// Set up approval attestation with "jill.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jill.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1507,12 +1507,12 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
 		// Set up reference authorization from "john.doe"
-		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		refAuthorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1529,7 +1529,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1567,7 +1567,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		}
 
 		// Add approval with "jane.doe" and "john.doe"
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1590,7 +1590,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -1628,7 +1628,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted identities
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"alice", "bob"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1651,7 +1651,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -2808,7 +2808,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		authorization, err := authorizationsv02.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := authorizationsv02.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2824,7 +2824,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -2964,7 +2964,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Create authorization for this change
 		// We're explicitly using the old type here to ensure policy
 		// verification still works
-		authorization, err := authorizationsv01.NewReferenceAuthorization(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := authorizationsv01.NewReferenceAuthorization(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2980,7 +2980,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3079,7 +3079,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change using john.doe trusted as approver
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3097,7 +3097,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3136,7 +3136,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create authorization for this change using john.doe trusted as approver
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3154,7 +3154,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3191,7 +3191,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Approved by jill.doe
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jill.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3209,7 +3209,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3219,7 +3219,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3233,7 +3233,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3270,7 +3270,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Approved by jill.doe
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jill.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3288,7 +3288,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3298,7 +3298,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3312,7 +3312,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3348,7 +3348,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create approval for jill.doe -> NOT TRUSTED in this policy
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"jill.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3366,7 +3366,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3402,7 +3402,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Create approval for john.doe
-		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
+		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, repo.ZeroHash().String(), commitTreeID.String(), []string{"john.doe"}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3420,7 +3420,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetGitHubPullRequestApprovalAttestation(repo, env, "https://github.com", 1, tuf.GitHubAppRoleName, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add GitHub pull request approval", true, false); err != nil {
@@ -3435,7 +3435,7 @@ func TestVerifyEntry(t *testing.T) {
 		// Add reference authorization for john.doe
 		signer = setupSSHKeysForSigning(t, targets2KeyBytes, targets2PubKeyBytes)
 
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3449,7 +3449,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3489,7 +3489,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3505,7 +3505,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3542,7 +3542,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, repo.ZeroHash().String(), commitTreeID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3558,7 +3558,7 @@ func TestVerifyEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, refName, repo.ZeroHash().String(), commitTreeID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3608,7 +3608,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Rewrite history altogether
 		// Delete ref
-		if err := repo.SetReference(refName, gitinterface.ZeroHash); err != nil {
+		if err := repo.SetReference(refName, repo.ZeroHash()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3655,7 +3655,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Rewrite history altogether
 		// Delete ref
-		if err := repo.SetReference(refName, gitinterface.ZeroHash); err != nil {
+		if err := repo.SetReference(refName, repo.ZeroHash()); err != nil {
 			t.Fatal(err)
 		}
 
@@ -3747,7 +3747,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
-		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, networkRepository.ZeroHash().String(), commitTreeID.String())
 		require.Nil(t, err)
 
 		env, err := dsse.CreateEnvelope(authorization)
@@ -3755,7 +3755,7 @@ func TestVerifyEntry(t *testing.T) {
 		env, err = dsse.SignEnvelope(testCtx, env, signer)
 		require.Nil(t, err)
 
-		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, networkRepository.ZeroHash().String(), commitTreeID.String())
 		require.Nil(t, err)
 		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
 		require.Nil(t, err)
@@ -3839,7 +3839,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		// This uses the latest reference authorization version
 		// As this is for a tag, the target is the commit the tag points to,
 		// taken from the RSL entry we just created for it
-		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, repo.ZeroHash().String(), entry.TargetID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3860,7 +3860,7 @@ func TestVerifyTagEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, repo.ZeroHash().String(), entry.TargetID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
@@ -3918,7 +3918,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		// This uses the latest reference authorization version
 		// As this is for a tag, the target is the commit the tag points to,
 		// taken from the RSL entry we just created for it
-		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, repo.ZeroHash().String(), entry.TargetID.String())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3940,7 +3940,7 @@ func TestVerifyTagEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, repo.ZeroHash().String(), entry.TargetID.String()); err != nil {
 			t.Fatal(err)
 		}
 		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {

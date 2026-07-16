@@ -16,7 +16,7 @@ func TestHasPolicyEntryNumber(t *testing.T) {
 		p := &Persistent{}
 		hash, has := p.HasPolicyEntryNumber(1)
 		assert.False(t, has)
-		assert.Equal(t, gitinterface.ZeroHash, hash)
+		assert.Nil(t, hash)
 	})
 
 	t.Run("entries exist", func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestHasPolicyEntryNumber(t *testing.T) {
 
 		hash, has := p.HasPolicyEntryNumber(uint64(1))
 		assert.False(t, has)
-		assert.Equal(t, gitinterface.ZeroHash, hash) // function returns ZeroHash when entry doesn't exist
+		assert.Nil(t, hash) // function returns nil when entry does not exist
 	})
 }
 
@@ -144,7 +144,7 @@ func TestInsertPolicyEntryNumber(t *testing.T) {
 			PolicyEntries: []RSLEntryIndex{},
 		}
 
-		p.InsertPolicyEntryNumber(uint64(0), gitinterface.ZeroHash)
+		p.InsertPolicyEntryNumber(uint64(0), testZeroHash)
 		assert.Equal(t, []RSLEntryIndex{}, p.PolicyEntries) // inserting entry number 0 should result in noop
 	})
 

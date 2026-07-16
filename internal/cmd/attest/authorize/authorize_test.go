@@ -253,7 +253,7 @@ func TestAuthorize(t *testing.T) {
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", fromRef, "--revoke", targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", fromRef, "--revoke", targetTagRef, "0000000000000000000000000000000000000000", initialCommitID.String())
 		assert.NoError(t, err)
 	})
 }

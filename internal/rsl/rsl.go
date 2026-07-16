@@ -664,10 +664,7 @@ func GetLatestEntry(repo *gitinterface.Repository) (Entry, error) {
 // GetLatestReferenceUpdaterEntry returns the latest reference updater entry in
 // the local RSL that matches the specified conditions.
 func GetLatestReferenceUpdaterEntry(repo *gitinterface.Repository, opts ...GetLatestReferenceUpdaterEntryOption) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
-	options := GetLatestReferenceUpdaterEntryOptions{
-		BeforeEntryID: gitinterface.ZeroHash,
-		UntilEntryID:  gitinterface.ZeroHash,
-	}
+	options := GetLatestReferenceUpdaterEntryOptions{}
 	for _, fn := range opts {
 		fn(&options)
 	}

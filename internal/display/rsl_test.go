@@ -19,7 +19,7 @@ func TestRSLLog(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// add first entry
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -34,12 +34,12 @@ func TestRSLLog(t *testing.T) {
 		}
 
 		// add another entry
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// add another entry
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -107,7 +107,7 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		// add first entry
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -122,12 +122,12 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
 		}
 
 		// add another entry -- not for main
-		if err := rsl.NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/feature", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// add another entry
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -163,8 +163,8 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 	colorer = colorerOff
 
 	t.Run("simple without number, no parent", func(t *testing.T) {
-		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewReferenceEntry("refs/heads/main", testZeroHash)
+		entry.ID = testZeroHash
 
 		expectedOutput := `entry 0000000000000000000000000000000000000000
 
@@ -180,8 +180,8 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 	})
 
 	t.Run("simple without number, has parent", func(t *testing.T) {
-		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewReferenceEntry("refs/heads/main", testZeroHash)
+		entry.ID = testZeroHash
 
 		expectedOutput := `entry 0000000000000000000000000000000000000000
 
@@ -198,8 +198,8 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 	})
 
 	t.Run("simple with number, no parent", func(t *testing.T) {
-		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewReferenceEntry("refs/heads/main", testZeroHash)
+		entry.ID = testZeroHash
 		entry.Number = 1
 		expectedOutput := `entry 0000000000000000000000000000000000000000
 
@@ -216,8 +216,8 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 	})
 
 	t.Run("simple with number, has parent", func(t *testing.T) {
-		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewReferenceEntry("refs/heads/main", testZeroHash)
+		entry.ID = testZeroHash
 		entry.Number = 1
 		expectedOutput := `entry 0000000000000000000000000000000000000000
 
@@ -238,7 +238,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -280,7 +280,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -323,7 +323,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -365,7 +365,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -408,7 +408,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -450,7 +450,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
 
-		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := rsl.NewReferenceEntry("refs/heads/main", testZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -495,8 +495,8 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 	colorer = colorerOff
 
 	t.Run("simple, without number, without parent", func(t *testing.T) {
-		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewPropagationEntry("refs/heads/main", testZeroHash, "https://git.example.com/repository", testZeroHash)
+		entry.ID = testZeroHash
 
 		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
 
@@ -514,9 +514,9 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 	})
 
 	t.Run("simple, with number, without parent", func(t *testing.T) {
-		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry := rsl.NewPropagationEntry("refs/heads/main", testZeroHash, "https://git.example.com/repository", testZeroHash)
 		entry.Number = 1
-		entry.ID = gitinterface.ZeroHash
+		entry.ID = testZeroHash
 
 		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
 
@@ -535,8 +535,8 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 	})
 
 	t.Run("simple, without number, with parent", func(t *testing.T) {
-		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
-		entry.ID = gitinterface.ZeroHash
+		entry := rsl.NewPropagationEntry("refs/heads/main", testZeroHash, "https://git.example.com/repository", testZeroHash)
+		entry.ID = testZeroHash
 
 		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
 
@@ -555,9 +555,9 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 	})
 
 	t.Run("simple, with number, with parent", func(t *testing.T) {
-		entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash)
+		entry := rsl.NewPropagationEntry("refs/heads/main", testZeroHash, "https://git.example.com/repository", testZeroHash)
 		entry.Number = 1
-		entry.ID = gitinterface.ZeroHash
+		entry.ID = testZeroHash
 
 		expectedOutput := `propagation entry 0000000000000000000000000000000000000000
 
@@ -576,3 +576,5 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 		assert.Equal(t, expectedOutput, output.String())
 	})
 }
+
+var testZeroHash = gitinterface.Hash(make([]byte, 20))

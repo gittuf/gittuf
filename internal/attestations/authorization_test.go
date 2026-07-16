@@ -21,7 +21,7 @@ func TestSetReferenceAuthorization(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID, false)
 		featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID, false)
 
@@ -45,7 +45,7 @@ func TestSetReferenceAuthorization(t *testing.T) {
 
 	t.Run("for tag", func(t *testing.T) {
 		tagRef := "refs/tags/v1"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
 
 		tempDir := t.TempDir()
@@ -60,7 +60,7 @@ func TestSetReferenceAuthorization(t *testing.T) {
 
 	t.Run("v01", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		env := createReferenceAuthorizationAttestationEnvelopeV01(t, testRef, testID, testID)
 
 		tempDir := t.TempDir()
@@ -75,7 +75,7 @@ func TestSetReferenceAuthorization(t *testing.T) {
 
 	t.Run("unknown version", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		env := createReferenceAuthorizationAttestationEnvelopeWithPredicateType(t, testRef, testID, testID, "https://gittuf.dev/reference-authorization/unknown")
 
 		tempDir := t.TempDir()
@@ -112,7 +112,7 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID, false)
 		featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID, false)
 
@@ -148,7 +148,7 @@ func TestRemoveReferenceAuthorization(t *testing.T) {
 
 	t.Run("for tag", func(t *testing.T) {
 		tagRef := "refs/tags/v1"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
 
 		tempDir := t.TempDir()
@@ -172,7 +172,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		mainZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testRef, testID, testID, false)
 		featureZeroZero := createReferenceAuthorizationAttestationEnvelopes(t, testAnotherRef, testID, testID, false)
 
@@ -201,7 +201,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 
 	t.Run("for tag", func(t *testing.T) {
 		tagRef := "refs/tags/v1"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		tagApproval := createReferenceAuthorizationAttestationEnvelopes(t, tagRef, testID, testID, true)
 
 		tempDir := t.TempDir()
@@ -222,7 +222,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 
 	t.Run("v01", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		env := createReferenceAuthorizationAttestationEnvelopeV01(t, testRef, testID, testID)
 
 		tempDir := t.TempDir()
@@ -240,7 +240,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 
 	t.Run("unknown version", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := testZeroHash.String()
 		env := createReferenceAuthorizationAttestationEnvelopeWithPredicateType(t, testRef, testID, testID, "https://gittuf.dev/reference-authorization/unknown")
 
 		tempDir := t.TempDir()

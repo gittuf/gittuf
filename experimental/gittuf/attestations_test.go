@@ -73,7 +73,7 @@ func TestApplyAttestations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+	env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, repo.r.ZeroHash().String(), initialCommitID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, repo.r.ZeroHash().String(), initialCommitID.String())
 		assert.Nil(t, err)
 		assert.Len(t, env.Signatures, 1)
 		assert.Equal(t, keyID, env.Signatures[0].KeyID)
@@ -271,7 +271,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry())
 		assert.ErrorIs(t, err, gitinterface.ErrTagAlreadyExists)
 
-		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String(), false, attestopts.WithRSLEntry())
+		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, repo.r.ZeroHash().String(), initialCommitID.String(), false, attestopts.WithRSLEntry())
 		assert.Nil(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
@@ -279,7 +279,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, repo.r.ZeroHash().String(), initialCommitID.String())
 		assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
 	})
 }
@@ -388,13 +388,13 @@ func TestIndexPathToComponents(t *testing.T) {
 	}{
 		"simple ref": {
 			baseRef: "refs/heads/main",
-			from:    gitinterface.ZeroHash.String(),
-			to:      gitinterface.ZeroHash.String(),
+			from:    testZeroHashID,
+			to:      testZeroHashID,
 		},
 		"complicated ref": {
 			baseRef: "refs/heads/jane.doe/feature-branch",
-			from:    gitinterface.ZeroHash.String(),
-			to:      gitinterface.ZeroHash.String(),
+			from:    testZeroHashID,
+			to:      testZeroHashID,
 		},
 	}
 
@@ -409,3 +409,5 @@ func TestIndexPathToComponents(t *testing.T) {
 		assert.Equal(t, test.to, to, fmt.Sprintf("unexpected 'to' in test '%s'", name))
 	}
 }
+
+const testZeroHashID = "0000000000000000000000000000000000000000"

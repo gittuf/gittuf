@@ -739,7 +739,7 @@ func TestFetchObject(t *testing.T) {
 	assert.True(t, has)
 
 	t.Run("fetch from non-existent remote", func(t *testing.T) {
-		err := downstreamRepo.FetchObject("nonexistent", ZeroHash)
+		err := downstreamRepo.FetchObject("nonexistent", downstreamRepo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to fetch object")
 	})
 }

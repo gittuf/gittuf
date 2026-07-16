@@ -55,7 +55,7 @@ func TestCacheDelete(t *testing.T) {
 		}
 
 		gitRepo := repo.GetGitRepository()
-		err = rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(gitRepo, false)
+		err = rsl.NewReferenceEntry(policy.PolicyRef, gitRepo.ZeroHash()).Commit(gitRepo, false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -90,7 +90,7 @@ func TestSkipRewritten(t *testing.T) {
 		err = libRepo.RecordRSLEntryForReference(t.Context(), "refs/heads/main", false, rslopts.WithRecordLocalOnly())
 		require.NoError(t, err)
 
-		err = r.SetReference("refs/heads/main", gitinterface.ZeroHash)
+		err = r.SetReference("refs/heads/main", r.ZeroHash())
 		require.NoError(t, err)
 
 		_, err = r.Commit(emptyTreeHash, "refs/heads/main", "Real initial commit\n", false)

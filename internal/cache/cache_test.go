@@ -149,7 +149,7 @@ func TestPopulatePersistentCache(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		err := rsl.NewReferenceEntry(policyRef, gitinterface.ZeroHash).Commit(repo, false)
+		err := rsl.NewReferenceEntry(policyRef, testZeroHash).Commit(repo, false)
 		require.Nil(t, err)
 
 		err = PopulatePersistentCache(repo)
@@ -189,7 +189,7 @@ func TestLoadPersistantCache(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		err := rsl.NewReferenceEntry(policyRef, gitinterface.ZeroHash).Commit(repo, false)
+		err := rsl.NewReferenceEntry(policyRef, testZeroHash).Commit(repo, false)
 		require.Nil(t, err)
 
 		err = PopulatePersistentCache(repo)
@@ -216,7 +216,7 @@ func TestLoadPersistantCache(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		err := rsl.NewReferenceEntry(attestations.Ref, gitinterface.ZeroHash).Commit(repo, false)
+		err := rsl.NewReferenceEntry(attestations.Ref, testZeroHash).Commit(repo, false)
 		require.Nil(t, err)
 
 		err = PopulatePersistentCache(repo)
@@ -253,7 +253,7 @@ func TestDeletePersistentCache(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		err := rsl.NewReferenceEntry(policyRef, gitinterface.ZeroHash).Commit(repo, false)
+		err := rsl.NewReferenceEntry(policyRef, testZeroHash).Commit(repo, false)
 		require.Nil(t, err)
 
 		err = PopulatePersistentCache(repo)
@@ -277,3 +277,5 @@ func TestRSLEntryMethods(t *testing.T) {
 	expectedID, _ := gitinterface.NewHash("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391")
 	assert.Equal(t, expectedID, id)
 }
+
+var testZeroHash = gitinterface.Hash(make([]byte, 20))

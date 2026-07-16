@@ -17,12 +17,12 @@ func (p *Persistent) GetPolicyEntries() []RSLEntryIndex {
 
 func (p *Persistent) HasPolicyEntryNumber(entryNumber uint64) (gitinterface.Hash, bool) {
 	if len(p.PolicyEntries) == 0 || entryNumber == 0 {
-		return gitinterface.ZeroHash, false
+		return nil, false
 	}
 
 	index, has := slices.BinarySearchFunc(p.PolicyEntries, RSLEntryIndex{EntryNumber: entryNumber}, binarySearch)
 	if !has {
-		return gitinterface.ZeroHash, false
+		return nil, false
 	}
 
 	// Unlike Find... we're actively checking if a policy number has been

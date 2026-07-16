@@ -132,7 +132,7 @@ func TestAnnotate(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(), gitinterface.ZeroHash.String(), "-m", "annotation message", "--local-only")
+		_, _, _, err = cmd.ExecuteCommandC(New(), "0000000000000000000000000000000000000000", "-m", "annotation message", "--local-only")
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 

@@ -45,7 +45,7 @@ func TestGetLastVerifiedEntryForRef(t *testing.T) {
 
 		number, id := p.GetLastVerifiedEntryForRef(policyRef)
 		assert.Equal(t, uint64(0), number)
-		assert.Equal(t, gitinterface.ZeroHash, id) // if the map doesn't exist, should return 0 for entry number and zero hash for entry id
+		assert.Nil(t, id) // if the map does not exist, should return 0 for entry number and nil for entry id
 	})
 
 	t.Run("entry for ref doesn't exist", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestGetLastVerifiedEntryForRef(t *testing.T) {
 
 		number, id := p.GetLastVerifiedEntryForRef(attestations.Ref)
 		assert.Equal(t, uint64(0), number)
-		assert.Equal(t, gitinterface.ZeroHash, id)
+		assert.Nil(t, id)
 	})
 
 	t.Run("entry for ref exists", func(t *testing.T) {

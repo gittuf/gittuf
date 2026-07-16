@@ -28,7 +28,7 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 	currentGitID, err := r.GetReference(targetRef)
 	if err != nil {
 		if !errors.Is(err, ErrReferenceNotFound) {
-			return ZeroHash, err
+			return nil, err
 		}
 	}
 
@@ -49,11 +49,11 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 
 	stdOut, err := r.executor(args...).withEnv(env...).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to create commit: %w", err)
+		return nil, fmt.Errorf("unable to create commit: %w", err)
 	}
 	commitID, err := NewHash(stdOut)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("received invalid commit ID: %w", err)
+		return nil, fmt.Errorf("received invalid commit ID: %w", err)
 	}
 
 	return commitID, r.CheckAndSetReference(targetRef, commitID, currentGitID)
@@ -67,7 +67,7 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message string, signingKeyPEMBytes []byte) (Hash, error) {
 	gitConfig, err := r.GetGitConfig()
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	commitMetadata := object.Signature{
@@ -86,7 +86,7 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 	refTip, err := r.GetReference(targetRef)
 	if err != nil {
 		if !errors.Is(err, ErrReferenceNotFound) {
-			return ZeroHash, err
+			return nil, err
 		}
 	}
 
@@ -96,11 +96,11 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 
 	commitContents, err := getCommitBytesWithoutSignature(commit)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	signature, err := signGitObjectUsingKey(commitContents, signingKeyPEMBytes)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	// SHA-256 repositories store the signature under the `gpgsig-sha256`
 	// header (go-git's SignatureSHA256), matching Git's own behavior, so it
@@ -113,21 +113,21 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	obj := goGitRepo.Storer.NewEncodedObject()
 	if err := commit.Encode(obj); err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	commitID, err := goGitRepo.Storer.SetEncodedObject(obj)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	commitIDHash, err := NewHash(commitID.String())
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	return commitIDHash, r.CheckAndSetReference(targetRef, commitIDHash, refTip)
@@ -233,17 +233,17 @@ func (r *Repository) GetCommitMessage(commitID Hash) (string, error) {
 // GetCommitTreeID returns the commit's Git tree ID.
 func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
 	if err := r.ensureIsCommit(commitID); err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^{tree}", commitID.String())).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
+		return nil, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
 	}
 
 	hash, err := NewHash(stdOut)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid tree for commit ID '%s': %w", commitID, err)
+		return nil, fmt.Errorf("invalid tree for commit ID '%s': %w", commitID, err)
 	}
 	return hash, nil
 }

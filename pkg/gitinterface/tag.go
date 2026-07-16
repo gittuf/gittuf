@@ -28,17 +28,17 @@ var ErrTagAlreadyExists = errors.New("tag already exists")
 func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, signingKeyPEMBytes []byte) (Hash, error) {
 	gitConfig, err := r.GetGitConfig()
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	goGitRepo, err := r.GetGoGitRepository()
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	targetObj, err := goGitRepo.Object(plumbing.AnyObject, plumbing.NewHash(target.String()))
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	if !strings.HasSuffix(message, "\n") {
@@ -59,11 +59,11 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 
 	tagContents, err := getTagBytesWithoutSignature(tag)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	signature, err := signGitObjectUsingKey(tagContents, signingKeyPEMBytes)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	// Git appends tag signatures to the tag payload regardless of the object
 	// format; only commits store the signature under a header named for the
@@ -72,16 +72,16 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 
 	obj := goGitRepo.Storer.NewEncodedObject()
 	if err := tag.Encode(obj); err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 	tagID, err := goGitRepo.Storer.SetEncodedObject(obj)
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	tagIDHash, err := NewHash(tagID.String())
 	if err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	return tagIDHash, r.SetReference(TagReferenceName(name), tagIDHash)
@@ -91,12 +91,12 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
 	targetID, err := r.executor("rev-list", "-n", "1", tagID.String()).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
+		return nil, fmt.Errorf("unable to resolve tag's target ID: %w", err)
 	}
 
 	hash, err := NewHash(targetID)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid format for target ID: %w", err)
+		return nil, fmt.Errorf("invalid format for target ID: %w", err)
 	}
 
 	return hash, nil

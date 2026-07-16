@@ -51,7 +51,7 @@ func TestPushPolicy(t *testing.T) {
 		remoteTmpDir := t.TempDir()
 		remoteRepo := gitinterface.CreateTestGitRepository(t, remoteTmpDir, false)
 
-		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(remoteRepo, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, remoteRepo.ZeroHash()).Commit(remoteRepo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -108,7 +108,7 @@ func TestPullPolicy(t *testing.T) {
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)
 		localRepo := &Repository{r: localRepoR}
 
-		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(localRepo.r, false); err != nil {
+		if err := rsl.NewReferenceEntry(policy.PolicyRef, localRepoR.ZeroHash()).Commit(localRepo.r, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -239,7 +239,7 @@ func TestDiscardPolicy(t *testing.T) {
 		initialRef, err := repo.r.GetReference(policy.PolicyRef)
 		assert.Nil(t, err)
 
-		if err := repo.r.SetReference(policy.PolicyStagingRef, gitinterface.ZeroHash); err != nil {
+		if err := repo.r.SetReference(policy.PolicyStagingRef, repo.r.ZeroHash()); err != nil {
 			t.Fatal(err)
 		}
 

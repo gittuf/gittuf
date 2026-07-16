@@ -61,3 +61,21 @@ func TestNewHash(t *testing.T) {
 		}
 	}
 }
+
+func TestHashIsZero(t *testing.T) {
+	tests := map[string]struct {
+		hash     Hash
+		expected bool
+	}{
+		"nil":              {nil, true},
+		"empty":            {Hash{}, true},
+		"sha1 zero":        {Hash(zeroSHA1HashBytes[:]), true},
+		"sha256 zero":      {Hash(zeroSHA256HashBytes[:]), true},
+		"sha1 non-zero":    {Hash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, false},
+		"wrong length all": {Hash{0, 0, 0}, false},
+	}
+
+	for name, test := range tests {
+		assert.Equal(t, test.expected, test.hash.IsZero(), name)
+	}
+}

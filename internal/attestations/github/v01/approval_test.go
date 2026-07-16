@@ -11,7 +11,6 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,7 +35,7 @@ func TestGetters(t *testing.T) {
 
 func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := "0000000000000000000000000000000000000000"
 
 	approvers := []string{"jane.doe@example.com"}
 
@@ -69,7 +68,7 @@ func TestNewGitHubPullRequestApprovalAttestation(t *testing.T) {
 func TestValidatePullRequestApproval(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
+	testID := "0000000000000000000000000000000000000000"
 
 	approvers := []string{"jane.doe@example.com"}
 

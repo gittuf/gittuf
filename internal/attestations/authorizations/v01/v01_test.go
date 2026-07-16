@@ -17,7 +17,7 @@ import (
 
 func TestGetters(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := zeroHashID
 
 	authorization := ReferenceAuthorization{
 		TargetRef:      testRef,
@@ -32,7 +32,7 @@ func TestGetters(t *testing.T) {
 
 func TestNewReferenceAuthorization(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := zeroHashID
 
 	authorization, err := NewReferenceAuthorization(testRef, testID, testID)
 	assert.Nil(t, err)
@@ -58,7 +58,7 @@ func TestNewReferenceAuthorization(t *testing.T) {
 func TestValidate(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
-	testID := gitinterface.ZeroHash.String()
+	testID := zeroHashID
 	mainZeroZero := createTestEnvelope(t, testRef, testID, testID)
 	featureZeroZero := createTestEnvelope(t, testAnotherRef, testID, testID)
 
@@ -104,3 +104,5 @@ func createTestEnvelope(t *testing.T, refName, fromID, toID string) *sslibdsse.E
 
 	return env
 }
+
+var zeroHashID = gitinterface.Hash(make([]byte, 20)).String()

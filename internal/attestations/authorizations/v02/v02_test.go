@@ -17,7 +17,7 @@ import (
 
 func TestGetters(t *testing.T) {
 	testRef := "refs/heads/main"
-	testID := gitinterface.ZeroHash.String()
+	testID := zeroHashID
 
 	authorization := ReferenceAuthorization{
 		TargetRef: testRef,
@@ -33,7 +33,7 @@ func TestGetters(t *testing.T) {
 func TestNewReferenceAuthorization(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 
 		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
 		assert.Nil(t, err)
@@ -58,7 +58,7 @@ func TestNewReferenceAuthorization(t *testing.T) {
 
 	t.Run("for tag", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 
 		authorization, err := NewReferenceAuthorizationForTag(testRef, testID, testID)
 		assert.Nil(t, err)
@@ -86,7 +86,7 @@ func TestValidate(t *testing.T) {
 	t.Run("for commit", func(t *testing.T) {
 		testRef := "refs/heads/main"
 		testAnotherRef := "refs/heads/feature"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 		mainZeroZero := createTestEnvelope(t, testRef, testID, testID, false)
 		featureZeroZero := createTestEnvelope(t, testAnotherRef, testID, testID, false)
 
@@ -102,7 +102,7 @@ func TestValidate(t *testing.T) {
 
 	t.Run("for tag", func(t *testing.T) {
 		testRef := "refs/tags/v1"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 		authorization := createTestEnvelope(t, testRef, testID, testID, true)
 
 		err := Validate(authorization, testRef, testID, testID)
@@ -111,7 +111,7 @@ func TestValidate(t *testing.T) {
 
 	t.Run("invalid subject", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 
 		authorization, err := NewReferenceAuthorizationForCommit(testRef, testID, testID)
 		if err != nil {
@@ -131,7 +131,7 @@ func TestValidate(t *testing.T) {
 
 	t.Run("mismatch ref (non tag) and subject digest key (commit)", func(t *testing.T) {
 		testRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := zeroHashID
 		authorization := createTestEnvelope(t, testRef, testID, testID, true)
 
 		err := Validate(authorization, testRef, testID, testID)
@@ -180,3 +180,5 @@ func createTestEnvelope(t *testing.T, refName, fromID, toID string, tag bool) *s
 
 	return env
 }
+
+var zeroHashID = gitinterface.Hash(make([]byte, 20)).String()

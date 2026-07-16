@@ -891,7 +891,7 @@ func TestEnsureIsCommit(t *testing.T) {
 	})
 
 	t.Run("non-existent object", func(t *testing.T) {
-		err := repo.ensureIsCommit(ZeroHash)
+		err := repo.ensureIsCommit(repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to inspect if object is commit")
 	})
 }

@@ -58,7 +58,7 @@ func TestNewReferenceEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -77,11 +77,11 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1)
+	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, repo.ZeroHash().String(), NumberKey, 1)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Nil(t, parentIDs)
 
-	if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,7 +100,7 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
+	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, repo.ZeroHash().String(), NumberKey, 2)
 	assert.Equal(t, expectedMessage, commitMessage)
 	assert.Contains(t, parentIDs, currentTip)
 }
@@ -168,7 +168,7 @@ func testCommitUsingSpecificKey(t *testing.T, objectFormat gitinterface.ObjectFo
 
 func TestReferenceUpdaterEntry(t *testing.T) {
 	refName := "refs/heads/main"
-	gitID := gitinterface.ZeroHash
+	gitID := testZeroHash
 	upstreamRepository := "http://git.example.com/repository"
 
 	t.Run("reference entry", func(t *testing.T) {
@@ -192,7 +192,7 @@ func TestGetLatestEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -200,9 +200,9 @@ func TestGetLatestEntry(t *testing.T) {
 	assert.Nil(t, err)
 	e := entry.(*ReferenceEntry)
 	assert.Equal(t, "refs/heads/main", e.RefName)
-	assert.Equal(t, gitinterface.ZeroHash, e.TargetID)
+	assert.Equal(t, repo.ZeroHash(), e.TargetID)
 
-	if err := NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/heads/feature", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -210,7 +210,7 @@ func TestGetLatestEntry(t *testing.T) {
 	assert.Nil(t, err)
 	e = entry.(*ReferenceEntry)
 	assert.Equal(t, "refs/heads/feature", e.RefName)
-	assert.Equal(t, gitinterface.ZeroHash, e.TargetID)
+	assert.Equal(t, repo.ZeroHash(), e.TargetID)
 
 	latestTip, err := repo.GetReference(Ref)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		refName := "refs/heads/main"
 		otherRefName := "refs/heads/feature"
 
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -257,7 +257,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Nil(t, annotations)
 		assert.Equal(t, rslRef, entry.GetID())
 
-		if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(otherRefName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -298,14 +298,14 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidGetLatestReferenceUpdaterEntryOptions)
 
 		// Until number is greater than latest entry in the RSL
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		_, _, err = GetLatestReferenceUpdaterEntry(repo, UntilEntryNumber(10))
 		assert.ErrorIs(t, err, ErrInvalidUntilEntryNumberCondition)
 
 		// a reference older than until entry number is being asked for (configuration mismatch)
-		if err := NewReferenceEntry("feature", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("feature", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		entry, annotations, err := GetLatestReferenceUpdaterEntry(repo, ForReference("main"), BeforeEntryID(emptyTreeID), UntilEntryNumber(2))
@@ -318,7 +318,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -327,7 +327,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -348,7 +348,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		refName := "refs/heads/main"
 		otherRefName := "refs/heads/feature"
 
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -365,7 +365,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Nil(t, annotations)
 		assert.Equal(t, rslRef, entry.GetID())
 
-		if err := NewReferenceEntry(otherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(otherRefName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -402,7 +402,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []gitinterface.Hash{}
 		for _, ref := range testRefs {
-			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -445,7 +445,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []gitinterface.Hash{}
 		for _, ref := range testRefs {
-			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -509,7 +509,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []gitinterface.Hash{}
 		for _, ref := range testRefs {
-			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -564,7 +564,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// main <- feature
 		testRefs := []string{"main", "feature"}
 		for _, ref := range testRefs {
-			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -587,7 +587,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
 		entryIDs := []gitinterface.Hash{}
 		for _, ref := range testRefs {
-			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			if err := NewReferenceEntry(ref, repo.ZeroHash()).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err := GetLatestEntry(repo)
@@ -660,7 +660,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		entryIDs := []gitinterface.Hash{}
 
 		// Add an entry
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -677,7 +677,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
 
 		// Add another entry
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -725,7 +725,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		entryIDs := []gitinterface.Hash{}
 
 		// Add an entry
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -737,7 +737,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		entryIDs = append(entryIDs, e.GetID())
 
 		// Add another entry
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -760,7 +760,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		}
 
 		// Now even the latest unskipped entry with zero hash should return the first one
-		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference(refName), BeforeEntryID(gitinterface.ZeroHash), IsUnskipped())
+		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference(refName), BeforeEntryID(repo.ZeroHash()), IsUnskipped())
 		assert.Nil(t, err)
 		assert.Empty(t, annotations)
 		assert.Equal(t, entryIDs[0], entry.GetID())
@@ -770,7 +770,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference(refName), BeforeEntryID(gitinterface.ZeroHash), IsUnskipped())
+		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference(refName), BeforeEntryID(repo.ZeroHash()), IsUnskipped())
 		assert.Nil(t, entry)
 		assert.Empty(t, annotations)
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
@@ -780,7 +780,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -798,12 +798,12 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// Add non gittuf entries
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -818,7 +818,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
 		// Add another gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -849,7 +849,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -857,7 +857,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -869,7 +869,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -878,7 +878,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -893,7 +893,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Add non-numbered entries, including an annotation
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).commitWithoutNumber(repo); err != nil {
 			t.Fatal(err)
 		}
 
@@ -913,7 +913,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrCannotUseEntryNumberFilter)
 
 		// Add numbered entries
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -932,12 +932,12 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		upstreamRepository := "http://git.example.com/repository"
-		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/main", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -955,12 +955,12 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		upstreamRepository := "http://git.example.com/repository"
-		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/main", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -974,12 +974,12 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		upstreamRepository := "http://git.example.com/repository"
-		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/feature", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -988,7 +988,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/main", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1001,7 +1001,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1011,11 +1011,11 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		}
 
 		upstreamRepository := "http://git.example.com/repository"
-		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/feature", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/main", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1029,11 +1029,11 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		upstreamRepository := "http://git.example.com/repository"
-		if err := NewPropagationEntry("refs/heads/feature", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/feature", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, upstreamRepository, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewPropagationEntry("refs/heads/main", repo.ZeroHash(), upstreamRepository, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1056,7 +1056,7 @@ func TestGetEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1074,7 +1074,7 @@ func TestGetEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -1082,7 +1082,7 @@ func TestGetEntry(t *testing.T) {
 	assert.Nil(t, err)
 	e := entry.(*ReferenceEntry)
 	assert.Equal(t, "main", e.RefName)
-	assert.Equal(t, gitinterface.ZeroHash, e.TargetID)
+	assert.Equal(t, repo.ZeroHash(), e.TargetID)
 
 	entry, err = GetEntry(repo, annotationID)
 	assert.Nil(t, err)
@@ -1098,7 +1098,7 @@ func TestGetParentForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Assert no parent for first entry
-		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1112,7 +1112,7 @@ func TestGetParentForEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Find parent for an entry
-		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1146,7 +1146,7 @@ func TestGetParentForEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).commitWithoutNumber(repo); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).commitWithoutNumber(repo); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1155,7 +1155,7 @@ func TestGetParentForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1179,12 +1179,12 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// Add non gittuf entry
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1194,7 +1194,7 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		}
 
 		// Add non gittuf entry
-		if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/heads/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1211,10 +1211,10 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		// Add another gittuf entry and then a non gittuf entry
 		expectedEntry = latestEntry
 
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
-		if err := NewReferenceEntry("refs/gittuf/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1245,7 +1245,7 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
 		// Add the first gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1257,7 +1257,7 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 
 		// Add another gittuf entry
-		if err := NewReferenceEntry("refs/gittuf/not-policy", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("refs/gittuf/not-policy", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1276,7 +1276,7 @@ func TestGetFirstEntry(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	if err := NewReferenceEntry("first", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("first", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1287,7 +1287,7 @@ func TestGetFirstEntry(t *testing.T) {
 	firstEntry := firstEntryT.(*ReferenceEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1314,7 +1314,7 @@ func TestGetFirstReferenceUpdaterEntryForRef(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	if err := NewReferenceEntry("first", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("first", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1325,7 +1325,7 @@ func TestGetFirstReferenceUpdaterEntryForRef(t *testing.T) {
 	firstEntry := firstEntryT.(*ReferenceEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry("main", repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1368,7 +1368,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		require.Nil(t, err)
 
 		// Create a different commit and override the ref
-		if err := repo.SetReference("refs/heads/main", gitinterface.ZeroHash); err != nil {
+		if err := repo.SetReference("refs/heads/main", repo.ZeroHash()); err != nil {
 			t.Fatal(err)
 		}
 		newCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Real initial commit\n", false)
@@ -1427,7 +1427,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		skippedEntries = append(skippedEntries, toBeSkippedEntry.GetID())
 
 		// Create a different commit and override the ref
-		if err := repo.SetReference("refs/heads/main", gitinterface.ZeroHash); err != nil {
+		if err := repo.SetReference("refs/heads/main", repo.ZeroHash()); err != nil {
 			t.Fatal(err)
 		}
 		newCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Real initial commit\n", false)
@@ -1668,7 +1668,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 
 	// Add some entries to main
 	for i := 0; i < 3; i++ {
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1700,7 +1700,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an entry and annotation for feature branch
-	if err := NewReferenceEntry(anotherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(anotherRefName, repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err := GetLatestEntry(repo)
@@ -1742,7 +1742,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add a gittuf namespace entry and ensure it's returned as relevant
-	if err := NewReferenceEntry("refs/gittuf/relevant", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/gittuf/relevant", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -1772,7 +1772,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 
 	// Add some entries to main
 	for i := 0; i < 3; i++ {
-		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		if err := NewReferenceEntry(refName, repo.ZeroHash()).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1804,7 +1804,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an entry and annotation for feature branch
-	if err := NewReferenceEntry(anotherRefName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry(anotherRefName, repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err := GetLatestEntry(repo)
@@ -1840,7 +1840,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add a gittuf namespace entry and ensure it's returned as relevant
-	if err := NewReferenceEntry("refs/gittuf/relevant", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+	if err := NewReferenceEntry("refs/gittuf/relevant", repo.ZeroHash()).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -2017,12 +2017,12 @@ func TestAnnotationEntryRefersTo(t *testing.T) {
 		},
 		"annotation refers to single entry, returns false": {
 			annotation:     NewAnnotationEntry([]gitinterface.Hash{emptyBlobID}, false, annotationMessage),
-			entryID:        gitinterface.ZeroHash,
+			entryID:        repo.ZeroHash(),
 			expectedResult: false,
 		},
 		"annotation refers to multiple entries, returns false": {
 			annotation:     NewAnnotationEntry([]gitinterface.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
-			entryID:        gitinterface.ZeroHash,
+			entryID:        repo.ZeroHash(),
 			expectedResult: false,
 		},
 	}
@@ -2046,7 +2046,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref": {
 			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
-				TargetID: gitinterface.ZeroHash,
+				TargetID: testZeroHash,
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String()),
 		},
@@ -2060,7 +2060,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref, small number": {
 			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
-				TargetID: gitinterface.ZeroHash,
+				TargetID: testZeroHash,
 				Number:   1,
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, 1),
@@ -2068,7 +2068,7 @@ func TestReferenceEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref, large number": {
 			entry: &ReferenceEntry{
 				RefName:  "refs/heads/main",
-				TargetID: gitinterface.ZeroHash,
+				TargetID: testZeroHash,
 				Number:   math.MaxUint64,
 			},
 			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, plumbing.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
@@ -2092,61 +2092,61 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 	}{
 		"annotation, no message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true"),
 		},
 		"annotation, with message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, with multi-line message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
 		},
 		"annotation, no message, skip false": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash, gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash, testZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), EntryIDKey, testZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, no message, small number": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "",
 				Number:      1,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 1),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", NumberKey, 1),
 		},
 		"annotation, no message, large number": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "",
 				Number:      math.MaxUint64,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, uint64(math.MaxUint64)),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 
@@ -2178,11 +2178,11 @@ func TestPropagationEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref": {
 			entry: &PropagationEntry{
 				RefName:            "refs/heads/main",
-				TargetID:           gitinterface.ZeroHash,
+				TargetID:           testZeroHash,
 				UpstreamRepository: upstreamRepository,
-				UpstreamEntryID:    gitinterface.ZeroHash,
+				UpstreamEntryID:    testZeroHash,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, testZeroHash.String()),
 		},
 		"entry, non-zero commit": {
 			entry: &PropagationEntry{
@@ -2196,22 +2196,22 @@ func TestPropagationEntryCreateCommitMessage(t *testing.T) {
 		"entry, fully resolved ref, small number": {
 			entry: &PropagationEntry{
 				RefName:            "refs/heads/main",
-				TargetID:           gitinterface.ZeroHash,
+				TargetID:           testZeroHash,
 				UpstreamRepository: upstreamRepository,
-				UpstreamEntryID:    gitinterface.ZeroHash,
+				UpstreamEntryID:    testZeroHash,
 				Number:             1,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, 1),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, testZeroHash.String(), NumberKey, 1),
 		},
 		"entry, fully resolved ref, large number": {
 			entry: &PropagationEntry{
 				RefName:            "refs/heads/main",
-				TargetID:           gitinterface.ZeroHash,
+				TargetID:           testZeroHash,
 				UpstreamRepository: upstreamRepository,
-				UpstreamEntryID:    gitinterface.ZeroHash,
+				UpstreamEntryID:    testZeroHash,
 				Number:             math.MaxUint64,
 			},
-			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
+			expectedMessage: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, testZeroHash.String(), NumberKey, uint64(math.MaxUint64)),
 		},
 	}
 
@@ -2240,15 +2240,15 @@ func TestParseRSLEntryText(t *testing.T) {
 	}{
 		"entry, fully resolved ref": {
 			expectedEntry: &ReferenceEntry{
-				ID:       gitinterface.ZeroHash,
+				ID:       testZeroHash,
 				RefName:  "refs/heads/main",
-				TargetID: gitinterface.ZeroHash,
+				TargetID: testZeroHash,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String()),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String()),
 		},
 		"entry, non-zero commit": {
 			expectedEntry: &ReferenceEntry{
-				ID:       gitinterface.ZeroHash,
+				ID:       testZeroHash,
 				RefName:  "refs/heads/main",
 				TargetID: nonZeroHash,
 			},
@@ -2256,7 +2256,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		},
 		"entry, missing header": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s: %s\n%s: %s", RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String()),
+			message:       fmt.Sprintf("%s: %s\n%s: %s", RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String()),
 		},
 		"entry, missing information": {
 			expectedError: ErrInvalidRSLEntry,
@@ -2264,70 +2264,70 @@ func TestParseRSLEntryText(t *testing.T) {
 		},
 		"annotation, no message": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true"),
 		},
 		"annotation, with message": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, with multi-line message": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message1\nmessage2")), EndMessage),
 		},
 		"annotation, no message, skip false": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash, gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash, testZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "false"),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), EntryIDKey, testZeroHash.String(), SkipKey, "false"),
 		},
 		"annotation, missing header": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s: %s\n%s: %s\n%s\n%s\n%s", EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
+			message:       fmt.Sprintf("%s: %s\n%s: %s\n%s\n%s\n%s", EntryIDKey, testZeroHash.String(), SkipKey, "true", BeginMessage, base64.StdEncoding.EncodeToString([]byte("message")), EndMessage),
 		},
 		"annotation, missing information": {
 			expectedError: ErrInvalidRSLEntry,
-			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String()),
+			message:       fmt.Sprintf("%s\n\n%s: %s", AnnotationEntryHeader, EntryIDKey, testZeroHash.String()),
 		},
 		"propagation entry, fully resolved ref": {
 			expectedEntry: &PropagationEntry{
-				ID:                 gitinterface.ZeroHash,
+				ID:                 testZeroHash,
 				RefName:            "refs/heads/main",
-				TargetID:           gitinterface.ZeroHash,
+				TargetID:           testZeroHash,
 				UpstreamRepository: upstreamRepository,
-				UpstreamEntryID:    gitinterface.ZeroHash,
+				UpstreamEntryID:    testZeroHash,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String()),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, testZeroHash.String()),
 		},
 		"propagation entry, non-zero commit": {
 			expectedEntry: &PropagationEntry{
-				ID:                 gitinterface.ZeroHash,
+				ID:                 testZeroHash,
 				RefName:            "refs/heads/main",
 				TargetID:           nonZeroHash,
 				UpstreamRepository: upstreamRepository,
@@ -2341,7 +2341,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		},
 		"entry, with number": {
 			expectedEntry: &ReferenceEntry{
-				ID:       gitinterface.ZeroHash,
+				ID:       testZeroHash,
 				RefName:  "refs/heads/main",
 				TargetID: nonZeroHash,
 				Number:   42,
@@ -2350,29 +2350,29 @@ func TestParseRSLEntryText(t *testing.T) {
 		},
 		"annotation, with number": {
 			expectedEntry: &AnnotationEntry{
-				ID:          gitinterface.ZeroHash,
-				RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash},
+				ID:          testZeroHash,
+				RSLEntryIDs: []gitinterface.Hash{testZeroHash},
 				Skip:        true,
 				Number:      7,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, gitinterface.ZeroHash.String(), SkipKey, "true", NumberKey, 7),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", AnnotationEntryHeader, EntryIDKey, testZeroHash.String(), SkipKey, "true", NumberKey, 7),
 		},
 		"propagation entry, with number": {
 			expectedEntry: &PropagationEntry{
-				ID:                 gitinterface.ZeroHash,
+				ID:                 testZeroHash,
 				RefName:            "refs/heads/main",
-				TargetID:           gitinterface.ZeroHash,
+				TargetID:           testZeroHash,
 				UpstreamRepository: upstreamRepository,
-				UpstreamEntryID:    gitinterface.ZeroHash,
+				UpstreamEntryID:    testZeroHash,
 				Number:             3,
 			},
-			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, gitinterface.ZeroHash.String(), NumberKey, 3),
+			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, testZeroHash.String(), UpstreamRepositoryKey, upstreamRepository, UpstreamEntryIDKey, testZeroHash.String(), NumberKey, 3),
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			entry, err := parseRSLEntryText(gitinterface.ZeroHash, test.message)
+			entry, err := parseRSLEntryText(testZeroHash, test.message)
 			if err != nil {
 				assert.ErrorIs(t, err, test.expectedError)
 			} else if !assert.Equal(t, test.expectedEntry, entry) {
@@ -2385,7 +2385,7 @@ func TestParseRSLEntryText(t *testing.T) {
 func TestParseRSLEntryTextRejectsMalformed(t *testing.T) {
 	t.Parallel()
 
-	zero := gitinterface.ZeroHash.String()
+	zero := testZeroHash.String()
 	upstream := "https://git.example.com/example/repository"
 
 	// Each message below is malformed in exactly one way and must be rejected
@@ -2436,7 +2436,7 @@ func TestParseRSLEntryTextRejectsMalformed(t *testing.T) {
 	for name, message := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			entry, err := parseRSLEntryText(testZeroHash, message)
 			assert.True(t, entry == nil, "expected a true nil Entry, not a typed nil pointer")
 			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
 		})
@@ -2446,7 +2446,7 @@ func TestParseRSLEntryTextRejectsMalformed(t *testing.T) {
 func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 	t.Parallel()
 
-	zero := gitinterface.ZeroHash.String()
+	zero := testZeroHash.String()
 	upstream := "https://git.example.com:8443/example/repository"
 
 	tests := map[string]struct {
@@ -2456,29 +2456,29 @@ func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 		"reference, unknown trailing key ignored": {
 			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\nfutureField: someValue",
 				ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero),
-			expectedEntry: &ReferenceEntry{ID: gitinterface.ZeroHash, RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			expectedEntry: &ReferenceEntry{ID: testZeroHash, RefName: "refs/heads/main", TargetID: testZeroHash},
 		},
 		"reference, unknown leading key ignored": {
 			message: fmt.Sprintf("%s\n\nfutureField: someValue\n%s: %s\n%s: %s",
 				ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero),
-			expectedEntry: &ReferenceEntry{ID: gitinterface.ZeroHash, RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			expectedEntry: &ReferenceEntry{ID: testZeroHash, RefName: "refs/heads/main", TargetID: testZeroHash},
 		},
 		"annotation, unknown key ignored between fields": {
 			message: fmt.Sprintf("%s\n\n%s: %s\nfutureField: someValue\n%s: %s",
 				AnnotationEntryHeader, EntryIDKey, zero, SkipKey, "false"),
-			expectedEntry: &AnnotationEntry{ID: gitinterface.ZeroHash, RSLEntryIDs: []gitinterface.Hash{gitinterface.ZeroHash}, Skip: false},
+			expectedEntry: &AnnotationEntry{ID: testZeroHash, RSLEntryIDs: []gitinterface.Hash{testZeroHash}, Skip: false},
 		},
 		"propagation, upstreamRepository with colons preserved": {
 			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s",
 				PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, upstream, UpstreamEntryIDKey, zero),
-			expectedEntry: &PropagationEntry{ID: gitinterface.ZeroHash, RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash, UpstreamRepository: upstream, UpstreamEntryID: gitinterface.ZeroHash},
+			expectedEntry: &PropagationEntry{ID: testZeroHash, RefName: "refs/heads/main", TargetID: testZeroHash, UpstreamRepository: upstream, UpstreamEntryID: testZeroHash},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			entry, err := parseRSLEntryText(gitinterface.ZeroHash, test.message)
+			entry, err := parseRSLEntryText(testZeroHash, test.message)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedEntry, entry)
 		})
@@ -2498,7 +2498,7 @@ func FuzzParseRSLEntryText(f *testing.F) {
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, fuzzZeroHash, UpstreamRepositoryKey, "https://git.example.com:8443/repo", UpstreamEntryIDKey, fuzzNonZeroHash))
 
 	f.Fuzz(func(_ *testing.T, text string) {
-		_, _ = parseRSLEntryText(gitinterface.ZeroHash, text)
+		_, _ = parseRSLEntryText(testZeroHash, text)
 	})
 }
 
@@ -2509,7 +2509,7 @@ func FuzzParseReferenceEntryText(f *testing.F) {
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, TargetIDKey, fuzzZeroHash, RefKey, "refs/heads/main"))
 
 	f.Fuzz(func(_ *testing.T, text string) {
-		_, _ = parseReferenceEntryText(gitinterface.ZeroHash, text)
+		_, _ = parseReferenceEntryText(testZeroHash, text)
 	})
 }
 
@@ -2519,7 +2519,7 @@ func FuzzParseAnnotationEntryText(f *testing.F) {
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s\n%s\n%s", AnnotationEntryHeader, EntryIDKey, fuzzZeroHash, EntryIDKey, fuzzNonZeroHash, SkipKey, "false", BeginMessage, base64.StdEncoding.EncodeToString([]byte("note")), EndMessage))
 
 	f.Fuzz(func(_ *testing.T, text string) {
-		_, _ = parseAnnotationEntryText(gitinterface.ZeroHash, text)
+		_, _ = parseAnnotationEntryText(testZeroHash, text)
 	})
 }
 
@@ -2529,7 +2529,7 @@ func FuzzParsePropagationEntryText(f *testing.F) {
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: %d", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, fuzzZeroHash, UpstreamRepositoryKey, "https://git.example.com/repo", UpstreamEntryIDKey, fuzzNonZeroHash, NumberKey, 9))
 
 	f.Fuzz(func(_ *testing.T, text string) {
-		_, _ = parsePropagationEntryText(gitinterface.ZeroHash, text)
+		_, _ = parsePropagationEntryText(testZeroHash, text)
 	})
 }
 
@@ -2538,7 +2538,7 @@ func BenchmarkParseReferenceEntryText(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := parseReferenceEntryText(gitinterface.ZeroHash, text); err != nil {
+		if _, err := parseReferenceEntryText(testZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -2549,7 +2549,7 @@ func BenchmarkParseAnnotationEntryText(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := parseAnnotationEntryText(gitinterface.ZeroHash, text); err != nil {
+		if _, err := parseAnnotationEntryText(testZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -2560,7 +2560,7 @@ func BenchmarkParseAnnotationEntryTextNoMessage(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := parseAnnotationEntryText(gitinterface.ZeroHash, text); err != nil {
+		if _, err := parseAnnotationEntryText(testZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -2571,7 +2571,7 @@ func BenchmarkParsePropagationEntryText(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := parsePropagationEntryText(gitinterface.ZeroHash, text); err != nil {
+		if _, err := parsePropagationEntryText(testZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -2582,7 +2582,7 @@ func BenchmarkParseRSLEntryText(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := parseRSLEntryText(gitinterface.ZeroHash, text); err != nil {
+		if _, err := parseRSLEntryText(testZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
 	}

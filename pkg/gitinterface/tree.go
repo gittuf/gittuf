@@ -21,12 +21,12 @@ var (
 func (r *Repository) EmptyTree() (Hash, error) {
 	treeID, err := r.executor("hash-object", "-t", "tree", "--stdin").executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to hash empty tree: %w", err)
+		return nil, fmt.Errorf("unable to hash empty tree: %w", err)
 	}
 
 	hash, err := NewHash(treeID)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("empty tree has invalid Git ID: %w", err)
+		return nil, fmt.Errorf("empty tree has invalid Git ID: %w", err)
 	}
 
 	return hash, nil
@@ -160,7 +160,7 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 // the second commit's tree is returned.
 func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 	if err := r.ensureIsCommit(commitBID); err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	if commitAID.IsZero() {
@@ -171,17 +171,17 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 	// Only commitB needs to be non-zero, we can allow fast-forward merges when
 	// the base commit is zero. So, check this only after above
 	if err := r.ensureIsCommit(commitAID); err != nil {
-		return ZeroHash, err
+		return nil, err
 	}
 
 	stdOut, err := r.executor("merge-tree", commitAID.String(), commitBID.String()).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to compute merge tree: %w", err)
+		return nil, fmt.Errorf("unable to compute merge tree: %w", err)
 	}
 
 	treeHash, err := NewHash(stdOut)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid merge tree ID: %w", err)
+		return nil, fmt.Errorf("invalid merge tree ID: %w", err)
 	}
 
 	return treeHash, nil
@@ -402,7 +402,7 @@ func (t *TreeBuilder) populateTree(parent, fullPath string, entry TreeEntry) {
 		// => This is an intermediate node, has to be a tree that we must build
 		entryObj = &entryTree{
 			name:          path.Base(fullPath),
-			gitID:         ZeroHash,
+			gitID:         nil,
 			alreadyExists: false,
 		}
 		t.trees[fullPath] = &entryTree{}
@@ -426,7 +426,7 @@ func (t *TreeBuilder) writeTrees(parent string, tree *entryTree) (Hash, error) {
 			p := path.Join(parent, e.name)
 			entryID, err := t.writeTrees(p, t.trees[p])
 			if err != nil {
-				return ZeroHash, err
+				return nil, err
 			}
 			e.gitID = entryID
 
@@ -462,12 +462,12 @@ func (t *TreeBuilder) writeTree(entries []TreeEntry) (Hash, error) {
 
 	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input)).executeString()
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
+		return nil, fmt.Errorf("unable to write Git tree: %w", err)
 	}
 
 	treeID, err := NewHash(stdOut)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid tree ID: %w", err)
+		return nil, fmt.Errorf("invalid tree ID: %w", err)
 	}
 
 	return treeID, nil
@@ -496,11 +496,11 @@ func (e *entryTree) getID() Hash {
 }
 
 // NewEntryTree creates a TreeEntry that represents a Git tree. If the tree
-// doesn't exist, i.e., it must be created, gitID must be set to ZeroHash. The
-// name must be set to the full path of the tree object.
+// doesn't exist, i.e., it must be created, gitID must be nil or a zero hash.
+// The name must be set to the full path of the tree object.
 func NewEntryTree(name string, gitID Hash) TreeEntry {
 	entry := &entryTree{name: name, gitID: gitID}
-	if gitID == nil || !gitID.IsZero() {
+	if !gitID.IsZero() {
 		entry.alreadyExists = true
 	}
 	return entry

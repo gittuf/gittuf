@@ -82,7 +82,7 @@ func TestDismissApproval(t *testing.T) {
 		}
 
 		fromRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := "0000000000000000000000000000000000000000"
 		reviewID := int64(123)
 		approvers := []string{"jane.doe"}
 
@@ -156,7 +156,7 @@ func TestDismissApproval(t *testing.T) {
 		}
 
 		fromRef := "refs/heads/main"
-		testID := gitinterface.ZeroHash.String()
+		testID := "0000000000000000000000000000000000000000"
 		reviewID := int64(123)
 		approvers := []string{"jane.doe"}
 

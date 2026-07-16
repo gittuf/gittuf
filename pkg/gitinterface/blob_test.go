@@ -31,7 +31,7 @@ func TestRepositoryReadBlob(t *testing.T) {
 	})
 
 	t.Run("read non-existing blob", func(t *testing.T) {
-		_, err := repo.ReadBlob(ZeroHash)
+		_, err := repo.ReadBlob(repo.ZeroHash())
 		assert.ErrorContains(t, err, "unable to inspect if object is blob")
 	})
 

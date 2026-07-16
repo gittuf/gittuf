@@ -23,12 +23,12 @@ func (p *Persistent) SetLastVerifiedEntryForRef(ref string, entryNumber uint64, 
 
 func (p *Persistent) GetLastVerifiedEntryForRef(ref string) (uint64, gitinterface.Hash) {
 	if p.LastVerifiedEntryForRef == nil {
-		return 0, gitinterface.ZeroHash
+		return 0, nil
 	}
 
 	currentIndex, hasEntryForRef := p.LastVerifiedEntryForRef[ref]
 	if !hasEntryForRef {
-		return 0, gitinterface.ZeroHash
+		return 0, nil
 	}
 
 	return currentIndex.GetEntryNumber(), currentIndex.GetEntryID()
