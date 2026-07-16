@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -50,32 +49,27 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx               context.Context
-	screen            screen
-	spinner           spinner.Model
-	homeScreen        homeScreen
-	helpScreen        helpScreen
-	policyScreen      policyScreen
-	trustScreen       trustScreen
-	policyRulesScreen policyRulesScreen
-	globalRules       []globalRule
-	globalRuleList    list.Model
-	inputs            []textinput.Model
-	focusIndex        int
-	cursorMode        cursor.Mode
-	repo              *gittuf.Repository
-	signer            dsse.SignerVerifier
-	policyName        string
-	options           *options
-	footer            string
-	errorMsg          string
-	readOnly          bool
-	width             int
-	height            int
-	confirmDelete     bool
-	deleteTarget      string
-	showHelp          bool
-	signerError       string
+	ctx                    context.Context
+	screen                 screen
+	spinner                spinner.Model
+	homeScreen             homeScreen
+	helpScreen             helpScreen
+	policyScreen           policyScreen
+	trustScreen            trustScreen
+	policyRulesScreen      policyRulesScreen
+	trustGlobalRulesScreen trustGlobalRulesScreen
+	cursorMode             cursor.Mode
+	repo                   *gittuf.Repository
+	signer                 dsse.SignerVerifier
+	policyName             string
+	options                *options
+	footer                 string
+	errorMsg               string
+	readOnly               bool
+	width                  int
+	height                 int
+	showHelp               bool
+	signerError            string
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -176,7 +170,9 @@ func initialModel(ctx context.Context, o *options) model {
 		policyRulesScreen: policyRulesScreen{
 			ruleList: newMenuList("Policy Rules", []list.Item{}, delegate),
 		},
-		globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		trustGlobalRulesScreen: trustGlobalRulesScreen{
+			globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		},
 	}
 
 	return m
@@ -221,7 +217,7 @@ func (m *model) resizeLists() {
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
 	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
-	m.globalRuleList.SetSize(innerWidth, innerHeight)
+	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
 }
 
 // loadRepoCmd performs all heavy TUI initialization asynchronously and sends
@@ -267,49 +263,4 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 // Init starts the spinner tick and kicks off async repo loading.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, m.spinner.Tick, loadRepoCmd(m.ctx, m.options))
-}
-
-// initGlobalRuleInputs initializes the input fields for global rule forms.
-func (m *model) initGlobalRuleInputs() {
-	m.inputs = initInputs([]inputField{
-		{"Enter Global Rule Name Here", "Rule Name:"},
-		{"Enter Global Rule Type (threshold|block-force-pushes)", "Type:"},
-		{"Enter Namespaces (comma-separated)", "Namespaces:"},
-		{"Enter Threshold (if threshold type)", "Threshold:"},
-	})
-	m.focusIndex = 0
-}
-
-// initGlobalRuleInputsPrefilled initializes global rule inputs prefilled with an existing global rule's values.
-func (m *model) initGlobalRuleInputsPrefilled(gr globalRule) {
-	m.initGlobalRuleInputs()
-	m.inputs[0].SetValue(gr.ruleName)
-	m.inputs[1].SetValue(gr.ruleType)
-	m.inputs[2].SetValue(strings.Join(gr.rulePatterns, ", "))
-	if gr.ruleType == tuf.GlobalRuleThresholdType {
-		m.inputs[3].SetValue(fmt.Sprintf("%d", gr.threshold))
-	}
-}
-
-// refreshGlobalRules re-fetches global rules from the repo and rebuilds the list.
-func (m *model) refreshGlobalRules() {
-	m.globalRules = getGlobalRules(m.ctx, m.options)
-	m.updateGlobalRuleList()
-}
-
-// updateGlobalRuleList updates the global rule list within the TUI.
-func (m *model) updateGlobalRuleList() {
-	items := make([]list.Item, len(m.globalRules))
-	for i, gr := range m.globalRules {
-		desc := fmt.Sprintf(
-			"Type: %s\nNamespaces: %s",
-			gr.ruleType,
-			strings.Join(gr.rulePatterns, ", "),
-		)
-		if gr.ruleType == tuf.GlobalRuleThresholdType {
-			desc += fmt.Sprintf("\nThreshold: %d", gr.threshold)
-		}
-		items[i] = item{title: gr.ruleName, desc: desc}
-	}
-	m.globalRuleList.SetItems(items)
 }

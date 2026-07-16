@@ -221,22 +221,6 @@ func renderStyledHelp(pairs [][2]string) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
 }
 
-// renderFormScreen renders a form screen with a title, input fields, help text, and footer.
-func (m model) renderFormScreen(formTitle string, breadcrumb string) string {
-	var b strings.Builder
-	b.WriteString(titleStyle.Render(formTitle) + "\n\n")
-	for _, input := range m.inputs {
-		b.WriteString(input.View() + "\n")
-	}
-	b.WriteString("\n" + "Press Tab to advance, Enter to advance/submit, and Esc to go back." + "\n")
-	b.WriteString(renderFooterBox(m))
-	b.WriteString(renderErrorMsg(m.errorMsg))
-	return lipgloss.JoinVertical(lipgloss.Left,
-		renderStatusBar(breadcrumb, m.readOnly, m.width),
-		renderWithMargin(b.String()),
-	)
-}
-
 // renderActionHints returns the consistent action hints requested for the bottom of screens.
 func renderActionHints(readOnly bool) string {
 	if readOnly {
@@ -365,31 +349,11 @@ func (m model) View() string {
 	case screenPolicyRules:
 		return m.policyRulesScreen.View(&m)
 
-	case screenTrustGlobalRules:
-		overlay := ""
-		if m.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(m.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
-			)
-		}
-
-		listView := m.renderListOrEmpty(m.globalRuleList, len(m.globalRules), "No global rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
-
-		return m.renderScreen("Home › Trust › Global Rules", listView, overlays)
+	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+		return m.trustGlobalRulesScreen.View(&m)
 
 	case screenPolicyAddRule, screenPolicyEditRule:
 		return m.policyRulesScreen.View(&m)
-
-	case screenTrustAddGlobalRule:
-		return m.renderFormScreen("Add Global Rule", "Home › Trust › Global Rules › Add")
-
-	case screenTrustEditGlobalRule:
-		return m.renderFormScreen("Edit Global Rule", "Home › Trust › Global Rules › Edit")
 
 	case screenHelp:
 		return m.helpScreen.View(&m)

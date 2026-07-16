@@ -18,7 +18,7 @@ func (s *trustScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 		if msg.String() == "enter" {
 			if _, ok := s.trustScreenList.SelectedItem().(item); ok {
 				m.screen = screenTrustGlobalRules
-				m.refreshGlobalRules()
+				m.trustGlobalRulesScreen.refreshGlobalRules(m.ctx, m.options)
 			}
 			return *m, nil
 		}

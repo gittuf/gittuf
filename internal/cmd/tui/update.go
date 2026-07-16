@@ -5,12 +5,10 @@ package tui
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/gittuf/gittuf/internal/tuf"
 )
 
 // Update updates the model based on the message received.
@@ -27,11 +25,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.signer = msg.signer
 		m.signerError = msg.signerError
 		m.policyRulesScreen.rules = msg.rules
-		m.globalRules = msg.globalRules
+		m.trustGlobalRulesScreen.globalRules = msg.globalRules
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
 		m.policyRulesScreen.updateRuleList()
-		m.updateGlobalRuleList()
+		m.trustGlobalRulesScreen.updateGlobalRuleList()
 		// Resize all lists now that readOnly/signerError are known — the earlier
 		// WindowSizeMsg fired before these flags were set, so sizes must be corrected.
 		m.resizeLists()
@@ -51,11 +49,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		// Delete confirmation overlay intercepts all keys
-		if m.confirmDelete {
-			return m.handleDeleteConfirm(msg.String())
-		}
-
 		// Global handlers (quit, back navigation)
 		switch msg.String() {
 		case "ctrl+c":
@@ -92,10 +85,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.screen = screenPolicy
 				}
+			case screenTrustGlobalRules:
+				if m.trustGlobalRulesScreen.confirmDelete {
+					m.trustGlobalRulesScreen.confirmDelete = false
+					m.trustGlobalRulesScreen.deleteTarget = ""
+				} else {
+					m.screen = screenTrust
+				}
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
-			case screenTrustGlobalRules:
-				m.screen = screenTrust
 			case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.screen = screenTrustGlobalRules
 			case screenHelp:
@@ -114,16 +112,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.trustScreen.Update(msg, &m)
 		case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 			return m.policyRulesScreen.Update(msg, &m)
-		case screenTrustGlobalRules:
-			return m.handleRulesListKey(msg)
-		case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
-			if msg.String() == "enter" {
-				return m.handleGlobalFormSubmit()
-			}
-			if msg.String() == "tab" || msg.String() == "shift+tab" || msg.String() == "up" || msg.String() == "down" {
-				m.cycleFocus(msg.String())
-				return m, nil
-			}
+		case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+			return m.trustGlobalRulesScreen.Update(msg, &m)
 		}
 	}
 
@@ -139,144 +129,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.trustScreen.Update(msg, &m)
 	case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 		return m.policyRulesScreen.Update(msg, &m)
-	case screenTrustGlobalRules:
-		m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
-		m.inputs[m.focusIndex], cmd = m.inputs[m.focusIndex].Update(msg)
+	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+		return m.trustGlobalRulesScreen.Update(msg, &m)
 	}
 
 	return m, cmd
-}
-
-// handleRulesListKey handles keybindings on rule list screens (rules and global rules).
-// For unhandled keys (including up/down arrows), it delegates to the active list for navigation.
-func (m model) handleRulesListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if !m.readOnly {
-		switch msg.String() {
-		// add rule
-		case "a":
-			m.initGlobalRuleInputs()
-			m.screen = screenTrustAddGlobalRule
-			return m, nil
-
-		// edit rule
-		case "e":
-			if sel, ok := m.globalRuleList.SelectedItem().(item); ok {
-				for _, gr := range m.globalRules {
-					if gr.ruleName == sel.title {
-						m.initGlobalRuleInputsPrefilled(gr)
-						m.screen = screenTrustEditGlobalRule
-						return m, nil
-					}
-				}
-			}
-
-		// delete rule
-		case "d":
-			var sel item
-			var ok bool
-			sel, ok = m.globalRuleList.SelectedItem().(item)
-			if ok {
-				m.confirmDelete = true
-				m.deleteTarget = sel.title
-				return m, nil
-			}
-		}
-	}
-
-	// Delegate unhandled keys to the active list for navigation (up/down arrows, etc.)
-	var cmd tea.Cmd
-	m.globalRuleList, cmd = m.globalRuleList.Update(msg)
-	return m, cmd
-}
-
-// handleDeleteConfirm handles the delete confirmation overlay.
-func (m model) handleDeleteConfirm(key string) (tea.Model, tea.Cmd) {
-	if key == "y" {
-		if m.screen == screenTrustGlobalRules {
-			if err := repoRemoveGlobalRule(m.ctx, m.options, globalRule{ruleName: m.deleteTarget}); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing global rule: %v", err)
-			} else {
-				m.footer = "Global rule removed!"
-				m.refreshGlobalRules()
-			}
-		}
-	}
-	m.confirmDelete = false
-	m.deleteTarget = ""
-	return m, nil
-}
-
-// handleGlobalFormSubmit handles enter on global add/edit form screens.
-func (m model) handleGlobalFormSubmit() (tea.Model, tea.Cmd) {
-	if m.focusIndex < len(m.inputs)-1 {
-		m.cycleFocus("tab")
-		return m, nil
-	}
-
-	parts := splitAndTrim(m.inputs[2].Value())
-	thr := 0
-	if m.inputs[1].Value() == tuf.GlobalRuleThresholdType {
-		thr, _ = strconv.Atoi(m.inputs[3].Value())
-	}
-	gr := globalRule{
-		ruleName:     m.inputs[0].Value(),
-		ruleType:     m.inputs[1].Value(),
-		rulePatterns: parts,
-		threshold:    thr,
-	}
-
-	var err error
-	switch m.screen {
-	case screenTrustAddGlobalRule:
-		err = repoAddGlobalRule(m.ctx, m.options, gr)
-	case screenTrustEditGlobalRule:
-		err = repoUpdateGlobalRule(m.ctx, m.options, gr)
-	}
-
-	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
-		return m, nil
-	}
-
-	m.refreshGlobalRules()
-	if m.screen == screenTrustAddGlobalRule {
-		m.footer = "Global rule added!"
-	} else {
-		m.footer = "Global rule updated!"
-	}
-	m.screen = screenTrustGlobalRules
-	return m, nil
-}
-
-// cycleFocus moves focus (the cursor) between input fields in form screens.
-func (m *model) cycleFocus(key string) {
-	if key == "up" || key == "shift+tab" {
-		if m.focusIndex > 0 {
-			m.focusIndex--
-			m.footer = ""
-		} else {
-			m.focusIndex = len(m.inputs) - 1
-		}
-	} else {
-		if m.focusIndex < len(m.inputs)-1 {
-			m.focusIndex++
-		} else {
-			m.focusIndex = 0
-		}
-	}
-
-	for i := range m.inputs {
-		if i == m.focusIndex {
-			m.inputs[i].Focus()
-			m.inputs[i].PromptStyle = focusedStyle
-			m.inputs[i].TextStyle = focusedStyle
-		} else {
-			m.inputs[i].Blur()
-			m.inputs[i].PromptStyle = blurredStyle
-			m.inputs[i].TextStyle = blurredStyle
-		}
-	}
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace.
