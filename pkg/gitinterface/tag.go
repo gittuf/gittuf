@@ -28,7 +28,7 @@ var (
 // gittuf is not expected to be used to create tags in developer workflows,
 // though this may change with command compatibility.
 func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, signingKeyPEMBytes []byte) (Hash, error) {
-	gitConfig, err := r.GetGitConfig()
+	gitConfig, err := GetGitConfig(r.gitDirPath)
 	if err != nil {
 		return ZeroHash, err
 	}

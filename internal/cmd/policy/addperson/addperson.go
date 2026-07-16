@@ -77,7 +77,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	publicKeys := map[string]*tufv02.Key{}
 	for _, key := range o.publicKeys {
-		key, err := gittuf.LoadPublicKey(key)
+		key, err := gittuf.LoadPublicKey(repo, key)
 		if err != nil {
 			return err
 		}

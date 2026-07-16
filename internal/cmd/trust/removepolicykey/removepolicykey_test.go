@@ -107,14 +107,14 @@ func TestRemovePolicyKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Also add the signer's own public key as a targets key so that after
 		// removing targetsKey, at least one key remains to meet the threshold.
-		signerPubKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		signerPubKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,14 +180,14 @@ func TestRemovePolicyKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		targetsKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Also add the signer's own public key as a targets key so that after
 		// removing targetsKey, at least one key remains to meet the threshold.
-		signerPubKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		signerPubKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

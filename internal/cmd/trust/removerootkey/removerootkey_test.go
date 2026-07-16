@@ -107,7 +107,7 @@ func TestRemoveRootKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rootKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		rootKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -170,7 +170,7 @@ func TestRemoveRootKey(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rootKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		rootKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -48,7 +48,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	expectedRootKeys := make([]tuf.Principal, len(o.expectedRootKeys))
 
 	for index, keyPath := range o.expectedRootKeys {
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(nil, keyPath)
 		if err != nil {
 			return err
 		}

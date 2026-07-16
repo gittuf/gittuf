@@ -142,7 +142,7 @@ func TestAddRule(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +204,7 @@ func TestAddRule(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +266,7 @@ func TestAddRule(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

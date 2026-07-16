@@ -77,7 +77,7 @@ func TestRemovePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestRemovePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -57,7 +57,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	initialRootPrincipals := []tuf.Principal{}
 	for _, principalRef := range o.initialRootPrincipals {
-		principal, err := gittuf.LoadPublicKey(principalRef)
+		principal, err := gittuf.LoadPublicKey(repo, principalRef)
 		if err != nil {
 			return err
 		}

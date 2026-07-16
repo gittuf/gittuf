@@ -51,7 +51,7 @@ var (
 // CanSign inspects the Git configuration to determine if commit / tag signing
 // is possible.
 func (r *Repository) CanSign() error {
-	config, err := r.GetGitConfig()
+	config, err := GetGitConfig(r.gitDirPath)
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,7 @@ func verifyGitsignSignature(ctx context.Context, repo *Repository, key *signerve
 
 	rekorURL := rekorPublicGoodInstance
 	// Check git config to see if rekor server must be overridden
-	config, err := repo.GetGitConfig()
+	config, err := GetGitConfig(repo.gitDirPath)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
 	}
