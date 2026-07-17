@@ -4,6 +4,8 @@
 package init
 
 import (
+	"log/slog"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
@@ -39,7 +41,17 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, rootopts.WithRSLEntry())
 	}
-	return repo.InitializeRoot(cmd.Context(), signer, true, opts...)
+	if err := repo.InitializeRoot(cmd.Context(), signer, true, opts...); err != nil {
+		return err
+	}
+
+	if !repo.GetAutomaticCacheEnablementStatus() {
+		if err := repo.PopulateCache(); err != nil {
+			slog.Warn("could not populate cache", "error", err)
+		}
+	}
+
+	return nil
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
