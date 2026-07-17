@@ -90,6 +90,25 @@ func (s *trustGlobalRulesScreen) cycleFocus(key string) {
 	}
 }
 
+func (s *trustGlobalRulesScreen) handleEsc(m *model) bool {
+	switch m.screen {
+	case screenTrustGlobalRules:
+		if s.confirmDelete {
+			s.confirmDelete = false
+			s.deleteTarget = ""
+			return true
+		}
+
+		m.screen = screenTrust
+		return true
+	case screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+		m.screen = screenTrustGlobalRules
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *trustGlobalRulesScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 

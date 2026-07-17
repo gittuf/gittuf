@@ -157,3 +157,40 @@ func TestSplitAndTrim(t *testing.T) {
 		})
 	}
 }
+
+func TestTrustGlobalRulesScreenHandleEsc(t *testing.T) {
+	t.Run("clears delete confirm before leaving list", func(t *testing.T) {
+		m := model{screen: screenTrustGlobalRules}
+		screen := trustGlobalRulesScreen{
+			confirmDelete: true,
+			deleteTarget:  "test-rule",
+		}
+
+		handled := screen.handleEsc(&m)
+
+		assert.True(t, handled)
+		assert.Equal(t, screenTrustGlobalRules, m.screen)
+		assert.False(t, screen.confirmDelete)
+		assert.Empty(t, screen.deleteTarget)
+	})
+
+	t.Run("returns to trust menu from list", func(t *testing.T) {
+		m := model{screen: screenTrustGlobalRules}
+		screen := trustGlobalRulesScreen{}
+
+		handled := screen.handleEsc(&m)
+
+		assert.True(t, handled)
+		assert.Equal(t, screenTrust, m.screen)
+	})
+
+	t.Run("returns to trust list from form", func(t *testing.T) {
+		m := model{screen: screenTrustAddGlobalRule}
+		screen := trustGlobalRulesScreen{}
+
+		handled := screen.handleEsc(&m)
+
+		assert.True(t, handled)
+		assert.Equal(t, screenTrustGlobalRules, m.screen)
+	})
+}
