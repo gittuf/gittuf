@@ -106,13 +106,24 @@ func TestNewReferenceEntry(t *testing.T) {
 }
 
 func TestCommitUsingSpecificKey(t *testing.T) {
+	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			testCommitUsingSpecificKey(t, objectFormat)
+		})
+	}
+}
+
+func testCommitUsingSpecificKey(t *testing.T, objectFormat gitinterface.ObjectFormat) {
+	t.Helper()
+
 	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false, gitinterface.WithObjectFormat(objectFormat))
 	signingKeyBytes := artifacts.SSHED25519Private
 	refName := "refs/heads/main"
 	upstreamRepository := "http://git.example.com/repository"
+	zeroHash := repo.ZeroHash()
 
-	referenceEntry := NewReferenceEntry(refName, gitinterface.ZeroHash)
+	referenceEntry := NewReferenceEntry(refName, zeroHash)
 	err := referenceEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
 	assert.Nil(t, err)
 
@@ -122,7 +133,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	assert.Nil(t, err)
 	referenceEntry = entry.(*ReferenceEntry)
 	assert.Equal(t, refName, referenceEntry.RefName)
-	assert.Equal(t, gitinterface.ZeroHash, referenceEntry.TargetID)
+	assert.Equal(t, zeroHash, referenceEntry.TargetID)
 	assert.Equal(t, uint64(1), referenceEntry.Number)
 
 	annotationEntry := NewAnnotationEntry([]gitinterface.Hash{referenceEntryID}, true, annotationMessage)
@@ -139,7 +150,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	assert.Equal(t, annotationMessage, annotationEntry.Message)
 	assert.Equal(t, uint64(2), annotationEntry.Number)
 
-	propagationEntry := NewPropagationEntry(refName, gitinterface.ZeroHash, upstreamRepository, referenceEntryID)
+	propagationEntry := NewPropagationEntry(refName, zeroHash, upstreamRepository, referenceEntryID)
 	err = propagationEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
 	assert.Nil(t, err)
 
@@ -149,7 +160,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	assert.Nil(t, err)
 	propagationEntry = entry.(*PropagationEntry)
 	assert.Equal(t, refName, propagationEntry.RefName)
-	assert.Equal(t, gitinterface.ZeroHash, propagationEntry.TargetID)
+	assert.Equal(t, zeroHash, propagationEntry.TargetID)
 	assert.Equal(t, upstreamRepository, propagationEntry.UpstreamRepository)
 	assert.Equal(t, referenceEntryID, propagationEntry.UpstreamEntryID)
 	assert.Equal(t, uint64(3), propagationEntry.Number)

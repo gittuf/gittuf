@@ -19,9 +19,7 @@ import (
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
-var (
-	ErrTagAlreadyExists = errors.New("tag already exists")
-)
+var ErrTagAlreadyExists = errors.New("tag already exists")
 
 // TagUsingSpecificKey creates a Git tag signed using the specified, PEM encoded
 // SSH or GPG key. It is primarily intended for use with testing. As of now,
@@ -67,6 +65,9 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 	if err != nil {
 		return ZeroHash, err
 	}
+	// Git appends tag signatures to the tag payload regardless of the object
+	// format; only commits store the signature under a header named for the
+	// hash algorithm (`gpgsig` / `gpgsig-sha256`).
 	tag.Signature = signature
 
 	obj := goGitRepo.Storer.NewEncodedObject()
@@ -111,36 +112,42 @@ func (r *Repository) verifyTagSignature(ctx context.Context, tagID Hash, key *si
 
 	tag, err := goGitRepo.TagObject(plumbing.NewHash(tagID.String()))
 	if err != nil {
-		return fmt.Errorf("unable to load commit object: %w", err)
+		return fmt.Errorf("unable to load tag object: %w", err)
+	}
+
+	tagContents, err := getTagBytesWithoutSignature(tag)
+	if err != nil {
+		return fmt.Errorf("unable to encode tag contents for verification: %w", err)
+	}
+
+	// Git appends tag signatures to the tag payload regardless of the object
+	// format, so the signature is always in the Signature field (unlike
+	// commits, where the header depends on the hash algorithm).
+	tagSignature := tag.Signature
+
+	if signatureBlockCount(tagSignature) > 1 {
+		return errors.Join(ErrIncorrectVerificationKey, ErrMultipleSignatures)
 	}
 
 	switch key.KeyType {
 	case gpg.KeyType:
-		if _, err := tag.Verify(key.KeyVal.Public); err != nil {
+		verifier, err := gpg.NewVerifierFromKey(key)
+		if err != nil {
+			return errors.Join(ErrIncorrectVerificationKey, err)
+		}
+		if err := verifier.Verify(ctx, tagContents, []byte(tagSignature)); err != nil {
 			return ErrIncorrectVerificationKey
 		}
 
 		return nil
 	case ssh.KeyType:
-		tagContents, err := getTagBytesWithoutSignature(tag)
-		if err != nil {
-			return errors.Join(ErrVerifyingSSHSignature, err)
-		}
-		tagSignature := []byte(tag.Signature)
-
-		if err := verifySSHKeySignature(ctx, key, tagContents, tagSignature); err != nil {
+		if err := verifySSHKeySignature(ctx, key, tagContents, []byte(tagSignature)); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 
 		return nil
 	case sigstore.KeyType:
-		tagContents, err := getTagBytesWithoutSignature(tag)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-		tagSignature := []byte(tag.Signature)
-
-		if err := verifyGitsignSignature(ctx, r, key, tagContents, tagSignature); err != nil {
+		if err := verifyGitsignSignature(ctx, r, key, tagContents, []byte(tagSignature)); err != nil {
 			return errors.Join(ErrIncorrectVerificationKey, err)
 		}
 

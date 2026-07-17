@@ -104,7 +104,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			return err
 		}
-		fromID = gitinterface.ZeroHash
+		fromID = r.r.ZeroHash()
 	}
 
 	slog.Debug("Identifying current status of feature Git reference...")

@@ -35,13 +35,13 @@ var (
 	gpgUnauthorizedPubKeyBytes = artifacts.GPGKey2Public
 )
 
-func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State) (*gitinterface.Repository, *State) {
+func createTestRepository(t *testing.T, stateCreator func(*testing.T) *State, opts ...gitinterface.TestRepositoryOption) (*gitinterface.Repository, *State) {
 	t.Helper()
 
 	state := stateCreator(t)
 
 	tempDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false, opts...)
 	state.repository = repo
 
 	if err := state.Commit(repo, "Create test state", true, false); err != nil {

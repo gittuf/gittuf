@@ -151,7 +151,7 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.S
 				// This likely means the remote doesn't have the specified ref.
 				// In this case, provide a zero hash as per original Git
 				// behavior.
-				remoteHash = gitinterface.ZeroHash
+				remoteHash = r.r.ZeroHash()
 			} else {
 				remoteHash, err = r.r.GetReference(remoteTrackerRef)
 				if err != nil {

@@ -17,7 +17,6 @@ import (
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 // handleSSH implements the helper for remotes configured to use SSH. For this
@@ -535,6 +534,8 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			}
 
 			log("adding gittuf RSL entries")
+			zeroHash := repo.GetGitRepository().ZeroHash().String()
+			objectFormat := repo.GetGitRepository().GetObjectFormat()
 			pushObjects := set.NewSet[string]()
 			dstRefs := set.NewSet[string]()
 			for i, refSpec := range pushRefSpecs {
@@ -566,7 +567,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				oldTip := remoteRefTips[dstRef]
 				if oldTip == "" {
-					oldTip = gitinterface.ZeroHash.String()
+					oldTip = zeroHash
 				}
 
 				newTipHash, err := repo.GetGitRepository().GetReference(srcRef)
@@ -585,7 +586,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					// because of inconsistencies between receive-pack
 					// implementations in sending status messages.
 					// TODO: check that server advertises all of these
-					pushCmd = fmt.Sprintf("%s%s report-status-v2 atomic object-format=sha1 agent=git/%s", pushCmd, string('\x00'), gitVersion)
+					pushCmd = fmt.Sprintf("%s%s report-status-v2 atomic object-format=%s agent=git/%s", pushCmd, string('\x00'), objectFormat, gitVersion)
 				}
 				pushCmd += "\n"
 
@@ -593,10 +594,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					return nil, false, err
 				}
 
-				if newTip != gitinterface.ZeroHash.String() {
+				if newTip != zeroHash {
 					pushObjects.Add(newTip)
 				}
-				if oldTip != gitinterface.ZeroHash.String() {
+				if oldTip != zeroHash {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
 				}
 			}
@@ -609,7 +610,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			if len(gittufRefsTips) != 0 {
 				oldTip, has := remoteRefTips[rsl.Ref]
 				if !has {
-					oldTip = gitinterface.ZeroHash.String()
+					oldTip = zeroHash
 				}
 
 				newTipHash, err := repo.GetGitRepository().GetReference(rsl.Ref)
@@ -623,10 +624,10 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				if _, err := helperStdIn.Write(packetEncode(pushCmd)); err != nil {
 					return nil, false, err
 				}
-				if newTip != gitinterface.ZeroHash.String() {
+				if newTip != zeroHash {
 					pushObjects.Add(newTip)
 				}
-				if oldTip != gitinterface.ZeroHash.String() {
+				if oldTip != zeroHash {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
 				}
 			}

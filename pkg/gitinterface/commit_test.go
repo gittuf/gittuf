@@ -6,6 +6,7 @@ package gitinterface
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,29 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRepositoryCommitSHA256(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false, WithSHA256Format())
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Commit to a ref that does not yet exist: the "current" tip is the zero
+	// hash, which must match the repository's SHA-256 object format.
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	assert.Nil(t, err)
+	assert.Len(t, commitID.String(), 64)
+
+	refHead, err := repo.GetReference(refName)
+	require.Nil(t, err)
+	assert.Equal(t, commitID, refHead)
+}
 
 func TestRepositoryCommit(t *testing.T) {
 	tempDir := t.TempDir()
@@ -274,6 +298,184 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 		err = repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
 		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
 	})
+}
+
+func TestRepositoryVerifyCommitSHA256(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false, WithSHA256Format())
+
+	treeBuilder := NewTreeBuilder(repo)
+
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sshSignedCommitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keyDir := t.TempDir()
+	keyPath := filepath.Join(keyDir, "ssh-key")
+	if err := os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sshKey, err := ssh.NewKeyFromFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKey, err := gpg.LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// gitsign/sigstore signed commits are not exercised here: that test relies
+	// on a precomputed signature over a fixed SHA-1 commit object, which cannot
+	// be reproduced for a SHA-256 repository.
+
+	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
+		assert.Nil(t, err)
+	})
+
+	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
+		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
+		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+	})
+
+	t.Run("unknown signing method", func(t *testing.T) {
+		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
+		err = repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
+		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+	})
+}
+
+func TestCommitUsingSpecificKeySignatureHeader(t *testing.T) {
+	for _, objectFormat := range []ObjectFormat{ObjectFormatSHA1, ObjectFormatSHA256} {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			tmpDir := t.TempDir()
+			repo := CreateTestGitRepository(t, tmpDir, false, WithObjectFormat(objectFormat))
+
+			emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
+			require.Nil(t, err)
+
+			commitID, err := repo.CommitUsingSpecificKey(emptyTreeID, "refs/heads/main", "Initial commit\n", artifacts.SSHRSAPrivate)
+			require.Nil(t, err)
+
+			raw, err := repo.executor("cat-file", "commit", commitID.String()).executeString()
+			require.Nil(t, err)
+
+			// The signature must be stored under the header matching the
+			// object's hash algorithm.
+			if objectFormat == ObjectFormatSHA256 {
+				assert.Contains(t, raw, "\ngpgsig-sha256 ")
+				assert.NotContains(t, raw, "\ngpgsig -")
+			} else {
+				assert.Contains(t, raw, "\ngpgsig -")
+				assert.NotContains(t, raw, "gpgsig-sha256")
+			}
+
+			keyDir := t.TempDir()
+			keyPath := filepath.Join(keyDir, "ssh-key")
+			require.Nil(t, os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600))
+			sshKey, err := ssh.NewKeyFromFile(keyPath)
+			require.Nil(t, err)
+
+			assert.Nil(t, repo.verifyCommitSignature(context.Background(), commitID, sshKey))
+		})
+	}
+}
+
+func TestSignatureBlockCount(t *testing.T) {
+	tests := map[string]struct {
+		signature string
+		expected  int
+	}{
+		"empty":             {"", 0},
+		"single pgp":        {"-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n", 1},
+		"single ssh":        {"-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n", 1},
+		"two pgp blocks":    {"-----BEGIN PGP SIGNATURE-----\na\n-----END PGP SIGNATURE-----\n-----BEGIN PGP SIGNATURE-----\nb\n-----END PGP SIGNATURE-----\n", 2},
+		"nested ssh blocks": {"-----BEGIN SSH SIGNATURE-----\n-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n-----END SSH SIGNATURE-----\n", 2},
+		"no signature":      {"not a signature", 0},
+	}
+
+	for name, test := range tests {
+		assert.Equal(t, test.expected, signatureBlockCount(test.signature), name)
+	}
+}
+
+func TestVerifyCommitSignatureRejectsMultipleSignatures(t *testing.T) {
+	tests := map[string]struct {
+		signingKey      []byte
+		verificationKey func(t *testing.T) *signerverifier.SSLibKey
+	}{
+		"gpg": {
+			signingKey: artifacts.GPGKey1Private,
+			verificationKey: func(t *testing.T) *signerverifier.SSLibKey {
+				t.Helper()
+				key, err := gpg.LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
+				require.Nil(t, err)
+				return key
+			},
+		},
+		"ssh": {
+			signingKey: artifacts.SSHED25519Private,
+			verificationKey: func(t *testing.T) *signerverifier.SSLibKey {
+				t.Helper()
+				keyPath := filepath.Join(t.TempDir(), "ssh-key.pub")
+				require.Nil(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
+				key, err := ssh.NewKeyFromFile(keyPath)
+				require.Nil(t, err)
+				return key
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			repo := CreateTestGitRepository(t, tmpDir, false)
+
+			goGitRepo, err := repo.GetGoGitRepository()
+			require.Nil(t, err)
+
+			testCommit := &object.Commit{
+				Author:    object.Signature{Name: testName, Email: testEmail, When: testClock.Now()},
+				Committer: object.Signature{Name: testName, Email: testEmail, When: testClock.Now()},
+				Message:   "Test commit\n",
+				TreeHash:  plumbing.ZeroHash,
+			}
+
+			commitEncoded := goGitRepo.Storer.NewEncodedObject()
+			require.Nil(t, testCommit.EncodeWithoutSignature(commitEncoded))
+			reader, err := commitEncoded.Reader()
+			require.Nil(t, err)
+			contents, err := io.ReadAll(reader)
+			require.Nil(t, err)
+
+			sig, err := signGitObjectUsingKey(contents, test.signingKey)
+			require.Nil(t, err)
+
+			// Two (individually valid) signature blocks, each on their own
+			// lines, must be rejected as ambiguous rather than verified
+			// against the first.
+			block := strings.TrimRight(sig, "\n") + "\n"
+			testCommit.Signature = block + block
+
+			commitEncoded = goGitRepo.Storer.NewEncodedObject()
+			require.Nil(t, testCommit.Encode(commitEncoded))
+			commitID, err := goGitRepo.Storer.SetEncodedObject(commitEncoded)
+			require.Nil(t, err)
+			commitHash, err := NewHash(commitID.String())
+			require.Nil(t, err)
+
+			err = repo.verifyCommitSignature(context.Background(), commitHash, test.verificationKey(t))
+			assert.ErrorIs(t, err, ErrMultipleSignatures)
+			assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		})
+	}
 }
 
 func TestKnowsCommit(t *testing.T) {

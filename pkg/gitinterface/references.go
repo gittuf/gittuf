@@ -27,14 +27,14 @@ func (r *Repository) GetReference(refName string) (Hash, error) {
 	refTipID, err := r.executor("rev-parse", refName).executeString()
 	if err != nil {
 		if strings.Contains(err.Error(), "unknown revision or path not in the working tree") {
-			return ZeroHash, ErrReferenceNotFound
+			return r.ZeroHash(), ErrReferenceNotFound
 		}
-		return ZeroHash, fmt.Errorf("unable to read reference '%s': %w", refName, err)
+		return r.ZeroHash(), fmt.Errorf("unable to read reference '%s': %w", refName, err)
 	}
 
 	hash, err := NewHash(refTipID)
 	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid Git ID for reference '%s': %w", refName, err)
+		return r.ZeroHash(), fmt.Errorf("invalid Git ID for reference '%s': %w", refName, err)
 	}
 
 	return hash, nil

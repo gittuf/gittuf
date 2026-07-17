@@ -21,7 +21,46 @@ import (
 )
 
 func TestVerifyRef(t *testing.T) {
-	repo := createTestRepositoryWithPolicy(t, "")
+	for _, objectFormat := range testObjectFormats {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			testVerifyRef(t, objectFormat)
+		})
+	}
+}
+
+// TestVerifyRefRecordedWithGitSigning exercises gittuf's standard workflow end
+// to end: commits and the RSL entry are created and signed via the Git binary
+// (RecordRSLEntryForReference), then verified. In SHA-256 repositories Git
+// stores the signature under the `gpgsig-sha256` header, so this guards against
+// regressions where signing and verification disagree on the header.
+func TestVerifyRefRecordedWithGitSigning(t *testing.T) {
+	for _, objectFormat := range testObjectFormats {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			repo := createTestRepositoryWithPolicyAuthorizingGitSigningKey(t, gitinterface.WithObjectFormat(objectFormat))
+
+			refName := "refs/heads/main"
+
+			// Commits are signed with the repository's Git signing key.
+			common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, rsaKeyBytes)
+
+			// Record the RSL entry through the Git-signed workflow.
+			if err := repo.RecordRSLEntryForReference(testCtx, refName, true, rslopts.WithRecordLocalOnly()); err != nil {
+				t.Fatal(err)
+			}
+
+			err := repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
+			assert.Nil(t, err)
+
+			err = repo.VerifyRef(testCtx, refName)
+			assert.Nil(t, err)
+		})
+	}
+}
+
+func testVerifyRef(t *testing.T, objectFormat gitinterface.ObjectFormat) {
+	t.Helper()
+
+	repo := createTestRepositoryWithPolicy(t, "", gitinterface.WithObjectFormat(objectFormat))
 
 	refName := "refs/heads/main"
 	remoteRefName := "refs/heads/not-main"
@@ -104,9 +143,18 @@ func TestVerifyRef(t *testing.T) {
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
+	for _, objectFormat := range testObjectFormats {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			testVerifyRefFromEntry(t, objectFormat)
+		})
+	}
+}
+
+func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat) {
+	t.Helper()
 	t.Setenv(dev.DevModeKey, "1")
 
-	repo := createTestRepositoryWithPolicy(t, "")
+	repo := createTestRepositoryWithPolicy(t, "", gitinterface.WithObjectFormat(objectFormat))
 
 	refName := "refs/heads/main"
 	remoteRefName := "refs/heads/not-main"
@@ -163,7 +211,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 		},
 		"unknown ref": {
 			localRefName: "refs/heads/unknown",
-			fromEntryID:  gitinterface.ZeroHash,
+			fromEntryID:  repo.r.ZeroHash(),
 			err:          rsl.ErrRSLEntryNotFound,
 		},
 		"different local and remote ref names, from non-violating": {
@@ -269,6 +317,45 @@ func TestVerifyMergeable(t *testing.T) {
 		needsSignature, err := repo.VerifyMergeable(testCtx, targetRef, featureRef)
 		assert.Nil(t, err)
 		assert.False(t, needsSignature)
+	})
+
+	t.Run("mergeable with approval, unborn target ref", func(t *testing.T) {
+		// When the target ref has no RSL entry yet, both the attestation
+		// writer and the verifier must use the same zero hash for the from
+		// revision. In SHA-256 repositories a SHA-1 zero on either side makes
+		// the authorization unfindable.
+		for _, objectFormat := range testObjectFormats {
+			t.Run(string(objectFormat), func(t *testing.T) {
+				repo := createTestRepositoryWithPolicy(t, "", gitinterface.WithObjectFormat(objectFormat))
+
+				treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+				emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := repo.r.Commit(emptyTreeID, featureRef, "Initial commit\n", false); err != nil {
+					t.Fatal(err)
+				}
+				common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+				if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+					t.Fatal(err)
+				}
+
+				gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
+				approverSigner, err := gpg.NewSignerFromKeyID("157507bbe151e378ce8126c1dcfe043cdd2db96e")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if err := repo.AddReferenceAuthorization(testCtx, approverSigner, targetRef, featureRef, false, attestopts.WithRSLEntry()); err != nil {
+					t.Fatal(err)
+				}
+
+				needsSignature, err := repo.VerifyMergeable(testCtx, targetRef, featureRef)
+				assert.Nil(t, err)
+				assert.False(t, needsSignature)
+			})
+		}
 	})
 
 	t.Run("mergeable with approval and feature RSL bypass", func(t *testing.T) {
