@@ -15,18 +15,15 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		pOpts := &persistent.Options{
@@ -39,12 +36,8 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("invalid signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -59,35 +52,21 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("success already untrusted", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -99,40 +78,24 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("success disable trusted app", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		key, err := gittuf.LoadPublicKey(keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
 		assert.NoError(t, err)
@@ -168,40 +131,24 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("success disable trusted app with RSL entry", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		key, err := gittuf.LoadPublicKey(keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
 		assert.NoError(t, err)

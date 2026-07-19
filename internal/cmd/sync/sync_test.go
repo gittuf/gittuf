@@ -14,18 +14,15 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSync(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		_, _, _, err = cmd.ExecuteCommandC(New())
@@ -35,12 +32,8 @@ func TestSync(t *testing.T) {
 	t.Run("no remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -58,65 +51,40 @@ func TestSync(t *testing.T) {
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if _, err := remoteR.Commit(emptyTreeHash, refName, "Remote commit", false); err != nil {
-			t.Fatal(err)
-		}
+		_, err = remoteR.Commit(emptyTreeHash, refName, "Remote commit", false)
+		require.NoError(t, err)
 
 		// We need a dummy gittuf repo to record RSL
 		remoteRepo, err := gittuf.LoadRepository(remoteTmpDir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := remoteRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, remoteRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()))
 
 		// 2. Setup Local Repo (Clone remote)
 		localTmpDir := filepath.Join(t.TempDir(), "local-sync-test")
 		localR, err := gitinterface.CloneAndFetchRepository(remoteTmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := localR.SetGitConfig("user.name", "Jane Doe"); err != nil {
-			t.Fatal(err)
-		}
-		if err := localR.SetGitConfig("user.email", "jane.doe@example.com"); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
 
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(localTmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		// 3. Make Remote and Local Diverge
 		// Remote Action:
-		if _, err := remoteRepo.GetGitRepository().Commit(emptyTreeHash, refName, "Another remote commit", false); err != nil {
-			t.Fatal(err)
-		}
-		if err := remoteRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()); err != nil {
-			t.Fatal(err)
-		}
+		_, err = remoteRepo.GetGitRepository().Commit(emptyTreeHash, refName, "Another remote commit", false)
+		require.NoError(t, err)
+		require.NoError(t, remoteRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()))
 
 		// Local Action:
 		localRepo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := localRepo.GetGitRepository().Commit(emptyTreeHash, refName, "Local commit", false); err != nil {
-			t.Fatal(err)
-		}
-		if err := localRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		_, err = localRepo.GetGitRepository().Commit(emptyTreeHash, refName, "Local commit", false)
+		require.NoError(t, err)
+		require.NoError(t, localRepo.RecordRSLEntryForReference(t.Context(), refName, false, rslopts.WithRecordLocalOnly()))
 
 		// 4. Test Sync without --overwrite (should catch divergence)
 		_, stdOut, _, err := cmd.ExecuteCommandC(New())

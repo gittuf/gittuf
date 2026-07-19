@@ -14,6 +14,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestApply(t *testing.T) {
@@ -21,14 +22,10 @@ func TestApply(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "--local-only")
 		assert.ErrorContains(t, err, "unable to identify git directory")
@@ -38,52 +35,32 @@ func TestApply(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		fromRef := "refs/heads/main"
 		targetTagRef := "refs/tags/v1"
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		_, err = repo.GetGitRepository().Commit(emptyTreeID, fromRef, "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()))
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "--local-only")
 		assert.NoError(t, err)
@@ -93,52 +70,32 @@ func TestApply(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		fromRef := "refs/heads/main"
 		targetTagRef := "refs/tags/v1"
 
 		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		_, err = repo.GetGitRepository().Commit(emptyTreeID, fromRef, "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()))
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "origin")
 		assert.Error(t, err)

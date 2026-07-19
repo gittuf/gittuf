@@ -17,6 +17,7 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveGitHubApp(t *testing.T) {
@@ -24,14 +25,10 @@ func TestRemoveGitHubApp(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
@@ -46,14 +43,10 @@ func TestRemoveGitHubApp(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
@@ -68,42 +61,26 @@ func TestRemoveGitHubApp(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, artifacts.SSHED25519PublicSSH))
 
-		if err := repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, key, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, key, false))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -118,42 +95,26 @@ func TestRemoveGitHubApp(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, artifacts.SSHED25519PublicSSH))
 
-		if err := repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, key, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, key, false))
 
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,

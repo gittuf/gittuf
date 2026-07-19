@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -25,12 +26,8 @@ func init() {
 func TestTUI(t *testing.T) {
 	tmpDir := t.TempDir()
 	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
 	defer os.Chdir(currentDir) //nolint:errcheck
 
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)

@@ -10,18 +10,15 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyNetwork(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		_, _, _, err = cmd.ExecuteCommandC(New())
@@ -31,12 +28,8 @@ func TestVerifyNetwork(t *testing.T) {
 	t.Run("uninitialized repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
 		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
