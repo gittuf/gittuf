@@ -14,6 +14,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAddPropagationDirective(t *testing.T) {
@@ -21,16 +22,10 @@ func TestAddPropagationDirective(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
@@ -51,16 +46,10 @@ func TestAddPropagationDirective(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
@@ -81,37 +70,21 @@ func TestAddPropagationDirective(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -132,37 +105,21 @@ func TestAddPropagationDirective(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,

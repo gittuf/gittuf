@@ -18,6 +18,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRemoveRule(t *testing.T) {
@@ -25,16 +26,10 @@ func TestRemoveRule(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(&persistent.Options{}), "--rule-name", "dummy-rule")
 		assert.ErrorContains(t, err, "unable to identify git directory")
@@ -45,57 +40,31 @@ func TestRemoveRule(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "protect-main", []string{newKey.ID()}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "protect-main", []string{newKey.ID()}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()))
 
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--rule-name", "protect-main")
@@ -103,9 +72,7 @@ func TestRemoveRule(t *testing.T) {
 
 		// Verification
 		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
@@ -121,69 +88,37 @@ func TestRemoveRule(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "custom-policy", []string{newKey.ID()}, []string{"*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "custom-policy", []string{newKey.ID()}, []string{"*"}, 1, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, "custom-policy", false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, "custom-policy", false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddPrincipalToTargets(t.Context(), signer, "custom-policy", []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, "custom-policy", []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddDelegation(t.Context(), signer, "custom-policy", "protect-main", []string{newKey.ID()}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddDelegation(t.Context(), signer, "custom-policy", "protect-main", []string{newKey.ID()}, []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry()))
 
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--policy-name", "custom-policy", "--rule-name", "protect-main")
@@ -191,9 +126,7 @@ func TestRemoveRule(t *testing.T) {
 
 		// Verification
 		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		targetsMetadata, err := state.GetTargetsMetadata("custom-policy", false)
 		assert.Nil(t, err)
@@ -209,16 +142,10 @@ func TestRemoveRule(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		command := New(&persistent.Options{SigningKey: "invalid-key"})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--rule-name", "dummy-rule")
@@ -230,36 +157,20 @@ func TestRemoveRule(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		// Run removerule for policy that is not initialized
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
@@ -272,46 +183,24 @@ func TestRemoveRule(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
 		// Run removerule for rule with gittuf prefix
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})

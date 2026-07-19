@@ -14,21 +14,16 @@ import (
 	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCacheInit(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		_, _, _, err = cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to identify git directory")
@@ -37,28 +32,18 @@ func TestCacheInit(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(currentDir)
-		}()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
+		defer os.Chdir(currentDir) //nolint:errcheck
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		gitRepo := repo.GetGitRepository()
 		err = rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(gitRepo, false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		_, _, _, err = cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)

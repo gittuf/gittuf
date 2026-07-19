@@ -17,6 +17,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDismissApproval(t *testing.T) {
@@ -24,16 +25,10 @@ func TestDismissApproval(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
@@ -47,16 +42,10 @@ func TestDismissApproval(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
@@ -69,17 +58,11 @@ func TestDismissApproval(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		fromRef := "refs/heads/main"
 		testID := gitinterface.ZeroHash.String()
@@ -87,50 +70,30 @@ func TestDismissApproval(t *testing.T) {
 		approvers := []string{"jane.doe"}
 
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(fromRef, testID, testID, approvers, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		env, err := dsse.CreateEnvelope(githubAppApproval)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		env, err = dsse.SignEnvelope(t.Context(), env, signer)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo.GetGitRepository())
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = currentAttestations.SetGitHubPullRequestApprovalAttestation(repo.GetGitRepository(), env, "https://github.com", reviewID, tuf.GitHubAppRoleName, fromRef, testID, testID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = currentAttestations.Commit(repo.GetGitRepository(), "Add GitHub pull request approval", true, false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -143,17 +106,11 @@ func TestDismissApproval(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		fromRef := "refs/heads/main"
 		testID := gitinterface.ZeroHash.String()
@@ -161,50 +118,30 @@ func TestDismissApproval(t *testing.T) {
 		approvers := []string{"jane.doe"}
 
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(fromRef, testID, testID, approvers, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		env, err := dsse.CreateEnvelope(githubAppApproval)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		env, err = dsse.SignEnvelope(t.Context(), env, signer)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo.GetGitRepository())
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = currentAttestations.SetGitHubPullRequestApprovalAttestation(repo.GetGitRepository(), env, "https://github.com", reviewID, tuf.GitHubAppRoleName, fromRef, testID, testID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		err = currentAttestations.Commit(repo.GetGitRepository(), "Add GitHub pull request approval", true, false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,

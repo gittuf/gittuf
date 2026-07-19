@@ -20,6 +20,7 @@ import (
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdatePerson(t *testing.T) {
@@ -27,16 +28,10 @@ func TestUpdatePerson(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(&persistent.Options{}), "--person-ID", "person-1")
 		assert.ErrorContains(t, err, "unable to identify git directory")
@@ -47,49 +42,27 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
 		// First, add the person using add-person command
 		addPersonCmd := addpersoncmd.New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
@@ -98,9 +71,7 @@ func TestUpdatePerson(t *testing.T) {
 
 		// Verify it was added
 		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
 		principals := targetsMetadata.GetPrincipals()
@@ -116,9 +87,7 @@ func TestUpdatePerson(t *testing.T) {
 
 		// Verify updated fields
 		state, err = policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 		assert.Nil(t, err)
 		principals = targetsMetadata.GetPrincipals()
@@ -132,61 +101,33 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "custom-policy", []string{newKey.ID()}, []string{"*"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.AddDelegation(t.Context(), signer, policy.TargetsRoleName, "custom-policy", []string{newKey.ID()}, []string{"*"}, 1, false, trustpolicyopts.WithRSLEntry()))
 
-		if err := repo.InitializeTargets(t.Context(), signer, "custom-policy", false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, "custom-policy", false, trustpolicyopts.WithRSLEntry()))
 
 		// First, add the person using add-person command
 		addPersonCmd := addpersoncmd.New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
@@ -200,9 +141,7 @@ func TestUpdatePerson(t *testing.T) {
 
 		// Verify updated fields
 		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		targetsMetadata, err := state.GetTargetsMetadata("custom-policy", false)
 		assert.Nil(t, err)
 		principals := targetsMetadata.GetPrincipals()
@@ -216,16 +155,10 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		command := New(&persistent.Options{SigningKey: "invalid-key"})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "person-1")
@@ -237,36 +170,20 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--policy-name", "non-existent-policy", "--person-ID", "person-1")
@@ -278,24 +195,14 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		command := New(&persistent.Options{SigningKey: keyPath})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "person-1", "--associated-identity", "invalididentity")
@@ -307,24 +214,14 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		command := New(&persistent.Options{SigningKey: keyPath})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "person-1", "--custom", "invalidcustom")
@@ -336,24 +233,14 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		command := New(&persistent.Options{SigningKey: keyPath})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "person-1", "--public-key", "non-existent-key.pub")
@@ -365,46 +252,24 @@ func TestUpdatePerson(t *testing.T) {
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
-		if err := os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
 		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = os.Chdir(cwd)
-		}()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
 
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
 
 		command := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
 		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "non-existent-person")
