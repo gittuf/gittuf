@@ -12,6 +12,7 @@ import (
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	lua "github.com/yuin/gopher-lua"
 )
 
@@ -24,8 +25,9 @@ func TestNewLuaEnvironment(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
+	require.NoError(t, err)
 	defer environment.Cleanup()
-	assert.Nil(t, err)
+
 	assert.NotNil(t, environment)
 }
 
@@ -34,9 +36,7 @@ func TestAPIMatchRegex(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	t.Run("exact match", func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestAPIMatchRegex(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -61,7 +61,7 @@ func TestAPIMatchRegex(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -76,7 +76,7 @@ func TestAPIMatchRegex(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -91,7 +91,7 @@ func TestAPIMatchRegex(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -104,9 +104,7 @@ func TestAPIStrSplit(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	t.Run("no separator", func(t *testing.T) {
@@ -116,7 +114,7 @@ func TestAPIStrSplit(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -135,7 +133,7 @@ func TestAPIStrSplit(t *testing.T) {
 		`
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -153,18 +151,14 @@ func TestAPIGitReadBlob(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	defer environment.Cleanup()
 
 	t.Run("text blob", func(t *testing.T) {
 		contents := []byte("Hello, world!")
 		blobID, err := repo.WriteBlob(contents)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitReadBlob("%s")
@@ -172,7 +166,7 @@ func TestAPIGitReadBlob(t *testing.T) {
 		`, blobID)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -185,9 +179,7 @@ func TestAPIGitReadBlob(t *testing.T) {
 	t.Run("binary blob", func(t *testing.T) {
 		contents := artifacts.GittufLogo
 		blobID, err := repo.WriteBlob(contents)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitReadBlob("%s")
@@ -195,7 +187,7 @@ func TestAPIGitReadBlob(t *testing.T) {
 		`, blobID)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -212,19 +204,13 @@ func TestAPIGitGetObjectSize(t *testing.T) {
 
 	contents := []byte("Hello, world!")
 	blobID, err := repo.WriteBlob(contents)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	blobSize, err := repo.GetObjectSize(blobID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	testScript := fmt.Sprintf(`
@@ -233,7 +219,7 @@ func TestAPIGitGetObjectSize(t *testing.T) {
 	`, blobID)
 
 	err = environment.lState.DoString(testScript)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	result := environment.lState.Get(-1)
 	environment.lState.Pop(1)
@@ -248,28 +234,20 @@ func TestAPIGitGetTagTarget(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	testScript := fmt.Sprintf(`
 	local result = gitGetTagTarget("%s")
@@ -277,7 +255,7 @@ func TestAPIGitGetTagTarget(t *testing.T) {
 	`, tagID)
 
 	err = environment.lState.DoString(testScript)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	result := environment.lState.Get(-1)
 	environment.lState.Pop(1)
@@ -292,23 +270,17 @@ func TestAPIGitGetReference(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	t.Run("main", func(t *testing.T) {
 		ref := "main"
@@ -319,7 +291,7 @@ func TestAPIGitGetReference(t *testing.T) {
 		`, ref)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -338,7 +310,7 @@ func TestAPIGitGetReference(t *testing.T) {
 		`, ref)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -354,23 +326,17 @@ func TestAPIGitGetAbsoluteReference(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	t.Run("main", func(t *testing.T) {
 		ref := "main"
@@ -382,7 +348,7 @@ func TestAPIGitGetAbsoluteReference(t *testing.T) {
 		`, ref)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -401,7 +367,7 @@ func TestAPIGitGetAbsoluteReference(t *testing.T) {
 		`, ref)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -417,23 +383,17 @@ func TestAPIGitGetSymbolicReferenceTarget(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ref := "HEAD"
 	targetRef := "refs/heads/main"
@@ -444,7 +404,7 @@ func TestAPIGitGetSymbolicReferenceTarget(t *testing.T) {
 	`, ref)
 
 	err = environment.lState.DoString(testScript)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	result := environment.lState.Get(-1)
 	environment.lState.Pop(1)
@@ -459,26 +419,20 @@ func TestAPIGitGetCommitMessage(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Write empty tree
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	t.Run("basic message", func(t *testing.T) {
 		message := "Initial commit"
 
 		commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", message, true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitGetCommitMessage("%s")
@@ -486,7 +440,7 @@ func TestAPIGitGetCommitMessage(t *testing.T) {
 		`, commitID)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -501,9 +455,7 @@ func TestAPIGitGetCommitMessage(t *testing.T) {
 		commit`
 
 		commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", message, true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitGetCommitMessage("%s")
@@ -511,7 +463,7 @@ func TestAPIGitGetCommitMessage(t *testing.T) {
 		`, commitID)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -531,40 +483,28 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	blobIDs := []gitinterface.Hash{}
 	for i := 0; i < 3; i++ {
 		blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("%d", i)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		blobIDs = append(blobIDs, blobID)
 	}
 
 	t.Run("modify single file", func(t *testing.T) {
 		treeA, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		treeB, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("a", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		_, err = repo.Commit(treeA, ref, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		cB, err := repo.Commit(treeB, ref, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitGetFilePathsChangedByCommit("%s")
@@ -572,7 +512,7 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 		`, cB)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -585,24 +525,16 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 
 	t.Run("rename single file", func(t *testing.T) {
 		treeA, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		treeB, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("b", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		_, err = repo.Commit(treeA, ref, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		cB, err := repo.Commit(treeB, ref, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		testScript := fmt.Sprintf(`
 		local result = gitGetFilePathsChangedByCommit("%s")
@@ -610,7 +542,7 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 		`, cB)
 
 		err = environment.lState.DoString(testScript)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		result := environment.lState.Get(-1)
 		environment.lState.Pop(1)
@@ -628,18 +560,14 @@ func TestAPIGitGetRemoteURL(t *testing.T) {
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	environment, err := NewLuaEnvironment(testCtx, repo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer environment.Cleanup()
 
 	remoteName := "origin"
 	remoteURL := "git@example.com:repo.git"
 
 	err = repo.AddRemote(remoteName, remoteURL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	testScript := fmt.Sprintf(`
 	local result = gitGetRemoteURL("%s")
@@ -647,7 +575,7 @@ func TestAPIGitGetRemoteURL(t *testing.T) {
 	`, remoteName)
 
 	err = environment.lState.DoString(testScript)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	result := environment.lState.Get(-1)
 	environment.lState.Pop(1)
@@ -655,4 +583,48 @@ func TestAPIGitGetRemoteURL(t *testing.T) {
 	expectedValue := lua.LString(remoteURL)
 
 	assert.Equal(t, expectedValue, result)
+}
+
+func TestRunScript(t *testing.T) {
+	t.Run("numeric return value", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		environment, err := NewLuaEnvironment(testCtx, repo)
+		require.NoError(t, err)
+		defer environment.Cleanup()
+
+		exitCode, err := environment.RunScript("return 0", lua.LTable{})
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0, exitCode)
+	})
+
+	t.Run("non-numeric return value", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		environment, err := NewLuaEnvironment(testCtx, repo)
+		require.NoError(t, err)
+		defer environment.Cleanup()
+
+		exitCode, err := environment.RunScript("return {}", lua.LTable{})
+
+		assert.NoError(t, err)
+		assert.Equal(t, 1, exitCode)
+	})
+
+	t.Run("script error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		environment, err := NewLuaEnvironment(testCtx, repo)
+		require.NoError(t, err)
+		defer environment.Cleanup()
+
+		exitCode, err := environment.RunScript("return )", lua.LTable{})
+
+		assert.Error(t, err)
+		assert.Equal(t, -1, exitCode)
+	})
 }
