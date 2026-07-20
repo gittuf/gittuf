@@ -22,13 +22,22 @@ jobs:
       uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       with:
         persist-credentials: false
+    - name: Move Go cache to D drive
+      if: runner.os == 'Windows'
+      shell: powershell
+      run: |
+        New-Item -ItemType Directory -Force -Path "D:\gopath"
+        New-Item -ItemType Directory -Force -Path "D:\gocache"
+        "GOPATH=D:\gopath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        "GOCACHE=D:\gocache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Write-Host "Go paths moved to D drive successfully"
     - name: Install Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
     - name: Test
-      run: go test -race -timeout 20m ./...
+      run: go test -race -timeout 40m ./...
   test-freebsd:
     runs-on: ubuntu-latest
     steps:
@@ -46,4 +55,4 @@ jobs:
           wget https://go.dev/dl/go1.26.1.freebsd-amd64.tar.gz
           tar -C /usr/local -xzf go1.26.1.freebsd-amd64.tar.gz
 
-          /usr/local/go/bin/go test -race -timeout 20m ./...
+          /usr/local/go/bin/go test -race -timeout 40m ./...

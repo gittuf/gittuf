@@ -18,6 +18,7 @@ import (
 )
 
 func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
@@ -26,6 +27,8 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	appName := "github"
 
 	t.Run("normal case", func(t *testing.T) {
+		t.Parallel()
+
 		approvers := []string{"jane.doe@example.com"}
 
 		mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
@@ -53,6 +56,8 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	})
 
 	t.Run("validation error", func(t *testing.T) {
+		t.Parallel()
+
 		// Create an invalid envelope (empty envelope)
 		invalidEnv := &sslibdsse.Envelope{}
 
@@ -69,6 +74,7 @@ func TestSetGitHubPullRequestApprovalAttestation(t *testing.T) {
 }
 
 func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
@@ -76,6 +82,8 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	appName := "github"
 
 	t.Run("normal case", func(t *testing.T) {
+		t.Parallel()
+
 		approvers := []string{"jane.doe@example.com"}
 
 		mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
@@ -105,6 +113,8 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	})
 
 	t.Run("conflicting index path", func(t *testing.T) {
+		t.Parallel()
+
 		approvers := []string{"jane.doe@example.com"}
 
 		mainZeroZero := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
@@ -132,6 +142,8 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 	})
 
 	t.Run("same review ID, same index path", func(t *testing.T) {
+		t.Parallel()
+
 		anotherAppName := "another-app"
 		approvers := []string{"jane.doe@example.com"}
 
@@ -163,18 +175,22 @@ func TestGetGitHubPullRequestApprovalAttestation(t *testing.T) {
 }
 
 func TestGitHubReviewID(t *testing.T) {
+	t.Parallel()
 	reviewID, err := GitHubReviewID("https://github.com", 123)
 	assert.Nil(t, err)
 	assert.Equal(t, "github.com::123", reviewID)
 }
 
 func TestGetGitHubPullRequestApprovalAttestationForReviewID(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 	baseURL := "https://github.com"
 	appName := "github"
 
 	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
 		reviewID := int64(123)
 
 		approvers := []string{"jane.doe@example.com"}
@@ -197,6 +213,8 @@ func TestGetGitHubPullRequestApprovalAttestationForReviewID(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -209,6 +227,8 @@ func TestGetGitHubPullRequestApprovalAttestationForReviewID(t *testing.T) {
 	})
 
 	t.Run("invalid URL", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -221,7 +241,10 @@ func TestGetGitHubPullRequestApprovalAttestationForReviewID(t *testing.T) {
 }
 
 func TestGetGitHubPullRequestApprovalAttestationForIndexPath(t *testing.T) {
+	t.Parallel()
 	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -235,6 +258,7 @@ func TestGetGitHubPullRequestApprovalAttestationForIndexPath(t *testing.T) {
 }
 
 func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 	baseURL := "https://github.com"
@@ -242,6 +266,8 @@ func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
 	reviewID := int64(123)
 
 	t.Run("success", func(t *testing.T) {
+		t.Parallel()
+
 		approvers := []string{"jane.doe@example.com"}
 
 		attestationEnv := createGitHubPullRequestApprovalAttestationEnvelope(t, testRef, testID, testID, approvers)
@@ -263,6 +289,8 @@ func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
+		t.Parallel()
+
 		attestations := &Attestations{}
 
 		// Try to get index path for non-existent review ID
@@ -274,6 +302,7 @@ func TestGetGitHubPullRequestApprovalIndexPathForReviewID(t *testing.T) {
 }
 
 func TestSetGitHubPullRequestAuthorization(t *testing.T) {
+	t.Parallel()
 	testRef := "refs/heads/main"
 	testID := gitinterface.ZeroHash.String()
 
@@ -294,6 +323,7 @@ func TestSetGitHubPullRequestAuthorization(t *testing.T) {
 }
 
 func TestGitHubPullRequestAttestationPath(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 	commitID := "abc123"
 
@@ -304,6 +334,7 @@ func TestGitHubPullRequestAttestationPath(t *testing.T) {
 }
 
 func TestGitHubPullRequestApprovalAttestationPath(t *testing.T) {
+	t.Parallel()
 	refName := "refs/heads/main"
 	fromID := "abc123"
 	toID := "def456"
