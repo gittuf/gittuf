@@ -5,13 +5,16 @@ package attestations
 
 import (
 	"encoding/json"
+	"errors"
 	"path"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/gitstoretest"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadCurrentAttestations(t *testing.T) {
@@ -186,4 +189,185 @@ func TestAttestationsCommit(t *testing.T) {
 	attestations, err = LoadCurrentAttestations(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, attestations.referenceAuthorizations, authorizations)
+}
+
+func TestAttestationsCommitStorerErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("write tree error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		injected := errors.New("write tree failure")
+		attestations := &Attestations{}
+
+		err := attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, WriteTreeErr: injected}, "Test commit", false, false)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("get reference error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		injected := errors.New("get reference failure")
+		attestations := &Attestations{}
+
+		err := attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, GetReferenceErr: injected}, "Test commit", false, false)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("commit error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		injected := errors.New("commit failure")
+		attestations := &Attestations{}
+
+		err := attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, CommitErr: injected}, "Test commit", false, false)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("write blob error for code review approval index", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		injected := errors.New("write blob failure")
+		// A non-empty index forces Commit to serialize and write the index blob.
+		attestations := &Attestations{
+			codeReviewApprovalIndex: map[string]string{"github-1": "refs/heads/main/from-to/github"},
+		}
+
+		err := attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, WriteBlobErr: injected}, "Test commit", false, false)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("RSL entry error without prior commit", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		// The injected EmptyTree error only affects the RSL entry commit.
+		// The attestations commit itself does not use the empty tree.
+		injected := errors.New("empty tree failure")
+		attestations := &Attestations{}
+
+		err := attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, EmptyTreeErr: injected}, "Test commit", true, false)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("RSL entry error resets to prior commit", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		attestations := &Attestations{}
+		require.Nil(t, attestations.Commit(repo, "First commit", false, false))
+		priorCommitID, err := repo.GetReference(Ref)
+		require.Nil(t, err)
+
+		injected := errors.New("empty tree failure")
+		err = attestations.Commit(&gitstoretest.FakeStorer{Storer: repo, EmptyTreeErr: injected}, "Second commit", true, false)
+		assert.ErrorIs(t, err, injected)
+
+		currentCommitID, err := repo.GetReference(Ref)
+		require.Nil(t, err)
+		assert.Equal(t, priorCommitID, currentCommitID)
+	})
+}
+
+func TestAttestationsCommitAndLoadAllAttestationTypes(t *testing.T) {
+	t.Parallel()
+
+	repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+	blobID, err := repo.WriteBlob([]byte("test attestation"))
+	require.Nil(t, err)
+
+	attestations := &Attestations{
+		referenceAuthorizations:        map[string]gitinterface.Hash{"refs/heads/main/from-to": blobID},
+		githubPullRequestAttestations:  map[string]gitinterface.Hash{"refs/heads/main/commit": blobID},
+		codeReviewApprovalAttestations: map[string]gitinterface.Hash{"refs/heads/main/from-to/github": blobID},
+		codeReviewApprovalIndex:        map[string]string{"github-1": "refs/heads/main/from-to/github"},
+	}
+
+	// The empty commit message exercises the default message path.
+	err = attestations.Commit(repo, "", true, false)
+	require.Nil(t, err)
+
+	loaded, err := LoadCurrentAttestations(repo)
+	require.Nil(t, err)
+
+	assert.Equal(t, attestations.referenceAuthorizations, loaded.referenceAuthorizations)
+	assert.Equal(t, attestations.githubPullRequestAttestations, loaded.githubPullRequestAttestations)
+	assert.Equal(t, attestations.codeReviewApprovalAttestations, loaded.codeReviewApprovalAttestations)
+	assert.Equal(t, attestations.codeReviewApprovalIndex, loaded.codeReviewApprovalIndex)
+	assert.Contains(t, loaded.codeReviewApprovalAttestations, codeReviewApprovalIndexTreeEntryName)
+}
+
+func TestLoadCurrentAttestationsStorerError(t *testing.T) {
+	t.Parallel()
+
+	repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+	injected := errors.New("get reference failure")
+
+	_, err := LoadCurrentAttestations(&gitstoretest.FakeStorer{Storer: repo, GetReferenceErr: injected})
+	assert.ErrorIs(t, err, injected)
+}
+
+func TestLoadAttestationsForEntryStorerErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("entry for wrong ref", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+		_, err := LoadAttestationsForEntry(repo, rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash))
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryDoesNotMatchRef)
+	})
+
+	t.Run("get commit tree ID error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		injected := errors.New("get commit tree ID failure")
+
+		_, err := LoadAttestationsForEntry(&gitstoretest.FakeStorer{Storer: repo, GetCommitTreeIDErr: injected}, rsl.NewReferenceEntry(Ref, gitinterface.ZeroHash))
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("get all files in tree error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		attestations := &Attestations{}
+		require.Nil(t, attestations.Commit(repo, "Test commit", true, false))
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(Ref))
+		require.Nil(t, err)
+
+		injected := errors.New("get all files in tree failure")
+		_, err = LoadAttestationsForEntry(&gitstoretest.FakeStorer{Storer: repo, GetAllFilesInTreeErr: injected}, entry)
+		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("read blob error for code review approval index", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		blobID, err := repo.WriteBlob([]byte("test attestation"))
+		require.Nil(t, err)
+
+		// A non-empty index causes Commit to store the index blob, which
+		// LoadAttestationsForEntry then reads back.
+		attestations := &Attestations{
+			codeReviewApprovalAttestations: map[string]gitinterface.Hash{"refs/heads/main/from-to/github": blobID},
+			codeReviewApprovalIndex:        map[string]string{"github-1": "refs/heads/main/from-to/github"},
+		}
+		require.Nil(t, attestations.Commit(repo, "Test commit", true, false))
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(Ref))
+		require.Nil(t, err)
+
+		injected := errors.New("read blob failure")
+		_, err = LoadAttestationsForEntry(&gitstoretest.FakeStorer{Storer: repo, ReadBlobErr: injected}, entry)
+		assert.ErrorIs(t, err, injected)
+	})
 }

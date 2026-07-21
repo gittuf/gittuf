@@ -16,6 +16,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -89,7 +90,7 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 // LoadPublicKeyFromGitConfig loads a public key as with LoadPublicKey above,
 // but from the key specified in the Git configuration of the target repository.
 func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
-	config, err := repo.r.GetGitConfig()
+	format, _, err := repo.r.LookupConfig(gitstore.ConfigGPGFormat)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +98,7 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	// Attempt to determine what type of key is specified by the user's Git
 	// config
 	var keyType signingMethod
-	switch config["gpg.format"] {
+	switch format {
 	case "gpg", "":
 		// GPG is assumed if "gpg" is specified, or if nothing is specified
 		keyType = signingMethodGPG
@@ -111,7 +112,10 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	}
 
 	// Get the path to the signing key, required if using an SSH or GPG key
-	signingKey := config["user.signingkey"]
+	signingKey, _, err := repo.r.LookupConfig(gitstore.ConfigUserSigningKey)
+	if err != nil {
+		return nil, err
+	}
 	if signingKey == "" && (keyType == signingMethodSSH || keyType == signingMethodGPG) {
 		return nil, ErrSigningKeyNotSpecified
 	}
@@ -128,7 +132,11 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
-		if config["gpg.x509.program"] == "gitsign" {
+		x509Program, _, err := repo.r.LookupConfig(gitstore.ConfigGPGX509Program)
+		if err != nil {
+			return nil, err
+		}
+		if x509Program == "gitsign" {
 			// gitsign
 			return LoadPublicKey(fmt.Sprintf("%s:%s", "fulcio", signingKey))
 		}
@@ -152,21 +160,19 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		keyID := strings.TrimPrefix(key, GPGKeyPrefix)
 
-		gitRepo := repo.GetGitRepository()
-		config, err := gitRepo.GetGitConfig()
+		opts, err := getGPGOptions(repo.GetGitRepository())
 		if err != nil {
 			return nil, err
 		}
 
-		return gpg.NewSignerFromKeyID(keyID, getGPGOptions(config)...)
+		return gpg.NewSignerFromKeyID(keyID, opts...)
 	case strings.HasPrefix(key, FulcioPrefix):
-		gitRepo := repo.GetGitRepository()
-		config, err := gitRepo.GetGitConfig()
+		opts, err := getSigstoreOptions(repo.GetGitRepository())
 		if err != nil {
 			return nil, err
 		}
 
-		return sigstore.NewSigner(getSigstoreOptions(config)...), nil
+		return sigstore.NewSigner(opts...), nil
 	default:
 		return ssh.NewSignerFromFile(key)
 	}
@@ -175,7 +181,9 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 // LoadSignerFromGitConfig loads a metadata signer for the signing key specified
 // in the Git configuration of the target repository.
 func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error) {
-	config, err := repo.r.GetGitConfig()
+	gitRepo := repo.r
+
+	format, _, err := gitRepo.LookupConfig(gitstore.ConfigGPGFormat)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +191,7 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	// Attempt to determine what type of key is specified by the user's Git
 	// config
 	var keyType signingMethod
-	switch config["gpg.format"] {
+	switch format {
 	case "gpg", "":
 		// GPG is assumed if "gpg" is specified, or if nothing is specified
 		keyType = signingMethodGPG
@@ -197,7 +205,10 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	}
 
 	// Get the path to the signing key, required if using an SSH or GPG key
-	signingKey := config["user.signingkey"]
+	signingKey, _, err := gitRepo.LookupConfig(gitstore.ConfigUserSigningKey)
+	if err != nil {
+		return nil, err
+	}
 	if signingKey == "" && (keyType == signingMethodSSH || keyType == signingMethodGPG) {
 		return nil, ErrSigningKeyNotSpecified
 	}
@@ -206,7 +217,11 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	case signingMethodGPG:
 		// GPG
 		// Load a GPG signer from the specified key
-		return gpg.NewSignerFromKeyID(signingKey, getGPGOptions(config)...)
+		opts, err := getGPGOptions(gitRepo)
+		if err != nil {
+			return nil, err
+		}
+		return gpg.NewSignerFromKeyID(signingKey, opts...)
 	case signingMethodSSH:
 		// SSH
 		// Load an SSH signer from the specified key
@@ -214,9 +229,17 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
-		if config["gpg.x509.program"] == "gitsign" {
+		x509Program, _, err := gitRepo.LookupConfig(gitstore.ConfigGPGX509Program)
+		if err != nil {
+			return nil, err
+		}
+		if x509Program == "gitsign" {
 			// gitsign
-			return sigstore.NewSigner(getSigstoreOptions(config)...), nil
+			opts, err := getSigstoreOptions(gitRepo)
+			if err != nil {
+				return nil, err
+			}
+			return sigstore.NewSigner(opts...), nil
 		}
 		return nil, ErrUnsupportedX509Method
 	default:
@@ -224,32 +247,62 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	}
 }
 
-func getGPGOptions(config map[string]string) []gpg.SignerOption {
+func getGPGOptions(storer gitstore.Storer) ([]gpg.SignerOption, error) {
 	opts := []gpg.SignerOption{}
 	// Parse relevant gpg.<name> config values
-	if value, has := config["gpg.program"]; has {
+	value, ok, err := storer.LookupConfig(gitstore.ConfigGPGProgram)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, gpg.WithGPGProgram(value))
 	}
-	return opts
+	return opts, nil
 }
 
-func getSigstoreOptions(config map[string]string) []sigstoresigneropts.Option {
+func getSigstoreOptions(storer gitstore.Storer) ([]sigstoresigneropts.Option, error) {
 	opts := []sigstoresigneropts.Option{}
+
 	// Parse relevant gitsign.<> config values
-	if value, has := config[sigstore.GitConfigIssuer]; has {
+	value, ok, err := storer.LookupConfig(gitstore.ConfigGitsignIssuer)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, sigstoresigneropts.WithIssuerURL(value))
 	}
-	if value, has := config[sigstore.GitConfigClientID]; has {
+
+	value, ok, err = storer.LookupConfig(gitstore.ConfigGitsignClientID)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, sigstoresigneropts.WithClientID(value))
 	}
-	if value, has := config[sigstore.GitConfigFulcio]; has {
+
+	value, ok, err = storer.LookupConfig(gitstore.ConfigGitsignFulcio)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, sigstoresigneropts.WithFulcioURL(value))
 	}
-	if value, has := config[sigstore.GitConfigRekor]; has {
+
+	value, ok, err = storer.LookupConfig(gitstore.ConfigGitsignRekor)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, sigstoresigneropts.WithRekorURL(value))
 	}
-	if value, has := config[sigstore.GitConfigRedirectURL]; has {
+
+	value, ok, err = storer.LookupConfig(gitstore.ConfigGitsignRedirectURL)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		opts = append(opts, sigstoresigneropts.WithRedirectURL(value))
 	}
-	return opts
+
+	return opts, nil
 }

@@ -16,7 +16,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 // handleSSH implements the helper for remotes configured to use SSH. For this

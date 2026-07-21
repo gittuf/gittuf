@@ -13,6 +13,7 @@ import (
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	ita "github.com/in-toto/attestation/go/v1"
 )
 
@@ -38,7 +39,7 @@ func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.State
 
 // SetReferenceAuthorization writes the new reference authorization attestation
 // to the object store and tracks it in the current attestations state.
-func (a *Attestations) SetReferenceAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, refName, fromID, toID string) error {
+func (a *Attestations) SetReferenceAuthorization(repo gitstore.Storer, env *sslibdsse.Envelope, refName, fromID, toID string) error {
 	payloadBytes, err := env.DecodeB64Payload()
 	if err != nil {
 		return fmt.Errorf("unable to inspect reference authorization: %w", err)
@@ -94,7 +95,7 @@ func (a *Attestations) RemoveReferenceAuthorization(refName, fromID, toID string
 
 // GetReferenceAuthorizationFor returns the requested reference authorization
 // attestation (with its signatures).
-func (a *Attestations) GetReferenceAuthorizationFor(repo *gitinterface.Repository, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
+func (a *Attestations) GetReferenceAuthorizationFor(repo gitstore.Storer, refName, fromID, toID string) (*sslibdsse.Envelope, error) {
 	blobID, has := a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)]
 	if !has {
 		return nil, authorizations.ErrAuthorizationNotFound

@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +60,7 @@ func TestGetPathIDInTree(t *testing.T) {
 		}
 		assert.Equal(t, emptyTreeID, treeID.String())
 
-		pathID, err := repo.GetPathIDInTree("a", treeID)
+		pathID, err := repo.GetPathIDInTree(treeID, "a")
 		assert.ErrorIs(t, err, ErrTreeDoesNotHavePath)
 		assert.Nil(t, pathID)
 	})
@@ -75,7 +76,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		itemID, err := repo.GetPathIDInTree("a", treeID)
+		itemID, err := repo.GetPathIDInTree(treeID, "a")
 		assert.Nil(t, err)
 		assert.Equal(t, blobAID, itemID)
 	})
@@ -91,7 +92,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		itemID, err := repo.GetPathIDInTree("foo/a", treeID)
+		itemID, err := repo.GetPathIDInTree(treeID, "foo/a")
 		assert.Nil(t, err)
 		assert.Equal(t, blobAID, itemID)
 	})
@@ -113,7 +114,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		itemID, err := repo.GetPathIDInTree("foo/bar/foobar", treeID)
+		itemID, err := repo.GetPathIDInTree(treeID, "foo/bar/foobar")
 		assert.Nil(t, err)
 		assert.Equal(t, expectedItemID, itemID)
 
@@ -123,7 +124,7 @@ func TestGetPathIDInTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		itemID, err = repo.GetPathIDInTree("foo/bar", treeID)
+		itemID, err = repo.GetPathIDInTree(treeID, "foo/bar")
 		assert.Nil(t, err)
 		assert.Equal(t, expectedItemID, itemID)
 
@@ -133,27 +134,27 @@ func TestGetPathIDInTree(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		itemID, err = repo.GetPathIDInTree("foobar/foo", treeID)
+		itemID, err = repo.GetPathIDInTree(treeID, "foobar/foo")
 		assert.Nil(t, err)
 		assert.Equal(t, expectedItemID, itemID)
 
-		itemID, err = repo.GetPathIDInTree("foobar/foo/foobar", treeID)
+		itemID, err = repo.GetPathIDInTree(treeID, "foobar/foo/foobar")
 		assert.ErrorIs(t, err, ErrTreeDoesNotHavePath)
 		assert.Nil(t, itemID)
 	})
 
 	t.Run("blob id", func(t *testing.T) {
-		_, err := repo.GetPathIDInTree("a", blobAID)
+		_, err := repo.GetPathIDInTree(blobAID, "a")
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		_, err := repo.GetPathIDInTree("a", ZeroHash)
+		_, err := repo.GetPathIDInTree(ZeroHash, "a")
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 }
 
-func TestGetTreeItems(t *testing.T) {
+func TestGetEntriesInTree(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
 	treeBuilder := NewTreeBuilder(repo)
@@ -177,9 +178,9 @@ func TestGetTreeItems(t *testing.T) {
 		}
 		assert.Equal(t, emptyTreeID, treeID.String())
 
-		treeItems, err := repo.GetTreeItems(treeID)
+		entries, err := repo.GetEntriesInTree(treeID)
 		assert.Nil(t, err)
-		assert.Nil(t, treeItems)
+		assert.Nil(t, entries)
 	})
 
 	t.Run("no subdirectories", func(t *testing.T) {
@@ -193,14 +194,14 @@ func TestGetTreeItems(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectedOutput := map[string]Hash{
-			"a": blobAID,
-			"b": blobBID,
+		expected := []TreeEntry{
+			NewEntryBlob("a", blobAID),
+			NewEntryBlob("b", blobBID),
 		}
 
-		treeItems, err := repo.GetTreeItems(treeID)
+		entries, err := repo.GetEntriesInTree(treeID)
 		assert.Nil(t, err)
-		assert.Equal(t, expectedOutput, treeItems)
+		assert.ElementsMatch(t, expected, entries)
 	})
 
 	t.Run("one file in root tree, one file in subdirectory", func(t *testing.T) {
@@ -219,14 +220,14 @@ func TestGetTreeItems(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectedTreeItems := map[string]Hash{
-			"foo": fooTreeID,
-			"b":   blobBID,
+		expected := []TreeEntry{
+			NewEntryTree("foo", fooTreeID),
+			NewEntryBlob("b", blobBID),
 		}
 
-		treeItems, err := repo.GetTreeItems(treeID)
+		entries, err := repo.GetEntriesInTree(treeID)
 		assert.Nil(t, err)
-		assert.Equal(t, expectedTreeItems, treeItems)
+		assert.ElementsMatch(t, expected, entries)
 	})
 
 	t.Run("one file in foo tree, one file in bar", func(t *testing.T) {
@@ -250,23 +251,23 @@ func TestGetTreeItems(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expectedTreeItems := map[string]Hash{
-			"foo": fooTreeID,
-			"bar": barTreeID,
+		expected := []TreeEntry{
+			NewEntryTree("foo", fooTreeID),
+			NewEntryTree("bar", barTreeID),
 		}
 
-		treeItems, err := repo.GetTreeItems(treeID)
+		entries, err := repo.GetEntriesInTree(treeID)
 		assert.Nil(t, err)
-		assert.Equal(t, expectedTreeItems, treeItems)
+		assert.ElementsMatch(t, expected, entries)
 	})
 
 	t.Run("blob id", func(t *testing.T) {
-		_, err := repo.GetTreeItems(blobAID)
+		_, err := repo.GetEntriesInTree(blobAID)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 
 	t.Run("non-existent id", func(t *testing.T) {
-		_, err := repo.GetTreeItems(ZeroHash)
+		_, err := repo.GetEntriesInTree(ZeroHash)
 		assert.ErrorContains(t, err, "unable to enumerate items in tree")
 	})
 }
@@ -891,23 +892,23 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 					rootTreeID, err := downstreamRepository.GetCommitTreeID(downstreamCommitID)
 					require.Nil(t, err)
 
-					itemID, err := downstreamRepository.GetPathIDInTree(test.localPath, rootTreeID)
+					itemID, err := downstreamRepository.GetPathIDInTree(rootTreeID, test.localPath)
 					require.Nil(t, err)
 
 					upstreamTreeID := upstreamRootTreeID
 					if test.upstreamPath != "" {
-						upstreamTreeID, err = upstreamRepository.GetPathIDInTree(test.upstreamPath, upstreamRootTreeID)
+						upstreamTreeID, err = upstreamRepository.GetPathIDInTree(upstreamRootTreeID, test.upstreamPath)
 						require.Nil(t, err)
 					}
 					assert.Equal(t, upstreamTreeID, itemID)
 
 					if test.refExists {
 						// check that other items are still present
-						itemID, err := downstreamRepository.GetPathIDInTree("oof/a", downstreamTreeID)
+						itemID, err := downstreamRepository.GetPathIDInTree(downstreamTreeID, "oof/a")
 						require.Nil(t, err)
 						assert.Equal(t, blobAID, itemID)
 
-						itemID, err = downstreamRepository.GetPathIDInTree("b", downstreamTreeID)
+						itemID, err = downstreamRepository.GetPathIDInTree(downstreamTreeID, "b")
 						require.Nil(t, err)
 						assert.Equal(t, blobBID, itemID)
 					}
@@ -1211,4 +1212,83 @@ func TestGetAllFilesInTree(t *testing.T) {
 		_, err = repo.GetAllFilesInTree(ZeroHash)
 		assert.ErrorContains(t, err, "unable to enumerate all files in tree")
 	})
+}
+
+func TestWriteTree(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	blobAID, err := repo.WriteBlob([]byte("a"))
+	require.Nil(t, err)
+	blobBID, err := repo.WriteBlob([]byte("b"))
+	require.Nil(t, err)
+
+	treeID, err := repo.WriteTree([]TreeEntry{
+		NewEntryBlob("a", blobAID),
+		NewEntryBlob("dir/b", blobBID),
+	})
+	assert.Nil(t, err)
+
+	files, err := repo.GetAllFilesInTree(treeID)
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]Hash{"a": blobAID, "dir/b": blobBID}, files)
+
+	emptyTreeID, err := repo.WriteTree(nil)
+	assert.Nil(t, err)
+	expectedEmpty, err := repo.EmptyTree()
+	require.Nil(t, err)
+	assert.Equal(t, expectedEmpty, emptyTreeID)
+
+	// subtree case: write a tree with a blob, then graft it as a subtree
+	blobCID, err := repo.WriteBlob([]byte("c"))
+	require.Nil(t, err)
+
+	firstTreeID, err := repo.WriteTree([]TreeEntry{NewEntryBlob("c", blobCID)})
+	require.Nil(t, err)
+
+	combinedTreeID, err := repo.WriteTree([]TreeEntry{
+		NewEntryBlob("a", blobAID),
+		NewEntryTree("nested", firstTreeID),
+	})
+	require.Nil(t, err)
+
+	allFiles, err := repo.GetAllFilesInTree(combinedTreeID)
+	require.Nil(t, err)
+	assert.Equal(t, map[string]Hash{
+		"a":        blobAID,
+		"nested/c": blobCID,
+	}, allFiles)
+
+	// duplicate path is rejected
+	_, err = repo.WriteTree([]TreeEntry{
+		NewEntryBlob("a", blobAID),
+		NewEntryBlob("a", blobBID),
+	})
+	assert.ErrorIs(t, err, gitstore.ErrDuplicateTreePath)
+}
+
+func TestWriteTreeDeterministic(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	entries := []TreeEntry{}
+	for _, name := range []string{"a", "b", "c", "d", "e", "dir/f", "dir/g"} {
+		blobID, err := repo.WriteBlob([]byte(name))
+		require.Nil(t, err)
+		entries = append(entries, NewEntryBlob(name, blobID))
+	}
+
+	// The tree ID must not depend on entry order.
+	first, err := repo.WriteTree(entries)
+	require.Nil(t, err)
+
+	reversed := make([]TreeEntry, len(entries))
+	for i, entry := range entries {
+		reversed[len(entries)-1-i] = entry
+	}
+	next, err := repo.WriteTree(reversed)
+	require.Nil(t, err)
+	assert.Equal(t, first, next)
 }

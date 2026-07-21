@@ -180,6 +180,17 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		assert.Equal(t, expectedCommits, commits)
 	})
 
+	t.Run("nil old commit ID", func(t *testing.T) {
+		commits, err := repo.GetCommitsBetweenRange(allCommits[4], nil)
+		assert.Nil(t, err)
+
+		expectedCommits := append([]Hash{}, allCommits...)
+		sort.Slice(expectedCommits, func(i, j int) bool {
+			return expectedCommits[i].String() < expectedCommits[j].String()
+		})
+		assert.Equal(t, expectedCommits, commits)
+	})
+
 	t.Run("Get all commits", func(t *testing.T) {
 		commits, err := repo.GetCommitsBetweenRange(allCommits[4], ZeroHash)
 		assert.Nil(t, err)

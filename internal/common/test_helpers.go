@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/go-git/go-git/v6/config"
 	"github.com/jonboulle/clockwork"
 )
@@ -40,7 +41,7 @@ var (
 //
 // Update: This helper just wraps around CommitUsingSpecificKey in the rsl
 // package. We can probably get rid of it, but it's a pretty big delta.
-func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *gitinterface.Repository, entry *rsl.ReferenceEntry, signingKeyBytes []byte) gitinterface.Hash {
+func CreateTestRSLReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry *rsl.ReferenceEntry, signingKeyBytes []byte) gitinterface.Hash {
 	t.Helper()
 
 	if err := entry.CommitUsingSpecificKey(repo, signingKeyBytes); err != nil {
@@ -62,7 +63,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo *gitinterface.Reposito
 //
 // Update: This helper just wraps around CommitUsingSpecificKey in the rsl
 // package. We can probably get rid of it, but it's a pretty big delta.
-func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo *gitinterface.Repository, annotation *rsl.AnnotationEntry, signingKeyBytes []byte) gitinterface.Hash {
+func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo gitstore.Storer, annotation *rsl.AnnotationEntry, signingKeyBytes []byte) gitinterface.Hash {
 	t.Helper()
 
 	if err := annotation.CommitUsingSpecificKey(repo, signingKeyBytes); err != nil {

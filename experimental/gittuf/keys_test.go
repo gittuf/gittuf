@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/gitstoretest"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -201,31 +203,34 @@ func TestLoadPublicKey(t *testing.T) {
 
 func TestGetSigstoreOptions(t *testing.T) {
 	t.Run("full config", func(t *testing.T) {
-		config := map[string]string{
-			"gitsign.issuer":      "issuer",
-			"gitsign.clientid":    "client",
-			"gitsign.fulcio":      "fulcio-url",
-			"gitsign.rekor":       "rekor-url",
-			"gitsign.redirecturl": "redirect-url",
-		}
+		storer := &gitstoretest.FakeStorer{Config: map[gitstore.ConfigKey]string{
+			gitstore.ConfigGitsignIssuer:      "issuer",
+			gitstore.ConfigGitsignClientID:    "client",
+			gitstore.ConfigGitsignFulcio:      "fulcio-url",
+			gitstore.ConfigGitsignRekor:       "rekor-url",
+			gitstore.ConfigGitsignRedirectURL: "redirect-url",
+		}}
 
-		opts := getSigstoreOptions(config)
+		opts, err := getSigstoreOptions(storer)
+		require.NoError(t, err)
 		require.Len(t, opts, 5)
 	})
 
 	t.Run("partial config", func(t *testing.T) {
-		config := map[string]string{
-			"gitsign.issuer": "issuer",
-		}
+		storer := &gitstoretest.FakeStorer{Config: map[gitstore.ConfigKey]string{
+			gitstore.ConfigGitsignIssuer: "issuer",
+		}}
 
-		opts := getSigstoreOptions(config)
+		opts, err := getSigstoreOptions(storer)
+		require.NoError(t, err)
 		require.Len(t, opts, 1)
 	})
 
 	t.Run("empty config", func(t *testing.T) {
-		config := map[string]string{}
+		storer := &gitstoretest.FakeStorer{Config: map[gitstore.ConfigKey]string{}}
 
-		opts := getSigstoreOptions(config)
+		opts, err := getSigstoreOptions(storer)
+		require.NoError(t, err)
 		assert.Empty(t, opts)
 	})
 }

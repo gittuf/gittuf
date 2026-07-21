@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 const (
@@ -18,9 +20,7 @@ const (
 	RemoteRefPrefix = "refs/remotes/"
 )
 
-var (
-	ErrReferenceNotFound = errors.New("requested Git reference not found")
-)
+var ErrReferenceNotFound = gitstore.ErrReferenceNotFound
 
 // GetReference returns the tip of the specified Git reference.
 func (r *Repository) GetReference(refName string) (Hash, error) {

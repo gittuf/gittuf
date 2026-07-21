@@ -5,30 +5,19 @@ package gitinterface
 
 import (
 	"bytes"
-	"context"
-	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/gittuf/gittuf/internal/signerverifier/common"
-	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
-	sslibsvssh "github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/hiddeco/sshsig"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
-	"github.com/sigstore/cosign/v3/pkg/cosign"
-	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
-	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
 	"golang.org/x/crypto/ssh"
 )
 
 const (
-	rekorPublicGoodInstance           = "https://rekor.sigstore.dev"
 	namespaceSSHSignature      string = "git"
 	gpgPrivateKeyPEMHeader     string = "PGP PRIVATE KEY"
 	opensshPrivateKeyPEMHeader string = "OPENSSH PRIVATE KEY"
@@ -39,32 +28,35 @@ const (
 )
 
 var (
-	ErrNotCommitOrTag             = errors.New("invalid object type, expected commit or tag for signature verification")
-	ErrSigningKeyNotSpecified     = errors.New("signing key not specified in git config")
-	ErrUnknownSigningMethod       = errors.New("unknown signing method (not one of gpg, ssh, x509)")
-	ErrIncorrectVerificationKey   = errors.New("incorrect key provided to verify signature")
-	ErrVerifyingSigstoreSignature = errors.New("unable to verify Sigstore signature")
-	ErrVerifyingSSHSignature      = errors.New("unable to verify SSH signature")
-	ErrInvalidSignature           = errors.New("unable to parse signature / signature has unexpected header")
-	ErrMultipleSignatures         = errors.New("object has multiple signatures")
+	ErrNotCommitOrTag         = errors.New("invalid object type, expected commit or tag for signature verification")
+	ErrSigningKeyNotSpecified = errors.New("signing key not specified in git config")
+
+	// ErrUnknownSigningMethod covers the signing side, in
+	// signGitObjectUsingKey. Verification reports
+	// gitobject.ErrUnknownSigningMethod instead.
+	ErrUnknownSigningMethod = errors.New("unknown signing method (not one of gpg, ssh, x509)")
 )
 
 // CanSign inspects the Git configuration to determine if commit / tag signing
 // is possible.
 func (r *Repository) CanSign() error {
-	config, err := r.GetGitConfig()
+	// Format is one of GPG, SSH, X509. GPG is the default when unset.
+	format, ok, err := r.LookupConfig(gitstore.ConfigGPGFormat)
 	if err != nil {
 		return err
 	}
-
-	// Format is one of GPG, SSH, X509
-	format := getSigningMethod(config)
+	if !ok {
+		format = signingFormatGPG
+	}
 
 	// If format is GPG or X509, the signing key parameter is optional
 	// However, for SSH, the signing key must be set
 	if format == signingFormatSSH {
-		keyInfo := getSigningKeyInfo(config)
-		if keyInfo == "" {
+		keyInfo, ok, err := r.LookupConfig(gitstore.ConfigUserSigningKey)
+		if err != nil {
+			return err
+		}
+		if !ok || keyInfo == "" {
 			return ErrSigningKeyNotSpecified
 		}
 	}
@@ -72,18 +64,56 @@ func (r *Repository) CanSign() error {
 	return nil
 }
 
-// VerifySignature verifies the cryptographic signature associated with the
-// specified object. The `objectID` must point to a Git commit or tag object.
-func (r *Repository) VerifySignature(ctx context.Context, objectID Hash, key *signerverifier.SSLibKey) error {
+// GetObjectSignature returns the signed payload and the detached signature for
+// the specified Git object. The `objectID` must point to a commit or tag
+// object. An unsigned object returns an empty signature and no error, and
+// verification layers decide how to treat it. For commits the signature is
+// read from the header matching the repository's object format (`gpgsig` or
+// `gpgsig-sha256`). For tags it is the block Git appends to the payload.
+// Signatures containing multiple armored blocks are returned verbatim, and
+// callers performing verification must reject them.
+func (r *Repository) GetObjectSignature(objectID Hash) ([]byte, []byte, error) {
 	if err := r.ensureIsCommit(objectID); err == nil {
-		return r.verifyCommitSignature(ctx, objectID, key)
+		goGitRepo, err := r.GetGoGitRepository()
+		if err != nil {
+			return nil, nil, fmt.Errorf("error opening repository: %w", err)
+		}
+
+		commit, err := goGitRepo.CommitObject(plumbing.NewHash(objectID.String()))
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to load commit object: %w", err)
+		}
+
+		payload, err := getCommitBytesWithoutSignature(commit)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to encode commit contents: %w", err)
+		}
+
+		return payload, []byte(signatureForObjectID(objectID, commit.Signature, commit.SignatureSHA256)), nil
 	}
 
 	if err := r.ensureIsTag(objectID); err == nil {
-		return r.verifyTagSignature(ctx, objectID, key)
+		goGitRepo, err := r.GetGoGitRepository()
+		if err != nil {
+			return nil, nil, fmt.Errorf("error opening repository: %w", err)
+		}
+
+		tag, err := goGitRepo.TagObject(plumbing.NewHash(objectID.String()))
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to load tag object: %w", err)
+		}
+
+		payload, err := getTagBytesWithoutSignature(tag)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to encode tag contents: %w", err)
+		}
+
+		// Git appends tag signatures to the tag payload regardless of the
+		// object format, so the signature is always in the Signature field.
+		return payload, []byte(tag.Signature), nil
 	}
 
-	return ErrNotCommitOrTag
+	return nil, nil, ErrNotCommitOrTag
 }
 
 func signGitObjectUsingKey(contents, pemKeyBytes []byte) (string, error) {
@@ -137,131 +167,6 @@ func signGitObjectUsingSSHKey(contents, pemKeyBytes []byte) (string, error) {
 	return string(sigBytes), nil
 }
 
-// verifyGitsignSignature handles the Sigstore-specific workflow involved in
-// verifying commit or tag signatures issued by gitsign.
-func verifyGitsignSignature(ctx context.Context, repo *Repository, key *signerverifier.SSLibKey, data, signature []byte) error {
-	checkOpts := &cosign.CheckOpts{
-		Identities: []cosign.Identity{{
-			Issuer:  key.KeyVal.Issuer,
-			Subject: key.KeyVal.Identity,
-		}},
-	}
-
-	var verifier *gitsignVerifier.CertVerifier
-	sigstoreRootFilePath := os.Getenv(sigstore.EnvSigstoreRootFile)
-	if sigstoreRootFilePath == "" {
-		root, err := fulcioroots.Get()
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-		intermediate, err := fulcioroots.GetIntermediates()
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		checkOpts.RootCerts = root
-		checkOpts.IntermediateCerts = intermediate
-
-		verifier, err = gitsignVerifier.NewCertVerifier(
-			gitsignVerifier.WithRootPool(root),
-			gitsignVerifier.WithIntermediatePool(intermediate),
-		)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-	} else {
-		slog.Debug("Using environment variables to establish trust for Sigstore instance...")
-		rootCerts, err := common.LoadCertsFromPath(sigstoreRootFilePath)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-		root := x509.NewCertPool()
-		for _, cert := range rootCerts {
-			root.AddCert(cert)
-		}
-
-		checkOpts.RootCerts = root
-
-		verifier, err = gitsignVerifier.NewCertVerifier(
-			gitsignVerifier.WithRootPool(root),
-		)
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-	}
-
-	verifiedCert, err := verifier.Verify(ctx, data, signature, true)
-	if err != nil {
-		return ErrIncorrectVerificationKey
-	}
-
-	rekorURL := rekorPublicGoodInstance
-	// Check git config to see if rekor server must be overridden
-	config, err := repo.GetGitConfig()
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-	if configValue, has := config[sigstore.GitConfigRekor]; has {
-		slog.Debug(fmt.Sprintf("Using '%s' as Rekor instance...", configValue))
-		rekorURL = configValue
-	}
-
-	// gitsignRekor.NewWithOptions invokes cosign.GetRekorPubs which looks at
-	// the env var, so we don't have to do anything here
-	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorURL)
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-
-	checkOpts.RekorClient = rekor.Rekor
-	checkOpts.RekorPubKeys = rekor.PublicKeys()
-
-	// cosign.GetCTLogPubs already looks at the env var, so we don't have to do
-	// anything here
-	ctPub, err := cosign.GetCTLogPubs(ctx)
-	if err != nil {
-		return errors.Join(ErrVerifyingSigstoreSignature, err)
-	}
-
-	checkOpts.CTLogPubKeys = ctPub
-
-	if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
-		return errors.Join(ErrIncorrectVerificationKey, err)
-	}
-
-	return nil
-}
-
-// verifySSHKeySignature verifies Git signatures issued by SSH keys.
-func verifySSHKeySignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte) error {
-	verifier, err := sslibsvssh.NewVerifierFromKey(key)
-	if err != nil {
-		return errors.Join(ErrVerifyingSSHSignature, err)
-	}
-
-	if err := verifier.Verify(ctx, data, signature); err != nil {
-		return errors.Join(ErrVerifyingSSHSignature, err)
-	}
-
-	return nil
-}
-
-func getSigningMethod(gitConfig map[string]string) string {
-	format, ok := gitConfig["gpg.format"]
-	if !ok {
-		return signingFormatGPG // default to gpg
-	}
-	return format
-}
-
-func getSigningKeyInfo(gitConfig map[string]string) string {
-	keyInfo, ok := gitConfig["user.signingkey"]
-	if !ok {
-		return ""
-	}
-	return keyInfo
-}
-
 // signatureForObjectID selects the signature stored for a Git commit based on
 // its hash algorithm, identified by the OID length. SHA-256 commits store
 // their signature under the `gpgsig-sha256` header (go-git's SignatureSHA256),
@@ -272,20 +177,4 @@ func signatureForObjectID(objectID Hash, signature, signatureSHA256 string) stri
 		return signatureSHA256
 	}
 	return signature
-}
-
-// signatureBlockCount reports how many armored signature blocks appear in a
-// signature. Verification rejects values carrying more than one block, which
-// are ambiguous.
-func signatureBlockCount(signature string) int {
-	count := 0
-	for line := range strings.SplitSeq(signature, "\n") {
-		switch strings.TrimSpace(line) {
-		case "-----BEGIN PGP SIGNATURE-----",
-			"-----BEGIN PGP MESSAGE-----",
-			"-----BEGIN SSH SIGNATURE-----":
-			count++
-		}
-	}
-	return count
 }

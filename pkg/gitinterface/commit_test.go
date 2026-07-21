@@ -5,7 +5,6 @@ package gitinterface
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
@@ -226,7 +226,7 @@ func TestCommitUsingSpecificKey(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Verify commit signature using publicKey
-	err = repo.verifyCommitSignature(context.Background(), commitID, publicKey)
+	err = verifyObjectSignature(t, repo, commitID, publicKey)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedSecondCommitID, commitID.String())
 }
@@ -269,34 +269,34 @@ func TestRepositoryVerifyCommit(t *testing.T) {
 	}
 
 	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, gpgKey)
+		assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gpg signed commit, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, gpgKey)
+		err = verifyObjectSignature(t, repo, gpgSignedCommitID, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gpgSignedCommitID, sshKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		err = verifyObjectSignature(t, repo, gpgSignedCommitID, sshKey)
+		assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 	})
 
 	t.Run("gitsign signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), gitsignSignedCommitID, sshKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		err = verifyObjectSignature(t, repo, gitsignSignedCommitID, sshKey)
+		assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
-		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, unknownKey)
+		assert.ErrorIs(t, err, gitobject.ErrUnknownSigningMethod)
 	})
 }
 
@@ -336,19 +336,19 @@ func TestRepositoryVerifyCommitSHA256(t *testing.T) {
 	// be reproduced for a SHA-256 repository.
 
 	t.Run("ssh signed commit, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, sshKey)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("ssh signed commit, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyCommitSignature(context.Background(), sshSignedCommitID, gpgKey)
-		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, gpgKey)
+		assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyCommitSignature(t.Context(), sshSignedCommitID, unknownKey)
-		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+		err = verifyObjectSignature(t, repo, sshSignedCommitID, unknownKey)
+		assert.ErrorIs(t, err, gitobject.ErrUnknownSigningMethod)
 	})
 }
 
@@ -383,26 +383,8 @@ func TestCommitUsingSpecificKeySignatureHeader(t *testing.T) {
 			sshKey, err := ssh.NewKeyFromFile(keyPath)
 			require.Nil(t, err)
 
-			assert.Nil(t, repo.verifyCommitSignature(context.Background(), commitID, sshKey))
+			assert.Nil(t, verifyObjectSignature(t, repo, commitID, sshKey))
 		})
-	}
-}
-
-func TestSignatureBlockCount(t *testing.T) {
-	tests := map[string]struct {
-		signature string
-		expected  int
-	}{
-		"empty":             {"", 0},
-		"single pgp":        {"-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n", 1},
-		"single ssh":        {"-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n", 1},
-		"two pgp blocks":    {"-----BEGIN PGP SIGNATURE-----\na\n-----END PGP SIGNATURE-----\n-----BEGIN PGP SIGNATURE-----\nb\n-----END PGP SIGNATURE-----\n", 2},
-		"nested ssh blocks": {"-----BEGIN SSH SIGNATURE-----\n-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n-----END SSH SIGNATURE-----\n", 2},
-		"no signature":      {"not a signature", 0},
-	}
-
-	for name, test := range tests {
-		assert.Equal(t, test.expected, signatureBlockCount(test.signature), name)
 	}
 }
 
@@ -471,9 +453,9 @@ func TestVerifyCommitSignatureRejectsMultipleSignatures(t *testing.T) {
 			commitHash, err := NewHash(commitID.String())
 			require.Nil(t, err)
 
-			err = repo.verifyCommitSignature(context.Background(), commitHash, test.verificationKey(t))
-			assert.ErrorIs(t, err, ErrMultipleSignatures)
-			assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+			err = verifyObjectSignature(t, repo, commitHash, test.verificationKey(t))
+			assert.ErrorIs(t, err, gitobject.ErrMultipleSignatures)
+			assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 		})
 	}
 }

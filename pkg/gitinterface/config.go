@@ -4,31 +4,39 @@
 package gitinterface
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"os/exec"
 	"strings"
+
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
-// GetGitConfig reads the applicable Git config for a repository and returns
-// it. The "keys" for each config are normalized to lowercase.
-func (r *Repository) GetGitConfig() (map[string]string, error) {
-	stdOut, err := r.executor("config", "--get-regexp", `.*`).executeString()
+// LookupConfig returns the value of a single Git config setting. ok is false
+// when the key is not set. A key that is set to an empty value returns "" with
+// ok true, matching `git config --get`, which exits 0 for a set-but-empty key
+// and 1 for an unset one.
+func (r *Repository) LookupConfig(key gitstore.ConfigKey) (string, bool, error) {
+	stdOut, stdErr, err := r.executor("config", "--get", string(key)).execute()
 	if err != nil {
-		return nil, fmt.Errorf("unable to read Git config: %w", err)
-	}
-
-	config := map[string]string{}
-
-	lines := strings.Split(strings.TrimSpace(stdOut), "\n")
-	for _, line := range lines {
-		split := strings.SplitN(line, " ", 2)
-		if len(split) == 2 {
-			config[strings.ToLower(split[0])] = split[1]
-		} else if len(split) == 1 && split[0] == "gpg.format" {
-			config[strings.ToLower(split[0])] = ""
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return "", false, nil
 		}
+		stdErrContents, readErr := io.ReadAll(stdErr)
+		if readErr != nil {
+			return "", false, fmt.Errorf("unable to read Git config key '%s': %w", key, err)
+		}
+		return "", false, fmt.Errorf("unable to read Git config key '%s': %w: %s", key, err, strings.TrimSpace(string(stdErrContents)))
 	}
 
-	return config, nil
+	value, err := io.ReadAll(stdOut)
+	if err != nil {
+		return "", false, fmt.Errorf("unable to read Git config value for '%s': %w", key, err)
+	}
+
+	return strings.TrimSpace(string(value)), true, nil
 }
 
 // SetGitConfig sets the specified key to the value locally for a repository.

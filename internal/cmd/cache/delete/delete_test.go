@@ -11,8 +11,8 @@ import (
 	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

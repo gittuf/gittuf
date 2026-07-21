@@ -5,13 +5,14 @@ package gittuf
 
 import (
 	"github.com/gittuf/gittuf/internal/cache"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 const (
 	// CacheAutomaticEnablementGitKey is the git config key used to control
 	// whether gittuf automatically enables the persistent cache after clone and
 	// trust init. Users can set this to "false" to opt out.
-	CacheAutomaticEnablementGitKey = "gittuf.cache.automatic"
+	CacheAutomaticEnablementGitKey = string(gitstore.ConfigCacheAutomatic)
 )
 
 // PopulateCache scans the repository's RSL and generates a persistent
@@ -30,13 +31,8 @@ func (r *Repository) DeleteCache() error {
 // automatic cache enablement. Returns false by default (meaning automatic
 // enablement is enabled) unless gittuf.cache.automatic=false is set.
 func (r *Repository) GetAutomaticCacheEnablementStatus() bool {
-	config, err := r.r.GetGitConfig()
-	if err != nil {
-		return false
-	}
-
-	val, exists := config[CacheAutomaticEnablementGitKey]
-	if !exists {
+	val, ok, err := r.r.LookupConfig(gitstore.ConfigCacheAutomatic)
+	if err != nil || !ok {
 		return false
 	}
 

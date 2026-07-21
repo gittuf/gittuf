@@ -18,13 +18,14 @@ import (
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,7 +226,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -273,7 +274,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgUnauthorizedKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -328,7 +329,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -383,7 +384,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgUnauthorizedKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -426,7 +427,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
-		invalidEntryIDs := []gitinterface.Hash{entryID}
+		invalidEntryIDs := []rsl.Hash{entryID}
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -488,7 +489,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
-		invalidEntryIDs := []gitinterface.Hash{entryID}
+		invalidEntryIDs := []rsl.Hash{entryID}
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -553,7 +554,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -582,7 +583,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation = rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -641,7 +642,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to invalid last good commit
@@ -696,7 +697,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -710,7 +711,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Skip the recovery entry as well
-		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation = rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		verifier = NewPolicyVerifier(repo)
@@ -747,7 +748,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 
@@ -2039,7 +2040,7 @@ func TestVerifyNetwork(t *testing.T) {
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		verifier := NewPolicyVerifier(controllerRepository)
@@ -2122,7 +2123,7 @@ func TestVerifyNetwork(t *testing.T) {
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
@@ -2260,7 +2261,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2308,7 +2309,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgUnauthorizedKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2363,7 +2364,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2418,7 +2419,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgUnauthorizedKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2461,7 +2462,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
-		invalidEntryIDs := []gitinterface.Hash{entryID}
+		invalidEntryIDs := []rsl.Hash{entryID}
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2523,7 +2524,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
-		invalidEntryIDs := []gitinterface.Hash{entryID}
+		invalidEntryIDs := []rsl.Hash{entryID}
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2588,7 +2589,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2617,7 +2618,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation = rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2676,7 +2677,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to invalid last good commit
@@ -2731,7 +2732,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		}
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		// Create a new entry moving branch back to valid commit
@@ -2745,7 +2746,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.Nil(t, err)
 
 		// Skip the recovery entry as well
-		annotation = rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation = rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID = common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 		verifier = NewPolicyVerifier(repo)
@@ -2782,7 +2783,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 
@@ -2896,7 +2897,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Create a skip annotation for the invalid entry
-		annotation := rsl.NewAnnotationEntry([]gitinterface.Hash{entryID}, true, "invalid entry")
+		annotation := rsl.NewAnnotationEntry([]rsl.Hash{entryID}, true, "invalid entry")
 		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
 		annotation.ID = annotationID
 
@@ -3729,7 +3730,7 @@ func TestVerifyEntry(t *testing.T) {
 		err = Apply(testCtx, networkRepository, false)
 		require.Nil(t, err)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)

@@ -4,11 +4,15 @@
 package gitinterface
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,12 +25,18 @@ func TestCreateTestGitRepository(t *testing.T) {
 		repo, err := createTestGitRepository(tmpDir, signingKeysDir, false)
 		require.Nil(t, err)
 
-		config, err := repo.GetGitConfig()
+		name, _, err := repo.LookupConfig(gitstore.ConfigUserName)
 		require.Nil(t, err)
-		assert.Equal(t, testName, config["user.name"])
-		assert.Equal(t, testEmail, config["user.email"])
-		assert.Equal(t, filepath.Join(signingKeysDir, "key.pub"), config["user.signingkey"])
-		assert.Equal(t, "ssh", config["gpg.format"])
+		assert.Equal(t, testName, name)
+		email, _, err := repo.LookupConfig(gitstore.ConfigUserEmail)
+		require.Nil(t, err)
+		assert.Equal(t, testEmail, email)
+		signingKey, _, err := repo.LookupConfig(gitstore.ConfigUserSigningKey)
+		require.Nil(t, err)
+		assert.Equal(t, filepath.Join(signingKeysDir, "key.pub"), signingKey)
+		format, _, err := repo.LookupConfig(gitstore.ConfigGPGFormat)
+		require.Nil(t, err)
+		assert.Equal(t, "ssh", format)
 	})
 
 	t.Run("invalid object format", func(t *testing.T) {
@@ -71,4 +81,16 @@ func TestWriteSigningKeys(t *testing.T) {
 
 		assert.Error(t, writeSigningKeys(keysDir))
 	})
+}
+
+// verifyObjectSignature verifies an object's signature the way callers now
+// compose it: extract payload and signature from the repository, verify the
+// bytes with gitobject.
+func verifyObjectSignature(t *testing.T, repo *Repository, objectID Hash, key *signerverifier.SSLibKey) error {
+	t.Helper()
+
+	payload, signature, err := repo.GetObjectSignature(objectID)
+	require.Nil(t, err)
+
+	return gitobject.Verify(context.Background(), key, payload, signature)
 }

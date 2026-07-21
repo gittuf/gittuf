@@ -10,8 +10,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 const (
@@ -25,7 +26,6 @@ const (
 	codeReviewApprovalAttestationsTreeEntryName = "code-review-approvals"
 	codeReviewApprovalIndexTreeEntryName        = "review-index.json"
 
-	initialCommitMessage = "Initial commit"
 	defaultCommitMessage = "Update attestations"
 )
 
@@ -74,7 +74,7 @@ type Attestations struct {
 
 // LoadCurrentAttestations inspects the repository's attestations namespace and
 // loads the current attestations.
-func LoadCurrentAttestations(repo *gitinterface.Repository) (*Attestations, error) {
+func LoadCurrentAttestations(repo gitstore.Storer) (*Attestations, error) {
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(Ref))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -89,7 +89,7 @@ func LoadCurrentAttestations(repo *gitinterface.Repository) (*Attestations, erro
 
 // LoadAttestationsForEntry loads the repository's attestations for a particular
 // RSL entry for the attestations namespace.
-func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdaterEntry) (*Attestations, error) {
+func LoadAttestationsForEntry(repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry) (*Attestations, error) {
 	if entry.GetRefName() != Ref {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
@@ -149,7 +149,7 @@ func LoadAttestationsForEntry(repo *gitinterface.Repository, entry rsl.Reference
 // Commit writes the state of the attestations to the repository, creating a new
 // commit with the changes made. An RSL entry is also recorded for the
 // namespace.
-func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
+func (a *Attestations) Commit(repo gitstore.Storer, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = defaultCommitMessage
 	}
@@ -167,20 +167,18 @@ func (a *Attestations) Commit(repo *gitinterface.Repository, commitMessage strin
 		a.codeReviewApprovalAttestations[codeReviewApprovalIndexTreeEntryName] = indexBlobID
 	}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo)
-
-	allAttestations := []gitinterface.TreeEntry{}
+	entries := []gitstore.TreeEntry{}
 	for name, blobID := range a.referenceAuthorizations {
-		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(referenceAuthorizationsTreeEntryName, name), blobID))
+		entries = append(entries, gitstore.TreeEntry{Path: path.Join(referenceAuthorizationsTreeEntryName, name), ID: blobID, Kind: gitstore.KindBlob})
 	}
 	for name, blobID := range a.githubPullRequestAttestations {
-		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(githubPullRequestAttestationsTreeEntryName, name), blobID))
+		entries = append(entries, gitstore.TreeEntry{Path: path.Join(githubPullRequestAttestationsTreeEntryName, name), ID: blobID, Kind: gitstore.KindBlob})
 	}
 	for name, blobID := range a.codeReviewApprovalAttestations {
-		allAttestations = append(allAttestations, gitinterface.NewEntryBlob(path.Join(codeReviewApprovalAttestationsTreeEntryName, name), blobID))
+		entries = append(entries, gitstore.TreeEntry{Path: path.Join(codeReviewApprovalAttestationsTreeEntryName, name), ID: blobID, Kind: gitstore.KindBlob})
 	}
 
-	attestationsTreeID, err := treeBuilder.WriteTreeFromEntries(allAttestations)
+	attestationsTreeID, err := repo.WriteTree(entries)
 	if err != nil {
 		return err
 	}
