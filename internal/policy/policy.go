@@ -384,7 +384,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 		}
 
 		// Note: this will not set the loadedEntry field in the policy state
-		return loadStateFromCommit(repo, commitID)
+		return LoadStateFromCommit(repo, commitID)
 	}
 
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(ref))
@@ -1321,7 +1321,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	state, err := loadStateFromCommit(repo, entry.GetTargetID())
+	state, err := LoadStateFromCommit(repo, entry.GetTargetID())
 	if err != nil {
 		return nil, err
 	}
@@ -1329,7 +1329,10 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 	return state, nil
 }
 
-func loadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
+// LoadStateFromCommit returns the policy state as recorded in the tree of the
+// specified commit. This allows a specific revision of the policy metadata to
+// be inspected directly, bypassing the RSL.
+func LoadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
 	commitTreeID, err := repo.GetCommitTreeID(commitID)
 	if err != nil {
 		return nil, err

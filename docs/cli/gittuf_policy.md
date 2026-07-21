@@ -34,6 +34,7 @@ The 'policy' command provides a suite of tools for managing gittuf policy config
 * [gittuf policy discard](gittuf_policy_discard.md)	 - Discard the currently staged changes to policy
 * [gittuf policy increment-version](gittuf_policy_increment-version.md)	 - Increment the integer version of the specified policy file metadata
 * [gittuf policy init](gittuf_policy_init.md)	 - Initialize policy file
+* [gittuf policy inspect](gittuf_policy_inspect.md)	 - Inspect policy metadata
 * [gittuf policy list-principals](gittuf_policy_list-principals.md)	 - List principals for the current policy in the specified rule file
 * [gittuf policy list-rules](gittuf_policy_list-rules.md)	 - List rules for the current state
 * [gittuf policy remote](gittuf_policy_remote.md)	 - Tools for managing remote policies
