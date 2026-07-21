@@ -4,12 +4,12 @@
 package gitinterface
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
@@ -94,26 +94,26 @@ func TestRepositoryVerifyTag(t *testing.T) {
 	}
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
+		err = verifyObjectSignature(t, repo, sshSignedTag, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
+		err = verifyObjectSignature(t, repo, gpgSignedTag, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
-		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+		err = verifyObjectSignature(t, repo, gpgSignedTag, unknownKey)
+		assert.ErrorIs(t, err, gitobject.ErrUnknownSigningMethod)
 	})
 }
 
 // Git appends tag signatures to the tag payload, and go-git only ever
 // surfaces the trailing block as the tag's signature; the earlier blocks stay
 // in the message, so the signed payload no longer matches and verification
-// fails. The explicit multi-block check in verifyTagSignature is
+// fails. The explicit multi-block check in gitobject.Verify is
 // defense-in-depth and is not reachable through go-git's tag decoding.
 func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 	tests := map[string]struct {
@@ -189,8 +189,8 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 			tagHash, err := NewHash(tagID.String())
 			require.Nil(t, err)
 
-			err = repo.verifyTagSignature(context.Background(), tagHash, test.verificationKey(t))
-			assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
+			err = verifyObjectSignature(t, repo, tagHash, test.verificationKey(t))
+			assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
 		})
 	}
 }
@@ -236,19 +236,19 @@ func TestRepositoryVerifyTagSHA256(t *testing.T) {
 	}
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
-		err = repo.verifyTagSignature(context.Background(), sshSignedTag, sshKey)
+		err = verifyObjectSignature(t, repo, sshSignedTag, sshKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, gpgKey)
+		err = verifyObjectSignature(t, repo, gpgSignedTag, gpgKey)
 		assert.Nil(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
 		unknownKey := &signerverifier.SSLibKey{KeyType: "unknown"}
-		err = repo.verifyTagSignature(context.Background(), gpgSignedTag, unknownKey)
-		assert.ErrorIs(t, err, ErrUnknownSigningMethod)
+		err = verifyObjectSignature(t, repo, gpgSignedTag, unknownKey)
+		assert.ErrorIs(t, err, gitobject.ErrUnknownSigningMethod)
 	})
 }
 
@@ -281,7 +281,7 @@ func TestTagUsingSpecificKeySignatureHeader(t *testing.T) {
 			sshKey, err := ssh.NewKeyFromFile(keyPath)
 			require.Nil(t, err)
 
-			assert.Nil(t, repo.verifyTagSignature(context.Background(), tagID, sshKey))
+			assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 		})
 	}
 }
@@ -312,7 +312,7 @@ func TestVerifyTagSignatureGitCreatedTag(t *testing.T) {
 			sshKey, err := ssh.NewKeyFromFile(keyPath)
 			require.Nil(t, err)
 
-			assert.Nil(t, repo.verifyTagSignature(context.Background(), tagID, sshKey))
+			assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 		})
 	}
 }
@@ -347,7 +347,7 @@ func TestVerifyTagSignatureArmorBlockInMessage(t *testing.T) {
 	sshKey, err := ssh.NewKeyFromFile(keyPath)
 	require.Nil(t, err)
 
-	assert.Nil(t, repo.verifyTagSignature(context.Background(), tagID, sshKey))
+	assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 }
 
 func TestEnsureIsTag(t *testing.T) {

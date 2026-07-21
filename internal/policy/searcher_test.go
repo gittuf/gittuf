@@ -8,8 +8,8 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/cache"
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -40,7 +40,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
 
 		// Try with annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -181,7 +181,7 @@ func TestRegularSearcher(t *testing.T) {
 		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
 
 		// Try with annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -326,7 +326,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Equal(t, expectedPolicyEntry.GetID(), policyEntry.GetID())
 
 		// Try with annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -548,7 +548,7 @@ func TestCacheSearcher(t *testing.T) {
 		assert.Equal(t, expectedAttestationsEntry.GetID(), attestationsEntry.GetID())
 
 		// Try with annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "Annotation\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 

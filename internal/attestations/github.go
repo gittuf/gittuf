@@ -15,6 +15,7 @@ import (
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
 )
@@ -23,7 +24,7 @@ func NewGitHubPullRequestAttestation(owner, repository string, pullRequestNumber
 	return githubv01.NewPullRequestAttestation(owner, repository, pullRequestNumber, commitID, pullRequest)
 }
 
-func (a *Attestations) SetGitHubPullRequestAuthorization(repo *gitinterface.Repository, env *sslibdsse.Envelope, targetRefName, commitID string) error {
+func (a *Attestations) SetGitHubPullRequestAuthorization(repo gitstore.Storer, env *sslibdsse.Envelope, targetRefName, commitID string) error {
 	envBytes, err := json.Marshal(env)
 	if err != nil {
 		return err
@@ -63,7 +64,7 @@ func NewGitHubPullRequestApprovalAttestation(targetRef, fromRevisionID, targetTr
 // used to construct an indexPath. The hostURL and reviewID are together mapped
 // to the indexPath so that if the review is dismissed later, the corresponding
 // attestation can be updated.
-func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterface.Repository, env *sslibdsse.Envelope, hostURL string, reviewID int64, appName, refName, fromRevisionID, targetTreeID string) error {
+func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo gitstore.Storer, env *sslibdsse.Envelope, hostURL string, reviewID int64, appName, refName, fromRevisionID, targetTreeID string) error {
 	// TODO: this will be updated to support validating different versions
 	if err := githubv01.ValidatePullRequestApproval(env, refName, fromRevisionID, targetTreeID); err != nil {
 		return errors.Join(github.ErrInvalidPullRequestApprovalAttestation, err)
@@ -118,7 +119,7 @@ func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo *gitinterfac
 // request approval attestation. Here, all the pieces of information to load the
 // attestation are known: the change the approval is for as well as the app that
 // observed the approval.
-func (a *Attestations) GetGitHubPullRequestApprovalAttestationFor(repo *gitinterface.Repository, appName, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
+func (a *Attestations) GetGitHubPullRequestApprovalAttestationFor(repo gitstore.Storer, appName, refName, fromRevisionID, targetTreeID string) (*sslibdsse.Envelope, error) {
 	indexPath := GitHubPullRequestApprovalAttestationPath(refName, fromRevisionID, targetTreeID)
 	return a.GetGitHubPullRequestApprovalAttestationForIndexPath(repo, appName, indexPath)
 }
@@ -128,7 +129,7 @@ func (a *Attestations) GetGitHubPullRequestApprovalAttestationFor(repo *gitinter
 // review ID, and app. This is used when the indexPath is unknown, such as when
 // dismissing a prior approval. The host information and reviewID are used to
 // identify the indexPath for the requested review.
-func (a *Attestations) GetGitHubPullRequestApprovalAttestationForReviewID(repo *gitinterface.Repository, hostURL string, reviewID int64, appName string) (*sslibdsse.Envelope, error) {
+func (a *Attestations) GetGitHubPullRequestApprovalAttestationForReviewID(repo gitstore.Storer, hostURL string, reviewID int64, appName string) (*sslibdsse.Envelope, error) {
 	indexPath, has, err := a.GetGitHubPullRequestApprovalIndexPathForReviewID(hostURL, reviewID)
 	if err != nil {
 		return nil, err
@@ -142,7 +143,7 @@ func (a *Attestations) GetGitHubPullRequestApprovalAttestationForReviewID(repo *
 
 // GetGitHubPullRequestApprovalAttestationForIndexPath returns the requested
 // GitHub pull request approval attestation for the indexPath and appName.
-func (a *Attestations) GetGitHubPullRequestApprovalAttestationForIndexPath(repo *gitinterface.Repository, appName, indexPath string) (*sslibdsse.Envelope, error) {
+func (a *Attestations) GetGitHubPullRequestApprovalAttestationForIndexPath(repo gitstore.Storer, appName, indexPath string) (*sslibdsse.Envelope, error) {
 	// We URL encode the appName to match the on-disk path
 	blobPath := path.Join(indexPath, base64.URLEncoding.EncodeToString([]byte(appName)))
 	blobID, has := a.codeReviewApprovalAttestations[blobPath]

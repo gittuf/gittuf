@@ -12,13 +12,14 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -580,7 +581,7 @@ func TestStateVerify(t *testing.T) {
 		require.Nil(t, err)
 		networkState.loadedEntry = latestNetworkEntry.(rsl.ReferenceUpdaterEntry)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, networkRootMetadata.GetPropagationDirectives(), false)
 		require.Nil(t, err)
 
 		latestEntry, err := rsl.GetLatestEntry(networkRepository)
@@ -646,7 +647,7 @@ func TestStateVerify(t *testing.T) {
 		require.Nil(t, err)
 		networkState.loadedEntry = latestNetworkEntry.(rsl.ReferenceUpdaterEntry)
 
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		latestEntry, err := rsl.GetLatestEntry(networkRepository)
@@ -1419,7 +1420,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// 1. Now, propagate changes from the controller into the network
 		// repository
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// These should not be equal, as policy has been updated, but *not*
@@ -1518,7 +1519,7 @@ func TestReconcileStaging(t *testing.T) {
 		// 2. Apply the controller's changes and propagate
 		err = Apply(testCtx, controllerRepository, false)
 		require.Nil(t, err)
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// The network repository's staging ref should not have changed since
@@ -1630,7 +1631,7 @@ func TestReconcileStaging(t *testing.T) {
 
 		// 3. Propagate changes from the controller repository into the network
 		// repository
-		err = rsl.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
 		require.Nil(t, err)
 
 		// These should not be equal, as policy has been updated, but *not*

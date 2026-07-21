@@ -14,12 +14,13 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -334,7 +335,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 
 	annotation := latestEntry.(*rsl.AnnotationEntry)
 	assert.Equal(t, "test annotation", annotation.Message)
-	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
+	assert.Equal(t, []rsl.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.False(t, annotation.Skip)
 
 	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", false, rslopts.WithAnnotateLocalOnly())
@@ -348,7 +349,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 
 	annotation = latestEntry.(*rsl.AnnotationEntry)
 	assert.Equal(t, "skip annotation", annotation.Message)
-	assert.Equal(t, []gitinterface.Hash{entryID}, annotation.RSLEntryIDs)
+	assert.Equal(t, []rsl.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.True(t, annotation.Skip)
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
@@ -1399,7 +1400,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
 		assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry.TargetID)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(propagationEntry.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1558,7 +1559,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
 		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1742,7 +1743,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1757,7 +1758,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
 
 		// Do the same thing for the other propagation entry's tree (this is a different ref!)
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry1.TargetID)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(propagationEntry1.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1940,7 +1941,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		expectedUpstreamIDs.Remove(propagationEntry2.UpstreamEntryID.String())
 		assert.Equal(t, 0, expectedUpstreamIDs.Len())
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(propagationEntry2.TargetID)
+		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2025,7 +2026,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 		assert.Equal(t, controllerPolicyEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(controllerPolicyEntry.GetTargetID())
+		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(gitinterface.Hash(controllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2038,7 +2039,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2102,7 +2103,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 
 		propagationEntries := []*rsl.PropagationEntry{}
-		for !latestEntry.GetID().Equal(previousLatestEntry.GetID()) {
+		for !latestEntry.GetID().Equal(previousLatestEntry.GetID().Bytes()) {
 			propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
 			if !isPropagationEntry {
 				t.Fatal("unexpected entry type in downstream repo")
@@ -2127,7 +2128,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(downstreamPolicyEntry.GetTargetID())
+		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(gitinterface.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2150,7 +2151,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(leafControllerPolicyEntry.GetTargetID())
+		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(gitinterface.Hash(leafControllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2197,7 +2198,9 @@ func TestRecordRSLEntryForReferenceWithSigningKeyBytes(t *testing.T) {
 	publicKey, err := ssh.NewKeyFromFile(keyPath)
 	require.NoError(t, err)
 
-	require.NoError(t, repo.r.VerifySignature(testCtx, entry.GetID(), publicKey))
+	payload, signature, err := repo.r.GetObjectSignature(entry.GetID())
+	require.NoError(t, err)
+	require.NoError(t, gitobject.Verify(testCtx, publicKey, payload, signature))
 }
 
 func TestRecordRSLAnnotationWithSigningKeyBytes(t *testing.T) {
@@ -2244,7 +2247,9 @@ func TestRecordRSLAnnotationWithSigningKeyBytes(t *testing.T) {
 	publicKey, err := ssh.NewKeyFromFile(keyPath)
 	require.NoError(t, err)
 
-	require.NoError(t, repo.r.VerifySignature(testCtx, ann.GetID(), publicKey))
+	payload, signature, err := repo.r.GetObjectSignature(ann.GetID())
+	require.NoError(t, err)
+	require.NoError(t, gitobject.Verify(testCtx, publicKey, payload, signature))
 }
 
 func TestRecordRSLEntryForReferenceSigningKeyBytesIgnoredWhenUnsigned(t *testing.T) {
@@ -2279,6 +2284,8 @@ func TestRecordRSLEntryForReferenceSigningKeyBytesIgnoredWhenUnsigned(t *testing
 	publicKey, err := ssh.NewKeyFromFile(keyPath)
 	require.NoError(t, err)
 
-	err = repo.r.VerifySignature(testCtx, entry.GetID(), publicKey)
+	payload, signature, err := repo.r.GetObjectSignature(entry.GetID())
+	require.NoError(t, err)
+	err = gitobject.Verify(testCtx, publicKey, payload, signature)
 	assert.Error(t, err, "entry must not be signed when signCommit=false")
 }
