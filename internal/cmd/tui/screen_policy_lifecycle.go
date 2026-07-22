@@ -42,15 +42,22 @@ func (s *policyLifecycleScreen) initInputs(action string, m *model) {
 		fields = []inputField{
 			{placeholder: "Enter remote name (leave blank for local-only)", prompt: "Remote Name: "},
 		}
+	case "Pull Policy", "Push Policy":
+		fields = []inputField{
+			{placeholder: "Enter remote name (default: origin)", prompt: "Remote Name: "},
+		}
 	}
 	s.inputs = initInputs(fields)
 	s.focusIndex = 0
-	if action == "Initialize Policy" || action == "Increment Version" || action == "Sign Policy" {
+	switch action {
+	case "Initialize Policy", "Increment Version", "Sign Policy":
 		defaultName := m.policyName
 		if defaultName == "" {
 			defaultName = "targets"
 		}
 		s.inputs[0].SetValue(defaultName)
+	case "Pull Policy", "Push Policy":
+		s.inputs[0].SetValue("origin")
 	}
 }
 
@@ -158,6 +165,11 @@ func (s *policyLifecycleScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd) 
 		localOnly := inputValue == ""
 		remoteName := inputValue
 		cmd = handlePolicyLifecycleCommand(m, s.action, "", remoteName, localOnly)
+	case "Pull Policy", "Push Policy":
+		if inputValue == "" {
+			inputValue = "origin"
+		}
+		cmd = handlePolicyLifecycleCommand(m, s.action, "", inputValue, false)
 	}
 
 	m.screen = screenPolicyLifecycle
@@ -253,6 +265,12 @@ func handlePolicyLifecycleCommand(m *model, action string, policyName string, re
 		case "Discard Changes":
 			err = m.repo.DiscardPolicy()
 			successMsg = "Successfully discarded policy changes."
+		case "Pull Policy":
+			err = m.repo.PullPolicy(remote)
+			successMsg = fmt.Sprintf("Successfully pulled policy from remote %q.", remote)
+		case "Push Policy":
+			err = m.repo.PushPolicy(remote)
+			successMsg = fmt.Sprintf("Successfully pushed policy to remote %q.", remote)
 		default:
 			err = fmt.Errorf("unknown action: %s", action)
 		}

@@ -170,7 +170,7 @@ func initialModel(ctx context.Context, o *options) model {
 			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 				item{title: "View Rules", desc: "View and manage policy rules"},
 				item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
-				item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply or discard policy changes"},
+				item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply, discard, pull or push policy changes"},
 			}, delegate),
 		},
 		policyLifecycleScreen: policyLifecycleScreen{
@@ -181,6 +181,8 @@ func initialModel(ctx context.Context, o *options) model {
 				item{title: "Stage Changes", desc: "Stage local policy changes"},
 				item{title: "Apply Changes", desc: "Apply staged policy changes"},
 				item{title: "Discard Changes", desc: "Discard staged policy changes"},
+				item{title: "Pull Policy", desc: "Pull policy from a remote repository"},
+				item{title: "Push Policy", desc: "Push policy to a remote repository"},
 			}, delegate),
 		},
 		trustScreen: trustScreen{
@@ -224,15 +226,17 @@ func (m *model) resizeLists() {
 	// readOnly: heightOffset_view=9 → innerHeight = m.height - 11
 	// readOnly+signerError: heightOffset_view = 7 + signerNoticeLines (dynamic)
 	//   → innerHeight = m.height - (2 + 7 + noticeLines) = m.height - 9 - noticeLines
-	heightOffset := 9
-	if m.readOnly {
-		heightOffset = 11
-		if m.signerError != "" {
-			// Same formula as view.go: v(2) + fixed(7) + dynamic notice lines
-			heightOffset = 9 + signerNoticeLines(m.signerError, m.width)
-		}
+	bottomHeight := 1
+	footerBox := renderFooterBox(*m)
+	if footerBox != "" {
+		bottomHeight += strings.Count(footerBox, "\n") + 1
 	}
-	innerHeight := m.height - heightOffset
+	errorMsg := renderErrorMsg(m.errorMsg)
+	if errorMsg != "" {
+		bottomHeight += strings.Count(errorMsg, "\n") + 1
+	}
+
+	innerHeight := m.height - 6 - bottomHeight
 	if innerHeight < 0 {
 		innerHeight = 0
 	}

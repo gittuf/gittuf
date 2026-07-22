@@ -102,22 +102,6 @@ func renderFooter(text string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(text)
 }
 
-// signerNoticeLines returns how many terminal rows the signer-error notice will
-// occupy when rendered at the given terminal width. This matches the exact same
-// Width() call used in renderFooterBox so both the layout reservation and the
-// rendered output always agree.
-func signerNoticeLines(signerError string, termWidth int) int {
-	if signerError == "" {
-		return 0
-	}
-	noticeWidth := termWidth - 6
-	if noticeWidth < 20 {
-		noticeWidth = 20
-	}
-	wrapped := lipgloss.NewStyle().Width(noticeWidth).Render("Notice: " + signerError)
-	return strings.Count(wrapped, "\n") + 1
-}
-
 // renderFooterBox wraps the footer in a rich info box if the user requests help in read-only mode.
 func renderFooterBox(m model) string {
 	baseFooter := renderFooter(m.footer)
@@ -259,18 +243,20 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxWidth = 0
 	}
 
-	heightOffset := 7
-	if m.readOnly {
-		heightOffset = 9
-		if m.signerError != "" {
-			// Dynamic: fixed overhead (7) + actual notice lines so the box
-			// perfectly fills any terminal regardless of width or screen size.
-			// Fixed overhead accounts for: 2 blank rows (between box and helpkeys),
-			// 1 helpkeys row, 1 blank gap (between helpkeys and notice).
-			heightOffset = 7 + signerNoticeLines(m.signerError, m.width)
-		}
+	bottomHeight := 1
+	if overlays != "" {
+		bottomHeight += strings.Count(overlays, "\n") + 1
 	}
-	boxHeight := m.height - v - heightOffset
+	footerBox := renderFooterBox(m)
+	if footerBox != "" {
+		bottomHeight += strings.Count(footerBox, "\n") + 1
+	}
+	errorMsg := renderErrorMsg(m.errorMsg)
+	if errorMsg != "" {
+		bottomHeight += strings.Count(errorMsg, "\n") + 1
+	}
+
+	boxHeight := m.height - v - 4 - bottomHeight
 	if boxHeight < 0 {
 		boxHeight = 0
 	}

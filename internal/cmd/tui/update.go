@@ -12,7 +12,7 @@ import (
 )
 
 // Update updates the model based on the message received.
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -158,6 +158,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// Update updates the model based on the message received, ensuring list sizes are
+// dynamically recalculated to fit any runtime error messages or notice overlays.
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	resModel, cmd := m.updateInternal(msg)
+	if typedModel, ok := resModel.(model); ok {
+		typedModel.resizeLists()
+		return typedModel, cmd
+	}
+	return resModel, cmd
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace.
