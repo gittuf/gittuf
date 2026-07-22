@@ -14,7 +14,7 @@ require (
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/muesli/termenv v0.16.0
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0
-	github.com/sigstore/cosign/v3 v3.1.1
+	github.com/sigstore/cosign/v3 v3.1.2
 	github.com/sigstore/fulcio v1.8.8
 	github.com/sigstore/gitsign v0.16.1
 	github.com/sigstore/protobuf-specs v0.5.1
@@ -155,7 +155,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/letsencrypt/boulder v0.20260623.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
-	github.com/mattn/go-isatty v0.0.22
+	github.com/mattn/go-isatty v0.0.23
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
