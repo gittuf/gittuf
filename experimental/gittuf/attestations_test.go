@@ -284,6 +284,69 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	})
 }
 
+func TestAddReferenceAuthorizationForNewTagZeroHashFormat(t *testing.T) {
+	for _, objectFormat := range testObjectFormats {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			testDir := t.TempDir()
+			r := gitinterface.CreateTestGitRepository(t, testDir, false, gitinterface.WithObjectFormat(objectFormat))
+
+			// We need to change the directory because we `checkout` for older
+			// Git versions, modifying the worktree.
+			pwd, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Chdir(testDir); err != nil {
+				t.Fatal(err)
+			}
+			defer os.Chdir(pwd) //nolint:errcheck
+
+			repo := &Repository{r: r}
+
+			fromRef := "refs/heads/main"
+			targetTagRef := "refs/tags/v1"
+
+			treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+			emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			initialCommitID, err := repo.r.Commit(emptyTreeID, fromRef, "Initial commit\n", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := repo.RecordRSLEntryForReference(testCtx, fromRef, false, rslopts.WithRecordLocalOnly()); err != nil {
+				t.Fatal(err)
+			}
+
+			signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+			// AddReferenceAuthorization calls r.r.ZeroHash() for the tag's fromID.
+			err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry())
+			assert.Nil(t, err)
+
+			allAttestations, err := attestations.LoadCurrentAttestations(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// The format-correct zero hash must retrieve the authorization.
+			formatZero := repo.r.ZeroHash().String()
+			env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, formatZero, initialCommitID.String())
+			assert.Nil(t, err)
+			assert.Len(t, env.Signatures, 1)
+
+			// On a SHA-256 repo, looking up with the SHA-1 zero (40 zeros)
+			// must NOT find the authorization, pinning width-consistency.
+			if objectFormat == gitinterface.ObjectFormatSHA256 {
+				sha1Zero := gitinterface.ZeroHash.String()
+				_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, sha1Zero, initialCommitID.String())
+				assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
+			}
+		})
+	}
+}
+
 func TestGetGitHubPullRequestApprovalPredicateFromEnvelope(t *testing.T) {
 	tests := map[string]struct {
 		envelope          *dsse.Envelope

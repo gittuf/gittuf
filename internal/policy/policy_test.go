@@ -6,6 +6,7 @@ package policy
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"path"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
@@ -23,6 +25,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestStateMetadataWriteTreeStorerError(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	metadata := &StateMetadata{RootEnvelope: &sslibdsse.Envelope{}}
+
+	injected := errors.New("write blob failure")
+	_, err := metadata.WriteTree(&overrideStorer{Storer: repo, writeBlobErr: injected})
+	assert.ErrorIs(t, err, injected)
+}
 
 func TestLoadState(t *testing.T) {
 	t.Run("loading while verifying multiple states", func(t *testing.T) {

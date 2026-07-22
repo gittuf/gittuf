@@ -401,6 +401,11 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 
 		_, _, err = GetLatestReferenceUpdaterEntry(repo, ForReference("feature"), BeforeEntryID(entryIDs[1]))
 		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+
+		t.Run("with explicit zero before entry ID, not treated as unset", func(t *testing.T) {
+			_, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference("main"), BeforeEntryID(repo.ZeroHash()))
+			assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		})
 	})
 
 	t.Run("with ref name, before entry ID, and annotations", func(t *testing.T) {

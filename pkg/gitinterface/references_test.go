@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestGetReferenceNotFoundZeroHash(t *testing.T) {
+	t.Parallel()
+	for _, objectFormat := range []ObjectFormat{ObjectFormatSHA1, ObjectFormatSHA256} {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			t.Parallel()
+			tmpDir := t.TempDir()
+			repo := CreateTestGitRepository(t, tmpDir, false, WithObjectFormat(objectFormat))
+
+			tip, err := repo.GetReference("refs/heads/does-not-exist")
+			assert.ErrorIs(t, err, ErrReferenceNotFound)
+			assert.Equal(t, repo.ZeroHash(), tip)
+			assert.True(t, tip.IsZero())
+		})
+	}
+}
+
 func TestGetReference(t *testing.T) {
 	tempDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tempDir, false)
