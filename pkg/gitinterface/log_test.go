@@ -95,7 +95,7 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		}
 
 		// Add a common merge commit
-		mergeCommit := repo.commitWithParents(
+		mergeCommit := repo.CommitWithParents(
 			t,
 			emptyTreeID,
 			[]Hash{
@@ -158,7 +158,7 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 			featureBranchCommits = append(featureBranchCommits, commitHash)
 		}
 
-		newMergeCommit := repo.commitWithParents(
+		newMergeCommit := repo.CommitWithParents(
 			t,
 			emptyTreeID,
 			[]Hash{
@@ -221,7 +221,7 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	treeHashes := createTestTrees(t, repo, emptyBlobHash, 6)
 
 	// creating the first commit
-	commitID := repo.commitWithParents(t, treeHashes[0], nil, fmt.Sprintf("Test commit %v", 1), false)
+	commitID := repo.CommitWithParents(t, treeHashes[0], nil, fmt.Sprintf("Test commit %v", 1), false)
 	commitIDs = append(commitIDs, commitID)
 
 	// creating two children from the first commit
@@ -230,15 +230,15 @@ func TestGetCommitsBetweenRangeForMergeCommits(t *testing.T) {
 	commitIDs = append(commitIDs, children...)
 
 	// creating a child for commit 2, which in the visual will be commit 4
-	commitID = repo.commitWithParents(t, treeHashes[3], []Hash{children[0]}, fmt.Sprintf("Test commit %v", 4), false)
+	commitID = repo.CommitWithParents(t, treeHashes[3], []Hash{children[0]}, fmt.Sprintf("Test commit %v", 4), false)
 	commitIDs = append(commitIDs, commitID)
 
 	// creating a merge commit from the two children, which in the visual will be commit 5
-	commitID = repo.commitWithParents(t, treeHashes[4], children, fmt.Sprintf("Test commit %v", 5), false)
+	commitID = repo.CommitWithParents(t, treeHashes[4], children, fmt.Sprintf("Test commit %v", 5), false)
 	commitIDs = append(commitIDs, commitID)
 
 	// creating a child for commit 3, which in the visual will be commit 6
-	commitID = repo.commitWithParents(t, treeHashes[5], []Hash{children[1]}, fmt.Sprintf("Test commit %v", 6), false)
+	commitID = repo.CommitWithParents(t, treeHashes[5], []Hash{children[1]}, fmt.Sprintf("Test commit %v", 6), false)
 	commitIDs = append(commitIDs, commitID)
 
 	// Git tree with merge commit structure without its commit trees and its values:
@@ -349,7 +349,7 @@ func createChildrenCommits(t *testing.T, repo *Repository, treeHashes []Hash, pa
 	children := make([]Hash, 0, numChildren)
 
 	for i := 1; i <= numChildren; i++ {
-		commitID := repo.commitWithParents(t, treeHashes[i], []Hash{parentHash}, fmt.Sprintf("Test commit %v", i+1), false)
+		commitID := repo.CommitWithParents(t, treeHashes[i], []Hash{parentHash}, fmt.Sprintf("Test commit %v", i+1), false)
 		children = append(children, commitID)
 	}
 	return children
