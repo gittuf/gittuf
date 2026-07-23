@@ -5,8 +5,6 @@ package rsl
 
 import (
 	"sync"
-
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 type rslCache struct {
@@ -17,7 +15,7 @@ type rslCache struct {
 	parentCacheMutex sync.RWMutex
 }
 
-func (r *rslCache) getEntry(id gitinterface.Hash) (Entry, bool) {
+func (r *rslCache) getEntry(id Hash) (Entry, bool) {
 	r.entryCacheMutex.RLock()
 	defer r.entryCacheMutex.RUnlock()
 
@@ -25,14 +23,14 @@ func (r *rslCache) getEntry(id gitinterface.Hash) (Entry, bool) {
 	return entry, has
 }
 
-func (r *rslCache) setEntry(id gitinterface.Hash, entry Entry) {
+func (r *rslCache) setEntry(id Hash, entry Entry) {
 	r.entryCacheMutex.Lock()
 	defer r.entryCacheMutex.Unlock()
 
 	r.entryCache[id.String()] = entry
 }
 
-func (r *rslCache) getParent(id gitinterface.Hash) (gitinterface.Hash, bool, error) {
+func (r *rslCache) getParent(id Hash) (Hash, bool, error) {
 	r.parentCacheMutex.RLock()
 	defer r.parentCacheMutex.RUnlock()
 
@@ -41,14 +39,14 @@ func (r *rslCache) getParent(id gitinterface.Hash) (gitinterface.Hash, bool, err
 		return nil, false, nil
 	}
 
-	parentIDHash, err := gitinterface.NewHash(parentID)
+	parentIDHash, err := NewHash(parentID)
 	if err != nil {
 		return nil, false, err
 	}
 	return parentIDHash, true, nil
 }
 
-func (r *rslCache) setParent(id, parentID gitinterface.Hash) {
+func (r *rslCache) setParent(id, parentID Hash) {
 	r.parentCacheMutex.Lock()
 	defer r.parentCacheMutex.Unlock()
 

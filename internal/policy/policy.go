@@ -14,13 +14,14 @@ import (
 
 	"github.com/gittuf/gittuf/internal/common/set"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 const (
@@ -65,7 +66,7 @@ type State struct {
 
 	GitHubApps map[string]tuf.GitHubApp
 
-	repository     *gitinterface.Repository
+	repository     gitstore.Storer
 	loadedEntry    rsl.ReferenceUpdaterEntry
 	verifiersCache map[string][]*SignatureVerifier
 	ruleNames      *set.Set[string]
@@ -186,7 +187,7 @@ func (s *StateMetadata) GetTargetsMetadata(roleName string, migrate bool) (tuf.T
 	}
 }
 
-func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.Hash, error) {
+func (s *StateMetadata) WriteTree(repo gitstore.Storer) (gitinterface.Hash, error) {
 	metadata := map[string]*sslibdsse.Envelope{}
 	metadata[RootRoleName] = s.RootEnvelope
 	if s.TargetsEnvelope != nil {
@@ -199,7 +200,7 @@ func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.H
 		}
 	}
 
-	allTreeEntries := []gitinterface.TreeEntry{}
+	blobs := map[string]gitinterface.Hash{}
 
 	for name, env := range metadata {
 		envContents, err := json.Marshal(env)
@@ -212,18 +213,17 @@ func (s *StateMetadata) WriteTree(repo *gitinterface.Repository) (gitinterface.H
 			return nil, err
 		}
 
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(name+".json", blobID))
+		blobs[name+".json"] = blobID
 	}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	return treeBuilder.WriteTreeFromEntries(allTreeEntries)
+	return repo.WriteTree(blobs, nil)
 }
 
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
 // policy-staging ref, that entry is returned with no verification.
-func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntry rsl.ReferenceUpdaterEntry, opts ...policyopts.LoadStateOption) (*State, error) {
+func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.ReferenceUpdaterEntry, opts ...policyopts.LoadStateOption) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
 	// before the entry. This is why we don't just load the state and return
@@ -251,7 +251,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 		return nil, err
 	}
 
-	if firstPolicyEntry.GetID().Equal(requestedEntry.GetID()) {
+	if firstPolicyEntry.GetID().Equal(requestedEntry.GetID().Bytes()) {
 		slog.Debug("Requested policy's entry is the same as first policy entry")
 		state, err := loadStateForEntry(repo, requestedEntry)
 		if err != nil {
@@ -371,7 +371,7 @@ func LoadState(ctx context.Context, repo *gitinterface.Repository, requestedEntr
 // LoadCurrentState returns the State corresponding to the repository's current
 // active policy. It verifies the root of trust for the state starting from the
 // initial policy entry in the RSL.
-func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref string, opts ...policyopts.LoadStateOption) (*State, error) {
+func LoadCurrentState(ctx context.Context, repo gitstore.Storer, ref string, opts ...policyopts.LoadStateOption) (*State, error) {
 	options := &policyopts.LoadStateOptions{}
 	for _, fn := range opts {
 		fn(options)
@@ -397,7 +397,7 @@ func LoadCurrentState(ctx context.Context, repo *gitinterface.Repository, ref st
 
 // LoadFirstState returns the State corresponding to the repository's first
 // active policy. It does not verify the root of trust since it is the initial policy.
-func LoadFirstState(ctx context.Context, repo *gitinterface.Repository, opts ...policyopts.LoadStateOption) (*State, error) {
+func LoadFirstState(ctx context.Context, repo gitstore.Storer, opts ...policyopts.LoadStateOption) (*State, error) {
 	firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(repo, PolicyRef)
 	if err != nil {
 		return nil, err
@@ -559,7 +559,7 @@ func (s *State) Verify(ctx context.Context) error {
 		return err
 	}
 
-	if _, err := rootVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.RootEnvelope); err != nil {
+	if _, err := rootVerifier.Verify(ctx, nil, s.Metadata.RootEnvelope); err != nil {
 		return err
 	}
 
@@ -590,7 +590,7 @@ func (s *State) Verify(ctx context.Context) error {
 			return err
 		}
 
-		if _, err := targetsVerifier.Verify(ctx, gitinterface.ZeroHash, s.Metadata.TargetsEnvelope); err != nil {
+		if _, err := targetsVerifier.Verify(ctx, nil, s.Metadata.TargetsEnvelope); err != nil {
 			return err
 		}
 
@@ -631,7 +631,7 @@ func (s *State) Verify(ctx context.Context) error {
 					threshold:  delegation.GetThreshold(),
 				}
 
-				if _, err := verifier.Verify(ctx, gitinterface.ZeroHash, env); err != nil {
+				if _, err := verifier.Verify(ctx, nil, env); err != nil {
 					return err
 				}
 
@@ -678,7 +678,7 @@ func (s *State) Verify(ctx context.Context) error {
 
 			// We need to LoadState() the state from which the root is derived
 			// For that, we need to know when it was propagated into this repository
-			upstreamEntryID := gitinterface.ZeroHash
+			var upstreamEntryID gitinterface.Hash
 			if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
 				// Check this entry
 				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
@@ -714,37 +714,35 @@ func (s *State) Verify(ctx context.Context) error {
 }
 
 // Commit verifies and writes the State to the policy-staging namespace.
-func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, createRSLEntry, signCommit bool) error {
+func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
 	}
 
 	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
-	allTreeEntries := []gitinterface.TreeEntry{}
-
 	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
 	if err != nil {
 		return err
 	}
-	allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(metadataTreeEntryName, stateMetadataTreeID))
+	subtrees := map[string]gitinterface.Hash{metadataTreeEntryName: stateMetadataTreeID}
+	blobs := map[string]gitinterface.Hash{}
 
 	for absoluteControllerPath, metadata := range s.ControllerMetadata {
 		stateMetadataTreeID, err := metadata.WriteTree(repo)
 		if err != nil {
 			return err
 		}
-		allTreeEntries = append(allTreeEntries, gitinterface.NewEntryTree(fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath), stateMetadataTreeID))
+		subtrees[fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath)] = stateMetadataTreeID
 	}
 
 	for stage, hookSet := range s.Hooks {
 		for _, hook := range hookSet {
 			hookPath := fmt.Sprintf("%s/%s/%s", tuf.HooksPrefix, stage.String(), hook.ID())
-			allTreeEntries = append(allTreeEntries, gitinterface.NewEntryBlob(hookPath, hook.GetBlobID()))
+			blobs[hookPath] = hook.GetBlobID()
 		}
 	}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	policyRootTreeID, err := treeBuilder.WriteTreeFromEntries(allTreeEntries)
+	policyRootTreeID, err := repo.WriteTree(blobs, subtrees)
 	if err != nil {
 		return err
 	}
@@ -780,7 +778,7 @@ func (s *State) Commit(repo *gitinterface.Repository, commitMessage string, crea
 // the policy staging ref is valid. This prevents invalid changes to the policy
 // taking affect, and allowing new changes, that until signed by multiple users
 // would be invalid to be made, by utilizing the policy staging ref.
-func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool) error {
+func Apply(ctx context.Context, repo gitstore.Storer, signRSLEntry bool) error {
 	// First, reconcile staging with policy
 	if err := ReconcileStaging(repo, signRSLEntry); err != nil {
 		return err
@@ -872,7 +870,7 @@ func Apply(ctx context.Context, repo *gitinterface.Repository, signRSLEntry bool
 }
 
 // Discard resets the policy staging ref, discarding any changes made to the policy staging ref.
-func Discard(repo *gitinterface.Repository) error {
+func Discard(repo gitstore.Storer) error {
 	policyTip, err := repo.GetReference(PolicyRef)
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
@@ -892,7 +890,7 @@ func Discard(repo *gitinterface.Repository) error {
 	return nil
 }
 
-func ReconcileStaging(repo *gitinterface.Repository, signCommit bool) error {
+func ReconcileStaging(repo gitstore.Storer, signCommit bool) error {
 	policyFound, stagingFound := false, false
 
 	// Get the reference for the PolicyRef
@@ -1316,7 +1314,7 @@ func (s *State) getTargetsVerifier() (*SignatureVerifier, error) {
 // and loading the policy contents. Typically, LoadCurrentState of LoadState
 // must be used. The exception is VerifyRelative... which performs root
 // verification between consecutive policy states.
-func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdaterEntry) (*State, error) {
+func loadStateForEntry(repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry) (*State, error) {
 	if entry.GetRefName() != PolicyRef && entry.GetRefName() != PolicyStagingRef {
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
@@ -1332,7 +1330,7 @@ func loadStateForEntry(repo *gitinterface.Repository, entry rsl.ReferenceUpdater
 // LoadStateFromCommit returns the policy state as recorded in the tree of the
 // specified commit. This allows a specific revision of the policy metadata to
 // be inspected directly, bypassing the RSL.
-func LoadStateFromCommit(repo *gitinterface.Repository, commitID gitinterface.Hash) (*State, error) {
+func LoadStateFromCommit(repo gitstore.Storer, commitID gitinterface.Hash) (*State, error) {
 	commitTreeID, err := repo.GetCommitTreeID(commitID)
 	if err != nil {
 		return nil, err

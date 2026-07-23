@@ -17,10 +17,11 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 const gittufTransportPrefix = "gittuf::"
@@ -207,7 +208,7 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 		}
 	}
 
-	rslEntryHashes := []gitinterface.Hash{}
+	rslEntryHashes := []rsl.Hash{}
 	for _, id := range rslEntryIDs {
 		hash, err := gitinterface.NewHash(id)
 		if err != nil {
@@ -903,7 +904,7 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
 		}
 
-		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+		if err := propagation.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
 			// TODO: atomic? abort?
 			return err
 		}

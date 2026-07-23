@@ -1212,3 +1212,73 @@ func TestGetAllFilesInTree(t *testing.T) {
 		assert.ErrorContains(t, err, "unable to enumerate all files in tree")
 	})
 }
+
+func TestWriteTree(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	blobAID, err := repo.WriteBlob([]byte("a"))
+	require.Nil(t, err)
+	blobBID, err := repo.WriteBlob([]byte("b"))
+	require.Nil(t, err)
+
+	treeID, err := repo.WriteTree(map[string]Hash{
+		"a":     blobAID,
+		"dir/b": blobBID,
+	}, nil)
+	assert.Nil(t, err)
+
+	files, err := repo.GetAllFilesInTree(treeID)
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]Hash{"a": blobAID, "dir/b": blobBID}, files)
+
+	emptyTreeID, err := repo.WriteTree(nil, nil)
+	assert.Nil(t, err)
+	expectedEmpty, err := repo.EmptyTree()
+	require.Nil(t, err)
+	assert.Equal(t, expectedEmpty, emptyTreeID)
+
+	// subtree case: write a tree with a blob, then graft it as a subtree
+	blobCID, err := repo.WriteBlob([]byte("c"))
+	require.Nil(t, err)
+
+	firstTreeID, err := repo.WriteTree(map[string]Hash{"c": blobCID}, nil)
+	require.Nil(t, err)
+
+	combinedTreeID, err := repo.WriteTree(
+		map[string]Hash{"a": blobAID},
+		map[string]Hash{"nested": firstTreeID},
+	)
+	require.Nil(t, err)
+
+	allFiles, err := repo.GetAllFilesInTree(combinedTreeID)
+	require.Nil(t, err)
+	assert.Equal(t, map[string]Hash{
+		"a":        blobAID,
+		"nested/c": blobCID,
+	}, allFiles)
+}
+
+func TestWriteTreeDeterministic(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	blobs := map[string]Hash{}
+	for _, name := range []string{"a", "b", "c", "d", "e", "dir/f", "dir/g"} {
+		blobID, err := repo.WriteBlob([]byte(name))
+		require.Nil(t, err)
+		blobs[name] = blobID
+	}
+
+	// Repeated writes of the same logical tree must yield the same ID
+	// despite the randomized map iteration order feeding WriteTree.
+	first, err := repo.WriteTree(blobs, nil)
+	require.Nil(t, err)
+	for range 8 {
+		next, err := repo.WriteTree(blobs, nil)
+		require.Nil(t, err)
+		assert.Equal(t, first, next)
+	}
+}

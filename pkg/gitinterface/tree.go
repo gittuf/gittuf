@@ -316,6 +316,24 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	return commitID, nil
 }
 
+// WriteTree writes a Git tree containing the specified blobs and subtrees,
+// keyed by their path in the tree, and returns its ID. Blob entries use
+// default permissions. Subtree values are the IDs of existing trees grafted
+// at their path. It covers gittuf's tree-writing needs without exposing the
+// full TreeBuilder. The returned ID is independent of the maps' iteration
+// order because git mktree normalizes entry order.
+func (r *Repository) WriteTree(blobs, subtrees map[string]Hash) (Hash, error) {
+	entries := make([]TreeEntry, 0, len(blobs)+len(subtrees))
+	for path, blobID := range blobs {
+		entries = append(entries, NewEntryBlob(path, blobID))
+	}
+	for path, treeID := range subtrees {
+		entries = append(entries, NewEntryTree(path, treeID))
+	}
+
+	return NewTreeBuilder(r).WriteTreeFromEntries(entries)
+}
+
 // TreeBuilder is used to create multi-level trees in a repository.  Based on
 // `buildTreeHelper` in go-git.
 type TreeBuilder struct {

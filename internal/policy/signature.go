@@ -13,6 +13,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	sigstoreverifieropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/verifier"
@@ -20,10 +21,11 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 type SignatureVerifier struct {
-	repository         *gitinterface.Repository
+	repository         gitstore.Storer
 	name               string
 	principals         []tuf.Principal
 	threshold          int
@@ -71,14 +73,30 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 	gitObjectVerified := false
 
 	// First, verify the gitObject's signature if one is presented
-	if gitObjectID != nil && !gitObjectID.IsZero() {
+	if !gitObjectID.IsZero() {
 		slog.Debug(fmt.Sprintf("Verifying signature of Git object with ID '%s'...", gitObjectID.String()))
+
+		payload, gitSignature, err := v.repository.GetObjectSignature(gitObjectID)
+		if err != nil {
+			return nil, err
+		}
+
+		verifyOpts := []gitobject.Option{}
+		config, err := v.repository.GetGitConfig()
+		if err != nil {
+			return nil, err
+		}
+		if rekorURL, has := config[sigstore.GitConfigRekor]; has {
+			slog.Debug(fmt.Sprintf("Using '%s' as Rekor server...", rekorURL))
+			verifyOpts = append(verifyOpts, gitobject.WithRekorURL(rekorURL))
+		}
+
 		for _, principal := range v.principals {
 			// there are multiple keys we must try
 			keys := principal.Keys()
 
 			for _, key := range keys {
-				err := v.repository.VerifySignature(ctx, gitObjectID, key)
+				err := gitobject.Verify(ctx, key, payload, gitSignature, verifyOpts...)
 				if err == nil {
 					// Signature verification succeeded
 					slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
@@ -89,12 +107,12 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface
 					// No need to try the other keys for this principal, break
 					break
 				}
-				if errors.Is(err, gitinterface.ErrUnknownSigningMethod) {
+				if errors.Is(err, gitobject.ErrUnknownSigningMethod) {
 					// TODO: this should be removed once we have unified signing
 					// methods across metadata and git signatures
 					continue
 				}
-				if !errors.Is(err, gitinterface.ErrIncorrectVerificationKey) {
+				if !errors.Is(err, gitobject.ErrIncorrectVerificationKey) {
 					return nil, err
 				}
 			}

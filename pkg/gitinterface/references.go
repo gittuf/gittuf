@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 const (
@@ -19,7 +21,9 @@ const (
 )
 
 var (
-	ErrReferenceNotFound = errors.New("requested Git reference not found")
+	// ErrReferenceNotFound aliases gitstore.ErrReferenceNotFound so a
+	// Repository satisfies the gitstore.Storer error contract directly.
+	ErrReferenceNotFound = gitstore.ErrReferenceNotFound
 )
 
 // GetReference returns the tip of the specified Git reference.

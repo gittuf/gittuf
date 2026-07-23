@@ -4,11 +4,14 @@
 package gitinterface
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/signerverifier/gitobject"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,4 +74,16 @@ func TestWriteSigningKeys(t *testing.T) {
 
 		assert.Error(t, writeSigningKeys(keysDir))
 	})
+}
+
+// verifyObjectSignature verifies an object's signature the way callers now
+// compose it: extract payload and signature from the repository, verify the
+// bytes with gitobject.
+func verifyObjectSignature(t *testing.T, repo *Repository, objectID Hash, key *signerverifier.SSLibKey) error {
+	t.Helper()
+
+	payload, signature, err := repo.GetObjectSignature(objectID)
+	require.Nil(t, err)
+
+	return gitobject.Verify(context.Background(), key, payload, signature)
 }

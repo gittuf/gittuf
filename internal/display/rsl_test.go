@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +29,7 @@ func TestRSLLog(t *testing.T) {
 		}
 
 		// skip annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -49,12 +49,12 @@ func TestRSLLog(t *testing.T) {
 		}
 
 		// skip annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
 		// non-skip annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -117,7 +117,7 @@ entry ae4467eaa656782fe9d04eaabfa30db47e9ea24b (skipped)
 		}
 
 		// skip annotation
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -247,7 +247,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)
@@ -289,7 +289,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, true, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)
@@ -332,7 +332,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)
@@ -374,7 +374,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "msg").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)
@@ -417,7 +417,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "msg\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)
@@ -459,7 +459,7 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := rsl.NewAnnotationEntry([]gitinterface.Hash{entry.GetID()}, false, "msg\n").Commit(repo, false); err != nil {
+		if err := rsl.NewAnnotationEntry([]rsl.Hash{entry.GetID()}, false, "msg\n").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		annotationEntryT, err := rsl.GetLatestEntry(repo)

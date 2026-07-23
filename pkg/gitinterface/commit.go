@@ -4,7 +4,6 @@
 package gitinterface
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -12,13 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
-	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
-	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/storage/memory"
-	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 // Commit creates a new commit in the repo and sets targetRef's to the commit.
@@ -162,58 +157,6 @@ func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Ha
 	}
 
 	return commitID
-}
-
-// verifyCommitSignature verifies a signature for the specified commit using
-// the provided public key.
-func (r *Repository) verifyCommitSignature(ctx context.Context, commitID Hash, key *signerverifier.SSLibKey) error {
-	goGitRepo, err := r.GetGoGitRepository()
-	if err != nil {
-		return fmt.Errorf("error opening repository: %w", err)
-	}
-
-	commit, err := goGitRepo.CommitObject(plumbing.NewHash(commitID.String()))
-	if err != nil {
-		return fmt.Errorf("unable to load commit object: %w", err)
-	}
-
-	commitContents, err := getCommitBytesWithoutSignature(commit)
-	if err != nil {
-		return fmt.Errorf("unable to encode commit contents for verification: %w", err)
-	}
-
-	commitSignature := signatureForObjectID(commitID, commit.Signature, commit.SignatureSHA256)
-
-	if signatureBlockCount(commitSignature) > 1 {
-		return errors.Join(ErrIncorrectVerificationKey, ErrMultipleSignatures)
-	}
-
-	switch key.KeyType {
-	case gpg.KeyType:
-		verifier, err := gpg.NewVerifierFromKey(key)
-		if err != nil {
-			return errors.Join(ErrIncorrectVerificationKey, err)
-		}
-		if err := verifier.Verify(ctx, commitContents, []byte(commitSignature)); err != nil {
-			return ErrIncorrectVerificationKey
-		}
-
-		return nil
-	case ssh.KeyType:
-		if err := verifySSHKeySignature(ctx, key, commitContents, []byte(commitSignature)); err != nil {
-			return errors.Join(ErrIncorrectVerificationKey, err)
-		}
-
-		return nil
-	case sigstore.KeyType:
-		if err := verifyGitsignSignature(ctx, r, key, commitContents, []byte(commitSignature)); err != nil {
-			return errors.Join(ErrIncorrectVerificationKey, err)
-		}
-
-		return nil
-	}
-
-	return ErrUnknownSigningMethod
 }
 
 // GetCommitMessage returns the commit's message.
