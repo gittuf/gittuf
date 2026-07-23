@@ -153,7 +153,11 @@ func isBareGitDir(path string) bool {
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
-	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: true})
+	// gitDirPath is already the resolved git directory (set via
+	// `git rev-parse --git-dir` in LoadRepository), so DetectDotGit must be
+	// false: with it true, go-git looks for a .git entry inside this path,
+	// which a bare repository does not have, and returns ErrRepositoryNotExists.
+	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: false})
 }
 
 // GetGitDir returns the GIT_DIR path for the repository.
