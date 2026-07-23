@@ -12,7 +12,7 @@ import (
 )
 
 // Update updates the model based on the message received.
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -36,6 +36,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenChoice
 		return m, nil
 
+	case policyLifecycleResultMsg:
+		if msg.err != nil {
+			m.errorMsg = msg.err.Error()
+		} else {
+			m.footer = msg.msg
+		}
+		return m, nil
+
 	case spinner.TickMsg:
 		if m.screen == screenLoading {
 			m.spinner, cmd = m.spinner.Update(msg)
@@ -57,14 +65,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm {
+				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
 				return m, tea.Quit
 			}
 		case "h":
 			// Toggle help screen if not in form mode
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm {
+				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
 				if m.screen == screenHelp {
 					// Toggle back
 					m.screen = m.helpScreen.previousScreen
@@ -77,6 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "esc":
 			m.footer = ""
+			m.errorMsg = ""
 			switch m.screen {
 			case screenPolicy, screenTrust:
 				m.screen = screenChoice
@@ -87,6 +96,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.screen = screenPolicy
 				}
+			case screenPolicyLifecycle:
+				m.screen = screenPolicy
+			case screenPolicyLifecycleForm:
+				m.screen = screenPolicyLifecycle
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
 			case screenPolicyPrincipalsForm:
@@ -109,6 +122,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.helpScreen.Update(msg, &m)
 		case screenTrust:
 			return m.trustScreen.Update(msg, &m)
+		case screenPolicyLifecycle, screenPolicyLifecycleForm:
+			return m.policyLifecycleScreen.Update(msg, &m)
 		case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 			return m.policyRulesScreen.Update(msg, &m)
 		case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -128,6 +143,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.helpScreen.Update(msg, &m)
 	case screenPolicy:
 		return m.policyScreen.Update(msg, &m)
+	case screenPolicyLifecycle, screenPolicyLifecycleForm:
+		return m.policyLifecycleScreen.Update(msg, &m)
 	case screenTrust:
 		return m.trustScreen.Update(msg, &m)
 	case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
@@ -141,6 +158,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+// Update updates the model based on the message received, ensuring list sizes are
+// dynamically recalculated to fit any runtime error messages or notice overlays.
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	resModel, cmd := m.updateInternal(msg)
+	if typedModel, ok := resModel.(model); ok {
+		typedModel.resizeLists()
+		return typedModel, cmd
+	}
+	return resModel, cmd
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace.
