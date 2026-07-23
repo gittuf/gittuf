@@ -303,19 +303,11 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 		}
 		if head == localRef {
 			worktree := strings.TrimSuffix(r.gitDirPath, ".git") // TODO: this doesn't support detached git dir
-			cwd, err := os.Getwd()
-			if err != nil {
-				return nil, err
-			}
-			if err := os.Chdir(worktree); err != nil {
-				return nil, err
-			}
-			defer os.Chdir(cwd) //nolint:errcheck
 
-			if _, err := r.executor("restore", "--staged", localPath).executeString(); err != nil {
+			if _, err := r.executor("restore", "--staged", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
-			if _, err := r.executor("restore", localPath).executeString(); err != nil {
+			if _, err := r.executor("restore", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
 		}
