@@ -186,7 +186,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 
 	repo := &Repository{clock: clockwork.NewRealClock()}
 
-	gitDirPath, has, err := findGitDirPath(".")
+	gitDirPath, has, err := findGitDirPath(repositoryPath)
 	if err != nil {
 		return nil, err
 	}
