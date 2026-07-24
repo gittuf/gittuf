@@ -305,7 +305,8 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	}
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
-	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
+	cmd.Env = append(cmd.Env, "LC_ALL=C")                 // force git to the C (and thus english) locale
+	cmd.Env = append(cmd.Env, "GIT_NO_REPLACE_OBJECTS=1") // ignore refs/replace/ so verification reads reflect the true objects, matching the replace-blind go-git reads
 	if e.dir != "" {
 		cmd.Dir = e.dir
 	}
