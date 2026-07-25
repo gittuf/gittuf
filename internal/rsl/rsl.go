@@ -1086,6 +1086,15 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 	// FIXME: We assume here that downstreamRepo and upstreamRepo have their
 	// gittuf refs already synced.
 
+	type pendingEntry struct {
+		directive       tuf.PropagationDirective
+		commitID        gitinterface.Hash
+		upstreamEntryID gitinterface.Hash
+	}
+
+	// Phase 1: compute all subtrees without writing any RSL entries. If any
+	// directive fails here, the RSL is left untouched.
+	var pending []pendingEntry
 	for _, detail := range details {
 		latestUpstreamEntry, _, err := GetLatestReferenceUpdaterEntry(upstreamRepo, ForReference(detail.GetUpstreamReference()), IsUnskipped())
 		if err != nil {
@@ -1132,12 +1141,18 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitint
 			return err
 		}
 
-		if err := NewPropagationEntry(detail.GetDownstreamReference(), commitID, detail.GetUpstreamRepository(), latestUpstreamEntry.GetID()).Commit(downstreamRepo, sign); err != nil {
+		pending = append(pending, pendingEntry{
+			directive:       detail,
+			commitID:        commitID,
+			upstreamEntryID: latestUpstreamEntry.GetID(),
+		})
+	}
+
+	// Phase 2: all subtrees computed successfully; write RSL entries.
+	for _, p := range pending {
+		if err := NewPropagationEntry(p.directive.GetDownstreamReference(), p.commitID, p.directive.GetUpstreamRepository(), p.upstreamEntryID).Commit(downstreamRepo, sign); err != nil {
 			return err
 		}
-
-		// TODO: error management should revert propagation entries?
-		// atomicity?
 	}
 
 	return nil
