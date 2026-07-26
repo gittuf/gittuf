@@ -213,7 +213,7 @@ func TestDiscardPolicy(t *testing.T) {
 		initialPolicyRef, err := repo.r.GetReference(policy.PolicyRef)
 		assert.Nil(t, err)
 
-		err = repo.DiscardPolicy()
+		err = repo.DiscardPolicy(false)
 		assert.Nil(t, err)
 
 		stagingRef, err := repo.r.GetReference(policy.PolicyStagingRef)
@@ -226,7 +226,7 @@ func TestDiscardPolicy(t *testing.T) {
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo := &Repository{r: r}
 
-		err := repo.DiscardPolicy()
+		err := repo.DiscardPolicy(false)
 		assert.Nil(t, err)
 
 		_, err = repo.r.GetReference(policy.PolicyStagingRef)
@@ -243,12 +243,54 @@ func TestDiscardPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = repo.DiscardPolicy()
+		err = repo.DiscardPolicy(false)
 		assert.Nil(t, err)
 
 		stagingRef, err := repo.r.GetReference(policy.PolicyStagingRef)
 		assert.Nil(t, err)
 		assert.Equal(t, initialRef, stagingRef)
+	})
+	// Regression test for issue #1342: Discard moved PolicyStagingRef without
+	// recording an RSL entry, leaving the staging ref out of sync with its
+	// latest RSL entry and causing a subsequent Apply to fail with
+	// ErrInvalidPolicy. createTestRepositoryWithPolicy applies the policy, so we
+	// must advance the staging ref past the policy ref before discarding to
+	// exercise the bug path (otherwise Discard hits its no-op guard).
+	t.Run("discard after real stage flow then apply succeeds", func(t *testing.T) {
+		repo := createTestRepositoryWithPolicy(t, "")
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgKeyBytes)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gpgKey := tufv02.NewKeyFromSSLibKey(gpgKeyR)
+
+		// Make a real policy change so PolicyStagingRef advances past PolicyRef.
+		if err := repo.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "protect-feature", []string{gpgKey.KeyID}, []string{"git:refs/heads/feature"}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Write a real RSL entry for the staging ref.
+		if err := repo.StagePolicy(testCtx, "", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Discard resets staging back to the policy tip; this must also record
+		// an RSL entry so staging and the RSL stay in sync.
+		if err := repo.DiscardPolicy(false); err != nil {
+			t.Fatal(err)
+		}
+
+		err = policy.Apply(testCtx, repo.r, false)
+		assert.Nil(t, err)
+
+		policyTip, err := repo.r.GetReference(policy.PolicyRef)
+		assert.Nil(t, err)
+
+		stagingEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo.r, rsl.ForReference(policy.PolicyStagingRef))
+		assert.Nil(t, err)
+		assert.Equal(t, policyTip, stagingEntry.GetTargetID())
 	})
 }
 

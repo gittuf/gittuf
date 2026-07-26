@@ -1233,7 +1233,7 @@ func TestDiscard(t *testing.T) {
 
 		assert.NotEqual(t, policyTip, stagingTip)
 
-		err = Discard(repo)
+		err = Discard(repo, false)
 		assert.Nil(t, err)
 
 		policyTip, err = repo.GetReference(PolicyRef)
@@ -1271,7 +1271,7 @@ func TestDiscard(t *testing.T) {
 		}
 		assert.Equal(t, commitID, stagingTip)
 
-		err = Discard(repo)
+		err = Discard(repo, false)
 		assert.Nil(t, err)
 
 		_, err = repo.GetReference(PolicyStagingRef)
