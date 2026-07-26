@@ -5,12 +5,12 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -85,6 +85,11 @@ func (s *trustKeysThresholdsScreen) View(m *model) string {
 }
 
 func (s *trustKeysThresholdsScreen) selectAction(title string, m *model) {
+	if m.readOnly {
+		m.footer = "Read-only mode: action unavailable."
+		return
+	}
+
 	switch title {
 	case "Add Root Key":
 		s.selectedAction = trustKeysActionAddRootKey
@@ -181,7 +186,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		s.selectedAction = trustKeysActionNone
 		m.screen = screenTrustKeysThresholds
 		return *m, nil
-	
+
 	case trustKeysActionRemoveRootKey:
 		value := strings.TrimSpace(s.inputs[0].Value())
 		if value == "" {
@@ -190,7 +195,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		}
 
 		err = repoRemoveRootKey(m.ctx, m.options, value)
-		if err != nil{
+		if err != nil {
 			m.errorMsg = fmt.Sprintf("Error removing root key: %v", err)
 			return *m, nil
 		}
@@ -201,7 +206,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		s.selectedAction = trustKeysActionNone
 		m.screen = screenTrustKeysThresholds
 		return *m, nil
-	
+
 	case trustKeysActionAddPolicyKey:
 		value := strings.TrimSpace(s.inputs[0].Value())
 		if value == "" {
@@ -221,7 +226,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		s.selectedAction = trustKeysActionNone
 		m.screen = screenTrustKeysThresholds
 		return *m, nil
-	
+
 	case trustKeysActionRemovePolicyKey:
 		value := strings.TrimSpace(s.inputs[0].Value())
 		if value == "" {
@@ -258,14 +263,14 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 			m.errorMsg = fmt.Sprintf("Error updating root threshold: %v", err)
 			return *m, nil
 		}
-		
+
 		m.errorMsg = ""
 		m.footer = "Root threshold updated!"
 		s.inputs = nil
 		s.selectedAction = trustKeysActionNone
 		m.screen = screenTrustKeysThresholds
 		return *m, nil
-	
+
 	case trustKeysActionUpdatePolicyThreshold:
 		value := strings.TrimSpace(s.inputs[0].Value())
 		if value == "" {

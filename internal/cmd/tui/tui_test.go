@@ -192,7 +192,81 @@ func TestTrustGlobalRulesScreenHandleEsc(t *testing.T) {
 	})
 }
 
+func TestTrustKeysThresholdsSelectActionReadOnly(t *testing.T) {
+	m := model{readOnly: true, screen: screenTrustKeysThresholds}
+	screen := trustKeysThresholdsScreen{}
+
+	screen.selectAction("Add Root Key", &m)
+
+	assert.Equal(t, screenTrustKeysThresholds, m.screen)
+	assert.Equal(t, "Read-only mode: action unavailable.", m.footer)
+	assert.Equal(t, trustKeysActionNone, screen.selectedAction)
+}
+
+func TestTrustHookScreenCycleFocus(t *testing.T) {
+	screen := trustHookScreen{
+		inputs:      initInputs([]inputField{{"name", "Name: "}, {"path", "Path: "}, {"env", "Env: "}, {"ids", "IDs: "}, {"timeout", "Timeout: "}}),
+		isPreCommit: true,
+	}
+
+	screen.cycleFocus("tab")
+	assert.Equal(t, 1, screen.focusIndex)
+	assert.False(t, screen.isPrePush)
+
+	screen.cycleFocus("tab")
+	screen.cycleFocus("tab")
+	screen.cycleFocus("tab")
+	screen.cycleFocus("tab")
+	assert.Equal(t, 5, screen.focusIndex)
+	assert.False(t, screen.isPreCommit)
+	assert.True(t, screen.isPrePush)
+
+	screen.cycleFocus("tab")
+	assert.Equal(t, 0, screen.focusIndex)
+	assert.False(t, screen.isPreCommit)
+	assert.True(t, screen.isPrePush)
+}
+
+func TestTrustHookScreenHandleEscClearsListedHooks(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: true, targetRef: "policy"})
+	m.screen = screenTrustHooks
+	m.trustHookScreen.showHooks = true
+	m.trustHookScreen.hooks = []trustHook{{name: "stale"}}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	next := updated.(model)
+
+	assert.Equal(t, screenTrust, next.screen)
+	assert.False(t, next.trustHookScreen.showHooks)
+	assert.Nil(t, next.trustHookScreen.hooks)
+}
+
+func TestTrustHookScreenHandleHookFormSubmitRequiresScriptPath(t *testing.T) {
+	m := model{}
+	screen := trustHookScreen{
+		selectedAction: trustAddHookAction,
+		inputs:         initInputs([]inputField{{"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}),
+	}
+	screen.inputs[0].SetValue("test-hook")
+	screen.inputs[2].SetValue("lua")
+	screen.inputs[3].SetValue("principal")
+	screen.inputs[4].SetValue("10")
+
+	updated, _ := screen.handleHookFormSubmit(&m)
+	next := updated.(model)
+
+	assert.Equal(t, "Hook name and script path are required", next.errorMsg)
+}
+
 func TestTrustCoreSubmenuNavigation(t *testing.T) {
+	tmpDir := t.TempDir()
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(currentDir) //nolint:errcheck
+
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
 	t.Run("Trust Keys And Thresholds Navigation", func(t *testing.T) {
 		o := &options{
 			readOnly:  true,
@@ -284,10 +358,10 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 			readOnly:  true,
 			targetRef: "policy",
 		}
-		
+
 		m := initialModel(context.Background(), o)
 		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
-		
+
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 			return strings.Contains(string(out), "Policy")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
@@ -295,7 +369,7 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		// Home -> Trust
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-		
+
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 			return strings.Contains(string(out), "Home › Trust")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))

@@ -56,13 +56,12 @@ func (s *trustHookScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 			case "enter":
 				return s.handleHookFormSubmit(m)
 			case "up", "down", "left", "right", "tab":
-				s.isPreCommit = !s.isPreCommit
-				s.isPrePush = !s.isPrePush
+				s.cycleFocus(keyMsg.String())
 				return *m, nil
 			}
 		}
-		
-		if len(s.inputs) > 0 {
+
+		if len(s.inputs) > 0 && s.focusIndex < len(s.inputs) {
 			s.inputs[s.focusIndex], cmd = s.inputs[s.focusIndex].Update(msg)
 		}
 		return *m, cmd
@@ -73,13 +72,12 @@ func (s *trustHookScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 			case "enter":
 				return s.handleRemoveHookSubmit(m)
 			case "up", "down", "left", "right", "tab":
-				s.isPreCommit = !s.isPreCommit
-				s.isPrePush = !s.isPrePush
+				s.cycleFocus(keyMsg.String())
 				return *m, nil
 			}
 		}
 
-		if len(s.inputs) > 0 {
+		if len(s.inputs) > 0 && s.focusIndex < len(s.inputs) {
 			s.inputs[s.focusIndex], cmd = s.inputs[s.focusIndex].Update(msg)
 		}
 		return *m, cmd
@@ -113,6 +111,7 @@ func (s *trustHookScreen) selectAction(title string, m *model) {
 		s.selectedAction = trustAddHookAction
 		s.inputs = initInputs([]inputField{
 			{"Hook name", "Hook Name: "},
+			{"Path to hook script", "Script Path: "},
 			{"Environment", "Environment (lua): "},
 			{"Principal IDs (comma-separated)", "Principal IDs: "},
 			{"Timeout (seconds)", "Timeout: "},
@@ -125,6 +124,7 @@ func (s *trustHookScreen) selectAction(title string, m *model) {
 		s.selectedAction = trustUpdateHookAction
 		s.inputs = initInputs([]inputField{
 			{"Hook name", "Hook Name: "},
+			{"Path to hook script", "Script Path: "},
 			{"Environment", "Environment (lua): "},
 			{"Principal IDs (comma-separated)", "Principal IDs: "},
 			{"Timeout (seconds)", "Timeout: "},
@@ -147,19 +147,43 @@ func (s *trustHookScreen) selectAction(title string, m *model) {
 	}
 }
 
+func (s *trustHookScreen) cycleFocus(key string) {
+	if len(s.inputs) == 0 {
+		return
+	}
 
-func (s *trustHookScreen) actionLabel() string {
-	switch s.selectedAction {
-	case trustListHooksAction:
-		return "List Hooks"
-	case trustAddHookAction:
-		return "Add Hook"
-	case trustUpdateHookAction:
-		return "Update Hook"
-	case trustRemoveHookAction:
-		return "Remove Hook"
-	default:
-		return "hook action"
+	stageIndex := len(s.inputs)
+
+	if key == "up" || key == "left" {
+		if s.focusIndex > 0 {
+			s.focusIndex--
+		} else {
+			s.focusIndex = stageIndex
+		}
+	} else {
+		if s.focusIndex < stageIndex {
+			s.focusIndex++
+		} else {
+			s.focusIndex = 0
+		}
+	}
+
+	for i := range s.inputs {
+		if i == s.focusIndex {
+			s.inputs[i].Focus()
+			s.inputs[i].PromptStyle = focusedStyle
+			s.inputs[i].TextStyle = focusedStyle
+			continue
+		}
+
+		s.inputs[i].Blur()
+		s.inputs[i].PromptStyle = blurredStyle
+		s.inputs[i].TextStyle = blurredStyle
+	}
+
+	if s.focusIndex == stageIndex {
+		s.isPreCommit = !s.isPreCommit
+		s.isPrePush = !s.isPrePush
 	}
 }
 

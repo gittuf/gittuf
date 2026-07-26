@@ -6,6 +6,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -288,7 +289,7 @@ func repoUpdatePolicyThreshold(ctx context.Context, o *options, thresholdInput i
 }
 
 // repoStageTrustChanges stages trust changes to the repository
-func repoStageTrustChanges(ctx context.Context, o *options) error {
+func repoStageTrustChanges(ctx context.Context, _ *options) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -317,7 +318,7 @@ func repoSignTrustChanges(ctx context.Context, o *options) error {
 }
 
 // repoApplyTrustChanges applies trust changes to the repository
-func repoApplyTrustChanges(ctx context.Context, o *options) error {
+func repoApplyTrustChanges(ctx context.Context, _ *options) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -338,7 +339,7 @@ func (s *trustHookScreen) renderHooks() string {
 		b.WriteString("Hook: " + hook.name + "\n")
 		b.WriteString("Environment: " + hook.environment.String() + "\n")
 		b.WriteString("Principals: " + strings.Join(hook.principalIDs, ", ") + "\n")
-		b.WriteString(fmt.Sprintf("Timeout: %d\n\n", hook.timeout))
+		fmt.Fprintf(&b, "Timeout: %d\n\n", hook.timeout)
 	}
 
 	return b.String()
@@ -374,7 +375,7 @@ func repoListHooks(ctx context.Context, o *options) ([]trustHook, error) {
 }
 
 // repoAddHook adds a hook to the repository
-func repoAddHook(ctx context.Context, o *options, hookName string, isPreCommit, isPrePush bool, timeout int, env string, principalIDs []string) error {
+func repoAddHook(ctx context.Context, o *options, hookName, hookPath string, isPreCommit, isPrePush bool, timeout int, env string, principalIDs []string) error {
 	var environment tuf.HookEnvironment
 	switch strings.ToLower(env) {
 	case tuf.HookEnvironmentLuaString:
@@ -406,7 +407,10 @@ func repoAddHook(ctx context.Context, o *options, hookName string, isPreCommit, 
 		return err
 	}
 
-	hookBytes := []byte{}
+	hookBytes, err := os.ReadFile(hookPath)
+	if err != nil {
+		return err
+	}
 
 	opts := []trustpolicyopts.Option{}
 	if o.p.WithRSLEntry {
@@ -417,7 +421,7 @@ func repoAddHook(ctx context.Context, o *options, hookName string, isPreCommit, 
 }
 
 // repoUpdateHook updates a hook in the repository
-func repoUpdateHook(ctx context.Context, o *options, hookName string, isPreCommit, isPrePush bool, timeout int, env string, principalIDs []string) error {
+func repoUpdateHook(ctx context.Context, o *options, hookName, hookPath string, isPreCommit, isPrePush bool, timeout int, env string, principalIDs []string) error {
 	var environment tuf.HookEnvironment
 	switch strings.ToLower(env) {
 	case tuf.HookEnvironmentLuaString:
@@ -449,7 +453,10 @@ func repoUpdateHook(ctx context.Context, o *options, hookName string, isPreCommi
 		return err
 	}
 
-	hookBytes := []byte{}
+	hookBytes, err := os.ReadFile(hookPath)
+	if err != nil {
+		return err
+	}
 
 	opts := []trustpolicyopts.Option{}
 	if o.p.WithRSLEntry {
@@ -502,9 +509,10 @@ func (s *trustHookScreen) renderHookForm() string {
 		s.inputs[1].View(),
 		s.inputs[2].View(),
 		s.inputs[3].View(),
+		s.inputs[4].View(),
 		"",
 		"Stage: " + stage,
-		"Use arrow keys or tab to switch stage.",
+		"Use arrow keys or tab to move between fields and stage.",
 		"Press Enter to submit.",
 	}, "\n")
 }
@@ -530,38 +538,38 @@ func (s *trustHookScreen) renderRemoveHookForm() string {
 // handleHookFormSubmit handles the submission of the add/update hook form
 func (s *trustHookScreen) handleHookFormSubmit(m *model) (tea.Model, tea.Cmd) {
 	hookName := strings.TrimSpace(s.inputs[0].Value())
-	environment := strings.TrimSpace(s.inputs[1].Value())
-	principalIDs := splitAndTrim(s.inputs[2].Value())
-	timeout, err := strconv.Atoi(strings.TrimSpace(s.inputs[3].Value()))
+	hookPath := strings.TrimSpace(s.inputs[1].Value())
+	environment := strings.TrimSpace(s.inputs[2].Value())
+	principalIDs := splitAndTrim(s.inputs[3].Value())
+	timeout, err := strconv.Atoi(strings.TrimSpace(s.inputs[4].Value()))
 	if err != nil || timeout <= 0 {
 		m.errorMsg = "Timeout must be a positive integer"
+		return *m, nil
+	}
+	if hookName == "" || hookPath == "" {
+		m.errorMsg = "Hook name and script path are required"
 		return *m, nil
 	}
 
 	switch s.selectedAction {
 	case trustAddHookAction:
-		err = repoAddHook(m.ctx, m.options, hookName, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
+		err = repoAddHook(m.ctx, m.options, hookName, hookPath, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
 		if err != nil {
 			m.errorMsg = fmt.Sprintf("Error adding hook: %v", err)
 			return *m, nil
 		}
 		m.footer = "Hook added!"
 	case trustUpdateHookAction:
-		err = repoUpdateHook(m.ctx, m.options, hookName, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
+		err = repoUpdateHook(m.ctx, m.options, hookName, hookPath, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error adding hook: %v", err)
+			m.errorMsg = fmt.Sprintf("Error updating hook: %v", err)
 			return *m, nil
 		}
 		m.footer = "Hook updated!"
 	}
 
 	m.errorMsg = ""
-	s.inputs = nil
-	s.isPreCommit = false
-	s.isPrePush = false
-	s.hooks = nil
-	s.showHooks = false
-	s.selectedAction = trustHookActionNone
+	s.resetView()
 	m.screen = screenTrustHooks
 	return *m, nil
 }
@@ -582,14 +590,19 @@ func (s *trustHookScreen) handleRemoveHookSubmit(m *model) (tea.Model, tea.Cmd) 
 
 	m.errorMsg = ""
 	m.footer = "Hook removed!"
+	s.resetView()
+	m.screen = screenTrustHooks
+	return *m, nil
+}
+
+func (s *trustHookScreen) resetView() {
 	s.inputs = nil
+	s.focusIndex = 0
 	s.isPreCommit = false
 	s.isPrePush = false
 	s.hooks = nil
 	s.showHooks = false
 	s.selectedAction = trustHookActionNone
-	m.screen = screenTrustHooks
-	return *m, nil
 }
 
 // repoListPropagationDirectives returns propagation directives for the TUI.

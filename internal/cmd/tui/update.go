@@ -14,6 +14,7 @@ import (
 func isFormScreen(s screen) bool {
 	switch s {
 	case screenPolicyAddRule, screenPolicyEditRule,
+		screenPolicyPrincipalsForm,
 		screenTrustAddGlobalRule, screenTrustEditGlobalRule,
 		screenTrustKeyForm, screenTrustThresholdForm,
 		screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm,
@@ -102,6 +103,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case screenPolicyAddRule, screenPolicyEditRule:
 				m.screen = screenPolicyRules
+			case screenPolicyPrincipalsForm:
+				m.screen = screenPolicyPrincipals
+			case screenPolicyPrincipals:
+				m.screen = screenPolicy
 			case screenHelp:
 				m.screen = m.helpScreen.previousScreen
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -109,6 +114,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenTrustKeyForm, screenTrustThresholdForm:
 				m.screen = screenTrustKeysThresholds
 			case screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:
+				m.trustHookScreen.resetView()
 				m.screen = screenTrustHooks
 			case screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
 				m.screen = screenTrustPropagation
@@ -117,6 +123,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenTrustRepoForm, screenTrustRepoLocationForm:
 				m.screen = screenTrustRepoNetwork
 			case screenTrustHooks, screenTrustLifecycle, screenTrustGitHubApp, screenTrustRepoNetwork:
+				if m.screen == screenTrustHooks {
+					m.trustHookScreen.resetView()
+				}
 				m.screen = screenTrust
 			case screenTrustPropagation:
 				m.screen = screenTrust
@@ -138,6 +147,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.policyRulesScreen.Update(msg, &m)
 		case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 			return m.trustGlobalRulesScreen.Update(msg, &m)
+		case screenPolicyPrincipals:
+			return m.policyPrincipalsScreen.Update(msg, &m)
+		case screenPolicyPrincipalsForm:
+			return m.policyPrincipalsFormScreen.Update(msg, &m)
 		case screenTrustLifecycle:
 			return m.trustLifecycleScreen.Update(msg, &m)
 		case screenTrustHooks, screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:
@@ -167,6 +180,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.policyRulesScreen.Update(msg, &m)
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		return m.trustGlobalRulesScreen.Update(msg, &m)
+	case screenPolicyPrincipals:
+		return m.policyPrincipalsScreen.Update(msg, &m)
+	case screenPolicyPrincipalsForm:
+		return m.policyPrincipalsFormScreen.Update(msg, &m)
 	case screenTrustLifecycle:
 		return m.trustLifecycleScreen.Update(msg, &m)
 	case screenTrustHooks, screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:

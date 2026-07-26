@@ -153,7 +153,11 @@ func isBareGitDir(path string) bool {
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
-	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: true})
+	// gitDirPath is already the resolved git directory (set via
+	// `git rev-parse --git-dir` in LoadRepository), so DetectDotGit must be
+	// false: with it true, go-git looks for a .git entry inside this path,
+	// which a bare repository does not have, and returns ErrRepositoryNotExists.
+	return git.PlainOpenWithOptions(r.gitDirPath, &git.PlainOpenOptions{DetectDotGit: false})
 }
 
 // GetGitDir returns the GIT_DIR path for the repository.
@@ -181,17 +185,8 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 
 	repo := &Repository{clock: clockwork.NewRealClock()}
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
 
-	if err = os.Chdir(repositoryPath); err != nil {
-		return nil, err
-	}
-	defer os.Chdir(currentDir) //nolint:errcheck
-
-	gitDirPath, has, err := findGitDirPath(".")
+	gitDirPath, has, err := findGitDirPath(repositoryPath)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +198,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 
 	slog.Debug("Identifying git directory for repository...")
-	stdOut, stdErr, err := repo.executor("rev-parse", "--git-dir").withoutGitDir().execute()
+	stdOut, stdErr, err := repo.executor("rev-parse", "--absolute-git-dir").withoutGitDir().withDir(repositoryPath).execute()
 	if err != nil {
 		errContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
@@ -217,9 +212,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
 	}
 
-	// git rev-parse --git-dir returns a local path, so filepath.Abs gives us
-	// the final path _including_ symlink follows.
-	absPath, err := filepath.Abs(strings.TrimSpace(string(stdOutContents)))
+	absPath, err := filepath.EvalSymlinks(strings.TrimSpace(string(stdOutContents)))
 	if err != nil {
 		return nil, err
 	}
@@ -243,6 +236,7 @@ type executor struct {
 	args        []string
 	env         []string
 	stdIn       io.Reader
+	dir         string
 	unsetGitDir bool
 }
 
@@ -263,6 +257,14 @@ func (e *executor) withEnv(env ...string) *executor {
 // executed command.
 func (e *executor) withoutGitDir() *executor {
 	e.unsetGitDir = true
+	return e
+}
+
+// withDir runs the command with the given working directory instead of the
+// process's. Use this for worktree-relative commands (status, restore) so the
+// process-global os.Chdir is never touched.
+func (e *executor) withDir(dir string) *executor {
+	e.dir = dir
 	return e
 }
 
@@ -303,7 +305,11 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	}
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
-	cmd.Env = append(cmd.Env, "LC_ALL=C") // force git to the C (and thus english) locale
+	cmd.Env = append(cmd.Env, "LC_ALL=C")                 // force git to the C (and thus english) locale
+	cmd.Env = append(cmd.Env, "GIT_NO_REPLACE_OBJECTS=1") // ignore refs/replace/ so verification reads reflect the true objects, matching the replace-blind go-git reads
+	if e.dir != "" {
+		cmd.Dir = e.dir
+	}
 
 	var (
 		stdOut bytes.Buffer

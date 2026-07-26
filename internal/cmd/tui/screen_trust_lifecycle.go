@@ -6,8 +6,8 @@ package tui
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type trustLifecycleAction int
@@ -27,11 +27,10 @@ type trustLifecycleScreen struct {
 func (s *trustLifecycleScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch m.screen {
-	case screenTrustLifecycle:
+	if m.screen == screenTrustLifecycle {
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 			if sel, ok := s.operationList.SelectedItem().(item); ok {
-				s.selectAction(sel.title, m)
+				s.selectAction(sel.title)
 				runSelectedLifecycleAction(s, m)
 				return *m, nil
 			}
@@ -52,7 +51,7 @@ func (s *trustLifecycleScreen) View(m *model) string {
 	}
 }
 
-func (s *trustLifecycleScreen) selectAction(title string, m *model) {
+func (s *trustLifecycleScreen) selectAction(title string) {
 	switch title {
 	case "Stage Trust Changes":
 		s.selectedAction = trustLifecycleActionStage
@@ -62,20 +61,6 @@ func (s *trustLifecycleScreen) selectAction(title string, m *model) {
 		s.selectedAction = trustLifecycleActionApply
 	default:
 		s.selectedAction = trustLifecycleActionNone
-	}
-}
-
-
-func (s *trustLifecycleScreen) actionLabel() string {
-	switch s.selectedAction {
-	case trustLifecycleActionStage:
-		return "Stage Trust Change"
-	case trustLifecycleActionSign:
-		return "Sign Trust Change"
-	case trustLifecycleActionApply:
-		return "Apply Trust Change"
-	default:
-		return "lifecycle action"
 	}
 }
 

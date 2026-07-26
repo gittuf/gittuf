@@ -5,7 +5,6 @@ package gitinterface
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
 	"testing"
@@ -51,20 +50,12 @@ func (r *Repository) RestoreWorktree(t *testing.T) {
 	if !r.IsBare() {
 		worktree = strings.TrimSuffix(worktree, ".git") // TODO: this doesn't support detached git dir
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(worktree); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(cwd) //nolint:errcheck
 
-	if _, err := r.executor("restore", "--staged", ".").executeString(); err != nil {
+	if _, err := r.executor("restore", "--staged", ".").withDir(worktree).executeString(); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := r.executor("restore", ".").executeString(); err != nil {
+	if _, err := r.executor("restore", ".").withDir(worktree).executeString(); err != nil {
 		t.Fatal(err)
 	}
 }

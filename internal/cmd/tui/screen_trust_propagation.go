@@ -225,14 +225,17 @@ func (s *trustPropagationScreen) handlePropagationFormSubmit(m *model) (tea.Mode
 		var err error
 		if s.selectedAction == trustAddDirectiveAction {
 			err = repoAddPropagationDirective(m.ctx, m.options, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
-			m.footer = "Propagation directive added!"
 		} else {
 			err = repoUpdatePropagationDirective(m.ctx, m.options, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath)
-			m.footer = "Propagation directive updated!"
 		}
 		if err != nil {
 			m.errorMsg = fmt.Sprintf("Error saving directive: %v", err)
 			return *m, nil
+		}
+		if s.selectedAction == trustAddDirectiveAction {
+			m.footer = "Propagation directive added!"
+		} else {
+			m.footer = "Propagation directive updated!"
 		}
 	case trustRemoveDirectiveAction:
 		name := strings.TrimSpace(s.inputs[0].Value())

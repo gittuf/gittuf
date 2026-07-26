@@ -355,6 +355,12 @@ func (m model) View() string {
 	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
 		return m.trustKeysScreen.View(&m)
 
+	case screenPolicyPrincipals:
+		return m.policyPrincipalsScreen.View(&m)
+
+	case screenPolicyPrincipalsForm:
+		return m.policyPrincipalsFormScreen.View(&m)
+
 	case screenTrustLifecycle:
 		return m.trustLifecycleScreen.View(&m)
 
