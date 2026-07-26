@@ -415,11 +415,29 @@ func (m model) View() string {
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		view = m.trustGlobalRulesScreen.View(&m)
 
+	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+		return m.trustKeysScreen.View(&m)
+
+	case screenTrustHooks, screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:
+		return m.trustHookScreen.View(&m)
+
 	case screenPolicyPrincipals:
 		view = m.policyPrincipalsScreen.View(&m)
 
 	case screenPolicyPrincipalsForm:
 		view = m.policyPrincipalsFormScreen.View(&m)
+
+	case screenTrustLifecycle:
+		return m.trustLifecycleScreen.View(&m)
+
+	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+		return m.trustPropagationScreen.View(&m)
+
+	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+		return m.trustGitHubAppScreen.View(&m)
+
+	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+		return m.trustRepoNetworkScreen.View(&m)
 
 	case screenPolicyAddRule, screenPolicyEditRule:
 		view = m.policyRulesScreen.View(&m)
