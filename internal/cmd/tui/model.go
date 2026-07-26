@@ -31,6 +31,24 @@ const (
 	screenTrustGlobalRules                  // Global rule management screen
 	screenTrustAddGlobalRule                // Form: add a new global rule
 	screenTrustEditGlobalRule               // Form: edit selected global rule (prefilled)
+	screenTrustKeysThresholds               // Manage root keys, policy keys, and thresholds
+	screenTrustKeyForm                      // Form: add/remove root or policy key
+	screenTrustThresholdForm                // Form: update root or policy threshold
+	screenTrustPropagation                  // Manage propagation directives
+	screenTrustAddPropagationForm           // Form: add a propagation directive
+	screenTrustUpdatePropagationForm        // Form: update a propagation directive
+	screenTrustRemovePropagationForm        // Form: remove a propagation directive
+	screenTrustGitHubApp                    // Manage trusted GitHub App settings
+	screenTrustAddGitHubAppForm             // Form: add a GitHub App
+	screenTrustGitHubAppActionForm          // Form: remove/enable/disable a GitHub App
+	screenTrustLifecycle                    // Stage, sign, and apply trust changes
+	screenTrustHooks                        // Manage trust hooks
+	screenTrustRemoveHookForm               // Form: remove a trust hook
+	screenTrustAddHookForm                  // Form: add a trust hook
+	screenTrustUpdateHookForm               // Form: update a trust hook
+	screenTrustRepoNetwork                  // Manage controller, network, and repository settings
+	screenTrustRepoForm                     // Form: add controller/network repository
+	screenTrustRepoLocationForm             // Form: set repository location
 	screenHelp                              // Generic Help screen displaying keybindings
 )
 
@@ -58,6 +76,12 @@ type model struct {
 	trustScreen            trustScreen
 	policyRulesScreen      policyRulesScreen
 	trustGlobalRulesScreen trustGlobalRulesScreen
+	trustKeysScreen        trustKeysThresholdsScreen
+	trustLifecycleScreen   trustLifecycleScreen
+	trustHookScreen        trustHookScreen
+	trustPropagationScreen trustPropagationScreen
+	trustGitHubAppScreen   trustGitHubAppScreen
+	trustRepoNetworkScreen trustRepoNetworkScreen
 	cursorMode             cursor.Mode
 	repo                   *gittuf.Repository
 	signer                 dsse.SignerVerifier
@@ -165,6 +189,12 @@ func initialModel(ctx context.Context, o *options) model {
 		trustScreen: trustScreen{
 			trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 				item{title: "View Global Rules", desc: "View and manage global rules"},
+				item{title: "Keys & Thresholds", desc: "Manage root keys, policy keys, and thresholds"},
+				item{title: "Hooks", desc: "Manage trust hooks"},
+				item{title: "Propagation", desc: "Manage propagation directives"},
+				item{title: "GitHub App", desc: "Manage trusted GitHub App settings"},
+				item{title: "Lifecycle", desc: "Stage, sign, and apply trust changes"},
+				item{title: "Repo/Network", desc: "Manage controller, network, and repository settings"},
 			}, delegate),
 		},
 		policyRulesScreen: policyRulesScreen{
@@ -172,6 +202,55 @@ func initialModel(ctx context.Context, o *options) model {
 		},
 		trustGlobalRulesScreen: trustGlobalRulesScreen{
 			globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
+		},
+		trustKeysScreen: trustKeysThresholdsScreen{
+			operationList: newMenuList("Keys & Thresholds", []list.Item{
+				item{title: "Add Root Key", desc: "TODO: collect a signer and public key input"},
+				item{title: "Remove Root Key", desc: "TODO: collect the root key ID to remove"},
+				item{title: "Add Policy Key", desc: "TODO: collect a signer and public key input"},
+				item{title: "Remove Policy Key", desc: "TODO: collect the policy key ID to remove"},
+				item{title: "Update Root Threshold", desc: "TODO: collect the new root threshold"},
+				item{title: "Update Policy Threshold", desc: "TODO: collect the new policy threshold"},
+			}, delegate),
+		},
+		trustLifecycleScreen: trustLifecycleScreen{
+			operationList: newMenuList("Trust Lifecycle", []list.Item{
+				item{title: "Stage Trust Changes", desc: "Stage trust changes for signing"},
+				item{title: "Sign Trust Changes", desc: "Sign staged trust changes"},
+				item{title: "Apply Trust Changes", desc: "Apply signed trust changes to the policy file"},
+			}, delegate),
+		},
+		trustHookScreen: trustHookScreen{
+			operationList: newMenuList("Trust Hooks", []list.Item{
+				item{title: "List Hooks", desc: "List all configured hooks"},
+				item{title: "Add Hook", desc: "Add a new hook"},
+				item{title: "Update Hook", desc: "Update an existing hook"},
+				item{title: "Remove Hook", desc: "Remove an existing hook"},
+			}, delegate),
+		},
+		trustPropagationScreen: trustPropagationScreen{
+			operationList: newMenuList("Trust Propagation", []list.Item{
+				item{title: "List Directives", desc: "List all configured propagation directives"},
+				item{title: "Add Directive", desc: "Add a new propagation directive"},
+				item{title: "Update Directive", desc: "Update an existing propagation directive"},
+				item{title: "Remove Directive", desc: "Remove an existing propagation directive"},
+			}, delegate),
+		},
+		trustGitHubAppScreen: trustGitHubAppScreen{
+			operationList: newMenuList("Trust GitHub App", []list.Item{
+				item{title: "Add GitHub App", desc: "Add a trusted GitHub App key"},
+				item{title: "Remove GitHub App", desc: "Remove a trusted GitHub App"},
+				item{title: "Enable App Approvals", desc: "Mark GitHub App approvals as trusted"},
+				item{title: "Disable App Approvals", desc: "Mark GitHub App approvals as untrusted"},
+			}, delegate),
+		},
+		trustRepoNetworkScreen: trustRepoNetworkScreen{
+			operationList: newMenuList("Trust Repo/Network", []list.Item{
+				item{title: "Add Controller Repository", desc: "Add a controller repository"},
+				item{title: "Add Network Repository", desc: "Add a network repository"},
+				item{title: "Set Repository Location", desc: "Set this repository's canonical location"},
+				item{title: "Make Controller", desc: "Mark this repository as a controller"},
+			}, delegate),
 		},
 	}
 
@@ -218,6 +297,13 @@ func (m *model) resizeLists() {
 	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
+	m.trustKeysScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustLifecycleScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustHookScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustPropagationScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustGitHubAppScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustRepoNetworkScreen.operationList.SetSize(innerWidth, innerHeight)
+
 }
 
 // loadRepoCmd performs all heavy TUI initialization asynchronously and sends
