@@ -91,8 +91,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenPolicyRules
 			case screenPolicyPrincipalsForm:
 				m.screen = screenPolicyPrincipals
+				if m.policyPrincipalsFormScreen.action == "Add Person" || m.policyPrincipalsFormScreen.action == "Add Standalone Key(s)" {
+					m.policyPrincipalsScreen.addChoice = true
+				}
 			case screenPolicyPrincipals:
-				m.screen = screenPolicy
+				if m.policyPrincipalsScreen.addChoice {
+					m.policyPrincipalsScreen.addChoice = false
+				} else {
+					m.screen = screenPolicy
+				}
 			case screenHelp:
 				m.screen = m.helpScreen.previousScreen
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:

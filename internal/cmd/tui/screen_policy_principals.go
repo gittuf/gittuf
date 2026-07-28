@@ -22,6 +22,7 @@ type policyPrincipalsScreen struct {
 	list          list.Model
 	confirmDelete bool
 	deleteTarget  string
+	addChoice     bool
 }
 
 type policyPrincipalsFormScreen struct {
@@ -85,12 +86,18 @@ func (s *policyPrincipalsScreen) updatePrincipalsList() {
 
 func (f *policyPrincipalsFormScreen) initInputs(action string) {
 	f.action = action
-	f.inputs = initInputs([]inputField{
-		{"Enter Principal ID", "Principal ID:"},
-		{"Enter Public Keys (paths or IDs, comma-separated)", "Public Keys:"},
-		{"Enter Associated Identities (provider::identity, comma-separated)", "Identities:"},
-		{"Enter Custom Metadata (Key=Value, comma-separated)", "Custom Metadata:"},
-	})
+	if action == "Add Standalone Key(s)" {
+		f.inputs = initInputs([]inputField{
+			{"Enter Public Keys (paths or IDs, comma-separated)", "Public Keys:"},
+		})
+	} else {
+		f.inputs = initInputs([]inputField{
+			{"Enter Principal ID", "Principal ID:"},
+			{"Enter Public Keys (paths or IDs, comma-separated)", "Public Keys:"},
+			{"Enter Associated Identities (provider::identity, comma-separated)", "Identities:"},
+			{"Enter Custom Metadata (Key=Value, comma-separated)", "Custom Metadata:"},
+		})
+	}
 	f.focusIndex = 0
 }
 
@@ -157,17 +164,42 @@ func (s *policyPrincipalsScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 		return s.handleDeleteConfirm(msg, m)
 	}
 
+	if s.addChoice {
+		if msg, ok := msg.(tea.KeyMsg); ok {
+			switch msg.String() {
+			case "1":
+				s.addChoice = false
+				m.policyPrincipalsFormScreen.initInputs("Add Person")
+				m.screen = screenPolicyPrincipalsForm
+				return *m, nil
+			case "2":
+				s.addChoice = false
+				m.policyPrincipalsFormScreen.initInputs("Add Standalone Key(s)")
+				m.screen = screenPolicyPrincipalsForm
+				return *m, nil
+			case "esc":
+				s.addChoice = false
+				m.footer = ""
+				return *m, nil
+			}
+		}
+		return *m, nil
+	}
+
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if !m.readOnly {
 			switch msg.String() {
 			case "a":
-				m.policyPrincipalsFormScreen.initInputs("Add Person")
-				m.screen = screenPolicyPrincipalsForm
+				s.addChoice = true
 				return *m, nil
 			case "e":
 				if sel, ok := s.list.SelectedItem().(item); ok {
 					for _, p := range s.principals {
 						if p.ID() == sel.title {
+							if _, ok := p.(*tufv02.Person); !ok {
+								m.errorMsg = "Error: Standalone keys cannot be edited. Remove and re-add instead."
+								return *m, nil
+							}
 							m.policyPrincipalsFormScreen.initInputsPrefilled(p)
 							m.screen = screenPolicyPrincipalsForm
 							return *m, nil
@@ -203,6 +235,46 @@ func (s *policyPrincipalsScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea
 	return *m, nil
 }
 
+func (s *policyPrincipalsScreen) renderChoiceMenu(m *model) string {
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colorFocus)).
+		Padding(0, 2).
+		Render("Add Principal")
+
+	options := lipgloss.JoinVertical(lipgloss.Left,
+		fmt.Sprintf("  %s Add Person (Wrapper with custom metadata/identities and support for multiple keys)", lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus)).Render("1.")),
+		fmt.Sprintf("  %s Add Standalone Key(s) (Directly authorize keys individually)", lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus)).Render("2.")),
+		"",
+		fmt.Sprintf("  %s Cancel", lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Esc.")),
+	)
+
+	menuBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(colorFocus)).
+		Padding(1, 3).
+		Render(lipgloss.JoinVertical(lipgloss.Center, title, "", options))
+
+	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+	boxWidth := m.width - h - 2
+	boxHeight := m.height - v - 7
+	if m.readOnly {
+		boxHeight = m.height - v - 9
+	}
+	if boxWidth < 0 {
+		boxWidth = 0
+	}
+	if boxHeight < 0 {
+		boxHeight = 0
+	}
+
+	return lipgloss.Place(
+		boxWidth, boxHeight,
+		lipgloss.Center, lipgloss.Center,
+		menuBox,
+	)
+}
+
 func (s *policyPrincipalsScreen) View(m *model) string {
 	overlay := ""
 	if s.confirmDelete {
@@ -215,8 +287,17 @@ func (s *policyPrincipalsScreen) View(m *model) string {
 		)
 	}
 
-	listView := m.renderListOrEmpty(s.list, len(s.principals), "No principals configured")
-	overlays := overlay + renderActionHints(m.readOnly) + hint
+	var listView string
+	if s.addChoice {
+		listView = s.renderChoiceMenu(m)
+	} else {
+		listView = m.renderListOrEmpty(s.list, len(s.principals), "No principals configured")
+	}
+
+	overlays := overlay
+	if !s.addChoice {
+		overlays += renderActionHints(m.readOnly) + hint
+	}
 
 	return m.renderScreen("Home › Policy › Principals", listView, overlays)
 }
@@ -243,14 +324,21 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 		return *m, nil
 	}
 
-	personID := f.inputs[0].Value()
-	publicKeysRaw := splitAndTrim(f.inputs[1].Value())
-	identitiesRaw := splitAndTrim(f.inputs[2].Value())
-	customRaw := splitAndTrim(f.inputs[3].Value())
+	var personID string
+	var publicKeysRaw, identitiesRaw, customRaw []string
 
-	if personID == "" {
-		m.errorMsg = "Error: Principal ID is required"
-		return *m, nil
+	if f.action == "Add Standalone Key(s)" {
+		publicKeysRaw = splitAndTrim(f.inputs[0].Value())
+	} else {
+		personID = f.inputs[0].Value()
+		publicKeysRaw = splitAndTrim(f.inputs[1].Value())
+		identitiesRaw = splitAndTrim(f.inputs[2].Value())
+		customRaw = splitAndTrim(f.inputs[3].Value())
+
+		if personID == "" {
+			m.errorMsg = "Error: Principal ID is required"
+			return *m, nil
+		}
 	}
 
 	publicKeys := map[string]*tufv02.Key{}
@@ -292,19 +380,31 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 		custom[split[0]] = split[1]
 	}
 
-	person := &tufv02.Person{
-		PersonID:             personID,
-		PublicKeys:           publicKeys,
-		AssociatedIdentities: associatedIdentities,
-		Custom:               custom,
-	}
-
 	var err error
-	switch f.action {
-	case "Add Person":
-		err = repoAddPrincipal(m.ctx, m.options, person)
-	case "Edit Person":
-		err = repoUpdatePrincipal(m.ctx, m.options, person)
+	if f.action == "Add Standalone Key(s)" {
+		var keys []tuf.Principal
+		for _, k := range publicKeys {
+			keys = append(keys, k)
+		}
+		if len(keys) == 0 {
+			m.errorMsg = "Error: At least one public key is required"
+			return *m, nil
+		}
+		err = repoAddKeys(m.ctx, m.options, keys)
+	} else {
+		person := &tufv02.Person{
+			PersonID:             personID,
+			PublicKeys:           publicKeys,
+			AssociatedIdentities: associatedIdentities,
+			Custom:               custom,
+		}
+
+		switch f.action {
+		case "Add Person":
+			err = repoAddPrincipal(m.ctx, m.options, person)
+		case "Edit Person":
+			err = repoUpdatePrincipal(m.ctx, m.options, person)
+		}
 	}
 
 	if err != nil {
@@ -359,6 +459,18 @@ func getCurrPrincipals(ctx context.Context, o *options) []tuf.Principal {
 		principals = append(principals, p)
 	}
 	return principals
+}
+
+func repoAddKeys(ctx context.Context, o *options, keys []tuf.Principal) error {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return err
+	}
+	signer, err := gittuf.LoadSigner(repo, o.p.SigningKey)
+	if err != nil {
+		return err
+	}
+	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, keys, true)
 }
 
 func repoAddPrincipal(ctx context.Context, o *options, person *tufv02.Person) error {
