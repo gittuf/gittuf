@@ -38,6 +38,10 @@ func getPagerTestNone() pager {
 }
 
 func TestPagerResolution(t *testing.T) {
+	// Ensure results are deterministic.
+	t.Setenv("PAGER", "")
+	t.Setenv("LESS", "")
+
 	pagerVar := newPagerEnvVar()
 	assert.Equal(t, &pagerEnvVar{}, pagerVar)
 	t.Setenv("PAGER", "less")
