@@ -23,6 +23,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
@@ -72,7 +73,7 @@ func NewPolicyVerifier(repo gitstore.Storer) *PolicyVerifier {
 // VerifyRef verifies the signature on the latest RSL entry for the target ref
 // using the latest policy. The expected Git ID for the ref in the latest RSL
 // entry is returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (githash.Hash, error) {
 	// Find latest entry for target
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
@@ -86,7 +87,7 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (gitinter
 // VerifyRefFull verifies the entire RSL for the target ref from the first
 // entry. The expected Git ID for the ref in the latest RSL entry is returned if
 // the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (githash.Hash, error) {
 	// Trace RSL back to the start
 	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
 	var (
@@ -129,7 +130,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (giti
 // VerifyRefFromEntry performs verification for the reference from a specific
 // RSL entry. The expected Git ID for the ref in the latest RSL entry is
 // returned if the policy verification is successful.
-func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID gitinterface.Hash) (gitinterface.Hash, error) {
+func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID githash.Hash) (githash.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
@@ -173,7 +174,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 		return false, ErrCannotVerifyMergeableForTagRef
 	}
 
-	var fromID gitinterface.Hash
+	var fromID githash.Hash
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
 	targetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
 	switch {
@@ -208,12 +209,12 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 // (true,  nil) -> merge is possible but it MUST be performed by an authorized
 // person for the rule, i.e., an authorized person must sign the merge's RSL
 // entry
-func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef string, featureID gitinterface.Hash) (bool, error) {
+func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef string, featureID githash.Hash) (bool, error) {
 	if strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
 		return false, ErrCannotVerifyMergeableForTagRef
 	}
 
-	var fromID gitinterface.Hash
+	var fromID githash.Hash
 	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
 	targetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
 	switch {
@@ -228,7 +229,7 @@ func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef
 	return v.verifyMergeable(ctx, targetRef, fromID, featureID)
 }
 
-func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, fromID, featureID gitinterface.Hash) (bool, error) {
+func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, fromID, featureID githash.Hash) (bool, error) {
 	// We're specifically focused on commit merges here, this doesn't apply to
 	// tags
 	mergeTreeID, err := v.repo.GetMergeTree(fromID, featureID)
@@ -961,7 +962,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo gitstore.Storer, 
 	// For a tag, the expected toID in the approval is the commit the tag points to
 	// Otherwise, the expected toID is the tree the commit points to
 	var (
-		toID  gitinterface.Hash
+		toID  githash.Hash
 		isTag bool
 	)
 	if strings.HasPrefix(entry.RefName, gitinterface.TagRefPrefix) {
@@ -978,7 +979,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo gitstore.Storer, 
 	return getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)
 }
 
-func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.Storer, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID gitinterface.Hash, isTag bool) (*sslibdsse.Envelope, *set.Set[string], error) {
+func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.Storer, policy *State, attestationsState *attestations.Attestations, targetRef string, fromID, toID githash.Hash, isTag bool) (*sslibdsse.Envelope, *set.Set[string], error) {
 	if attestationsState == nil {
 		return nil, nil, nil
 	}
@@ -1063,7 +1064,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.
 // getCommits identifies the commits introduced to the entry's ref since the
 // last RSL entry for the same ref. These commits are then verified for file
 // policies.
-func getCommits(repo gitstore.Storer, entry *rsl.ReferenceEntry) ([]gitinterface.Hash, error) {
+func getCommits(repo gitstore.Storer, entry *rsl.ReferenceEntry) ([]githash.Hash, error) {
 	firstEntry := false
 
 	priorRefEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
@@ -1088,7 +1089,7 @@ type verifyGitObjectAndAttestationsOptions struct {
 	approverPrincipalIDs *set.Set[string]
 	verifyMergeable      bool
 	trustedVerifier      string
-	tagObjectID          gitinterface.Hash
+	tagObjectID          githash.Hash
 }
 
 type verifyGitObjectAndAttestationsOption func(o *verifyGitObjectAndAttestationsOptions)
@@ -1122,13 +1123,13 @@ func withTrustedVerifier(name string) verifyGitObjectAndAttestationsOption {
 // withTagObjectID is used to set the Git ID of a tag object. When this is set,
 // the tag object's signature is also verified in addition to the RSL entry for
 // the tag.
-func withTagObjectID(objID gitinterface.Hash) verifyGitObjectAndAttestationsOption {
+func withTagObjectID(objID githash.Hash) verifyGitObjectAndAttestationsOption {
 	return func(o *verifyGitObjectAndAttestationsOptions) {
 		o.tagObjectID = objID
 	}
 }
 
-func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
+func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID githash.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
 	options := &verifyGitObjectAndAttestationsOptions{}
 	for _, fn := range opts {
 		fn(options)
@@ -1296,7 +1297,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 	return verifiedUsing, rslSignatureNeededForThreshold, nil
 }
 
-func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID gitinterface.Hash, authorizationAttestation *sslibdsse.Envelope, appNames []string, approverIDs *set.Set[string], verifyMergeable bool) (string, *set.Set[string], bool, error) {
+func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID githash.Hash, authorizationAttestation *sslibdsse.Envelope, appNames []string, approverIDs *set.Set[string], verifyMergeable bool) (string, *set.Set[string], bool, error) {
 	if len(verifiers) == 0 {
 		return "", nil, false, ErrNoVerifiers
 	}

@@ -17,9 +17,9 @@ var (
 	ErrInvalidHashLength   = githash.ErrInvalidHashLength
 )
 
-// Hash represents a Git object hash. It aliases githash.Hash so gittuf's
-// dependency-light packages (such as rsl) can name the same concrete type
-// without importing gitinterface and its signing/attestation stack.
+// Hash represents a Git object hash.
+//
+// Deprecated: use githash.Hash.
 type Hash = githash.Hash
 
 // ZeroHash represents an empty SHA-1 Hash. It is safe to use as an

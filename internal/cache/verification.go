@@ -3,9 +3,12 @@
 
 package cache
 
-import "github.com/gittuf/gittuf/pkg/gitinterface"
+import (
+	"github.com/gittuf/gittuf/pkg/githash"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
+)
 
-func (p *Persistent) SetLastVerifiedEntryForRef(ref string, entryNumber uint64, entryID gitinterface.Hash) {
+func (p *Persistent) SetLastVerifiedEntryForRef(ref string, entryNumber uint64, entryID githash.Hash) {
 	if p.LastVerifiedEntryForRef == nil {
 		p.LastVerifiedEntryForRef = map[string]RSLEntryIndex{}
 	}
@@ -21,7 +24,7 @@ func (p *Persistent) SetLastVerifiedEntryForRef(ref string, entryNumber uint64, 
 	p.LastVerifiedEntryForRef[ref] = RSLEntryIndex{EntryNumber: entryNumber, EntryID: entryID.String()}
 }
 
-func (p *Persistent) GetLastVerifiedEntryForRef(ref string) (uint64, gitinterface.Hash) {
+func (p *Persistent) GetLastVerifiedEntryForRef(ref string) (uint64, githash.Hash) {
 	if p.LastVerifiedEntryForRef == nil {
 		return 0, gitinterface.ZeroHash
 	}

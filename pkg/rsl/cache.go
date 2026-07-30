@@ -5,6 +5,8 @@ package rsl
 
 import (
 	"sync"
+
+	"github.com/gittuf/gittuf/pkg/githash"
 )
 
 type rslCache struct {
@@ -15,7 +17,7 @@ type rslCache struct {
 	parentCacheMutex sync.RWMutex
 }
 
-func (r *rslCache) getEntry(id Hash) (Entry, bool) {
+func (r *rslCache) getEntry(id githash.Hash) (Entry, bool) {
 	r.entryCacheMutex.RLock()
 	defer r.entryCacheMutex.RUnlock()
 
@@ -23,14 +25,14 @@ func (r *rslCache) getEntry(id Hash) (Entry, bool) {
 	return entry, has
 }
 
-func (r *rslCache) setEntry(id Hash, entry Entry) {
+func (r *rslCache) setEntry(id githash.Hash, entry Entry) {
 	r.entryCacheMutex.Lock()
 	defer r.entryCacheMutex.Unlock()
 
 	r.entryCache[id.String()] = entry
 }
 
-func (r *rslCache) getParent(id Hash) (Hash, bool, error) {
+func (r *rslCache) getParent(id githash.Hash) (githash.Hash, bool, error) {
 	r.parentCacheMutex.RLock()
 	defer r.parentCacheMutex.RUnlock()
 
@@ -46,7 +48,7 @@ func (r *rslCache) getParent(id Hash) (Hash, bool, error) {
 	return parentIDHash, true, nil
 }
 
-func (r *rslCache) setParent(id, parentID Hash) {
+func (r *rslCache) setParent(id, parentID githash.Hash) {
 	r.parentCacheMutex.Lock()
 	defer r.parentCacheMutex.Unlock()
 

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/attestations"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
@@ -208,7 +209,7 @@ type RSLEntryIndex struct {
 	EntryNumber uint64 `json:"entryNumber"`
 }
 
-func (r *RSLEntryIndex) GetEntryID() gitinterface.Hash {
+func (r *RSLEntryIndex) GetEntryID() githash.Hash {
 	hash, _ := gitinterface.NewHash(r.EntryID)
 	// TODO: error?
 	return hash

@@ -19,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -138,14 +139,14 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.S
 		luaParameters.RawSet(lua.LString("remoteName"), lua.LString(options.PrePush.RemoteName))
 		luaParameters.RawSet(lua.LString("remoteURL"), lua.LString(options.PrePush.RemoteURL))
 
-		remoteObjects := make(map[string][]gitinterface.Hash, len(options.PrePush.RefSpecs))
+		remoteObjects := make(map[string][]githash.Hash, len(options.PrePush.RefSpecs))
 
 		for _, refSpec := range options.PrePush.RefSpecs {
 			splitRefSpec := strings.Split(refSpec, ":")
 			localRef, remoteRef := splitRefSpec[0], splitRefSpec[1]
 			remoteTrackerRef := gitinterface.RemoteRef(remoteRef, options.PrePush.RemoteName)
 
-			var remoteHash gitinterface.Hash
+			var remoteHash githash.Hash
 			err = r.r.FetchRefSpec(options.PrePush.RemoteName, []string{fmt.Sprintf("%s:%s", remoteRef, remoteTrackerRef)})
 			if err != nil {
 				// This likely means the remote doesn't have the specified ref.
@@ -164,7 +165,7 @@ func (r *Repository) InvokeHooksForStage(ctx context.Context, signer sslibdsse.S
 				return nil, err
 			}
 
-			remoteObjects[refSpec] = []gitinterface.Hash{localHash, remoteHash}
+			remoteObjects[refSpec] = []githash.Hash{localHash, remoteHash}
 		}
 
 		i := 0

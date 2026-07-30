@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitstoretest"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,7 +106,7 @@ func testCommitUsingSpecificKey(t *testing.T, objectFormat gitinterface.ObjectFo
 	assert.Equal(t, zeroHash, referenceEntry.TargetID)
 	assert.Equal(t, uint64(1), referenceEntry.Number)
 
-	annotationEntry := NewAnnotationEntry([]Hash{referenceEntryID}, true, annotationMessage)
+	annotationEntry := NewAnnotationEntry([]githash.Hash{referenceEntryID}, true, annotationMessage)
 	err = annotationEntry.CommitUsingSpecificKey(repo, signingKeyBytes)
 	assert.Nil(t, err)
 
@@ -114,7 +115,7 @@ func testCommitUsingSpecificKey(t *testing.T, objectFormat gitinterface.ObjectFo
 	entry, err = GetEntry(repo, annotationEntryID)
 	assert.Nil(t, err)
 	annotationEntry = entry.(*AnnotationEntry)
-	assert.Equal(t, []Hash{referenceEntryID}, annotationEntry.RSLEntryIDs)
+	assert.Equal(t, []githash.Hash{referenceEntryID}, annotationEntry.RSLEntryIDs)
 	assert.True(t, annotationEntry.Skip)
 	assert.Equal(t, annotationMessage, annotationEntry.Message)
 	assert.Equal(t, uint64(2), annotationEntry.Number)
@@ -186,7 +187,7 @@ func TestGetLatestEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewAnnotationEntry([]Hash{latestTip}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{latestTip}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Error(err)
 	}
 
@@ -194,7 +195,7 @@ func TestGetLatestEntry(t *testing.T) {
 	assert.Nil(t, err)
 	a := entry.(*AnnotationEntry)
 	assert.True(t, a.Skip)
-	assert.Equal(t, []Hash{latestTip}, a.RSLEntryIDs)
+	assert.Equal(t, []githash.Hash{latestTip}, a.RSLEntryIDs)
 	assert.Equal(t, "This was a mistaken push!", a.Message)
 }
 
@@ -236,7 +237,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, rslRef, entry.GetID())
 
 		// Add annotation for the target entry
-		if err := NewAnnotationEntry([]Hash{entry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -346,7 +347,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, rslRef, entry.GetID())
 
 		// Add annotation for the target entry
-		if err := NewAnnotationEntry([]Hash{entry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -369,7 +370,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// RSL structure for the test
 		// main <- feature <- main <- feature <- main
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 		for _, ref := range testRefs {
 			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
@@ -417,7 +418,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// RSL structure for the test
 		// main <- A <- feature <- A <- main <- A <- feature <- A <- main <- A
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 		for _, ref := range testRefs {
 			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
@@ -428,7 +429,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			}
 			entryIDs = append(entryIDs, latest.GetID())
 
-			if err := NewAnnotationEntry([]Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			if err := NewAnnotationEntry([]githash.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err = GetLatestEntry(repo)
@@ -445,7 +446,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// Add an annotation at the end for some entry and see it gets pulled in
 		// even when the anchor is for its ancestor
 		assert.Len(t, annotations, 1) // before adding an annotation, we have just 1
-		if err := NewAnnotationEntry([]Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]))
@@ -481,7 +482,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// 1    <- 2       <- 3    <- 4       <- 5
 		// main <- feature <- main <- feature <- main
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 		for _, ref := range testRefs {
 			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
@@ -559,7 +560,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// RSL structure for the test
 		// main <- A <- feature <- A <- main <- A <- feature <- A <- main <- A
 		testRefs := []string{"main", "feature", "main", "feature", "main"}
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 		for _, ref := range testRefs {
 			if err := NewReferenceEntry(ref, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 				t.Fatal(err)
@@ -570,7 +571,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			}
 			entryIDs = append(entryIDs, latest.GetID())
 
-			if err := NewAnnotationEntry([]Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+			if err := NewAnnotationEntry([]githash.Hash{latest.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 				t.Fatal(err)
 			}
 			latest, err = GetLatestEntry(repo)
@@ -587,7 +588,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		// Add an annotation at the end for some entry and see it gets pulled in
 		// even when the anchor is for its ancestor
 		assert.Len(t, annotations, 1) // before adding an annotation, we have just 1
-		if err := NewAnnotationEntry([]Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[0]}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference("main"), BeforeEntryID(entryIDs[4]), UntilEntryNumber(1))
@@ -631,7 +632,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 
 		// Add an entry
 		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
@@ -669,7 +670,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[len(entryIDs)-1], entry.GetID())
 
 		// Skip the second one
-		if err := NewAnnotationEntry([]Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -680,7 +681,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[0], entry.GetID())
 
 		// Skip the first one too to trigger error
-		if err := NewAnnotationEntry([]Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -696,7 +697,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		entryIDs := []Hash{}
+		entryIDs := []githash.Hash{}
 
 		// Add an entry
 		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
@@ -729,7 +730,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[0], entry.GetID())
 
 		// Skip the second one
-		if err := NewAnnotationEntry([]Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[1]}, true, "revoke").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -740,7 +741,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, entryIDs[0], entry.GetID())
 
 		// Skip the first one too to trigger error
-		if err := NewAnnotationEntry([]Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryIDs[0]}, true, "revoke").Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -803,7 +804,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 		assert.Equal(t, expectedLatestEntry, latestEntry)
 
 		// Add an annotation for latest entry, check that it's returned
-		if err := NewAnnotationEntry([]Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{expectedLatestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -876,7 +877,7 @@ func TestGetLatestReferenceUpdaterEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if err := NewAnnotationEntry([]Hash{entry.GetID()}, false, "annotation").CommitWithoutNumber(repo); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entry.GetID()}, false, "annotation").CommitWithoutNumber(repo); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1039,7 +1040,7 @@ func TestGetEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := NewAnnotationEntry([]Hash{initialEntryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{initialEntryID}, true, "This was a mistaken push!").Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1062,7 +1063,7 @@ func TestGetEntry(t *testing.T) {
 	assert.Nil(t, err)
 	a := entry.(*AnnotationEntry)
 	assert.True(t, a.Skip)
-	assert.Equal(t, []Hash{initialEntryID}, a.RSLEntryIDs)
+	assert.Equal(t, []githash.Hash{initialEntryID}, a.RSLEntryIDs)
 	assert.Equal(t, "This was a mistaken push!", a.Message)
 }
 
@@ -1102,7 +1103,7 @@ func TestGetParentForEntry(t *testing.T) {
 		entryID = entry.GetID()
 
 		// Find parent for an annotation
-		if err := NewAnnotationEntry([]Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{entryID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1204,7 +1205,7 @@ func TestGetNonGittufParentReferenceUpdaterEntryForEntry(t *testing.T) {
 		assert.Equal(t, expectedEntry, parentEntry)
 
 		// Add annotation pertaining to the expected entry
-		if err := NewAnnotationEntry([]Hash{expectedEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{expectedEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1272,7 +1273,7 @@ func TestGetFirstEntry(t *testing.T) {
 	assert.Equal(t, firstEntry, testEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewAnnotationEntry([]Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1310,7 +1311,7 @@ func TestGetFirstReferenceUpdaterEntryForRef(t *testing.T) {
 	assert.Equal(t, firstEntry, testEntry)
 
 	for i := 0; i < 5; i++ {
-		if err := NewAnnotationEntry([]Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1364,7 +1365,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 			t.Fatal("invalid entry type")
 		}
 
-		assert.Equal(t, []Hash{toBeSkippedEntry.GetID()}, annotationEntry.RSLEntryIDs)
+		assert.Equal(t, []githash.Hash{toBeSkippedEntry.GetID()}, annotationEntry.RSLEntryIDs)
 	})
 
 	t.Run("skip multiple entries", func(t *testing.T) {
@@ -1375,7 +1376,7 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 		require.Nil(t, err)
 
-		skippedEntries := []Hash{}
+		skippedEntries := []githash.Hash{}
 
 		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
 		require.Nil(t, err)
@@ -1514,7 +1515,7 @@ func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
 
 	mainRef := "refs/heads/main"
 
-	initialTargetIDs := []gitinterface.Hash{}
+	initialTargetIDs := []githash.Hash{}
 	for i := 0; i < 3; i++ {
 		commitID, err := repo.Commit(emptyTreeHash, mainRef, "Test commit", false)
 		if err != nil {
@@ -1555,7 +1556,7 @@ func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
 	}
 
 	// Next, add some new commits to this branch.
-	featureTargetIDs := []gitinterface.Hash{}
+	featureTargetIDs := []githash.Hash{}
 	for i := 0; i < 3; i++ {
 		commitID, err := repo.Commit(emptyTreeHash, featureRef, "Feature commit", false)
 		if err != nil {
@@ -1614,7 +1615,7 @@ func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
 	}
 
 	// Add annotation for feature entry
-	if err := NewAnnotationEntry([]Hash{latestEntryT.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{latestEntryT.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1656,7 +1657,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 
 	// Add some annotations
 	for i := 0; i < 3; i++ {
-		if err := NewAnnotationEntry([]Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1682,7 +1683,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectedEntries = append(expectedEntries, latestEntry.(*ReferenceEntry))
-	if err := NewAnnotationEntry([]Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -1698,7 +1699,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an annotation that refers to two valid entries
-	if err := NewAnnotationEntry([]Hash{expectedEntries[0].GetID(), expectedEntries[1].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{expectedEntries[0].GetID(), expectedEntries[1].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -1760,7 +1761,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 
 	// Add some annotations
 	for i := 0; i < 3; i++ {
-		if err := NewAnnotationEntry([]Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+		if err := NewAnnotationEntry([]githash.Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1785,7 +1786,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := NewAnnotationEntry([]Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{latestEntry.GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1796,7 +1797,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	assert.Equal(t, expectedAnnotationMap, annotationMap)
 
 	// Add an annotation that refers to two valid entries
-	if err := NewAnnotationEntry([]Hash{expectedEntries[0].GetID(), expectedEntries[1].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
+	if err := NewAnnotationEntry([]githash.Hash{expectedEntries[0].GetID(), expectedEntries[1].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 		t.Fatal(err)
 	}
 	latestEntry, err = GetLatestEntry(repo)
@@ -1847,26 +1848,26 @@ func TestAnnotationEntryRefersTo(t *testing.T) {
 
 	tests := map[string]struct {
 		annotation     *AnnotationEntry
-		entryID        gitinterface.Hash
+		entryID        githash.Hash
 		expectedResult bool
 	}{
 		"annotation refers to single entry, returns true": {
-			annotation:     NewAnnotationEntry([]Hash{emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]githash.Hash{emptyBlobID}, false, annotationMessage),
 			entryID:        emptyBlobID,
 			expectedResult: true,
 		},
 		"annotation refers to multiple entries, returns true": {
-			annotation:     NewAnnotationEntry([]Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]githash.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
 			entryID:        emptyBlobID,
 			expectedResult: true,
 		},
 		"annotation refers to single entry, returns false": {
-			annotation:     NewAnnotationEntry([]Hash{emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]githash.Hash{emptyBlobID}, false, annotationMessage),
 			entryID:        gitinterface.ZeroHash,
 			expectedResult: false,
 		},
 		"annotation refers to multiple entries, returns false": {
-			annotation:     NewAnnotationEntry([]Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
+			annotation:     NewAnnotationEntry([]githash.Hash{emptyTreeID, emptyBlobID}, false, annotationMessage),
 			entryID:        gitinterface.ZeroHash,
 			expectedResult: false,
 		},
@@ -2049,7 +2050,7 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		injected := errors.New("get commit message failure")
 		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitMessageErr: injected}
 
-		err = NewAnnotationEntry([]Hash{entryID}, true, annotationMessage).Commit(storer, false)
+		err = NewAnnotationEntry([]githash.Hash{entryID}, true, annotationMessage).Commit(storer, false)
 		assert.ErrorIs(t, err, injected)
 	})
 
@@ -2064,7 +2065,7 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		injected := errors.New("get commit message failure")
 		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitMessageErr: injected}
 
-		err = NewAnnotationEntry([]Hash{entryID}, true, annotationMessage).CommitUsingSpecificKey(storer, artifacts.SSHED25519Private)
+		err = NewAnnotationEntry([]githash.Hash{entryID}, true, annotationMessage).CommitUsingSpecificKey(storer, artifacts.SSHED25519Private)
 		assert.ErrorIs(t, err, injected)
 	})
 }

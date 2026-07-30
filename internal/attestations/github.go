@@ -14,7 +14,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	gogithub "github.com/google/go-github/v61/github"
 	ita "github.com/in-toto/attestation/go/v1"
@@ -36,7 +36,7 @@ func (a *Attestations) SetGitHubPullRequestAuthorization(repo gitstore.Storer, e
 	}
 
 	if a.githubPullRequestAttestations == nil {
-		a.githubPullRequestAttestations = map[string]gitinterface.Hash{}
+		a.githubPullRequestAttestations = map[string]githash.Hash{}
 	}
 
 	a.githubPullRequestAttestations[GitHubPullRequestAttestationPath(targetRefName, commitID)] = blobID
@@ -81,7 +81,7 @@ func (a *Attestations) SetGitHubPullRequestApprovalAttestation(repo gitstore.Sto
 	}
 
 	if a.codeReviewApprovalAttestations == nil {
-		a.codeReviewApprovalAttestations = map[string]gitinterface.Hash{}
+		a.codeReviewApprovalAttestations = map[string]githash.Hash{}
 	}
 
 	if a.codeReviewApprovalIndex == nil {

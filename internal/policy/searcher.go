@@ -10,7 +10,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/cache"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
 )
@@ -320,7 +320,7 @@ func newCacheSearcher(repo gitstore.Storer, persistentCache *cache.Persistent) *
 	}
 }
 
-func loadRSLReferenceUpdaterEntry(repo gitstore.Storer, entryID gitinterface.Hash) (rsl.ReferenceUpdaterEntry, error) {
+func loadRSLReferenceUpdaterEntry(repo gitstore.Storer, entryID githash.Hash) (rsl.ReferenceUpdaterEntry, error) {
 	entryT, err := rsl.GetEntry(repo, entryID)
 	if err != nil {
 		return nil, err

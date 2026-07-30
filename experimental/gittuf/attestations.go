@@ -21,6 +21,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/go-git/go-git/v6/plumbing"
@@ -85,9 +86,9 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 	}
 
 	var (
-		fromID          gitinterface.Hash
-		featureCommitID gitinterface.Hash
-		toID            gitinterface.Hash
+		fromID          githash.Hash
+		featureCommitID githash.Hash
+		toID            githash.Hash
 	)
 
 	isTag := strings.HasPrefix(targetRef, gitinterface.TagRefPrefix)

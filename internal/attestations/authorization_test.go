@@ -11,6 +11,7 @@ import (
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	ita "github.com/in-toto/attestation/go/v1"
 	"github.com/stretchr/testify/assert"
@@ -271,7 +272,7 @@ func TestGetReferenceAuthorizationFor(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		attestations.referenceAuthorizations = map[string]gitinterface.Hash{
+		attestations.referenceAuthorizations = map[string]githash.Hash{
 			ReferenceAuthorizationPath(testRef, testID, testID): blobID,
 		}
 

@@ -13,6 +13,7 @@ import (
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
@@ -27,7 +28,7 @@ var ErrRefStateDoesNotMatchRSL = errors.New("current state of Git reference does
 
 func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...verifyopts.Option) error {
 	var (
-		expectedTip gitinterface.Hash
+		expectedTip githash.Hash
 		err         error
 	)
 
@@ -206,7 +207,7 @@ func (r *Repository) VerifyNetwork(ctx context.Context) error {
 
 // verifyRefTip inspects the specified reference in the local repository to
 // check if it points to the expected Git object.
-func (r *Repository) verifyRefTip(target string, expectedTip gitinterface.Hash) error {
+func (r *Repository) verifyRefTip(target string, expectedTip githash.Hash) error {
 	refTip, err := r.r.GetReference(target)
 	if err != nil {
 		return err

@@ -11,6 +11,7 @@ import (
 	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
@@ -1096,7 +1097,7 @@ func (h *Hook) GetHashes() map[string]string {
 	return h.Hashes
 }
 
-func (h *Hook) GetBlobID() gitinterface.Hash {
+func (h *Hook) GetBlobID() githash.Hash {
 	hash, _ := gitinterface.NewHash(h.Hashes[gitinterface.GitBlobHashName])
 	return hash
 }

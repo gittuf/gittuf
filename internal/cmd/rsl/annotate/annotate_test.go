@@ -10,6 +10,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/cmd"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
@@ -136,7 +137,7 @@ func TestAnnotate(t *testing.T) {
 
 		annotation := latestEntry.(*rsl.AnnotationEntry)
 		assert.Equal(t, "test annotation message", annotation.Message)
-		assert.Equal(t, []rsl.Hash{entryID}, annotation.RSLEntryIDs)
+		assert.Equal(t, []githash.Hash{entryID}, annotation.RSLEntryIDs)
 		assert.False(t, annotation.Skip)
 	})
 
@@ -176,7 +177,7 @@ func TestAnnotate(t *testing.T) {
 
 		annotation := latestEntry.(*rsl.AnnotationEntry)
 		assert.Equal(t, "test skip message", annotation.Message)
-		assert.Equal(t, []rsl.Hash{entryID}, annotation.RSLEntryIDs)
+		assert.Equal(t, []githash.Hash{entryID}, annotation.RSLEntryIDs)
 		assert.True(t, annotation.Skip)
 	})
 }

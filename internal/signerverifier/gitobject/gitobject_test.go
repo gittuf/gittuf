@@ -17,6 +17,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/sigstore"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
@@ -145,7 +146,7 @@ func TestVerifyWithRekorURL(t *testing.T) {
 // createGPGSignedCommit builds a GPG-signed commit object directly via go-git's
 // storer and returns its hash. It mirrors the approach used in
 // pkg/gitinterface/commit_test.go's createTestGPGSignedCommit helper.
-func createGPGSignedCommit(t *testing.T, repo *gitinterface.Repository) gitinterface.Hash {
+func createGPGSignedCommit(t *testing.T, repo *gitinterface.Repository) githash.Hash {
 	t.Helper()
 
 	goGitRepo, err := repo.GetGoGitRepository()
@@ -271,7 +272,7 @@ func TestSignatureBlockCount(t *testing.T) {
 // createSigstoreSignedCommit builds a commit object carrying a gitsign
 // (Sigstore) signature directly via go-git's storer and returns its hash. It
 // mirrors createTestSigstoreSignedCommit in pkg/gitinterface/commit_test.go.
-func createSigstoreSignedCommit(t *testing.T, repo *gitinterface.Repository) gitinterface.Hash {
+func createSigstoreSignedCommit(t *testing.T, repo *gitinterface.Repository) githash.Hash {
 	t.Helper()
 
 	goGitRepo, err := repo.GetGoGitRepository()

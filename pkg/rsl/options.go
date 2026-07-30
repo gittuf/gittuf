@@ -3,13 +3,15 @@
 
 package rsl
 
+import "github.com/gittuf/gittuf/pkg/githash"
+
 type GetLatestReferenceUpdaterEntryOptions struct {
 	Reference string
 
-	BeforeEntryID     Hash
+	BeforeEntryID     githash.Hash
 	BeforeEntryNumber uint64
 
-	UntilEntryID     Hash
+	UntilEntryID     githash.Hash
 	UntilEntryNumber uint64
 
 	Unskipped bool
@@ -34,7 +36,7 @@ func ForReference(reference string) GetLatestReferenceUpdaterEntryOption {
 // entry ID. It cannot be used in combination with BeforeEntryNumber.
 // BeforeEntryID is exclusive: the returned entry cannot be the reference entry
 // that matches the specified ID.
-func BeforeEntryID(entryID Hash) GetLatestReferenceUpdaterEntryOption {
+func BeforeEntryID(entryID githash.Hash) GetLatestReferenceUpdaterEntryOption {
 	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.BeforeEntryID = entryID
 	}
@@ -54,7 +56,7 @@ func BeforeEntryNumber(number uint64) GetLatestReferenceUpdaterEntryOption {
 // entry with the specified ID is encountered. It cannot be used in combination
 // with UntilEntryNumber. UntilEntryID is inclusive: the returned entry can be
 // the entry that matches the specified ID.
-func UntilEntryID(entryID Hash) GetLatestReferenceUpdaterEntryOption {
+func UntilEntryID(entryID githash.Hash) GetLatestReferenceUpdaterEntryOption {
 	return func(o *GetLatestReferenceUpdaterEntryOptions) {
 		o.UntilEntryID = entryID
 	}

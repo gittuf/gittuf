@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
@@ -88,7 +89,7 @@ func RemoteTrackerRef(remote string) string {
 
 // Entry is the abstract representation of an object in the RSL.
 type Entry interface {
-	GetID() Hash
+	GetID() githash.Hash
 	Commit(gitstore.Storer, bool) error
 	GetNumber() uint64
 	createCommitMessage(bool) (string, error)
@@ -100,31 +101,31 @@ type Entry interface {
 type ReferenceUpdaterEntry interface {
 	Entry
 	GetRefName() string
-	GetTargetID() Hash
+	GetTargetID() githash.Hash
 }
 
 // ReferenceEntry represents a record of a reference state in the RSL. It
 // implements the Entry interface.
 type ReferenceEntry struct {
 	// ID contains the Git hash for the commit corresponding to the entry.
-	ID Hash
+	ID githash.Hash
 
 	// RefName contains the Git reference the entry is for.
 	RefName string
 
 	// TargetID contains the Git hash for the object expected at RefName.
-	TargetID Hash
+	TargetID githash.Hash
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
 }
 
 // NewReferenceEntry returns a ReferenceEntry object for a normal RSL entry.
-func NewReferenceEntry(refName string, targetID Hash) *ReferenceEntry {
+func NewReferenceEntry(refName string, targetID githash.Hash) *ReferenceEntry {
 	return &ReferenceEntry{RefName: refName, TargetID: targetID}
 }
 
-func (e *ReferenceEntry) GetID() Hash {
+func (e *ReferenceEntry) GetID() githash.Hash {
 	return e.ID
 }
 
@@ -132,7 +133,7 @@ func (e *ReferenceEntry) GetRefName() string {
 	return e.RefName
 }
 
-func (e *ReferenceEntry) GetTargetID() Hash {
+func (e *ReferenceEntry) GetTargetID() githash.Hash {
 	return e.TargetID
 }
 
@@ -231,10 +232,10 @@ func (e *ReferenceEntry) CommitWithoutNumber(storer gitstore.Storer) error {
 // implements the Entry interface.
 type AnnotationEntry struct {
 	// ID contains the Git hash for the commit corresponding to the annotation.
-	ID Hash
+	ID githash.Hash
 
 	// RSLEntryIDs contains one or more Git hashes for the RSL entries the annotation applies to.
-	RSLEntryIDs []Hash
+	RSLEntryIDs []githash.Hash
 
 	// Skip indicates if the RSLEntryIDs must be skipped during gittuf workflows.
 	Skip bool
@@ -248,11 +249,11 @@ type AnnotationEntry struct {
 
 // NewAnnotationEntry returns an Annotation object that applies to one or more
 // prior RSL entries.
-func NewAnnotationEntry(rslEntryIDs []Hash, skip bool, message string) *AnnotationEntry {
+func NewAnnotationEntry(rslEntryIDs []githash.Hash, skip bool, message string) *AnnotationEntry {
 	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
 }
 
-func (a *AnnotationEntry) GetID() Hash {
+func (a *AnnotationEntry) GetID() githash.Hash {
 	return a.ID
 }
 
@@ -316,7 +317,7 @@ func (a *AnnotationEntry) GetNumber() uint64 {
 
 // RefersTo returns true if the specified entryID is referred to by the
 // annotation.
-func (a *AnnotationEntry) RefersTo(entryID Hash) bool {
+func (a *AnnotationEntry) RefersTo(entryID githash.Hash) bool {
 	for _, id := range a.RSLEntryIDs {
 		if id.Equal(entryID.Bytes()) {
 			return true
@@ -404,26 +405,26 @@ func (a *AnnotationEntry) CommitWithoutNumber(storer gitstore.Storer) error {
 // propagated.
 type PropagationEntry struct {
 	// ID contains the Git hash for the commit corresponding to the entry.
-	ID Hash
+	ID githash.Hash
 
 	// RefName contains the Git reference the entry is for.
 	RefName string
 
 	// TargetID contains the Git hash for the object expected at RefName.
-	TargetID Hash
+	TargetID githash.Hash
 
 	// UpstreamRepository records the location of the upstream repository.
 	UpstreamRepository string
 
 	// UpstreamEntryID records the upstream repository's RSL entry ID whose
 	// contents were propagated.
-	UpstreamEntryID Hash
+	UpstreamEntryID githash.Hash
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
 }
 
-func NewPropagationEntry(refName string, targetID Hash, upstreamRepository string, upstreamEntryID Hash) *PropagationEntry {
+func NewPropagationEntry(refName string, targetID githash.Hash, upstreamRepository string, upstreamEntryID githash.Hash) *PropagationEntry {
 	return &PropagationEntry{
 		RefName:            refName,
 		TargetID:           targetID,
@@ -432,7 +433,7 @@ func NewPropagationEntry(refName string, targetID Hash, upstreamRepository strin
 	}
 }
 
-func (e *PropagationEntry) GetID() Hash {
+func (e *PropagationEntry) GetID() githash.Hash {
 	return e.ID
 }
 
@@ -440,7 +441,7 @@ func (e *PropagationEntry) GetRefName() string {
 	return e.RefName
 }
 
-func (e *PropagationEntry) GetTargetID() Hash {
+func (e *PropagationEntry) GetTargetID() githash.Hash {
 	return e.TargetID
 }
 
@@ -514,7 +515,7 @@ func (e *PropagationEntry) createCommitMessage(includeNumber bool) (string, erro
 }
 
 // GetEntry returns the entry corresponding to entryID.
-func GetEntry(storer gitstore.Storer, entryID Hash) (Entry, error) {
+func GetEntry(storer gitstore.Storer, entryID githash.Hash) (Entry, error) {
 	entry, has := cache.getEntry(entryID)
 	if has {
 		return entry, nil
@@ -876,7 +877,7 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 	}
 	iterator := Entry(iteratorEntry)
 
-	entriesToSkip := []Hash{}
+	entriesToSkip := []githash.Hash{}
 
 	for {
 		if entry, ok := iterator.(*ReferenceEntry); ok {
@@ -914,7 +915,7 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 // This establishes the first time a commit was seen in the repository,
 // irrespective of the ref it was associated with, and we can infer things like
 // the active developers who could have signed the commit.
-func GetFirstReferenceUpdaterEntryForCommit(storer gitstore.Storer, commitID Hash) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
+func GetFirstReferenceUpdaterEntryForCommit(storer gitstore.Storer, commitID githash.Hash) (ReferenceUpdaterEntry, []*AnnotationEntry, error) {
 	// We check entries in pairs. In the initial case, we have the latest entry
 	// and its parent. At all times, the parent in the pair is being tested.
 	// If the latest entry is a descendant of the target commit, we start
@@ -964,7 +965,7 @@ func GetFirstReferenceUpdaterEntryForCommit(storer gitstore.Storer, commitID Has
 // entry in the range. The annotations map is keyed by the ID of the reference
 // entry, with the value being a list of annotations that apply to that
 // reference entry.
-func GetReferenceUpdaterEntriesInRange(storer gitstore.Storer, firstID, lastID Hash) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
+func GetReferenceUpdaterEntriesInRange(storer gitstore.Storer, firstID, lastID githash.Hash) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
 	return GetReferenceUpdaterEntriesInRangeForRef(storer, firstID, lastID, "")
 }
 
@@ -973,7 +974,7 @@ func GetReferenceUpdaterEntriesInRange(storer gitstore.Storer, firstID, lastID H
 // to each reference entry in the range. The annotations map is keyed by the ID
 // of the reference entry, with the value being a list of annotations that apply
 // to that reference entry.
-func GetReferenceUpdaterEntriesInRangeForRef(storer gitstore.Storer, firstID, lastID Hash, refName string) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
+func GetReferenceUpdaterEntriesInRangeForRef(storer gitstore.Storer, firstID, lastID githash.Hash, refName string) ([]ReferenceUpdaterEntry, map[string][]*AnnotationEntry, error) {
 	// We have to iterate from latest to get the annotations that refer to the
 	// last requested entry
 	iterator, err := GetLatestEntry(storer)
@@ -1071,11 +1072,11 @@ func GetReferenceUpdaterEntriesInRangeForRef(storer gitstore.Storer, firstID, la
 // This is the entry point for consumers that already hold the commit message
 // (e.g. a server walking its own RSL) and do not want a gitstore.Storer or
 // the entry cache.
-func ParseEntryText(id Hash, text string) (Entry, error) {
+func ParseEntryText(id githash.Hash, text string) (Entry, error) {
 	return parseRSLEntryText(id, text)
 }
 
-func parseRSLEntryText(id Hash, text string) (Entry, error) {
+func parseRSLEntryText(id githash.Hash, text string) (Entry, error) {
 	// Each parser returns a concrete pointer type. Assign to a local and return
 	// an explicit nil interface on error: returning the typed nil pointer
 	// directly would yield a non-nil Entry wrapping a nil pointer.
@@ -1107,7 +1108,7 @@ func parseRSLEntryText(id Hash, text string) (Entry, error) {
 // fields must appear in the order ref, targetID, number, each at most once;
 // number is optional and trailing. Out-of-order fields and duplicates are
 // rejected. Unknown keys are ignored for forward compatibility.
-func parseReferenceEntryText(id Hash, text string) (*ReferenceEntry, error) {
+func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, error) {
 	body, err := entryBody(text, ReferenceEntryHeader)
 	if err != nil {
 		return nil, err
@@ -1168,10 +1169,10 @@ func parseReferenceEntryText(id Hash, text string) (*ReferenceEntry, error) {
 // more entryID fields come first, followed by skip, then an optional number,
 // then an optional PEM message block. The message is decoded separately, so the
 // state machine stops at its begin marker.
-func parseAnnotationEntryText(id Hash, text string) (*AnnotationEntry, error) {
+func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, error) {
 	annotation := &AnnotationEntry{
 		ID:          id,
-		RSLEntryIDs: []Hash{},
+		RSLEntryIDs: []githash.Hash{},
 	}
 
 	body, err := entryBody(text, AnnotationEntryHeader)
@@ -1254,7 +1255,7 @@ func parseAnnotationEntryText(id Hash, text string) (*AnnotationEntry, error) {
 // parsePropagationEntryText parses a propagation entry as a state machine. The
 // fields must appear in the order ref, targetID, upstreamRepository,
 // upstreamEntryID, number, each at most once; number is optional and trailing.
-func parsePropagationEntryText(id Hash, text string) (*PropagationEntry, error) {
+func parsePropagationEntryText(id githash.Hash, text string) (*PropagationEntry, error) {
 	body, err := entryBody(text, PropagationEntryHeader)
 	if err != nil {
 		return nil, err
@@ -1341,7 +1342,7 @@ func entryBody(text, header string) ([]string, error) {
 	return lines[2:], nil
 }
 
-func setHash(dst *Hash, value string) error {
+func setHash(dst *githash.Hash, value string) error {
 	h, err := NewHash(value)
 	if err != nil {
 		return err
@@ -1359,7 +1360,7 @@ func setNumber(dst *uint64, value string) error {
 	return nil
 }
 
-func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID Hash) []*AnnotationEntry {
+func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID githash.Hash) []*AnnotationEntry {
 	annotations := []*AnnotationEntry{}
 	for _, annotation := range allAnnotations {
 		annotation := annotation

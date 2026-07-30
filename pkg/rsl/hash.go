@@ -8,10 +8,6 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
-// Hash is the Git object hash the RSL operates over, aliased from
-// githash.Hash (and therefore identical to gitinterface.Hash).
-type Hash = githash.Hash
-
 var (
 	ErrInvalidHashEncoding = githash.ErrInvalidHashEncoding
 	ErrInvalidHashLength   = githash.ErrInvalidHashLength
@@ -21,7 +17,7 @@ var (
 	ErrReferenceNotFound = gitstore.ErrReferenceNotFound
 )
 
-// NewHash returns a Hash from a hex encoded SHA-1 or SHA-256 string.
-func NewHash(h string) (Hash, error) {
+// NewHash returns a githash.Hash from a hex encoded SHA-1 or SHA-256 string.
+func NewHash(h string) (githash.Hash, error) {
 	return githash.NewHash(h)
 }

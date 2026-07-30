@@ -19,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
@@ -83,7 +84,7 @@ func TestSignatureVerifier(t *testing.T) {
 	tests := map[string]struct {
 		principals  []tuf.Principal
 		threshold   int
-		gitObjectID gitinterface.Hash
+		gitObjectID githash.Hash
 		attestation *sslibdsse.Envelope
 
 		expectedError error

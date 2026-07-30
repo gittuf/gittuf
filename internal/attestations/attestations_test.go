@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/gitstoretest"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,7 @@ func TestLoadCurrentAttestations(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]githash.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
@@ -92,7 +93,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		authorizations := map[string]gitinterface.Hash{}
+		authorizations := map[string]githash.Hash{}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
@@ -120,7 +121,7 @@ func TestLoadAttestationsForEntry(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+		authorizations := map[string]githash.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 
 		attestations := &Attestations{referenceAuthorizations: authorizations}
 		if err := attestations.Commit(repo, "Test commit", true, false); err != nil {
@@ -163,7 +164,7 @@ func TestAttestationsCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	authorizations := map[string]gitinterface.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
+	authorizations := map[string]githash.Hash{ReferenceAuthorizationPath(testRef, testID, testID): blobID}
 	attestations := &Attestations{referenceAuthorizations: authorizations}
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
@@ -282,9 +283,9 @@ func TestAttestationsCommitAndLoadAllAttestationTypes(t *testing.T) {
 	require.Nil(t, err)
 
 	attestations := &Attestations{
-		referenceAuthorizations:        map[string]gitinterface.Hash{"refs/heads/main/from-to": blobID},
-		githubPullRequestAttestations:  map[string]gitinterface.Hash{"refs/heads/main/commit": blobID},
-		codeReviewApprovalAttestations: map[string]gitinterface.Hash{"refs/heads/main/from-to/github": blobID},
+		referenceAuthorizations:        map[string]githash.Hash{"refs/heads/main/from-to": blobID},
+		githubPullRequestAttestations:  map[string]githash.Hash{"refs/heads/main/commit": blobID},
+		codeReviewApprovalAttestations: map[string]githash.Hash{"refs/heads/main/from-to/github": blobID},
 		codeReviewApprovalIndex:        map[string]string{"github-1": "refs/heads/main/from-to/github"},
 	}
 
@@ -358,7 +359,7 @@ func TestLoadAttestationsForEntryStorerErrors(t *testing.T) {
 		// A non-empty index causes Commit to store the index blob, which
 		// LoadAttestationsForEntry then reads back.
 		attestations := &Attestations{
-			codeReviewApprovalAttestations: map[string]gitinterface.Hash{"refs/heads/main/from-to/github": blobID},
+			codeReviewApprovalAttestations: map[string]githash.Hash{"refs/heads/main/from-to/github": blobID},
 			codeReviewApprovalIndex:        map[string]string{"github-1": "refs/heads/main/from-to/github"},
 		}
 		require.Nil(t, attestations.Commit(repo, "Test commit", true, false))

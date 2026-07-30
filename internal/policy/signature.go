@@ -20,7 +20,7 @@ import (
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
@@ -54,7 +54,7 @@ func (v *SignatureVerifier) TrustedPrincipalIDs() *set.Set[string] {
 // signature and signatures embedded in a DSSE envelope. Verify does not inspect
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
-func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID gitinterface.Hash, env *sslibdsse.Envelope) (*set.Set[string], error) {
+func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash, env *sslibdsse.Envelope) (*set.Set[string], error) {
 	if v.threshold < 1 || len(v.principals) < 1 {
 		return nil, ErrInvalidVerifier
 	}

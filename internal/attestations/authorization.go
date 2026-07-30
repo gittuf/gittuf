@@ -12,7 +12,7 @@ import (
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	ita "github.com/in-toto/attestation/go/v1"
 )
@@ -73,7 +73,7 @@ func (a *Attestations) SetReferenceAuthorization(repo gitstore.Storer, env *ssli
 	}
 
 	if a.referenceAuthorizations == nil {
-		a.referenceAuthorizations = map[string]gitinterface.Hash{}
+		a.referenceAuthorizations = map[string]githash.Hash{}
 	}
 
 	a.referenceAuthorizations[ReferenceAuthorizationPath(refName, fromID, toID)] = blobID

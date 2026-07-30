@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
@@ -15,7 +16,7 @@ func (p *Persistent) GetPolicyEntries() []RSLEntryIndex {
 	return p.PolicyEntries
 }
 
-func (p *Persistent) HasPolicyEntryNumber(entryNumber uint64) (gitinterface.Hash, bool) {
+func (p *Persistent) HasPolicyEntryNumber(entryNumber uint64) (githash.Hash, bool) {
 	if len(p.PolicyEntries) == 0 || entryNumber == 0 {
 		return gitinterface.ZeroHash, false
 	}
@@ -79,7 +80,7 @@ func (p *Persistent) FindPolicyEntriesInRange(firstNumber, lastNumber uint64) ([
 	return p.PolicyEntries[firstIndex:lastIndex], nil
 }
 
-func (p *Persistent) InsertPolicyEntryNumber(entryNumber uint64, entryID gitinterface.Hash) {
+func (p *Persistent) InsertPolicyEntryNumber(entryNumber uint64, entryID githash.Hash) {
 	if entryNumber == 0 {
 		// For now, we don't have a way to track non-numbered entries
 		// We likely never want to track non-numbered entries in this

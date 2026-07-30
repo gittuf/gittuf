@@ -19,6 +19,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf/migrations"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
@@ -187,7 +188,7 @@ func (s *StateMetadata) GetTargetsMetadata(roleName string, migrate bool) (tuf.T
 	}
 }
 
-func (s *StateMetadata) WriteTree(repo gitstore.Storer) (gitinterface.Hash, error) {
+func (s *StateMetadata) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
 	metadata := map[string]*sslibdsse.Envelope{}
 	metadata[RootRoleName] = s.RootEnvelope
 	if s.TargetsEnvelope != nil {
@@ -678,7 +679,7 @@ func (s *State) Verify(ctx context.Context) error {
 
 			// We need to LoadState() the state from which the root is derived
 			// For that, we need to know when it was propagated into this repository
-			var upstreamEntryID gitinterface.Hash
+			var upstreamEntryID githash.Hash
 			if entry, isPropagationEntry := s.loadedEntry.(*rsl.PropagationEntry); isPropagationEntry {
 				// Check this entry
 				if entry.RefName == PolicyRef && entry.UpstreamRepository == controllerRepositoryDetail.GetLocation() {
@@ -1333,7 +1334,7 @@ func loadStateForEntry(repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry) (*
 // LoadStateFromCommit returns the policy state as recorded in the tree of the
 // specified commit. This allows a specific revision of the policy metadata to
 // be inspected directly, bypassing the RSL.
-func LoadStateFromCommit(repo gitstore.Storer, commitID gitinterface.Hash) (*State, error) {
+func LoadStateFromCommit(repo gitstore.Storer, commitID githash.Hash) (*State, error) {
 	commitTreeID, err := repo.GetCommitTreeID(commitID)
 	if err != nil {
 		return nil, err
@@ -1430,5 +1431,5 @@ func LoadStateFromCommit(repo gitstore.Storer, commitID gitinterface.Hash) (*Sta
 
 type policyTreeItem struct {
 	name   string
-	treeID gitinterface.Hash
+	treeID githash.Hash
 }

@@ -100,7 +100,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 	}{
 		"annotation, no message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
@@ -108,7 +108,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, with message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
@@ -116,7 +116,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, with multi-line message": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
@@ -124,7 +124,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, no message, skip false": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
@@ -132,7 +132,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, no message, skip false, multiple entry IDs": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash, githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash, githash.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
@@ -140,7 +140,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, no message, small number": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "",
 				Number:      1,
@@ -149,7 +149,7 @@ func TestAnnotationEntryCreateCommitMessage(t *testing.T) {
 		},
 		"annotation, no message, large number": {
 			entry: &AnnotationEntry{
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "",
 				Number:      math.MaxUint64,
@@ -273,7 +273,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, no message": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "",
 			},
@@ -282,7 +282,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, with message": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "message",
 			},
@@ -291,7 +291,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, with multi-line message": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Message:     "message1\nmessage2",
 			},
@@ -300,7 +300,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, no message, skip false": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
@@ -309,7 +309,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, no message, skip false, multiple entry IDs": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash, githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash, githash.ZeroHash},
 				Skip:        false,
 				Message:     "",
 			},
@@ -359,7 +359,7 @@ func TestParseRSLEntryText(t *testing.T) {
 		"annotation, with number": {
 			expectedEntry: &AnnotationEntry{
 				ID:          githash.ZeroHash,
-				RSLEntryIDs: []Hash{githash.ZeroHash},
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
 				Skip:        true,
 				Number:      7,
 			},
@@ -474,7 +474,7 @@ func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 		"annotation, unknown key ignored between fields": {
 			message: fmt.Sprintf("%s\n\n%s: %s\nfutureField: someValue\n%s: %s",
 				AnnotationEntryHeader, EntryIDKey, zero, SkipKey, "false"),
-			expectedEntry: &AnnotationEntry{ID: githash.ZeroHash, RSLEntryIDs: []Hash{githash.ZeroHash}, Skip: false},
+			expectedEntry: &AnnotationEntry{ID: githash.ZeroHash, RSLEntryIDs: []githash.Hash{githash.ZeroHash}, Skip: false},
 		},
 		"propagation, upstreamRepository with colons preserved": {
 			message: fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s",

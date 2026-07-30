@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
@@ -41,7 +42,7 @@ var (
 //
 // Update: This helper just wraps around CommitUsingSpecificKey in the rsl
 // package. We can probably get rid of it, but it's a pretty big delta.
-func CreateTestRSLReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry *rsl.ReferenceEntry, signingKeyBytes []byte) gitinterface.Hash {
+func CreateTestRSLReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry *rsl.ReferenceEntry, signingKeyBytes []byte) githash.Hash {
 	t.Helper()
 
 	if err := entry.CommitUsingSpecificKey(repo, signingKeyBytes); err != nil {
@@ -63,7 +64,7 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry
 //
 // Update: This helper just wraps around CommitUsingSpecificKey in the rsl
 // package. We can probably get rid of it, but it's a pretty big delta.
-func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo gitstore.Storer, annotation *rsl.AnnotationEntry, signingKeyBytes []byte) gitinterface.Hash {
+func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo gitstore.Storer, annotation *rsl.AnnotationEntry, signingKeyBytes []byte) githash.Hash {
 	t.Helper()
 
 	if err := annotation.CommitUsingSpecificKey(repo, signingKeyBytes); err != nil {
@@ -84,7 +85,7 @@ func CreateTestRSLAnnotationEntryCommit(t *testing.T, repo gitstore.Storer, anno
 // first commit contains a tree with one object (an empty blob), the second with
 // two objects (both empty blobs), and so on. Each commit is signed using the
 // specified key.
-func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, refName string, n int, signingKeyBytes []byte) []gitinterface.Hash {
+func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, refName string, n int, signingKeyBytes []byte) []githash.Hash {
 	t.Helper()
 
 	emptyBlobHash, err := repo.WriteBlob(nil)
@@ -95,7 +96,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 	treeBuilder := gitinterface.NewTreeBuilder(repo)
 
 	// Create N trees with 1...N artifacts
-	treeHashes := make([]gitinterface.Hash, 0, n)
+	treeHashes := make([]githash.Hash, 0, n)
 	for i := range n {
 		objects := []gitinterface.TreeEntry{}
 		for j := range i + 1 {
@@ -110,7 +111,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 		treeHashes = append(treeHashes, treeHash)
 	}
 
-	commitIDs := []gitinterface.Hash{}
+	commitIDs := []githash.Hash{}
 	for i := range n {
 		commitID, err := repo.CommitUsingSpecificKey(treeHashes[i], refName, "Test commit\n", signingKeyBytes)
 		if err != nil {
@@ -125,7 +126,7 @@ func AddNTestCommitsToSpecifiedRef(t *testing.T, repo *gitinterface.Repository, 
 
 // CreateTestSignedTag creates a signed tag in the repository pointing to the
 // target object. The tag is signed using the specified key.
-func CreateTestSignedTag(t *testing.T, repo *gitinterface.Repository, tagName string, target gitinterface.Hash, signingKeyBytes []byte) gitinterface.Hash {
+func CreateTestSignedTag(t *testing.T, repo *gitinterface.Repository, tagName string, target githash.Hash, signingKeyBytes []byte) githash.Hash {
 	t.Helper()
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)

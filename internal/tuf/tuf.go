@@ -8,7 +8,7 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -545,7 +545,7 @@ type Hook interface {
 	GetHashes() map[string]string
 
 	// GetBlobID returns the Git blob ID for the hook on disk.
-	GetBlobID() gitinterface.Hash
+	GetBlobID() githash.Hash
 
 	// GetEnvironment returns the environment that the hook is to run in.
 	GetEnvironment() HookEnvironment

@@ -10,6 +10,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +36,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	var state *policy.State
 	if o.revision != "" {
-		var commitID gitinterface.Hash
+		var commitID githash.Hash
 		commitID, err = gitinterface.NewHash(o.revision)
 		if err != nil {
 			return err
