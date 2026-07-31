@@ -17,6 +17,7 @@ func (s *policyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if msg.String() == "enter" {
 			if i, ok := s.policyScreenList.SelectedItem().(item); ok {
+				m.errorMsg = ""
 				switch i.title {
 				case "View Rules":
 					m.screen = screenPolicyRules
@@ -24,6 +25,8 @@ func (s *policyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 				case "Manage Principals":
 					m.screen = screenPolicyPrincipals
 					m.policyPrincipalsScreen.refreshPrincipals(m.ctx, m.options)
+				case "Manage Lifecycle":
+					m.screen = screenPolicyLifecycle
 				}
 			}
 			return *m, nil
