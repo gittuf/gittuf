@@ -90,6 +90,12 @@ var (
 	helpDescStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(colorBlur)).
 			Padding(0, 1)
+
+	errorDialogStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color(colorErrorMsg)).
+				Background(lipgloss.Color(colorStatusBg)).
+				Padding(1, 2)
 )
 
 // renderWithMargin wraps content in the standard margin used by all screens.
@@ -154,6 +160,45 @@ func renderErrorMsg(text string) string {
 		return ""
 	}
 	return "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Render(text)
+}
+
+func renderErrorDialog(m model) string {
+	if m.errorDialog == nil {
+		return ""
+	}
+
+	width := m.width - 12
+	if width > 72 {
+		width = 72
+	}
+	if width < 24 {
+		width = 24
+	}
+
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorErrorMsg)).
+		Bold(true).
+		Render(m.errorDialog.title)
+	message := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorRegularText)).
+		Width(width - 6).
+		Render(m.errorDialog.message)
+	hint := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorSubtext)).
+		Render("Press Enter or Esc to close.")
+
+	return errorDialogStyle.Width(width).Render(
+		lipgloss.JoinVertical(lipgloss.Left, title, "", message, "", hint),
+	)
+}
+
+func renderPopupDialog(m model) string {
+	dialog := renderErrorDialog(m)
+	if dialog == "" {
+		return ""
+	}
+
+	return dialog
 }
 
 // renderStatusBar renders the top status bar showing screen name and current mode.
@@ -261,7 +306,12 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxHeight = 0
 	}
 
-	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(listContent)
+	contentBody := listContent
+	if dialog := renderPopupDialog(m); dialog != "" {
+		contentBody = lipgloss.Place(boxWidth-2, boxHeight, lipgloss.Center, lipgloss.Center, dialog)
+	}
+
+	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(contentBody)
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		renderStatusBar(title, m.readOnly, m.width),
@@ -311,51 +361,55 @@ func (m model) View() string {
 		return m.spinner.View() + " Loading TUI...\n"
 	}
 
+	var view string
 	switch m.screen {
 	case screenLoading:
 		if m.errorMsg != "" {
-			return renderWithMargin(
+			view = renderWithMargin(
 				titleStyle.Render("gittuf TUI") + "\n\n" +
 					renderErrorMsg(m.errorMsg) + "\n\n" +
 					lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render("Press Q or Ctrl+C to quit."),
 			)
+			break
 		}
-		return renderWithMargin(
+		view = renderWithMargin(
 			titleStyle.Render("gittuf TUI") + "\n\n" +
 				m.spinner.View() + " Loading, please wait...\n",
 		)
 
 	case screenChoice:
-		return m.homeScreen.View(&m)
+		view = m.homeScreen.View(&m)
 
 	case screenPolicy:
-		return m.policyScreen.View(&m)
+		view = m.policyScreen.View(&m)
 
 	case screenPolicyLifecycle, screenPolicyLifecycleForm:
-		return m.policyLifecycleScreen.View(&m)
+		view = m.policyLifecycleScreen.View(&m)
 
 	case screenTrust:
-		return m.trustScreen.View(&m)
+		view = m.trustScreen.View(&m)
 
 	case screenPolicyRules:
-		return m.policyRulesScreen.View(&m)
+		view = m.policyRulesScreen.View(&m)
 
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
-		return m.trustGlobalRulesScreen.View(&m)
+		view = m.trustGlobalRulesScreen.View(&m)
 
 	case screenPolicyPrincipals:
-		return m.policyPrincipalsScreen.View(&m)
+		view = m.policyPrincipalsScreen.View(&m)
 
 	case screenPolicyPrincipalsForm:
-		return m.policyPrincipalsFormScreen.View(&m)
+		view = m.policyPrincipalsFormScreen.View(&m)
 
 	case screenPolicyAddRule, screenPolicyEditRule:
-		return m.policyRulesScreen.View(&m)
+		view = m.policyRulesScreen.View(&m)
 
 	case screenHelp:
-		return m.helpScreen.View(&m)
+		view = m.helpScreen.View(&m)
 
 	default:
-		return "Unknown screen"
+		view = "Unknown screen"
 	}
+
+	return view
 }
