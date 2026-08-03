@@ -4,6 +4,7 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
 
@@ -45,7 +46,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.screen == screenLoading {
+		if m.screen == screenLoading || m.verifying {
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
@@ -54,9 +55,44 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.resizeLists()
+		if msg.Width > 4 {
+			m.logViewport.Width = msg.Width - 4
+		} else {
+			m.logViewport.Width = msg.Width
+		}
+		if msg.Height > 6 {
+			m.logViewport.Height = msg.Height - 6
+		} else {
+			m.logViewport.Height = msg.Height
+		}
+		return m, nil
+
+	case logUpdateMsg:
+		m.logs += msg.line
+		m.logViewport.SetContent(m.logs)
+		m.logViewport.GotoBottom()
+		return m, waitForLog(msg.scanner)
+
+	case verifyResultMsg:
+		m.verifying = false
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("Verification failed: %v", msg.err)
+		} else {
+			m.errorMsg = ""
+			m.footer = msg.successMsg
+			m.screen = screenVerify // Go back to Verify menu
+		}
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.verifying {
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m.logViewport, cmd = m.logViewport.Update(msg)
+			return m, cmd
+		}
+
 		// Global handlers (quit, back navigation)
 		switch msg.String() {
 		case "ctrl+c":
@@ -65,14 +101,18 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
+				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm &&
+				m.screen != screenVerifyRefForm && m.screen != screenVerifyMergeableForm {
 				return m, tea.Quit
 			}
 		case "h":
 			// Toggle help screen if not in form mode
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
 				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
+				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm &&
+				m.screen != screenVerifyRefForm && m.screen != screenVerifyMergeableForm {
+				m.footer = ""
+				m.errorMsg = ""
 				if m.screen == screenHelp {
 					// Toggle back
 					m.screen = m.helpScreen.previousScreen
@@ -87,7 +127,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.footer = ""
 			m.errorMsg = ""
 			switch m.screen {
-			case screenPolicy, screenTrust:
+			case screenPolicy, screenTrust, screenVerify:
 				m.screen = screenChoice
 			case screenPolicyRules:
 				if m.policyRulesScreen.confirmDelete {
@@ -110,6 +150,8 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = m.helpScreen.previousScreen
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.trustGlobalRulesScreen.handleEsc(&m)
+			case screenVerifyRefForm, screenVerifyMergeableForm:
+				m.screen = screenVerify
 			}
 			return m, nil
 		}
@@ -132,6 +174,12 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.policyPrincipalsScreen.Update(msg, &m)
 		case screenPolicyPrincipalsForm:
 			return m.policyPrincipalsFormScreen.Update(msg, &m)
+		case screenVerify:
+			return m.verifyScreen.Update(msg, &m)
+		case screenVerifyRefForm:
+			return m.verifyRefScreen.Update(msg, &m)
+		case screenVerifyMergeableForm:
+			return m.verifyMergeableScreen.Update(msg, &m)
 		}
 	}
 
@@ -178,4 +226,13 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+func waitForLog(scanner *bufio.Scanner) tea.Cmd {
+	return func() tea.Msg {
+		if scanner.Scan() {
+			return logUpdateMsg{line: scanner.Text() + "\n", scanner: scanner}
+		}
+		return nil
+	}
 }
