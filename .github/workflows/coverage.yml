@@ -28,6 +28,6 @@ jobs:
         go test -covermode=atomic -coverprofile='unfiltered_coverage.cov' `go list ./... | grep -v -f .test_ignore.txt`
         grep -v -f .test_ignore.txt unfiltered_coverage.cov > coverage.cov
     - name: Coveralls Parallel
-      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e
+      uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329
       with:
         file: 'coverage.cov'

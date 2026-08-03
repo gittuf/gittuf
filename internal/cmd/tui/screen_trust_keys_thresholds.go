@@ -326,10 +326,6 @@ func (s *trustKeysThresholdsScreen) renderFormScreen(m *model, formTitle string,
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(formTitle))
 	b.WriteString("\n\n")
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-		fmt.Sprintf("TODO: wire %s to the trust repo helpers.", s.actionLabel()),
-	))
-	b.WriteString("\n\n")
 
 	for _, input := range s.inputs {
 		b.WriteString(input.View())

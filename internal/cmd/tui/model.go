@@ -21,37 +21,35 @@ import (
 type screen int
 
 const (
-	screenLoading screen = iota
-	screenChoice
-	screenPolicy
-	screenPolicyRules
-	screenPolicyAddRule
-	screenPolicyEditRule
-	screenPolicyPrincipals
-	screenPolicyPrincipalsForm
-	screenTrust
-	screenTrustGlobalRules
-	screenTrustAddGlobalRule
-	screenTrustEditGlobalRule
-	screenTrustKeysThresholds
-	screenTrustKeyForm
-	screenTrustThresholdForm
-	screenTrustPropagation
-	screenTrustAddPropagationForm
-	screenTrustUpdatePropagationForm
-	screenTrustRemovePropagationForm
-	screenTrustGitHubApp
-	screenTrustAddGitHubAppForm
-	screenTrustGitHubAppActionForm
-	screenTrustLifecycle
-	screenTrustHooks
-	screenTrustRemoveHookForm
-	screenTrustAddHookForm
-	screenTrustUpdateHookForm
-	screenTrustRepoNetwork
-	screenTrustRepoForm
-	screenTrustRepoLocationForm
-	screenHelp
+	screenLoading                    screen = iota // Loading screen shown on startup
+	screenChoice                                   // Initial menu
+	screenPolicy                                   // Menu for Policy operations
+	screenPolicyRules                              // Rule management screen
+	screenPolicyAddRule                            // Form: add a new policy rule
+	screenPolicyEditRule                           // Form: edit selected rule (prefilled)
+	screenPolicyPrincipals                         // Principals management screen
+	screenPolicyPrincipalsForm                     // Form: Add/Edit principal or add key
+	screenPolicyLifecycle                          // Menu for Policy lifecycle operations
+	screenPolicyLifecycleForm                      // Form: policy lifecycle operation options
+	screenTrust                                    // Menu for Trust operations
+	screenTrustGlobalRules                         // Global rule management screen
+	screenTrustAddGlobalRule                       // Form: add a new global rule
+	screenTrustEditGlobalRule                      // Form: edit selected global rule
+	screenTrustKeysThresholds                      // Manage root/policy keys and thresholds
+	screenTrustKeyForm                             // Form: add/remove trust key
+	screenTrustThresholdForm                       // Form: update trust threshold
+	screenTrustPropagation                         // Propagation directive management screen
+	screenTrustAddPropagationForm                  // Form: add a propagation directive
+	screenTrustUpdatePropagationForm               // Form: update a propagation directive
+	screenTrustRemovePropagationForm               // Form: remove a propagation directive
+	screenTrustGitHubApp                           // GitHub App management screens.
+	screenTrustAddGitHubAppForm                    // Form: add a trusted GitHub App
+	screenTrustGitHubAppActionForm                 // Form: manage GitHub App trust actions
+	screenTrustLifecycle                           // Trust lifecycle operations.
+	screenTrustRepoNetwork                         // Repo/network management screens.
+	screenTrustRepoForm                            // Form: add or update trust repo settings
+	screenTrustRepoLocationForm                    // Form: set the repository location
+	screenHelp                                     // Generic help screen displaying keybindings.
 )
 
 type item struct {
@@ -75,6 +73,7 @@ type model struct {
 	homeScreen                 homeScreen
 	helpScreen                 helpScreen
 	policyScreen               policyScreen
+	policyLifecycleScreen      policyLifecycleScreen
 	trustScreen                trustScreen
 	policyRulesScreen          policyRulesScreen
 	trustGlobalRulesScreen     trustGlobalRulesScreen
@@ -82,7 +81,6 @@ type model struct {
 	policyPrincipalsFormScreen policyPrincipalsFormScreen
 	trustKeysScreen            trustKeysThresholdsScreen
 	trustLifecycleScreen       trustLifecycleScreen
-	trustHookScreen            trustHookScreen
 	trustPropagationScreen     trustPropagationScreen
 	trustGitHubAppScreen       trustGitHubAppScreen
 	trustRepoNetworkScreen     trustRepoNetworkScreen
@@ -191,13 +189,25 @@ func initialModel(ctx context.Context, o *options) model {
 			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
 				item{title: "View Rules", desc: "View and manage policy rules"},
 				item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
+				item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply, discard, pull or push policy changes"},
+			}, delegate),
+		},
+		policyLifecycleScreen: policyLifecycleScreen{
+			list: newMenuList("Policy Lifecycle", []list.Item{
+				item{title: "Initialize Policy", desc: "Initialize a new gittuf policy file"},
+				item{title: "Increment Version", desc: "Increment the version of the specified rule file metadata"},
+				item{title: "Sign Policy", desc: "Sign the specified policy file"},
+				item{title: "Stage Changes", desc: "Stage local policy changes"},
+				item{title: "Apply Changes", desc: "Apply staged policy changes"},
+				item{title: "Discard Changes", desc: "Discard staged policy changes"},
+				item{title: "Pull Policy", desc: "Pull policy from a remote repository"},
+				item{title: "Push Policy", desc: "Push policy to a remote repository"},
 			}, delegate),
 		},
 		trustScreen: trustScreen{
 			trustScreenList: newMenuList("gittuf Trust Operations", []list.Item{
 				item{title: "View Global Rules", desc: "View and manage global rules"},
 				item{title: "Keys & Thresholds", desc: "Manage root keys, policy keys, and thresholds"},
-				item{title: "Hooks", desc: "Manage trust hooks"},
 				item{title: "Propagation", desc: "Manage propagation directives"},
 				item{title: "GitHub App", desc: "Manage trusted GitHub App settings"},
 				item{title: "Lifecycle", desc: "Stage, sign, and apply trust changes"},
@@ -225,14 +235,6 @@ func initialModel(ctx context.Context, o *options) model {
 				item{title: "Stage Trust Changes", desc: "Stage trust changes for signing"},
 				item{title: "Sign Trust Changes", desc: "Sign staged trust changes"},
 				item{title: "Apply Trust Changes", desc: "Apply signed trust changes to the policy file"},
-			}, delegate),
-		},
-		trustHookScreen: trustHookScreen{
-			operationList: newMenuList("Trust Hooks", []list.Item{
-				item{title: "List Hooks", desc: "List all configured hooks"},
-				item{title: "Add Hook", desc: "Add a new hook"},
-				item{title: "Update Hook", desc: "Update an existing hook"},
-				item{title: "Remove Hook", desc: "Remove an existing hook"},
 			}, delegate),
 		},
 		trustPropagationScreen: trustPropagationScreen{
@@ -289,28 +291,30 @@ func (m *model) resizeLists() {
 	// readOnly: heightOffset_view=9 → innerHeight = m.height - 11
 	// readOnly+signerError: heightOffset_view = 7 + signerNoticeLines (dynamic)
 	//   → innerHeight = m.height - (2 + 7 + noticeLines) = m.height - 9 - noticeLines
-	heightOffset := 9
-	if m.readOnly {
-		heightOffset = 11
-		if m.signerError != "" {
-			// Same formula as view.go: v(2) + fixed(7) + dynamic notice lines
-			heightOffset = 9 + signerNoticeLines(m.signerError, m.width)
-		}
+	bottomHeight := 1
+	footerBox := renderFooterBox(*m)
+	if footerBox != "" {
+		bottomHeight += strings.Count(footerBox, "\n") + 1
 	}
-	innerHeight := m.height - heightOffset
+	errorMsg := renderErrorMsg(m.errorMsg)
+	if errorMsg != "" {
+		bottomHeight += strings.Count(errorMsg, "\n") + 1
+	}
+
+	innerHeight := m.height - 6 - bottomHeight
 	if innerHeight < 0 {
 		innerHeight = 0
 	}
 
 	m.homeScreen.choiceList.SetSize(innerWidth, innerHeight)
 	m.policyScreen.policyScreenList.SetSize(innerWidth, innerHeight)
+	m.policyLifecycleScreen.list.SetSize(innerWidth, innerHeight)
 	m.trustScreen.trustScreenList.SetSize(innerWidth, innerHeight)
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
 	m.policyPrincipalsScreen.list.SetSize(innerWidth, innerHeight)
 	m.trustKeysScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustLifecycleScreen.operationList.SetSize(innerWidth, innerHeight)
-	m.trustHookScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustPropagationScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustGitHubAppScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustRepoNetworkScreen.operationList.SetSize(innerWidth, innerHeight)

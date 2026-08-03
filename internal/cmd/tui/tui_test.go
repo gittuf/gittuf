@@ -203,61 +203,6 @@ func TestTrustKeysThresholdsSelectActionReadOnly(t *testing.T) {
 	assert.Equal(t, trustKeysActionNone, screen.selectedAction)
 }
 
-func TestTrustHookScreenCycleFocus(t *testing.T) {
-	screen := trustHookScreen{
-		inputs:      initInputs([]inputField{{"name", "Name: "}, {"path", "Path: "}, {"env", "Env: "}, {"ids", "IDs: "}, {"timeout", "Timeout: "}}),
-		isPreCommit: true,
-	}
-
-	screen.cycleFocus("tab")
-	assert.Equal(t, 1, screen.focusIndex)
-	assert.False(t, screen.isPrePush)
-
-	screen.cycleFocus("tab")
-	screen.cycleFocus("tab")
-	screen.cycleFocus("tab")
-	screen.cycleFocus("tab")
-	assert.Equal(t, 5, screen.focusIndex)
-	assert.False(t, screen.isPreCommit)
-	assert.True(t, screen.isPrePush)
-
-	screen.cycleFocus("tab")
-	assert.Equal(t, 0, screen.focusIndex)
-	assert.False(t, screen.isPreCommit)
-	assert.True(t, screen.isPrePush)
-}
-
-func TestTrustHookScreenHandleEscClearsListedHooks(t *testing.T) {
-	m := initialModel(context.Background(), &options{readOnly: true, targetRef: "policy"})
-	m.screen = screenTrustHooks
-	m.trustHookScreen.showHooks = true
-	m.trustHookScreen.hooks = []trustHook{{name: "stale"}}
-
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
-	next := updated.(model)
-
-	assert.Equal(t, screenTrust, next.screen)
-	assert.False(t, next.trustHookScreen.showHooks)
-	assert.Nil(t, next.trustHookScreen.hooks)
-}
-
-func TestTrustHookScreenHandleHookFormSubmitRequiresScriptPath(t *testing.T) {
-	m := model{}
-	screen := trustHookScreen{
-		selectedAction: trustAddHookAction,
-		inputs:         initInputs([]inputField{{"", ""}, {"", ""}, {"", ""}, {"", ""}, {"", ""}}),
-	}
-	screen.inputs[0].SetValue("test-hook")
-	screen.inputs[2].SetValue("lua")
-	screen.inputs[3].SetValue("principal")
-	screen.inputs[4].SetValue("10")
-
-	updated, _ := screen.handleHookFormSubmit(&m)
-	next := updated.(model)
-
-	assert.Equal(t, "Hook name and script path are required", next.errorMsg)
-}
-
 func TestTrustCoreSubmenuNavigation(t *testing.T) {
 	tmpDir := t.TempDir()
 	currentDir, err := os.Getwd()
@@ -334,7 +279,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
@@ -353,48 +297,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 	})
 
-	t.Run("Trust Hooks Navigation", func(t *testing.T) {
-		o := &options{
-			readOnly:  true,
-			targetRef: "policy",
-		}
-
-		m := initialModel(context.Background(), o)
-		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Policy")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Home -> Trust
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Home › Trust")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Trust -> Hooks
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			content := string(out)
-			return strings.Contains(content, "Home › Trust › Hooks") &&
-				strings.Contains(content, "List Hooks")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Esc -> Trust
-		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			content := string(out)
-			return strings.Contains(content, "Home › Trust") &&
-				strings.Contains(content, "Hooks")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-	})
-
 	t.Run("Trust Propagation Navigation", func(t *testing.T) {
 		o := &options{readOnly: true, targetRef: "policy"}
 		m := initialModel(context.Background(), o)
@@ -409,7 +311,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 		// Trust -> Propagation
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
@@ -450,7 +351,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 		// Trust -> GitHub App
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
@@ -496,7 +396,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
@@ -519,44 +418,6 @@ func TestTrustCoreSubmenuNavigation(t *testing.T) {
 
 		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
 			return strings.Contains(string(out), "Home › Trust › Repo/Network")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-	})
-
-	t.Run("Trust Hook Add Form Navigation", func(t *testing.T) {
-		o := &options{readOnly: true, targetRef: "policy"}
-		m := initialModel(context.Background(), o)
-		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Policy")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Home -> Trust
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		// Trust -> Hooks
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Home › Trust › Hooks")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Hooks -> Add Hook
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Home › Trust › Hooks › Add Hook")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		// Add Hook -> Hooks
-		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Home › Trust › Hooks")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 	})
 }
