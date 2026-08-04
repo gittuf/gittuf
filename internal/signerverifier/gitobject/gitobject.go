@@ -24,7 +24,7 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
+	"github.com/sigstore/sigstore/pkg/fulcioroots" //nolint:staticcheck
 )
 
 const rekorPublicGoodInstance = "https://rekor.sigstore.dev"
