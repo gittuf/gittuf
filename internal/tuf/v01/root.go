@@ -722,7 +722,7 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	temp := &tempType{}
-	if err := json.Unmarshal(data, &temp); err != nil {
+	if err := json.Unmarshal(data, temp); err != nil {
 		return fmt.Errorf("unable to unmarshal json: %w", err)
 	}
 

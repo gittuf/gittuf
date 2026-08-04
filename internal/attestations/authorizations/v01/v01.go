@@ -84,7 +84,15 @@ func Validate(env *sslibdsse.Envelope, targetRef, fromRevisionID, targetTreeID s
 		return err
 	}
 
+	if len(attestation.Subject) == 0 || attestation.Subject[0] == nil {
+		return authorizations.ErrInvalidAuthorization
+	}
+
 	if attestation.Subject[0].Digest[digestGitTreeKey] != targetTreeID {
+		return authorizations.ErrInvalidAuthorization
+	}
+
+	if attestation.Predicate == nil {
 		return authorizations.ErrInvalidAuthorization
 	}
 
