@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/rsl"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 type options struct {
@@ -28,7 +28,7 @@ func WithReferences(refs []string) Option {
 }
 
 // RSLLog implements the display function for `gittuf rsl log`.
-func RSLLog(repo *gitinterface.Repository, writer io.WriteCloser, opts ...Option) error {
+func RSLLog(repo gitstore.Storer, writer io.WriteCloser, opts ...Option) error {
 	defer writer.Close() //nolint:errcheck
 
 	options := &options{refs: set.NewSet[string]()}

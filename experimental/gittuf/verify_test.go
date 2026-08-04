@@ -14,9 +14,10 @@ import (
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -188,7 +189,7 @@ func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat
 	tests := map[string]struct {
 		localRefName  string
 		remoteRefName string
-		fromEntryID   gitinterface.Hash
+		fromEntryID   githash.Hash
 		err           error
 	}{
 		"absolute ref, from non-violating": {

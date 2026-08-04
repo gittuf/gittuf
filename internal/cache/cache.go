@@ -9,8 +9,10 @@ import (
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/attestations"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 const (
@@ -48,7 +50,7 @@ type Persistent struct {
 	LastVerifiedEntryForRef map[string]RSLEntryIndex `json:"lastVerifiedEntryForRef"`
 }
 
-func (p *Persistent) Commit(repo *gitinterface.Repository) error {
+func (p *Persistent) Commit(repo gitstore.Storer) error {
 	if len(p.PolicyEntries) == 0 && len(p.AttestationEntries) == 0 && p.AddedAttestationsBeforeNumber == 0 && len(p.LastVerifiedEntryForRef) == 0 {
 		// nothing to do
 		return nil
@@ -64,8 +66,7 @@ func (p *Persistent) Commit(repo *gitinterface.Repository) error {
 		return err
 	}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo)
-	treeID, err := treeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob(persistentTreeEntryName, blobID)})
+	treeID, err := repo.WriteTree([]gitstore.TreeEntry{{Path: persistentTreeEntryName, ID: blobID, Kind: gitstore.KindBlob}})
 	if err != nil {
 		return err
 	}
@@ -86,7 +87,7 @@ func (p *Persistent) Commit(repo *gitinterface.Repository) error {
 // PopulatePersistentCache scans the repository's RSL and generates a persistent
 // local-only cache of policy and attestation entries. This makes subsequent
 // verifications faster.
-func PopulatePersistentCache(repo *gitinterface.Repository) error {
+func PopulatePersistentCache(repo gitstore.Storer) error {
 	persistent := &Persistent{
 		PolicyEntries:      []RSLEntryIndex{},
 		AttestationEntries: []RSLEntryIndex{},
@@ -133,7 +134,7 @@ func PopulatePersistentCache(repo *gitinterface.Repository) error {
 // LoadPersistentCache loads the persistent cache from the tip of the local ref.
 // If an instance has already been loaded and a pointer has been stored in
 // memory, that instance is returned.
-func LoadPersistentCache(repo *gitinterface.Repository) (*Persistent, error) {
+func LoadPersistentCache(repo gitstore.Storer) (*Persistent, error) {
 	slog.Debug("Loading persistent cache from disk...")
 
 	commitID, err := repo.GetReference(Ref)
@@ -180,7 +181,7 @@ func LoadPersistentCache(repo *gitinterface.Repository) (*Persistent, error) {
 }
 
 // DeletePersistentCache deletes the local persistent cache ref.
-func DeletePersistentCache(repo *gitinterface.Repository) error {
+func DeletePersistentCache(repo gitstore.Storer) error {
 	ref, err := repo.GetReference(Ref)
 	if err != nil {
 		if errors.Is(err, gitinterface.ErrReferenceNotFound) {
@@ -208,7 +209,7 @@ type RSLEntryIndex struct {
 	EntryNumber uint64 `json:"entryNumber"`
 }
 
-func (r *RSLEntryIndex) GetEntryID() gitinterface.Hash {
+func (r *RSLEntryIndex) GetEntryID() githash.Hash {
 	hash, _ := gitinterface.NewHash(r.EntryID)
 	// TODO: error?
 	return hash

@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"slices"
 
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 )
 
 func (p *Persistent) GetAttestationsEntries() []RSLEntryIndex {
@@ -40,7 +40,7 @@ func (p *Persistent) FindAttestationsEntryNumberForEntry(entryNumber uint64) (RS
 	return p.AttestationEntries[index-1], false
 }
 
-func (p *Persistent) InsertAttestationEntryNumber(entryNumber uint64, entryID gitinterface.Hash) {
+func (p *Persistent) InsertAttestationEntryNumber(entryNumber uint64, entryID githash.Hash) {
 	if entryNumber == 0 {
 		// For now, we don't have a way to track non-numbered entries
 		// We likely never want to track non-numbered entries in this

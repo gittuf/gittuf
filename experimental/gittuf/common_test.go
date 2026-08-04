@@ -6,11 +6,11 @@ package gittuf
 import (
 	"testing"
 
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
 )
 
-func assertLocalAndRemoteRefsMatch(t *testing.T, localRepo, remoteRepo *gitinterface.Repository, refName string) {
+func assertLocalAndRemoteRefsMatch(t *testing.T, localRepo, remoteRepo gitstore.Storer, refName string) {
 	t.Helper()
 
 	localRefTip, err := localRepo.GetReference(refName)

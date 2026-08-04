@@ -7,9 +7,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"path"
 	"strings"
+
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 var (
@@ -38,18 +39,18 @@ func (r *Repository) EmptyTree() (Hash, error) {
 // for `foo/bar/baz` will return the blob ID for baz. Querying the ID for
 // `foo/bar` will return the intermediate tree ID for bar, while querying for
 // `foo/baz` will return an error.
-func (r *Repository) GetPathIDInTree(treePath string, treeID Hash) (Hash, error) {
+func (r *Repository) GetPathIDInTree(treeID Hash, treePath string) (Hash, error) {
 	treePath = strings.TrimSuffix(treePath, "/")
 	components := strings.Split(treePath, "/")
 
 	currentTreeID := treeID
 	for len(components) != 0 {
-		items, err := r.GetTreeItems(currentTreeID)
+		entries, err := r.GetEntriesInTree(currentTreeID)
 		if err != nil {
 			return nil, err
 		}
 
-		entryID, has := items[components[0]]
+		entryID, has := findEntryID(entries, components[0])
 		if !has {
 			return nil, fmt.Errorf("%w: %s", ErrTreeDoesNotHavePath, treePath)
 		}
@@ -61,9 +62,19 @@ func (r *Repository) GetPathIDInTree(treePath string, treeID Hash) (Hash, error)
 	return currentTreeID, nil
 }
 
-// GetTreeItems returns the items in a specified Git tree without recursively
-// expanding subtrees.
-func (r *Repository) GetTreeItems(treeID Hash) (map[string]Hash, error) {
+func findEntryID(entries []TreeEntry, name string) (Hash, bool) {
+	for _, entry := range entries {
+		if entry.Path == name {
+			return entry.ID, true
+		}
+	}
+	return nil, false
+}
+
+// GetEntriesInTree returns the immediate entries of the specified Git tree
+// (without recursively expanding subtrees). Each entry carries its name, ID,
+// and kind.
+func (r *Repository) GetEntriesInTree(treeID Hash) ([]TreeEntry, error) {
 	// From Git 2.36, we can use --format here. However, it appears a not
 	// insignificant number of developers are still on Git 2.34.1, a side effect
 	// of being on Ubuntu 22.04. 22.04 is still widely used in WSL2 environments.
@@ -78,33 +89,33 @@ func (r *Repository) GetTreeItems(treeID Hash) (map[string]Hash, error) {
 		return nil, nil // alternatively, just check if treeID is empty tree?
 	}
 
-	entries := strings.Split(stdOut, "\n")
-	if len(entries) == 0 {
-		return nil, nil
-	}
-
-	items := map[string]Hash{}
-	for _, entry := range entries {
+	lines := strings.Split(stdOut, "\n")
+	entries := make([]TreeEntry, 0, len(lines))
+	for _, line := range lines {
 		// Without --format, the output is in the following format:
 		// <mode> SP <type> SP <object> TAB <file>
 		// From: https://git-scm.com/docs/git-ls-tree/2.34.1#_output_format
 
-		entrySplit := strings.Split(entry, " ")
-		// entrySplit[0] is <mode> -- discard
-		// entrySplit[1] is <type> -- discard
-		// entrySplit[2] is <object> TAB <file> -- keep
-		entrySplit = strings.Split(entrySplit[2], "\t")
+		fields := strings.Split(line, " ")
+		// fields[0] is <mode> -- discard
+		// fields[1] is <type> -- blob or tree
+		// fields[2] is <object> TAB <file>
+		objectAndName := strings.Split(fields[2], "\t")
 
-		// <object> is really the object ID
-		hash, err := NewHash(entrySplit[0])
+		hash, err := NewHash(objectAndName[0])
 		if err != nil {
-			return nil, fmt.Errorf("invalid Git ID '%s' for path '%s': %w", entrySplit[0], entrySplit[1], err)
+			return nil, fmt.Errorf("invalid Git ID '%s' for path '%s': %w", objectAndName[0], objectAndName[1], err)
 		}
 
-		items[entrySplit[1]] = hash
+		kind := gitstore.KindBlob
+		if fields[1] == "tree" {
+			kind = gitstore.KindSubtree
+		}
+
+		entries = append(entries, TreeEntry{Path: objectAndName[1], ID: hash, Kind: kind})
 	}
 
-	return items, nil
+	return entries, nil
 }
 
 // GetAllFilesInTree returns all filepaths and the corresponding blob hashes in
@@ -247,7 +258,7 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	if upstreamPath != "" {
 		// If upstreamPath is empty, then the entire tree is copied over,
 		// otherwise, identify the subtree to copy over
-		treeID, err = upstream.GetPathIDInTree(upstreamPath, treeID)
+		treeID, err = upstream.GetPathIDInTree(treeID, upstreamPath)
 		if err != nil {
 			return nil, err
 		}
@@ -285,8 +296,8 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 		}
 	}
 
-	treeBuilder := NewTreeBuilder(r)
-	newTreeID, err := treeBuilder.WriteTreeFromEntries(entries)
+	builder := NewTreeBuilder(r)
+	newTreeID, err := builder.WriteTreeFromEntries(entries)
 	if err != nil {
 		return nil, err
 	}
@@ -316,27 +327,41 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	return commitID, nil
 }
 
-// TreeBuilder is used to create multi-level trees in a repository.  Based on
+// WriteTree writes a Git tree from the given entries and returns its ID.
+// Intermediate trees implied by "/" in an entry's path are created
+// automatically. The result is independent of entry order because git mktree
+// normalizes entries. It returns gitstore.ErrDuplicateTreePath if two entries
+// share a path.
+func (r *Repository) WriteTree(entries []TreeEntry) (Hash, error) {
+	seen := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if _, ok := seen[entry.Path]; ok {
+			return ZeroHash, fmt.Errorf("%w: %s", gitstore.ErrDuplicateTreePath, entry.Path)
+		}
+		seen[entry.Path] = struct{}{}
+	}
+
+	return NewTreeBuilder(r).WriteTreeFromEntries(entries)
+}
+
+// TreeBuilder creates multi-level trees in a repository. Based on
 // `buildTreeHelper` in go-git.
 type TreeBuilder struct {
-	repo    *Repository
-	trees   map[string]*entryTree
-	entries map[string]TreeEntry
+	repo  *Repository
+	trees map[string]*entryTree
 }
 
 func NewTreeBuilder(repo *Repository) *TreeBuilder {
 	return &TreeBuilder{repo: repo}
 }
 
-// WriteTreeFromEntries accepts list of TreeEntry representations, and returns
-// the Git ID of the tree that contains these entries. It constructs the
-// required intermediate trees.
-func (t *TreeBuilder) WriteTreeFromEntries(files []TreeEntry) (Hash, error) {
+// WriteTreeFromEntries writes the tree containing the given entries, building
+// any intermediate trees their paths require, and returns its ID.
+func (t *TreeBuilder) WriteTreeFromEntries(entries []TreeEntry) (Hash, error) {
 	rootNodeKey := ""
 	t.trees = map[string]*entryTree{rootNodeKey: {}}
-	t.entries = map[string]TreeEntry{}
 
-	for _, entry := range files {
+	for _, entry := range entries {
 		t.identifyIntermediates(entry)
 	}
 
@@ -346,7 +371,7 @@ func (t *TreeBuilder) WriteTreeFromEntries(files []TreeEntry) (Hash, error) {
 // identifyIntermediates identifies the intermediate trees that must be
 // constructed for the specified path.
 func (t *TreeBuilder) identifyIntermediates(entry TreeEntry) {
-	parts := strings.Split(entry.getName(), "/")
+	parts := strings.Split(entry.Path, "/")
 
 	var fullPath string
 	for _, part := range parts {
@@ -364,35 +389,26 @@ func (t *TreeBuilder) populateTree(parent, fullPath string, entry TreeEntry) {
 		return
 	}
 
-	if _, ok := t.entries[fullPath]; ok {
-		return
-	}
+	var node treeNode
 
-	var entryObj TreeEntry
-
-	if fullPath == entry.getName() {
-		// => This is a leaf node
-		// However, gitID _may_ be a tree ID, and we've inserted an existing
-		// tree object as a subtree here, we want to support this so that we
-		// don't have to recreate trees that already exist
-
-		if err := t.repo.ensureIsTree(entry.getID()); err == nil {
-			// gitID represents tree
-			entryObj = &entryTree{
+	if fullPath == entry.Path {
+		// => This is a leaf node. Its kind is authoritative: a subtree grafts
+		// an existing tree object, a blob is a regular file.
+		if entry.Kind == gitstore.KindSubtree {
+			node = &entryTree{
 				name:          path.Base(fullPath),
-				gitID:         entry.getID(),
+				gitID:         entry.ID,
 				alreadyExists: true,
 			}
 		} else {
-			// gitID is not for a tree
-			entryObj = &entryBlob{
+			node = &entryBlob{
 				name:  path.Base(fullPath),
-				gitID: entry.getID(),
+				gitID: entry.ID,
 			}
 		}
 	} else {
 		// => This is an intermediate node, has to be a tree that we must build
-		entryObj = &entryTree{
+		node = &entryTree{
 			name:          path.Base(fullPath),
 			gitID:         ZeroHash,
 			alreadyExists: false,
@@ -400,7 +416,7 @@ func (t *TreeBuilder) populateTree(parent, fullPath string, entry TreeEntry) {
 		t.trees[fullPath] = &entryTree{}
 	}
 
-	t.trees[parent].entries = append(t.trees[parent].entries, entryObj)
+	t.trees[parent].entries = append(t.trees[parent].entries, node)
 }
 
 // writeTrees recursively stores each tree that must be created in the
@@ -436,7 +452,7 @@ func (t *TreeBuilder) writeTrees(parent string, tree *entryTree) (Hash, error) {
 // only supports a typical blob with permission 0o644 and a subtree. This is
 // because it is only intended for use with gittuf specific metadata and tests.
 // Generic tree creation is left to invocations of the Git binary by the user.
-func (t *TreeBuilder) writeTree(entries []TreeEntry) (Hash, error) {
+func (t *TreeBuilder) writeTree(entries []treeNode) (Hash, error) {
 	input := ""
 	for _, entry := range entries {
 		// this is very opinionated about the modes right now because the plan
@@ -465,18 +481,24 @@ func (t *TreeBuilder) writeTree(entries []TreeEntry) (Hash, error) {
 	return treeID, nil
 }
 
-// TreeEntry represents an entry in a Git tree.
-type TreeEntry interface {
+// TreeEntry describes one entry to place in a tree. It aliases
+// gitstore.TreeEntry so both the Storer interface and gitinterface name the
+// same type.
+type TreeEntry = gitstore.TreeEntry
+
+// treeNode is the builder's internal representation of a resolved tree entry,
+// either a (possibly to-be-created) subtree or a blob.
+type treeNode interface {
 	getName() string
 	getID() Hash
 }
 
-// entryTree implements TreeEntry and indicates the entry is for a Git tree.
+// entryTree implements treeNode and indicates the entry is for a Git tree.
 type entryTree struct {
 	name          string
 	gitID         Hash
 	alreadyExists bool
-	entries       []TreeEntry
+	entries       []treeNode
 }
 
 func (e *entryTree) getName() string {
@@ -487,22 +509,15 @@ func (e *entryTree) getID() Hash {
 	return e.gitID
 }
 
-// NewEntryTree creates a TreeEntry that represents a Git tree. If the tree
-// doesn't exist, i.e., it must be created, gitID must be set to ZeroHash. The
-// name must be set to the full path of the tree object.
+// NewEntryTree creates a TreeEntry that grafts an existing Git tree at name.
 func NewEntryTree(name string, gitID Hash) TreeEntry {
-	entry := &entryTree{name: name, gitID: gitID}
-	if gitID == nil || !gitID.IsZero() {
-		entry.alreadyExists = true
-	}
-	return entry
+	return TreeEntry{Path: name, ID: gitID, Kind: gitstore.KindSubtree}
 }
 
-// entryBlob implements TreeEntry and indicates the entry is for a Git blob.
+// entryBlob implements treeNode and indicates the entry is for a Git blob.
 type entryBlob struct {
-	name        string
-	gitID       Hash
-	permissions os.FileMode //nolint:unused
+	name  string
+	gitID Hash
 }
 
 func (e *entryBlob) getName() string {
@@ -515,13 +530,7 @@ func (e *entryBlob) getID() Hash {
 
 // NewEntryBlob creates a TreeEntry that represents a Git blob.
 func NewEntryBlob(name string, gitID Hash) TreeEntry {
-	return &entryBlob{name: name, gitID: gitID, permissions: 0o644}
-}
-
-// NewEntryBlobWithPermissions creates a TreeEntry that represents a Git blob.
-// The permissions parameter can be used to set custom permissions.
-func NewEntryBlobWithPermissions(name string, gitID Hash, permissions os.FileMode) TreeEntry {
-	return &entryBlob{name: name, gitID: gitID, permissions: permissions}
+	return TreeEntry{Path: name, ID: gitID, Kind: gitstore.KindBlob}
 }
 
 // ensureIsTree is a helper to check that the ID represents a Git tree

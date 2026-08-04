@@ -9,9 +9,17 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ gitstore.Storer = (*Repository)(nil)
+
+func TestErrReferenceNotFoundIsGitstoreSentinel(t *testing.T) {
+	t.Parallel()
+	assert.ErrorIs(t, ErrReferenceNotFound, gitstore.ErrReferenceNotFound)
+}
 
 func TestRepository(t *testing.T) {
 	t.Run("repository.isBare", func(t *testing.T) {

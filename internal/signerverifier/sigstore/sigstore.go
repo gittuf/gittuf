@@ -32,12 +32,6 @@ const (
 
 	ExtensionMimeType = "application/vnd.dev.sigstore.verificationmaterial;version=0.3"
 
-	GitConfigIssuer      = "gitsign.issuer"
-	GitConfigClientID    = "gitsign.clientid"
-	GitConfigFulcio      = "gitsign.fulcio"
-	GitConfigRekor       = "gitsign.rekor"
-	GitConfigRedirectURL = "gitsign.redirecturl"
-
 	EnvSigstoreRootFile = "SIGSTORE_ROOT_FILE"
 
 	sigstoreBundleMimeType = "application/vnd.dev.sigstore.bundle+json;version=0.3"

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -486,7 +487,7 @@ func TestAPIGitGetFilePathsChangedByCommit(t *testing.T) {
 	require.NoError(t, err)
 	defer environment.Cleanup()
 
-	blobIDs := []gitinterface.Hash{}
+	blobIDs := []githash.Hash{}
 	for i := 0; i < 3; i++ {
 		blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("%d", i)))
 		require.NoError(t, err)

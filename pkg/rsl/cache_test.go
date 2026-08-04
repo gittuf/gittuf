@@ -6,24 +6,24 @@ package rsl
 import (
 	"testing"
 
-	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRSLCache(t *testing.T) {
 	// Add test entries
 	// Using fake hashes (these are commits in the gittuf repo itself)
-	entry1 := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
+	entry1 := NewReferenceEntry("refs/heads/main", githash.ZeroHash)
 	entry1.Number = 1
-	hash, err := gitinterface.NewHash("4dcd174e182cedf597b8a84f24ea5a53dae7e1e7")
+	hash, err := NewHash("4dcd174e182cedf597b8a84f24ea5a53dae7e1e7")
 	if err != nil {
 		t.Fatal(err)
 	}
 	entry1.ID = hash
 
-	entry2 := NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash)
+	entry2 := NewReferenceEntry("refs/heads/feature", githash.ZeroHash)
 	entry2.Number = 2
-	hash, err = gitinterface.NewHash("5bf80ffecacfde7e6b8281e65223b139a76160e1")
+	hash, err = NewHash("5bf80ffecacfde7e6b8281e65223b139a76160e1")
 	if err != nil {
 		t.Fatal(err)
 	}

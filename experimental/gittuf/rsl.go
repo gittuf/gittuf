@@ -17,10 +17,13 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
-	"github.com/gittuf/gittuf/internal/rsl"
+	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/gittuf/gittuf/pkg/rsl"
 )
 
 const gittufTransportPrefix = "gittuf::"
@@ -207,7 +210,7 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 		}
 	}
 
-	rslEntryHashes := []gitinterface.Hash{}
+	rslEntryHashes := []githash.Hash{}
 	for _, id := range rslEntryIDs {
 		hash, err := gitinterface.NewHash(id)
 		if err != nil {
@@ -524,7 +527,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 
 		remoteUpdatedRefTips := getLatestRefTipsFromRSLEntries(remoteOnlyEntries)
 
-		referenceUpdateDirectives := map[string]gitinterface.Hash{
+		referenceUpdateDirectives := map[string]githash.Hash{
 			rsl.Ref: remoteRefState,
 		}
 		divergedRefs := []string{}
@@ -620,7 +623,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 
 	remoteUpdatedRefTips := getLatestRefTipsFromRSLEntries(remoteOnlyEntries)
 
-	referenceUpdateDirectives := map[string]gitinterface.Hash{
+	referenceUpdateDirectives := map[string]githash.Hash{
 		rsl.Ref: remoteRefState,
 	}
 	divergedRefs := []string{}
@@ -688,7 +691,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	return nil, nil
 }
 
-func getRSLEntriesUntil(repo *gitinterface.Repository, start, until gitinterface.Hash) ([]rsl.Entry, error) {
+func getRSLEntriesUntil(repo gitstore.Storer, start, until githash.Hash) ([]rsl.Entry, error) {
 	entries := []rsl.Entry{}
 
 	iterator, err := rsl.GetEntry(repo, start)
@@ -714,8 +717,8 @@ func getRSLEntriesUntil(repo *gitinterface.Repository, start, until gitinterface
 	return entries, nil
 }
 
-func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]gitinterface.Hash {
-	refTips := map[string]gitinterface.Hash{}
+func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash {
+	refTips := map[string]githash.Hash{}
 	annotationsMap := map[string][]*rsl.AnnotationEntry{}
 	for _, entry := range entries {
 		switch entry := entry.(type) {
@@ -772,7 +775,7 @@ func (r *Repository) PullRSL(remoteName string) error {
 // isDuplicateEntry checks if the latest unskipped entry for the ref has the
 // same target ID. Note that it's legal for the RSL to have target A, then B,
 // then A again, this is not considered a duplicate entry
-func (r *Repository) isDuplicateEntry(refName string, targetID gitinterface.Hash) (bool, error) {
+func (r *Repository) isDuplicateEntry(refName string, targetID githash.Hash) (bool, error) {
 	latestUnskippedEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.r, rsl.ForReference(refName), rsl.IsUnskipped())
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -903,7 +906,7 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
 		}
 
-		if err := rsl.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+		if err := propagation.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
 			// TODO: atomic? abort?
 			return err
 		}
