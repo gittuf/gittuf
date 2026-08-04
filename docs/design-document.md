@@ -309,6 +309,7 @@ RSL Reference Entry
 ref: <ref name>
 targetID: <target ID>
 number: <number>
+custom.<namespace>/<name>: <value>
 ```
 
 The `targetID` is typically the ID of a commit for references that are branches.
@@ -333,10 +334,34 @@ entryID: <RSL entry ID 2>
 ...
 skip: <true/false>
 number: <number>
+custom.<namespace>/<name>: <value>
 -----BEGIN MESSAGE-----
 <message>
 ------END MESSAGE------
 ```
+
+RSL entries may include application-defined custom fields after their standard
+fields and before an annotation's message block. Custom field names begin with
+`custom.` followed by one or more of `[A-Za-z0-9._/-]`, and are unique in the
+canonical format. Values may contain `[A-Za-z0-9-+./,()]`. These character sets
+are enforced on write. Readers accept whatever is stored. Writers sort fields by
+name so their encoding is deterministic. Readers accept fields in any order and,
+when a non-canonical entry repeats a name, use its first value. Custom fields
+are part of the RSL commit message and are therefore covered by the entry's Git
+signature.
+
+For example, a forge might record who pushed a change and the server version
+that processed it:
+
+```
+custom.gitforge.com/pusher: <handle>(<id>)
+custom.gitforge.com/server-version: v4.2.0-coffee
+```
+
+Custom fields do not impact gittuf verification. gittuf treats them as opaque
+metadata: their presence, absence, or contents never change a verification
+outcome. The entry's signature still covers them, so they cannot be tampered
+with, but interpreting them is left entirely to the application.
 
 ##### Example Entries
 

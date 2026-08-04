@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,9 @@ const (
 	UpstreamRepositoryKey  = "upstreamRepository"
 	UpstreamEntryIDKey     = "upstreamEntryID"
 
+	// CustomFieldPrefix identifies extension fields in an RSL entry.
+	CustomFieldPrefix = "custom."
+
 	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
 	gittufNamespacePrefix  = "refs/gittuf/"
 	gittufPolicyStagingRef = "refs/gittuf/policy-staging"
@@ -54,6 +58,7 @@ var (
 	ErrInvalidGetLatestReferenceUpdaterEntryOptions = errors.New("invalid options presented for getting latest reference updater entry (are both before or until conditions set or is the before number less than the until number?)")
 	ErrCannotUseEntryNumberFilter                   = errors.New("current RSL entries are not numbered, cannot use number range options")
 	ErrInvalidUntilEntryNumberCondition             = errors.New("cannot meet until entry number condition")
+	ErrInvalidCustomFields                          = errors.New("invalid RSL custom fields")
 )
 
 // commitEntry commits an RSL entry: an empty-tree commit on Ref carrying the
@@ -80,6 +85,10 @@ func commitEntryUsingSpecificKey(storer gitstore.Storer, message string, signing
 	return err
 }
 
+// CustomFields contains signed, application-defined metadata stored in an RSL
+// entry. Keys begin with CustomFieldPrefix.
+type CustomFields map[string]string
+
 // RemoteTrackerRef returns the remote tracking ref for the specified remote's
 // name. For example, for 'origin', the remote tracker ref is
 // 'refs/remotes/origin/gittuf/reference-state-log'.
@@ -92,6 +101,7 @@ type Entry interface {
 	GetID() githash.Hash
 	Commit(gitstore.Storer, bool) error
 	GetNumber() uint64
+	GetCustomFields() CustomFields
 	createCommitMessage(bool) (string, error)
 }
 
@@ -118,11 +128,15 @@ type ReferenceEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
 // NewReferenceEntry returns a ReferenceEntry object for a normal RSL entry.
-func NewReferenceEntry(refName string, targetID githash.Hash) *ReferenceEntry {
-	return &ReferenceEntry{RefName: refName, TargetID: targetID}
+func NewReferenceEntry(refName string, targetID githash.Hash, opts ...EntryOption) *ReferenceEntry {
+	options := applyEntryOptions(opts)
+	return &ReferenceEntry{RefName: refName, TargetID: targetID, CustomFields: options.customFields}
 }
 
 func (e *ReferenceEntry) GetID() githash.Hash {
@@ -147,10 +161,12 @@ func (e *ReferenceEntry) Commit(storer gitstore.Storer, sign bool) error {
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, sign)
-	return err
+	return commitEntry(storer, message, sign)
 }
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
@@ -165,14 +181,20 @@ func (e *ReferenceEntry) CommitUsingSpecificKey(storer gitstore.Storer, signingK
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
-	return err
+	return commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
 }
 
 func (e *ReferenceEntry) GetNumber() uint64 {
 	return e.Number
+}
+
+func (e *ReferenceEntry) GetCustomFields() CustomFields {
+	return cloneCustomFields(e.CustomFields)
 }
 
 // Skipped returns true if any of the annotations mark the entry as
@@ -213,6 +235,10 @@ func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error)
 	if includeNumber && e.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
 	}
+	lines, err := appendCustomFields(lines, e.CustomFields)
+	if err != nil {
+		return "", err
+	}
 	return strings.Join(lines, "\n"), nil
 }
 
@@ -220,10 +246,12 @@ func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error)
 // producing a legacy unnumbered entry. It exists to exercise the RSL's support
 // for repositories that transition from unnumbered to numbered entries.
 func (e *ReferenceEntry) CommitWithoutNumber(storer gitstore.Storer) error {
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, false)
-	return err
+	return commitEntry(storer, message, false)
 }
 
 // AnnotationEntry is a type of RSL record that references prior items in the
@@ -245,12 +273,16 @@ type AnnotationEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
 // NewAnnotationEntry returns an Annotation object that applies to one or more
 // prior RSL entries.
-func NewAnnotationEntry(rslEntryIDs []githash.Hash, skip bool, message string) *AnnotationEntry {
-	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
+func NewAnnotationEntry(rslEntryIDs []githash.Hash, skip bool, message string, opts ...EntryOption) *AnnotationEntry {
+	options := applyEntryOptions(opts)
+	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message, CustomFields: options.customFields}
 }
 
 func (a *AnnotationEntry) GetID() githash.Hash {
@@ -315,6 +347,10 @@ func (a *AnnotationEntry) GetNumber() uint64 {
 	return a.Number
 }
 
+func (a *AnnotationEntry) GetCustomFields() CustomFields {
+	return cloneCustomFields(a.CustomFields)
+}
+
 // RefersTo returns true if the specified entryID is referred to by the
 // annotation.
 func (a *AnnotationEntry) RefersTo(entryID githash.Hash) bool {
@@ -361,6 +397,11 @@ func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error
 
 	if includeNumber && a.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, a.Number))
+	}
+
+	lines, err := appendCustomFields(lines, a.CustomFields)
+	if err != nil {
+		return "", err
 	}
 
 	if len(a.Message) != 0 {
@@ -422,14 +463,19 @@ type PropagationEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
-func NewPropagationEntry(refName string, targetID githash.Hash, upstreamRepository string, upstreamEntryID githash.Hash) *PropagationEntry {
+func NewPropagationEntry(refName string, targetID githash.Hash, upstreamRepository string, upstreamEntryID githash.Hash, opts ...EntryOption) *PropagationEntry {
+	options := applyEntryOptions(opts)
 	return &PropagationEntry{
 		RefName:            refName,
 		TargetID:           targetID,
 		UpstreamRepository: upstreamRepository,
 		UpstreamEntryID:    upstreamEntryID,
+		CustomFields:       options.customFields,
 	}
 }
 
@@ -455,10 +501,12 @@ func (e *PropagationEntry) Commit(storer gitstore.Storer, sign bool) error {
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, sign)
-	return err
+	return commitEntry(storer, message, sign)
 }
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
@@ -473,14 +521,20 @@ func (e *PropagationEntry) CommitUsingSpecificKey(storer gitstore.Storer, signin
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
-	return err
+	return commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
 }
 
 func (e PropagationEntry) GetNumber() uint64 {
 	return e.Number
+}
+
+func (e *PropagationEntry) GetCustomFields() CustomFields {
+	return cloneCustomFields(e.CustomFields)
 }
 
 func (e *PropagationEntry) setEntryNumber(storer gitstore.Storer) error {
@@ -511,7 +565,91 @@ func (e *PropagationEntry) createCommitMessage(includeNumber bool) (string, erro
 	if includeNumber && e.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
 	}
+	lines, err := appendCustomFields(lines, e.CustomFields)
+	if err != nil {
+		return "", err
+	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func applyEntryOptions(opts []EntryOption) *entryOptions {
+	options := &entryOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+	return options
+}
+
+func cloneCustomFields(fields CustomFields) CustomFields {
+	if fields == nil {
+		return nil
+	}
+	cloned := make(CustomFields, len(fields))
+	for key, value := range fields {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+// ValidateCustomFields checks that keys and values use only supported
+// characters. A key must begin with CustomFieldPrefix followed by one or more of
+// [A-Za-z0-9._/-]. A value may contain [A-Za-z0-9-+./,()]. It is enforced on
+// write. Readers accept whatever is stored.
+func ValidateCustomFields(fields CustomFields) error {
+	for key, value := range fields {
+		if !validCustomFieldKey(key) {
+			return fmt.Errorf("%w: invalid key %q", ErrInvalidCustomFields, key)
+		}
+		if !validCustomFieldValue(value) {
+			return fmt.Errorf("%w: invalid value for %q", ErrInvalidCustomFields, key)
+		}
+	}
+	return nil
+}
+
+func validCustomFieldKey(key string) bool {
+	if !strings.HasPrefix(key, CustomFieldPrefix) || len(key) == len(CustomFieldPrefix) {
+		return false
+	}
+	for _, character := range key[len(CustomFieldPrefix):] {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9' || strings.ContainsRune("._/-", character) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func validCustomFieldValue(value string) bool {
+	for _, character := range value {
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9' || strings.ContainsRune("-+./,()", character) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// appendCustomFields validates the fields, then appends them to lines sorted by
+// key so the encoding is deterministic.
+func appendCustomFields(lines []string, fields CustomFields) ([]string, error) {
+	if len(fields) == 0 {
+		return lines, nil
+	}
+	if err := ValidateCustomFields(fields); err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(fields))
+	for key := range fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		lines = append(lines, fmt.Sprintf("%s: %s", key, fields[key]))
+	}
+	return lines, nil
 }
 
 // GetEntry returns the entry corresponding to entryID.
@@ -1107,7 +1245,8 @@ func parseRSLEntryText(id githash.Hash, text string) (Entry, error) {
 // parseReferenceEntryText parses a reference entry as a state machine. The
 // fields must appear in the order ref, targetID, number, each at most once;
 // number is optional and trailing. Out-of-order fields and duplicates are
-// rejected. Unknown keys are ignored for forward compatibility.
+// rejected. Custom fields may appear in any order and use the first value when
+// repeated. Other unknown keys are ignored for forward compatibility.
 func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, error) {
 	body, err := entryBody(text, ReferenceEntryHeader)
 	if err != nil {
@@ -1155,6 +1294,11 @@ func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, err
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, CustomFieldPrefix) {
+				setCustomField(&entry.CustomFields, key, value)
+			}
 		}
 	}
 
@@ -1168,7 +1312,8 @@ func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, err
 // parseAnnotationEntryText parses an annotation entry as a state machine. One or
 // more entryID fields come first, followed by skip, then an optional number,
 // then an optional PEM message block. The message is decoded separately, so the
-// state machine stops at its begin marker.
+// state machine stops at its begin marker. Custom fields may appear in any
+// order and use the first value when repeated.
 func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, error) {
 	annotation := &AnnotationEntry{
 		ID:          id,
@@ -1242,6 +1387,11 @@ func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, e
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, CustomFieldPrefix) {
+				setCustomField(&annotation.CustomFields, key, value)
+			}
 		}
 	}
 
@@ -1255,6 +1405,7 @@ func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, e
 // parsePropagationEntryText parses a propagation entry as a state machine. The
 // fields must appear in the order ref, targetID, upstreamRepository,
 // upstreamEntryID, number, each at most once; number is optional and trailing.
+// Custom fields may appear in any order and use the first value when repeated.
 func parsePropagationEntryText(id githash.Hash, text string) (*PropagationEntry, error) {
 	body, err := entryBody(text, PropagationEntryHeader)
 	if err != nil {
@@ -1322,6 +1473,11 @@ func parsePropagationEntryText(id githash.Hash, text string) (*PropagationEntry,
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, CustomFieldPrefix) {
+				setCustomField(&entry.CustomFields, key, value)
+			}
 		}
 	}
 
@@ -1358,6 +1514,17 @@ func setNumber(dst *uint64, value string) error {
 	}
 	*dst = number
 	return nil
+}
+
+// setCustomField records a custom field parsed from an entry body. The first
+// value for a repeated key wins.
+func setCustomField(fields *CustomFields, key, value string) {
+	if *fields == nil {
+		*fields = CustomFields{}
+	} else if _, exists := (*fields)[key]; exists {
+		return
+	}
+	(*fields)[key] = value
 }
 
 func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID githash.Hash) []*AnnotationEntry {

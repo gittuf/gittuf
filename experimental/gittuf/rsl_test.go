@@ -42,7 +42,8 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly()); err != nil {
+	customFields := map[string]string{"custom.example.com/source": "forge"}
+	if err := repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly(), rslopts.WithRecordCustomFields(customFields)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -57,6 +58,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	}
 	assert.Equal(t, "refs/heads/main", entry.RefName)
 	assert.Equal(t, commitID, entry.TargetID)
+	assert.Equal(t, customFields, map[string]string(entry.GetCustomFields()))
 
 	newCommitID, err := repo.r.Commit(emptyTreeHash, "refs/heads/main", "Another commit\n", false)
 	if err != nil {
@@ -325,7 +327,8 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	}
 	entryID := latestEntry.GetID()
 
-	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
+	customFields := map[string]string{"custom.example.com/source": "forge"}
+	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly(), rslopts.WithAnnotateCustomFields(customFields))
 	assert.Nil(t, err)
 
 	latestEntry, err = rsl.GetLatestEntry(repo.r)
@@ -338,6 +341,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	assert.Equal(t, "test annotation", annotation.Message)
 	assert.Equal(t, []githash.Hash{entryID}, annotation.RSLEntryIDs)
 	assert.False(t, annotation.Skip)
+	assert.Equal(t, customFields, map[string]string(annotation.GetCustomFields()))
 
 	err = repo.RecordRSLAnnotation(testCtx, []string{entryID.String()}, true, "skip annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.Nil(t, err)
