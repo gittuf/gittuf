@@ -16,7 +16,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.0
 	github.com/sigstore/cosign/v3 v3.1.2
 	github.com/sigstore/fulcio v1.8.8
-	github.com/sigstore/gitsign v0.16.1
+	github.com/sigstore/gitsign v0.17.1
 	github.com/sigstore/protobuf-specs v0.5.1
 	github.com/sigstore/sigstore v1.10.9
 	github.com/sigstore/sigstore-go v1.3.0
@@ -26,8 +26,6 @@ require (
 	golang.org/x/crypto v0.54.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 )
-
-require github.com/go-openapi/swag/pools v0.27.3 // indirect
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
@@ -118,6 +116,7 @@ require (
 	github.com/go-openapi/swag/loading v0.27.3 // indirect
 	github.com/go-openapi/swag/mangling v0.27.3 // indirect
 	github.com/go-openapi/swag/netutils v0.27.0 // indirect
+	github.com/go-openapi/swag/pools v0.27.3 // indirect
 	github.com/go-openapi/swag/stringutils v0.27.3 // indirect
 	github.com/go-openapi/swag/typeutils v0.27.3 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.3 // indirect
