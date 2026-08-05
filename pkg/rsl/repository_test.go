@@ -23,7 +23,7 @@ const annotationMessage = "test annotation"
 func TestCustomFieldsRoundTrip(t *testing.T) {
 	fields := CustomFields{
 		"custom.example.com/z-field": "v1.2.3-rc.1/build(42),ok",
-		"custom.example.com/a-field": "first",
+		"custom.example.com/a-field": "hello world_ok",
 	}
 
 	tests := map[string]Entry{
@@ -107,12 +107,20 @@ func TestWithCustomFieldsKeepsFirstValueForRepeatedKey(t *testing.T) {
 
 func TestValidateCustomFields(t *testing.T) {
 	invalid := map[string]CustomFields{
-		"missing namespace": {"field": "value"},
-		"empty name":        {CustomFieldPrefix: "value"},
-		"key with space":    {"custom.example.com/field name": "value"},
-		"value with space":  {"custom.example.com/field": "hello world"},
-		"value with colon":  {"custom.example.com/field": "a:b"},
-		"multiline value":   {"custom.example.com/field": "first\nsecond"},
+		"missing namespace":    {"field": "value"},
+		"no name separator":    {"custom.example.com": "value"},
+		"empty name":           {"custom.example.com/": "value"},
+		"empty domain":         {"custom./field": "value"},
+		"uppercase key":        {"custom.example.com/Field": "value"},
+		"key with space":       {"custom.example.com/field name": "value"},
+		"bad domain label":     {"custom.-bad.com/field": "value"},
+		"name too long":        {"custom.example.com/" + strings.Repeat("a", 64): "value"},
+		"key too long":         {"custom." + strings.Repeat("a.", 125) + "com/field": "value"},
+		"value with colon":     {"custom.example.com/field": "a:b"},
+		"multiline value":      {"custom.example.com/field": "first\nsecond"},
+		"value leading space":  {"custom.example.com/field": " value"},
+		"value trailing space": {"custom.example.com/field": "value "},
+		"value too long":       {"custom.example.com/field": strings.Repeat("a", maxCustomFieldValueLength)},
 	}
 
 	for name, fields := range invalid {
@@ -121,11 +129,74 @@ func TestValidateCustomFields(t *testing.T) {
 		})
 	}
 
-	assert.NoError(t, ValidateCustomFields(CustomFields{"custom.example.com/field": "v1.2.3-rc.1/build(42),ok"}))
+	valid := map[string]CustomFields{
+		"symbols":             {"custom.example.com/field": "v1.2.3-rc.1/build(42),ok"},
+		"internal space":      {"custom.example.com/field": "hello world"},
+		"underscore":          {"custom.example.com/field": "hello_world"},
+		"single label domain": {"custom.example/field": "value"},
+		"subdomains":          {"custom.a.b.example.com/x-y_z.1": "value"},
+		"max name length":     {"custom.example.com/" + strings.Repeat("a", 63): "value"},
+		"max value length":    {"custom.example.com/field": strings.Repeat("a", maxCustomFieldValueLength-1)},
+	}
+
+	for name, fields := range valid {
+		t.Run(name, func(t *testing.T) {
+			assert.NoError(t, ValidateCustomFields(fields))
+		})
+	}
+}
+
+func TestValidateCustomFieldsRejectsTooManyFields(t *testing.T) {
+	fields := CustomFields{}
+	for i := 0; i <= maxCustomFieldCount; i++ {
+		fields[fmt.Sprintf("custom.example.com/field-%d", i)] = "v"
+	}
+	require.Len(t, fields, maxCustomFieldCount+1)
+	assert.ErrorIs(t, ValidateCustomFields(fields), ErrInvalidCustomFields)
+}
+
+func TestParseRSLEntryTextDropsOverlongCustomFields(t *testing.T) {
+	longKey := CustomFieldPrefix + strings.Repeat("a", maxCustomFieldKeyLength)
+	longValue := strings.Repeat("a", maxCustomFieldValueLength)
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\ncustom.example.com/ok: fine\n%s: value\ncustom.example.com/big: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), longKey, longValue)
+
+	entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+	require.NoError(t, err)
+	assert.Equal(t, CustomFields{"custom.example.com/ok": "fine"}, entry.GetCustomFields())
+}
+
+func TestParseRSLEntryTextCapsCustomFieldCount(t *testing.T) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	for i := 0; i < maxCustomFieldCount+10; i++ {
+		fmt.Fprintf(&b, "\ncustom.example.com/field-%02d: v", i)
+	}
+
+	entry, err := parseRSLEntryText(gitinterface.ZeroHash, b.String())
+	require.NoError(t, err)
+	assert.Len(t, entry.GetCustomFields(), maxCustomFieldCount)
+}
+
+func TestCreateCommitMessageDropsEmptyCustomFields(t *testing.T) {
+	fields := CustomFields{
+		"custom.example.com/kept":  "value",
+		"custom.example.com/empty": "",
+	}
+	entry := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, WithCustomFields(fields))
+
+	message, err := entry.createCommitMessage(true)
+	require.NoError(t, err)
+	assert.Contains(t, message, "custom.example.com/kept: value")
+	assert.NotContains(t, message, "custom.example.com/empty")
+
+	parsed, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+	require.NoError(t, err)
+	assert.Equal(t, CustomFields{"custom.example.com/kept": "value"}, parsed.GetCustomFields())
 }
 
 func TestCreateCommitMessageRejectsInvalidCustomFields(t *testing.T) {
-	invalid := WithCustomFields(CustomFields{"custom.example.com/field": "no spaces allowed"})
+	invalid := WithCustomFields(CustomFields{"custom.example.com/Field": "value"})
 	tests := map[string]Entry{
 		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, invalid),
 		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", invalid),

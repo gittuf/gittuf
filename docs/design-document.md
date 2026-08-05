@@ -342,20 +342,27 @@ custom.<namespace>/<name>: <value>
 
 RSL entries may include application-defined custom fields after their standard
 fields and before an annotation's message block. Custom field names begin with
-`custom.` followed by one or more of `[A-Za-z0-9._/-]`, and are unique in the
-canonical format. Values may contain `[A-Za-z0-9-+./,()]`. These character sets
-are enforced on write. Readers accept whatever is stored. Writers sort fields by
-name so their encoding is deterministic. Readers accept fields in any order and,
-when a non-canonical entry repeats a name, use its first value. Custom fields
-are part of the RSL commit message and are therefore covered by the entry's Git
-signature.
+`custom.` and follow the Kubernetes annotation convention: a lowercase DNS
+subdomain the application controls (for example `gitforge.com`), a `/`, and a
+name of at most 63 lowercase characters that starts and ends alphanumeric with
+`.`, `_`, or `-` allowed in between. Namespacing keys to a domain you control
+avoids collisions between applications. The whole key is fewer than 250
+characters and unique in the canonical format. Values may contain
+`[A-Za-z0-9-+./,()_ ]`, have no leading or trailing spaces, and are fewer than
+500 characters. An entry carries at most 20 custom fields, and empty values are
+dropped. These constraints are enforced on write. Writers sort fields by name so
+their encoding is deterministic. Readers accept fields in any order and, when a
+non-canonical entry repeats a name, use its first value; fields exceeding the
+length limits are ignored and the count is capped, so a crafted entry cannot
+force gittuf to surface unbounded data. Custom fields are part of the RSL commit
+message and are therefore covered by the entry's Git signature.
 
 For example, a forge might record who pushed a change and the server version
 that processed it:
 
 ```
 custom.gitforge.com/pusher: <handle>(<id>)
-custom.gitforge.com/server-version: v4.2.0-coffee
+custom.gitforge.com/server-version: v4.2.0-c0ffee
 ```
 
 Custom fields do not impact gittuf verification. gittuf treats them as opaque

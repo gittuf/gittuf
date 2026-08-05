@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,6 +44,17 @@ const (
 
 	// CustomFieldPrefix identifies extension fields in an RSL entry.
 	CustomFieldPrefix = "custom."
+
+	// maxCustomFieldKeyLength is the exclusive upper bound on a custom field
+	// key's length, including CustomFieldPrefix. A key must be shorter than this.
+	maxCustomFieldKeyLength = 250
+
+	// maxCustomFieldValueLength is the exclusive upper bound on a custom field
+	// value's length. A value must be shorter than this.
+	maxCustomFieldValueLength = 500
+
+	// maxCustomFieldCount bounds how many custom fields a single entry may carry.
+	maxCustomFieldCount = 20
 
 	remoteTrackerRef       = "refs/remotes/%s/gittuf/reference-state-log"
 	gittufNamespacePrefix  = "refs/gittuf/"
@@ -591,11 +603,27 @@ func cloneCustomFields(fields CustomFields) CustomFields {
 	return cloned
 }
 
-// ValidateCustomFields checks that keys and values use only supported
-// characters. A key must begin with CustomFieldPrefix followed by one or more of
-// [A-Za-z0-9._/-]. A value may contain [A-Za-z0-9-+./,()]. It is enforced on
-// write. Readers accept whatever is stored.
+// customFieldDomainLabel matches a single lowercase DNS label. customFieldName
+// matches a Kubernetes-style name segment: lowercase, starting and ending
+// alphanumeric, with '.', '_', and '-' allowed in between.
+var (
+	customFieldDomainLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
+	customFieldName        = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$`)
+)
+
+// ValidateCustomFields checks that the fields are well formed. A key must begin
+// with CustomFieldPrefix and follow the Kubernetes annotation convention: a
+// lowercase DNS subdomain (the namespace an application controls), a '/', and a
+// name of at most 63 lowercase characters starting and ending alphanumeric. The
+// whole key must be shorter than maxCustomFieldKeyLength. A value may contain
+// [A-Za-z0-9-+./,()_ ], must have no leading or trailing spaces, and be shorter
+// than maxCustomFieldValueLength. An entry carries at most maxCustomFieldCount
+// fields. It is enforced on write. On read, fields exceeding the length limits
+// are dropped and the count is capped.
 func ValidateCustomFields(fields CustomFields) error {
+	if len(fields) > maxCustomFieldCount {
+		return fmt.Errorf("%w: %d fields exceed the maximum of %d", ErrInvalidCustomFields, len(fields), maxCustomFieldCount)
+	}
 	for key, value := range fields {
 		if !validCustomFieldKey(key) {
 			return fmt.Errorf("%w: invalid key %q", ErrInvalidCustomFields, key)
@@ -608,23 +636,46 @@ func ValidateCustomFields(fields CustomFields) error {
 }
 
 func validCustomFieldKey(key string) bool {
-	if !strings.HasPrefix(key, CustomFieldPrefix) || len(key) == len(CustomFieldPrefix) {
+	if !strings.HasPrefix(key, CustomFieldPrefix) || len(key) >= maxCustomFieldKeyLength {
 		return false
 	}
-	for _, character := range key[len(CustomFieldPrefix):] {
-		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
-			character >= '0' && character <= '9' || strings.ContainsRune("._/-", character) {
-			continue
-		}
+	domain, name, ok := strings.Cut(key[len(CustomFieldPrefix):], "/")
+	if !ok {
 		return false
+	}
+	return validCustomFieldDomain(domain) && validCustomFieldNameSegment(name)
+}
+
+// validCustomFieldDomain reports whether domain is a lowercase DNS subdomain, as
+// Kubernetes requires for an annotation key's prefix.
+func validCustomFieldDomain(domain string) bool {
+	if len(domain) == 0 || len(domain) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(domain, ".") {
+		if len(label) > 63 || !customFieldDomainLabel.MatchString(label) {
+			return false
+		}
 	}
 	return true
+}
+
+func validCustomFieldNameSegment(name string) bool {
+	return len(name) > 0 && len(name) <= 63 && customFieldName.MatchString(name)
 }
 
 func validCustomFieldValue(value string) bool {
+	if len(value) >= maxCustomFieldValueLength {
+		return false
+	}
+	// The parser trims each value, so a leading or trailing space would not
+	// round-trip and would desync from the signed bytes. Reject it on write.
+	if value != strings.TrimSpace(value) {
+		return false
+	}
 	for _, character := range value {
 		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
-			character >= '0' && character <= '9' || strings.ContainsRune("-+./,()", character) {
+			character >= '0' && character <= '9' || strings.ContainsRune("-+./,()_ ", character) {
 			continue
 		}
 		return false
@@ -632,22 +683,29 @@ func validCustomFieldValue(value string) bool {
 	return true
 }
 
-// appendCustomFields validates the fields, then appends them to lines sorted by
-// key so the encoding is deterministic.
+// appendCustomFields drops empty values, validates the rest, then appends them
+// to lines sorted by key so the encoding is deterministic.
 func appendCustomFields(lines []string, fields CustomFields) ([]string, error) {
-	if len(fields) == 0 {
+	effective := make(CustomFields, len(fields))
+	for key, value := range fields {
+		if value == "" {
+			continue // empty values are dropped on write
+		}
+		effective[key] = value
+	}
+	if len(effective) == 0 {
 		return lines, nil
 	}
-	if err := ValidateCustomFields(fields); err != nil {
+	if err := ValidateCustomFields(effective); err != nil {
 		return nil, err
 	}
-	keys := make([]string, 0, len(fields))
-	for key := range fields {
+	keys := make([]string, 0, len(effective))
+	for key := range effective {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		lines = append(lines, fmt.Sprintf("%s: %s", key, fields[key]))
+		lines = append(lines, fmt.Sprintf("%s: %s", key, effective[key]))
 	}
 	return lines, nil
 }
@@ -1516,12 +1574,21 @@ func setNumber(dst *uint64, value string) error {
 	return nil
 }
 
-// setCustomField records a custom field parsed from an entry body. The first
-// value for a repeated key wins.
+// setCustomField records a custom field parsed from an entry body. Fields whose
+// key or value exceeds the maximum lengths are ignored, and no more than
+// maxCustomFieldCount fields are kept, so a crafted entry cannot force gittuf to
+// surface unbounded data. The first value for a repeated key wins.
 func setCustomField(fields *CustomFields, key, value string) {
+	if len(key) >= maxCustomFieldKeyLength || len(value) >= maxCustomFieldValueLength {
+		return
+	}
 	if *fields == nil {
 		*fields = CustomFields{}
-	} else if _, exists := (*fields)[key]; exists {
+	}
+	if _, exists := (*fields)[key]; exists {
+		return
+	}
+	if len(*fields) >= maxCustomFieldCount {
 		return
 	}
 	(*fields)[key] = value
