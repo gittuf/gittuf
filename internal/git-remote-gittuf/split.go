@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"strconv"
 )
 
@@ -88,10 +89,19 @@ func splitPacket(data []byte, atEOF bool) (int, []byte, error) {
 
 	length, err := strconv.ParseInt(string(lengthB), 16, 64)
 	if err != nil {
-		return -1, nil, err
+		return 0, nil, err
 	}
 
 	l := int(length)
+	if l < 4 {
+		// A data packet's length includes its own four length bytes, so any
+		// value below 4 is malformed. The zero-length control packets are
+		// already handled above. strconv.ParseInt also accepts a leading
+		// sign, so this rejects negative lengths that would otherwise slice
+		// out of range.
+		return 0, nil, fmt.Errorf("invalid packet length %q", string(lengthB))
+	}
+
 	if l > len(data) {
 		return 0, nil, nil // request more in a new buffer
 	}

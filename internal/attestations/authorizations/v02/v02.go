@@ -107,6 +107,10 @@ func Validate(env *sslibdsse.Envelope, targetRef, fromID, targetID string) error
 		return err
 	}
 
+	if len(attestation.Subject) == 0 || attestation.Subject[0] == nil {
+		return authorizations.ErrInvalidAuthorization
+	}
+
 	subjectDigest, hasGitTree := attestation.Subject[0].Digest[digestGitTreeKey]
 	if hasGitTree {
 		if subjectDigest != targetID {
@@ -125,6 +129,10 @@ func Validate(env *sslibdsse.Envelope, targetRef, fromID, targetID string) error
 		if !strings.HasPrefix(targetRef, gitinterface.TagRefPrefix) {
 			return authorizations.ErrInvalidAuthorization
 		}
+	}
+
+	if attestation.Predicate == nil {
+		return authorizations.ErrInvalidAuthorization
 	}
 
 	predicate := attestation.Predicate.AsMap()

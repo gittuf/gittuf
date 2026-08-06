@@ -125,6 +125,10 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 		return nil, err
 	}
 
+	if len(keyring) == 0 {
+		return nil, fmt.Errorf("no GPG keys found in armored input")
+	}
+
 	// TODO: check if this is correct for subkeys
 	fingerprint := fmt.Sprintf("%x", keyring[0].PrimaryKey.Fingerprint)
 	key := strings.TrimSpace(string(contents))
