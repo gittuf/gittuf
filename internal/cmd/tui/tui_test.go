@@ -191,3 +191,233 @@ func TestTrustGlobalRulesScreenHandleEsc(t *testing.T) {
 		assert.Equal(t, screenTrustGlobalRules, m.screen)
 	})
 }
+
+func TestTrustKeysThresholdsSelectActionReadOnly(t *testing.T) {
+	m := model{readOnly: true, screen: screenTrustKeysThresholds}
+	screen := trustKeysThresholdsScreen{}
+
+	screen.selectAction("Add Root Key", &m)
+
+	assert.Equal(t, screenTrustKeysThresholds, m.screen)
+	assert.Equal(t, "Read-only mode: action unavailable.", m.footer)
+	assert.Equal(t, trustKeysActionNone, screen.selectedAction)
+}
+
+func TestTrustCoreSubmenuNavigation(t *testing.T) {
+	tmpDir := t.TempDir()
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(currentDir) //nolint:errcheck
+
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	t.Run("Trust Keys And Thresholds Navigation", func(t *testing.T) {
+		o := &options{
+			readOnly:  true,
+			targetRef: "policy",
+		}
+
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Home -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Trust -> Keys & Thresholds
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › Keys & Thresholds") &&
+				strings.Contains(content, "Add Root Key")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Esc -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust") &&
+				strings.Contains(content, "Keys & Thresholds")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+	})
+
+	t.Run("Trust Lifecycle Navigation", func(t *testing.T) {
+		o := &options{
+			readOnly:  true,
+			targetRef: "policy",
+		}
+
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Home -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Trust -> Lifecycle
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › Lifecycle") &&
+				strings.Contains(content, "Stage Trust Changes")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Esc -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust") &&
+				strings.Contains(content, "Lifecycle")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+	})
+
+	t.Run("Trust Propagation Navigation", func(t *testing.T) {
+		o := &options{readOnly: true, targetRef: "policy"}
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Home -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		// Trust -> Propagation
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › Propagation") &&
+				strings.Contains(content, "List Directives")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Propagation -> Add Directive
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › Propagation › Add Directive")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Add Directive -> Propagation
+		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › Propagation")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+	})
+
+	t.Run("Trust GitHub App Navigation", func(t *testing.T) {
+		o := &options{readOnly: true, targetRef: "policy"}
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Home -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		// Trust -> GitHub App
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › GitHub App") &&
+				strings.Contains(content, "Add GitHub App")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// GitHub App -> Add GitHub App
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › GitHub App › Add")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Add GitHub App -> GitHub App
+		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › GitHub App")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+	})
+
+	t.Run("Trust Repo Network Navigation", func(t *testing.T) {
+		o := &options{readOnly: true, targetRef: "policy"}
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Home -> Trust
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		// Trust -> Repo/Network
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Trust › Repo/Network") &&
+				strings.Contains(content, "Add Controller Repository")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Repo/Network -> Set Repository Location
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › Repo/Network › Location")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		// Set Repository Location -> Repo/Network
+		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Home › Trust › Repo/Network")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+	})
+}
