@@ -18,6 +18,8 @@ import (
 )
 
 func TestPullRequest(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
