@@ -13,7 +13,7 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/go-git/go-git/v6/plumbing"
-	"github.com/hiddeco/sshsig"
+	"github.com/hiddeco/sshsig" //nolint:staticcheck
 	"golang.org/x/crypto/ssh"
 )
 
