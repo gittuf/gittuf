@@ -5,7 +5,10 @@ package github
 
 import (
 	"context"
+	"net/http"
 	"os"
+
+	"github.com/gittuf/gittuf/internal/dev"
 )
 
 const (
@@ -21,10 +24,11 @@ type TokenSource interface {
 }
 
 type Options struct {
-	GitHubTokenSource TokenSource
-	GitHubBaseURL     string
-	CreateRSLEntry    bool
-	UseGitHubAPI      bool
+	GitHubTokenSource  TokenSource
+	GitHubBaseURL      string
+	GitHubMockedClient *http.Client
+	CreateRSLEntry     bool
+	UseGitHubAPI       bool
 }
 
 var DefaultOptions = &Options{
@@ -47,6 +51,17 @@ func WithGitHubTokenSource(tokenSource TokenSource) Option {
 func WithGitHubBaseURL(baseURL string) Option {
 	return func(o *Options) {
 		o.GitHubBaseURL = baseURL
+	}
+}
+
+// WithMockedGitHubAPIClient is used to supply a client that mocks GitHub API
+// responses, used only for testing.
+func WithMockedGitHubAPIClient(client *http.Client) Option {
+	if client != nil && !dev.InDevMode() {
+		panic(dev.ErrNotInDevMode)
+	}
+	return func(o *Options) {
+		o.GitHubMockedClient = client
 	}
 }
 
