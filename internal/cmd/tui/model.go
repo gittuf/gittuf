@@ -42,6 +42,11 @@ type item struct {
 	title, desc string
 }
 
+type errorDialog struct {
+	title   string
+	message string
+}
+
 // Note: virtual methods must be implemented for the item struct
 // Title returns the title of the item.
 func (i item) Title() string { return i.title }
@@ -72,6 +77,7 @@ type model struct {
 	options                    *options
 	footer                     string
 	errorMsg                   string
+	errorDialog                *errorDialog
 	readOnly                   bool
 	width                      int
 	height                     int
@@ -141,6 +147,19 @@ func initInputs(fields []inputField) []textinput.Model {
 		inputs[i] = t
 	}
 	return inputs
+}
+
+func (m *model) openErrorDialog(title, message string) {
+	m.footer = ""
+	m.errorMsg = ""
+	m.errorDialog = &errorDialog{
+		title:   title,
+		message: message,
+	}
+}
+
+func (m *model) closeErrorDialog() {
+	m.errorDialog = nil
 }
 
 // initialModel returns a lightweight loading model for the Terminal UI.

@@ -5,6 +5,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -190,4 +191,126 @@ func TestTrustGlobalRulesScreenHandleEsc(t *testing.T) {
 		assert.True(t, handled)
 		assert.Equal(t, screenTrustGlobalRules, m.screen)
 	})
+}
+
+func TestPolicyLifecycleResultShowsErrorDialog(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+
+	updated, _ := m.Update(policyLifecycleResultMsg{
+		action: "Apply Changes",
+		err:    errors.New("boom"),
+	})
+	typed := updated.(model)
+
+	require.NotNil(t, typed.errorDialog)
+	assert.Equal(t, "Apply Changes Failed", typed.errorDialog.title)
+	assert.Equal(t, "boom", typed.errorDialog.message)
+	assert.Empty(t, typed.footer)
+	assert.Empty(t, typed.errorMsg)
+}
+
+func TestPolicyLifecycleResultSuccessKeepsFooter(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.errorDialog = &errorDialog{title: "old", message: "old"}
+
+	updated, _ := m.Update(policyLifecycleResultMsg{
+		action: "Apply Changes",
+		msg:    "ok",
+	})
+	typed := updated.(model)
+
+	assert.Nil(t, typed.errorDialog)
+	assert.Equal(t, "ok", typed.footer)
+}
+
+func TestLifecycleReadOnlyUsesErrorDialog(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: true, targetRef: "policy"})
+	m.screen = screenPolicyLifecycle
+	m.readOnly = true
+
+	updated, _ := m.policyLifecycleScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+	typed := updated.(model)
+
+	require.NotNil(t, typed.errorDialog)
+	assert.Equal(t, "Initialize Policy Failed", typed.errorDialog.title)
+	assert.Equal(t, "cannot perform action in read-only mode", typed.errorDialog.message)
+	assert.Empty(t, typed.errorMsg)
+}
+
+func TestErrorDialogBlocksInputAndDismisses(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.screen = screenPolicyLifecycle
+	m.width = 80
+	m.height = 24
+	m.openErrorDialog("Stage Changes Failed", "boom")
+
+	startIndex := m.policyLifecycleScreen.list.Index()
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	typed := updated.(model)
+	require.NotNil(t, typed.errorDialog)
+	assert.Equal(t, startIndex, typed.policyLifecycleScreen.list.Index())
+
+	updated, _ = typed.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	typed = updated.(model)
+	assert.Nil(t, typed.errorDialog)
+	assert.Equal(t, startIndex, typed.policyLifecycleScreen.list.Index())
+}
+
+func TestErrorDialogDismissesOnEsc(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.screen = screenPolicyLifecycle
+	m.openErrorDialog("Apply Changes Failed", "boom")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	typed := updated.(model)
+
+	assert.Nil(t, typed.errorDialog)
+}
+
+func TestPrincipalValidationStaysInline(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.screen = screenPolicyPrincipalsForm
+	m.policyPrincipalsFormScreen = policyPrincipalsFormScreen{
+		action: "Add Person",
+		inputs: initInputs([]inputField{
+			{placeholder: "Person ID", prompt: "Person ID: "},
+			{placeholder: "Keys", prompt: "Public Keys: "},
+			{placeholder: "Identities", prompt: "Associated Identities: "},
+			{placeholder: "Custom", prompt: "Custom: "},
+		}),
+		focusIndex: 3,
+	}
+
+	updated, _ := m.policyPrincipalsFormScreen.handleFormSubmit(&m)
+	typed := updated.(model)
+
+	assert.Nil(t, typed.errorDialog)
+	assert.Equal(t, "Error: Principal ID is required", typed.errorMsg)
+}
+
+func TestErrorDialogAllowsQuit(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.screen = screenPolicyLifecycle
+	m.openErrorDialog("Apply Changes Failed", "boom")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	typed := updated.(model)
+
+	require.NotNil(t, cmd)
+	assert.NotNil(t, typed.errorDialog)
+}
+
+func TestViewRendersErrorDialog(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+	m.screen = screenPolicyLifecycle
+	m.width = 80
+	m.height = 24
+	m.openErrorDialog("Apply Changes Failed", "remote rejected update")
+
+	view := m.View()
+
+	assert.Contains(t, view, "Apply Changes Failed")
+	assert.Contains(t, view, "remote rejected update")
+	assert.Contains(t, view, "Press Enter or Esc to close.")
 }

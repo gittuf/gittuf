@@ -169,7 +169,7 @@ func (s *trustGlobalRulesScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "y" {
 			if err := repoRemoveGlobalRule(m.ctx, m.options, globalRule{ruleName: s.deleteTarget}); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing global rule: %v", err)
+				m.openErrorDialog("Remove Global Rule Failed", err.Error())
 			} else {
 				m.footer = "Global rule removed!"
 				s.refreshGlobalRules(m.ctx, m.options)
@@ -208,7 +208,11 @@ func (s *trustGlobalRulesScreen) handleGlobalFormSubmit(m *model) (tea.Model, te
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		title := "Update Global Rule Failed"
+		if m.screen == screenTrustAddGlobalRule {
+			title = "Add Global Rule Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 

@@ -23,8 +23,9 @@ type policyLifecycleScreen struct {
 }
 
 type policyLifecycleResultMsg struct {
-	msg string
-	err error
+	action string
+	msg    string
+	err    error
 }
 
 func (s *policyLifecycleScreen) initInputs(action string, m *model) {
@@ -100,7 +101,7 @@ func (s *policyLifecycleScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cm
 			case "enter":
 				if selectedItem, ok := s.list.SelectedItem().(item); ok {
 					if m.readOnly {
-						m.errorMsg = "cannot perform action in read-only mode"
+						m.openErrorDialog(selectedItem.title+" Failed", "cannot perform action in read-only mode")
 						return *m, nil
 					}
 					m.errorMsg = ""
@@ -238,8 +239,9 @@ func handlePolicyLifecycleCommand(m *model, action string, policyName string, re
 	if m.readOnly {
 		return func() tea.Msg {
 			return policyLifecycleResultMsg{
-				msg: "",
-				err: fmt.Errorf("cannot perform action in read-only mode"),
+				action: action,
+				msg:    "",
+				err:    fmt.Errorf("cannot perform action in read-only mode"),
 			}
 		}
 	}
@@ -291,8 +293,9 @@ func handlePolicyLifecycleCommand(m *model, action string, policyName string, re
 
 	return tea.Exec(backendExec{run: runFn}, func(err error) tea.Msg {
 		return policyLifecycleResultMsg{
-			msg: successMsg,
-			err: err,
+			action: action,
+			msg:    successMsg,
+			err:    err,
 		}
 	})
 }

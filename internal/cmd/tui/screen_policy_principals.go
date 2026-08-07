@@ -191,7 +191,7 @@ func (s *policyPrincipalsScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "y" {
 			if err := repoRemovePrincipal(m.ctx, m.options, s.deleteTarget); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing principal: %v", err)
+				m.openErrorDialog("Remove Principal Failed", err.Error())
 			} else {
 				m.footer = "Principal removed successfully!"
 				s.refreshPrincipals(m.ctx, m.options)
@@ -308,7 +308,11 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		title := "Update Principal Failed"
+		if f.action == "Add Person" {
+			title = "Add Principal Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 
