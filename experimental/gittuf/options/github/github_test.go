@@ -4,11 +4,22 @@
 package github
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestWithGitHubTokenSource(t *testing.T) {
+	options := &Options{}
+
+	tokenSource := &TokenSourceEnvironment{}
+	option := WithGitHubTokenSource(tokenSource)
+	option(options)
+
+	assert.Equal(t, tokenSource, options.GitHubTokenSource)
+}
 
 func TestDefaultOptions(t *testing.T) {
 	assert.Equal(t, DefaultGitHubBaseURL, DefaultOptions.GitHubBaseURL)
@@ -54,4 +65,21 @@ func TestWithUseGitHubAPI(t *testing.T) {
 	option(options)
 
 	assert.True(t, options.UseGitHubAPI)
+}
+
+func TestTokenSourceEnvironment_Token(t *testing.T) {
+	t.Run("with valid GITHUB_TOKEN env var", func(t *testing.T) {
+		t.Setenv("GITHUB_TOKEN", "test-token")
+		source := &TokenSourceEnvironment{}
+		token, err := source.Token(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "test-token", token)
+	})
+	t.Run("with empty GITHUB_TOKEN env var", func(t *testing.T) {
+		t.Setenv("GITHUB_TOKEN", "")
+		source := &TokenSourceEnvironment{}
+		token, err := source.Token(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "", token)
+	})
 }
