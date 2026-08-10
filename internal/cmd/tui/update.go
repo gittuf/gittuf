@@ -38,8 +38,9 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case policyLifecycleResultMsg:
 		if msg.err != nil {
-			m.errorMsg = msg.err.Error()
+			m.openErrorDialog(msg.action+" Failed", msg.err.Error())
 		} else {
+			m.closeErrorDialog()
 			m.footer = msg.msg
 		}
 		return m, nil
@@ -57,10 +58,21 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		if m.errorDialog != nil {
+			switch msg.String() {
+			case "q":
+				return m, tea.Quit
+			case "enter", "esc":
+				m.closeErrorDialog()
+			}
+			return m, nil
+		}
+
 		// Global handlers (quit, back navigation)
 		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
 		case "q":
 			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
 			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
