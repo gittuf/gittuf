@@ -313,13 +313,18 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 
 	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(contentBody)
 
+	errMsg := ""
+	if m.errorMsg != "" {
+		errMsg = "\n" + renderErrorMsg(m.errorMsg)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left,
 		renderStatusBar(title, m.readOnly, m.width),
 		renderWithMargin(
 			content+"\n"+
 				overlays+
 				renderFooterBox(m)+
-				renderErrorMsg(m.errorMsg),
+				errMsg,
 		),
 	)
 }
@@ -359,6 +364,21 @@ func (m model) renderListOrEmpty(l list.Model, length int, emptyTitleText string
 func (m model) View() string {
 	if m.width == 0 || m.height == 0 {
 		return m.spinner.View() + " Loading TUI...\n"
+	}
+
+	if m.verifying {
+		content := lipgloss.JoinVertical(lipgloss.Left,
+			m.spinner.View()+" "+m.loadingMsg,
+			"",
+			lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				Width(m.logViewport.Width).
+				Height(m.logViewport.Height).
+				Render(m.logViewport.View()),
+		)
+		return renderWithMargin(
+			titleStyle.Render("gittuf TUI") + "\n\n" + content,
+		)
 	}
 
 	var view string
@@ -406,6 +426,15 @@ func (m model) View() string {
 
 	case screenHelp:
 		view = m.helpScreen.View(&m)
+
+	case screenVerify:
+		return m.verifyScreen.View(&m)
+
+	case screenVerifyRefForm:
+		return m.verifyRefScreen.View(&m)
+
+	case screenVerifyMergeableForm:
+		return m.verifyMergeableScreen.View(&m)
 
 	default:
 		view = "Unknown screen"
