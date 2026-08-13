@@ -650,3 +650,30 @@ func TestAllowRule(t *testing.T) {
 	assert.Empty(t, allowRule.PrincipalIDs)
 	assert.Equal(t, 1, allowRule.Threshold)
 }
+
+func TestAddAndUpdatePrincipalValidatesPerson(t *testing.T) {
+	targetsMetadata := initialTestTargetsMetadata(t)
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	invalidPerson := &Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*Key{key.KeyID: key},
+		Custom:     map[string]string{"invalid key": "value"},
+	}
+
+	err := targetsMetadata.AddPrincipal(invalidPerson)
+	assert.ErrorIs(t, err, tuf.ErrInvalidCustomMetadataKey)
+	assert.NotContains(t, targetsMetadata.Delegations.Principals, invalidPerson.PersonID)
+
+	validPerson := &Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*Key{key.KeyID: key},
+		Custom:     map[string]string{"department": "engineering"},
+	}
+	if err := targetsMetadata.AddPrincipal(validPerson); err != nil {
+		t.Fatal(err)
+	}
+
+	err = targetsMetadata.UpdatePrincipal(invalidPerson)
+	assert.ErrorIs(t, err, tuf.ErrInvalidCustomMetadataKey)
+}

@@ -2069,3 +2069,55 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		assert.ErrorIs(t, err, injected)
 	})
 }
+
+func TestCommitWithoutNumberIgnoresNumber(t *testing.T) {
+	t.Run("reference entry", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+		entry := &ReferenceEntry{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash, Number: 42}
+		require.Nil(t, entry.CommitWithoutNumber(repo))
+
+		got, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+		assert.Equal(t, uint64(0), got.GetNumber())
+	})
+
+	t.Run("annotation entry", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		require.Nil(t, NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).CommitWithoutNumber(repo))
+
+		refEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		annotation := &AnnotationEntry{RSLEntryIDs: []githash.Hash{refEntry.GetID()}, Skip: false, Message: annotationMessage, Number: 42}
+		require.Nil(t, annotation.CommitWithoutNumber(repo))
+
+		got, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+		assert.Equal(t, uint64(0), got.GetNumber())
+	})
+}
+
+func TestCommitRejectsLineBreakInField(t *testing.T) {
+	repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+	t.Run("reference entry Commit", func(t *testing.T) {
+		err := NewReferenceEntry("refs/heads/main\ntargetID: injected", gitinterface.ZeroHash).Commit(repo, false)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+
+	t.Run("reference entry CommitWithoutNumber", func(t *testing.T) {
+		err := NewReferenceEntry("refs/heads/main\ntargetID: injected", gitinterface.ZeroHash).CommitWithoutNumber(repo)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+
+	t.Run("reference entry CommitUsingSpecificKey", func(t *testing.T) {
+		err := NewReferenceEntry("refs/heads/main\ntargetID: injected", gitinterface.ZeroHash).CommitUsingSpecificKey(repo, artifacts.SSHED25519Private)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+
+	t.Run("propagation entry Commit", func(t *testing.T) {
+		err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repo\ninjected", gitinterface.ZeroHash).Commit(repo, false)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+}

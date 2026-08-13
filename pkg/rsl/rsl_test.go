@@ -451,6 +451,66 @@ func TestParseRSLEntryTextRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestReferenceEntryRefNameWithNewline(t *testing.T) {
+	t.Parallel()
+
+	targetID, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refNames := map[string]string{
+		"forged targetID":       fmt.Sprintf("refs/heads/main\n%s: %s", TargetIDKey, githash.ZeroHash.String()),
+		"forged number":         fmt.Sprintf("refs/heads/main\n%s: 999", NumberKey),
+		"bare trailing newline": "refs/heads/main\n",
+		"carriage return":       "refs/heads/main\rrefs/heads/other",
+	}
+
+	for name, refName := range refNames {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			entry := &ReferenceEntry{RefName: refName, TargetID: targetID}
+			_, err := entry.createCommitMessage(true)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+		})
+	}
+}
+
+func TestPropagationEntryFieldWithNewline(t *testing.T) {
+	t.Parallel()
+
+	targetID, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	base := PropagationEntry{
+		RefName:            "refs/heads/main",
+		TargetID:           targetID,
+		UpstreamRepository: "https://git.example.com/example/repository",
+		UpstreamEntryID:    githash.ZeroHash,
+	}
+
+	t.Run("ref name with newline", func(t *testing.T) {
+		t.Parallel()
+
+		entry := base
+		entry.RefName = fmt.Sprintf("refs/heads/main\n%s: 999", NumberKey)
+		_, err := entry.createCommitMessage(true)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+
+	t.Run("upstream repository with newline", func(t *testing.T) {
+		t.Parallel()
+
+		entry := base
+		entry.UpstreamRepository = fmt.Sprintf("https://git.example.com/repo\n%s: 999", NumberKey)
+		_, err := entry.createCommitMessage(true)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+}
+
 func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 	t.Parallel()
 
