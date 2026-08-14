@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
@@ -35,6 +36,9 @@ const (
 	screenTrustGlobalRules                   // Global rule management screen
 	screenTrustAddGlobalRule                 // Form: add a new global rule
 	screenTrustEditGlobalRule                // Form: edit selected global rule (prefilled)
+	screenVerify                             // Menu for Verify operations
+	screenVerifyRefForm                      // Form: verify reference
+	screenVerifyMergeableForm                // Form: verify mergeability
 	screenHelp                               // Generic Help screen displaying keybindings
 )
 
@@ -61,6 +65,7 @@ type model struct {
 	ctx                        context.Context
 	screen                     screen
 	spinner                    spinner.Model
+	logViewport                viewport.Model
 	homeScreen                 homeScreen
 	helpScreen                 helpScreen
 	policyScreen               policyScreen
@@ -70,6 +75,9 @@ type model struct {
 	trustGlobalRulesScreen     trustGlobalRulesScreen
 	policyPrincipalsScreen     policyPrincipalsScreen
 	policyPrincipalsFormScreen policyPrincipalsFormScreen
+	verifyScreen               verifyScreen
+	verifyRefScreen            verifyRefScreen
+	verifyMergeableScreen      verifyMergeableScreen
 	cursorMode                 cursor.Mode
 	repo                       *gittuf.Repository
 	signer                     dsse.SignerVerifier
@@ -83,6 +91,10 @@ type model struct {
 	height                     int
 	showHelp                   bool
 	signerError                string
+	verifying                  bool
+	loadingMsg                 string
+	logsBuf                    *strings.Builder
+	logCh                      chan string
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -95,6 +107,17 @@ type initDoneMsg struct {
 	footer      string
 	signerError string
 	err         error
+}
+
+// verifyResultMsg carries the result of an async verification command.
+type verifyResultMsg struct {
+	err        error
+	successMsg string
+}
+
+// logBatchMsg carries a batch of log lines for the verification viewport.
+type logBatchMsg struct {
+	lines []string
 }
 
 // inputField describes a single text input's placeholder and prompt label.
@@ -172,17 +195,20 @@ func initialModel(ctx context.Context, o *options) model {
 	delegateMultiline := newDelegate(4)
 
 	m := model{
-		ctx:        ctx,
-		screen:     screenLoading,
-		spinner:    s,
-		cursorMode: cursor.CursorBlink,
-		policyName: o.policyName,
-		options:    o,
+		ctx:         ctx,
+		screen:      screenLoading,
+		spinner:     s,
+		cursorMode:  cursor.CursorBlink,
+		policyName:  o.policyName,
+		options:     o,
+		logViewport: viewport.New(80, 20),
+		logsBuf:     &strings.Builder{},
 
 		homeScreen: homeScreen{
 			choiceList: newMenuList("gittuf TUI", []list.Item{
 				item{title: "Policy", desc: "View and manage gittuf Policy"},
 				item{title: "Trust", desc: "View and manage gittuf Root of Trust"},
+				item{title: "Verify", desc: "Verify references and mergeability"},
 			}, delegate),
 		},
 		policyScreen: policyScreen{
@@ -217,6 +243,13 @@ func initialModel(ctx context.Context, o *options) model {
 		},
 		policyPrincipalsScreen: policyPrincipalsScreen{
 			list: newMenuList("Policy Principals", []list.Item{}, delegateMultiline),
+		},
+		verifyScreen: verifyScreen{
+			choiceList: newMenuList("gittuf Verify Operations", []list.Item{
+				item{title: "Verify Reference", desc: "Verify a specific reference"},
+				item{title: "Verify Mergeability", desc: "Check if a feature branch can be merged"},
+				item{title: "Verify Network", desc: "Verify state of network repositories"},
+			}, delegate),
 		},
 	}
 
@@ -267,6 +300,7 @@ func (m *model) resizeLists() {
 	m.policyRulesScreen.ruleList.SetSize(innerWidth, innerHeight)
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
 	m.policyPrincipalsScreen.list.SetSize(innerWidth, innerHeight)
+	m.verifyScreen.choiceList.SetSize(innerWidth, innerHeight)
 }
 
 // loadRepoCmd performs all heavy TUI initialization asynchronously and sends
