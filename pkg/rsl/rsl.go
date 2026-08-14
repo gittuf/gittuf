@@ -147,10 +147,12 @@ func (e *ReferenceEntry) Commit(storer gitstore.Storer, sign bool) error {
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, sign)
-	return err
+	return commitEntry(storer, message, sign)
 }
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
@@ -165,10 +167,12 @@ func (e *ReferenceEntry) CommitUsingSpecificKey(storer gitstore.Storer, signingK
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
-	return err
+	return commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
 }
 
 func (e *ReferenceEntry) GetNumber() uint64 {
@@ -203,7 +207,17 @@ func (e *ReferenceEntry) setEntryNumber(storer gitstore.Storer) error {
 	return nil
 }
 
+func checkSingleLineField(value string) error {
+	if strings.ContainsAny(value, "\n\r") {
+		return fmt.Errorf("%w: field value contains a line break", ErrInvalidRSLEntry)
+	}
+	return nil
+}
+
 func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error) {
+	if err := checkSingleLineField(e.RefName); err != nil {
+		return "", err
+	}
 	lines := []string{
 		ReferenceEntryHeader,
 		"",
@@ -220,10 +234,12 @@ func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error)
 // producing a legacy unnumbered entry. It exists to exercise the RSL's support
 // for repositories that transition from unnumbered to numbered entries.
 func (e *ReferenceEntry) CommitWithoutNumber(storer gitstore.Storer) error {
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(false)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, false)
-	return err
+	return commitEntry(storer, message, false)
 }
 
 // AnnotationEntry is a type of RSL record that references prior items in the
@@ -389,7 +405,7 @@ func (a *AnnotationEntry) CommitWithoutNumber(storer gitstore.Storer) error {
 		}
 	}
 
-	message, err := a.createCommitMessage(true)
+	message, err := a.createCommitMessage(false)
 	if err != nil {
 		return err
 	}
@@ -455,10 +471,12 @@ func (e *PropagationEntry) Commit(storer gitstore.Storer, sign bool) error {
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntry(storer, message, sign)
-	return err
+	return commitEntry(storer, message, sign)
 }
 
 // CommitUsingSpecificKey creates a commit object in the RSL for the
@@ -473,10 +491,12 @@ func (e *PropagationEntry) CommitUsingSpecificKey(storer gitstore.Storer, signin
 		return err
 	}
 
-	message, _ := e.createCommitMessage(true) // we have an error return for annotations, always nil here
+	message, err := e.createCommitMessage(true)
+	if err != nil {
+		return err
+	}
 
-	err := commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
-	return err
+	return commitEntryUsingSpecificKey(storer, message, signingKeyBytes)
 }
 
 func (e PropagationEntry) GetNumber() uint64 {
@@ -500,6 +520,12 @@ func (e *PropagationEntry) setEntryNumber(storer gitstore.Storer) error {
 }
 
 func (e *PropagationEntry) createCommitMessage(includeNumber bool) (string, error) {
+	if err := checkSingleLineField(e.RefName); err != nil {
+		return "", err
+	}
+	if err := checkSingleLineField(e.UpstreamRepository); err != nil {
+		return "", err
+	}
 	lines := []string{
 		PropagationEntryHeader,
 		"",

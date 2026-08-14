@@ -55,6 +55,7 @@ var (
 	ErrDuplicateNetworkRepository                      = errors.New("network repository already exists")
 	ErrInvalidPrincipalID                              = errors.New("principal ID is invalid")
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
+	ErrInvalidCustomMetadataKey                        = errors.New("custom metadata key contains invalid characters")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
 	ErrPrincipalStillInUse                             = errors.New("principal is still in use")
 	ErrRuleNotFound                                    = errors.New("cannot find rule entry")

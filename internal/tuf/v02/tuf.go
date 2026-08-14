@@ -9,11 +9,17 @@ package v02
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/tuf"
 	v01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
+
+// customMetadataKeyRegexp restricts custom metadata keys to a conservative
+// character set. It excludes spaces and parentheses.
+var customMetadataKeyRegexp = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 
 const (
 	associatedIdentityKey = "(associated identity)"
@@ -69,6 +75,17 @@ func (p *Person) CustomMetadata() map[string]string {
 	}
 
 	return metadata
+}
+
+// Validate checks that the person is well-formed.
+func (p *Person) Validate() error {
+	for key := range p.Custom {
+		if !customMetadataKeyRegexp.MatchString(key) {
+			return fmt.Errorf("%w: %q", tuf.ErrInvalidCustomMetadataKey, key)
+		}
+	}
+
+	return nil
 }
 
 // Role records common characteristics recorded in a role entry in Root metadata
