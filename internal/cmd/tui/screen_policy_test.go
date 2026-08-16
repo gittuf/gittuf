@@ -9,9 +9,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 )
+
+func selectItemByTitle(t *testing.T, l *list.Model, title string) {
+	t.Helper()
+	for i, it := range l.Items() {
+		if item, ok := it.(item); ok && item.title == title {
+			l.Select(i)
+			return
+		}
+	}
+	t.Fatalf("menu item %q not found", title)
+}
 
 func TestPolicyUINavigationMenu(t *testing.T) {
 	o := &options{
@@ -28,27 +40,31 @@ func TestPolicyUINavigationMenu(t *testing.T) {
 		t.Errorf("expected view to contain header Home › Policy, got %q", viewStr)
 	}
 
-	// Test selecting "View Rules" (first item, index 0)
+	// Test selecting "View Rules"
+	m.screen = screenPolicy
+	selectItemByTitle(t, &m.policyScreen.policyScreenList, "View Rules")
 	updatedModel, _ := m.policyScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 	resModel := updatedModel.(model)
 	if resModel.screen != screenPolicyRules {
-		t.Errorf("expected screenPolicyRules, got %v", resModel.screen)
+		t.Errorf("expected screenPolicyRules (%v), got %v", screenPolicyRules, resModel.screen)
 	}
 
-	// Test selecting "Manage Principals" (second item, index 1)
-	m.policyScreen.policyScreenList.Select(1)
+	// Test selecting "Manage Principals"
+	m.screen = screenPolicy
+	selectItemByTitle(t, &m.policyScreen.policyScreenList, "Manage Principals")
 	updatedModel, _ = m.policyScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 	resModel = updatedModel.(model)
 	if resModel.screen != screenPolicyPrincipals {
-		t.Errorf("expected screenPolicyPrincipals, got %v", resModel.screen)
+		t.Errorf("expected screenPolicyPrincipals (%v), got %v", screenPolicyPrincipals, resModel.screen)
 	}
 
-	// Test selecting "Manage Lifecycle" (third item, index 2)
-	m.policyScreen.policyScreenList.Select(2)
+	// Test selecting "Manage Lifecycle"
+	m.screen = screenPolicy
+	selectItemByTitle(t, &m.policyScreen.policyScreenList, "Manage Lifecycle")
 	updatedModel, _ = m.policyScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 	resModel = updatedModel.(model)
 	if resModel.screen != screenPolicyLifecycle {
-		t.Errorf("expected screenPolicyLifecycle, got %v", resModel.screen)
+		t.Errorf("expected screenPolicyLifecycle (%v), got %v", screenPolicyLifecycle, resModel.screen)
 	}
 }
 
