@@ -9,10 +9,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 )
+
+func selectItemByTitle(t *testing.T, l *list.Model, title string) {
+	t.Helper()
+	for i, it := range l.Items() {
+		if item, ok := it.(item); ok && item.title == title {
+			l.Select(i)
+			return
+		}
+	}
+	t.Fatalf("menu item %q not found", title)
+}
 
 func TestTrustScreenMenuSelectionAndRendering(t *testing.T) {
 	o := &options{
@@ -31,11 +43,12 @@ func TestTrustScreenMenuSelectionAndRendering(t *testing.T) {
 		t.Errorf("expected view to contain header Home › Trust, got %q", viewStr)
 	}
 
-	// Test pressing Enter to select View Global Rules
+	// Test selecting "View Global Rules"
+	selectItemByTitle(t, &s.trustScreenList, "View Global Rules")
 	updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 	resModel := updatedModel.(model)
 	if resModel.screen != screenTrustGlobalRules {
-		t.Errorf("expected screenTrustGlobalRules, got %v", resModel.screen)
+		t.Errorf("expected screenTrustGlobalRules (%v), got %v", screenTrustGlobalRules, resModel.screen)
 	}
 }
 
@@ -54,9 +67,21 @@ func TestTrustScreenInteractiveNavigation(t *testing.T) {
 		return strings.Contains(string(out), "Policy")
 	}, teatest.WithCheckInterval(time.Millisecond*50), teatest.WithDuration(time.Second*10))
 
-	// Move down to Trust option and press Enter
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-	time.Sleep(time.Millisecond * 50)
+	// Dynamically calculate number of Down presses to reach "Trust"
+	var trustIndex int
+	for i, it := range m.homeScreen.choiceList.Items() {
+		if it.(item).title == "Trust" {
+			trustIndex = i
+			break
+		}
+	}
+
+	for i := 0; i < trustIndex; i++ {
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		time.Sleep(time.Millisecond * 50)
+	}
+
+	// Press Enter to enter Trust screen
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
 	// Wait for Trust screen
