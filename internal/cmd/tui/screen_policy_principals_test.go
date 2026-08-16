@@ -277,3 +277,55 @@ func TestPolicyPrincipalsScreenViewRendering(t *testing.T) {
 		t.Errorf("expected form header in view, got %q", viewStr)
 	}
 }
+
+func TestPolicyPrincipalsScreenReadOnlyAddGuard(t *testing.T) {
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	s := &m.policyPrincipalsScreen
+	m.screen = screenPolicyPrincipals
+
+	// Pressing 'a' in read-only mode should not open addChoice popup
+	s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}, &m)
+	if s.addChoice {
+		t.Error("expected addChoice to remain false in read-only mode")
+	}
+}
+
+func TestPolicyPrincipalsScreenEditStandaloneKey(t *testing.T) {
+	o := &options{
+		readOnly:  false,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	s := &m.policyPrincipalsScreen
+	m.screen = screenPolicyPrincipals
+
+	key := &tufv02.Key{KeyID: "key-1"}
+	s.principals = []tuf.Principal{key}
+	s.updatePrincipalsList()
+
+	// Pressing 'e' on a standalone key should show error and stay on screenPolicyPrincipals
+	s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")}, &m)
+	if m.screen != screenPolicyPrincipals {
+		t.Errorf("expected screen to remain screenPolicyPrincipals, got %v", m.screen)
+	}
+	if !strings.Contains(m.errorMsg, "Standalone keys cannot be edited") {
+		t.Errorf("expected error message for standalone key edit, got %q", m.errorMsg)
+	}
+
+	// Pressing 'a' should clear the stale errorMsg and open addChoice popup
+	s.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}, &m)
+	if !s.addChoice {
+		t.Error("expected addChoice to be true after pressing 'a'")
+	}
+	if m.errorMsg != "" {
+		t.Errorf("expected errorMsg to be cleared after pressing 'a', got %q", m.errorMsg)
+	}
+}

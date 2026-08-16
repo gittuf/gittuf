@@ -201,6 +201,7 @@ func initialModel(ctx context.Context, o *options) model {
 		cursorMode:  cursor.CursorBlink,
 		policyName:  o.policyName,
 		options:     o,
+		readOnly:    o.readOnly,
 		logViewport: viewport.New(80, 20),
 		logsBuf:     &strings.Builder{},
 
