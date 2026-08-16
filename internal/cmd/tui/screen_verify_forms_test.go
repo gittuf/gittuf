@@ -54,6 +54,28 @@ func TestVerifyMergeableScreenValidation(t *testing.T) {
 			t.Errorf("expected errorMsg %q, got %q", "Both Feature Branch and Base Branch are required", resModel.errorMsg)
 		}
 	})
+
+	t.Run("Partial Submission", func(t *testing.T) {
+		o := &options{
+			readOnly:  true,
+			targetRef: "policy",
+		}
+
+		m := initialModel(context.Background(), o)
+		m.screen = screenVerifyMergeableForm
+		m.verifyMergeableScreen.reset()
+
+		// Fill only feature branch field
+		m.verifyMergeableScreen.form.inputs[0].SetValue("feature-branch")
+
+		// Submit partial form (press Enter)
+		updatedModel, _ := m.verifyMergeableScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		if resModel.errorMsg != "Both Feature Branch and Base Branch are required" {
+			t.Errorf("expected errorMsg %q, got %q", "Both Feature Branch and Base Branch are required", resModel.errorMsg)
+		}
+	})
 }
 
 func TestVerifyRefScreenViewAndKeyHandling(t *testing.T) {
