@@ -130,6 +130,10 @@ func (s *policyLifecycleScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cm
 				s.cycleFocus(keyMsg.String())
 				m.footer = ""
 				return *m, nil
+			case "esc":
+				m.footer = ""
+				m.screen = screenPolicyLifecycle
+				return *m, nil
 			}
 		}
 		s.inputs[s.focusIndex], cmd = s.inputs[s.focusIndex].Update(msg)

@@ -5,6 +5,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -114,9 +115,12 @@ func TestPolicyLifecycleScreenFormSubmissions(t *testing.T) {
 			m.screen = screenPolicyLifecycleForm
 
 			s.initInputs(act, &m)
-			s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+			_, cmd := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 			if m.screen != screenPolicyLifecycle {
 				t.Errorf("expected screen to return to screenPolicyLifecycle, got %v", m.screen)
+			}
+			if cmd == nil {
+				t.Error("expected non-nil cmd returned for lifecycle command submission")
 			}
 		})
 	}
@@ -131,12 +135,20 @@ func TestPolicyLifecycleScreenNavigationKeys(t *testing.T) {
 
 	m := initialModel(context.Background(), o)
 	s := &m.policyLifecycleScreen
-	m.screen = screenPolicyLifecycle
 
-	// Esc returns to screenPolicy
+	// Esc from screenPolicyLifecycle returns to screenPolicy
+	m.screen = screenPolicyLifecycle
 	s.Update(tea.KeyMsg{Type: tea.KeyEsc}, &m)
 	if m.screen != screenPolicy {
 		t.Errorf("expected screenPolicy on Esc, got %v", m.screen)
+	}
+
+	// Esc from screenPolicyLifecycleForm returns to screenPolicyLifecycle
+	m.screen = screenPolicyLifecycleForm
+	s.initInputs("Initialize Policy", &m)
+	s.Update(tea.KeyMsg{Type: tea.KeyEsc}, &m)
+	if m.screen != screenPolicyLifecycle {
+		t.Errorf("expected screenPolicyLifecycle on form Esc, got %v", m.screen)
 	}
 }
 
@@ -170,6 +182,11 @@ func TestBackendExecInterface(t *testing.T) {
 	be := backendExec{run: func() error { return nil }}
 	if err := be.Run(); err != nil {
 		t.Errorf("expected nil error from backendExec.Run(), got %v", err)
+	}
+
+	beErr := backendExec{run: func() error { return errors.New("exec error") }}
+	if err := beErr.Run(); err == nil || err.Error() != "exec error" {
+		t.Errorf("expected 'exec error' from backendExec.Run(), got %v", err)
 	}
 
 	// Cover setters
