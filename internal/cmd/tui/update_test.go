@@ -177,22 +177,23 @@ func TestUpdateEscNavigationAcrossScreens(t *testing.T) {
 	m := initialModel(context.Background(), o)
 
 	escScreens := []struct {
+		name     string
 		start    screen
 		expected screen
 	}{
-		{screenPolicy, screenChoice},
-		{screenTrust, screenChoice},
-		{screenVerify, screenChoice},
-		{screenPolicyLifecycle, screenPolicy},
-		{screenPolicyLifecycleForm, screenPolicyLifecycle},
-		{screenPolicyAddRule, screenPolicyRules},
-		{screenPolicyEditRule, screenPolicyRules},
-		{screenVerifyRefForm, screenVerify},
-		{screenVerifyMergeableForm, screenVerify},
+		{"screenPolicy to screenChoice", screenPolicy, screenChoice},
+		{"screenTrust to screenChoice", screenTrust, screenChoice},
+		{"screenVerify to screenChoice", screenVerify, screenChoice},
+		{"screenPolicyLifecycle to screenPolicy", screenPolicyLifecycle, screenPolicy},
+		{"screenPolicyLifecycleForm to screenPolicyLifecycle", screenPolicyLifecycleForm, screenPolicyLifecycle},
+		{"screenPolicyAddRule to screenPolicyRules", screenPolicyAddRule, screenPolicyRules},
+		{"screenPolicyEditRule to screenPolicyRules", screenPolicyEditRule, screenPolicyRules},
+		{"screenVerifyRefForm to screenVerify", screenVerifyRefForm, screenVerify},
+		{"screenVerifyMergeableForm to screenVerify", screenVerifyMergeableForm, screenVerify},
 	}
 
 	for _, tc := range escScreens {
-		t.Run(fmt.Sprintf("%v_to_%v", tc.start, tc.expected), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			m.screen = tc.start
 			updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 			resModel := updatedModel.(model)
