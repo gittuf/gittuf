@@ -28,13 +28,18 @@ func TestVerifyUINavigation(t *testing.T) {
 		return strings.Contains(string(out), "Policy")
 	}, teatest.WithCheckInterval(time.Millisecond*50), teatest.WithDuration(time.Second*10))
 
-	// Send Down arrow to move to Trust
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-	time.Sleep(time.Millisecond * 50)
+	var verifyIndex int
+	for i, it := range m.homeScreen.choiceList.Items() {
+		if it.(item).title == "Verify" {
+			verifyIndex = i
+			break
+		}
+	}
 
-	// Send Down arrow to move to Verify
-	tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-	time.Sleep(time.Millisecond * 50)
+	for i := 0; i < verifyIndex; i++ {
+		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
+		time.Sleep(time.Millisecond * 50)
+	}
 
 	// Enter Verify screen
 	tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
