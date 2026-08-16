@@ -135,7 +135,6 @@ func TestPolicyRulesScreenKeyHandling(t *testing.T) {
 }
 
 func TestPolicyRulesScreenReorder(t *testing.T) {
-	t.Helper()
 	o := &options{
 		readOnly:  false,
 		targetRef: "policy",
@@ -154,10 +153,16 @@ func TestPolicyRulesScreenReorder(t *testing.T) {
 
 	// Test handleReorderDown when at top (index 0)
 	s.handleReorderDown(&m)
+	if s.rules[0].name != "rule-b" || s.rules[1].name != "rule-a" {
+		t.Errorf("expected [rule-b, rule-a] after reorder down, got [%s, %s]", s.rules[0].name, s.rules[1].name)
+	}
 
 	// Test handleReorderUp when at index 1
 	s.ruleList.Select(1)
 	s.handleReorderUp(&m)
+	if s.rules[0].name != "rule-a" || s.rules[1].name != "rule-b" {
+		t.Errorf("expected [rule-a, rule-b] after reorder up, got [%s, %s]", s.rules[0].name, s.rules[1].name)
+	}
 }
 
 func TestPolicyRulesScreenFormNavigationAndSubmit(t *testing.T) {
