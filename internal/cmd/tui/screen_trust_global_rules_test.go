@@ -177,9 +177,15 @@ func TestTrustGlobalRulesScreenFormNavigationAndSubmit(t *testing.T) {
 	s.inputs[0].SetValue("my-global-rule")
 	s.inputs[1].SetValue(tuf.GlobalRuleThresholdType)
 	s.inputs[2].SetValue("refs/heads/*")
-	s.inputs[3].SetValue("1")
-
 	s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+	if m.screen != screenTrustAddGlobalRule {
+		t.Errorf("expected screen to remain screenTrustAddGlobalRule on failed submission, got %v", m.screen)
+	}
+	if m.errorDialog == nil {
+		t.Error("expected errorDialog on failed submission, got nil")
+	} else if m.errorDialog.title != "Add Global Rule Failed" {
+		t.Errorf("expected errorDialog title 'Add Global Rule Failed', got %q", m.errorDialog.title)
+	}
 }
 
 func TestTrustGlobalRulesScreenViewRendering(t *testing.T) {
