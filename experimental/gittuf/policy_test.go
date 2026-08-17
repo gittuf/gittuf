@@ -250,6 +250,7 @@ func TestDiscardPolicy(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, initialRef, stagingRef)
 	})
+
 	// Regression test for issue #1342: Discard moved PolicyStagingRef without
 	// recording an RSL entry, leaving the staging ref out of sync with its
 	// latest RSL entry and causing a subsequent Apply to fail with
