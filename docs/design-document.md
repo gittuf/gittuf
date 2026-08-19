@@ -309,6 +309,7 @@ RSL Reference Entry
 ref: <ref name>
 targetID: <target ID>
 number: <number>
+custom.<namespace>/<name>: <value>
 ```
 
 The `targetID` is typically the ID of a commit for references that are branches.
@@ -333,9 +334,30 @@ entryID: <RSL entry ID 2>
 ...
 skip: <true/false>
 number: <number>
+custom.<namespace>/<name>: <value>
 -----BEGIN MESSAGE-----
 <message>
 ------END MESSAGE------
+```
+
+RSL entries may carry application-defined custom fields after their standard
+fields (for annotation entries, before the message block), each a
+`custom.<namespace>/<name>: <value>` line. Custom fields are advisory only:
+gittuf treats them as opaque metadata whose presence, absence, or contents
+never change a verification outcome. Applications must not make security
+decisions based on them and should treat values as untrusted input unless
+they generated the data themselves. Because the fields are part of the
+entry's commit message, they are covered by the entry's signature and are as
+tamper-evident as the entry itself. The key grammar, value alphabet, length
+and count limits, along with how writers and readers handle malformed fields,
+are specified in [GAP-7](/docs/gaps/7/README.md).
+
+For example, a forge might record who pushed a change and the server version
+that processed it:
+
+```
+custom.gitforge.com/pusher: <id> (<handle>)
+custom.gitforge.com/server-version: v4.2.0-c0ffee
 ```
 
 ##### Example Entries
@@ -348,6 +370,9 @@ entry a5ea2c6ee7e8b577f6be6fcee5b06e6cac7166fa (skipped)
   Ref:    refs/heads/main
   Target: 6cb8e5c546eab3d0e1d245014de8003febb8e9b3
   Number: 5
+  Custom Fields:
+    custom.gitforge.com/pusher: 01ARZ3NDEKTSV4RRFFQ69G5FAV (jane)
+    custom.gitforge.com/server-version: v4.2.0-c0ffee
 
     Annotation ID: cccfb6f27b2a71c33e9a55bc82f084e2445aa398
     Skip:          yes
@@ -404,6 +429,8 @@ RSL Reference Entry
 ref: refs/heads/main
 targetID: 6cb8e5c546eab3d0e1d245014de8003febb8e9b3
 number: 5
+custom.gitforge.com/pusher: 01ARZ3NDEKTSV4RRFFQ69G5FAV (jane)
+custom.gitforge.com/server-version: v4.2.0-c0ffee
 ```
 
 Similarly, the commit object for the annotation entry is as follows:
