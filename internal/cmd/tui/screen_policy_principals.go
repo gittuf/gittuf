@@ -191,6 +191,7 @@ func (s *policyPrincipalsScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 			switch msg.String() {
 			case "a":
 				s.addChoice = true
+				m.errorMsg = ""
 				return *m, nil
 			case "e":
 				if sel, ok := s.list.SelectedItem().(item); ok {
