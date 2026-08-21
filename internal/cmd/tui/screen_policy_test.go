@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
+	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 )
 
 func selectItemByTitle(t *testing.T, l *list.Model, title string) {
@@ -72,9 +73,11 @@ func TestPolicyUINavigationInteractive(t *testing.T) {
 	o := &options{
 		readOnly:  true,
 		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
 	}
 
 	m := initialModel(context.Background(), o)
+	m.screen = screenChoice
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
 
 	// Wait for home screen Policy option
