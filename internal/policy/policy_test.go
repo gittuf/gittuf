@@ -898,7 +898,8 @@ func TestStateGetRootMetadata(t *testing.T) {
 				Payload: "invalid-base64",
 			},
 		}
-		_, err:= invalidState.GetRootMetadata(false)
+		
+		_, err := invalidState.GetRootMetadata(false)
 		assert.Error(t, err)
 	})
 
@@ -909,6 +910,7 @@ func TestStateGetRootMetadata(t *testing.T) {
 				Payload: invalidJSON,
 			},
 		}
+		
 		_, err := invalidState.GetRootMetadata(false)
 		assert.Error(t,err)
 		assert.Contains(t, err.Error(), "unable to unmarshal root metadata")
