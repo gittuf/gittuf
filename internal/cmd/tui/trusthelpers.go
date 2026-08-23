@@ -547,14 +547,14 @@ func (s *trustHookScreen) handleHookFormSubmit(m *model) (tea.Model, tea.Cmd) {
 	case trustAddHookAction:
 		err = repoAddHook(m.ctx, m.options, hookName, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error adding hook: %v", err)
+			m.openErrorDialog("Add Hook Failed", err.Error())
 			return *m, nil
 		}
 		m.footer = "Hook added!"
 	case trustUpdateHookAction:
 		err = repoUpdateHook(m.ctx, m.options, hookName, s.isPreCommit, s.isPrePush, timeout, environment, principalIDs)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error adding hook: %v", err)
+			m.openErrorDialog("Update Hook Failed", err.Error())
 			return *m, nil
 		}
 		m.footer = "Hook updated!"
@@ -586,7 +586,7 @@ func (s *trustHookScreen) handleRemoveHookSubmit(m *model) (tea.Model, tea.Cmd) 
 
 	err := repoRemoveHook(m.ctx, m.options, value, s.isPreCommit, s.isPrePush)
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error removing hook: %v", err)
+		m.openErrorDialog("Remove Hook Failed", err.Error())
 		return *m, nil
 	}
 

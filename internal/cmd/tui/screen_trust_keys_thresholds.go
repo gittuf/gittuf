@@ -171,7 +171,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 
 		err = repoAddRootKey(m.ctx, m.options, value)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error adding root key: %v", err)
+			m.openErrorDialog("Add Root Key Failed", err.Error())
 			return *m, nil
 		}
 
@@ -191,7 +191,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 
 		err = repoRemoveRootKey(m.ctx, m.options, value)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error removing root key: %v", err)
+			m.openErrorDialog("Remove Root Key Failed", err.Error())
 			return *m, nil
 		}
 
@@ -211,7 +211,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 
 		err = repoAddPolicyKey(m.ctx, m.options, value)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error adding policy key: %v", err)
+			m.openErrorDialog("Add Policy Key Failed", err.Error())
 			return *m, nil
 		}
 
@@ -231,7 +231,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 
 		err = repoRemovePolicyKey(m.ctx, m.options, value)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error removing policy key: %v", err)
+			m.openErrorDialog("Remove Policy Key Failed", err.Error())
 			return *m, nil
 		}
 
@@ -255,7 +255,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		}
 		err = repoUpdateRootThreshold(m.ctx, m.options, threshold)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error updating root threshold: %v", err)
+			m.openErrorDialog("Update Root Threshold Failed", err.Error())
 			return *m, nil
 		}
 
@@ -280,7 +280,7 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 		}
 		err = repoUpdatePolicyThreshold(m.ctx, m.options, threshold)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error updating policy threshold: %v", err)
+			m.openErrorDialog("Update Policy Threshold Failed", err.Error())
 			return *m, nil
 		}
 

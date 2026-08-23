@@ -4,7 +4,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -175,7 +174,7 @@ func runSelectedPropagationAction(s *trustPropagationScreen, m *model) {
 	case trustListDirectivesAction:
 		directives, err := repoListPropagationDirectives(m.ctx, m.options)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error listing directives: %v", err)
+			m.openErrorDialog("List Directives Failed", err.Error())
 			return
 		}
 
@@ -242,7 +241,11 @@ func (s *trustPropagationScreen) handlePropagationFormSubmit(m *model) (tea.Mode
 			m.footer = "Propagation directive updated!"
 		}
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error saving directive: %v", err)
+			title := "Update Directive Failed"
+			if s.selectedAction == trustAddDirectiveAction {
+				title = "Add Directive Failed"
+			}
+			m.openErrorDialog(title, err.Error())
 			return *m, nil
 		}
 	case trustRemoveDirectiveAction:
@@ -252,7 +255,7 @@ func (s *trustPropagationScreen) handlePropagationFormSubmit(m *model) (tea.Mode
 			return *m, nil
 		}
 		if err := repoRemovePropagationDirective(m.ctx, m.options, name); err != nil {
-			m.errorMsg = fmt.Sprintf("Error removing directive: %v", err)
+			m.openErrorDialog("Remove Directive Failed", err.Error())
 			return *m, nil
 		}
 		m.footer = "Propagation directive removed!"
