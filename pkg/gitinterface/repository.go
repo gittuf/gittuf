@@ -84,7 +84,10 @@ func (r *Repository) ensureNoCompatObjectFormat() error {
 			if !filepath.IsAbs(commonDirPath) {
 				commonDirPath = filepath.Join(r.gitDirPath, commonDirPath)
 			}
-			configPath = filepath.Join(commonDirPath, "config")
+			commonConfigPath := filepath.Join(commonDirPath, "config")
+			if fileInfo, err := os.Stat(commonConfigPath); err == nil && fileInfo.Mode().IsRegular() {
+				configPath = commonConfigPath
+			}
 		}
 	}
 
@@ -199,13 +202,12 @@ func (r *Repository) GetGitDir() string {
 
 // IsBare returns true if the repository is a bare repository, i.e. it has no
 // worktree. Bareness is determined by Git itself; if Git cannot be consulted,
-// we fall back to inspecting the GIT_DIR name.
+// we fall back to checking for the sentinel files Git writes on bare
+// repositories.
 func (r *Repository) IsBare() bool {
 	stdOut, err := r.executor("rev-parse", "--is-bare-repository").executeString()
 	if err != nil {
-		// TODO: this may not work when the repo is cloned with GIT_DIR set
-		// elsewhere. We don't support this at the moment, so it's probably okay?
-		return !strings.HasSuffix(r.gitDirPath, ".git")
+		return isBareGitDir(r.gitDirPath)
 	}
 	return stdOut == "true"
 }
@@ -215,15 +217,13 @@ func (r *Repository) IsBare() bool {
 // ErrNoWorktree if the repository is bare or if the worktree cannot be
 // determined.
 //
-// Resolution relies on Git's own records so that repositories with a detached
-// GIT_DIR (--separate-git-dir) and linked worktrees (`git worktree add`) are
-// handled correctly:
+// Resolves:
 //  1. linked worktrees record the location of their `.git` file in
-//     `$GIT_DIR/gitdir`
-//  2. `core.worktree` may be set explicitly in some configurations
-//  3. the worktree may have been discovered while loading the repository,
-//     which is the only reliable source for repositories with a detached
-//     GIT_DIR that do not set core.worktree
+//     `$GIT_DIR/gitdir`; the link is verified in both directions
+//  2. the worktree discovered while loading the repository, which is the only
+//     reliable source for repositories with a detached GIT_DIR
+//  3. `core.worktree` from the repository-local configuration, set explicitly
+//     for repositories like submodules
 //  4. otherwise, a `$GIT_DIR` named `.git` implies its parent directory is
 //     the worktree
 //
@@ -241,17 +241,23 @@ func (r *Repository) GetWorktree() (string, error) {
 				worktree = filepath.Join(r.gitDirPath, worktree)
 			}
 			worktree = resolvePath(worktree)
-			// Git records the location of the worktree's `.git` entry here;
-			// if it does not exist, the record is stale or malformed.
+			// Git records the location of the worktree's `.git` entry here.
+			// Verify the link in the other direction too: the `.git` file it
+			// points at must reference this GIT_DIR, so a stale pointer that
+			// now belongs to a different repository is rejected.
 			if isUsableWorktree(r.gitDirPath, worktree) {
-				if _, err := os.Stat(filepath.Join(worktree, ".git")); err == nil {
+				if gitDirBelongsTo(worktree, r.gitDirPath) {
 					return worktree, nil
 				}
 			}
 		}
 	}
 
-	if worktree, err := r.executor("config", "--get", "core.worktree").executeString(); err == nil && worktree != "" {
+	if r.worktreePath != "" {
+		return resolvePath(r.worktreePath), nil
+	}
+
+	if worktree, err := r.executor("config", "--local", "--get", "core.worktree").executeString(); err == nil && worktree != "" {
 		if !filepath.IsAbs(worktree) {
 			// Git interprets relative core.worktree values relative to the
 			// GIT_DIR.
@@ -263,10 +269,6 @@ func (r *Repository) GetWorktree() (string, error) {
 		}
 	}
 
-	if r.worktreePath != "" {
-		return resolvePath(r.worktreePath), nil
-	}
-
 	if filepath.Base(r.gitDirPath) == ".git" {
 		return resolvePath(filepath.Dir(r.gitDirPath)), nil
 	}
@@ -274,11 +276,42 @@ func (r *Repository) GetWorktree() (string, error) {
 	return "", fmt.Errorf("%w: unable to determine worktree for '%s'", ErrNoWorktree, r.gitDirPath)
 }
 
+// gitDirBelongsTo returns true if the `.git` entry at the specified worktree
+// resolves to the supplied GIT_DIR. A conventional `.git` directory matches
+// only when its resolved path is the GIT_DIR; a `.git` file matches when its
+// `gitdir:` pointer resolves to the GIT_DIR.
+func gitDirBelongsTo(worktree, gitDirPath string) bool {
+	resolvedGitDir := resolvePath(gitDirPath)
+	gitEntryPath := filepath.Join(worktree, ".git")
+	fileInfo, err := os.Stat(gitEntryPath)
+	if err != nil {
+		return false
+	}
+	if fileInfo.IsDir() {
+		return filepath.Clean(resolvePath(gitEntryPath)) == filepath.Clean(resolvedGitDir)
+	}
+	gitFileContents, err := os.ReadFile(gitEntryPath)
+	if err != nil {
+		return false
+	}
+	link, has := strings.CutPrefix(strings.TrimSpace(string(gitFileContents)), "gitdir:")
+	if !has {
+		return false
+	}
+	link = strings.TrimSpace(link)
+	if !filepath.IsAbs(link) {
+		link = filepath.Join(worktree, link)
+	}
+	return filepath.Clean(resolvePath(link)) == filepath.Clean(resolvedGitDir)
+}
+
 // isUsableWorktree returns true if the candidate path is an existing directory
 // other than the repository's Git directory.
 func isUsableWorktree(gitDirPath, candidate string) bool {
 	fileInfo, err := os.Stat(candidate)
-	return err == nil && fileInfo.IsDir() && filepath.Clean(candidate) != filepath.Clean(gitDirPath)
+	return err == nil &&
+		fileInfo.IsDir() &&
+		filepath.Clean(resolvePath(candidate)) != filepath.Clean(resolvePath(gitDirPath))
 }
 
 // LoadRepository returns a Repository instance using the current working

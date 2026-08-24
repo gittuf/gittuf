@@ -319,10 +319,10 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 			return nil, err
 		}
 		if head == localRef {
-			if _, err := r.executor("restore", "--staged", localPath).withDir(worktree).executeString(); err != nil {
+			if _, err := r.executor("restore", "--staged", "--", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
-			if _, err := r.executor("restore", localPath).withDir(worktree).executeString(); err != nil {
+			if _, err := r.executor("restore", "--", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
 		}
