@@ -4,8 +4,6 @@
 package tui
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -158,7 +156,7 @@ func runSelectedHookAction(s *trustHookScreen, m *model) {
 	case trustListHooksAction:
 		trustHooks, err := repoListHooks(m.ctx, m.options)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error listing hooks: %v", err)
+			m.openErrorDialog("List Hooks Failed", err.Error())
 			return
 		}
 

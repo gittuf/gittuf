@@ -4,7 +4,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -227,7 +226,18 @@ func (s *trustGitHubAppScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd) {
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error updating GitHub App settings: %v", err)
+		title := "Update GitHub App Settings Failed"
+		switch s.selectedAction {
+		case trustGitHubAppActionAdd:
+			title = "Add GitHub App Failed"
+		case trustGitHubAppActionRemove:
+			title = "Remove GitHub App Failed"
+		case trustGitHubAppActionEnableApprovals:
+			title = "Enable App Approvals Failed"
+		case trustGitHubAppActionDisableApprovals:
+			title = "Disable App Approvals Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 

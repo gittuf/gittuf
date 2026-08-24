@@ -4,8 +4,6 @@
 package tui
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -80,7 +78,7 @@ func runSelectedLifecycleAction(s *trustLifecycleScreen, m *model) {
 	case trustLifecycleActionStage:
 		err = repoStageTrustChanges(m.ctx, m.options)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error staging trust changes: %v", err)
+			m.openErrorDialog("Stage Trust Changes Failed", err.Error())
 			return
 		}
 
@@ -91,7 +89,7 @@ func runSelectedLifecycleAction(s *trustLifecycleScreen, m *model) {
 	case trustLifecycleActionSign:
 		err = repoSignTrustChanges(m.ctx, m.options)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error signing trust changes: %v", err)
+			m.openErrorDialog("Sign Trust Changes Failed", err.Error())
 			return
 		}
 
@@ -102,7 +100,7 @@ func runSelectedLifecycleAction(s *trustLifecycleScreen, m *model) {
 	case trustLifecycleActionApply:
 		err = repoApplyTrustChanges(m.ctx, m.options)
 		if err != nil {
-			m.errorMsg = fmt.Sprintf("Error applying trust changes: %v", err)
+			m.openErrorDialog("Apply Trust Changes Failed", err.Error())
 			return
 		}
 

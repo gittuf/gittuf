@@ -4,7 +4,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -231,7 +230,18 @@ func (s *trustRepoNetworkScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd)
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error updating repo/network settings: %v", err)
+		title := "Update Repo/Network Settings Failed"
+		switch s.selectedAction {
+		case trustRepoNetworkActionAddControllerRepository:
+			title = "Add Controller Repository Failed"
+		case trustRepoNetworkActionAddNetworkRepository:
+			title = "Add Network Repository Failed"
+		case trustRepoNetworkActionSetRepositoryLocation:
+			title = "Set Repository Location Failed"
+		case trustRepoNetworkActionMakeController:
+			title = "Make Controller Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 
