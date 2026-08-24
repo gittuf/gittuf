@@ -44,6 +44,8 @@ func evalTestPath(t *testing.T, path string) string {
 }
 
 func TestGetWorktree(t *testing.T) {
+	t.Parallel()
+
 	t.Run("standard layout", func(t *testing.T) {
 		t.Parallel()
 
@@ -194,7 +196,7 @@ func TestGetWorktree(t *testing.T) {
 		repo := CreateTestGitRepository(t, mainRepoPath, false)
 
 		// `git worktree add` requires at least one commit
-		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o644))
+		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o600))
 		_, err := repo.executor("add", ".").executeString()
 		require.Nil(t, err)
 		_, err = repo.executor("commit", "--no-gpg-sign", "-m", "initial commit").executeString()
@@ -228,7 +230,7 @@ func TestGetWorktree(t *testing.T) {
 		linkedRepoPath := filepath.Join(tmpDir, "linked")
 		repo := CreateTestGitRepository(t, mainRepoPath, false, WithSHA256Format())
 
-		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o644))
+		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o600))
 		_, err := repo.executor("add", ".").executeString()
 		require.Nil(t, err)
 		_, err = repo.executor("commit", "--no-gpg-sign", "-m", "initial commit").executeString()
@@ -256,7 +258,7 @@ func TestGetWorktree(t *testing.T) {
 		linkedRepoPath := filepath.Join(tmpDir, "linked")
 		repo := CreateTestGitRepository(t, mainRepoPath, false)
 
-		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o644))
+		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o600))
 		_, err := repo.executor("add", ".").executeString()
 		require.Nil(t, err)
 		_, err = repo.executor("commit", "--no-gpg-sign", "-m", "initial commit").executeString()
@@ -266,7 +268,7 @@ func TestGetWorktree(t *testing.T) {
 		require.Nil(t, err)
 
 		untrackedFile := filepath.Join(linkedRepoPath, "untracked.txt")
-		require.Nil(t, os.WriteFile(untrackedFile, []byte("test"), 0o644))
+		require.Nil(t, os.WriteFile(untrackedFile, []byte("test"), 0o600))
 
 		linkedRepo, err := LoadRepository(linkedRepoPath)
 		require.Nil(t, err)
@@ -335,7 +337,7 @@ func TestGetWorktree(t *testing.T) {
 		linkedRepoPath := filepath.Join(tmpDir, "linked")
 		repo := CreateTestGitRepository(t, mainRepoPath, false)
 
-		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o644))
+		require.Nil(t, os.WriteFile(filepath.Join(mainRepoPath, "README.md"), []byte("test"), 0o600))
 		_, err := repo.executor("add", ".").executeString()
 		require.Nil(t, err)
 		_, err = repo.executor("commit", "--no-gpg-sign", "-m", "initial commit").executeString()
