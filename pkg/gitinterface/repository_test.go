@@ -71,7 +71,7 @@ func TestRepository(t *testing.T) {
 
 	t.Run("invalid path", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		if _, has, err := findGitDirPath(tmpDir); err == nil && has {
+		if _, _, has, err := findGitDirPath(tmpDir); err == nil && has {
 			tmpDir = filepath.Join(tmpDir, "invalid-repository")
 			require.Nil(t, os.Mkdir(tmpDir, 0o700))
 			require.Nil(t, os.WriteFile(filepath.Join(tmpDir, ".git"), []byte("not a gitdir file"), 0o600))
@@ -127,20 +127,22 @@ func TestFindGitDirPath(t *testing.T) {
 		nestedDir := filepath.Join(tmpDir, "nested", "dir")
 		require.Nil(t, os.MkdirAll(nestedDir, 0o700))
 
-		gitDirPath, has, err := findGitDirPath(nestedDir)
+		gitDirPath, worktreePath, has, err := findGitDirPath(nestedDir)
 		require.Nil(t, err)
 		assert.True(t, has)
 		assert.Equal(t, filepath.Join(tmpDir, ".git"), gitDirPath)
+		assert.Equal(t, tmpDir, worktreePath)
 	})
 
 	t.Run("bare git directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		_ = CreateTestGitRepository(t, tmpDir, true)
 
-		gitDirPath, has, err := findGitDirPath(tmpDir)
+		gitDirPath, worktreePath, has, err := findGitDirPath(tmpDir)
 		require.Nil(t, err)
 		assert.True(t, has)
 		assert.Equal(t, tmpDir, gitDirPath)
+		assert.Empty(t, worktreePath)
 	})
 
 	t.Run("gitdir file", func(t *testing.T) {
@@ -151,31 +153,32 @@ func TestFindGitDirPath(t *testing.T) {
 		gitDirPath := filepath.Join(tmpDir, "actual.git")
 		require.Nil(t, os.WriteFile(filepath.Join(worktreePath, ".git"), []byte("gitdir: ../actual.git\n"), 0o600))
 
-		gotGitDirPath, has, err := findGitDirPath(worktreePath)
+		gotGitDirPath, gotWorktreePath, has, err := findGitDirPath(worktreePath)
 		require.Nil(t, err)
 		assert.True(t, has)
 		assert.Equal(t, gitDirPath, gotGitDirPath)
+		assert.Equal(t, worktreePath, gotWorktreePath)
 	})
 
 	t.Run("invalid gitdir file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		require.Nil(t, os.WriteFile(filepath.Join(tmpDir, ".git"), []byte("not a gitdir file"), 0o600))
 
-		_, has, err := findGitDirPath(tmpDir)
+		_, _, has, err := findGitDirPath(tmpDir)
 		assert.False(t, has)
 		assert.ErrorContains(t, err, "invalid gitdir file")
 	})
 
 	t.Run("no git directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		if _, has, err := findGitDirPath(tmpDir); err == nil && has {
+		if _, _, has, err := findGitDirPath(tmpDir); err == nil && has {
 			tmpDir = "/dev"
-			if _, has, err := findGitDirPath(tmpDir); err != nil || has {
+			if _, _, has, err := findGitDirPath(tmpDir); err != nil || has {
 				t.Skip("unable to find a filesystem path outside a Git repository")
 			}
 		}
 
-		_, has, err := findGitDirPath(tmpDir)
+		_, _, has, err := findGitDirPath(tmpDir)
 		require.Nil(t, err)
 		assert.False(t, has)
 	})
