@@ -13,15 +13,15 @@ require (
 	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/muesli/termenv v0.16.0
-	github.com/secure-systems-lab/go-securesystemslib v0.11.0
+	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/sigstore/cosign/v3 v3.1.3
 	github.com/sigstore/fulcio v1.8.8
 	github.com/sigstore/gitsign v0.17.1
-	github.com/sigstore/protobuf-specs v0.5.1
+	github.com/sigstore/protobuf-specs v0.5.2
 	github.com/sigstore/sigstore v1.10.9
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/crypto v0.55.0
 	google.golang.org/protobuf v1.36.12
@@ -207,7 +207,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
@@ -222,7 +222,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260727163830-6c54dddc4772 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720155508-bb71a54f79dc // indirect
 	google.golang.org/grpc v1.82.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
