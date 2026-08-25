@@ -67,13 +67,14 @@ type State struct {
 
 	GitHubApps map[string]tuf.GitHubApp
 
-	repository     gitstore.Storer
-	loadedEntry    rsl.ReferenceUpdaterEntry
-	verifiersCache map[string][]*SignatureVerifier
-	ruleNames      *set.Set[string]
-	allPrincipals  map[string]tuf.Principal
-	hasFileRule    bool
-	globalRules    map[string][]tuf.GlobalRule
+	repository          gitstore.Storer
+	loadedEntry         rsl.ReferenceUpdaterEntry
+	verifiersCache      map[string][]*SignatureVerifier
+	globalRulesVerifier *SignatureVerifier
+	ruleNames           *set.Set[string]
+	allPrincipals       map[string]tuf.Principal
+	hasFileRule         bool
+	globalRules         map[string][]tuf.GlobalRule
 }
 
 type StateMetadata struct {
@@ -409,7 +410,12 @@ func LoadFirstState(ctx context.Context, repo gitstore.Storer, opts ...policyopt
 
 // FindVerifiersForPath identifies the trusted set of verifiers for the
 // specified path. While walking the delegation graph for the path, signatures
-// for delegated metadata files are verified using the verifier context.
+// for delegated metadata files are verified using the verifier context. An
+// empty set is returned when no rule protects the path.
+//
+// The returned verifiers only reflect the rules protecting the path. Global
+// rules are not delegations of trust and are verified separately, see
+// getVerifierForGlobalRules.
 func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) {
 	if s.verifiersCache == nil {
 		slog.Debug("Initializing path cache in policy...")
@@ -420,34 +426,54 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 		return verifiers, nil
 	}
 
-	allVerifiers := []*SignatureVerifier{}
-
-	if len(s.globalRules) != 0 {
-		slog.Debug("Global constraints found, including exhaustive verifier...")
-		// This has to go first so it's prioritized during verification
-		// At least one global rule exists, return an exhaustive verifier
-		verifier := &SignatureVerifier{
-			repository: s.repository,
-			name:       tuf.ExhaustiveVerifierName,
-			principals: []tuf.Principal{}, // we'll add all principals below
-
-			// threshold doesn't matter since we set verifyExhaustively to true
-			threshold:          1,
-			verifyExhaustively: true, // very important!
-		}
-
-		for _, principal := range s.allPrincipals {
-			verifier.principals = append(verifier.principals, principal)
-		}
-
-		allVerifiers = append(allVerifiers, verifier)
-	}
-
-	specificVerifiers, err := s.findVerifiersForPathIfProtected(path)
+	verifiers, err := s.findVerifiersForPathIfProtected(path)
 	if err != nil {
 		return nil, err
 	}
-	allVerifiers = append(allVerifiers, specificVerifiers...)
+
+	// add to cache
+	s.verifiersCache[path] = verifiers
+	// return verifiers
+	return verifiers, nil
+}
+
+// getVerifierForGlobalRules returns a verifier that trusts every principal
+// declared in the policy. Global rules are not delegations of trust: they
+// constrain a namespace irrespective of who is trusted for it, so they are
+// evaluated against every principal that signed rather than only the principals
+// trusted by the rules protecting the namespace. Accordingly, the returned
+// verifier MUST NOT be used to decide whether the rules protecting a namespace
+// are met, as it accepts principals who are not trusted for that namespace. It
+// is only used to enumerate the principals the global rules are evaluated
+// against.
+//
+// nil is returned when the policy declares no global rules.
+func (s *State) getVerifierForGlobalRules() *SignatureVerifier {
+	if len(s.globalRules) == 0 {
+		return nil
+	}
+
+	if s.globalRulesVerifier != nil {
+		return s.globalRulesVerifier
+	}
+
+	slog.Debug("Global constraints found, creating exhaustive verifier...")
+
+	// Unlike the verifiers for rules, this verifier is not specific to a path:
+	// it trusts every principal for every path, so it's built once per state.
+	verifier := &SignatureVerifier{
+		repository: s.repository,
+		name:       tuf.ExhaustiveVerifierName,
+		principals: []tuf.Principal{}, // we'll add all principals below
+
+		// threshold doesn't matter since we set verifyExhaustively to true
+		threshold:          1,
+		verifyExhaustively: true, // very important!
+	}
+
+	for _, principal := range s.allPrincipals {
+		verifier.principals = append(verifier.principals, principal)
+	}
 
 	// Note: we could loop through all global constraints and create a
 	// verifier with all principals but targeting a specific constraint (or
@@ -458,10 +484,8 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 	// would also want to verify every applicable global constraint for
 	// safety, so we would be doing extra work for no reason.
 
-	// add to cache
-	s.verifiersCache[path] = allVerifiers
-	// return verifiers
-	return allVerifiers, nil
+	s.globalRulesVerifier = verifier
+	return verifier
 }
 
 func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifier, error) {
