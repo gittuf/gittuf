@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -103,6 +104,65 @@ func Verify(ctx context.Context, key *signerverifier.SSLibKey, payload, signatur
 	}
 }
 
+// The Sigstore trusted root is fetched over the network via TUF. A single
+// gittuf operation can verify many signatures -- an RSL walk checks every
+// signed commit in range, trying each principal's keys in turn -- so the
+// fetch and the certificate pools derived from it are cached for the lifetime
+// of the process. The failure is cached alongside the result: a process that
+// cannot reach the TUF repository fails fast on every subsequent verification
+// rather than retrying the fetch for each signature.
+var (
+	trustedRootOnce        sync.Once
+	cachedTrustedRoot      *sigstoreroot.TrustedRoot
+	cachedRootPool         *x509.CertPool
+	cachedIntermediatePool *x509.CertPool
+	cachedTrustedRootErr   error
+)
+
+// getCachedTrustedRootPools returns the root and intermediate certificate
+// pools built from the Sigstore trusted root, fetching the trusted root on
+// first use.
+func getCachedTrustedRootPools() (*x509.CertPool, *x509.CertPool, error) {
+	trustedRootOnce.Do(func() {
+		cachedTrustedRoot, cachedRootPool, cachedIntermediatePool, cachedTrustedRootErr = fetchTrustedRootPools()
+	})
+
+	return cachedRootPool, cachedIntermediatePool, cachedTrustedRootErr
+}
+
+// fetchTrustedRootPools fetches the Sigstore trusted root over TUF and builds
+// the root and intermediate certificate pools from it. It performs no caching
+// of its own.
+func fetchTrustedRootPools() (*sigstoreroot.TrustedRoot, *x509.CertPool, *x509.CertPool, error) {
+	// The result is memoized for the process, so the fetch must not be bound
+	// to the context of whichever verification happens to trigger it first.
+	// The TUF client in sigstore-go applies its own timeout to the fetch.
+	trustedRoot, err := sigstoreroot.FetchTrustedRootWithOptions(tuf.DefaultOptions().WithContext(context.Background()))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// The trusted root carries each Fulcio CA's root and intermediates
+	// together, so both pools are built from the same walk.
+	root := x509.NewCertPool()
+	intermediate := x509.NewCertPool()
+	for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
+		fulcioCA, ok := ca.(*sigstoreroot.FulcioCertificateAuthority)
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("unexpected Fulcio CA type %T", ca)
+		}
+
+		if fulcioCA.Root != nil {
+			root.AddCert(fulcioCA.Root)
+		}
+		for _, cert := range fulcioCA.Intermediates {
+			intermediate.AddCert(cert)
+		}
+	}
+
+	return trustedRoot, root, intermediate, nil
+}
+
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
 // verifying commit or tag signatures issued by gitsign.
 func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte, rekorURL string) error {
@@ -116,27 +176,9 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 	var verifier *gitsignVerifier.CertVerifier
 	sigstoreRootFilePath := os.Getenv(sigstore.EnvSigstoreRootFile)
 	if sigstoreRootFilePath == "" {
-		trustedRoot, err := sigstoreroot.FetchTrustedRootWithOptions(tuf.DefaultOptions().WithContext(ctx))
+		root, intermediate, err := getCachedTrustedRootPools()
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		// The trusted root carries each Fulcio CA's root and intermediates
-		// together, so both pools are built from the same walk.
-		root := x509.NewCertPool()
-		intermediate := x509.NewCertPool()
-		for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
-			fulcioCA, ok := ca.(*sigstoreroot.FulcioCertificateAuthority)
-			if !ok {
-				return errors.Join(ErrVerifyingSigstoreSignature, fmt.Errorf("unexpected Fulcio CA type %T", ca))
-			}
-
-			if fulcioCA.Root != nil {
-				root.AddCert(fulcioCA.Root)
-			}
-			for _, cert := range fulcioCA.Intermediates {
-				intermediate.AddCert(cert)
-			}
 		}
 
 		checkOpts.RootCerts = root
