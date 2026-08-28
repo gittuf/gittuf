@@ -109,7 +109,7 @@ func run(ctx context.Context) error {
 	remoteName := os.Args[1]
 	url := os.Args[2]
 
-	var handler func(context.Context, *gittuf.Repository, string, string) (map[string]string, bool, error)
+	var handler func(context.Context, *gittuf.Repository, string, string) (map[string]string, bool, []string, error)
 	switch {
 	case strings.HasPrefix(url, "https://"), strings.HasPrefix(url, "http://"), strings.HasPrefix(url, "ftp://"), strings.HasPrefix(url, "ftps://"):
 		log("Prefix indicates curl remote helper must be used")
@@ -129,10 +129,13 @@ func run(ctx context.Context) error {
 	}
 	gitDir := repo.GetGitRepository().GetGitDir()
 
-	gittufRefsTips, isPush, err := handler(ctx, repo, remoteName, url)
+	gittufRefsTips, isPush, fetchedRefs, err := handler(ctx, repo, remoteName, url)
 	if err != nil {
 		return err
 	}
+
+	log("FETCHED REFS")
+	log(fetchedRefs)
 
 	for {
 		// When cloning/fetching, we have to hang until Git sets things up
@@ -174,31 +177,18 @@ func run(ctx context.Context) error {
 				fmt.Fprintf(os.Stderr, "git-remote-gittuf: %s\n", msg) //nolint:errcheck
 			}
 		}
-
-		// Uncomment after gittuf can accept a git_dir env var; this will happen
-		// with the gitinterface PRs naturally.
-
-		// TODO: this must either be looped to address each changed ref that
-		// exists locally or gittuf needs another flag for --all.
-		// var cmd *exec.Cmd
-		// if rslTip != "" {
-		// 	log("we have rsl tip")
-		// 	cmd = exec.Command("gittuf", "verify-ref", "--from-entry", rslTip, "HEAD")
-		// } else {
-		// 	cwd, _ := os.Getwd()
-		// 	log("we don't have rsl tip", cwd)
-		// 	cmd = exec.Command("gittuf", "verify-ref", "HEAD")
-		// }
-		// _, err := cmd.Output()
-		// if err != nil {
-		// 	log(err.Error())
-		// 	if _, nerr := os.Stderr.Write([]byte("gittuf verification failed\n")); nerr != nil {
-		// 		return errors.Join(err, nerr)
-		// 	}
-		// 	return err
-		// }
+		for _, ref := range fetchedRefs {
+			if !strings.HasPrefix(ref, "refs/gittuf/") {
+				log(fmt.Sprintf("Verifying %s...", ref))
+				err = repo.VerifyRef(ctx, ref)
+			}
+			if err != nil {
+				msg := fmt.Sprintf("Verification error for reference '%s': '%s'", ref, err.Error())
+				log(msg)
+				fmt.Fprintf(os.Stderr, "git-remote-gittuf: %s\n", msg) //nolint:errcheck
+			}
+		}
 	}
-
 	return nil
 }
 
