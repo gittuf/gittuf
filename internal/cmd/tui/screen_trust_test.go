@@ -60,6 +60,7 @@ func TestTrustScreenInteractiveNavigation(t *testing.T) {
 	}
 
 	m := initialModel(context.Background(), o)
+	m.screen = screenChoice
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
 
 	// Wait for home screen Policy option

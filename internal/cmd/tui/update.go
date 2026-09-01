@@ -37,7 +37,9 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case initDoneMsg:
 		if msg.err != nil {
-			m.errorMsg = fmt.Sprintf("Initialization failed: %v", msg.err)
+			m.readOnly = true
+			m.openErrorDialog("Initialization Failed", msg.err.Error())
+			m.screen = screenChoice
 			return m, nil
 		}
 		m.repo = msg.repo
