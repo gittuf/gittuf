@@ -15,6 +15,8 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
   # Monitor GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -30,3 +32,5 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 10
+    cooldown:
+      default-days: 7
