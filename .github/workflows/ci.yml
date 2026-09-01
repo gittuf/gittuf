@@ -42,6 +42,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
     - name: Test in FreeBSD
       id: test
       uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1
