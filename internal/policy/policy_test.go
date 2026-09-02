@@ -891,6 +891,30 @@ func TestStateGetRootMetadata(t *testing.T) {
 		_, err = state.GetRootMetadata(false)
 		assert.Nil(t, err)
 	})
+	
+	t.Run("with invalid base64 payload", func(t *testing.T) {
+		invalidState := &StateMetadata{
+			RootEnvelope: &sslibdsse.Envelope{
+				Payload: "invalid-base64",
+			},
+		}
+		
+		_, err := invalidState.GetRootMetadata(false)
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid JSON payload", func(t *testing.T) {
+		invalidJSON := base64.StdEncoding.EncodeToString([]byte("{invalid-bracket"))
+		invalidState := &StateMetadata{
+			RootEnvelope: &sslibdsse.Envelope{
+				Payload: invalidJSON,
+			},
+		}
+		
+		_, err := invalidState.GetRootMetadata(false)
+		assert.Error(t,err)
+		assert.Contains(t, err.Error(), "unable to unmarshal root metadata")
+	})
 }
 
 func TestStateGetTargetsMetadata(t *testing.T) {
