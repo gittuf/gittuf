@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -125,10 +127,14 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 	     Ref:    <refName>
 	     Target: <targetID>
 	     Number: <number>
+	     Custom Fields:
+	       <key>: <value>
 
 	       Annotation ID: <annotationID>
 	       Skip:          <yes/no>
 	       Number:        <number>
+	       Custom Fields:
+	         <key>: <value>
 	       Message:
 	         <message>
 
@@ -155,6 +161,7 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 	if entry.Number != 0 {
 		text += fmt.Sprintf("\n  Number: %d", entry.Number)
 	}
+	text = appendCustomFields(text, entry.CustomFields, "  ")
 
 	for _, annotation := range annotations {
 		text += "\n\n"
@@ -168,6 +175,7 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 		if annotation.Number != 0 {
 			text += fmt.Sprintf("\n    Number:        %d", annotation.Number)
 		}
+		text = appendCustomFields(text, annotation.CustomFields, "    ")
 		text += fmt.Sprintf("\n    Message:\n      %s", strings.TrimSpace(annotation.Message))
 	}
 
@@ -188,6 +196,8 @@ func writeRSLPropagationEntry(writer io.WriteCloser, entry *rsl.PropagationEntry
 		 UpstreamRepo:  <upstreamRepoLocation>
 		 UpstreamEntry: <upstreamEntryID>
 	     Number:        <number>
+	     Custom Fields:
+	       <key>: <value>
 	*/
 
 	text := colorer(fmt.Sprintf("propagation entry %s", entry.ID.String()), yellow)
@@ -200,6 +210,7 @@ func writeRSLPropagationEntry(writer io.WriteCloser, entry *rsl.PropagationEntry
 	if entry.Number != 0 {
 		text += fmt.Sprintf("\n  Number:        %d", entry.Number)
 	}
+	text = appendCustomFields(text, entry.CustomFields, "  ")
 
 	text += "\n" // single trailing newline by default
 	if hasParent {
@@ -208,4 +219,24 @@ func writeRSLPropagationEntry(writer io.WriteCloser, entry *rsl.PropagationEntry
 
 	_, err := writer.Write([]byte(text))
 	return err
+}
+
+// appendCustomFields appends an entry's custom fields to text as a block
+// labelled at indent with each field indented two spaces further. Fields are
+// sorted by key so the output is stable. An entry without custom fields gets no
+// block at all.
+//
+// Custom fields are advisory: gittuf never consults them during verification.
+// They are rendered as recorded, so an operator reading them should treat them
+// as claims made by whoever signed the entry.
+func appendCustomFields(text string, fields rsl.CustomFields, indent string) string {
+	if len(fields) == 0 {
+		return text
+	}
+
+	text += fmt.Sprintf("\n%sCustom Fields:", indent)
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		text += fmt.Sprintf("\n%s  %s: %s", indent, key, fields[key])
+	}
+	return text
 }

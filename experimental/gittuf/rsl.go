@@ -112,7 +112,7 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	entry := rsl.NewReferenceEntry(refName, refTip)
+	entry := rsl.NewReferenceEntry(refName, refTip, rsl.WithCustomFields(rsl.CustomFields(options.CustomFields)))
 	if signCommit && options.SigningKeyBytes != nil {
 		if err := entry.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
 			return err
@@ -168,7 +168,7 @@ func (r *Repository) RecordRSLEntryForReferenceAtTarget(refName, targetID string
 	// signCommit must be verified for the refName in the delegation tree.
 
 	slog.Debug("Creating RSL reference entry...")
-	return rsl.NewReferenceEntry(refName, targetIDHash).CommitUsingSpecificKey(r.r, signingKeyBytes)
+	return rsl.NewReferenceEntry(refName, targetIDHash, rsl.WithCustomFields(rsl.CustomFields(options.CustomFields))).CommitUsingSpecificKey(r.r, signingKeyBytes)
 }
 
 func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, signCommit bool) error {
@@ -223,7 +223,7 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 	// signCommit must be verified for the refNames of the rslEntryIDs.
 
 	slog.Debug("Creating RSL annotation entry...")
-	annotation := rsl.NewAnnotationEntry(rslEntryHashes, skip, message)
+	annotation := rsl.NewAnnotationEntry(rslEntryHashes, skip, message, rsl.WithCustomFields(rsl.CustomFields(options.CustomFields)))
 	if signCommit && options.SigningKeyBytes != nil {
 		if err := annotation.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
 			return err
@@ -398,13 +398,15 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		// entry may contain that is inferred at commit time
 		// For example, an incrementing number inferred from the
 		// parent entry
+		// WithCustomFields copies the fields into the new entry, so the
+		// original entry's map can be passed directly without cloning it first.
 		switch entry := localOnlyEntries[i].(type) {
 		case *rsl.ReferenceEntry:
-			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID).Commit(r.r, sign); err != nil {
+			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
 				return fmt.Errorf("unable to reapply reference entry '%s': %w", entry.ID.String(), err)
 			}
 		case *rsl.AnnotationEntry:
-			if err := rsl.NewAnnotationEntry(entry.RSLEntryIDs, entry.Skip, entry.Message).Commit(r.r, sign); err != nil {
+			if err := rsl.NewAnnotationEntry(entry.RSLEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
 				return fmt.Errorf("unable to reapply annotation entry '%s': %w", entry.ID.String(), err)
 			}
 		}

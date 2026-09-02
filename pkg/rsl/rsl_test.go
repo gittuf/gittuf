@@ -11,6 +11,7 @@ import (
 
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsRelevantGittufRef(t *testing.T) {
@@ -551,6 +552,47 @@ func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 			assert.Equal(t, test.expectedEntry, entry)
 		})
 	}
+}
+
+func TestParseRSLEntryTextTreatsEmptyCustomFieldValueAsAbsent(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	emptyKey := CustomFieldPrefix + "example.com/empty"
+	setKey := CustomFieldPrefix + "example.com/set"
+
+	// A canonical writer never emits an empty value, so an entry carrying one
+	// must not report the field as set: the value would not round-trip.
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s:\n%s: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, emptyKey, setKey, "value")
+
+	entry, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+
+	value, has := entry.(*ReferenceEntry).GetCustomField(emptyKey)
+	assert.False(t, has)
+	assert.Empty(t, value)
+
+	value, has = entry.(*ReferenceEntry).GetCustomField(setKey)
+	assert.True(t, has)
+	assert.Equal(t, "value", value)
+}
+
+func TestParseRSLEntryTextEmptyCustomFieldValueDoesNotShadow(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	key := CustomFieldPrefix + "example.com/field"
+
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s:\n%s: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, key, key, "value")
+
+	entry, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+
+	value, has := entry.(*ReferenceEntry).GetCustomField(key)
+	assert.True(t, has)
+	assert.Equal(t, "value", value)
 }
 
 const (

@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/gitstoretest"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +20,336 @@ import (
 )
 
 const annotationMessage = "test annotation"
+
+func parsedCustomFieldEntry(t *testing.T, entry Entry) CustomFieldEntry {
+	t.Helper()
+
+	withFields, ok := entry.(CustomFieldEntry)
+	require.True(t, ok)
+	return withFields
+}
+
+func TestCustomFieldsRoundTrip(t *testing.T) {
+	fields := CustomFields{
+		"custom.example.com/z-field": "v1.2.3-rc.1/build(42),ok",
+		"custom.example.com/a-field": "hello world_ok",
+	}
+
+	tests := map[string]CustomFieldEntry{
+		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, WithCustomFields(fields)),
+		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "message", WithCustomFields(fields)),
+		"propagation": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, WithCustomFields(fields)),
+	}
+
+	for name, entry := range tests {
+		t.Run(name, func(t *testing.T) {
+			message, err := entry.createCommitMessage(true)
+			require.NoError(t, err)
+			assert.Less(t, strings.Index(message, "custom.example.com/a-field"), strings.Index(message, "custom.example.com/z-field"))
+
+			parsed, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			require.NoError(t, err)
+			parsedEntry := parsedCustomFieldEntry(t, parsed)
+			for key, want := range fields {
+				value, has := parsedEntry.GetCustomField(key)
+				assert.True(t, has)
+				assert.Equal(t, want, value)
+			}
+		})
+	}
+}
+
+func TestCustomFieldsAreCopied(t *testing.T) {
+	fields := CustomFields{"custom.example.com/field": "original"}
+	entry := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, WithCustomFields(fields))
+
+	fields["custom.example.com/field"] = "changed"
+	value, has := entry.GetCustomField("custom.example.com/field")
+	assert.True(t, has)
+	assert.Equal(t, "original", value)
+}
+
+func TestParseRSLEntryTextUsesFirstDuplicateCustomField(t *testing.T) {
+	zero := gitinterface.ZeroHash.String()
+	tests := map[string]string{
+		"reference": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\ncustom.example.com/field: first\ncustom.example.com/field: second",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero),
+		"annotation": fmt.Sprintf("%s\n\n%s: %s\n%s: false\ncustom.example.com/field: first\ncustom.example.com/field: second",
+			AnnotationEntryHeader, EntryIDKey, zero, SkipKey),
+		"propagation": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\ncustom.example.com/field: first\ncustom.example.com/field: second",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero),
+	}
+
+	for name, message := range tests {
+		t.Run(name, func(t *testing.T) {
+			entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			require.NoError(t, err)
+			value, has := parsedCustomFieldEntry(t, entry).GetCustomField("custom.example.com/field")
+			assert.True(t, has)
+			assert.Equal(t, "first", value)
+		})
+	}
+}
+
+func TestParseRSLEntryTextAcceptsUnsortedCustomFields(t *testing.T) {
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\ncustom.example.com/z-field: last\ncustom.example.com/a-field: first",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+
+	entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+	require.NoError(t, err)
+	assert.Equal(t, CustomFields{
+		"custom.example.com/z-field": "last",
+		"custom.example.com/a-field": "first",
+	}, entry.(*ReferenceEntry).CustomFields)
+}
+
+func TestWithCustomFieldsKeepsFirstValueForRepeatedKey(t *testing.T) {
+	first := WithCustomFields(CustomFields{"custom.example.com/field": "first"})
+	duplicate := WithCustomFields(CustomFields{"custom.example.com/field": "second"})
+	tests := map[string]CustomFieldEntry{
+		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, first, duplicate),
+		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", first, duplicate),
+		"propagation": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, first, duplicate),
+	}
+
+	for name, entry := range tests {
+		t.Run(name, func(t *testing.T) {
+			value, has := entry.GetCustomField("custom.example.com/field")
+			assert.True(t, has)
+			assert.Equal(t, "first", value)
+		})
+	}
+}
+
+func TestWithCustomFieldsSkipsEmptyValues(t *testing.T) {
+	mixed := WithCustomFields(CustomFields{
+		"custom.example.com/set":   "value",
+		"custom.example.com/empty": "",
+	})
+	tests := map[string]CustomFieldEntry{
+		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, mixed),
+		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", mixed),
+		"propagation": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, mixed),
+	}
+
+	for name, entry := range tests {
+		t.Run(name, func(t *testing.T) {
+			value, has := entry.GetCustomField("custom.example.com/set")
+			assert.True(t, has)
+			assert.Equal(t, "value", value)
+
+			value, has = entry.GetCustomField("custom.example.com/empty")
+			assert.False(t, has, "an empty value means the field is absent")
+			assert.Empty(t, value)
+		})
+	}
+}
+
+func TestWithCustomFieldsAllEmptyKeepsNilMap(t *testing.T) {
+	empty := WithCustomFields(CustomFields{"custom.example.com/empty": ""})
+
+	entry := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, empty)
+	assert.Nil(t, entry.CustomFields)
+
+	annotation := NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", empty)
+	assert.Nil(t, annotation.CustomFields)
+
+	propagation := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, empty)
+	assert.Nil(t, propagation.CustomFields)
+}
+
+func TestWithCustomFieldsEmptyValueDoesNotShadow(t *testing.T) {
+	empty := WithCustomFields(CustomFields{"custom.example.com/field": ""})
+	set := WithCustomFields(CustomFields{"custom.example.com/field": "value"})
+
+	entry := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, empty, set)
+	value, has := entry.GetCustomField("custom.example.com/field")
+	assert.True(t, has)
+	assert.Equal(t, "value", value)
+}
+
+func TestGetCustomField(t *testing.T) {
+	fields := WithCustomFields(CustomFields{"custom.example.com/field": "value"})
+	tests := map[string]CustomFieldEntry{
+		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, fields),
+		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", fields),
+		"propagation": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, fields),
+	}
+
+	for name, entry := range tests {
+		t.Run(name, func(t *testing.T) {
+			value, has := entry.GetCustomField("custom.example.com/field")
+			assert.True(t, has)
+			assert.Equal(t, "value", value)
+
+			value, has = entry.GetCustomField("custom.example.com/absent")
+			assert.False(t, has)
+			assert.Empty(t, value)
+		})
+	}
+
+	t.Run("entry without fields", func(t *testing.T) {
+		value, has := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).GetCustomField("custom.example.com/field")
+		assert.False(t, has)
+		assert.Empty(t, value)
+	})
+}
+
+func TestCreateCommitMessageHasNoTrailingNewline(t *testing.T) {
+	fields := WithCustomFields(CustomFields{"custom.example.com/field": "value"})
+
+	entries := map[string]Entry{
+		"reference":               NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash),
+		"reference with fields":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, fields),
+		"annotation":              NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, ""),
+		"annotation with fields":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", fields),
+		"propagation":             NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash),
+		"propagation with fields": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, fields),
+	}
+
+	for name, entry := range entries {
+		t.Run(name, func(t *testing.T) {
+			message, err := entry.createCommitMessage(true)
+			require.NoError(t, err)
+			assert.False(t, strings.HasSuffix(message, "\n"), "expected no trailing newline, got %q", message)
+		})
+	}
+}
+
+func TestParseRSLEntryTextRequiresCustomFieldsAfterBuiltInFields(t *testing.T) {
+	zero := gitinterface.ZeroHash.String()
+	custom := "custom.example.com/field: value"
+
+	invalid := map[string]string{
+		"reference custom before ref": fmt.Sprintf("%s\n\n%s\n%s: %s\n%s: %s",
+			ReferenceEntryHeader, custom, RefKey, "refs/heads/main", TargetIDKey, zero),
+		"reference custom between ref and targetID": fmt.Sprintf("%s\n\n%s: %s\n%s\n%s: %s",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", custom, TargetIDKey, zero),
+		"reference number after custom": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s: 1",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, custom, NumberKey),
+		"annotation custom before entryID": fmt.Sprintf("%s\n\n%s\n%s: %s\n%s: false",
+			AnnotationEntryHeader, custom, EntryIDKey, zero, SkipKey),
+		"annotation custom between entryID and skip": fmt.Sprintf("%s\n\n%s: %s\n%s\n%s: false",
+			AnnotationEntryHeader, EntryIDKey, zero, custom, SkipKey),
+		"annotation number after custom": fmt.Sprintf("%s\n\n%s: %s\n%s: false\n%s\n%s: 1",
+			AnnotationEntryHeader, EntryIDKey, zero, SkipKey, custom, NumberKey),
+		"propagation custom between targetID and upstreamRepository": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s\n%s: https://example.com/repository\n%s: %s",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, custom, UpstreamRepositoryKey, UpstreamEntryIDKey, zero),
+		"propagation number after custom": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\n%s\n%s: 1",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero, custom, NumberKey),
+	}
+
+	for name, message := range invalid {
+		t.Run(name, func(t *testing.T) {
+			_, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+		})
+	}
+
+	valid := map[string]string{
+		"reference custom without number": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, custom),
+		"reference custom after number": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: 1\n%s",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, NumberKey, custom),
+		"annotation custom without number": fmt.Sprintf("%s\n\n%s: %s\n%s: false\n%s",
+			AnnotationEntryHeader, EntryIDKey, zero, SkipKey, custom),
+		"annotation custom after number": fmt.Sprintf("%s\n\n%s: %s\n%s: false\n%s: 1\n%s",
+			AnnotationEntryHeader, EntryIDKey, zero, SkipKey, NumberKey, custom),
+		"propagation custom without number": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\n%s",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero, custom),
+		"propagation custom after number": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\n%s: 1\n%s",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero, NumberKey, custom),
+	}
+
+	for name, message := range valid {
+		t.Run(name, func(t *testing.T) {
+			entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			require.NoError(t, err)
+			value, has := parsedCustomFieldEntry(t, entry).GetCustomField("custom.example.com/field")
+			assert.True(t, has)
+			assert.Equal(t, "value", value)
+		})
+	}
+}
+
+func TestParseRSLEntryTextDropsOverlongCustomFields(t *testing.T) {
+	longKey := CustomFieldPrefix + strings.Repeat("a", customfields.MaxKeyLength)
+	longValue := strings.Repeat("a", customfields.MaxValueLength)
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\ncustom.example.com/ok: fine\n%s: value\ncustom.example.com/big: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), longKey, longValue)
+
+	entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+	require.NoError(t, err)
+	assert.Equal(t, CustomFields{"custom.example.com/ok": "fine"}, entry.(*ReferenceEntry).CustomFields)
+}
+
+func TestParseRSLEntryTextDropsCustomFieldsOutsideTheGrammar(t *testing.T) {
+	tests := map[string]string{
+		"escape sequence in value": "custom.example.com/bad: \x1b[31mred",
+		"tab in value":             "custom.example.com/bad: a\tb",
+		"non-ascii value":          "custom.example.com/bad: café",
+		"uppercase key":            "custom.example.com/BAD: value",
+		"key without name":         "custom.example.com: value",
+		"key with bad domain":      "custom.-bad.com/field: value",
+	}
+
+	for name, field := range tests {
+		t.Run(name, func(t *testing.T) {
+			message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\ncustom.example.com/ok: fine\n%s",
+				ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), field)
+
+			entry, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+			require.NoError(t, err)
+			assert.Equal(t, CustomFields{"custom.example.com/ok": "fine"}, entry.(*ReferenceEntry).CustomFields)
+		})
+	}
+}
+
+func TestParseRSLEntryTextCapsCustomFieldCount(t *testing.T) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
+	for i := 0; i < customfields.MaxCount+10; i++ {
+		fmt.Fprintf(&b, "\ncustom.example.com/field-%02d: v", i)
+	}
+
+	entry, err := parseRSLEntryText(gitinterface.ZeroHash, b.String())
+	require.NoError(t, err)
+	assert.Len(t, entry.(*ReferenceEntry).CustomFields, customfields.MaxCount)
+}
+
+func TestCreateCommitMessageDropsEmptyCustomFields(t *testing.T) {
+	fields := CustomFields{
+		"custom.example.com/kept":  "value",
+		"custom.example.com/empty": "",
+	}
+	entry := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, WithCustomFields(fields))
+
+	message, err := entry.createCommitMessage(true)
+	require.NoError(t, err)
+	assert.Contains(t, message, "custom.example.com/kept: value")
+	assert.NotContains(t, message, "custom.example.com/empty")
+
+	parsed, err := parseRSLEntryText(gitinterface.ZeroHash, message)
+	require.NoError(t, err)
+	assert.Equal(t, CustomFields{"custom.example.com/kept": "value"}, parsed.(*ReferenceEntry).CustomFields)
+}
+
+func TestCreateCommitMessageRejectsInvalidCustomFields(t *testing.T) {
+	invalid := WithCustomFields(CustomFields{"custom.example.com/Field": "value"})
+	tests := map[string]Entry{
+		"reference":   NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, invalid),
+		"annotation":  NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "", invalid),
+		"propagation": NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repository", gitinterface.ZeroHash, invalid),
+	}
+
+	for name, entry := range tests {
+		t.Run(name, func(t *testing.T) {
+			message, err := entry.createCommitMessage(true)
+			assert.Empty(t, message)
+			assert.ErrorIs(t, err, ErrInvalidCustomFields)
+		})
+	}
+}
 
 func TestRemoteTrackerRef(t *testing.T) {
 	assert.Equal(t, "refs/remotes/origin/gittuf/reference-state-log", RemoteTrackerRef("origin"))
