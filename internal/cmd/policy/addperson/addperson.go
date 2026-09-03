@@ -47,7 +47,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		[]string{},
 		"authorized public key for the person (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
-	cmd.MarkFlagRequired("public-key") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.associatedIdentities,
