@@ -1,5 +1,7 @@
 gittuf is built and maintained by developers from New York University (NYU),
-Chainguard, and New Jersey Institute of Technology (NJIT).
+Chainguard, Bloomberg, Entire, and New Jersey Institute of Technology (NJIT).
+
+Current maintainers:
 
 Aditya Sirish A Yelgundhalli
   Email: aditya.sirish@nyu.edu
@@ -25,6 +27,13 @@ Patrick Zielinski
   Email: patrick.z@nyu.edu
   GitHub username: @patzielinski
   Affiliation: NYU
+
+Paulo Gomes
+  Email: paulo@entire.io
+  GitHub username: @pjbgf
+  Affiliation: Entire
+
+Emeritus maintainers:
 
 Neil Naveen
   Email: naveen.neil@icloud.com

@@ -98,17 +98,5 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		}
 	}
 	slog.Debug("Verifying HEAD...")
-	if err := repository.VerifyRef(ctx, head); err != nil {
-		return repository, err
-	}
-
-	// enable and populate the persistent cache by default after cloning
-	// this is a non-fatal operation - if it fails, we log and continue
-	if !repository.GetAutomaticCacheEnablementStatus() {
-		if err := repository.PopulateCache(); err != nil {
-			slog.Warn("could not populate cache", "error", err)
-		}
-	}
-
-	return repository, nil
+	return repository, repository.VerifyRef(ctx, head)
 }

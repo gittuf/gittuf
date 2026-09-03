@@ -49,6 +49,16 @@ func TestWithRecordLocalOnly(t *testing.T) {
 	assert.True(t, options.LocalOnly)
 }
 
+func TestWithRecordSigningKeyBytes(t *testing.T) {
+	options := &RecordOptions{}
+
+	option := WithRecordSigningKeyBytes([]byte("test-key"))
+
+	option(options)
+
+	assert.Equal(t, []byte("test-key"), options.SigningKeyBytes)
+}
+
 func TestWithAnnotateRemote(t *testing.T) {
 	options := &AnnotateOptions{}
 
@@ -67,4 +77,14 @@ func TestWithAnnotateLocalOnly(t *testing.T) {
 	option(options)
 
 	assert.True(t, options.LocalOnly)
+}
+
+func TestWithAnnotateSigningKeyBytes(t *testing.T) {
+	options := &AnnotateOptions{}
+
+	option := WithAnnotateSigningKeyBytes([]byte("test-key"))
+
+	option(options)
+
+	assert.Equal(t, []byte("test-key"), options.SigningKeyBytes)
 }

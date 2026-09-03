@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.26']
+        go-version: ['1.26', '1.27']
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout code
@@ -42,9 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@83b151f58c6047089f4c80eb5ba2039d158ce093
+      uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1
       with:
         usesh: true
         prepare: |

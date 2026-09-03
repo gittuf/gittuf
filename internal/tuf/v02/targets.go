@@ -331,7 +331,12 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 	}
 
 	switch principal := principal.(type) {
-	case *Key, *Person:
+	case *Key:
+		d.Principals[principal.ID()] = principal
+	case *Person:
+		if err := principal.Validate(); err != nil {
+			return err
+		}
 		d.Principals[principal.ID()] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType
@@ -353,7 +358,12 @@ func (d *Delegations) updatePrincipal(principal tuf.Principal) error {
 	}
 
 	switch principal := principal.(type) {
-	case *Key, *Person:
+	case *Key:
+		d.Principals[principalID] = principal
+	case *Person:
+		if err := principal.Validate(); err != nil {
+			return err
+		}
 		d.Principals[principalID] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType

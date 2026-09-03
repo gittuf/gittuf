@@ -313,13 +313,18 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 
 	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(contentBody)
 
+	errMsg := ""
+	if m.errorMsg != "" {
+		errMsg = "\n" + renderErrorMsg(m.errorMsg)
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left,
 		renderStatusBar(title, m.readOnly, m.width),
 		renderWithMargin(
 			content+"\n"+
 				overlays+
 				renderFooterBox(m)+
-				renderErrorMsg(m.errorMsg),
+				errMsg,
 		),
 	)
 }
@@ -361,6 +366,21 @@ func (m model) View() string {
 		return m.spinner.View() + " Loading TUI...\n"
 	}
 
+	if m.verifying {
+		content := lipgloss.JoinVertical(lipgloss.Left,
+			m.spinner.View()+" "+m.loadingMsg,
+			"",
+			lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				Width(m.logViewport.Width).
+				Height(m.logViewport.Height).
+				Render(m.logViewport.View()),
+		)
+		return renderWithMargin(
+			titleStyle.Render("gittuf TUI") + "\n\n" + content,
+		)
+	}
+
 	var view string
 	switch m.screen {
 	case screenLoading:
@@ -395,17 +415,44 @@ func (m model) View() string {
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		view = m.trustGlobalRulesScreen.View(&m)
 
+	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+		return m.trustKeysScreen.View(&m)
+
+	case screenTrustHooks, screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:
+		return m.trustHookScreen.View(&m)
+
 	case screenPolicyPrincipals:
 		view = m.policyPrincipalsScreen.View(&m)
 
 	case screenPolicyPrincipalsForm:
 		view = m.policyPrincipalsFormScreen.View(&m)
 
+	case screenTrustLifecycle:
+		return m.trustLifecycleScreen.View(&m)
+
+	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+		return m.trustPropagationScreen.View(&m)
+
+	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+		return m.trustGitHubAppScreen.View(&m)
+
+	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+		return m.trustRepoNetworkScreen.View(&m)
+
 	case screenPolicyAddRule, screenPolicyEditRule:
 		view = m.policyRulesScreen.View(&m)
 
 	case screenHelp:
 		view = m.helpScreen.View(&m)
+
+	case screenVerify:
+		return m.verifyScreen.View(&m)
+
+	case screenVerifyRefForm:
+		return m.verifyRefScreen.View(&m)
+
+	case screenVerifyMergeableForm:
+		return m.verifyMergeableScreen.View(&m)
 
 	default:
 		view = "Unknown screen"
