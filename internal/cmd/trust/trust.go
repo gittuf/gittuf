@@ -7,7 +7,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/addcontrollerrepository"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
-	"github.com/gittuf/gittuf/internal/cmd/trust/addhook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addnetworkrepository"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addpropagationdirective"
@@ -18,20 +17,17 @@ import (
 	i "github.com/gittuf/gittuf/internal/cmd/trust/init"
 	"github.com/gittuf/gittuf/internal/cmd/trust/inspectroot"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listglobalrules"
-	"github.com/gittuf/gittuf/internal/cmd/trust/listhooks"
 	"github.com/gittuf/gittuf/internal/cmd/trust/listpropagationdirectives"
 	"github.com/gittuf/gittuf/internal/cmd/trust/makecontroller"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removegithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removeglobalrule"
-	"github.com/gittuf/gittuf/internal/cmd/trust/removehook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepolicykey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removepropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/removerootkey"
 	"github.com/gittuf/gittuf/internal/cmd/trust/setrepositorylocation"
 	"github.com/gittuf/gittuf/internal/cmd/trust/sign"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updateglobalrule"
-	"github.com/gittuf/gittuf/internal/cmd/trust/updatehook"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepolicythreshold"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updatepropagationdirective"
 	"github.com/gittuf/gittuf/internal/cmd/trust/updaterootthreshold"
@@ -55,7 +51,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(addcontrollerrepository.New(o))
 	cmd.AddCommand(addgithubapp.New(o))
 	cmd.AddCommand(addglobalrule.New(o))
-	cmd.AddCommand(addhook.New(o))
 	cmd.AddCommand(addnetworkrepository.New(o))
 	cmd.AddCommand(addpolicykey.New(o))
 	cmd.AddCommand(addpropagationdirective.New(o))
@@ -66,13 +61,11 @@ func New() *cobra.Command {
 	cmd.AddCommand(incrementversion.New(o))
 	cmd.AddCommand(inspectroot.New())
 	cmd.AddCommand(listglobalrules.New())
-	cmd.AddCommand(listhooks.New())
 	cmd.AddCommand(listpropagationdirectives.New())
 	cmd.AddCommand(makecontroller.New(o))
 	cmd.AddCommand(remote.New())
 	cmd.AddCommand(removegithubapp.New(o))
 	cmd.AddCommand(removeglobalrule.New(o))
-	cmd.AddCommand(removehook.New(o))
 	cmd.AddCommand(removepolicykey.New(o))
 	cmd.AddCommand(removepropagationdirective.New(o))
 	cmd.AddCommand(removerootkey.New(o))
@@ -80,7 +73,6 @@ func New() *cobra.Command {
 	cmd.AddCommand(sign.New(o))
 	cmd.AddCommand(stage.New())
 	cmd.AddCommand(updateglobalrule.New(o))
-	cmd.AddCommand(updatehook.New(o))
 	cmd.AddCommand(updatepolicythreshold.New(o))
 	cmd.AddCommand(updatepropagationdirective.New(o))
 	cmd.AddCommand(updaterootthreshold.New(o))
