@@ -15,6 +15,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -29,6 +31,9 @@ import (
 )
 
 const rekorPublicGoodInstance = "https://rekor.sigstore.dev"
+
+// trustedRootFetchTimeout bounds the TUF fetch of the Sigstore trusted root.
+const trustedRootFetchTimeout = 30 * time.Second
 
 var (
 	ErrUnknownSigningMethod       = errors.New("unknown signing method (not one of gpg, ssh, x509)")
@@ -103,6 +108,93 @@ func Verify(ctx context.Context, key *signerverifier.SSLibKey, payload, signatur
 	}
 }
 
+// The Sigstore trusted root is fetched over the network via TUF. A single
+// gittuf operation can verify many signatures -- an RSL walk checks every
+// signed commit in range, trying each principal's keys in turn -- so the
+// fetch and the certificate pools derived from it are cached for the lifetime
+// of the process. Only successful fetches are cached, leaving a transient
+// network failure to be retried by the next verification.
+var (
+	trustedRootMutex       sync.Mutex
+	cachedTrustedRoot      *sigstoreroot.TrustedRoot
+	cachedRootPool         *x509.CertPool
+	cachedIntermediatePool *x509.CertPool
+)
+
+// getCachedTrustedRootPools returns the root and intermediate certificate
+// pools built from the Sigstore trusted root, fetching the trusted root on
+// first use.
+func getCachedTrustedRootPools() (*x509.CertPool, *x509.CertPool, error) {
+	trustedRootMutex.Lock()
+	if cachedTrustedRoot != nil {
+		root, intermediate := cachedRootPool, cachedIntermediatePool
+		trustedRootMutex.Unlock()
+		return root, intermediate, nil
+	}
+	trustedRootMutex.Unlock()
+
+	// The fetch is a network round-trip, so it is performed without the lock
+	// held. Concurrent callers may each fetch; the first to finish populates
+	// the cache and the others discard their result below.
+	trustedRoot, root, intermediate, err := fetchTrustedRootPools()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	trustedRootMutex.Lock()
+	defer trustedRootMutex.Unlock()
+
+	// Another caller may have populated the cache while the fetch was in
+	// flight. Prefer what is already cached so every caller sees the same
+	// pools.
+	if cachedTrustedRoot != nil {
+		return cachedRootPool, cachedIntermediatePool, nil
+	}
+
+	cachedTrustedRoot = trustedRoot
+	cachedRootPool = root
+	cachedIntermediatePool = intermediate
+
+	return root, intermediate, nil
+}
+
+// fetchTrustedRootPools fetches the Sigstore trusted root over TUF and builds
+// the root and intermediate certificate pools from it. It performs no caching
+// of its own.
+func fetchTrustedRootPools() (*sigstoreroot.TrustedRoot, *x509.CertPool, *x509.CertPool, error) {
+	// The result is memoized for the process, so the fetch must not be bound
+	// to the context of whichever verification happens to trigger it first.
+	// The timeout keeps an unresponsive TUF repository from stalling
+	// verification indefinitely.
+	ctx, cancel := context.WithTimeout(context.Background(), trustedRootFetchTimeout)
+	defer cancel()
+
+	trustedRoot, err := sigstoreroot.FetchTrustedRootWithOptions(tuf.DefaultOptions().WithContext(ctx))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// The trusted root carries each Fulcio CA's root and intermediates
+	// together, so both pools are built from the same walk.
+	root := x509.NewCertPool()
+	intermediate := x509.NewCertPool()
+	for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
+		fulcioCA, ok := ca.(*sigstoreroot.FulcioCertificateAuthority)
+		if !ok {
+			return nil, nil, nil, fmt.Errorf("unexpected Fulcio CA type %T", ca)
+		}
+
+		if fulcioCA.Root != nil {
+			root.AddCert(fulcioCA.Root)
+		}
+		for _, cert := range fulcioCA.Intermediates {
+			intermediate.AddCert(cert)
+		}
+	}
+
+	return trustedRoot, root, intermediate, nil
+}
+
 // verifyGitsignSignature handles the Sigstore-specific workflow involved in
 // verifying commit or tag signatures issued by gitsign.
 func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, data, signature []byte, rekorURL string) error {
@@ -116,27 +208,9 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 	var verifier *gitsignVerifier.CertVerifier
 	sigstoreRootFilePath := os.Getenv(sigstore.EnvSigstoreRootFile)
 	if sigstoreRootFilePath == "" {
-		trustedRoot, err := sigstoreroot.FetchTrustedRootWithOptions(tuf.DefaultOptions().WithContext(ctx))
+		root, intermediate, err := getCachedTrustedRootPools()
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
-		}
-
-		// The trusted root carries each Fulcio CA's root and intermediates
-		// together, so both pools are built from the same walk.
-		root := x509.NewCertPool()
-		intermediate := x509.NewCertPool()
-		for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
-			fulcioCA, ok := ca.(*sigstoreroot.FulcioCertificateAuthority)
-			if !ok {
-				return errors.Join(ErrVerifyingSigstoreSignature, fmt.Errorf("unexpected Fulcio CA type %T", ca))
-			}
-
-			if fulcioCA.Root != nil {
-				root.AddCert(fulcioCA.Root)
-			}
-			for _, cert := range fulcioCA.Intermediates {
-				intermediate.AddCert(cert)
-			}
 		}
 
 		checkOpts.RootCerts = root
