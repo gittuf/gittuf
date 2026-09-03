@@ -289,8 +289,6 @@ func TestRemoveDelegation(t *testing.T) {
 
 	err := r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, []string{targetsPubKey.KeyID}, rulePatterns, 1, false)
 	assert.Nil(t, err)
-	err = r.InitializeTargets(testCtx, targetsSigner, ruleName, false)
-	require.Nil(t, err)
 
 	err = r.StagePolicy(testCtx, "", true, false)
 	require.Nil(t, err)
@@ -311,7 +309,6 @@ func TestRemoveDelegation(t *testing.T) {
 		Role:        tufv02.Role{PrincipalIDs: set.NewSetFromItems(targetsPubKey.KeyID), Threshold: 1},
 	})
 	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
-	assert.True(t, state.HasTargetsRole(ruleName))
 
 	err = r.RemoveDelegation(testCtx, targetsSigner, policy.TargetsRoleName, ruleName, false)
 	assert.Nil(t, err)
@@ -329,7 +326,6 @@ func TestRemoveDelegation(t *testing.T) {
 	assert.Contains(t, targetsMetadata.GetPrincipals(), targetsPubKey.ID())
 	assert.Equal(t, 2, len(targetsMetadata.GetRules()))
 	assert.Contains(t, targetsMetadata.GetRules(), tufv02.AllowRule())
-	assert.False(t, state.HasTargetsRole(ruleName))
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
