@@ -548,6 +548,101 @@ func createTestStateWithGlobalConstraintBlockForcePushes(t *testing.T) *State {
 	return state
 }
 
+// createTestStateWithBranchProtectionAndGlobalConstraintThreshold creates a
+// policy state with both a branch protection rule (with threshold 2) and a
+// global constraint (of threshold 1), both targeting main. An additional
+// principal is added that is in the policy file, but not authorized for main. A
+// branch protection rule and global rule (both with threshold 1) are also added
+// for the feature branch.
+
+func createTestStateWithBranchProtectionAndGlobalConstraintThreshold(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("threshold-1-main", []string{"git:refs/heads/main"}, 1)); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("threshold-1-feature", []string{"git:refs/heads/feature"}, 1)); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	gpg2KeyR, err := gpg.LoadGPGKeyFromBytes(gpgUnauthorizedPubKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpg2Key := tufv01.NewKeyFromSSLibKey(gpg2KeyR)
+
+	targetsMetadata := InitializeTargetsMetadata()
+	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := targetsMetadata.AddPrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := targetsMetadata.AddPrincipal(gpg2Key); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := targetsMetadata.AddRule("protect-main", []string{gpgKey.KeyID, key.KeyID}, []string{"git:refs/heads/main"}, 2); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := targetsMetadata.AddRule("protect-feature", []string{gpgKey.KeyID}, []string{"git:refs/heads/feature"}, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state := &State{
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
+		},
+	}
+
+	if err := state.preprocess(); err != nil {
+		t.Fatal(err)
+	}
+
+	return state
+}
+
 func createTestStateWithPolicyUsingPersons(t *testing.T) *State {
 	t.Helper()
 
