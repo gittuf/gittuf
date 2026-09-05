@@ -18,7 +18,7 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return repo.DiscardPolicy()
+	return repo.DiscardPolicy(true)
 }
 
 func New() *cobra.Command {
