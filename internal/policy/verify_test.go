@@ -17,7 +17,6 @@ import (
 	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -3095,8 +3094,6 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification using persons", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
 		repo, state := createTestRepository(t, createTestStateWithPolicyUsingPersons)
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
@@ -3223,8 +3220,6 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("successful verification with higher threshold but using GitHub approval", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
@@ -3280,8 +3275,6 @@ func TestVerifyEntry(t *testing.T) {
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval due to invalid app key", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
-
 		repo, state := createTestRepository(t, createTestStateWithThresholdPolicyAndGitHubAppTrust)
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
@@ -3940,6 +3933,39 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("both global and policy rule declared, global rule threshold less than policy rule", func(t *testing.T) {
+		// Test that an authorized keyholder for main cannot alone satisfy the
+		// branch protection rule
+		repo, state := createTestRepository(t, createTestStateWithBranchProtectionAndGlobalConstraintThreshold)
+
+		rslTip, err := repo.GetReference(rsl.Ref)
+		require.NoError(t, err)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, nil, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+
+		// Test that a keyholder not authorized for main but still added to
+		// policy cannot satisfy the branch protection rule
+		err = repo.DeleteReference(refName)
+		require.Nil(t, err)
+
+		err = repo.SetReference(rsl.Ref, rslTip)
+		require.Nil(t, err)
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		err = verifyEntry(testCtx, repo, state, nil, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }

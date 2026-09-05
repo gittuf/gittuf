@@ -294,7 +294,9 @@ func (v *PolicyVerifier) verifyMergeable(ctx context.Context, targetRef string, 
 			return false, err
 		}
 
-		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
+		// these will be set after one successful verification of the commit to
+		// avoid repeated signature verification
+		verifiedUsing := ""
 		for _, path := range paths {
 			// If we've already verified and identified commit signature, we can
 			// just check if that verifier is trusted for the new path. If not
@@ -919,7 +921,9 @@ func verifyEntry(ctx context.Context, repo gitstore.Storer, policy *State, attes
 			return err
 		}
 
-		verifiedUsing := "" // this will be set after one successful verification of the commit to avoid repeated signature verification
+		// these will be set after one successful verification of the commit to
+		// avoid repeated signature verification
+		verifiedUsing := ""
 		for _, path := range paths {
 			// If we've already verified and identified commit signature, we
 			// can just check if that verifier is trusted for the new path.
@@ -1114,8 +1118,11 @@ func getCommits(repo gitstore.Storer, entry *rsl.ReferenceEntry) ([]githash.Hash
 type verifyGitObjectAndAttestationsOptions struct {
 	approverPrincipalIDs *set.Set[string]
 	verifyMergeable      bool
-	trustedVerifier      string
-	tagObjectID          githash.Hash
+	// trustedVerifier is the name of the verifier that has already been used to
+	// verify in the past. If the newly discovered set of verifiers includes the
+	// trusted verifier, then we can skip verifying the signature again.
+	trustedVerifier string
+	tagObjectID     githash.Hash
 }
 
 type verifyGitObjectAndAttestationsOption func(o *verifyGitObjectAndAttestationsOptions)
@@ -1139,7 +1146,8 @@ func withVerifyMergeable() verifyGitObjectAndAttestationsOption {
 
 // withTrustedVerifier is used to specify the name of a verifier that has
 // already been used to verify in the past. If the newly discovered set of
-// verifiers includes the trusted verifier, then we can return early.
+// verifiers includes the trusted verifier, then we can skip verifying the
+// signature again.
 func withTrustedVerifier(name string) verifyGitObjectAndAttestationsOption {
 	return func(o *verifyGitObjectAndAttestationsOptions) {
 		o.trustedVerifier = name
@@ -1166,61 +1174,107 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		return "", false, err
 	}
 
-	if len(verifiers) == 0 {
+	// Global rules apply to the target irrespective of the rules protecting it,
+	// so they must be verified even when no rule protects the target.
+	globalRulesVerifier := policy.getVerifierForGlobalRules()
+
+	if len(verifiers) == 0 && globalRulesVerifier == nil {
 		// This target is not protected by gittuf policy
 		return "", false, nil
 	}
 
+	var (
+		verifiedUsing                  string
+		rslSignatureNeededForThreshold bool
+		rulesAlreadyVerified           bool
+	)
+
 	if options.trustedVerifier != "" {
 		for _, verifier := range verifiers {
 			if verifier.Name() == options.trustedVerifier {
-				return options.trustedVerifier, false, nil
-			}
-		}
-	}
-
-	appNames := []string{}
-	for appName, appEntry := range policy.GitHubApps {
-		if appEntry.IsTrusted() {
-			appNames = append(appNames, appName)
-		}
-	}
-	verifiedUsing, acceptedPrincipalIDs, rslSignatureNeededForThreshold, err := verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
-	if err != nil {
-		return "", false, err
-	}
-
-	if !options.tagObjectID.IsZero() {
-		// Verify tag object's signature as well
-		tagObjVerified := false
-		for _, verifier := range verifiers {
-			// explicitly not looking at the attestation
-			// that applies to the _push_
-			// thus, we also set threshold to 1
-			verifier.threshold = 1
-
-			_, err := verifier.Verify(ctx, options.tagObjectID, nil)
-			if err == nil {
-				// Signature verification succeeded
-				tagObjVerified = true
-				// TODO: should we check if a different verifier / signer was
-				// matched for the tag object compared with the RSL entry?
+				// The trusted verifier also protects this target, so its
+				// signature verification carries over and the rules protecting
+				// the target are met. We must not return here, the global rules
+				// below still apply to the target.
+				//
+				// rslSignatureNeededForThreshold is left false because the
+				// trustedVerifier is only meant to be used for file path rules,
+				// where RSL signature doesn't matter anyway.
+				verifiedUsing = options.trustedVerifier
+				rulesAlreadyVerified = true
 				break
-			} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-				// Unexpected error
-				return "", false, err
 			}
-			// Haven't found a valid verifier, continue with next verifier
-		}
-
-		if !tagObjVerified {
-			return "", false, fmt.Errorf("verifying tag object's signature failed")
 		}
 	}
 
-	verifiedPrincipalIDs := 0
-	if acceptedPrincipalIDs != nil {
-		verifiedPrincipalIDs = acceptedPrincipalIDs.Len()
+	// Verify the rules protecting the target. When no rule protects it, there
+	// is nothing to meet here and only the global rules below apply. Similarly,
+	// if we established above that the verifier that applied to this Git object
+	// + attestation(s) is trusted for the namespace under verification this
+	// time, we don't need to verify the rules again.
+	//
+	// TODO: in the long run, we should:
+	// a) structure the outcome as a report rather than an increasingly complex
+	// set of return values
+	// b) cache the report against Git object + attestation(s) context to avoid
+	// relying on callsites passing in information correctly and at the right
+	// times
+	if !rulesAlreadyVerified && len(verifiers) != 0 {
+		appNames := []string{}
+		for appName, appEntry := range policy.GitHubApps {
+			if appEntry.IsTrusted() {
+				appNames = append(appNames, appName)
+			}
+		}
+
+		verifiedUsing, _, rslSignatureNeededForThreshold, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
+		if err != nil {
+			return "", false, err
+		}
+
+		if !options.tagObjectID.IsZero() {
+			// Verify tag object's signature as well
+			tagObjVerified := false
+			for _, verifier := range verifiers {
+				// explicitly not looking at the attestation
+				// that applies to the _push_
+				// thus, we also set threshold to 1
+				verifier.threshold = 1
+
+				_, err := verifier.Verify(ctx, options.tagObjectID, nil)
+				if err == nil {
+					// Signature verification succeeded
+					tagObjVerified = true
+					// TODO: should we check if a different verifier / signer was
+					// matched for the tag object compared with the RSL entry?
+					break
+				} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
+					// Unexpected error
+					return "", false, err
+				}
+				// Haven't found a valid verifier, continue with next verifier
+			}
+
+			if !tagObjVerified {
+				return "", false, fmt.Errorf("verifying tag object's signature failed")
+			}
+		}
+	}
+
+	// Global rules are not delegations of trust: they constrain the target
+	// irrespective of who is trusted for it. They are therefore verified
+	// independently of the rules above, against every principal declared in the
+	// policy that signed rather than only those trusted by those rules.
+	verifiedGlobalRulesPrincipalIDs := 0
+	if globalRulesVerifier != nil {
+		globalRulesPrincipalIDs, err := globalRulesVerifier.Verify(ctx, gitID, authorizationAttestation)
+		if err != nil {
+			return "", false, err
+		}
+
+		if globalRulesPrincipalIDs != nil {
+			verifiedGlobalRulesPrincipalIDs = globalRulesPrincipalIDs.Len()
+		}
 	}
 
 	for controllerName, globalRules := range policy.globalRules {
@@ -1248,10 +1302,10 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 					slog.Debug("Reducing required global threshold by 1 (verifying if change is mergeable and RSL signature is required)...")
 					requiredThreshold--
 				}
-				if verifiedPrincipalIDs < requiredThreshold {
+				if verifiedGlobalRulesPrincipalIDs < requiredThreshold {
 					// Check if the verifiedPrincipalIDs meets the required global
 					// threshold
-					slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedPrincipalIDs))
+					slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedGlobalRulesPrincipalIDs))
 					return "", false, ErrVerifierConditionsUnmet
 				}
 
