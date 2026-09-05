@@ -51,8 +51,15 @@ func TestUpdateInitDoneMsg(t *testing.T) {
 	}
 	updatedModel, _ = m.Update(msgErr)
 	resModel = updatedModel.(model)
-	if !strings.Contains(resModel.errorMsg, "Initialization failed: git repo error") {
-		t.Errorf("expected initialization failure errorMsg, got %q", resModel.errorMsg)
+	if resModel.errorDialog == nil {
+		t.Error("expected errorDialog on initDoneMsg error, got nil")
+	} else {
+		if resModel.errorDialog.title != "Initialization Failed" {
+			t.Errorf("expected errorDialog title 'Initialization Failed', got %q", resModel.errorDialog.title)
+		}
+		if resModel.errorDialog.message != "git repo error" {
+			t.Errorf("expected errorDialog message 'git repo error', got %q", resModel.errorDialog.message)
+		}
 	}
 }
 
