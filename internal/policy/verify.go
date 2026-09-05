@@ -629,29 +629,41 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		// 1. What's the last good state?
 		slog.Debug("Identifying last valid state...")
 		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(invalidEntry.GetRefName()), rsl.BeforeEntryID(invalidEntry.GetID()), rsl.IsUnskipped(), rsl.IsReferenceEntry())
+		isFirstEntryViolation := false
 		if err != nil {
-			return err
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				firstEntryForRef, _, errFirst := rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, invalidEntry.GetRefName())
+				if errFirst == nil && firstEntryForRef.GetID().Equal(invalidEntry.GetID().Bytes()) {
+					isFirstEntryViolation = true
+				} else {
+					return err
+				}
+			} else {
+				return err
+			}
 		}
-		slog.Debug("Verifying identified last valid entry has not been revoked...")
-		if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
-			// this type assertion is fine because we use the rsl.IsReferenceEntry opt
-			return ErrLastGoodEntryIsSkipped
-		}
-		// require lastGoodEntry != nil
+		
+		var lastGoodTreeID githash.Hash
+		if !isFirstEntryViolation {
+			slog.Debug("Verifying identified last valid entry has not been revoked...")
+			if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
+				// this type assertion is fine because we use the rsl.IsReferenceEntry opt
+				return ErrLastGoodEntryIsSkipped
+			}
+			// require lastGoodEntry != nil
 
-		// TODO: what if the very first entry for a ref is a violation?
-
-		// gittuf requires the fix to point to a commit that is tree-same as the
-		// last good state
-		lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
-		if err != nil {
-			return err
+			// gittuf requires the fix to point to a commit that is tree-same as the
+			// last good state
+			lastGoodTreeID, err = v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
+			if err != nil {
+				return err
+			}
 		}
 
 		// 2. What entries do we have in the current verification set for the
 		// ref? The first one that is tree-same as lastGoodEntry's commit is the
 		// fix. Entries prior to that one in the queue are considered invalid
-		// and must be skipped
+		// and must be skipped. For first entry violations, the fix is verified directly instead.
 		fixed := false
 		var fixEntry *rsl.ReferenceEntry
 		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
@@ -678,13 +690,27 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				continue
 
 			case *rsl.ReferenceEntry:
-				newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
-				if err != nil {
-					return err
+				isFix := false
+				if isFirstEntryViolation {
+					slog.Debug("Checking if potential fix entry meets policy as there is no last good state to compare tree against...")
+					if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, newEntry); err == nil {
+						isFix = true
+					} else {
+						slog.Debug(fmt.Sprintf("Potential fix entry does not meet policy: %v", err))
+					}
+				} else {
+					newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
+					if err != nil {
+						return err
+					}
+
+					slog.Debug("Checking if entry is tree-same with last valid state...")
+					if newCommitTreeID.Equal(lastGoodTreeID) {
+						isFix = true
+					}
 				}
 
-				slog.Debug("Checking if entry is tree-same with last valid state...")
-				if newCommitTreeID.Equal(lastGoodTreeID) {
+				if isFix {
 					// Fix found, we append the rest of the current verification set
 					// to the new entry queue
 					// But first, we must check that this fix hasn't been skipped
@@ -702,7 +728,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					break lookForFixes
 				}
 
-				// newEntry is not tree-same / commit-same, so it is automatically
+				// newEntry is not tree-same / commit-same / verifyable, so it is automatically
 				// invalid, check that it's been marked as revoked
 				slog.Debug("Checking non-fix entry has been revoked as well...")
 				if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
