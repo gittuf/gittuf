@@ -585,7 +585,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				if currentPolicy == nil {
 					return ErrPolicyNotFound
 				}
-				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
+				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry, false); err != nil {
 					slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
 					slog.Debug("Checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
@@ -631,29 +631,41 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		// 1. What's the last good state?
 		slog.Debug("Identifying last valid state...")
 		lastGoodEntry, lastGoodEntryAnnotations, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(invalidEntry.GetRefName()), rsl.BeforeEntryID(invalidEntry.GetID()), rsl.IsUnskipped(), rsl.IsReferenceEntry())
+		isFirstEntryViolation := false
 		if err != nil {
-			return err
+			if errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				firstEntryForRef, _, errFirst := rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, invalidEntry.GetRefName())
+				if errFirst == nil && firstEntryForRef.GetID().Equal(invalidEntry.GetID().Bytes()) {
+					isFirstEntryViolation = true
+				} else {
+					return verificationErr
+				}
+			} else {
+				return err
+			}
 		}
-		slog.Debug("Verifying identified last valid entry has not been revoked...")
-		if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
-			// this type assertion is fine because we use the rsl.IsReferenceEntry opt
-			return ErrLastGoodEntryIsSkipped
-		}
-		// require lastGoodEntry != nil
 
-		// TODO: what if the very first entry for a ref is a violation?
+		var lastGoodTreeID githash.Hash
+		if !isFirstEntryViolation {
+			slog.Debug("Verifying identified last valid entry has not been revoked...")
+			if lastGoodEntry.(*rsl.ReferenceEntry).SkippedBy(lastGoodEntryAnnotations) {
+				// this type assertion is fine because we use the rsl.IsReferenceEntry opt
+				return ErrLastGoodEntryIsSkipped
+			}
+			// require lastGoodEntry != nil
 
-		// gittuf requires the fix to point to a commit that is tree-same as the
-		// last good state
-		lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
-		if err != nil {
-			return err
+			// gittuf requires the fix to point to a commit that is tree-same as the
+			// last good state
+			lastGoodTreeID, err = v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
+			if err != nil {
+				return err
+			}
 		}
 
 		// 2. What entries do we have in the current verification set for the
 		// ref? The first one that is tree-same as lastGoodEntry's commit is the
 		// fix. Entries prior to that one in the queue are considered invalid
-		// and must be skipped
+		// and must be skipped. For first entry violations, the fix is verified directly instead.
 		fixed := false
 		var fixEntry *rsl.ReferenceEntry
 		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
@@ -680,13 +692,27 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				continue
 
 			case *rsl.ReferenceEntry:
-				newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
-				if err != nil {
-					return err
+				isFix := false
+				if isFirstEntryViolation {
+					slog.Debug("Checking if potential fix entry meets policy as there is no last good state to compare tree against...")
+					if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, newEntry, true); err == nil {
+						isFix = true
+					} else {
+						slog.Debug(fmt.Sprintf("Potential fix entry does not meet policy: %v", err))
+					}
+				} else {
+					newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
+					if err != nil {
+						return err
+					}
+
+					slog.Debug("Checking if entry is tree-same with last valid state...")
+					if newCommitTreeID.Equal(lastGoodTreeID) {
+						isFix = true
+					}
 				}
 
-				slog.Debug("Checking if entry is tree-same with last valid state...")
-				if newCommitTreeID.Equal(lastGoodTreeID) {
+				if isFix {
 					// Fix found, we append the rest of the current verification set
 					// to the new entry queue
 					// But first, we must check that this fix hasn't been skipped
@@ -704,7 +730,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					break lookForFixes
 				}
 
-				// newEntry is not tree-same / commit-same, so it is automatically
+				// newEntry is not tree-same / commit-same / verifiable, so it is automatically
 				// invalid, check that it's been marked as revoked
 				slog.Debug("Checking non-fix entry has been revoked as well...")
 				if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
@@ -852,7 +878,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 // via the RSL across all refs. Then, it uses the policy applicable at the
 // commit's first entry into the repository. If the commit is brand new to the
 // repository, the specified policy is used.
-func verifyEntry(ctx context.Context, repo gitstore.Storer, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry) error {
+func verifyEntry(ctx context.Context, repo gitstore.Storer, policy *State, attestationsState *attestations.Attestations, entry *rsl.ReferenceEntry, isFirstEntryViolation bool) error {
 	if entry.RefName == PolicyRef || entry.RefName == attestations.Ref {
 		return nil
 	}
@@ -884,7 +910,7 @@ func verifyEntry(ctx context.Context, repo gitstore.Storer, policy *State, attes
 	// Verify modified files
 
 	// First, get all commits between the current and last entry for the ref.
-	commitIDs, err := getCommits(repo, entry) // note: this is ordered by commit ID
+	commitIDs, err := getCommits(repo, entry, isFirstEntryViolation) // note: this is ordered by commit ID
 	if err != nil {
 		return err
 	}
@@ -1065,26 +1091,22 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.
 	return authorizationAttestation, approverIdentities, nil
 }
 
-// getCommits identifies the commits introduced to the entry's ref since the
-// last RSL entry for the same ref. These commits are then verified for file
-// policies.
-func getCommits(repo gitstore.Storer, entry *rsl.ReferenceEntry) ([]githash.Hash, error) {
-	firstEntry := false
+// getCommits returns the commits between the current and previous RSL entries.
+func getCommits(repo gitstore.Storer, entry *rsl.ReferenceEntry, isFirstEntryViolation bool) ([]githash.Hash, error) {
+	firstEntry := isFirstEntryViolation
 
-	priorRefEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
-	if err != nil {
-		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			return nil, err
+	if !firstEntry {
+		priorRefEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
+		if err != nil {
+			if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
+				return nil, err
+			}
+		} else {
+			return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.GetTargetID())
 		}
-
-		firstEntry = true
 	}
 
-	if firstEntry {
-		return repo.GetCommitsBetweenRange(entry.TargetID, nil)
-	}
-
-	return repo.GetCommitsBetweenRange(entry.TargetID, priorRefEntry.GetTargetID())
+	return repo.GetCommitsBetweenRange(entry.TargetID, nil)
 }
 
 // verifyGitObjectAndAttestationsOptions contains the configurable options for
