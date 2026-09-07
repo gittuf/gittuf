@@ -427,6 +427,9 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 }
 
 func (f *policyPrincipalsFormScreen) View(m *model) string {
+	if dialog := renderPopupDialog(*m); dialog != "" {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
+	}
 	breadcrumb := fmt.Sprintf("Home › Policy › Principals › %s", f.action)
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(f.action))

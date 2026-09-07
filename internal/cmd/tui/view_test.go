@@ -19,10 +19,22 @@ func TestViewHelperFunctions(t *testing.T) {
 		t.Errorf("expected margin content, got %q", marginStr)
 	}
 
-	// Test renderFooter
+	// Test renderFooter standard & success
 	footerStr := renderFooter("footer-text")
 	if !strings.Contains(footerStr, "footer-text") {
 		t.Errorf("expected footer text, got %q", footerStr)
+	}
+
+	successFooter := renderFooter("Changes staged successfully!")
+	if !strings.Contains(successFooter, "✓") || !strings.Contains(successFooter, "Changes staged successfully!") {
+		t.Errorf("expected green checkmark in success footer, got %q", successFooter)
+	}
+
+	if !isSuccessMessage("Policy initialized successfully.") || !isSuccessMessage("Root key added!") {
+		t.Error("expected isSuccessMessage to return true for success texts")
+	}
+	if isSuccessMessage("Read-only mode") || isSuccessMessage("No action selected.") {
+		t.Error("expected isSuccessMessage to return false for standard info texts")
 	}
 
 	// Test renderErrorMsg
