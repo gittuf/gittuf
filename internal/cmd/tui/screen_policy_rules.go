@@ -288,8 +288,16 @@ func getCurrRules(ctx context.Context, o *options) []rule {
 	if err != nil {
 		return nil
 	}
+	return getRulesForRef(ctx, repo, o.targetRef)
+}
 
-	rules, err := repo.ListRules(ctx, o.targetRef)
+// getRulesForRef returns the rules from a specific policy ref (e.g. policy or policy-staging).
+func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []rule {
+	if repo == nil {
+		return nil
+	}
+
+	rules, err := repo.ListRules(ctx, targetRef)
 	if err != nil {
 		return nil
 	}

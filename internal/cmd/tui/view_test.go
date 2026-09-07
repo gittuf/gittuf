@@ -64,6 +64,47 @@ func TestViewHelperFunctions(t *testing.T) {
 	}
 }
 
+func TestDiffOverlayRendering(t *testing.T) {
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	m.width = 80
+	m.height = 24
+
+	if renderDiffOverlay(m) != "" {
+		t.Error("expected empty string when showDiffOverlay is false")
+	}
+
+	m.toggleDiffOverlay()
+	diffStr := renderDiffOverlay(m)
+	if !strings.Contains(diffStr, "Staged Policy & Trust Changes") {
+		t.Errorf("expected diff overlay header, got %q", diffStr)
+	}
+
+	m.toggleDiffOverlay()
+	if m.showDiffOverlay {
+		t.Error("expected showDiffOverlay to be false after toggle")
+	}
+}
+
+func TestGenerateStagedDiffEqualTips(t *testing.T) {
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	diff := m.generateStagedDiff()
+	if !strings.Contains(diff, "No staged policy changes detected") {
+		t.Errorf("expected 'No staged policy changes detected', got %q", diff)
+	}
+}
+
 func TestRenderFooterBoxVariants(t *testing.T) {
 	o := &options{
 		readOnly:  true,

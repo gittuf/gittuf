@@ -125,6 +125,27 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.showDiffOverlay {
+			switch msg.String() {
+			case "esc", "v", "q":
+				m.showDiffOverlay = false
+				return m, nil
+			case "up", "k":
+				m.diffViewport.ScrollUp(1)
+				return m, nil
+			case "down", "j":
+				m.diffViewport.ScrollDown(1)
+				return m, nil
+			case "pgup":
+				m.diffViewport.HalfPageUp()
+				return m, nil
+			case "pgdown":
+				m.diffViewport.HalfPageDown()
+				return m, nil
+			}
+			m.diffViewport, cmd = m.diffViewport.Update(msg)
+			return m, cmd
+		}
 		if m.verifying {
 			if msg.String() == "ctrl+c" {
 				return m, tea.Quit
@@ -146,6 +167,11 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "v":
+			if !isFormScreen(m.screen) {
+				m.toggleDiffOverlay()
+				return m, nil
+			}
 		case "q":
 			if !isFormScreen(m.screen) {
 				return m, tea.Quit

@@ -225,12 +225,61 @@ func renderErrorDialog(m model) string {
 }
 
 func renderPopupDialog(m model) string {
+	if m.showDiffOverlay {
+		return renderDiffOverlay(m)
+	}
 	dialog := renderErrorDialog(m)
 	if dialog == "" {
 		return ""
 	}
 
 	return dialog
+}
+
+func renderDiffOverlay(m model) string {
+	if !m.showDiffOverlay {
+		return ""
+	}
+
+	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+	availableWidth := m.width - h - 4
+	availableHeight := m.height - v - 6
+
+	w := availableWidth - 6
+	if w > 74 {
+		w = 74
+	}
+	if w < 28 {
+		w = 28
+	}
+
+	vh := availableHeight - 6
+	if vh < 4 {
+		vh = 4
+	}
+
+	m.diffViewport.Width = w
+	m.diffViewport.Height = vh
+
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorFocus)).
+		Bold(true).
+		Render("Staged Policy & Trust Changes (Diff)")
+
+	content := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(colorFocus)).
+		Padding(1, 2).
+		Width(w).
+		Render(lipgloss.JoinVertical(lipgloss.Left,
+			title,
+			"",
+			m.diffViewport.View(),
+			"",
+			lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Press Esc or 'v' to close • Arrow keys to scroll"),
+		))
+
+	return content
 }
 
 // renderStatusBar renders the top status bar showing screen name and current mode.
@@ -270,24 +319,23 @@ func renderStatusBar(screenName string, readOnly bool, width int) string {
 
 // renderHelpKey renders a single styled key + description pair.
 func renderHelpKey(key, desc string) string {
-	k := helpKeyStyle.Render(key)
-	d := helpDescStyle.Render(desc)
-	return lipgloss.JoinHorizontal(lipgloss.Top, k, d)
+	return helpKeyStyle.Render(key) + helpDescStyle.Render(desc)
 }
 
-// renderStyledHelp renders the full help bar from a list of key/desc pairs.
-func renderStyledHelp(pairs [][2]string) string {
-	parts := make([]string, 0, len(pairs))
-	for _, p := range pairs {
-		parts = append(parts, renderHelpKey(p[0], p[1]))
+// renderStyledHelp formats keybinding pairs into a single horizontal help bar.
+func renderStyledHelp(keys [][2]string) string {
+	var parts []string
+	for _, pair := range keys {
+		parts = append(parts, renderHelpKey(pair[0], pair[1]))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+	return strings.Join(parts, " ")
 }
 
 // renderActionHints returns the consistent action hints requested for the bottom of screens.
 func renderActionHints(readOnly bool) string {
 	if readOnly {
 		return "\n" + renderStyledHelp([][2]string{
+			{"v", "review diff"},
 			{"h", "help"},
 			{"esc", "back"},
 			{"q", "quit"},
@@ -297,6 +345,7 @@ func renderActionHints(readOnly bool) string {
 		{"a", "add"},
 		{"e", "edit"},
 		{"d", "delete"},
+		{"v", "review diff"},
 		{"h", "help"},
 		{"esc", "back"},
 		{"q", "quit"},
@@ -320,9 +369,15 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxWidth = 0
 	}
 
+	// When diff overlay is active, suppress bottom hints so status bar stays visible.
+	effectiveOverlays := overlays
+	if m.showDiffOverlay {
+		effectiveOverlays = ""
+	}
+
 	bottomHeight := 1
-	if overlays != "" {
-		bottomHeight += strings.Count(overlays, "\n") + 1
+	if effectiveOverlays != "" {
+		bottomHeight += strings.Count(effectiveOverlays, "\n") + 1
 	}
 	footerBox := renderFooterBox(m)
 	if footerBox != "" {
@@ -354,7 +409,7 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		renderStatusBar(title, m.readOnly, m.width),
 		renderWithMargin(
 			content+"\n"+
-				overlays+
+				effectiveOverlays+
 				renderFooterBox(m)+
 				errMsg,
 		),
@@ -413,7 +468,60 @@ func (m model) View() string {
 		)
 	}
 
+	// Diff overlay takes over the full screen below the status bar.
+	// We determine the current screen's title to keep the status bar correct.
+	if m.showDiffOverlay {
+		screenTitle := m.currentScreenTitle()
+		statusBar := renderStatusBar(screenTitle, m.readOnly, m.width)
+		// Height available below status bar (1 row) minus margin (2 rows top+bottom)
+		overlayHeight := m.height - 3
+		if overlayHeight < 6 {
+			overlayHeight = 6
+		}
+		overlayWidth := m.width - 6
+		if overlayWidth > 76 {
+			overlayWidth = 76
+		}
+		if overlayWidth < 28 {
+			overlayWidth = 28
+		}
+		// viewport fits inside the box: subtract border(2) + padding(2) + title(1) + blank(1) + hint(1) + blank(1) = 8
+		vpHeight := overlayHeight - 8
+		if vpHeight < 2 {
+			vpHeight = 2
+		}
+		m.diffViewport.Width = overlayWidth - 4
+		m.diffViewport.Height = vpHeight
+
+		title := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colorFocus)).
+			Bold(true).
+			Render("Staged Policy & Trust Changes (Diff)")
+
+		overlayBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(colorFocus)).
+			Padding(1, 2).
+			Width(overlayWidth).
+			Height(overlayHeight).
+			Render(lipgloss.JoinVertical(lipgloss.Left,
+				title,
+				"",
+				m.diffViewport.View(),
+				"",
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Press Esc or 'v' to close • Arrow keys to scroll"),
+			))
+
+		centeredOverlay := lipgloss.Place(m.width, overlayHeight, lipgloss.Center, lipgloss.Top, overlayBox)
+
+		return lipgloss.JoinVertical(lipgloss.Left,
+			statusBar,
+			centeredOverlay,
+		)
+	}
+
 	var view string
+
 	switch m.screen {
 	case screenLoading:
 		if m.errorMsg != "" {
