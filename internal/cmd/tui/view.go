@@ -20,6 +20,7 @@ const (
 	colorFooter      = "#007AFF"
 	colorSubtext     = "#A0A0A0"
 	colorErrorMsg    = "#FF5252"
+	colorSuccessMsg  = "#4CAF50"
 	colorStatusBg    = "#1A1A2E"
 	colorEditMode    = "#007AFF"
 	colorReadOnly    = "#FF6B6B"
@@ -96,6 +97,10 @@ var (
 				BorderForeground(lipgloss.Color(colorErrorMsg)).
 				Background(lipgloss.Color(colorStatusBg)).
 				Padding(1, 2)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colorSuccessMsg)).
+			Bold(true)
 )
 
 // renderWithMargin wraps content in the standard margin used by all screens.
@@ -103,8 +108,36 @@ func renderWithMargin(content string) string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(content)
 }
 
-// renderFooter returns the footer text styled in the footer color.
+// isSuccessMessage returns true if the footer text indicates a successful operation.
+func isSuccessMessage(text string) bool {
+	if text == "" {
+		return false
+	}
+	lower := strings.ToLower(text)
+	if strings.HasPrefix(text, "✓") || strings.HasPrefix(text, "✔") {
+		return true
+	}
+	if strings.Contains(lower, "successfully") || strings.Contains(lower, "successful") {
+		return true
+	}
+	if strings.HasSuffix(text, "!") && !strings.Contains(lower, "error") && !strings.Contains(lower, "fail") && !strings.Contains(lower, "read-only") {
+		return true
+	}
+	return false
+}
+
+// renderFooter returns the footer text styled in green for success or blue for standard info.
 func renderFooter(text string) string {
+	if text == "" {
+		return ""
+	}
+	if isSuccessMessage(text) {
+		formattedText := text
+		if !strings.HasPrefix(formattedText, "✓") && !strings.HasPrefix(formattedText, "✔") {
+			formattedText = "✓ " + formattedText
+		}
+		return successStyle.Render(formattedText)
+	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(text)
 }
 
@@ -181,7 +214,6 @@ func renderErrorDialog(m model) string {
 		Render(m.errorDialog.title)
 	message := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(colorRegularText)).
-		Width(width - 6).
 		Render(m.errorDialog.message)
 	hint := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(colorSubtext)).

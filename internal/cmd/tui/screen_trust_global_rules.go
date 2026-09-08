@@ -255,6 +255,9 @@ func (s *trustGlobalRulesScreen) View(m *model) string {
 }
 
 func (s *trustGlobalRulesScreen) renderFormScreen(m *model, formTitle string, breadcrumb string) string {
+	if dialog := renderPopupDialog(*m); dialog != "" {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
+	}
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(formTitle) + "\n\n")
 	for _, input := range s.inputs {
