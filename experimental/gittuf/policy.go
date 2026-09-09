@@ -217,20 +217,6 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 	return rootMetadata.GetGlobalRules(), nil
 }
 
-func (r *Repository) ListHooks(ctx context.Context, targetRef string) (map[tuf.HookStage][]tuf.Hook, error) {
-	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
-		targetRef = "refs/gittuf/" + targetRef
-	}
-
-	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
-	if err != nil {
-		return nil, err
-	}
-
-	return state.Hooks, nil
-}
-
 func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")

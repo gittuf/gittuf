@@ -139,50 +139,11 @@ func TestTUI(t *testing.T) {
 			content := string(out)
 			return strings.Contains(content, "Home › Trust") &&
 				strings.Contains(content, "View Global Rules") &&
-				strings.Contains(content, "Hooks") &&
 				strings.Contains(content, "Propagation") &&
 				!strings.Contains(content, "Keys & Thresholds") &&
 				!strings.Contains(content, "GitHub App") &&
 				!strings.Contains(content, "Lifecycle") &&
 				!strings.Contains(content, "Repo/Network")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-	})
-
-	t.Run("Trust Hooks Navigation", func(t *testing.T) {
-		o := &options{readOnly: true, targetRef: "policy"}
-		m := initialModel(context.Background(), o)
-		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			return strings.Contains(string(out), "Policy")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			content := string(out)
-			return strings.Contains(content, "Home › Trust › Hooks") &&
-				strings.Contains(content, "List Hooks") &&
-				!strings.Contains(content, "Add Hook")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			content := string(out)
-			return strings.Contains(content, "List Hooks Failed") &&
-				strings.Contains(content, "Press Enter or Esc to close.")
-		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
-
-		tm.Send(tea.KeyMsg{Type: tea.KeyEsc})
-
-		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
-			content := string(out)
-			return strings.Contains(content, "Trust Hooks") &&
-				strings.Contains(content, "List Hooks")
 		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
 	})
 
@@ -424,10 +385,10 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 		index  int
 		screen screen
 	}{
-		{name: "keys and thresholds", index: 3, screen: screenTrustKeysThresholds},
-		{name: "github app", index: 4, screen: screenTrustGitHubApp},
-		{name: "lifecycle", index: 5, screen: screenTrustLifecycle},
-		{name: "repo network", index: 6, screen: screenTrustRepoNetwork},
+		{name: "keys and thresholds", index: 2, screen: screenTrustKeysThresholds},
+		{name: "github app", index: 3, screen: screenTrustGitHubApp},
+		{name: "lifecycle", index: 4, screen: screenTrustLifecycle},
+		{name: "repo network", index: 5, screen: screenTrustRepoNetwork},
 	}
 
 	for _, tt := range tests {

@@ -39,10 +39,6 @@ const (
 	screenTrustKeysThresholds                      // Manage root/policy keys and thresholds
 	screenTrustKeyForm                             // Form: add/remove trust key
 	screenTrustThresholdForm                       // Form: update trust threshold
-	screenTrustHooks                               // Hook management screen
-	screenTrustRemoveHookForm                      // Form: remove a trust hook
-	screenTrustAddHookForm                         // Form: add a trust hook
-	screenTrustUpdateHookForm                      // Form: update a trust hook
 	screenTrustPropagation                         // Propagation directive management screen
 	screenTrustAddPropagationForm                  // Form: add a propagation directive
 	screenTrustUpdatePropagationForm               // Form: update a propagation directive
@@ -95,7 +91,6 @@ type model struct {
 	policyPrincipalsFormScreen policyPrincipalsFormScreen
 	trustKeysScreen            trustKeysThresholdsScreen
 	trustLifecycleScreen       trustLifecycleScreen
-	trustHookScreen            trustHookScreen
 	trustPropagationScreen     trustPropagationScreen
 	trustGitHubAppScreen       trustGitHubAppScreen
 	trustRepoNetworkScreen     trustRepoNetworkScreen
@@ -175,7 +170,6 @@ func newMenuList(title string, items []list.Item, delegate list.DefaultDelegate)
 func trustMenuItems(readOnly bool) []list.Item {
 	items := []list.Item{
 		item{title: "View Global Rules", desc: "View and manage global rules"},
-		item{title: "Hooks", desc: "Manage trust hooks"},
 		item{title: "Propagation", desc: "Manage propagation directives"},
 	}
 	if !readOnly {
@@ -212,20 +206,6 @@ func trustLifecycleMenuItems(readOnly bool) []list.Item {
 		item{title: "Sign Trust Changes", desc: "Sign staged trust changes"},
 		item{title: "Apply Trust Changes", desc: "Apply signed trust changes to the policy file"},
 	}
-}
-
-func trustHooksMenuItems(readOnly bool) []list.Item {
-	items := []list.Item{
-		item{title: "List Hooks", desc: "List all configured hooks"},
-	}
-	if !readOnly {
-		items = append(items,
-			item{title: "Add Hook", desc: "Add a new hook"},
-			item{title: "Update Hook", desc: "Update an existing hook"},
-			item{title: "Remove Hook", desc: "Remove an existing hook"},
-		)
-	}
-	return items
 }
 
 func trustPropagationMenuItems(readOnly bool) []list.Item {
@@ -363,9 +343,6 @@ func initialModel(ctx context.Context, o *options) model {
 		trustLifecycleScreen: trustLifecycleScreen{
 			operationList: newMenuList("Trust Lifecycle", trustLifecycleMenuItems(o.readOnly), delegate),
 		},
-		trustHookScreen: trustHookScreen{
-			operationList: newMenuList("Trust Hooks", trustHooksMenuItems(o.readOnly), delegate),
-		},
 		trustPropagationScreen: trustPropagationScreen{
 			operationList: newMenuList("Trust Propagation", trustPropagationMenuItems(o.readOnly), delegate),
 		},
@@ -394,7 +371,6 @@ func (m *model) applyReadOnlyMenus() {
 	m.trustScreen.trustScreenList.SetItems(trustMenuItems(m.readOnly))
 	m.trustKeysScreen.operationList.SetItems(trustKeysMenuItems(m.readOnly))
 	m.trustLifecycleScreen.operationList.SetItems(trustLifecycleMenuItems(m.readOnly))
-	m.trustHookScreen.operationList.SetItems(trustHooksMenuItems(m.readOnly))
 	m.trustPropagationScreen.operationList.SetItems(trustPropagationMenuItems(m.readOnly))
 	m.trustGitHubAppScreen.operationList.SetItems(trustGitHubAppMenuItems(m.readOnly))
 	m.trustRepoNetworkScreen.operationList.SetItems(trustRepoNetworkMenuItems(m.readOnly))
@@ -445,9 +421,7 @@ func (m *model) resizeLists() {
 	m.trustGlobalRulesScreen.globalRuleList.SetSize(innerWidth, innerHeight)
 	m.policyPrincipalsScreen.list.SetSize(innerWidth, innerHeight)
 	m.trustKeysScreen.operationList.SetSize(innerWidth, innerHeight)
-	m.trustHookScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustLifecycleScreen.operationList.SetSize(innerWidth, innerHeight)
-	m.trustHookScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustPropagationScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustGitHubAppScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustRepoNetworkScreen.operationList.SetSize(innerWidth, innerHeight)
