@@ -63,8 +63,6 @@ type State struct {
 	Metadata           *StateMetadata
 	ControllerMetadata map[string]*StateMetadata
 
-	Hooks map[tuf.HookStage][]tuf.Hook
-
 	GitHubApps map[string]tuf.GitHubApp
 
 	repository          gitstore.Storer
@@ -763,13 +761,6 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 		})
 	}
 
-	for stage, hookSet := range s.Hooks {
-		for _, hook := range hookSet {
-			hookPath := fmt.Sprintf("%s/%s/%s", tuf.HooksPrefix, stage.String(), hook.ID())
-			entries = append(entries, gitstore.TreeEntry{Path: hookPath, ID: hook.GetBlobID(), Kind: gitstore.KindBlob})
-		}
-	}
-
 	policyRootTreeID, err := repo.WriteTree(entries)
 	if err != nil {
 		return err
@@ -1151,34 +1142,6 @@ func (s *State) preprocess() error {
 	if err != nil {
 		return err
 	}
-
-	s.Hooks = make(map[tuf.HookStage][]tuf.Hook, 2)
-
-	hooks, err := rootMetadata.GetHooks(tuf.HookStagePreCommit)
-	if err != nil {
-		if !errors.Is(err, tuf.ErrNoHooksDefined) {
-			return err
-		}
-	}
-
-	if s.Hooks[tuf.HookStagePreCommit] == nil {
-		s.Hooks[tuf.HookStagePreCommit] = []tuf.Hook{}
-	}
-
-	s.Hooks[tuf.HookStagePreCommit] = append(s.Hooks[tuf.HookStagePreCommit], hooks...)
-
-	hooks, err = rootMetadata.GetHooks(tuf.HookStagePrePush)
-	if err != nil {
-		if !errors.Is(err, tuf.ErrNoHooksDefined) {
-			return err
-		}
-	}
-
-	if s.Hooks[tuf.HookStagePrePush] == nil {
-		s.Hooks[tuf.HookStagePrePush] = []tuf.Hook{}
-	}
-
-	s.Hooks[tuf.HookStagePrePush] = append(s.Hooks[tuf.HookStagePrePush], hooks...)
 
 	globalRules := rootMetadata.GetGlobalRules()
 	if len(globalRules) > 0 {

@@ -79,9 +79,6 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 		}
 	}
 
-	// Set hooks
-	newRootMetadata.Hooks = rootMetadata.Hooks
-
 	return newRootMetadata
 }
 
