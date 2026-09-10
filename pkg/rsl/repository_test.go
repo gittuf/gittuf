@@ -237,6 +237,14 @@ func TestParseRSLEntryTextRequiresCustomFieldsAfterBuiltInFields(t *testing.T) {
 			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, custom, UpstreamRepositoryKey, UpstreamEntryIDKey, zero),
 		"propagation number after custom": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\n%s\n%s: 1",
 			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero, custom, NumberKey),
+		"reference number after custom with invalid key": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: value\n%s: 1",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, customfields.Prefix+"INVALID", NumberKey),
+		"reference number after custom with empty value": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s:\n%s: 1",
+			ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, customfields.Prefix+"example.com/field", NumberKey),
+		"annotation number after custom with empty value": fmt.Sprintf("%s\n\n%s: %s\n%s: false\n%s:\n%s: 1",
+			AnnotationEntryHeader, EntryIDKey, zero, SkipKey, customfields.Prefix+"example.com/field", NumberKey),
+		"propagation number after custom with invalid key": fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: https://example.com/repository\n%s: %s\n%s: value\n%s: 1",
+			PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, UpstreamRepositoryKey, UpstreamEntryIDKey, zero, customfields.Prefix+"INVALID", NumberKey),
 	}
 
 	for name, message := range invalid {
