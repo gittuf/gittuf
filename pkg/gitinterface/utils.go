@@ -46,9 +46,9 @@ func RemoteRef(refName, remoteName string) string {
 func (r *Repository) RestoreWorktree(t *testing.T) {
 	t.Helper()
 
-	worktree := r.gitDirPath
-	if !r.IsBare() {
-		worktree = strings.TrimSuffix(worktree, ".git") // TODO: this doesn't support detached git dir
+	worktree, err := r.GetWorktree()
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	if _, err := r.executor("restore", "--staged", ".").withDir(worktree).executeString(); err != nil {

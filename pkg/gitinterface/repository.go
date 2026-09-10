@@ -29,12 +29,16 @@ var (
 	ErrRepositoryPathNotSpecified    = errors.New("repository path not specified")
 	ErrUnknownObjectFormat           = errors.New("unknown object format")
 	ErrCompatObjectFormatUnsupported = errors.New("gittuf does not support repositories with extensions.compatObjectFormat enabled")
+	ErrNoWorktree                    = errors.New("repository has no worktree")
 )
 
 // Repository is a lightweight wrapper around a Git repository. It stores the
-// location of the repository's GIT_DIR.
+// location of the repository's GIT_DIR. If the repository has a worktree and
+// it was discovered while loading the repository, its location is also
+// recorded.
 type Repository struct {
 	gitDirPath   string
+	worktreePath string
 	objectFormat ObjectFormat
 	clock        clockwork.Clock
 }
@@ -70,7 +74,24 @@ func (r *Repository) readObjectFormat() (ObjectFormat, error) {
 // support refuse to open such repositories at all.
 func (r *Repository) ensureNoCompatObjectFormat() error {
 	configPath := filepath.Join(r.gitDirPath, "config")
-	configFile, err := os.Open(configPath)
+
+	// Linked worktrees do not have their own config file: configuration lives
+	// in the repository's common Git directory, whose location is recorded in
+	// $GIT_DIR/commondir.
+	if contents, err := os.ReadFile(filepath.Join(r.gitDirPath, "commondir")); err == nil {
+		commonDirPath := strings.TrimSpace(string(contents))
+		if commonDirPath != "" {
+			if !filepath.IsAbs(commonDirPath) {
+				commonDirPath = filepath.Join(r.gitDirPath, commonDirPath)
+			}
+			commonConfigPath := filepath.Join(commonDirPath, "config")
+			if fileInfo, err := os.Stat(commonConfigPath); err == nil && fileInfo.Mode().IsRegular() { //nolint:gosec // the path comes from the repository's own commondir and is verified to be a regular file here
+				configPath = commonConfigPath
+			}
+		}
+	}
+
+	configFile, err := os.Open(configPath) //nolint:gosec // opens either the repository's own config or an existing regular file at the commondir location
 	if err != nil {
 		return fmt.Errorf("unable to read repository config: %w", err)
 	}
@@ -88,35 +109,35 @@ func (r *Repository) ensureNoCompatObjectFormat() error {
 	return nil
 }
 
-func findGitDirPath(startPath string) (string, bool, error) {
+func findGitDirPath(startPath string) (string, string, bool, error) {
 	currentPath, err := filepath.Abs(startPath)
 	if err != nil {
-		return "", false, err
+		return "", "", false, err
 	}
 
 	for {
 		gitDirPath := filepath.Join(currentPath, ".git")
 		if fileInfo, err := os.Stat(gitDirPath); err == nil {
 			if fileInfo.IsDir() {
-				return gitDirPath, true, nil
+				return gitDirPath, currentPath, true, nil
 			}
 
 			resolvedGitDirPath, err := readGitDirFile(gitDirPath, currentPath)
 			if err != nil {
-				return "", false, err
+				return "", "", false, err
 			}
-			return resolvedGitDirPath, true, nil
+			return resolvedGitDirPath, currentPath, true, nil
 		} else if !os.IsNotExist(err) {
-			return "", false, err
+			return "", "", false, err
 		}
 
 		if isBareGitDir(currentPath) {
-			return currentPath, true, nil
+			return currentPath, "", true, nil
 		}
 
 		parentPath := filepath.Dir(currentPath)
 		if parentPath == currentPath {
-			return "", false, nil
+			return "", "", false, nil
 		}
 		currentPath = parentPath
 	}
@@ -150,6 +171,20 @@ func isBareGitDir(path string) bool {
 	return true
 }
 
+// resolvePath returns the absolute, symlink-resolved form of the specified
+// path. If the path cannot be resolved, the absolute path is returned.
+func resolvePath(path string) string {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return absPath
+	}
+	return resolvedPath
+}
+
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
@@ -165,11 +200,122 @@ func (r *Repository) GetGitDir() string {
 	return r.gitDirPath
 }
 
-// IsBare returns true if the repository is a bare repository.
+// IsBare returns true if the repository is a bare repository, i.e. it has no
+// worktree. Bareness is determined by Git itself; if Git cannot be consulted,
+// we fall back to checking for the sentinel files Git writes on bare
+// repositories.
 func (r *Repository) IsBare() bool {
-	// TODO: this may not work when the repo is cloned with GIT_DIR set
-	// elsewhere. We don't support this at the moment, so it's probably okay?
-	return !strings.HasSuffix(r.gitDirPath, ".git")
+	stdOut, err := r.executor("rev-parse", "--is-bare-repository").executeString()
+	if err != nil {
+		return isBareGitDir(r.gitDirPath)
+	}
+	return stdOut == "true"
+}
+
+// GetWorktree returns the absolute path of the repository's worktree, i.e.
+// the directory containing the checked out files. It returns an error wrapping
+// ErrNoWorktree if the repository is bare or if the worktree cannot be
+// determined.
+//
+// Resolves:
+//  1. linked worktrees record the location of their `.git` file in
+//     `$GIT_DIR/gitdir`; the link is verified in both directions
+//  2. the worktree discovered while loading the repository, which is the only
+//     reliable source for repositories with a detached GIT_DIR
+//  3. `core.worktree` from the repository-local configuration, set explicitly
+//     for repositories like submodules
+//  4. otherwise, a `$GIT_DIR` named `.git` implies its parent directory is
+//     the worktree
+//
+// Callers can test for ErrNoWorktree with errors.Is.
+func (r *Repository) GetWorktree() (string, error) {
+	if r.IsBare() {
+		return "", ErrNoWorktree
+	}
+
+	if contents, err := os.ReadFile(filepath.Join(r.gitDirPath, "gitdir")); err == nil {
+		gitDirFilePath := strings.TrimSpace(string(contents))
+		if gitDirFilePath != "" {
+			worktree := filepath.Dir(gitDirFilePath)
+			if !filepath.IsAbs(worktree) {
+				worktree = filepath.Join(r.gitDirPath, worktree)
+			}
+			worktree = resolvePath(worktree)
+			// Git records the location of the worktree's `.git` entry here.
+			// Verify the link in the other direction too: the `.git` file it
+			// points at must reference this GIT_DIR, so a stale pointer that
+			// now belongs to a different repository is rejected.
+			if isUsableWorktree(r.gitDirPath, worktree) {
+				if gitDirBelongsTo(worktree, r.gitDirPath) {
+					return worktree, nil
+				}
+			}
+		}
+	}
+
+	if r.worktreePath != "" {
+		return resolvePath(r.worktreePath), nil
+	}
+
+	if worktree, err := r.executor("config", "--local", "--get", "core.worktree").executeString(); err == nil && worktree != "" {
+		if !filepath.IsAbs(worktree) {
+			// Git interprets relative core.worktree values relative to the
+			// GIT_DIR.
+			worktree = filepath.Join(r.gitDirPath, worktree)
+		}
+		worktree = resolvePath(worktree)
+		if isUsableWorktree(r.gitDirPath, worktree) {
+			// The worktree must belong to this repository, so core.worktree
+			// cannot redirect resolution to an unrelated directory.
+			if gitDirBelongsTo(worktree, r.gitDirPath) {
+				return worktree, nil
+			}
+		}
+	}
+
+	if filepath.Base(r.gitDirPath) == ".git" {
+		return resolvePath(filepath.Dir(r.gitDirPath)), nil
+	}
+
+	return "", fmt.Errorf("%w: unable to determine worktree for '%s'", ErrNoWorktree, r.gitDirPath)
+}
+
+// gitDirBelongsTo returns true if the `.git` entry at the specified worktree
+// resolves to the supplied GIT_DIR. A conventional `.git` directory matches
+// only when its resolved path is the GIT_DIR; a `.git` file matches when its
+// `gitdir:` pointer resolves to the GIT_DIR.
+func gitDirBelongsTo(worktree, gitDirPath string) bool {
+	resolvedGitDir := resolvePath(gitDirPath)
+	gitEntryPath := filepath.Join(worktree, ".git") //nolint:gosec // worktree is resolved and validated before being passed in here
+	fileInfo, err := os.Stat(gitEntryPath)          //nolint:gosec // gitEntryPath is on the already-validated worktree path
+	if err != nil {
+		return false
+	}
+	if fileInfo.IsDir() {
+		return filepath.Clean(resolvePath(gitEntryPath)) == filepath.Clean(resolvedGitDir)
+	}
+	gitFileContents, err := os.ReadFile(gitEntryPath) //nolint:gosec // gitEntryPath is on the already-validated worktree path
+	if err != nil {
+		return false
+	}
+	link, has := strings.CutPrefix(strings.TrimSpace(string(gitFileContents)), "gitdir:")
+	if !has {
+		return false
+	}
+	link = strings.TrimSpace(link)
+	if !filepath.IsAbs(link) {
+		link = filepath.Join(worktree, link)
+	}
+	return filepath.Clean(resolvePath(link)) == filepath.Clean(resolvedGitDir)
+}
+
+// isUsableWorktree returns true if the candidate path is an existing directory
+// other than the repository's Git directory.
+func isUsableWorktree(gitDirPath, candidate string) bool {
+	fileInfo, err := os.Stat(candidate) //nolint:gosec // candidate is a worktree path validated against the repository before use
+	return err == nil &&
+		fileInfo.IsDir() &&
+		filepath.Clean(resolvePath(candidate)) != filepath.Clean(resolvePath(gitDirPath))
 }
 
 // LoadRepository returns a Repository instance using the current working
@@ -186,12 +332,13 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 
 	repo := &Repository{clock: clockwork.NewRealClock()}
 
-	gitDirPath, has, err := findGitDirPath(repositoryPath)
+	gitDirPath, worktreePath, has, err := findGitDirPath(repositoryPath)
 	if err != nil {
 		return nil, err
 	}
 	if has {
 		repo.gitDirPath = gitDirPath
+		repo.worktreePath = worktreePath
 		if err := repo.ensureNoCompatObjectFormat(); err != nil {
 			return nil, err
 		}
@@ -218,6 +365,27 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
 	repo.gitDirPath = absPath
+
+	// Capture the worktree using the same invocation context that resolved
+	// the Git directory so that the two remain consistent even when
+	// environment variables like GIT_DIR influence discovery. Note that
+	// `--show-toplevel` must run without an explicit `--git-dir`: with one,
+	// Git regards the working directory itself as the top level. For bare
+	// repositories this fails and no worktree is recorded.
+	stdOut, stdErr, err = repo.executor("rev-parse", "--show-toplevel").withoutGitDir().withDir(repositoryPath).execute()
+	if err == nil {
+		if worktreeContents, readErr := io.ReadAll(stdOut); readErr == nil {
+			if worktree := strings.TrimSpace(string(worktreeContents)); worktree != "" {
+				slog.Debug(fmt.Sprintf("Setting worktree for repository to '%s'...", worktree))
+				repo.worktreePath = worktree
+			}
+		}
+	} else {
+		errContents, readErr := io.ReadAll(stdErr)
+		if readErr == nil {
+			slog.Debug(fmt.Sprintf("Repository '%s' does not have a worktree: %s", absPath, strings.TrimSpace(string(errContents))))
+		}
+	}
 
 	objectFormat, err := repo.readObjectFormat()
 	if err != nil {
