@@ -6,9 +6,11 @@ package gitobject
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
+	sigstoreroot "github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -230,6 +233,63 @@ func TestVerifySigstore(t *testing.T) {
 		assert.ErrorIs(t, err, ErrMultipleSignatures)
 		assert.ErrorIs(t, err, ErrIncorrectVerificationKey)
 	})
+}
+
+func TestGetCachedTrustedRootPools(t *testing.T) {
+	// Not parallel: this test replaces the package-level trusted root cache.
+
+	savedTrustedRoot, savedRootPool, savedIntermediatePool, savedErr := cachedTrustedRoot, cachedRootPool, cachedIntermediatePool, cachedTrustedRootErr
+	// A sync.Once cannot be copied, so the original cannot be stashed and put
+	// back. Note whether it had already been consumed instead, so an
+	// equivalent one can be restored below.
+	savedConsumed := savedTrustedRoot != nil || savedErr != nil
+
+	t.Cleanup(func() {
+		trustedRootOnce = sync.Once{}
+		if savedConsumed {
+			trustedRootOnce.Do(func() {})
+		}
+		cachedTrustedRoot = savedTrustedRoot
+		cachedRootPool = savedRootPool
+		cachedIntermediatePool = savedIntermediatePool
+		cachedTrustedRootErr = savedErr
+	})
+
+	mockRootPool := x509.NewCertPool()
+	mockIntermediatePool := x509.NewCertPool()
+
+	// Reset the cache, then seed it with pools of our own by consuming the
+	// sync.Once ourselves. Consuming it this way keeps the test off the
+	// network: the fetch is never run, and getCachedTrustedRootPools returns
+	// what was seeded here.
+	trustedRootOnce = sync.Once{}
+	trustedRootOnce.Do(func() {
+		cachedTrustedRoot = &sigstoreroot.TrustedRoot{}
+		cachedRootPool = mockRootPool
+		cachedIntermediatePool = mockIntermediatePool
+		cachedTrustedRootErr = nil
+	})
+
+	rootPool, intermediatePool, err := getCachedTrustedRootPools()
+	require.Nil(t, err)
+	require.NotNil(t, rootPool)
+	require.NotNil(t, intermediatePool)
+
+	secondRootPool, secondIntermediatePool, err := getCachedTrustedRootPools()
+	require.Nil(t, err)
+	require.NotNil(t, secondRootPool)
+	require.NotNil(t, secondIntermediatePool)
+
+	// Identical pointers across the two calls show the second call was served
+	// from the cache rather than from a fresh fetch, which would have built
+	// new pools.
+	assert.Same(t, rootPool, secondRootPool)
+	assert.Same(t, intermediatePool, secondIntermediatePool)
+
+	// Both calls returned exactly what was seeded, confirming nothing was
+	// refetched behind our back.
+	assert.Same(t, mockRootPool, rootPool)
+	assert.Same(t, mockIntermediatePool, intermediatePool)
 }
 
 func TestSignatureBlockCount(t *testing.T) {
