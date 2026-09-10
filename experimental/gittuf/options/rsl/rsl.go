@@ -9,6 +9,7 @@ type RecordOptions struct {
 	LocalOnly             bool
 	SkipCheckForDuplicate bool
 	SigningKeyBytes       []byte
+	CustomFields          map[string]string
 }
 
 type RecordOption func(o *RecordOptions)
@@ -51,10 +52,20 @@ func WithRecordSigningKeyBytes(pem []byte) RecordOption {
 	}
 }
 
+// WithRecordCustomFields adds application-defined fields to the RSL entry. The
+// fields are copied into the entry when it is built, so the caller keeps
+// ownership of the supplied map and no copy is made here.
+func WithRecordCustomFields(fields map[string]string) RecordOption {
+	return func(o *RecordOptions) {
+		o.CustomFields = fields
+	}
+}
+
 type AnnotateOptions struct {
 	RemoteName      string
 	LocalOnly       bool
 	SigningKeyBytes []byte
+	CustomFields    map[string]string
 }
 
 type AnnotateOption func(o *AnnotateOptions)
@@ -76,5 +87,14 @@ func WithAnnotateLocalOnly() AnnotateOption {
 func WithAnnotateSigningKeyBytes(pem []byte) AnnotateOption {
 	return func(o *AnnotateOptions) {
 		o.SigningKeyBytes = pem
+	}
+}
+
+// WithAnnotateCustomFields adds application-defined fields to the annotation.
+// The fields are copied into the entry when it is built, so the caller keeps
+// ownership of the supplied map and no copy is made here.
+func WithAnnotateCustomFields(fields map[string]string) AnnotateOption {
+	return func(o *AnnotateOptions) {
+		o.CustomFields = fields
 	}
 }
