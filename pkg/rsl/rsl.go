@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 )
@@ -118,11 +119,15 @@ type ReferenceEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
 // NewReferenceEntry returns a ReferenceEntry object for a normal RSL entry.
-func NewReferenceEntry(refName string, targetID githash.Hash) *ReferenceEntry {
-	return &ReferenceEntry{RefName: refName, TargetID: targetID}
+func NewReferenceEntry(refName string, targetID githash.Hash, opts ...EntryOption) *ReferenceEntry {
+	options := applyEntryOptions(opts)
+	return &ReferenceEntry{RefName: refName, TargetID: targetID, CustomFields: options.customFields}
 }
 
 func (e *ReferenceEntry) GetID() githash.Hash {
@@ -179,6 +184,11 @@ func (e *ReferenceEntry) GetNumber() uint64 {
 	return e.Number
 }
 
+func (e *ReferenceEntry) GetCustomField(key string) (string, bool) {
+	value, has := e.CustomFields[key]
+	return value, has
+}
+
 // Skipped returns true if any of the annotations mark the entry as
 // to-be-skipped.
 func (e *ReferenceEntry) SkippedBy(annotations []*AnnotationEntry) bool {
@@ -227,6 +237,10 @@ func (e *ReferenceEntry) createCommitMessage(includeNumber bool) (string, error)
 	if includeNumber && e.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
 	}
+	lines, err := appendCustomFieldLines(lines, e.CustomFields)
+	if err != nil {
+		return "", err
+	}
 	return strings.Join(lines, "\n"), nil
 }
 
@@ -261,12 +275,16 @@ type AnnotationEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
 // NewAnnotationEntry returns an Annotation object that applies to one or more
 // prior RSL entries.
-func NewAnnotationEntry(rslEntryIDs []githash.Hash, skip bool, message string) *AnnotationEntry {
-	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message}
+func NewAnnotationEntry(rslEntryIDs []githash.Hash, skip bool, message string, opts ...EntryOption) *AnnotationEntry {
+	options := applyEntryOptions(opts)
+	return &AnnotationEntry{RSLEntryIDs: rslEntryIDs, Skip: skip, Message: message, CustomFields: options.customFields}
 }
 
 func (a *AnnotationEntry) GetID() githash.Hash {
@@ -331,6 +349,11 @@ func (a *AnnotationEntry) GetNumber() uint64 {
 	return a.Number
 }
 
+func (a *AnnotationEntry) GetCustomField(key string) (string, bool) {
+	value, has := a.CustomFields[key]
+	return value, has
+}
+
 // RefersTo returns true if the specified entryID is referred to by the
 // annotation.
 func (a *AnnotationEntry) RefersTo(entryID githash.Hash) bool {
@@ -377,6 +400,11 @@ func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error
 
 	if includeNumber && a.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, a.Number))
+	}
+
+	lines, err := appendCustomFieldLines(lines, a.CustomFields)
+	if err != nil {
+		return "", err
 	}
 
 	if len(a.Message) != 0 {
@@ -438,14 +466,19 @@ type PropagationEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
-func NewPropagationEntry(refName string, targetID githash.Hash, upstreamRepository string, upstreamEntryID githash.Hash) *PropagationEntry {
+func NewPropagationEntry(refName string, targetID githash.Hash, upstreamRepository string, upstreamEntryID githash.Hash, opts ...EntryOption) *PropagationEntry {
+	options := applyEntryOptions(opts)
 	return &PropagationEntry{
 		RefName:            refName,
 		TargetID:           targetID,
 		UpstreamRepository: upstreamRepository,
 		UpstreamEntryID:    upstreamEntryID,
+		CustomFields:       options.customFields,
 	}
 }
 
@@ -503,6 +536,11 @@ func (e PropagationEntry) GetNumber() uint64 {
 	return e.Number
 }
 
+func (e *PropagationEntry) GetCustomField(key string) (string, bool) {
+	value, has := e.CustomFields[key]
+	return value, has
+}
+
 func (e *PropagationEntry) setEntryNumber(storer gitstore.Storer) error {
 	latestEntry, err := GetLatestEntry(storer)
 	if err == nil {
@@ -537,7 +575,19 @@ func (e *PropagationEntry) createCommitMessage(includeNumber bool) (string, erro
 	if includeNumber && e.Number > 0 {
 		lines = append(lines, fmt.Sprintf("%s: %d", NumberKey, e.Number))
 	}
+	lines, err := appendCustomFieldLines(lines, e.CustomFields)
+	if err != nil {
+		return "", err
+	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func applyEntryOptions(opts []EntryOption) *entryOptions {
+	options := &entryOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+	return options
 }
 
 // GetEntry returns the entry corresponding to entryID.
@@ -1133,7 +1183,9 @@ func parseRSLEntryText(id githash.Hash, text string) (Entry, error) {
 // parseReferenceEntryText parses a reference entry as a state machine. The
 // fields must appear in the order ref, targetID, number, each at most once;
 // number is optional and trailing. Out-of-order fields and duplicates are
-// rejected. Unknown keys are ignored for forward compatibility.
+// rejected. Custom fields must appear after the built-in fields. Among
+// themselves, they may appear in any order and use the first value when
+// repeated. Other unknown keys are ignored for forward compatibility.
 func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, error) {
 	body, err := entryBody(text, ReferenceEntryHeader)
 	if err != nil {
@@ -1181,6 +1233,15 @@ func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, err
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, customfields.Prefix) {
+				if state < expectNumber {
+					return nil, ErrInvalidRSLEntry
+				}
+				state = done
+				setCustomField(&entry.CustomFields, key, value)
+			}
 		}
 	}
 
@@ -1194,7 +1255,9 @@ func parseReferenceEntryText(id githash.Hash, text string) (*ReferenceEntry, err
 // parseAnnotationEntryText parses an annotation entry as a state machine. One or
 // more entryID fields come first, followed by skip, then an optional number,
 // then an optional PEM message block. The message is decoded separately, so the
-// state machine stops at its begin marker.
+// state machine stops at its begin marker. Custom fields must appear after the
+// built-in fields and before the message block. Among themselves they may
+// appear in any order and use the first value when repeated.
 func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, error) {
 	annotation := &AnnotationEntry{
 		ID:          id,
@@ -1268,6 +1331,15 @@ func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, e
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, customfields.Prefix) {
+				if state < expectNumber {
+					return nil, ErrInvalidRSLEntry
+				}
+				state = done
+				setCustomField(&annotation.CustomFields, key, value)
+			}
 		}
 	}
 
@@ -1281,6 +1353,8 @@ func parseAnnotationEntryText(id githash.Hash, text string) (*AnnotationEntry, e
 // parsePropagationEntryText parses a propagation entry as a state machine. The
 // fields must appear in the order ref, targetID, upstreamRepository,
 // upstreamEntryID, number, each at most once; number is optional and trailing.
+// Custom fields must appear after the built-in fields. Among themselves they
+// may appear in any order and use the first value when repeated.
 func parsePropagationEntryText(id githash.Hash, text string) (*PropagationEntry, error) {
 	body, err := entryBody(text, PropagationEntryHeader)
 	if err != nil {
@@ -1348,6 +1422,15 @@ func parsePropagationEntryText(id githash.Hash, text string) (*PropagationEntry,
 				return nil, err
 			}
 			state = done
+
+		default:
+			if strings.HasPrefix(key, customfields.Prefix) {
+				if state < expectNumber {
+					return nil, ErrInvalidRSLEntry
+				}
+				state = done
+				setCustomField(&entry.CustomFields, key, value)
+			}
 		}
 	}
 

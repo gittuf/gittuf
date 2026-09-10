@@ -88,3 +88,21 @@ func TestWithAnnotateSigningKeyBytes(t *testing.T) {
 
 	assert.Equal(t, []byte("test-key"), options.SigningKeyBytes)
 }
+
+func TestWithRecordCustomFields(t *testing.T) {
+	fields := map[string]string{"custom.example.com/field": "value"}
+	options := &RecordOptions{}
+
+	WithRecordCustomFields(fields)(options)
+
+	assert.Equal(t, fields, options.CustomFields)
+}
+
+func TestWithAnnotateCustomFields(t *testing.T) {
+	fields := map[string]string{"custom.example.com/field": "value"}
+	options := &AnnotateOptions{}
+
+	WithAnnotateCustomFields(fields)(options)
+
+	assert.Equal(t, fields, options.CustomFields)
+}
