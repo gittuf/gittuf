@@ -47,8 +47,16 @@ func getGlobalRules(ctx context.Context, o *options) []globalRule {
 	if err != nil {
 		return nil
 	}
+	return getGlobalRulesForRef(ctx, repo, o.targetRef)
+}
 
-	rules, err := repo.ListGlobalRules(ctx, o.targetRef)
+// getGlobalRulesForRef returns global rules for a given target ref
+func getGlobalRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []globalRule {
+	if repo == nil {
+		return nil
+	}
+
+	rules, err := repo.ListGlobalRules(ctx, targetRef)
 	if err != nil {
 		return nil
 	}

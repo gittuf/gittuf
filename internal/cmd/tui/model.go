@@ -15,7 +15,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/policy"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/dsse"
 )
 
@@ -119,6 +122,8 @@ type model struct {
 	loadingMsg                 string
 	logsBuf                    *strings.Builder
 	logCh                      chan string
+	showDiffOverlay            bool
+	diffViewport               viewport.Model
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -497,4 +502,296 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 // Init starts the spinner tick and kicks off async repo loading.
 func (m model) Init() tea.Cmd {
 	return tea.Batch(textinput.Blink, m.spinner.Tick, loadRepoCmd(m.ctx, m.options))
+}
+
+// currentScreenTitle returns the status bar title for the active screen.
+func (m *model) currentScreenTitle() string {
+	switch m.screen {
+	case screenChoice:
+		return "Home"
+	case screenPolicy:
+		return "Home › Policy"
+	case screenPolicyRules:
+		return "Home › Policy › Rules"
+	case screenPolicyAddRule:
+		return "Home › Policy › Rules › Add"
+	case screenPolicyEditRule:
+		return "Home › Policy › Rules › Edit"
+	case screenPolicyPrincipals:
+		return "Home › Policy › Principals"
+	case screenPolicyPrincipalsForm:
+		return "Home › Policy › Principals › Edit"
+	case screenPolicyLifecycle, screenPolicyLifecycleForm:
+		return "Home › Policy › Lifecycle"
+	case screenTrust:
+		return "Home › Trust"
+	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
+		return "Home › Trust › Global Rules"
+	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+		return "Home › Trust › Keys & Thresholds"
+	case screenTrustHooks, screenTrustAddHookForm, screenTrustUpdateHookForm, screenTrustRemoveHookForm:
+		return "Home › Trust › Hooks"
+	case screenTrustLifecycle:
+		return "Home › Trust › Lifecycle"
+	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+		return "Home › Trust › Propagation"
+	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+		return "Home › Trust › GitHub App"
+	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+		return "Home › Trust › Repo/Network"
+	case screenVerify:
+		return "Home › Verify"
+	case screenVerifyRefForm:
+		return "Home › Verify › Ref"
+	case screenVerifyMergeableForm:
+		return "Home › Verify › Mergeable"
+	case screenHelp:
+		return "Help"
+	default:
+		return "Home"
+	}
+}
+
+func (m *model) toggleDiffOverlay() {
+	if m.showDiffOverlay {
+		m.showDiffOverlay = false
+		return
+	}
+	m.showDiffOverlay = true
+	w := m.width - 10
+	h := m.height - 8
+	if w < 30 {
+		w = 30
+	}
+	if h < 6 {
+		h = 6
+	}
+	m.diffViewport = viewport.New(w, h)
+	m.diffViewport.SetContent(m.generateStagedDiff())
+}
+
+func (m *model) generateStagedDiff() string {
+	var b strings.Builder
+
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Bold(true)
+	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#28A745"))
+	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5252"))
+	modStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68"))
+	sectionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus)).Bold(true)
+	subtextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext))
+
+	b.WriteString(headerStyle.Render("--- Active Policy (refs/gittuf/policy)\n+++ Staged Policy Changes (refs/gittuf/policy-staging)") + "\n\n")
+
+	repo := m.repo
+	if repo == nil {
+		var err error
+		repo, err = gittuf.LoadRepository(".")
+		if err != nil {
+			b.WriteString("No staged policy changes detected.\n\n")
+			b.WriteString(subtextStyle.Render("Tip: Add, edit, or remove policy rules & principals, then press 'v' to review unapplied staged changes."))
+			return b.String()
+		}
+	}
+
+	gitRepo := repo.GetGitRepository()
+	policyTip, errPolicy := gitRepo.GetReference(policy.PolicyRef)
+	stagingTip, errStaging := gitRepo.GetReference(policy.PolicyStagingRef)
+
+	// If staging ref does not exist, nothing is staged.
+	if errStaging != nil {
+		b.WriteString("No staged policy changes detected.\n\n")
+		b.WriteString(subtextStyle.Render("Policy staging reference (refs/gittuf/policy-staging) does not exist."))
+		return b.String()
+	}
+
+	// If policy ref exists and tips are identical, staging is fully in sync with policy.
+	if errPolicy == nil && policyTip.Equal(stagingTip) {
+		b.WriteString("No staged policy changes detected.\n\n")
+		b.WriteString(subtextStyle.Render("Policy staging is up to date with active policy (tips are identical)."))
+		return b.String()
+	}
+
+	var activeRules []rule
+	if errPolicy == nil {
+		activeRules = getRulesForRef(m.ctx, repo, policy.PolicyRef)
+	}
+	stagedRules := getRulesForRef(m.ctx, repo, policy.PolicyStagingRef)
+
+	var activeGlobalRules []globalRule
+	if errPolicy == nil {
+		activeGlobalRules = getGlobalRulesForRef(m.ctx, repo, policy.PolicyRef)
+	}
+	stagedGlobalRules := getGlobalRulesForRef(m.ctx, repo, policy.PolicyStagingRef)
+
+	policyName := policy.TargetsRoleName
+	if m.options != nil && m.options.policyName != "" {
+		policyName = m.options.policyName
+	}
+	var activePrincipals []tuf.Principal
+	if errPolicy == nil {
+		activePrincipals = getPrincipalsForRef(m.ctx, repo, policy.PolicyRef, policyName)
+	}
+	stagedPrincipals := getPrincipalsForRef(m.ctx, repo, policy.PolicyStagingRef, policyName)
+
+	activeRuleMap := make(map[string]rule, len(activeRules))
+	for _, r := range activeRules {
+		activeRuleMap[r.name] = r
+	}
+	stagedRuleMap := make(map[string]rule, len(stagedRules))
+	for _, r := range stagedRules {
+		stagedRuleMap[r.name] = r
+	}
+
+	var addedRules []rule
+	var removedRules []rule
+	type modifiedRule struct {
+		oldRule rule
+		newRule rule
+	}
+	var modifiedRules []modifiedRule
+
+	for _, sr := range stagedRules {
+		if ar, exists := activeRuleMap[sr.name]; !exists {
+			addedRules = append(addedRules, sr)
+		} else if ar.pattern != sr.pattern || ar.threshold != sr.threshold || ar.key != sr.key {
+			modifiedRules = append(modifiedRules, modifiedRule{oldRule: ar, newRule: sr})
+		}
+	}
+	for _, ar := range activeRules {
+		if _, exists := stagedRuleMap[ar.name]; !exists {
+			removedRules = append(removedRules, ar)
+		}
+	}
+
+	activeGRMap := make(map[string]globalRule, len(activeGlobalRules))
+	for _, gr := range activeGlobalRules {
+		activeGRMap[gr.ruleName] = gr
+	}
+	stagedGRMap := make(map[string]globalRule, len(stagedGlobalRules))
+	for _, gr := range stagedGlobalRules {
+		stagedGRMap[gr.ruleName] = gr
+	}
+
+	var addedGRs []globalRule
+	var removedGRs []globalRule
+	type modifiedGR struct {
+		oldGR globalRule
+		newGR globalRule
+	}
+	var modifiedGRs []modifiedGR
+
+	for _, sgr := range stagedGlobalRules {
+		if agr, exists := activeGRMap[sgr.ruleName]; !exists {
+			addedGRs = append(addedGRs, sgr)
+		} else if agr.ruleType != sgr.ruleType || agr.threshold != sgr.threshold || strings.Join(agr.rulePatterns, ",") != strings.Join(sgr.rulePatterns, ",") {
+			modifiedGRs = append(modifiedGRs, modifiedGR{oldGR: agr, newGR: sgr})
+		}
+	}
+	for _, agr := range activeGlobalRules {
+		if _, exists := stagedGRMap[agr.ruleName]; !exists {
+			removedGRs = append(removedGRs, agr)
+		}
+	}
+
+	activePMap := make(map[string]tuf.Principal, len(activePrincipals))
+	for _, p := range activePrincipals {
+		activePMap[p.ID()] = p
+	}
+	stagedPMap := make(map[string]tuf.Principal, len(stagedPrincipals))
+	for _, p := range stagedPrincipals {
+		stagedPMap[p.ID()] = p
+	}
+
+	var addedPrincipals []tuf.Principal
+	var removedPrincipals []tuf.Principal
+
+	for _, sp := range stagedPrincipals {
+		if _, exists := activePMap[sp.ID()]; !exists {
+			addedPrincipals = append(addedPrincipals, sp)
+		}
+	}
+	for _, ap := range activePrincipals {
+		if _, exists := stagedPMap[ap.ID()]; !exists {
+			removedPrincipals = append(removedPrincipals, ap)
+		}
+	}
+
+	hasChanges := false
+
+	// Policy Rules
+	if len(addedRules) > 0 || len(removedRules) > 0 || len(modifiedRules) > 0 {
+		hasChanges = true
+		b.WriteString(sectionStyle.Render("Staged Rules:") + "\n")
+		for _, r := range addedRules {
+			b.WriteString(addStyle.Render(fmt.Sprintf("+ Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)) + "\n")
+			if r.key != "" {
+				b.WriteString(subtextStyle.Render(fmt.Sprintf("  Authorized Principals: %s", r.key)) + "\n")
+			}
+		}
+		for _, r := range removedRules {
+			b.WriteString(delStyle.Render(fmt.Sprintf("- Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)) + "\n")
+			if r.key != "" {
+				b.WriteString(subtextStyle.Render(fmt.Sprintf("  Authorized Principals: %s", r.key)) + "\n")
+			}
+		}
+		for _, mr := range modifiedRules {
+			b.WriteString(modStyle.Render(fmt.Sprintf("~ Rule: %s", mr.newRule.name)) + "\n")
+			b.WriteString(delStyle.Render(fmt.Sprintf("  - pattern: %s, threshold: %d", mr.oldRule.pattern, mr.oldRule.threshold)) + "\n")
+			b.WriteString(addStyle.Render(fmt.Sprintf("  + pattern: %s, threshold: %d", mr.newRule.pattern, mr.newRule.threshold)) + "\n")
+			if mr.oldRule.key != mr.newRule.key {
+				b.WriteString(delStyle.Render(fmt.Sprintf("  - Authorized Principals: %s", mr.oldRule.key)) + "\n")
+				b.WriteString(addStyle.Render(fmt.Sprintf("  + Authorized Principals: %s", mr.newRule.key)) + "\n")
+			}
+		}
+	}
+
+	// Global Rules
+	if len(addedGRs) > 0 || len(removedGRs) > 0 || len(modifiedGRs) > 0 {
+		if hasChanges {
+			b.WriteString("\n")
+		}
+		hasChanges = true
+		b.WriteString(sectionStyle.Render("Staged Global Rules:") + "\n")
+		for _, gr := range addedGRs {
+			b.WriteString(addStyle.Render(fmt.Sprintf("+ Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)) + "\n")
+		}
+		for _, gr := range removedGRs {
+			b.WriteString(delStyle.Render(fmt.Sprintf("- Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)) + "\n")
+		}
+		for _, mgr := range modifiedGRs {
+			b.WriteString(modStyle.Render(fmt.Sprintf("~ Global Rule: %s", mgr.newGR.ruleName)) + "\n")
+			b.WriteString(delStyle.Render(fmt.Sprintf("  - type: %s, patterns: %v", mgr.oldGR.ruleType, mgr.oldGR.rulePatterns)) + "\n")
+			b.WriteString(addStyle.Render(fmt.Sprintf("  + type: %s, patterns: %v", mgr.newGR.ruleType, mgr.newGR.rulePatterns)) + "\n")
+		}
+	}
+
+	// Principals
+	if len(addedPrincipals) > 0 || len(removedPrincipals) > 0 {
+		if hasChanges {
+			b.WriteString("\n")
+		}
+		hasChanges = true
+		b.WriteString(sectionStyle.Render("Staged Principals:") + "\n")
+		for _, p := range addedPrincipals {
+			b.WriteString(addStyle.Render(fmt.Sprintf("+ Principal: %s", p.ID())) + "\n")
+		}
+		for _, p := range removedPrincipals {
+			b.WriteString(delStyle.Render(fmt.Sprintf("- Principal: %s", p.ID())) + "\n")
+		}
+	}
+
+	if !hasChanges {
+		filesChanged, _ := gitRepo.GetFilePathsChangedByCommit(stagingTip)
+		if len(filesChanged) > 0 {
+			b.WriteString(sectionStyle.Render("Staged Trust Metadata Changes:") + "\n")
+			for _, f := range filesChanged {
+				b.WriteString(addStyle.Render(fmt.Sprintf("+ Modified %s", f)) + "\n")
+			}
+		} else {
+			b.WriteString("No staged policy changes detected.\n\n")
+			b.WriteString(subtextStyle.Render("Policy staging has no rule, principal, or metadata differences."))
+		}
+	}
+
+	return b.String()
 }
