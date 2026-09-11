@@ -421,6 +421,7 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 			// to pass the response from the server for those refs
 			// back to Git
 			dstRefs := set.NewSet[string]()
+			rslUpdates := []gittuf.ReferenceUpdateRequest{}
 			for _, pushCommand := range pushCommands {
 				// TODO: maybe find another way to determine
 				// whether repo is gittuf enabled
@@ -451,14 +452,21 @@ func handleCurl(ctx context.Context, repo *gittuf.Repository, remoteName, url st
 						// pushed by the user
 
 						// TODO: skipping propagation; invoke it once total instead of per ref
-						if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
-							return nil, false, err
-						}
+						rslUpdates = append(rslUpdates, gittuf.ReferenceUpdateRequest{RefName: srcRef, RefNameOverride: dstRef})
 					}
 				}
 
 				// Write push command to helper
 				if _, err := helperStdIn.Write(pushCommand); err != nil {
+					return nil, false, err
+				}
+			}
+
+			// The RSL entries must exist before the RSL tip is read and
+			// pushed below. Recording all of the updates in one call keeps
+			// the local RSL either fully updated or untouched.
+			if len(rslUpdates) != 0 {
+				if err := repo.RecordRSLEntryForReferences(ctx, rslUpdates, true, rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
 					return nil, false, err
 				}
 			}

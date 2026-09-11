@@ -330,6 +330,7 @@ entries. Annotations have the following schema.
 RSL Annotation Entry
 
 entryID: <RSL entry ID 1>
+ref: <ref name>
 entryID: <RSL entry ID 2>
 ...
 skip: <true/false>
@@ -339,6 +340,62 @@ custom.<namespace>/<name>: <value>
 <message>
 ------END MESSAGE------
 ```
+
+The `ref` lines after an `entryID` are optional qualifiers. An entry ID with no
+qualifier is referred to as a whole, while an entry ID with qualifiers is
+referred to only for the listed reference updates. Qualifiers are only valid
+against RSL bulk reference entries, and they allow an annotation to skip one
+reference update inside a bulk entry while leaving the other updates in that
+entry in force.
+
+##### RSL Bulk Reference Entries
+
+A bulk reference entry records several reference updates under one signature.
+It exists so that a push touching several references costs one RSL entry and
+one signature rather than one of each per reference. It has the following
+structure.
+
+```
+RSL Bulk Reference Entry
+
+<ref 1>: <target ID 1>
+<ref 2>: <target ID 2>
+
+number: <number>
+```
+
+The following rules are enforced by the parser, and therefore by every
+verifier.
+
+* The body is one line per reference update, in the order the updates were
+  recorded. The reference name is the key and the target ID is the value.
+  Git reference names cannot contain a colon, so splitting each line on its
+  first colon is unambiguous.
+* Reference names must be fully qualified and must be unique within one entry.
+  A duplicate reference is rejected.
+* No reference may be in the `refs/gittuf/` namespace. Policy,
+  policy-staging and attestations updates keep their own single entries.
+* The `number` field is mandatory for this entry type, unlike for the other
+  entry types where it is optional. It always follows exactly one blank line
+  after the last update line.
+* The entry commit uses the empty tree, like every other RSL entry, and the
+  signature on that commit covers all the updates the entry lists.
+
+The blank line before the mandatory `number` line is load bearing for
+compatibility with clients that do not implement this entry type. gittuf
+v0.9.0 through v0.16.0 reject an entry whose header they do not recognize.
+Clients up to v0.8.1 instead parse any unknown header with the reference entry
+parser, which rejects a body line that has no colon in it. The blank line is
+such a line, so those clients fail closed rather than silently reading an
+entry with an empty reference name.
+
+gittuf reads a bulk reference entry as one per-reference view of the update for
+each line. All the views of one entry share the entry's ID and number, so a
+bulk entry counts as one entry for RSL numbering and for the RSL's hash chain.
+A writer never records a bulk entry for a single update, which is written as a
+plain RSL reference entry instead. The parser nonetheless accepts a
+single-update bulk entry, so that a future writer may record one without
+breaking clients shipped before that change.
 
 RSL entries may carry application-defined custom fields after their standard
 fields (for annotation entries, before the message block), each a
@@ -456,6 +513,27 @@ number: 6
 -----BEGIN MESSAGE-----
 U2tpcHBpbmcgUlNMIGVudHJ5
 -----END MESSAGE-----
+```
+
+The commit object for a bulk reference entry recording two references is as
+follows:
+
+```bash
+~/tmp/repo $ git cat-file -p 8f4b0c1d2e3a4b5c6d7e8f90a1b2c3d4e5f60718
+tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+parent cccfb6f27b2a71c33e9a55bc82f084e2445aa398
+author Jane Doe <jane.doe@example.com> 1729515000 -0400
+committer Jane Doe <jane.doe@example.com> 1729515000 -0400
+gpgsig -----BEGIN SSH SIGNATURE-----
+ ...
+ -----END SSH SIGNATURE-----
+
+RSL Bulk Reference Entry
+
+refs/heads/feature: 4a2f1b9c7e5d3a8b6c4f2e1d0b9a8c7f6e5d4c3b
+refs/heads/release: 9e37b2f8b9d5b0e1cc2f2c2a6a4b1f9c7b5e0d31
+
+number: 7
 ```
 
 #### Attestations for Authorization Records

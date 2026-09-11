@@ -114,3 +114,28 @@ type Storer interface {
 	// returns cause, wrapped if the reset itself fails.
 	ResetDueToError(cause error, refName string, commitID githash.Hash) error
 }
+
+// TipPinningStorer is an optional extension of Storer for stores that can
+// pin a commit to the tip the caller observed. Both methods create the commit
+// with expectedTip as its only parent, or with no parent when expectedTip is
+// the zero hash, and update targetRef only if targetRef still points at
+// expectedTip. A zero expectedTip therefore also asserts that targetRef does
+// not exist yet. When targetRef has moved in the meantime the methods return
+// an error and leave targetRef untouched. The commit object itself may already
+// have been written, it is simply unreferenced.
+//
+// *gitinterface.Repository implements this interface.
+//
+// Implementing it is optional. pkg/rsl uses it to write an RSL entry against
+// the tip it read the entry number from. A Storer that does not implement it
+// falls back to Commit and CommitUsingSpecificKey, which read the tip again,
+// so an RSL write can record a stale entry number when another writer appends
+// concurrently. pkg/rsl logs a warning each time it takes that fallback.
+type TipPinningStorer interface {
+	// CommitWithExpectedTip is Commit with the parent pinned to expectedTip.
+	CommitWithExpectedTip(treeID githash.Hash, targetRef, message string, sign bool, expectedTip githash.Hash) (githash.Hash, error)
+
+	// CommitUsingSpecificKeyWithExpectedTip is CommitUsingSpecificKey with
+	// the parent pinned to expectedTip.
+	CommitUsingSpecificKeyWithExpectedTip(treeID githash.Hash, targetRef, message string, signingKeyPEMBytes []byte, expectedTip githash.Hash) (githash.Hash, error)
+}

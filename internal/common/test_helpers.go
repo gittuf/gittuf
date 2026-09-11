@@ -57,6 +57,23 @@ func CreateTestRSLReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry
 	return entryID
 }
 
+// CreateTestRSLBulkReferenceEntryCommit is a test helper used to create a
+// signed bulk reference entry using the specified key.
+func CreateTestRSLBulkReferenceEntryCommit(t *testing.T, repo gitstore.Storer, entry *rsl.BulkReferenceEntry, signingKeyBytes []byte) githash.Hash {
+	t.Helper()
+
+	if err := entry.CommitUsingSpecificKey(repo, signingKeyBytes); err != nil {
+		t.Fatal(err)
+	}
+
+	entryID, err := repo.GetReference(rsl.Ref)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return entryID
+}
+
 // CreateTestRSLAnnotationEntryCommit is a test helper used to create a
 // **signed** RSL annotation using the specified GPG key. It is used to
 // substitute for the default RSL annotation creation and signing mechanism

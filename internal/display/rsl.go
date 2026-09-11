@@ -75,6 +75,21 @@ func RSLLog(repo gitstore.Storer, writer io.WriteCloser, opts ...Option) error {
 				// unexpectedly closed, such as by killing the pager
 				return nil
 			}
+		case *rsl.BulkReferenceEntry:
+			// The whole entry renders when any update matches the filter,
+			// because the entry is one signed act.
+			if options.refs.Len() != 0 && !bulkTouchesAnyRef(iteratorEntry, options.refs) {
+				slog.Debug(fmt.Sprintf("Skipping bulk reference entry '%s' since none of its refs were requested...", iteratorEntry.ID.String()))
+				break
+			}
+
+			slog.Debug(fmt.Sprintf("Writing bulk reference entry '%s'...", iteratorEntry.ID.String()))
+			if err := writeRSLBulkReferenceEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
+				// We return nil here to avoid noisy output when the writer is
+				// unexpectedly closed, such as by killing the pager
+				return nil
+			}
+
 		case *rsl.AnnotationEntry:
 			slog.Debug(fmt.Sprintf("Tracking annotation entry '%s'...", iteratorEntry.ID.String()))
 			for _, targetID := range iteratorEntry.RSLEntryIDs {
@@ -163,6 +178,88 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 	}
 	text = appendCustomFields(text, entry.CustomFields, "  ")
 
+	text += formatAnnotations(annotations, entry.ID.String())
+
+	text += "\n" // single trailing newline by default
+	if hasParent {
+		text += "\n" // extra newline for all intermediate (i.e., not last) entries
+	}
+
+	_, err := writer.Write([]byte(text))
+	return err
+}
+
+// bulkTouchesAnyRef reports whether any of the entry's updates is for one of
+// the requested refs.
+func bulkTouchesAnyRef(entry *rsl.BulkReferenceEntry, refs *set.Set[string]) bool {
+	for _, update := range entry.Updates {
+		if refs.Has(update.RefName) {
+			return true
+		}
+	}
+	return false
+}
+
+// writeRSLBulkReferenceEntry renders a bulk entry as one block listing every
+// update, followed by its annotations. A qualified annotation lists the refs
+// it applies to.
+func writeRSLBulkReferenceEntry(writer io.WriteCloser, entry *rsl.BulkReferenceEntry, annotations []*rsl.AnnotationEntry, hasParent bool) error {
+	/* Output format:
+	   bulk entry <entryID> (skipped)
+
+	     Ref:    <refName>
+	     Target: <targetID>
+
+	     Ref:    <refName>
+	     Target: <targetID>
+
+	     Number: <number>
+
+	       Annotation ID: <annotationID>
+	       Skip:          <yes/no>
+	       Refs:          <ref>, <ref>
+	       Number:        <number>
+	       Message:
+	         <message>
+	*/
+
+	text := colorer(fmt.Sprintf("bulk entry %s", entry.ID.String()), yellow)
+
+	for _, annotation := range annotations {
+		if annotation.Skip && len(annotation.Refs[entry.ID.String()]) == 0 {
+			text += fmt.Sprintf(" %s", colorer("(skipped)", red))
+			break
+		}
+	}
+	text += "\n"
+
+	for i, update := range entry.Updates {
+		if i != 0 {
+			text += "\n"
+		}
+		text += fmt.Sprintf("\n  Ref:    %s", update.RefName)
+		text += fmt.Sprintf("\n  Target: %s", update.TargetID.String())
+	}
+	if entry.Number != 0 {
+		text += "\n"
+		text += fmt.Sprintf("\n  Number: %d", entry.Number)
+	}
+
+	text += formatAnnotations(annotations, entry.ID.String())
+
+	text += "\n"
+	if hasParent {
+		text += "\n"
+	}
+
+	_, err := writer.Write([]byte(text))
+	return err
+}
+
+// formatAnnotations renders the annotation blocks shared by reference and
+// bulk entries. entryID selects which qualifiers to show.
+func formatAnnotations(annotations []*rsl.AnnotationEntry, entryID string) string {
+	text := ""
 	for _, annotation := range annotations {
 		text += "\n\n"
 		text += colorer(fmt.Sprintf("    Annotation ID: %s", annotation.ID.String()), green)
@@ -172,20 +269,16 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 		} else {
 			text += "    Skip:          no"
 		}
+		if refs := annotation.Refs[entryID]; len(refs) != 0 {
+			text += fmt.Sprintf("\n    Refs:          %s", strings.Join(refs, ", "))
+		}
 		if annotation.Number != 0 {
 			text += fmt.Sprintf("\n    Number:        %d", annotation.Number)
 		}
 		text = appendCustomFields(text, annotation.CustomFields, "    ")
 		text += fmt.Sprintf("\n    Message:\n      %s", strings.TrimSpace(annotation.Message))
 	}
-
-	text += "\n" // single trailing newline by default
-	if hasParent {
-		text += "\n" // extra newline for all intermediate (i.e., not last) entries
-	}
-
-	_, err := writer.Write([]byte(text))
-	return err
+	return text
 }
 
 func writeRSLPropagationEntry(writer io.WriteCloser, entry *rsl.PropagationEntry, hasParent bool) error {

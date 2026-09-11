@@ -28,10 +28,18 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 		}
 	}
 
+	return r.CommitWithExpectedTip(treeID, targetRef, message, sign, currentGitID)
+}
+
+// CommitWithExpectedTip is Commit with the parent pinned to expectedTip. The
+// commit is created with expectedTip as its parent (none when expectedTip is
+// the zero hash) and targetRef is updated only if it still points at
+// expectedTip. It fails if another writer advanced targetRef in between.
+func (r *Repository) CommitWithExpectedTip(treeID Hash, targetRef, message string, sign bool, expectedTip Hash) (Hash, error) {
 	args := []string{"commit-tree", "-m", message}
 
-	if !currentGitID.IsZero() {
-		args = append(args, "-p", currentGitID.String())
+	if !expectedTip.IsZero() {
+		args = append(args, "-p", expectedTip.String())
 	}
 
 	if sign {
@@ -52,7 +60,7 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 		return ZeroHash, fmt.Errorf("received invalid commit ID: %w", err)
 	}
 
-	return commitID, r.CheckAndSetReference(targetRef, commitID, currentGitID)
+	return commitID, r.CheckAndSetReference(targetRef, commitID, expectedTip)
 }
 
 // CommitUsingSpecificKey creates a new commit in the repository for the
@@ -61,6 +69,22 @@ func (r *Repository) Commit(treeID Hash, targetRef, message string, sign bool) (
 // developer mode. In standard workflows, Commit() must be used instead which
 // infers the signing key from the user's Git config.
 func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message string, signingKeyPEMBytes []byte) (Hash, error) {
+	refTip, err := r.GetReference(targetRef)
+	if err != nil {
+		if !errors.Is(err, ErrReferenceNotFound) {
+			return ZeroHash, err
+		}
+	}
+
+	return r.CommitUsingSpecificKeyWithExpectedTip(treeID, targetRef, message, signingKeyPEMBytes, refTip)
+}
+
+// CommitUsingSpecificKeyWithExpectedTip is CommitUsingSpecificKey with the
+// parent pinned to expectedTip. The commit is created with expectedTip as its
+// parent (none when expectedTip is the zero hash) and targetRef is updated
+// only if it still points at expectedTip. It fails if another writer advanced
+// targetRef in between.
+func (r *Repository) CommitUsingSpecificKeyWithExpectedTip(treeID Hash, targetRef, message string, signingKeyPEMBytes []byte, expectedTip Hash) (Hash, error) {
 	name, _, err := r.LookupConfig(gitstore.ConfigUserName)
 	if err != nil {
 		return ZeroHash, err
@@ -83,15 +107,8 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 		Message:   message,
 	}
 
-	refTip, err := r.GetReference(targetRef)
-	if err != nil {
-		if !errors.Is(err, ErrReferenceNotFound) {
-			return ZeroHash, err
-		}
-	}
-
-	if !refTip.IsZero() {
-		commit.ParentHashes = []plumbing.Hash{plumbing.NewHash(refTip.String())}
+	if !expectedTip.IsZero() {
+		commit.ParentHashes = []plumbing.Hash{plumbing.NewHash(expectedTip.String())}
 	}
 
 	commitContents, err := getCommitBytesWithoutSignature(commit)
@@ -130,7 +147,7 @@ func (r *Repository) CommitUsingSpecificKey(treeID Hash, targetRef, message stri
 		return ZeroHash, err
 	}
 
-	return commitIDHash, r.CheckAndSetReference(targetRef, commitIDHash, refTip)
+	return commitIDHash, r.CheckAndSetReference(targetRef, commitIDHash, expectedTip)
 }
 
 // commitWithParents creates a new commit in the repo but does not update any

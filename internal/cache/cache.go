@@ -105,13 +105,18 @@ func PopulatePersistentCache(repo gitstore.Storer) error {
 	persistent.AddedAttestationsBeforeNumber = iterator.GetNumber()
 
 	for {
-		if iterator, isReferenceEntry := iterator.(*rsl.ReferenceEntry); isReferenceEntry {
-			switch iterator.RefName {
+		switch entry := iterator.(type) {
+		case *rsl.ReferenceEntry:
+			switch entry.RefName {
 			case policyRef:
-				persistent.InsertPolicyEntryNumber(iterator.GetNumber(), iterator.GetID())
+				persistent.InsertPolicyEntryNumber(entry.GetNumber(), entry.GetID())
 			case attestations.Ref:
-				persistent.InsertAttestationEntryNumber(iterator.GetNumber(), iterator.GetID())
+				persistent.InsertAttestationEntryNumber(entry.GetNumber(), entry.GetID())
 			}
+		case *rsl.BulkReferenceEntry:
+			// Bulk reference entries cannot record gittuf namespace refs, so
+			// they never carry policy or attestations updates. Nothing to
+			// index.
 		}
 
 		iterator, err = rsl.GetParentForEntry(repo, iterator)

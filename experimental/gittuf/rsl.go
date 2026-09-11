@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
@@ -66,30 +67,7 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 		}
 	}
 
-	slog.Debug("Identifying absolute reference path...")
-	refName, err := r.r.AbsoluteReference(refName)
-	if err != nil {
-		return err
-	}
-
-	// Track localRefName to check the expected tip as we may override refName
-	localRefName := refName
-
-	if options.RefNameOverride != "" {
-		// dst differs from src
-		// Eg: git push <remote> <src>:<dst>
-		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
-		refNameOverride, err := r.r.AbsoluteReference(options.RefNameOverride)
-		if err != nil {
-			return err
-		}
-
-		refName = refNameOverride
-	}
-
-	// The tip of the ref is always from the localRefName
-	slog.Debug(fmt.Sprintf("Loading current state of '%s'...", localRefName))
-	refTip, err := r.r.GetReference(localRefName)
+	refName, refTip, err := r.resolveReferenceUpdate(refName, options.RefNameOverride)
 	if err != nil {
 		return err
 	}
@@ -127,6 +105,166 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 
 	_, err = r.Sync(ctx, options.RemoteName, false, signCommit)
 	return err
+}
+
+// ReferenceUpdateRequest names one local reference to record, optionally
+// under a different name, as during git push <src>:<dst>.
+type ReferenceUpdateRequest struct {
+	RefName         string
+	RefNameOverride string
+}
+
+// resolvedReferenceUpdate is a request after ref resolution and duplicate
+// filtering.
+type resolvedReferenceUpdate struct {
+	refName string
+	tip     githash.Hash
+}
+
+// RecordRSLEntryForReferences records the current state of several
+// references. When more than one update remains after duplicate filtering,
+// one BulkReferenceEntry is recorded, so either every update is recorded by
+// that single entry or none of them is. A single remaining update is
+// recorded as one ReferenceEntry, exactly as RecordRSLEntryForReference
+// does.
+func (r *Repository) RecordRSLEntryForReferences(ctx context.Context, updates []ReferenceUpdateRequest, signCommit bool, opts ...rslopts.RecordOption) error {
+	options := &rslopts.RecordOptions{}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	if signCommit && options.SigningKeyBytes == nil {
+		slog.Debug("Checking if Git signing is configured...")
+		if err := r.r.CanSign(); err != nil {
+			return err
+		}
+	}
+
+	if options.RemoteName == "" && !options.LocalOnly {
+		return ErrRemoteNotSpecified
+	} else if options.RemoteName != "" && options.LocalOnly {
+		return ErrCannotUseRemoteAndLocalOnly
+	}
+
+	if !options.LocalOnly {
+		if _, err := r.Sync(ctx, options.RemoteName, false, signCommit); err != nil {
+			return err
+		}
+	}
+
+	// A bulk entry must not list the same reference twice, so requests that
+	// resolve to the same recorded reference are collapsed into the first
+	// position with the last tip given.
+	seen := make(map[string]int, len(updates))
+	resolved := make([]resolvedReferenceUpdate, 0, len(updates))
+	for _, update := range updates {
+		refName, tip, err := r.resolveReferenceUpdate(update.RefName, update.RefNameOverride)
+		if err != nil {
+			return err
+		}
+
+		if i, isSeen := seen[refName]; isSeen {
+			slog.Debug(fmt.Sprintf("Reference '%s' is named more than once, using the last target...", refName))
+			resolved[i].tip = tip
+			continue
+		}
+
+		seen[refName] = len(resolved)
+		resolved = append(resolved, resolvedReferenceUpdate{refName: refName, tip: tip})
+	}
+
+	if !options.SkipCheckForDuplicate {
+		slog.Debug("Checking if latest entry for each reference has same target...")
+		remaining := make([]resolvedReferenceUpdate, 0, len(resolved))
+		for _, update := range resolved {
+			isDuplicate, err := r.isDuplicateEntry(update.refName, update.tip)
+			if err != nil {
+				return err
+			}
+			if isDuplicate {
+				slog.Debug(fmt.Sprintf("The latest entry for '%s' has the same target, skipping...", update.refName))
+				continue
+			}
+
+			remaining = append(remaining, update)
+		}
+		resolved = remaining
+	} else {
+		slog.Debug("Not checking if latest entry for each reference has same target")
+	}
+
+	if len(resolved) == 0 {
+		return nil
+	}
+
+	// TODO: once policy verification is in place, the signing key used by
+	// signCommit must be verified for each refName in the delegation tree.
+
+	if len(resolved) > 1 {
+		slog.Debug("Creating RSL bulk reference entry...")
+		rslUpdates := make([]rsl.ReferenceUpdate, 0, len(resolved))
+		for _, update := range resolved {
+			rslUpdates = append(rslUpdates, rsl.ReferenceUpdate{RefName: update.refName, TargetID: update.tip})
+		}
+		entry := rsl.NewBulkReferenceEntry(rslUpdates)
+		if signCommit && options.SigningKeyBytes != nil {
+			if err := entry.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
+				return err
+			}
+		} else if err := entry.Commit(r.r, signCommit); err != nil {
+			return err
+		}
+	} else {
+		for _, update := range resolved {
+			slog.Debug(fmt.Sprintf("Creating RSL reference entry for '%s'...", update.refName))
+			entry := rsl.NewReferenceEntry(update.refName, update.tip)
+			if signCommit && options.SigningKeyBytes != nil {
+				if err := entry.CommitUsingSpecificKey(r.r, options.SigningKeyBytes); err != nil {
+					return err
+				}
+			} else if err := entry.Commit(r.r, signCommit); err != nil {
+				return err
+			}
+		}
+	}
+
+	if options.LocalOnly {
+		return nil
+	}
+
+	_, err := r.Sync(ctx, options.RemoteName, false, signCommit)
+	return err
+}
+
+// resolveReferenceUpdate resolves the local ref to record and its tip. The
+// tip is always read from the local ref. The recorded name is the override
+// when one is given.
+func (r *Repository) resolveReferenceUpdate(refName, refNameOverride string) (string, githash.Hash, error) {
+	slog.Debug("Identifying absolute reference path...")
+	localRefName, err := r.r.AbsoluteReference(refName)
+	if err != nil {
+		return "", nil, err
+	}
+
+	recordedRefName := localRefName
+	if refNameOverride != "" {
+		// dst differs from src
+		// Eg: git push <remote> <src>:<dst>
+		slog.Debug("Name of reference overridden to match remote reference name, identifying absolute reference path...")
+		recordedRefName, err = r.r.AbsoluteReference(refNameOverride)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+
+	// The tip of the ref is always from the localRefName
+	slog.Debug(fmt.Sprintf("Loading current state of '%s'...", localRefName))
+	tip, err := r.r.GetReference(localRefName)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return recordedRefName, tip, nil
 }
 
 // RecordRSLEntryForReferenceAtTarget is a special version of
@@ -240,13 +378,41 @@ func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []stri
 	return err
 }
 
+// rewriteAnnotationTargets maps an annotation's targets and qualifiers
+// through the entries a replay wrote. A target that was not replayed keeps
+// its ID and its qualifiers. A replayed target is mapped to the ID of the
+// entry the replay wrote, with its qualifiers rekeyed to that ID.
+func rewriteAnnotationTargets(entry *rsl.AnnotationEntry, replayedIDs map[string]githash.Hash) ([]githash.Hash, map[string][]string) {
+	newIDs := make([]githash.Hash, 0, len(entry.RSLEntryIDs))
+	newRefs := map[string][]string{}
+
+	for _, id := range entry.RSLEntryIDs {
+		refs, qualified := entry.Refs[id.String()]
+
+		newID, wasReplayed := replayedIDs[id.String()]
+		if !wasReplayed {
+			newID = id
+		}
+
+		newIDs = append(newIDs, newID)
+		if qualified {
+			newRefs[newID.String()] = refs
+		}
+	}
+
+	return newIDs, newRefs
+}
+
 // ReconcileLocalRSLWithRemote checks the local RSL against the specified remote
 // and reconciles the local RSL if needed. If the local RSL doesn't exist or is
 // strictly behind the remote RSL, then the local RSL is updated to match the
 // remote RSL. If the local RSL is ahead of the remote RSL, nothing is updated.
 // Finally, if the local and remote RSLs have diverged, then the local only RSL
 // entries are reapplied over the latest entries in the remote if the local only
-// RSL entries and remote only entries are for different Git references.
+// RSL entries and remote only entries are for different Git references. A
+// local only bulk reference entry is replayed as a bulk reference entry.
+// Replayed entries receive new IDs, so an annotation that referred to a
+// replayed entry is rewritten to the new ID.
 func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName string, sign bool) error {
 	if sign {
 		slog.Debug("Checking if Git signing is configured...")
@@ -364,16 +530,16 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	localUpdatedRefs := set.NewSet[string]()
 	for _, entry := range localOnlyEntries {
 		slog.Debug(fmt.Sprintf("Identified local only entry that must be reapplied '%s'", entry.GetID().String()))
-		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
-			localUpdatedRefs.Add(entry.RefName)
+		if err := addUpdatedRefs(localUpdatedRefs, entry); err != nil {
+			return fmt.Errorf("unable to inspect local only entry '%s': %w", entry.GetID().String(), err)
 		}
 	}
 
 	remoteUpdatedRefs := set.NewSet[string]()
 	for _, entry := range remoteOnlyEntries {
 		slog.Debug(fmt.Sprintf("Identified remote only entry '%s'", entry.GetID().String()))
-		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
-			remoteUpdatedRefs.Add(entry.RefName)
+		if err := addUpdatedRefs(remoteUpdatedRefs, entry); err != nil {
+			return fmt.Errorf("unable to inspect remote only entry '%s': %w", entry.GetID().String(), err)
 		}
 	}
 
@@ -389,35 +555,43 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		return fmt.Errorf("unable to update local RSL: %w", err)
 	}
 
-	// Apply local only entries on top of the new local RSL
-	// localOnlyEntries is in reverse order
+	// Apply local only entries on top of the new local RSL. localOnlyEntries
+	// is in reverse order. Replayed entries receive new IDs, so annotations
+	// that referred to replayed entries are rewritten to the new IDs.
+	replayedIDs := map[string]githash.Hash{}
 	for i := len(localOnlyEntries) - 1; i >= 0; i-- {
-		slog.Debug(fmt.Sprintf("Reapplying entry '%s'...", localOnlyEntries[i].GetID().String()))
+		original := localOnlyEntries[i]
+		slog.DebugContext(ctx, fmt.Sprintf("Reapplying entry '%s'...", original.GetID().String()))
 
-		// We create a new object so as to apply anything the
-		// entry may contain that is inferred at commit time
-		// For example, an incrementing number inferred from the
-		// parent entry
+		// We create a new object so as to apply anything the entry may
+		// contain that is inferred at commit time, such as the number.
 		// WithCustomFields copies the fields into the new entry, so the
-		// original entry's map can be passed directly without cloning it first.
-		switch entry := localOnlyEntries[i].(type) {
+		// original entry's map can be passed directly without cloning it
+		// first.
+		var err error
+		switch entry := original.(type) {
 		case *rsl.ReferenceEntry:
-			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply reference entry '%s': %w", entry.ID.String(), err)
-			}
+			err = rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
+		case *rsl.BulkReferenceEntry:
+			err = rsl.NewBulkReferenceEntry(slices.Clone(entry.Updates)).Commit(r.r, sign)
+		case *rsl.PropagationEntry:
+			err = rsl.NewPropagationEntry(entry.RefName, entry.TargetID, entry.UpstreamRepository, entry.UpstreamEntryID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
 		case *rsl.AnnotationEntry:
-			if err := rsl.NewAnnotationEntry(entry.RSLEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply annotation entry '%s': %w", entry.ID.String(), err)
-			}
+			newIDs, newRefs := rewriteAnnotationTargets(entry, replayedIDs)
+			err = rsl.NewAnnotationEntryWithQualifiers(newIDs, newRefs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
+		default:
+			err = fmt.Errorf("%w: cannot reapply entry type %T", rsl.ErrUnknownRSLEntryType, original)
+		}
+		if err != nil {
+			return fmt.Errorf("unable to reapply entry '%s': %w", original.GetID().String(), err)
 		}
 
-		if slog.Default().Enabled(ctx, slog.LevelDebug) {
-			currentTip, err := r.r.GetReference(rsl.Ref)
-			if err != nil {
-				return fmt.Errorf("unable to get current tip of the RSL: %w", err)
-			}
-			slog.Debug("New entry ID for '%s' is '%s'", localOnlyEntries[i].GetID().String(), currentTip.String())
+		currentTip, err := r.r.GetReference(rsl.Ref)
+		if err != nil {
+			return fmt.Errorf("unable to get current tip of the RSL: %w", err)
 		}
+		replayedIDs[original.GetID().String()] = currentTip
+		slog.DebugContext(ctx, fmt.Sprintf("New entry ID for '%s' is '%s'", original.GetID().String(), currentTip.String()))
 	}
 
 	slog.Debug("Updated local RSL!")
@@ -719,6 +893,29 @@ func getRSLEntriesUntil(repo gitstore.Storer, start, until githash.Hash) ([]rsl.
 	return entries, nil
 }
 
+// addUpdatedRefs records every ref that entry updates into refs. It handles
+// the same entry types as the replay switch in ReconcileLocalRSLWithRemote, so
+// an entry type this build does not know cannot silently contribute no refs
+// and slip past the conflict check.
+func addUpdatedRefs(refs *set.Set[string], entry rsl.Entry) error {
+	switch entry := entry.(type) {
+	case *rsl.ReferenceEntry:
+		refs.Add(entry.RefName)
+	case *rsl.PropagationEntry:
+		refs.Add(entry.RefName)
+	case *rsl.BulkReferenceEntry:
+		for _, update := range entry.Updates {
+			refs.Add(update.RefName)
+		}
+	case *rsl.AnnotationEntry:
+		// Annotations refer to prior entries and update no refs of their own.
+	default:
+		return fmt.Errorf("%w: cannot identify the refs updated by entry type %T", rsl.ErrUnknownRSLEntryType, entry)
+	}
+
+	return nil
+}
+
 func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash {
 	refTips := map[string]githash.Hash{}
 	annotationsMap := map[string][]*rsl.AnnotationEntry{}
@@ -735,6 +932,21 @@ func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash
 			}
 
 			refTips[entry.GetRefName()] = entry.GetTargetID()
+		case *rsl.BulkReferenceEntry:
+			// The annotations apply to the entry, so they are looked up once
+			// rather than per view.
+			annotations, hasAnnotations := annotationsMap[entry.GetID().String()]
+			for _, view := range entry.ReferenceEntries() {
+				if _, has := refTips[view.RefName]; has {
+					continue
+				}
+
+				if hasAnnotations && view.SkippedBy(annotations) {
+					continue
+				}
+
+				refTips[view.RefName] = view.TargetID
+			}
 		case *rsl.PropagationEntry:
 			if _, has := refTips[entry.GetRefName()]; has {
 				continue
