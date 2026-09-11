@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/pkg/customfields"
@@ -697,4 +698,20 @@ func BenchmarkParseRSLEntryText(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestParseRSLEntryTextUnknownHeader(t *testing.T) {
+	t.Parallel()
+
+	_, err := parseRSLEntryText(githash.ZeroHash, "RSL Future Entry\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	assert.ErrorContains(t, err, `"RSL Future Entry"`)
+	assert.ErrorContains(t, err, "Upgrade gittuf to the latest release")
+
+	longHeader := "RSL " + strings.Repeat("x", 200) + " Entry"
+	_, err = parseRSLEntryText(githash.ZeroHash, longHeader+"\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorContains(t, err, longHeader[:maxHeaderInError]+"...")
+	assert.NotContains(t, err.Error(), longHeader)
 }

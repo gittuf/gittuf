@@ -55,6 +55,7 @@ var (
 	ErrInvalidGetLatestReferenceUpdaterEntryOptions = errors.New("invalid options presented for getting latest reference updater entry (are both before or until conditions set or is the before number less than the until number?)")
 	ErrCannotUseEntryNumberFilter                   = errors.New("current RSL entries are not numbered, cannot use number range options")
 	ErrInvalidUntilEntryNumberCondition             = errors.New("cannot meet until entry number condition")
+	ErrUnknownRSLEntryType                          = fmt.Errorf("%w: RSL entry is of an unknown type", ErrInvalidRSLEntry)
 )
 
 // commitEntry commits an RSL entry: an empty-tree commit on Ref carrying the
@@ -1152,6 +1153,18 @@ func ParseEntryText(id githash.Hash, text string) (Entry, error) {
 	return parseRSLEntryText(id, text)
 }
 
+const unknownEntryTypeGuidance = "This repository may use a gittuf feature newer than this client. Upgrade gittuf to the latest release and retry. If this client is already the latest release, the entry may be corrupt or malicious and should be reported to the repository owners."
+
+const maxHeaderInError = 80
+
+func newUnknownEntryTypeError(id githash.Hash, text string) error {
+	header, _, _ := strings.Cut(text, "\n")
+	if len(header) > maxHeaderInError {
+		header = header[:maxHeaderInError] + "..."
+	}
+	return fmt.Errorf("%w: entry %s has header %q. %s", ErrUnknownRSLEntryType, id.String(), header, unknownEntryTypeGuidance)
+}
+
 func parseRSLEntryText(id githash.Hash, text string) (Entry, error) {
 	// Each parser returns a concrete pointer type. Assign to a local and return
 	// an explicit nil interface on error: returning the typed nil pointer
@@ -1176,7 +1189,7 @@ func parseRSLEntryText(id githash.Hash, text string) (Entry, error) {
 		}
 		return entry, nil
 	default:
-		return nil, ErrInvalidRSLEntry
+		return nil, newUnknownEntryTypeError(id, text)
 	}
 }
 
