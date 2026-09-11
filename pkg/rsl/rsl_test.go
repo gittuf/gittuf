@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/pkg/githash"
@@ -654,4 +655,32 @@ func BenchmarkParseRSLEntryText(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestParseRSLEntryTextUnknownHeader(t *testing.T) {
+	t.Parallel()
+
+	for _, header := range []string{
+		"RSL Future Entry",
+		ReferenceEntryHeader + " v2",
+		AnnotationEntryHeader + " v2",
+		PropagationEntryHeader + " v2",
+	} {
+		t.Run(header, func(t *testing.T) {
+			t.Parallel()
+
+			entry, err := parseRSLEntryText(githash.ZeroHash, header+"\n\nsomething: else")
+			assert.Nil(t, entry)
+			assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+			assert.ErrorContains(t, err, fmt.Sprintf("%q", header))
+			assert.ErrorContains(t, err, "Upgrade gittuf to the latest release")
+		})
+	}
+
+	longHeader := "RSL " + strings.Repeat("x", 200) + " Entry"
+	_, err := parseRSLEntryText(githash.ZeroHash, longHeader+"\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorContains(t, err, longHeader[:maxHeaderInError]+"...")
+	assert.NotContains(t, err.Error(), longHeader)
 }

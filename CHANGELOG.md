@@ -2,6 +2,13 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## Unreleased
+
+### Added
+
+- A clear upgrade message when the RSL contains an entry type or the policy
+  metadata uses a schema version this client does not implement
+
 ## v0.16.0
 
 This release adds support for SHA-256 Git repositories and reworks gittuf's
