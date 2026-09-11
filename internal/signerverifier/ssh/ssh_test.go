@@ -6,6 +6,7 @@ package ssh
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -45,8 +46,15 @@ func TestSSH(t *testing.T) {
 	// Write script to mock password prompt
 
 	scriptPath := filepath.Join(tmpDir, "askpass.sh")
-	if err := os.WriteFile(scriptPath, artifacts.AskpassScript, 0o500); err != nil { //nolint:gosec
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(tmpDir, "askpass.bat")
+		if err := os.WriteFile(scriptPath, []byte("@echo hunter2\r\n"), 0o500); err != nil { //nolint:gosec
+			t.Fatal(err)
+		}
+	} else {
+		if err := os.WriteFile(scriptPath, artifacts.AskpassScript, 0o500); err != nil { //nolint:gosec
+			t.Fatal(err)
+		}
 	}
 
 	// Write test key pairs to temp dir with permissions required by ssh-keygen
@@ -54,6 +62,17 @@ func TestSSH(t *testing.T) {
 		keyPath := filepath.Join(tmpDir, test.keyName)
 		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
 			t.Fatal(err)
+		}
+		if runtime.GOOS == "windows" && strings.Contains(test.keyName, "_enc") {
+			if err := exec.Command("icacls", keyPath, "/inheritance:r").Run(); err != nil { //nolint:gosec
+				t.Fatal(err)
+			}
+			user := os.Getenv("USERNAME")
+			if user != "" {
+				if err := exec.Command("icacls", keyPath, "/grant:r", user+":F").Run(); err != nil { //nolint:gosec
+					t.Fatal(err)
+				}
+			}
 		}
 	}
 
@@ -64,9 +83,6 @@ func TestSSH(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.keyName, func(t *testing.T) {
 			if strings.Contains(test.keyName, "_enc") {
-				if runtime.GOOS == "windows" {
-					t.Skip("TODO: test encrypted keys on windows")
-				}
 				t.Setenv("SSH_ASKPASS", scriptPath)
 				t.Setenv("SSH_ASKPASS_REQUIRE", "force")
 			}
