@@ -570,7 +570,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					oldTip = zeroHash
 				}
 
-				newTipHash, err := repo.GetGitRepository().GetReference(srcRef)
+				newTipHash, err := repo.GetStorer().GetReference(srcRef)
 				if err != nil {
 					return nil, false, err
 				}
@@ -613,7 +613,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 					oldTip = zeroHash
 				}
 
-				newTipHash, err := repo.GetGitRepository().GetReference(rsl.Ref)
+				newTipHash, err := repo.GetStorer().GetReference(rsl.Ref)
 				if err != nil {
 					return nil, false, err
 				}

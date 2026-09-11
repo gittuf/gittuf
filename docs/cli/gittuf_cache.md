@@ -19,6 +19,8 @@ The 'cache' command group contains subcommands to manage gittuf's local persiste
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
       --verbose                      enable verbose logging
 ```
 

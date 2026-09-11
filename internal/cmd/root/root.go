@@ -4,6 +4,8 @@
 package root
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
@@ -34,6 +36,8 @@ type options struct {
 	profile           bool
 	cpuProfileFile    string
 	memoryProfileFile string
+	storerTrace       bool
+	storerTraceFile   string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -71,9 +75,29 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"memory.prof",
 		"file to store memory profile",
 	)
+
+	cmd.PersistentFlags().BoolVar(
+		&o.storerTrace,
+		"storer-trace",
+		false,
+		"report Git storage backend call counts, timings and git fork counts on exit",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&o.storerTraceFile,
+		"storer-trace-file",
+		"storer.trace",
+		"file to store the Git storage backend trace",
+	)
 }
 
 func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
+	if err := selectStorerBackend(); err != nil {
+		return err
+	}
+	gittuf.SetStorerTrace(o.storerTrace)
+	storerTraceFile = o.storerTraceFile
+
 	// Check if colored output must be disabled
 	output := os.Stdout
 	isTerminal := isatty.IsTerminal(output.Fd()) || isatty.IsCygwinTerminal(output.Fd())
@@ -126,4 +150,49 @@ func New() *cobra.Command {
 	cmd.AddCommand(tui.New(&persistent.Options{}))
 
 	return cmd
+}
+
+// selectStorerBackend reads the backend from the environment. There is no
+// flag: the backend is experimental, so selecting it is deliberately as
+// explicit as enabling developer mode.
+func selectStorerBackend() error {
+	backend, err := gittuf.ParseStorerBackend(os.Getenv(gittuf.StorerBackendEnvKey))
+	if err != nil {
+		return err
+	}
+
+	return gittuf.SetStorerBackend(backend)
+}
+
+// storerTraceReported keeps the trace to one emission. It is reported from
+// main's deferred cleanup and again before a non-zero exit, both on the main
+// goroutine.
+var storerTraceReported bool
+
+// storerTraceFile is the path PreRunE recorded for ReportStorerTrace, which
+// runs after the command body and so cannot reach the flag itself.
+var storerTraceFile string
+
+// ReportStorerTrace writes the storer trace to the requested file if one was
+// requested. Only the first call writes. A failure to write goes to errOut,
+// since the trace is diagnostic and must not change the exit status.
+func ReportStorerTrace(errOut io.Writer) {
+	if storerTraceReported {
+		return
+	}
+	storerTraceReported = true
+
+	report, has := gittuf.StorerTraceReport()
+	if !has {
+		return
+	}
+
+	if storerTraceFile == "" {
+		fmt.Fprint(errOut, report)
+		return
+	}
+
+	if err := os.WriteFile(storerTraceFile, []byte(report), 0o600); err != nil {
+		fmt.Fprintf(errOut, "unable to write storer trace to '%s': %v\n", storerTraceFile, err)
+	}
 }
