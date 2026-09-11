@@ -155,13 +155,57 @@ func getPublicKeyForKeyID(keyID, program string) (*signerverifier.SSLibKey, erro
 	return LoadGPGKeyFromBytes(output)
 }
 
+// msysPath converts a native Windows path (e.g. `C:\Users\foo`) into the
+// POSIX-style form MSYS tools such as Git for Windows' bundled gpg expect
+// for absolute paths (e.g. `/c/Users/foo`). See the MSYS2 documentation on
+// path conversion: https://www.msys2.org/docs/filesystem-paths/
+//
+// This intentionally doesn't use filepath.ToSlash: that only rewrites the
+// separator native to the OS the code is compiled for, so on a non-Windows
+// host (as when this package's tests run on Linux/macOS CI runners) it
+// leaves Windows-style backslashes untouched instead of converting them.
+func msysPath(path string) string {
+	path = strings.ReplaceAll(path, `\`, "/")
+	if len(path) >= 2 && path[1] == ':' {
+		path = "/" + strings.ToLower(path[:1]) + path[2:]
+	}
+	return path
+}
+
+// gpgIsMSYSBuild reports whether the `gpg` binary that will actually be
+// invoked is an MSYS build, such as the one bundled with Git for Windows.
+// This matters because MSYS gpg only recognizes POSIX-style absolute paths
+// (e.g. `/c/Users/...`): given a native Windows path, it doesn't treat it as
+// absolute and silently resolves it relative to gpg's working directory
+// instead. A non-MSYS (e.g. Gpg4win) install, on the other hand, expects the
+// native Windows path as-is, so callers must not assume one or the other
+// merely from being on Windows.
+func gpgIsMSYSBuild() bool {
+	path, err := exec.LookPath("gpg")
+	if err != nil {
+		return false
+	}
+
+	return isMSYSGPGPath(path)
+}
+
+// isMSYSGPGPath reports whether path (as resolved by exec.LookPath("gpg"))
+// points at an MSYS build of gpg, such as the one bundled with Git for
+// Windows under `Git\usr\bin` or `Git\mingw64\bin`. See
+// https://www.msys2.org/docs/environments/ for background on the usr/bin
+// vs. mingw64/bin MSYS2 environments Git for Windows is built from.
+//
+// As in msysPath, this doesn't use filepath.ToSlash, since that would only
+// normalize separators when compiled for Windows and this needs to work
+// when the package's tests run on any OS.
+func isMSYSGPGPath(path string) bool {
+	path = strings.ToLower(strings.ReplaceAll(path, `\`, "/"))
+	return strings.Contains(path, "/git/usr/bin/gpg") || strings.Contains(path, "/git/mingw64/bin/gpg")
+}
+
 // SetupTestGPGHomeDir is a test helper used only to prepare a temporary GPG
 // home dir with the specified keys added in.
 func SetupTestGPGHomeDir(t *testing.T, privateKeyBytes ...[]byte) {
-	if runtime.GOOS == "windows" {
-		t.Skip("TODO: test gpg keys for metadata on Windows")
-	}
-
 	// We use os.MkdirTemp because t.TempDir can result in a path
 	// that's too long for socket files, used for gpg-agent.
 	tmpGpgHomeDir, err := os.MkdirTemp("", "gittuf-gpg-")
@@ -170,7 +214,11 @@ func SetupTestGPGHomeDir(t *testing.T, privateKeyBytes ...[]byte) {
 		os.RemoveAll(tmpGpgHomeDir) //nolint:errcheck
 	})
 
-	t.Setenv("GNUPGHOME", tmpGpgHomeDir)
+	gnupgHome := tmpGpgHomeDir
+	if runtime.GOOS == "windows" && gpgIsMSYSBuild() {
+		gnupgHome = msysPath(tmpGpgHomeDir)
+	}
+	t.Setenv("GNUPGHOME", gnupgHome)
 
 	gpgAgentConfPath := filepath.Join(tmpGpgHomeDir, "gpg-agent.conf")
 	if err := os.WriteFile(gpgAgentConfPath, artifacts.GPGAgentConf, 0o600); err != nil {
