@@ -16,7 +16,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ['1.26', '1.27']
+        storer: [binary, go-git]
     runs-on: ${{ matrix.os }}
+    env:
+      GITTUF_STORER: ${{ matrix.storer }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

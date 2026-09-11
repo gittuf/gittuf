@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/go-git/go-git/v6"
 	gogitconfig "github.com/go-git/go-git/v6/config"
@@ -37,6 +38,16 @@ type Repository struct {
 	gitDirPath   string
 	objectFormat ObjectFormat
 	clock        clockwork.Clock
+
+	// gitInvocations counts spawns of the git binary, which dominate the cost
+	// of read heavy commands.
+	gitInvocations atomic.Uint64
+}
+
+// GitInvocationCount returns how often the git binary was spawned for this
+// repository.
+func (r *Repository) GitInvocationCount() uint64 {
+	return r.gitInvocations.Load()
 }
 
 // GetObjectFormat returns the hash algorithm the repository uses for its object
@@ -303,6 +314,8 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	if e.r.gitDirPath != "" && !e.unsetGitDir {
 		e.args = append([]string{"--git-dir", e.r.gitDirPath}, e.args...)
 	}
+	e.r.gitInvocations.Add(1)
+
 	cmd := exec.Command(binary, e.args...) //nolint:gosec
 	cmd.Env = e.env
 	cmd.Env = append(cmd.Env, "LC_ALL=C")                 // force git to the C (and thus english) locale

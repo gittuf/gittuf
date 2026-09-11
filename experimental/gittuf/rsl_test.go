@@ -30,9 +30,9 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +142,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 
 		remoteTmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -162,7 +162,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		blobID, err := localR.WriteBlob([]byte("test"))
 		if err != nil {
@@ -196,7 +196,7 @@ func TestRecordRSLEntryForReference(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -227,9 +227,9 @@ func TestRecordRSLEntryForReferenceAtTarget(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-			repo := &Repository{r: r}
+			repo := &Repository{r: newStorer(r)}
 
-			treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+			treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 			emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 			if err != nil {
 				t.Fatal(err)
@@ -303,12 +303,12 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
 	err := repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -360,7 +360,7 @@ func TestRecordRSLAnnotation(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -381,7 +381,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("remote has updates for local", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -405,7 +405,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -438,7 +438,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -468,7 +468,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		// Simulate more remote actions
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
@@ -507,7 +507,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("remote has no updates for local", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -531,7 +531,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		originalRSLTip, err := localRepo.r.GetReference(rsl.Ref)
 		if err != nil {
@@ -552,7 +552,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("local is ahead of remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -578,7 +578,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		// Simulate local actions
 		if _, err := localR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
@@ -617,7 +617,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("remote and local have diverged", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -643,7 +643,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		// Simulate remote actions
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
@@ -711,7 +711,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("remote and local have diverged but modify same ref", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -737,7 +737,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		// Simulate remote actions
 		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
@@ -784,7 +784,7 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -804,7 +804,7 @@ func TestSync(t *testing.T) {
 	t.Run("local and remote are identical", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -829,7 +829,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -841,7 +841,7 @@ func TestSync(t *testing.T) {
 	t.Run("remote uses gittuf transport prefix", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -870,7 +870,7 @@ func TestSync(t *testing.T) {
 		if err := localR.AddRemote(remoteName, gittufTransportPrefix+tmpDir); err != nil {
 			t.Fatal(err)
 		}
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
 		assert.Nil(t, err)
@@ -890,7 +890,7 @@ func TestSync(t *testing.T) {
 	t.Run("local is strictly ahead of remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -915,7 +915,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -950,7 +950,7 @@ func TestSync(t *testing.T) {
 	t.Run("local is strictly behind remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -975,7 +975,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -1010,7 +1010,7 @@ func TestSync(t *testing.T) {
 	t.Run("local RSL has diverged, not allowed to overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -1035,7 +1035,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -1063,7 +1063,7 @@ func TestSync(t *testing.T) {
 	t.Run("local ref (not RSL) has diverged, not allowed to overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -1088,7 +1088,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -1113,7 +1113,7 @@ func TestSync(t *testing.T) {
 	t.Run("local RSL has diverged, allowed to overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -1138,7 +1138,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -1170,7 +1170,7 @@ func TestSync(t *testing.T) {
 	t.Run("local ref (not RSL) has diverged, allowed to overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
@@ -1195,7 +1195,7 @@ func TestSync(t *testing.T) {
 		}
 		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 
@@ -1271,7 +1271,7 @@ func TestPullRSL(t *testing.T) {
 
 		localTmpDir := t.TempDir()
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)
-		localRepo := &Repository{r: localRepoR}
+		localRepo := &Repository{r: newStorer(localRepoR)}
 		if err := localRepo.r.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
@@ -1292,7 +1292,7 @@ func TestPullRSL(t *testing.T) {
 
 		localTmpDir := t.TempDir()
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)
-		localRepo := &Repository{r: localRepoR}
+		localRepo := &Repository{r: newStorer(localRepoR)}
 		if err := localRepo.r.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
 		}
@@ -1342,7 +1342,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r.Repository)
 		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("b", blobBID),
@@ -1376,7 +1376,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r.Repository)
 		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("foo/b", blobBID),
@@ -1481,7 +1481,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r.Repository)
 		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("b", blobBID),
@@ -1525,7 +1525,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r.Repository)
 		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("foo/b", blobBID),
@@ -1646,7 +1646,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r)
+		upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo.r.Repository)
 		upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("b", blobBID),
@@ -1690,7 +1690,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r.Repository)
 		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("foo/b", blobBID),
@@ -1831,7 +1831,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		upstreamTreeBuilder1 := gitinterface.NewTreeBuilder(upstreamRepo1.r)
+		upstreamTreeBuilder1 := gitinterface.NewTreeBuilder(upstreamRepo1.r.Repository)
 		upstreamRootTree1ID, err := upstreamTreeBuilder1.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("b", blobBID),
@@ -1860,7 +1860,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		upstreamTreeBuilder2 := gitinterface.NewTreeBuilder(upstreamRepo2.r)
+		upstreamTreeBuilder2 := gitinterface.NewTreeBuilder(upstreamRepo2.r.Repository)
 		upstreamRootTree2ID, err := upstreamTreeBuilder2.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("c", blobCID),
 			gitinterface.NewEntryBlob("d", blobDID),
@@ -1896,7 +1896,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r)
+		downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo.r.Repository)
 		downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
 			gitinterface.NewEntryBlob("a", blobAID),
 			gitinterface.NewEntryBlob("foo/b", blobBID),
@@ -2175,9 +2175,9 @@ func TestRecordRSLEntryForReferenceWithSigningKeyBytes(t *testing.T) {
 	// CommitUsingSpecificKey takes.
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	require.NoError(t, err)
 	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
@@ -2212,9 +2212,9 @@ func TestRecordRSLAnnotationWithSigningKeyBytes(t *testing.T) {
 	// Mirror the entry test for annotations.
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	require.NoError(t, err)
 	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
@@ -2263,9 +2263,9 @@ func TestRecordRSLEntryForReferenceSigningKeyBytesIgnoredWhenUnsigned(t *testing
 	// the existing flag rather than letting key presence silently override it.
 	tempDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, tempDir, false)
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	require.NoError(t, err)
 	_, err = repo.r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)

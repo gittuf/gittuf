@@ -42,7 +42,7 @@ func TestVerifyRefRecordedWithGitSigning(t *testing.T) {
 			refName := "refs/heads/main"
 
 			// Commits are signed with the repository's Git signing key.
-			common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, rsaKeyBytes)
+			common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, rsaKeyBytes)
 
 			// Record the RSL entry through the Git-signed workflow.
 			if err := repo.RecordRSLEntryForReference(testCtx, refName, true, rslopts.WithRecordLocalOnly()); err != nil {
@@ -66,7 +66,7 @@ func testVerifyRef(t *testing.T, objectFormat gitinterface.ObjectFormat) {
 	refName := "refs/heads/main"
 	remoteRefName := "refs/heads/not-main"
 
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgKeyBytes)
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
 	entry.ID = entryID
@@ -136,7 +136,7 @@ func testVerifyRef(t *testing.T, objectFormat gitinterface.ObjectFormat) {
 	}
 
 	// Add another commit
-	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgKeyBytes)
 	err := repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
 	assert.ErrorIs(t, err, ErrRefStateDoesNotMatchRSL)
 	err = repo.VerifyRef(testCtx, refName, verifyopts.WithLatestOnly())
@@ -161,7 +161,7 @@ func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat
 	remoteRefName := "refs/heads/not-main"
 
 	// Policy violation
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgUnauthorizedKeyBytes)
+	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgUnauthorizedKeyBytes)
 	// Violation for refName
 	entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 	violatingEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgUnauthorizedKeyBytes)
@@ -170,7 +170,7 @@ func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat
 	violatingRemoteRefNameEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgUnauthorizedKeyBytes)
 
 	// No policy violation for refName
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgKeyBytes)
 	// refName
 	entry = rsl.NewReferenceEntry(refName, commitIDs[0])
 	goodEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
@@ -179,7 +179,7 @@ func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat
 	goodRemoteRefNameEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
 
 	// No policy violation for refName (what we verify)
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgKeyBytes)
 	entry = rsl.NewReferenceEntry(refName, commitIDs[0])
 	common.CreateTestRSLReferenceEntryCommit(t, repo.r, entry, gpgKeyBytes)
 	// No policy violation for remoteRefName (what we verify)
@@ -237,7 +237,7 @@ func testVerifyRefFromEntry(t *testing.T, objectFormat gitinterface.ObjectFormat
 	}
 
 	// Add another commit
-	common.AddNTestCommitsToSpecifiedRef(t, repo.r, refName, 1, gpgKeyBytes)
+	common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, refName, 1, gpgKeyBytes)
 
 	// Verifying from only good entry tells us ref does not match RSL
 	err := repo.VerifyRefFromEntry(testCtx, refName, goodEntryID.String())
@@ -255,7 +255,7 @@ func TestVerifyMergeable(t *testing.T) {
 	t.Run("not mergeable without approval", func(t *testing.T) {
 		repo := createTestRepositoryWithPolicy(t, "")
 
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -271,7 +271,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
 			t.Fatal(err)
 		}
-		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, featureRef, 1, gpgUnauthorizedKeyBytes)
 		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
@@ -284,7 +284,7 @@ func TestVerifyMergeable(t *testing.T) {
 	t.Run("mergeable with approval", func(t *testing.T) {
 		repo := createTestRepositoryWithPolicy(t, "")
 
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -300,7 +300,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
 			t.Fatal(err)
 		}
-		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, featureRef, 1, gpgUnauthorizedKeyBytes)
 		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
@@ -329,7 +329,7 @@ func TestVerifyMergeable(t *testing.T) {
 			t.Run(string(objectFormat), func(t *testing.T) {
 				repo := createTestRepositoryWithPolicy(t, "", gitinterface.WithObjectFormat(objectFormat))
 
-				treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+				treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 				emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 				if err != nil {
 					t.Fatal(err)
@@ -337,7 +337,7 @@ func TestVerifyMergeable(t *testing.T) {
 				if _, err := repo.r.Commit(emptyTreeID, featureRef, "Initial commit\n", false); err != nil {
 					t.Fatal(err)
 				}
-				common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+				common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, featureRef, 1, gpgUnauthorizedKeyBytes)
 				if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 					t.Fatal(err)
 				}
@@ -362,7 +362,7 @@ func TestVerifyMergeable(t *testing.T) {
 	t.Run("mergeable with approval and feature RSL bypass", func(t *testing.T) {
 		repo := createTestRepositoryWithPolicy(t, "")
 
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -378,7 +378,7 @@ func TestVerifyMergeable(t *testing.T) {
 		if err := repo.r.SetReference(featureRef, baseCommitID); err != nil {
 			t.Fatal(err)
 		}
-		common.AddNTestCommitsToSpecifiedRef(t, repo.r, featureRef, 1, gpgUnauthorizedKeyBytes)
+		common.AddNTestCommitsToSpecifiedRef(t, repo.r.Repository, featureRef, 1, gpgUnauthorizedKeyBytes)
 		if err := repo.RecordRSLEntryForReference(testCtx, featureRef, false, rslopts.WithRecordLocalOnly()); err != nil {
 			t.Fatal(err)
 		}
