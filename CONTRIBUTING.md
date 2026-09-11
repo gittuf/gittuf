@@ -29,6 +29,24 @@ automated testing such as (but not limited to):
 * Static analysis using linters
 * Developer Certificate of Origin (DCO) check
 
+### Running Tests on Windows
+
+gittuf's GPG support (`internal/signerverifier/gpg`) shells out to a `gpg`
+binary, so `go test ./...` needs one resolvable on `PATH`. Windows doesn't
+ship GnuPG by default, and unlike Linux/macOS CI runners, there's no
+system-wide install to fall back on, so you'll need one of:
+
+* [Git for Windows](https://gitforwindows.org/), which bundles its own `gpg`
+  under `Git\usr\bin`. If it isn't already on `PATH`, add that directory to
+  your user or system `PATH` (this is what gittuf's own CI does).
+* A standalone GnuPG install, such as [Gpg4win](https://www.gpg4win.org/).
+
+Either works: `SetupTestGPGHomeDir` (the test helper that provisions a
+temporary `GNUPGHOME`) detects at runtime whether the resolved `gpg` is an
+MSYS build (as bundled with Git for Windows) or a native one (such as
+Gpg4win), and adjusts the path format it hands to `gpg` accordingly. No
+manual configuration beyond having `gpg` on `PATH` is required.
+
 ## AI-based Contributions Policy
 
 AI-based contributions to gittuf are allowed, but must be of good quality as is
