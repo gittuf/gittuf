@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 )
@@ -45,6 +46,8 @@ type ReferenceUpdate struct {
 //	refs/heads/feature: 4a2f1b9c7e5d3a8b6c4f2e1d0b9a8c7f6e5d4c3b
 //
 //	number: 5
+//
+// Custom fields, when present, follow the number line.
 type BulkReferenceEntry struct {
 	// ID contains the Git hash for the commit corresponding to the entry.
 	ID githash.Hash
@@ -54,14 +57,18 @@ type BulkReferenceEntry struct {
 
 	// Number contains a strictly increasing number that hints at entry ordering.
 	Number uint64
+
+	// CustomFields contains application-defined metadata for the entry.
+	CustomFields CustomFields
 }
 
 var _ Entry = (*BulkReferenceEntry)(nil)
 
 // NewBulkReferenceEntry returns a BulkReferenceEntry for the specified
 // updates. Validation happens when the entry is committed.
-func NewBulkReferenceEntry(updates []ReferenceUpdate) *BulkReferenceEntry {
-	return &BulkReferenceEntry{Updates: updates}
+func NewBulkReferenceEntry(updates []ReferenceUpdate, opts ...EntryOption) *BulkReferenceEntry {
+	options := applyEntryOptions(opts)
+	return &BulkReferenceEntry{Updates: updates, CustomFields: options.customFields}
 }
 
 func (e *BulkReferenceEntry) GetID() githash.Hash {
@@ -70,6 +77,11 @@ func (e *BulkReferenceEntry) GetID() githash.Hash {
 
 func (e *BulkReferenceEntry) GetNumber() uint64 {
 	return e.Number
+}
+
+func (e *BulkReferenceEntry) GetCustomField(key string) (string, bool) {
+	value, has := e.CustomFields[key]
+	return value, has
 }
 
 // ReferenceEntries returns one read-only view per update. Each view carries
@@ -89,7 +101,10 @@ func (e *BulkReferenceEntry) referenceEntryForUpdate(update ReferenceUpdate) *Re
 		RefName:  update.RefName,
 		TargetID: update.TargetID,
 		Number:   e.Number,
-		isView:   true,
+		// The map is shared with the bulk entry rather than copied. A view
+		// is read only, and GetCustomField is the only reader.
+		CustomFields: e.CustomFields,
+		isView:       true,
 	}
 }
 
@@ -136,7 +151,9 @@ func (e *BulkReferenceEntry) setEntryNumber(storer gitstore.Storer) (githash.Has
 	return tip, nil
 }
 
-// createCommitMessage renders the bulk entry's wire format. The number is
+// createCommitMessage renders the bulk entry's wire format. Custom fields, if
+// any, follow the number line, as they do for the other entry types. The
+// number is
 // mandatory for a bulk entry, so the includeNumber parameter that the Entry
 // interface requires is ignored here. The older entry types honour it because
 // they must still be able to render the numberless form they shipped with.
@@ -157,6 +174,15 @@ func (e *BulkReferenceEntry) createCommitMessage(bool) (string, error) {
 		fmt.Fprintf(&message, "%s: %s\n", update.RefName, update.TargetID.String())
 	}
 	fmt.Fprintf(&message, "\n%s: %d", NumberKey, e.Number)
+
+	lines, err := appendCustomFieldLines(nil, e.CustomFields)
+	if err != nil {
+		return "", err
+	}
+	for _, line := range lines {
+		message.WriteString("\n")
+		message.WriteString(line)
+	}
 	return message.String(), nil
 }
 
@@ -280,7 +306,14 @@ func parseBulkReferenceEntryText(id githash.Hash, text string) (*BulkReferenceEn
 			state = done
 
 		default:
-			return nil, fmt.Errorf("%w: bulk reference entry has a line after its number", ErrInvalidRSLEntry)
+			// Only custom fields may follow the number. Unlike the older
+			// entry types, which ignore unknown keys, an unknown key here is
+			// an error: this entry type fails closed on anything a client
+			// does not implement.
+			if !strings.HasPrefix(key, customfields.Prefix) {
+				return nil, fmt.Errorf("%w: bulk reference entry has a line after its number", ErrInvalidRSLEntry)
+			}
+			setCustomField(&entry.CustomFields, key, value)
 		}
 	}
 

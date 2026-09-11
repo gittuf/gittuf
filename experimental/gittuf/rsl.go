@@ -573,7 +573,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		case *rsl.ReferenceEntry:
 			err = rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
 		case *rsl.BulkReferenceEntry:
-			err = rsl.NewBulkReferenceEntry(slices.Clone(entry.Updates)).Commit(r.r, sign)
+			err = rsl.NewBulkReferenceEntry(slices.Clone(entry.Updates), rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
 		case *rsl.PropagationEntry:
 			err = rsl.NewPropagationEntry(entry.RefName, entry.TargetID, entry.UpstreamRepository, entry.UpstreamEntryID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign)
 		case *rsl.AnnotationEntry:

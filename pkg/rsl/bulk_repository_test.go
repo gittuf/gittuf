@@ -137,3 +137,33 @@ func TestGetReferenceUpdaterEntryForRef(t *testing.T) {
 	_, err = GetReferenceUpdaterEntryForRef(repo, unknownID, "refs/heads/main")
 	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
 }
+
+func TestBulkReferenceEntryCommitWithCustomFields(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	fields := CustomFields{
+		"custom.gitforge.com/pusher":         "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)",
+		"custom.gitforge.com/server-version": "v4.2.0-c0ffee",
+	}
+	updates := []ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+		{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+	}
+	if err := NewBulkReferenceEntry(updates, WithCustomFields(fields)).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	latest, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	bulk, isBulk := latest.(*BulkReferenceEntry)
+	require.True(t, isBulk)
+	assert.Equal(t, fields, bulk.CustomFields)
+
+	for _, view := range bulk.ReferenceEntries() {
+		value, has := view.GetCustomField("custom.gitforge.com/pusher")
+		assert.True(t, has)
+		assert.Equal(t, "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)", value)
+	}
+}

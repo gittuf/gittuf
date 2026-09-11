@@ -362,6 +362,7 @@ RSL Bulk Reference Entry
 <ref 2>: <target ID 2>
 
 number: <number>
+custom.<namespace>/<name>: <value>
 ```
 
 The following rules are enforced by the parser, and therefore by every
@@ -378,6 +379,10 @@ verifier.
 * The `number` field is mandatory for this entry type, unlike for the other
   entry types where it is optional. It always follows exactly one blank line
   after the last update line.
+* Custom fields, described below, follow the `number` line. Unlike the other
+  entry types, which ignore keys they do not recognize, any other key after
+  the `number` line is rejected, so a client fails closed on a field it does
+  not implement.
 * The entry commit uses the empty tree, like every other RSL entry, and the
   signature on that commit covers all the updates the entry lists.
 

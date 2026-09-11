@@ -7,7 +7,7 @@ This file tracks the changes introduced by gittuf versions.
 ### Added
 
 - RSL bulk reference entries recording several reference updates under one
-  signature
+  signature, with support for custom fields
 - `ref` qualifiers on RSL annotation entries so a skip can target one update
   inside a bulk entry
 - A clear upgrade message when the RSL contains an entry type or the policy

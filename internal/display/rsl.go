@@ -214,6 +214,8 @@ func writeRSLBulkReferenceEntry(writer io.WriteCloser, entry *rsl.BulkReferenceE
 	     Target: <targetID>
 
 	     Number: <number>
+	     Custom Fields:
+	       <key>: <value>
 
 	       Annotation ID: <annotationID>
 	       Skip:          <yes/no>
@@ -244,6 +246,7 @@ func writeRSLBulkReferenceEntry(writer io.WriteCloser, entry *rsl.BulkReferenceE
 		text += "\n"
 		text += fmt.Sprintf("\n  Number: %d", entry.Number)
 	}
+	text = appendCustomFields(text, entry.CustomFields, "  ")
 
 	text += formatAnnotations(annotations, entry.ID.String())
 

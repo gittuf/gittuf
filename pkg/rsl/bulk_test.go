@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
@@ -262,6 +263,40 @@ func TestParseBulkReferenceEntryText(t *testing.T) {
 			message:        body("refs/heads/main: "+zero, "", "number: five"),
 			expectedErrors: []error{strconv.ErrSyntax},
 		},
+		"custom fields after the number": {
+			message: body("refs/heads/main: "+zero, "", "number: 1", "custom.example.com/field: value"),
+			expectedEntry: &BulkReferenceEntry{
+				ID:           githash.ZeroHash,
+				Updates:      []ReferenceUpdate{{RefName: "refs/heads/main", TargetID: githash.ZeroHash}},
+				Number:       1,
+				CustomFields: CustomFields{"custom.example.com/field": "value"},
+			},
+		},
+		"repeated custom field keeps the first value": {
+			message: body("refs/heads/main: "+zero, "", "number: 1", "custom.example.com/field: first", "custom.example.com/field: second"),
+			expectedEntry: &BulkReferenceEntry{
+				ID:           githash.ZeroHash,
+				Updates:      []ReferenceUpdate{{RefName: "refs/heads/main", TargetID: githash.ZeroHash}},
+				Number:       1,
+				CustomFields: CustomFields{"custom.example.com/field": "first"},
+			},
+		},
+		"malformed custom field is dropped": {
+			message: body("refs/heads/main: "+zero, "", "number: 1", "custom.example.com/Field: value"),
+			expectedEntry: &BulkReferenceEntry{
+				ID:      githash.ZeroHash,
+				Updates: []ReferenceUpdate{{RefName: "refs/heads/main", TargetID: githash.ZeroHash}},
+				Number:  1,
+			},
+		},
+		"custom field before the number": {
+			message:        body("refs/heads/main: "+zero, "custom.example.com/field: value", "", "number: 1"),
+			expectedErrors: []error{ErrInvalidRSLEntry},
+		},
+		"unknown key after the number": {
+			message:        body("refs/heads/main: "+zero, "", "number: 1", "other: value"),
+			expectedErrors: []error{ErrInvalidRSLEntry},
+		},
 		"header with trailing text": {
 			message:        BulkReferenceEntryHeader + " v2\n\nrefs/heads/main: " + zero + "\n\nnumber: 1",
 			expectedErrors: []error{ErrInvalidRSLEntry},
@@ -424,5 +459,77 @@ func FuzzParseBulkReferenceEntryText(f *testing.F) {
 
 	f.Fuzz(func(_ *testing.T, text string) {
 		_, _ = parseBulkReferenceEntryText(githash.ZeroHash, text)
+	})
+}
+
+func TestBulkReferenceEntryCustomFieldsCodec(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	updates := []ReferenceUpdate{{RefName: "refs/heads/main", TargetID: githash.ZeroHash}}
+	body := func(lines ...string) string {
+		return BulkReferenceEntryHeader + "\n\n" + strings.Join(lines, "\n")
+	}
+
+	t.Run("fields are sorted and follow the number", func(t *testing.T) {
+		t.Parallel()
+
+		entry := &BulkReferenceEntry{
+			Updates: updates,
+			Number:  4,
+			CustomFields: CustomFields{
+				"custom.example.com/zebra": "last",
+				"custom.example.com/alpha": "first",
+			},
+		}
+
+		message, err := entry.createCommitMessage(true)
+		require.NoError(t, err)
+		assert.Equal(t, body("refs/heads/main: "+zero, "", "number: 4", "custom.example.com/alpha: first", "custom.example.com/zebra: last"), message)
+	})
+
+	t.Run("invalid field is rejected", func(t *testing.T) {
+		t.Parallel()
+
+		entry := &BulkReferenceEntry{
+			Updates:      updates,
+			Number:       1,
+			CustomFields: CustomFields{"custom.example.com/Field": "value"},
+		}
+
+		_, err := entry.createCommitMessage(true)
+		assert.ErrorIs(t, err, customfields.ErrInvalid)
+	})
+
+	t.Run("round trip", func(t *testing.T) {
+		t.Parallel()
+
+		entry := &BulkReferenceEntry{
+			ID:           githash.ZeroHash,
+			Updates:      updates,
+			Number:       9,
+			CustomFields: CustomFields{"custom.example.com/field": "value"},
+		}
+
+		message, err := entry.createCommitMessage(true)
+		require.NoError(t, err)
+		parsed, err := parseRSLEntryText(githash.ZeroHash, message)
+		require.NoError(t, err)
+		assert.Equal(t, entry, parsed)
+	})
+
+	t.Run("constructor copies the supplied fields", func(t *testing.T) {
+		t.Parallel()
+
+		fields := CustomFields{"custom.example.com/field": "value"}
+		entry := NewBulkReferenceEntry(updates, WithCustomFields(fields))
+		fields["custom.example.com/field"] = "changed"
+
+		value, has := entry.GetCustomField("custom.example.com/field")
+		assert.True(t, has)
+		assert.Equal(t, "value", value)
+
+		_, has = entry.GetCustomField("custom.example.com/absent")
+		assert.False(t, has)
 	})
 }

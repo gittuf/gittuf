@@ -865,6 +865,38 @@ func TestWriteRSLBulkReferenceEntry(t *testing.T) {
 		assert.Equal(t, expectedOutput, output.String())
 	})
 
+	t.Run("custom fields", func(t *testing.T) {
+		entry := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}, rsl.WithCustomFields(rsl.CustomFields{
+			"custom.gitforge.com/server-version": "v4.2.0-c0ffee",
+			"custom.gitforge.com/pusher":         "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)",
+		}))
+		entry.ID = gitinterface.ZeroHash
+		entry.Number = 2
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 2
+  Custom Fields:
+    custom.gitforge.com/pusher: jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)
+    custom.gitforge.com/server-version: v4.2.0-c0ffee
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, entry, nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
 	t.Run("qualified skip annotation, has parent", func(t *testing.T) {
 		annotation := rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{gitinterface.ZeroHash}, map[string][]string{gitinterface.ZeroHash.String(): {"refs/heads/feature"}}, true, "rewritten")
 		annotation.ID = gitinterface.ZeroHash
