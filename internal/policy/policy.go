@@ -721,13 +721,13 @@ func (s *State) Verify(ctx context.Context) error {
 				upstreamEntryID = propagationEntry.(*rsl.PropagationEntry).UpstreamEntryID
 			}
 
-			upstreamEntry, err := rsl.GetEntry(controllerRepository, upstreamEntryID)
+			upstreamUpdater, err := rsl.GetReferenceUpdaterEntryForRef(controllerRepository, upstreamEntryID, PolicyRef)
 			if err != nil {
-				return err
+				return fmt.Errorf("%w: upstream entry %s is not a policy reference update: %w", ErrControllerMetadataNotVerified, upstreamEntryID.String(), err)
 			}
 
 			// LoadState does full verification up until the requested entry
-			if _, err := LoadState(ctx, controllerRepository, upstreamEntry.(rsl.ReferenceUpdaterEntry), policyopts.WithInitialRootPrincipals(controllerRepositoryDetail.GetInitialRootPrincipals())); err != nil {
+			if _, err := LoadState(ctx, controllerRepository, upstreamUpdater, policyopts.WithInitialRootPrincipals(controllerRepositoryDetail.GetInitialRootPrincipals())); err != nil {
 				return fmt.Errorf("%w, unable to verify root of trust for controller '%s': %w", ErrControllerMetadataNotVerified, controllerName, err)
 			}
 

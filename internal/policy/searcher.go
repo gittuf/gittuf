@@ -167,7 +167,7 @@ func (c *cacheSearcher) FindFirstPolicyEntry() (rsl.ReferenceUpdaterEntry, error
 		return nil, ErrPolicyNotFound
 	}
 
-	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[0].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[0].GetEntryID(), PolicyRef)
 	if err != nil {
 		return c.searcher.FindFirstPolicyEntry()
 	}
@@ -184,7 +184,7 @@ func (c *cacheSearcher) FindLatestPolicyEntry() (rsl.ReferenceUpdaterEntry, erro
 		return nil, ErrPolicyNotFound
 	}
 
-	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[len(policyEntries)-1].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntries[len(policyEntries)-1].GetEntryID(), PolicyRef)
 	if err != nil {
 		return c.searcher.FindLatestPolicyEntry()
 	}
@@ -217,7 +217,7 @@ func (c *cacheSearcher) FindPolicyEntryFor(entry rsl.Entry) (rsl.ReferenceUpdate
 		return nil, ErrPolicyNotFound
 	}
 
-	policyEntry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntryIndex.GetEntryID())
+	policyEntry, err := loadRSLReferenceUpdaterEntry(c.repo, policyEntryIndex.GetEntryID(), PolicyRef)
 	if err != nil {
 		return c.searcher.FindPolicyEntryFor(entry)
 	}
@@ -252,7 +252,7 @@ func (c *cacheSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Entry
 
 	entries := []rsl.ReferenceUpdaterEntry{}
 	for _, index := range policyIndices {
-		entry, err := loadRSLReferenceUpdaterEntry(c.repo, index.GetEntryID())
+		entry, err := loadRSLReferenceUpdaterEntry(c.repo, index.GetEntryID(), PolicyRef)
 		if err != nil {
 			return c.searcher.FindPolicyEntriesInRange(firstEntry, lastEntry)
 		}
@@ -288,7 +288,7 @@ func (c *cacheSearcher) FindAttestationsEntryFor(entry rsl.Entry) (rsl.Reference
 		return nil, attestations.ErrAttestationsNotFound
 	}
 
-	attestationsEntry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntryIndex.GetEntryID())
+	attestationsEntry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntryIndex.GetEntryID(), attestations.Ref)
 	if err != nil {
 		return c.searcher.FindAttestationsEntryFor(entry)
 	}
@@ -305,7 +305,7 @@ func (c *cacheSearcher) FindLatestAttestationsEntry() (rsl.ReferenceUpdaterEntry
 		return nil, attestations.ErrAttestationsNotFound
 	}
 
-	entry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntries[len(attestationsEntries)-1].GetEntryID())
+	entry, err := loadRSLReferenceUpdaterEntry(c.repo, attestationsEntries[len(attestationsEntries)-1].GetEntryID(), attestations.Ref)
 	if err != nil {
 		return c.searcher.FindLatestAttestationsEntry()
 	}
@@ -320,15 +320,23 @@ func newCacheSearcher(repo gitstore.Storer, persistentCache *cache.Persistent) *
 	}
 }
 
-func loadRSLReferenceUpdaterEntry(repo gitstore.Storer, entryID githash.Hash) (rsl.ReferenceUpdaterEntry, error) {
-	entryT, err := rsl.GetEntry(repo, entryID)
+// loadRSLReferenceUpdaterEntry loads the reference entry for refName at
+// entryID. The ref is required because entryID may be a bulk reference entry
+// carrying several updates.
+func loadRSLReferenceUpdaterEntry(repo gitstore.Storer, entryID githash.Hash, refName string) (rsl.ReferenceUpdaterEntry, error) {
+	entryT, err := rsl.GetReferenceUpdaterEntryForRef(repo, entryID, refName)
 	if err != nil {
 		return nil, err
 	}
 
+	// Every caller asks for the policy or the attestations ref. Bulk
+	// reference entries cannot record refs in the gittuf namespace, so a
+	// match here is always a plain reference entry. The assertion also
+	// excludes propagation entries, which do record gittuf refs, so a
+	// propagated policy update is reported as an error rather than returned.
 	entry, isReferenceEntry := entryT.(*rsl.ReferenceEntry)
 	if !isReferenceEntry {
-		return nil, fmt.Errorf("not reference entry")
+		return nil, fmt.Errorf("%w: entry %s for ref %s is not a reference entry", rsl.ErrInvalidRSLEntry, entryID.String(), refName)
 	}
 
 	return entry, nil

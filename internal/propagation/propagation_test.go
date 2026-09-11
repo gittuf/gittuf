@@ -6,6 +6,8 @@ package propagation
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
@@ -248,4 +250,99 @@ func TestPropagateChangesUpstreamPathMissing(t *testing.T) {
 
 	err = PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo, []tuf.PropagationDirective{directive}, false)
 	assert.ErrorIs(t, err, gitinterface.ErrTreeDoesNotHavePath)
+}
+
+func TestPropagateChangesFromUpstreamBulkEntry(t *testing.T) {
+	upstreamRepoLocation := t.TempDir()
+	upstreamRepo := gitinterface.CreateTestGitRepository(t, upstreamRepoLocation, true)
+
+	downstreamRepoLocation := t.TempDir()
+	downstreamRepo := gitinterface.CreateTestGitRepository(t, downstreamRepoLocation, true)
+
+	upstreamBlobID, err := upstreamRepo.WriteBlob([]byte("upstream"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	upstreamTreeBuilder := gitinterface.NewTreeBuilder(upstreamRepo)
+	upstreamRootTreeID, err := upstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("a", upstreamBlobID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	otherCommitID, err := upstreamRepo.Commit(upstreamRootTreeID, "refs/heads/other", "Other commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	upstreamCommitID, err := upstreamRepo.Commit(upstreamRootTreeID, "refs/heads/main", "Upstream commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The propagated ref is the second update in the bulk entry, so the
+	// entry ID recorded downstream does not identify it on its own.
+	bulkEntryID := common.CreateTestRSLBulkReferenceEntryCommit(t, upstreamRepo, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+		{RefName: "refs/heads/other", TargetID: otherCommitID},
+		{RefName: "refs/heads/main", TargetID: upstreamCommitID},
+	}), artifacts.SSHRSAPrivate)
+
+	downstreamBlobID, err := downstreamRepo.WriteBlob([]byte("downstream"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	downstreamTreeBuilder := gitinterface.NewTreeBuilder(downstreamRepo)
+	downstreamRootTreeID, err := downstreamTreeBuilder.WriteTreeFromEntries([]gitinterface.TreeEntry{
+		gitinterface.NewEntryBlob("b", downstreamBlobID),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	downstreamCommitID, err := downstreamRepo.Commit(downstreamRootTreeID, "refs/heads/main", "Downstream commit\n", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rsl.NewReferenceEntry("refs/heads/main", downstreamCommitID).Commit(downstreamRepo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	directive := &tufv01.PropagationDirective{
+		UpstreamReference:   "refs/heads/main",
+		UpstreamRepository:  upstreamRepoLocation,
+		DownstreamReference: "refs/heads/main",
+		DownstreamPath:      "upstream",
+	}
+
+	err = PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo, []tuf.PropagationDirective{directive}, false)
+	assert.Nil(t, err)
+
+	latestEntry, err := rsl.GetLatestEntry(downstreamRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	propagationEntry, isPropagationEntry := latestEntry.(*rsl.PropagationEntry)
+	if !isPropagationEntry {
+		t.Fatal("unexpected entry type in downstream repo")
+	}
+	assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
+	assert.Equal(t, bulkEntryID, propagationEntry.UpstreamEntryID)
+
+	updater, err := rsl.GetReferenceUpdaterEntryForRef(upstreamRepo, propagationEntry.UpstreamEntryID, "refs/heads/main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, "refs/heads/main", updater.GetRefName())
+	assert.Equal(t, upstreamCommitID, updater.GetTargetID())
+
+	propagatedRootTreeID, err := downstreamRepo.GetCommitTreeID(propagationEntry.TargetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathTreeID, err := downstreamRepo.GetPathIDInTree(propagatedRootTreeID, "upstream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, upstreamRootTreeID, pathTreeID)
 }

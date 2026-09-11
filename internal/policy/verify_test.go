@@ -4182,3 +4182,273 @@ func getPropagationDirectivesForNetworkRepository(t *testing.T, rootMetadata tuf
 
 	return directives
 }
+
+func TestVerifyRelativeForRefWithBulkEntries(t *testing.T) {
+	t.Run("all updates authorized", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		featureCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+			{RefName: "refs/heads/feature", TargetID: featureCommits[0]},
+		})
+		bulkID := common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+		mainView, err := rsl.GetReferenceUpdaterEntryForRef(repo, bulkID, "refs/heads/main")
+		require.NoError(t, err)
+
+		verifier := NewPolicyVerifier(repo)
+		assert.NoError(t, verifier.VerifyRelativeForRef(testCtx, mainView, mainView, "refs/heads/main"))
+
+		// refs/heads/feature is not protected by the test policy, so this
+		// assertion pins only that the bulk view for it loads and walks
+		// without error.
+		_, err = verifier.VerifyRef(testCtx, "refs/heads/feature")
+		assert.NoError(t, err)
+	})
+
+	t.Run("one update unauthorized, qualified skip and fix recovers", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		goodMain := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		first := rsl.NewReferenceEntry("refs/heads/main", goodMain[0])
+		first.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, first, gpgKeyBytes)
+
+		badMain := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgUnauthorizedKeyBytes)
+		feature := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: badMain[0]},
+			{RefName: "refs/heads/feature", TargetID: feature[0]},
+		})
+		bulkID := common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgUnauthorizedKeyBytes)
+
+		verifier := NewPolicyVerifier(repo)
+		_, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+		assert.ErrorContains(t, err, "refs/heads/main")
+
+		annotation := rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{bulkID}, map[string][]string{bulkID.String(): {"refs/heads/main"}}, true, "bad main")
+		common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+
+		require.NoError(t, repo.SetReference("refs/heads/main", goodMain[0]))
+		fix := rsl.NewReferenceEntry("refs/heads/main", goodMain[0])
+		fix.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, fix, gpgKeyBytes)
+
+		_, err = verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.NoError(t, err)
+
+		// The feature update was never skipped and is unaffected by the
+		// recovery on main. There is no rule protecting feature, so this
+		// assertion pins only that the bulk view for it loads and walks
+		// without error.
+		_, err = verifier.VerifyRefFull(testCtx, "refs/heads/feature")
+		assert.NoError(t, err)
+	})
+
+	t.Run("VerifyRefFromEntry accepts a bulk entry ID", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		featureCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/feature", TargetID: featureCommits[0]},
+			{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+		})
+		bulkID := common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+		verifier := NewPolicyVerifier(repo)
+		_, err := verifier.VerifyRefFromEntry(testCtx, "refs/heads/main", bulkID)
+		assert.NoError(t, err)
+
+		_, err = verifier.VerifyRefFromEntry(testCtx, "refs/heads/nonexistent", bulkID)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryDoesNotMatchRef)
+	})
+}
+
+func TestVerifyRefFullWithPersistentCacheOverBulkEntries(t *testing.T) {
+	repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+	// The bulk entry's first update is for feature and its second is for
+	// main, so the cached last-verified entry for main is a bulk entry whose
+	// first update is for another ref.
+	featureCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+	mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+	bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+		{RefName: "refs/heads/feature", TargetID: featureCommits[0]},
+		{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+	})
+	bulkID := common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+	require.NoError(t, cache.PopulatePersistentCache(repo))
+
+	verifier := NewPolicyVerifier(repo)
+	currentTip, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+	require.NoError(t, err)
+	assert.Equal(t, mainCommits[0], currentTip)
+
+	bulkEntry, err := rsl.GetEntry(repo, bulkID)
+	require.NoError(t, err)
+
+	persistentCache, err := cache.LoadPersistentCache(repo)
+	require.NoError(t, err)
+	entryNumber, entryID := persistentCache.GetLastVerifiedEntryForRef("refs/heads/main")
+	assert.GreaterOrEqual(t, entryNumber, bulkEntry.GetNumber())
+	// The bulk entry is the latest entry for main at this point, so the
+	// cached ID is the bulk entry itself and the resumed walk must resolve it
+	// to the main view.
+	assert.Equal(t, bulkID, entryID)
+
+	// Verification resumes from the cached bulk entry for a later main entry.
+	laterMainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+	later := rsl.NewReferenceEntry("refs/heads/main", laterMainCommits[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, later, gpgKeyBytes)
+
+	verifier = NewPolicyVerifier(repo)
+	currentTip, err = verifier.VerifyRefFull(testCtx, "refs/heads/main")
+	require.NoError(t, err)
+	assert.Equal(t, laterMainCommits[0], currentTip)
+
+	persistentCache, err = cache.LoadPersistentCache(repo)
+	require.NoError(t, err)
+	entryNumber, _ = persistentCache.GetLastVerifiedEntryForRef("refs/heads/main")
+	assert.GreaterOrEqual(t, entryNumber, bulkEntry.GetNumber())
+}
+
+func TestVerifyRefFullWithTagInBulkEntry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("signer authorized for both the branch and the tag", func(t *testing.T) {
+		t.Parallel()
+
+		repo, _ := createTestRepository(t, createTestStateWithTagPolicy)
+
+		mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		tagID := common.CreateTestSignedTag(t, repo, "v1", mainCommits[0], gpgKeyBytes)
+
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+			{RefName: gitinterface.TagReferenceName("v1"), TargetID: tagID},
+		})
+		common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+		verifier := NewPolicyVerifier(repo)
+		currentTip, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.NoError(t, err)
+		assert.Equal(t, mainCommits[0], currentTip)
+
+		verifier = NewPolicyVerifier(repo)
+		currentTip, err = verifier.VerifyRefFull(testCtx, gitinterface.TagReferenceName("v1"))
+		assert.NoError(t, err)
+		assert.Equal(t, tagID, currentTip)
+	})
+
+	t.Run("signer authorized for the branch but not the tag", func(t *testing.T) {
+		t.Parallel()
+
+		repo, _ := createTestRepository(t, createTestStateWithTagPolicyForUnauthorizedTest)
+
+		mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		tagID := common.CreateTestSignedTag(t, repo, "v1", mainCommits[0], gpgKeyBytes)
+
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+			{RefName: gitinterface.TagReferenceName("v1"), TargetID: tagID},
+		})
+		common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+		verifier := NewPolicyVerifier(repo)
+		_, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.NoError(t, err)
+
+		verifier = NewPolicyVerifier(repo)
+		_, err = verifier.VerifyRefFull(testCtx, gitinterface.TagReferenceName("v1"))
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+		assert.ErrorContains(t, err, gitinterface.TagReferenceName("v1"))
+	})
+}
+
+func TestVerifyRefFullWithBulkEntryAndBlockForcePushesGlobalRule(t *testing.T) {
+	t.Parallel()
+
+	repo, _ := createTestRepository(t, createTestStateWithGlobalConstraintBlockForcePushes)
+
+	mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+	first := rsl.NewReferenceEntry("refs/heads/main", mainCommits[0])
+	common.CreateTestRSLReferenceEntryCommit(t, repo, first, gpgKeyBytes)
+
+	// Rewrite main's history so its new tip does not descend from the commit
+	// recorded by the first entry. The key is switched as well so the
+	// rewritten commits cannot collide with the original ones.
+	require.NoError(t, repo.SetReference("refs/heads/main", gitinterface.ZeroHash))
+	rewrittenMainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 2, rootKeyBytes)
+	require.False(t, rewrittenMainCommits[1].Equal(mainCommits[0].Bytes()))
+
+	featureCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+
+	bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: rewrittenMainCommits[1]},
+		{RefName: "refs/heads/feature", TargetID: featureCommits[0]},
+	})
+	common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+
+	verifier := NewPolicyVerifier(repo)
+	_, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+	assert.ErrorIs(t, err, ErrVerificationFailed)
+	assert.ErrorContains(t, err, "refs/heads/main")
+
+	// The global rule only protects main, so the feature update in the same
+	// bulk entry is unaffected.
+	verifier = NewPolicyVerifier(repo)
+	_, err = verifier.VerifyRefFull(testCtx, "refs/heads/feature")
+	assert.NoError(t, err)
+}
+
+func TestVerifyRefFullWithBulkEntryBeforePolicy(t *testing.T) {
+	t.Parallel()
+
+	createBulkEntry := func(t *testing.T, repo *gitinterface.Repository) {
+		t.Helper()
+
+		mainCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		featureCommits := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/feature", 1, gpgKeyBytes)
+		bulk := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainCommits[0]},
+			{RefName: "refs/heads/feature", TargetID: featureCommits[0]},
+		})
+		common.CreateTestRSLBulkReferenceEntryCommit(t, repo, bulk, gpgKeyBytes)
+	}
+
+	t.Run("no policy entry at all", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		createBulkEntry(t, repo)
+
+		verifier := NewPolicyVerifier(repo)
+		_, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
+
+		verifier = NewPolicyVerifier(repo)
+		_, err = verifier.VerifyRefFull(testCtx, "refs/heads/feature")
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
+	})
+
+	t.Run("policy entry only after the bulk entry", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		createBulkEntry(t, repo)
+
+		state := createTestStateWithPolicy(t)
+		state.repository = repo
+		require.NoError(t, state.Commit(repo, "Create test state", true, false))
+		require.NoError(t, Apply(testCtx, repo, false))
+
+		verifier := NewPolicyVerifier(repo)
+		_, err := verifier.VerifyRefFull(testCtx, "refs/heads/main")
+		assert.ErrorIs(t, err, ErrPolicyNotFound)
+	})
+}

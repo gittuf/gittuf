@@ -2,6 +2,18 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## Unreleased
+
+### Added
+
+- RSL bulk reference entries recording several reference updates under one
+  signature, with support for custom fields
+- `ref` qualifiers on RSL annotation entries so a skip can target one update
+  inside a bulk entry
+- A clear upgrade message when the RSL contains an entry type or the policy
+  metadata uses a schema version this client does not implement
+- `make test-compat` covering v0.8.1, v0.14.1 and v0.16.0
+
 ## v0.16.0
 
 This release adds support for SHA-256 Git repositories and reworks gittuf's
