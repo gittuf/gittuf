@@ -36,6 +36,14 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         cache: true
+    - name: Use Git for Windows' bundled gpg (Windows)
+      if: runner.os == 'Windows'
+      shell: powershell
+      # Appended to the end of PATH (via GITHUB_ENV) rather than the front
+      # (via GITHUB_PATH), so this only fills in gpg, which isn't on PATH
+      # otherwise, without shadowing tools like ssh-keygen that already
+      # resolve to the Windows OpenSSH build earlier in PATH.
+      run: echo "PATH=$env:PATH;C:\Program Files\Git\usr\bin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Test
       run: go test -race -timeout 40m ./...
   test-freebsd:
