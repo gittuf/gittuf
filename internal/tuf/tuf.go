@@ -4,11 +4,9 @@
 package tuf
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
@@ -31,16 +29,6 @@ const (
 	GlobalRuleThresholdType        = "threshold"
 	GlobalRuleBlockForcePushesType = "block-force-pushes"
 	RemoveGlobalRuleType           = "remove"
-
-	HookStagePreCommitString = "preCommit"
-	HookStagePrePushString   = "prePush"
-
-	HookStagePreCommitGitString = "pre-commit"
-	HookStagePrePushGitString   = "pre-push"
-
-	HookEnvironmentLuaString = "lua"
-
-	HooksPrefix = "hooks"
 )
 
 var (
@@ -71,11 +59,6 @@ var (
 	ErrPropagationDirectiveNotFound                    = errors.New("specified propagation directive not found")
 	ErrPropagationDirectiveAlreadyExists               = errors.New("specified propagation directive already exists")
 	ErrNotAControllerRepository                        = errors.New("current repository is not marked as a controller repository")
-	ErrDuplicatedHookName                              = errors.New("two hooks with same name found in policy")
-	ErrInvalidHookStage                                = errors.New("invalid stage for hook")
-	ErrInvalidHookEnvironment                          = errors.New("invalid environment for hook")
-	ErrHookNotFound                                    = errors.New("cannot find hook entry")
-	ErrNoHooksDefined                                  = errors.New("no hooks defined")
 )
 
 // Principal represents an entity that is granted trust by gittuf metadata. In
@@ -215,22 +198,6 @@ type RootMetadata interface {
 	// network for which the current repository is a controller.
 	// IsController must return true for this to be set.
 	GetNetworkRepositories() []OtherRepository
-
-	// AddHook adds to the metadata for the specified Git stage a hook named
-	// hookName to be run by the specified principals. For support of more than
-	// one hashing algorithm, providing multiple hashes is supported. The hook's
-	// environment (e.g. lua) and maximum allowable running time in seconds are
-	// also required.
-	AddHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) (Hook, error)
-	// UpdateHook updates the hook identified by hookName in the specified Git
-	// stage with the provided parameters. The parameters are the same as those
-	// used in AddHook.
-	UpdateHook(stages []HookStage, hookName string, principalIDs []string, hashes map[string]string, environment HookEnvironment, timeout int) error
-	// RemoveHook removes the hook identified by hookName in the specified Git
-	// stage.
-	RemoveHook(stages []HookStage, hookName string) error
-	// GetHooks returns all hooks in the metadata for the specified Git stage.
-	GetHooks(stage HookStage) ([]Hook, error)
 }
 
 // TargetsMetadata represents gittuf's rule files. Its name is inspired by TUF.
@@ -404,155 +371,6 @@ type OtherRepository interface {
 	// GetInitialRootPrincipals returns the set of principals trusted to
 	// sign the other repository's initial gittuf root of trust metadata.
 	GetInitialRootPrincipals() []Principal
-}
-
-// HookStage encodes the Git stage at which a hook is to run
-type HookStage uint
-
-const (
-	HookStagePreCommit HookStage = iota
-	HookStagePrePush
-)
-
-func (h *HookStage) IsValid() error {
-	switch *h {
-	case HookStagePreCommit, HookStagePrePush:
-		return nil
-	default:
-		return ErrInvalidHookStage
-	}
-}
-
-func (h *HookStage) String() string {
-	switch *h {
-	case HookStagePreCommit:
-		return HookStagePreCommitString
-	case HookStagePrePush:
-		return HookStagePrePushString
-	default:
-		return ""
-	}
-}
-
-// MarshalText is used to convert the instance of HookStage into text. Needed
-// for proper marshalling into JSON as HookStage is a key in a map.
-func (h HookStage) MarshalText() ([]byte, error) {
-	str := h.String()
-	if str == "" {
-		return nil, ErrInvalidHookStage
-	}
-	return []byte(str), nil
-}
-
-// UnmarshalText is used to convert the instance of HookStage from text. Needed
-// for proper marshalling into JSON as HookStage is a key in a map.
-func (h *HookStage) UnmarshalText(text []byte) error {
-	switch string(text) {
-	case HookStagePreCommitString:
-		*h = HookStagePreCommit
-	case HookStagePrePushString:
-		*h = HookStagePrePush
-	default:
-		return ErrInvalidHookStage
-	}
-
-	return nil
-}
-
-// MarshalJSON is used to serialize the instance of HookStage into JSON.
-func (h HookStage) MarshalJSON() ([]byte, error) {
-	str := h.String()
-	if str == "" {
-		return nil, ErrInvalidHookStage
-	}
-
-	return json.Marshal(str)
-}
-
-// UnmarshalJSON is used to load an instance of HookStage from the JSON
-// representation.
-func (h *HookStage) UnmarshalJSON(jsonBytes []byte) error {
-	var stage string
-	if err := json.Unmarshal(jsonBytes, &stage); err != nil {
-		return err
-	}
-
-	switch stage {
-	case HookStagePreCommitString:
-		*h = HookStagePreCommit
-	case HookStagePrePushString:
-		*h = HookStagePrePush
-	default:
-		return ErrInvalidHookStage
-	}
-
-	return nil
-}
-
-// HookEnvironment encodes the environment that a hook is run in
-type HookEnvironment uint
-
-const (
-	HookEnvironmentLua HookEnvironment = iota
-)
-
-func (h HookEnvironment) String() string {
-	switch h {
-	case HookEnvironmentLua:
-		return HookEnvironmentLuaString
-	default:
-		return ""
-	}
-}
-
-// MarshalJSON is used to serialize the instance of HookEnvironment into JSON.
-func (h *HookEnvironment) MarshalJSON() ([]byte, error) {
-	if h.String() == "" {
-		return nil, ErrInvalidHookEnvironment
-	}
-
-	return json.Marshal(h.String())
-}
-
-// UnmarshalJSON is used to load an instance of HookEnvironment from the JSON
-// representation.
-func (h *HookEnvironment) UnmarshalJSON(jsonBytes []byte) error {
-	var env string
-	if err := json.Unmarshal(jsonBytes, &env); err != nil {
-		return err
-	}
-
-	switch env {
-	case HookEnvironmentLuaString:
-		*h = HookEnvironmentLua
-	default:
-		return ErrInvalidHookEnvironment
-	}
-
-	return nil
-}
-
-// Hook represents a gittuf hook entry in the gittuf root of trust
-// ('RootMetadata').
-type Hook interface {
-	// ID returns the identifier of the hook, typically a name.
-	ID() string
-
-	// GetPrincipalIDs returns the identifiers of the principals that must run
-	// the hook.
-	GetPrincipalIDs() *set.Set[string]
-
-	// GetHashes returns the hashes identifying the hook file itself.
-	GetHashes() map[string]string
-
-	// GetBlobID returns the Git blob ID for the hook on disk.
-	GetBlobID() githash.Hash
-
-	// GetEnvironment returns the environment that the hook is to run in.
-	GetEnvironment() HookEnvironment
-
-	// GetTimeout returns the maximum duration the hook can run for, in seconds.
-	GetTimeout() int
 }
 
 type GitHubApp interface {

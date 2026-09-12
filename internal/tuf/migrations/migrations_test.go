@@ -107,22 +107,6 @@ func TestMigrateRootMetadataV01ToV02(t *testing.T) {
 		assert.Equal(t, 1, len(v02Root.MultiRepository.NetworkRepositories[0].InitialRootPrincipals))
 		assert.Equal(t, key.KeyID, v02Root.MultiRepository.NetworkRepositories[0].InitialRootPrincipals[0].ID())
 	})
-
-	t.Run("test hooks", func(t *testing.T) {
-		v01Root := tufv01.NewRootMetadata()
-
-		err := v01Root.AddRootPrincipal(key)
-		assert.Nil(t, err)
-
-		_, err = v01Root.AddHook([]tuf.HookStage{tuf.HookStagePreCommit}, "test-hook", []string{key.KeyID}, map[string]string{"sha256": "abc123"}, tuf.HookEnvironmentLua, 30)
-		assert.Nil(t, err)
-
-		v02Root := MigrateRootMetadataV01ToV02(v01Root)
-
-		assert.Contains(t, v02Root.Hooks, tuf.HookStagePreCommit)
-		assert.Equal(t, 1, len(v02Root.Hooks[tuf.HookStagePreCommit]))
-		assert.Equal(t, "test-hook", v02Root.Hooks[tuf.HookStagePreCommit][0].ID())
-	})
 }
 
 func TestMigrateTargetsMetadataV01ToV02(t *testing.T) {
