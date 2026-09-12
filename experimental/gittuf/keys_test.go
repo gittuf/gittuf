@@ -64,7 +64,7 @@ func TestLoadSigner(t *testing.T) {
 		t.Run("no signing method specified", func(t *testing.T) {
 			// Test no configuration, this means GPG
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", ""); err != nil {
 				t.Fatal(err)
@@ -80,7 +80,7 @@ func TestLoadSigner(t *testing.T) {
 
 		t.Run("method specified but no signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", "gpg"); err != nil {
 				t.Fatal(err)
@@ -95,7 +95,7 @@ func TestLoadSigner(t *testing.T) {
 
 		t.Run("no method specified but signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", ""); err != nil {
 				t.Fatal(err)
@@ -114,7 +114,7 @@ func TestLoadSigner(t *testing.T) {
 
 		t.Run("method and signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", "gpg"); err != nil {
 				t.Fatal(err)
@@ -137,7 +137,7 @@ func TestLoadSigner(t *testing.T) {
 			// Test misconfiguration of SSH
 			tmpDir := t.TempDir()
 			// CreateTestGitRepository sets up the repository to use ssh by default
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("user.signingkey", ""); err != nil {
 				t.Fatal(err)
@@ -151,7 +151,7 @@ func TestLoadSigner(t *testing.T) {
 			// Test a working SSH key configured
 			tmpDir := t.TempDir()
 			// CreateTestGitRepository sets up the repository to use ssh by default
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			signer, err := LoadSigner(repo, "")
 			assert.Nil(t, err)
@@ -185,7 +185,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 		t.Run("no signing method specified", func(t *testing.T) {
 			// Test no configuration, this means GPG
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", ""); err != nil {
 				t.Fatal(err)
@@ -201,7 +201,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 
 		t.Run("method specified but no signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", "gpg"); err != nil {
 				t.Fatal(err)
@@ -216,7 +216,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 
 		t.Run("no method specified but signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", ""); err != nil {
 				t.Fatal(err)
@@ -235,7 +235,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 
 		t.Run("method and signing key specified", func(t *testing.T) {
 			tmpDir := t.TempDir()
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("gpg.format", "gpg"); err != nil {
 				t.Fatal(err)
@@ -258,7 +258,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 			// Test misconfiguration of SSH
 			tmpDir := t.TempDir()
 			// CreateTestGitRepository sets up the repository to use ssh by default
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			if err := repo.r.SetGitConfig("user.signingkey", ""); err != nil {
 				t.Fatal(err)
@@ -272,7 +272,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 			// Test a working SSH key configured
 			tmpDir := t.TempDir()
 			// CreateTestGitRepository sets up the repository to use ssh by default
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			signer, err := LoadSignerFromGitConfig(repo)
 			assert.Nil(t, err)
@@ -291,7 +291,7 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 		t.Run("non-sigstore program", func(t *testing.T) {
 			tmpDir := t.TempDir()
 
-			repo := &Repository{r: gitinterface.CreateTestGitRepository(t, tmpDir, false)}
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
 
 			require.NoError(t, repo.r.SetGitConfig("gpg.format", "x509"))
 			require.NoError(t, repo.r.SetGitConfig("user.signingkey", ""))

@@ -31,12 +31,12 @@ func TestApplyAttestations(t *testing.T) {
 	remoteName := "origin"
 	testDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, testDir, false)
-	repo := &Repository{r: r}
+	repo := &Repository{r: newStorer(r)}
 
 	fromRef := "refs/heads/main"
 	targetTagRef := "refs/tags/v1"
 
-	treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestApplyAttestations(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -116,7 +116,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -124,7 +124,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -237,13 +237,13 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		fromRef := "refs/heads/main"
 		targetTagRef := "refs/tags/v1"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -305,7 +305,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
@@ -334,7 +334,7 @@ func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -355,7 +355,7 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -376,7 +376,7 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
@@ -399,7 +399,7 @@ func TestDismissGitHubPullRequestApprover(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
@@ -435,12 +435,12 @@ func TestAddReferenceAuthorizationForNewTagZeroHashFormat(t *testing.T) {
 			}
 			defer os.Chdir(pwd) //nolint:errcheck
 
-			repo := &Repository{r: r}
+			repo := &Repository{r: newStorer(r)}
 
 			fromRef := "refs/heads/main"
 			targetTagRef := "refs/tags/v1"
 
-			treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+			treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
 			emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 			if err != nil {
 				t.Fatal(err)

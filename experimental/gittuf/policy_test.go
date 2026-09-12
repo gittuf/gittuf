@@ -82,7 +82,7 @@ func TestPullPolicy(t *testing.T) {
 
 		localTmpDir := t.TempDir()
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)
-		localRepo := &Repository{r: localRepoR}
+		localRepo := &Repository{r: newStorer(localRepoR)}
 
 		if err := localRepo.r.CreateRemote(remoteName, remoteTmpDir); err != nil {
 			t.Fatal(err)
@@ -106,7 +106,7 @@ func TestPullPolicy(t *testing.T) {
 
 		localTmpDir := t.TempDir()
 		localRepoR := gitinterface.CreateTestGitRepository(t, localTmpDir, false)
-		localRepo := &Repository{r: localRepoR}
+		localRepo := &Repository{r: newStorer(localRepoR)}
 
 		if err := rsl.NewReferenceEntry(policy.PolicyRef, gitinterface.ZeroHash).Commit(localRepo.r, false); err != nil {
 			t.Fatal(err)
@@ -132,7 +132,7 @@ func TestHasPolicy(t *testing.T) {
 	t.Run("policy does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		hasPolicy, err := repo.HasPolicy()
 		assert.Nil(t, err)
@@ -189,7 +189,7 @@ func TestApplyPolicy(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -224,7 +224,7 @@ func TestDiscardPolicy(t *testing.T) {
 	t.Run("discard with no policy references", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		err := repo.DiscardPolicy()
 		assert.Nil(t, err)
@@ -396,7 +396,7 @@ func TestStagePolicy(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")

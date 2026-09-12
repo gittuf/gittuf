@@ -4,6 +4,8 @@
 package root
 
 import (
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 
@@ -34,6 +36,8 @@ type options struct {
 	profile           bool
 	cpuProfileFile    string
 	memoryProfileFile string
+	storer            string
+	storerTrace       bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -71,9 +75,28 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"memory.prof",
 		"file to store memory profile",
 	)
+
+	cmd.PersistentFlags().StringVar(
+		&o.storer,
+		"storer",
+		string(gittuf.StorerBackendBinary),
+		fmt.Sprintf("Git storage backend to use, one of %s or %s (experimental, overrides %s)", gittuf.StorerBackendBinary, gittuf.StorerBackendGoGit, gittuf.StorerBackendEnvKey),
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&o.storerTrace,
+		"storer-trace",
+		false,
+		"report Git storage backend call counts, timings and git fork counts to stderr on exit",
+	)
 }
 
-func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
+func (o *options) PreRunE(cmd *cobra.Command, _ []string) error {
+	if err := o.selectStorerBackend(cmd); err != nil {
+		return err
+	}
+	gittuf.SetStorerTrace(o.storerTrace)
+
 	// Check if colored output must be disabled
 	output := os.Stdout
 	isTerminal := isatty.IsTerminal(output.Fd()) || isatty.IsCygwinTerminal(output.Fd())
@@ -126,4 +149,50 @@ func New() *cobra.Command {
 	cmd.AddCommand(tui.New(&persistent.Options{}))
 
 	return cmd
+}
+
+// selectStorerBackend gives an explicit flag precedence over the environment.
+func (o *options) selectStorerBackend(cmd *cobra.Command) error {
+	backend, err := gittuf.ParseStorerBackend(o.storer)
+	if err != nil {
+		return err
+	}
+
+	// Include flags inherited from the root command.
+	var passed bool
+	if cmd != nil {
+		if flag := cmd.Flag("storer"); flag != nil {
+			passed = flag.Changed
+		}
+	}
+
+	if !passed {
+		if fromEnv, err := gittuf.ParseStorerBackend(os.Getenv(gittuf.StorerBackendEnvKey)); err == nil {
+			backend = fromEnv
+		}
+	}
+
+	gittuf.SetStorerBackend(backend)
+
+	return nil
+}
+
+// storerTraceReported keeps the trace to one emission. It is reported from
+// main's deferred cleanup and again before a non-zero exit, both on the main
+// goroutine.
+var storerTraceReported bool
+
+// ReportStorerTrace writes the storer trace if one was requested. Only the
+// first call writes.
+func ReportStorerTrace(w io.Writer) {
+	if storerTraceReported {
+		return
+	}
+	storerTraceReported = true
+
+	report, has := gittuf.StorerTraceReport()
+	if !has {
+		return
+	}
+	fmt.Fprint(w, report)
 }

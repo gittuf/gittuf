@@ -251,7 +251,7 @@ func (r *Repository) executeHook(ctx context.Context, hook tuf.Hook, parameters 
 	var hookContents string
 	hookBlobID := hook.GetBlobID()
 
-	environment, err := luasandbox.NewLuaEnvironment(ctx, r.r, luasandboxopts.WithLuaTimeout(hook.GetTimeout()))
+	environment, err := luasandbox.NewLuaEnvironment(ctx, r.r.Repository, luasandboxopts.WithLuaTimeout(hook.GetTimeout()))
 	if err != nil {
 		return -1, err
 	}
