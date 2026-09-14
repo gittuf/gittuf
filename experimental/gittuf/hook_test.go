@@ -23,7 +23,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		err := r.UpdateGitHook(HookPrePush, []byte("some content"), false)
 		require.NoError(t, err)
@@ -38,7 +38,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
@@ -55,7 +55,7 @@ func TestUpdatePrePushHook(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		hookFile := filepath.Join(repo.GetGitDir(), "hooks", "pre-push")
 		err := os.WriteFile(hookFile, []byte("existing hook script"), 0o700) // nolint:gosec
@@ -85,7 +85,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		_, err := r.InvokeHooksForStage(testCtx, nil, tuf.HookStagePreCommit)
 		assert.ErrorIs(t, err, sslibdsse.ErrNoSigners)
@@ -95,7 +95,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		hookStage := tuf.HookStagePreCommit
 		hookName := "test-hook"
@@ -126,7 +126,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		hookStage := tuf.HookStagePreCommit
 		hookName := "test-hook"
@@ -176,7 +176,7 @@ func TestInvokeHooksForStage(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				r := &Repository{r: repo}
+				r := &Repository{r: newStorer(repo)}
 
 				hookStage := tuf.HookStagePrePush
 				hookName := "test-hook"

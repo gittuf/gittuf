@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/gittuf/gittuf/internal/gogitstore"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 const (
@@ -28,11 +30,39 @@ func InDebugMode() bool {
 }
 
 type Repository struct {
-	r *gitinterface.Repository
+	r *gogitstore.Storer
 }
 
+// GetGitRepository returns the git binary backend. Use GetStorer instead for
+// anything taking a gitstore.Storer, so it uses the selected backend.
 func (r *Repository) GetGitRepository() *gitinterface.Repository {
+	return r.r.Repository
+}
+
+// GetStorer returns the repository's storage backend.
+func (r *Repository) GetStorer() gitstore.Storer {
 	return r.r
+}
+
+// newStorer wraps repo with the selected backend, attaching a trace if one was
+// requested.
+func newStorer(repo *gitinterface.Repository) *gogitstore.Storer {
+	backend := storer.resolve()
+	enableGoGit := backend == StorerBackendGoGit
+
+	if !storer.tracing() {
+		return gogitstore.New(repo, enableGoGit)
+	}
+
+	trace := gogitstore.NewTrace()
+
+	activeTrace.mu.Lock()
+	activeTrace.trace = trace
+	activeTrace.repo = repo
+	activeTrace.backend = backend
+	activeTrace.mu.Unlock()
+
+	return gogitstore.NewWithTrace(repo, enableGoGit, trace)
 }
 
 func LoadRepository(repositoryPath string) (*Repository, error) {
@@ -54,7 +84,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}
 
 	return &Repository{
-		r: repo,
+		r: newStorer(repo),
 	}, nil
 }
 

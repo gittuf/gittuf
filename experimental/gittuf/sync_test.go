@@ -26,7 +26,7 @@ func TestClone(t *testing.T) {
 	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
 	remoteR := gitinterface.CreateTestGitRepository(t, remoteTmpDir, true)
-	remoteRepo := &Repository{r: remoteR}
+	remoteRepo := &Repository{r: newStorer(remoteR)}
 	treeBuilder := gitinterface.NewTreeBuilder(remoteR)
 	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
 	if err != nil {

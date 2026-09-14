@@ -26,6 +26,8 @@ gittuf attest apply [flags]
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
   -k, --signing-key string           signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --storer string                Git storage backend to use, one of binary or go-git (experimental, overrides GITTUF_STORER) (default "binary")
+      --storer-trace                 report Git storage backend call counts, timings and git fork counts to stderr on exit
       --verbose                      enable verbose logging
 ```
 

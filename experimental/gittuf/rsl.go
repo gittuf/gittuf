@@ -908,7 +908,7 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 			return fmt.Errorf("unable to fetch upstream repository '%s': %w", upstreamRepositoryURL, err)
 		}
 
-		if err := propagation.PropagateChangesFromUpstreamRepository(r.r, upstreamRepository, directives, sign); err != nil {
+		if err := propagation.PropagateChangesFromUpstreamRepository(r.r.Repository, upstreamRepository, directives, sign); err != nil {
 			// TODO: atomic? abort?
 			return err
 		}
