@@ -3703,7 +3703,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
-		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, true)
 		require.Nil(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
 		require.Nil(t, err)
@@ -3774,6 +3774,275 @@ func TestVerifyEntry(t *testing.T) {
 
 		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("verify global rule from controller repository is satisfied by a principal declared only in the controller", func(t *testing.T) {
+		// This is a regression test for a bug where a controller's global
+		// rule could never be satisfied by a principal declared only in the
+		// controller's own metadata. Unlike the "verify global rules applied
+		// from controller repository" test above, the network repository
+		// here does NOT independently redeclare the controller's GPG
+		// principal, so this isolates the controller-only case.
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t) // trusts SSH root key and gpgKey, threshold-2-main on refs/heads/main
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithOnlyRootAndEmptyTargets(t) // only trusts the SSH root key; gpgKey is never declared here
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, true)
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		refName := "refs/heads/main" // threshold 2 in the controller repo, no local rule in the network repo
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		// The commit is signed with gpgKeyBytes: the same identity the
+		// controller's threshold-2-main rule trusts, but never duplicated in
+		// the network repository's own metadata.
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
+
+		commitTreeID, err := networkRepository.GetCommitTreeID(commitIDs[0])
+		require.Nil(t, err)
+
+		// Reference authorization from the SSH root key: the second
+		// principal the controller's threshold-2-main rule trusts.
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		require.Nil(t, err)
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		require.Nil(t, err)
+
+		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
+		require.Nil(t, err)
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// Both principals the controller's rule requires signed (gpgKey on
+		// the commit, the SSH root key on the reference authorization), so
+		// this must be accepted even though gpgKey is controller-only.
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("controller-only principal does not satisfy the network repository's own local global rule", func(t *testing.T) {
+		// This guards against an overly broad fix: a principal declared only
+		// in a controller's metadata must not be treated as trusted for the
+		// network repository's own (non-propagated) global rules.
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t) // trusts SSH root key and gpgKey, threshold-2-main on refs/heads/main
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithOnlyRootAndEmptyTargets(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		// The network repository declares its own local global rule on a
+		// different ref, protected only by the network repository's own
+		// principals (the controller's rule above only ever matches
+		// refs/heads/main).
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, true)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("threshold-1-develop", []string{"git:refs/heads/develop"}, 1))
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		refName := "refs/heads/develop" // only the network repository's own threshold-1-develop rule applies here
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		// Signed only with gpgKey, which the controller trusts but the
+		// network repository's own metadata never declares.
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// gpgKey must not count toward the network repository's own
+		// threshold-1-develop rule: it is a controller-only principal.
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("verify global rule from a controller repository that declares no targets metadata", func(t *testing.T) {
+		// A controller can declare global rules and principals entirely in
+		// its root metadata, without ever creating a targets file. This
+		// exercises that path in preprocess(), where controller principals
+		// are collected only from root metadata when the controller's
+		// TargetsEnvelope is nil.
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithOnlyRoot(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithOnlyRootAndEmptyTargets(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		// The only principal this controller ever declares is the root key
+		// itself, registered via InitializeRootMetadata/createTestStateWithOnlyRoot.
+		// The controller has no targets metadata at all.
+		err = controllerRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("threshold-1-main", []string{"git:refs/heads/main"}, 1))
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, true)
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		refName := "refs/heads/main"
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, rootKeyBytes)
+		entry.ID = entryID
+
+		// The RSL entry is signed with the SSH root key, which the
+		// controller declares in its root metadata even though it has no
+		// targets file, so the propagated threshold-1 rule is satisfied.
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.Nil(t, err)
 	})
 
 	t.Run("both global and policy rule declared, global rule threshold less than policy rule", func(t *testing.T) {

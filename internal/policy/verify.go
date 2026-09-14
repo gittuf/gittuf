@@ -1150,9 +1150,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 
 	// Global rules apply to the target irrespective of the rules protecting it,
 	// so they must be verified even when no rule protects the target.
-	globalRulesVerifier := policy.getVerifierForGlobalRules()
-
-	if len(verifiers) == 0 && globalRulesVerifier == nil {
+	if len(verifiers) == 0 && len(policy.globalRules) == 0 {
 		// This target is not protected by gittuf policy
 		return "", false, nil
 	}
@@ -1237,26 +1235,31 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 
 	// Global rules are not delegations of trust: they constrain the target
 	// irrespective of who is trusted for it. They are therefore verified
-	// independently of the rules above, against every principal declared in the
-	// policy that signed rather than only those trusted by those rules.
-	verifiedGlobalRulesPrincipalIDs := 0
-	if globalRulesVerifier != nil {
-		globalRulesPrincipalIDs, err := globalRulesVerifier.Verify(ctx, gitID, authorizationAttestation)
-		if err != nil {
-			return "", false, err
-		}
-
-		if globalRulesPrincipalIDs != nil {
-			verifiedGlobalRulesPrincipalIDs = globalRulesPrincipalIDs.Len()
-		}
-	}
-
+	// independently of the rules above, against every principal declared by
+	// their own source (this repository, or the controller that declared
+	// them) that signed, rather than only those trusted by those rules.
 	for controllerName, globalRules := range policy.globalRules {
 		if controllerName == "" { // this is the special case
 			slog.Debug("Checking global rules declared in current repository...")
 		} else {
 			slog.Debug(fmt.Sprintf("Checking global rules declared in controller repository '%s'...", controllerName))
 		}
+
+		// Each global rules source (this repository, or a specific
+		// controller) is checked against the principals it declares, not the
+		// principals declared by any other source.
+		verifiedGlobalRulesPrincipalIDs := 0
+		if globalRulesVerifier := policy.getVerifierForGlobalRules(controllerName); globalRulesVerifier != nil {
+			globalRulesPrincipalIDs, err := globalRulesVerifier.Verify(ctx, gitID, authorizationAttestation)
+			if err != nil {
+				return "", false, err
+			}
+
+			if globalRulesPrincipalIDs != nil {
+				verifiedGlobalRulesPrincipalIDs = globalRulesPrincipalIDs.Len()
+			}
+		}
+
 		for _, rule := range globalRules {
 			// We check every global rule
 			slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))

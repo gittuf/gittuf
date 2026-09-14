@@ -579,7 +579,7 @@ func TestStateVerify(t *testing.T) {
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
-		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
 		require.Nil(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
 		require.Nil(t, err)
@@ -645,7 +645,7 @@ func TestStateVerify(t *testing.T) {
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
-		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))})
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}, false)
 		require.Nil(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
 		require.Nil(t, err)
@@ -1730,7 +1730,7 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 	// Set up the network repository and add the controller to it
 	networkRootMetadata, err := networkState.GetRootMetadata(false)
 	require.Nil(t, err)
-	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
 	require.Nil(t, err)
 	networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
 	require.Nil(t, err)

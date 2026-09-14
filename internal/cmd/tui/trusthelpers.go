@@ -807,7 +807,11 @@ func repoAddControllerRepository(ctx context.Context, o *options, repositoryName
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.AddControllerRepository(ctx, signer, repositoryName, repositoryLocation, initialRootPrincipals, true, opts...)
+	// The TUI does not currently expose an opt-in prompt for trusting a
+	// controller's own principals to satisfy its global rules, so it stays
+	// off by default here; use `gittuf trust add-controller-repository
+	// --trust-principals-for-global-rules` for that.
+	return repo.AddControllerRepository(ctx, signer, repositoryName, repositoryLocation, initialRootPrincipals, false, true, opts...)
 }
 
 // repoAddNetworkRepository adds a network repository.

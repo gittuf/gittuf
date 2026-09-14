@@ -2893,7 +2893,7 @@ func TestAddControllerRepository(t *testing.T) {
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	rootPrincipal := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
 
-	err := r.AddControllerRepository(testCtx, rootSigner, "controller-repo", "https://example.com/controller", []tuf.Principal{rootPrincipal}, false)
+	err := r.AddControllerRepository(testCtx, rootSigner, "controller-repo", "https://example.com/controller", []tuf.Principal{rootPrincipal}, false, false)
 	require.Nil(t, err)
 
 	err = r.StagePolicy(testCtx, "", true, false)
@@ -2921,19 +2921,19 @@ func TestAddControllerRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = nr.AddControllerRepository(testCtx, nil, "", "", nil, true)
+		err = nr.AddControllerRepository(testCtx, nil, "", "", nil, false, true)
 		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
 		// Test non-existent policy
 		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
-		err = nr.AddControllerRepository(testCtx, sv, "", "", nil, false)
+		err = nr.AddControllerRepository(testCtx, sv, "", "", nil, false, false)
 		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
 
-		err = r.AddControllerRepository(testCtx, sv, "", "", nil, false)
+		err = r.AddControllerRepository(testCtx, sv, "", "", nil, false, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
 }

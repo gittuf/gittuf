@@ -12,10 +12,11 @@ import (
 )
 
 type options struct {
-	p                     *persistent.Options
-	repositoryName        string
-	repositoryLocation    string
-	initialRootPrincipals []string
+	p                             *persistent.Options
+	repositoryName                string
+	repositoryLocation            string
+	initialRootPrincipals         []string
+	trustPrincipalsForGlobalRules bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -42,6 +43,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"initial root principals of the controller repository (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("initial-root-principal") //nolint:errcheck
+
+	cmd.Flags().BoolVar(
+		&o.trustPrincipalsForGlobalRules,
+		"trust-principals-for-global-rules",
+		false,
+		"trust the controller repository's own principals to satisfy its global rules (only enable this for controllers whose identities should be trusted directly, e.g. an internal company repository)",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -69,7 +77,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
 
-	return repo.AddControllerRepository(cmd.Context(), signer, o.repositoryName, o.repositoryLocation, initialRootPrincipals, true, opts...)
+	return repo.AddControllerRepository(cmd.Context(), signer, o.repositoryName, o.repositoryLocation, initialRootPrincipals, o.trustPrincipalsForGlobalRules, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {

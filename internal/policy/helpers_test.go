@@ -115,7 +115,7 @@ func createControllerAndNetworkRepositories(t *testing.T) (*gitinterface.Reposit
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,6 +167,55 @@ func createTestStateWithOnlyRoot(t *testing.T) *State {
 	return &State{
 		Metadata: &StateMetadata{
 			RootEnvelope: rootEnv,
+		},
+	}
+}
+
+// createTestStateWithOnlyRootAndEmptyTargets is like
+// createTestStateWithOnlyRoot, but it also declares an empty top-level
+// targets role. preprocess() returns early when Metadata.TargetsEnvelope is
+// nil, before it processes s.ControllerMetadata, so a state used to exercise
+// controller-related preprocessing (without trusting any additional
+// principals of its own) needs a non-nil, even if empty, targets envelope.
+func createTestStateWithOnlyRootAndEmptyTargets(t *testing.T) *State {
+	t.Helper()
+
+	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes) //nolint:staticcheck
+	key := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+
+	rootMetadata, err := InitializeRootMetadata(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := rootMetadata.AddPrimaryRuleFilePrincipal(key); err != nil {
+		t.Fatal(err)
+	}
+
+	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootEnv, err = dsse.SignEnvelope(context.Background(), rootEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	targetsMetadata := InitializeTargetsMetadata()
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetsEnv, err = dsse.SignEnvelope(context.Background(), targetsEnv, signer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &State{
+		Metadata: &StateMetadata{
+			RootEnvelope:    rootEnv,
+			TargetsEnvelope: targetsEnv,
 		},
 	}
 }

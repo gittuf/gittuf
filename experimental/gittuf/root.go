@@ -1277,8 +1277,13 @@ func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.Sig
 }
 
 // AddControllerRepository adds a repository as a controller to the current
-// repository.
-func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+// repository. trustPrincipalsForGlobalRules opts the current repository
+// into trusting the controller's own principals to satisfy that
+// controller's global rules; this should only be enabled for controllers
+// whose identities are meant to be trusted directly, such as an internal
+// company repository, since it is a distinct trust decision from simply
+// adding the controller.
+func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, trustPrincipalsForGlobalRules, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1309,7 +1314,7 @@ func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibds
 	}
 
 	slog.Debug("Adding controller repository...")
-	if err := rootMetadata.AddControllerRepository(repositoryName, repositoryLocation, initialRootPrincipals); err != nil {
+	if err := rootMetadata.AddControllerRepository(repositoryName, repositoryLocation, initialRootPrincipals, trustPrincipalsForGlobalRules); err != nil {
 		return err
 	}
 

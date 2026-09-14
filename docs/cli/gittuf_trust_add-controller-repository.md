@@ -17,6 +17,7 @@ gittuf trust add-controller-repository [flags]
       --initial-root-principal stringArray   initial root principals of the controller repository (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
       --location string                      location of controller repository
       --name string                          name of controller repository
+      --trust-principals-for-global-rules    trust the controller repository's own principals to satisfy its global rules (only enable this for controllers whose identities should be trusted directly, e.g. an internal company repository)
 ```
 
 ### Options inherited from parent commands
