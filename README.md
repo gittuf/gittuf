@@ -32,10 +32,12 @@ Take a look at the [get started guide] to learn how to install and try gittuf
 out! Additionally, contributions are welcome, please refer to the [contributing
 guide], our [roadmap], and the issue tracker for ways to get involved. In
 addition, you can join the gittuf channel on the [OpenSSF Slack] and say hello! 
+See how gittuf compares with other systems in [this comparison].
 
 [contributing guide]: /CONTRIBUTING.md
 [roadmap]: /docs/roadmap.md
 [Open Source Security Foundation (OpenSSF)]: https://openssf.org/
 [Supply Chain Integrity Working Group]: https://github.com/ossf/wg-supply-chain-integrity
 [get started guide]: /docs/get-started.md
+[this comparison]: /docs/comparisons.md
 [OpenSSF Slack]: https://slack.openssf.org/
