@@ -11,8 +11,6 @@ import (
 	"github.com/danwakefield/fnmatch"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/gittuf/gittuf/pkg/githash"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 )
 
 const (
@@ -31,7 +29,6 @@ type RootMetadata struct {
 	GlobalRules        []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
 	MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
-	Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -709,16 +706,15 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	// this type _has_ to be a copy of RootMetadata, minus the use of
 	// json.RawMessage for tuf interfaces
 	type tempType struct {
-		Type               string                    `json:"type"`
-		Expires            string                    `json:"expires"`
-		RepositoryLocation string                    `json:"repositoryLocation,omitempty"`
-		Keys               map[string]*Key           `json:"keys"`
-		Roles              map[string]Role           `json:"roles"`
-		GitHubApps         map[string]*GitHubApp     `json:"githubApps,omitempty"`
-		GlobalRules        []json.RawMessage         `json:"globalRules,omitempty"`
-		Propagations       []json.RawMessage         `json:"propagations,omitempty"`
-		MultiRepository    *MultiRepository          `json:"multiRepository,omitempty"`
-		Hooks              map[tuf.HookStage][]*Hook `json:"hooks,omitempty"`
+		Type               string                `json:"type"`
+		Expires            string                `json:"expires"`
+		RepositoryLocation string                `json:"repositoryLocation,omitempty"`
+		Keys               map[string]*Key       `json:"keys"`
+		Roles              map[string]Role       `json:"roles"`
+		GitHubApps         map[string]*GitHubApp `json:"githubApps,omitempty"`
+		GlobalRules        []json.RawMessage     `json:"globalRules,omitempty"`
+		Propagations       []json.RawMessage     `json:"propagations,omitempty"`
+		MultiRepository    *MultiRepository      `json:"multiRepository,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -773,8 +769,6 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.MultiRepository = temp.MultiRepository
-
-	r.Hooks = temp.Hooks
 
 	return nil
 }
@@ -973,143 +967,6 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 		initialRootPrincipals = append(initialRootPrincipals, key)
 	}
 	return initialRootPrincipals
-}
-
-// AddHook adds the specified hook to the metadata.
-func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) (tuf.Hook, error) {
-	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
-
-	newHook := &Hook{
-		Name:         hookName,
-		PrincipalIDs: set.NewSetFromItems(principalIDs...),
-		Hashes:       hashes,
-		Environment:  environment,
-		Timeout:      timeout,
-	}
-
-	if r.Hooks == nil {
-		r.Hooks = map[tuf.HookStage][]*Hook{}
-	}
-
-	for _, stage := range stages {
-		if err := stage.IsValid(); err != nil {
-			return nil, err
-		}
-
-		if r.Hooks[stage] == nil {
-			r.Hooks[stage] = []*Hook{}
-		} else {
-			for _, existingHook := range r.Hooks[stage] {
-				if existingHook.Name == hookName {
-					return nil, tuf.ErrDuplicatedHookName
-				}
-			}
-		}
-
-		r.Hooks[stage] = append(r.Hooks[stage], newHook)
-	}
-
-	return tuf.Hook(newHook), nil
-}
-
-// UpdateHook updates the hook specified by stage and hookName with the new
-// principalIDs, hashes, environment, and timeout.
-func (r *RootMetadata) UpdateHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) error {
-	if r.Hooks == nil {
-		return tuf.ErrNoHooksDefined
-	}
-
-	var hookFound bool
-
-	for _, stage := range stages {
-		for i, hook := range r.Hooks[stage] {
-			if hook.Name == hookName {
-				r.Hooks[stage][i].PrincipalIDs = set.NewSetFromItems(principalIDs...)
-				r.Hooks[stage][i].Hashes = hashes
-				r.Hooks[stage][i].Environment = environment
-				r.Hooks[stage][i].Timeout = timeout
-				hookFound = true
-			}
-		}
-	}
-
-	if !hookFound {
-		return tuf.ErrHookNotFound
-	}
-
-	return nil
-}
-
-// RemoveHook removes the hook specified by stage and hookName.
-func (r *RootMetadata) RemoveHook(stages []tuf.HookStage, hookName string) error {
-	if r.Hooks == nil {
-		return tuf.ErrNoHooksDefined
-	}
-
-	for _, stage := range stages {
-		hooks := []*Hook{}
-		for _, hook := range r.Hooks[stage] {
-			if hook.Name != hookName {
-				hooks = append(hooks, hook)
-			}
-		}
-
-		r.Hooks[stage] = hooks
-	}
-
-	return nil
-}
-
-// GetHooks returns the hooks for the specified stage.
-func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
-	if r.Hooks == nil {
-		return nil, tuf.ErrNoHooksDefined
-	}
-
-	hooks := []tuf.Hook{}
-	for _, hook := range r.Hooks[stage] {
-		hooks = append(hooks, hook)
-	}
-	return hooks, nil
-}
-
-// Hook defines the schema for a hook.
-type Hook struct {
-	Name         string              `json:"name"`
-	PrincipalIDs *set.Set[string]    `json:"principals"`
-	Hashes       map[string]string   `json:"hashes"`
-	Environment  tuf.HookEnvironment `json:"environment"`
-	Timeout      int                 `json:"timeout"`
-}
-
-// ID returns the identifier of the hook, its name.
-func (h *Hook) ID() string {
-	return h.Name
-}
-
-// GetPrincipalIDs returns the principals that must run this hook.
-func (h *Hook) GetPrincipalIDs() *set.Set[string] {
-	return h.PrincipalIDs
-}
-
-// GetHashes returns the hashes of the hook file.
-func (h *Hook) GetHashes() map[string]string {
-	return h.Hashes
-}
-
-func (h *Hook) GetBlobID() githash.Hash {
-	hash, _ := gitinterface.NewHash(h.Hashes[gitinterface.GitBlobHashName])
-	return hash
-}
-
-// GetEnvironment returns the environment that the hook is to run in.
-func (h *Hook) GetEnvironment() tuf.HookEnvironment {
-	return h.Environment
-}
-
-// GetTimeout returns the maximum duration the hook can run for, in seconds.
-func (h *Hook) GetTimeout() int {
-	return h.Timeout
 }
 
 type GitHubApp struct {

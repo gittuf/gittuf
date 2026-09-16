@@ -29,7 +29,6 @@ type RootMetadata struct {
 	GlobalRules        []tuf.GlobalRule           `json:"globalRules,omitempty"`
 	Propagations       []tuf.PropagationDirective `json:"propagations,omitempty"`
 	MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
-	Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 }
 
 // NewRootMetadata returns a new instance of RootMetadata.
@@ -374,7 +373,6 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 		GlobalRules        []json.RawMessage          `json:"globalRules,omitempty"`
 		Propagations       []json.RawMessage          `json:"propagations,omitempty"`
 		MultiRepository    *MultiRepository           `json:"multiRepository,omitempty"`
-		Hooks              map[tuf.HookStage][]*Hook  `json:"hooks,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -463,8 +461,6 @@ func (r *RootMetadata) UnmarshalJSON(data []byte) error {
 	}
 
 	r.MultiRepository = temp.MultiRepository
-
-	r.Hooks = temp.Hooks
 
 	return nil
 }
@@ -964,107 +960,6 @@ func (o *OtherRepository) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
-}
-
-type Hook = tufv01.Hook
-
-// AddHook adds the specified hook to the metadata.
-func (r *RootMetadata) AddHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) (tuf.Hook, error) {
-	// TODO: Check if principal exists in RootMetadata/TargetsMetadata
-
-	newHook := &Hook{
-		Name:         hookName,
-		PrincipalIDs: set.NewSetFromItems(principalIDs...),
-		Hashes:       hashes,
-		Environment:  environment,
-		Timeout:      timeout,
-	}
-
-	if r.Hooks == nil {
-		r.Hooks = map[tuf.HookStage][]*Hook{}
-	}
-
-	for _, stage := range stages {
-		if err := stage.IsValid(); err != nil {
-			return nil, err
-		}
-		if r.Hooks[stage] == nil {
-			r.Hooks[stage] = []*Hook{}
-		} else {
-			for _, existingHook := range r.Hooks[stage] {
-				if existingHook.Name == hookName {
-					return nil, tuf.ErrDuplicatedHookName
-				}
-			}
-		}
-
-		r.Hooks[stage] = append(r.Hooks[stage], newHook)
-	}
-
-	return tuf.Hook(newHook), nil
-}
-
-// UpdateHook updates the hook specified by stage and hookName with the new
-// principalIDs, hashes, environment, and timeout.
-func (r *RootMetadata) UpdateHook(stages []tuf.HookStage, hookName string, principalIDs []string, hashes map[string]string, environment tuf.HookEnvironment, timeout int) error {
-	if r.Hooks == nil {
-		return tuf.ErrNoHooksDefined
-	}
-
-	var found bool
-
-	for _, stage := range stages {
-		for i, hook := range r.Hooks[stage] {
-			if hook.Name == hookName {
-				r.Hooks[stage][i].PrincipalIDs = set.NewSetFromItems(principalIDs...)
-				for key, value := range hashes {
-					r.Hooks[stage][i].Hashes[key] = value
-				}
-				r.Hooks[stage][i].Environment = environment
-				r.Hooks[stage][i].Timeout = timeout
-				found = true
-			}
-		}
-	}
-
-	if !found {
-		return tuf.ErrHookNotFound
-	}
-
-	return nil
-}
-
-// RemoveHook removes the hook specified by stage and hookName.
-func (r *RootMetadata) RemoveHook(stages []tuf.HookStage, hookName string) error {
-	if r.Hooks == nil {
-		return tuf.ErrNoHooksDefined
-	}
-
-	for _, stage := range stages {
-		hooks := []*Hook{}
-		for _, hook := range r.Hooks[stage] {
-			if hook.Name != hookName {
-				hooks = append(hooks, hook)
-			}
-		}
-
-		r.Hooks[stage] = hooks
-	}
-
-	return nil
-}
-
-// GetHooks returns the hooks for the specified stage.
-func (r *RootMetadata) GetHooks(stage tuf.HookStage) ([]tuf.Hook, error) {
-	if r.Hooks == nil {
-		return nil, tuf.ErrNoHooksDefined
-	}
-
-	hooks := []tuf.Hook{}
-	for _, hook := range r.Hooks[stage] {
-		hooks = append(hooks, hook)
-	}
-	return hooks, nil
 }
 
 type GitHubApp = tufv01.GitHubApp
