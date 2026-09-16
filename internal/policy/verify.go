@@ -17,7 +17,6 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
-	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/policy/options/policy"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
@@ -50,9 +49,6 @@ type PolicyVerifier struct { //nolint:revive
 
 	repo     gitstore.Storer
 	searcher searcher
-
-	persistentCacheEnabled bool
-	persistentCache        *cache.Persistent
 }
 
 func NewPolicyVerifier(repo gitstore.Storer) *PolicyVerifier {
@@ -60,11 +56,6 @@ func NewPolicyVerifier(repo gitstore.Storer) *PolicyVerifier {
 	verifier := &PolicyVerifier{
 		repo:     repo,
 		searcher: searcher,
-	}
-
-	if searcher, isCacheSearcher := searcher.(*cacheSearcher); isCacheSearcher {
-		verifier.persistentCacheEnabled = true
-		verifier.persistentCache = searcher.persistentCache
 	}
 
 	return verifier
@@ -94,26 +85,10 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gith
 		firstEntry rsl.ReferenceUpdaterEntry
 		err        error
 	)
-	switch v.persistentCacheEnabled {
-	case true:
-		slog.Debug("Cache is enabled, checking for last verified entry...")
-		entryNumber, entryID := v.persistentCache.GetLastVerifiedEntryForRef(target)
-		if entryNumber != 0 {
-			firstEntry, err = loadRSLReferenceUpdaterEntry(v.repo, entryID)
-			if err != nil {
-				return gitinterface.ZeroHash, err
-			}
 
-			// break because we've loaded the entry and don't need to fallthrough
-			break
-		}
-		slog.Debug("Cache doesn't have last verified entry for ref...")
-		fallthrough
-	case false:
-		firstEntry, _, err = rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, target)
-		if err != nil {
-			return gitinterface.ZeroHash, err
-		}
+	firstEntry, _, err = rsl.GetFirstReferenceUpdaterEntryForRef(v.repo, target)
+	if err != nil {
+		return gitinterface.ZeroHash, err
 	}
 
 	// Find latest entry for target
@@ -458,10 +433,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		require target != ""
 	*/
 
-	if v.persistentCacheEnabled {
-		defer v.persistentCache.Commit(v.repo) //nolint:errcheck
-	}
-
 	var (
 		currentPolicy       *State
 		currentAttestations *attestations.Attestations
@@ -558,10 +529,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 					currentPolicy = newPolicy
 
-					if v.persistentCacheEnabled {
-						v.persistentCache.InsertPolicyEntryNumber(entry.GetNumber(), entry.GetID())
-					}
-
 					continue
 				}
 
@@ -573,10 +540,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					}
 
 					currentAttestations = newAttestationsState
-
-					if v.persistentCacheEnabled {
-						v.persistentCache.InsertAttestationEntryNumber(entry.GetNumber(), entry.GetID())
-					}
 
 					continue
 				}
@@ -603,9 +566,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 						// Fix entry does not exist after revoking annotation
 						return verificationErr
 					}
-				} else if v.persistentCacheEnabled {
-					// Verification has passed, add to cache
-					v.persistentCache.SetLastVerifiedEntryForRef(entry.GetRefName(), entry.GetNumber(), entry.GetID())
 				}
 
 				continue
@@ -655,7 +615,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		// fix. Entries prior to that one in the queue are considered invalid
 		// and must be skipped
 		fixed := false
-		var fixEntry *rsl.ReferenceEntry
 		invalidIntermediateEntries := []*rsl.ReferenceEntry{}
 		newEntryQueue := []rsl.ReferenceUpdaterEntry{}
 	lookForFixes:
@@ -696,7 +655,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
 						slog.Debug("Fix entry found, proceeding with regular verification workflow...")
 						fixed = true
-						fixEntry = newEntry
 						newEntryQueue = append(newEntryQueue, entries...)
 					}
 				}
@@ -730,10 +688,6 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 		verificationErr = nil
 
 		entries = newEntryQueue
-
-		if v.persistentCacheEnabled {
-			v.persistentCache.SetLastVerifiedEntryForRef(fixEntry.RefName, fixEntry.GetNumber(), fixEntry.GetID())
-		}
 	}
 
 	return nil
