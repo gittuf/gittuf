@@ -4,7 +4,7 @@ List global rules for the current state
 
 ### Synopsis
 
-The 'list-global-rules' command lists the global rules currently defined in the repository's root of trust. It is used to review the repository-wide constraints in effect, with output grouped by rule type.
+The 'list-global-rules' command lists the global rules defined in the repository's root of trust and propagated from controller repositories. Local rules are shown first, followed by controller rules grouped by repository name and location. Rules within each repository are grouped by rule type.
 
 ```
 gittuf trust list-global-rules [flags]
