@@ -4,6 +4,15 @@
 package sigstore
 
 import (
+	"crypto"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
+	"os"
+
+	"github.com/gittuf/gittuf/internal/signerverifier/common"
+	"github.com/sigstore/sigstore-go/pkg/root"
+
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -142,4 +151,37 @@ func subjectFromToken(tok *idToken) string {
 	}
 
 	return tok.Subject
+}
+
+func parsePEMFile(path string) (*root.FulcioCertificateAuthority, error) {
+	certs, err := common.LoadCertsFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	ca := &root.FulcioCertificateAuthority{}
+	ca.Root = certs[len(certs)-1]
+	if len(certs) > 1 {
+		ca.Intermediates = certs[:len(certs)-1]
+	}
+
+	return ca, nil
+}
+
+func parsePubKey(path string) (crypto.PublicKey, []byte, error) {
+	pubKeyBytes, err := os.ReadFile(path) //nolint:gosec
+	if err != nil {
+		return nil, nil, err
+	}
+	block, _ := pem.Decode(pubKeyBytes)
+	if block == nil {
+		return nil, nil, fmt.Errorf("failed to decode public key")
+	}
+	pubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	keyHash := sha256.Sum256(block.Bytes)
+	return pubKey, keyHash[:], nil
 }
