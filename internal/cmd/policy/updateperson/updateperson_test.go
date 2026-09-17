@@ -228,6 +228,53 @@ func TestUpdatePerson(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid format for custom metadata")
 	})
 
+	t.Run("custom metadata value containing '='", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
+
+		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		require.NoError(t, err)
+
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
+
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
+
+		// First, add the person using add-person command
+		addPersonCmd := addpersoncmd.New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
+		_, _, _, err = cmd.ExecuteCommandC(addPersonCmd, "--person-ID", "person-1", "--public-key", keyPath+".pub", "--custom", "profile=https://example.com/u?ref=1")
+		assert.NoError(t, err)
+
+		// Now update person with a custom value that also contains '='
+		updatePersonCmd := New(&persistent.Options{SigningKey: keyPath, WithRSLEntry: true})
+		_, _, _, err = cmd.ExecuteCommandC(updatePersonCmd, "--person-ID", "person-1", "--public-key", keyPath+".pub", "--custom", "profile=https://example.com/u?ref=2")
+		assert.NoError(t, err)
+
+		// Verify updated fields
+		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
+		require.NoError(t, err)
+		targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+		assert.NoError(t, err)
+		principals := targetsMetadata.GetPrincipals()
+		person := principals["person-1"].(*tufv02.Person)
+		assert.Equal(t, "https://example.com/u?ref=2", person.Custom["profile"])
+	})
+
 	t.Run("missing public key file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
