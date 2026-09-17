@@ -36,18 +36,22 @@ func getGlobalRules(ctx context.Context, o *options) []globalRule {
 	if err != nil {
 		return nil
 	}
-	return getGlobalRulesForRef(ctx, repo, o.targetRef)
+	rules, err := getGlobalRulesForRef(ctx, repo, o.targetRef)
+	if err != nil {
+		return nil
+	}
+	return rules
 }
 
 // getGlobalRulesForRef returns global rules for a given target ref
-func getGlobalRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []globalRule {
+func getGlobalRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) ([]globalRule, error) {
 	if repo == nil {
-		return nil
+		return nil, nil
 	}
 
 	rules, err := repo.ListGlobalRules(ctx, targetRef)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var currRules = make([]globalRule, len(rules))
@@ -68,7 +72,7 @@ func getGlobalRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRe
 			}
 		}
 	}
-	return currRules
+	return currRules, nil
 }
 
 // repoAddGlobalRule adds a global rule
