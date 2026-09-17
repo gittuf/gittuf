@@ -270,3 +270,23 @@ func TestTrustGlobalRulesScreenViewRendering(t *testing.T) {
 		t.Errorf("expected title in edit form view, got %q", viewStr)
 	}
 }
+
+func TestTrustGlobalRulesDeletePrompt(t *testing.T) {
+	s := &trustGlobalRulesScreen{
+		confirmDelete: true,
+		deleteTarget:  "global-threshold-rule",
+	}
+	m := &model{
+		screen: screenTrustGlobalRules,
+		width:  80,
+		height: 24,
+	}
+
+	out := s.View(m)
+	if !strings.Contains(out, `Delete global rule "global-threshold-rule"? [y/n]`) {
+		t.Errorf("expected global rule delete prompt, got %q", out)
+	}
+	if strings.Contains(out, `Delete rule "global-threshold-rule"`) {
+		t.Errorf("expected prompt NOT to use generic 'Delete rule', got %q", out)
+	}
+}

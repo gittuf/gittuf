@@ -239,20 +239,20 @@ func (s *policyRulesScreen) handlePolicyFormSubmit(m *model) (tea.Model, tea.Cmd
 func (s *policyRulesScreen) View(m *model) string {
 	switch m.screen {
 	case screenPolicyRules:
-		overlay := ""
+		var overlays string
 		if s.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-			)
+			overlays = renderDeleteOverlay("rule", s.deleteTarget)
+		} else {
+			hint := ""
+			if !m.readOnly {
+				hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+					"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
+				)
+			}
+			overlays = renderActionHints(m.readOnly) + hint
 		}
 
 		listView := m.renderListOrEmpty(s.ruleList, len(s.rules), "No rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
-
 		return m.renderScreen("Home › Policy › Rules", listView, overlays)
 
 	case screenPolicyAddRule:
