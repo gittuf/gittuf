@@ -239,20 +239,20 @@ func (s *policyRulesScreen) handlePolicyFormSubmit(m *model) (tea.Model, tea.Cmd
 func (s *policyRulesScreen) View(m *model) string {
 	switch m.screen {
 	case screenPolicyRules:
-		overlay := ""
+		var overlays string
 		if s.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-			)
+			overlays = renderDeleteOverlay("rule", s.deleteTarget)
+		} else {
+			hint := ""
+			if !m.readOnly {
+				hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+					"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
+				)
+			}
+			overlays = renderActionHints(m.readOnly) + hint
 		}
 
 		listView := m.renderListOrEmpty(s.ruleList, len(s.rules), "No rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
-
 		return m.renderScreen("Home › Policy › Rules", listView, overlays)
 
 	case screenPolicyAddRule:
@@ -288,18 +288,22 @@ func getCurrRules(ctx context.Context, o *options) []rule {
 	if err != nil {
 		return nil
 	}
-	return getRulesForRef(ctx, repo, o.targetRef)
+	rules, err := getRulesForRef(ctx, repo, o.targetRef)
+	if err != nil {
+		return nil
+	}
+	return rules
 }
 
 // getRulesForRef returns the rules from a specific policy ref (e.g. policy or policy-staging).
-func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []rule {
+func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) ([]rule, error) {
 	if repo == nil {
-		return nil
+		return nil, nil
 	}
 
 	rules, err := repo.ListRules(ctx, targetRef)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var currRules = make([]rule, len(rules))
@@ -311,7 +315,7 @@ func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef stri
 			threshold: r.Delegation.GetThreshold(),
 		}
 	}
-	return currRules
+	return currRules, nil
 }
 
 // repoAddRule adds a rule to the policy file.
