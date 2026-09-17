@@ -386,7 +386,12 @@ func repoUpdatePropagationDirective(ctx context.Context, o *options, name, upstr
 		return err
 	}
 
-	return repo.UpdatePropagationDirective(ctx, signer, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.UpdatePropagationDirective(ctx, signer, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath, true, opts...)
 }
 
 // repoRemovePropagationDirective removes a propagation directive.
