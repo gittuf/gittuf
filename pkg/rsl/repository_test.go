@@ -15,9 +15,12 @@ import (
 	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var _ gitstore.TipPinningStorer = (*gitinterface.Repository)(nil)
 
 const annotationMessage = "test annotation"
 
@@ -2460,4 +2463,380 @@ func TestCommitRejectsLineBreakInField(t *testing.T) {
 		err := NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://example.com/repo\ninjected", gitinterface.ZeroHash).Commit(repo, false)
 		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
 	})
+}
+
+// buildMixedRSL records, in order: main (single), bulk {main, feature},
+// annotation skipping the bulk entry's feature update only, policy (single),
+// bulk {feature, release}. It returns the entries in recording order.
+func buildMixedRSL(t *testing.T, repo *gitinterface.Repository) []Entry {
+	t.Helper()
+
+	entries := []Entry{}
+	record := func(commit func() error) {
+		if err := commit(); err != nil {
+			t.Fatal(err)
+		}
+		latest, err := GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, latest)
+	}
+
+	record(func() error { return NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false) })
+	record(func() error {
+		return NewBulkReferenceEntry([]ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}).Commit(repo, false)
+	})
+	record(func() error {
+		bulkID := entries[1].GetID()
+		return NewAnnotationEntryWithQualifiers([]githash.Hash{bulkID}, map[string][]string{bulkID.String(): {"refs/heads/feature"}}, true, annotationMessage).Commit(repo, false)
+	})
+	record(func() error {
+		return NewReferenceEntry("refs/gittuf/policy", gitinterface.ZeroHash).Commit(repo, false)
+	})
+	featureTarget, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseTarget, err := NewHash("1234567890abcdef1234567890abcdef12345678")
+	if err != nil {
+		t.Fatal(err)
+	}
+	record(func() error {
+		return NewBulkReferenceEntry([]ReferenceUpdate{
+			{RefName: "refs/heads/feature", TargetID: featureTarget},
+			{RefName: "refs/heads/release", TargetID: releaseTarget},
+		}).Commit(repo, false)
+	})
+
+	return entries
+}
+
+func TestWalkersWithBulkEntries(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+	entries := buildMixedRSL(t, repo)
+	firstBulk := entries[1].(*BulkReferenceEntry)
+	secondBulk := entries[4].(*BulkReferenceEntry)
+
+	t.Run("latest for ref inside bulk", func(t *testing.T) {
+		entry, annotations, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/release"))
+		require.NoError(t, err)
+		assert.Equal(t, secondBulk.ID, entry.GetID())
+		assert.Equal(t, "refs/heads/release", entry.GetRefName())
+		assert.Nil(t, annotations)
+	})
+
+	t.Run("latest without filter is last listed update of latest bulk", func(t *testing.T) {
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo)
+		require.NoError(t, err)
+		assert.Equal(t, "refs/heads/release", entry.GetRefName())
+	})
+
+	t.Run("before bulk ID skips all its updates", func(t *testing.T) {
+		entry, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/main"), BeforeEntryID(firstBulk.ID))
+		require.NoError(t, err)
+		assert.Equal(t, entries[0].GetID(), entry.GetID())
+	})
+
+	t.Run("until bulk ID excludes all its updates", func(t *testing.T) {
+		_, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/main"), UntilEntryID(firstBulk.ID))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+	})
+
+	t.Run("unskipped honours qualified annotation", func(t *testing.T) {
+		entry, annotations, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/feature"), IsUnskipped(), BeforeEntryID(secondBulk.ID))
+		assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+		assert.Nil(t, entry)
+		assert.Nil(t, annotations)
+
+		entry, annotations, err = GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/main"), IsUnskipped(), BeforeEntryID(secondBulk.ID))
+		require.NoError(t, err)
+		assert.Equal(t, firstBulk.ID, entry.GetID())
+		require.Len(t, annotations, 1)
+		assert.False(t, entry.(*ReferenceEntry).SkippedBy(annotations))
+	})
+
+	t.Run("first for ref inside bulk", func(t *testing.T) {
+		entry, _, err := GetFirstReferenceUpdaterEntryForRef(repo, "refs/heads/feature")
+		require.NoError(t, err)
+		assert.Equal(t, firstBulk.ID, entry.GetID())
+		assert.Equal(t, "refs/heads/feature", entry.GetRefName())
+	})
+
+	t.Run("first entry overall is first listed update when first entry is bulk", func(t *testing.T) {
+		otherDir := t.TempDir()
+		otherRepo := gitinterface.CreateTestGitRepository(t, otherDir, false)
+		require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+			{RefName: "refs/heads/a", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/b", TargetID: gitinterface.ZeroHash},
+		}).Commit(otherRepo, false))
+		entry, _, err := GetFirstEntry(otherRepo)
+		require.NoError(t, err)
+		assert.Equal(t, "refs/heads/a", entry.GetRefName())
+	})
+
+	t.Run("range across bulk entries in listed order", func(t *testing.T) {
+		updaters, annotationMap, err := GetReferenceUpdaterEntriesInRange(repo, entries[0].GetID(), secondBulk.ID)
+		require.NoError(t, err)
+		refs := make([]string, 0, len(updaters))
+		for _, u := range updaters {
+			refs = append(refs, u.GetRefName())
+		}
+		assert.Equal(t, []string{"refs/heads/main", "refs/heads/main", "refs/heads/feature", "refs/gittuf/policy", "refs/heads/feature", "refs/heads/release"}, refs)
+		require.Len(t, annotationMap[firstBulk.ID.String()], 1)
+
+		require.Len(t, updaters, 6)
+		assert.Equal(t, secondBulk.Updates[0].TargetID, updaters[4].GetTargetID())
+		assert.Equal(t, secondBulk.Updates[1].TargetID, updaters[5].GetTargetID())
+		assert.NotEqual(t, updaters[4].GetTargetID(), updaters[5].GetTargetID())
+	})
+
+	t.Run("range with first equal to last on a bulk entry", func(t *testing.T) {
+		updaters, _, err := GetReferenceUpdaterEntriesInRange(repo, secondBulk.ID, secondBulk.ID)
+		require.NoError(t, err)
+		require.Len(t, updaters, 2)
+		assert.Equal(t, "refs/heads/feature", updaters[0].GetRefName())
+		assert.Equal(t, "refs/heads/release", updaters[1].GetRefName())
+	})
+
+	t.Run("range for ref filters views", func(t *testing.T) {
+		updaters, _, err := GetReferenceUpdaterEntriesInRangeForRef(repo, entries[0].GetID(), secondBulk.ID, "refs/heads/feature")
+		require.NoError(t, err)
+		refs := make([]string, 0, len(updaters))
+		for _, u := range updaters {
+			refs = append(refs, u.GetRefName())
+		}
+		assert.Equal(t, []string{"refs/heads/feature", "refs/gittuf/policy", "refs/heads/feature"}, refs)
+	})
+
+	t.Run("non gittuf parent of a view", func(t *testing.T) {
+		policyEntry := entries[3].(*ReferenceEntry)
+		entry, _, err := GetNonGittufParentReferenceUpdaterEntryForEntry(repo, policyEntry)
+		require.NoError(t, err)
+		assert.Equal(t, firstBulk.ID, entry.GetID())
+		assert.Equal(t, "refs/heads/feature", entry.GetRefName())
+	})
+}
+
+func TestRangeWalkerOverAppliesQualifiedAnnotations(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+		{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+	}).Commit(repo, false))
+	bulk, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	require.NoError(t, NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID()}, map[string][]string{bulk.GetID().String(): {"refs/heads/feature"}}, true, annotationMessage).Commit(repo, false))
+	annotation, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	// The annotation map is keyed by entry ID, so the qualified annotation
+	// reaches the view for every ref the bulk entry updates. Narrowing is the
+	// consumer's job, here via SkippedBy.
+	for _, refName := range []string{"refs/heads/main", "refs/heads/feature"} {
+		updaters, annotationMap, err := GetReferenceUpdaterEntriesInRangeForRef(repo, bulk.GetID(), bulk.GetID(), refName)
+		require.NoError(t, err)
+		require.Len(t, updaters, 1)
+		assert.Equal(t, refName, updaters[0].GetRefName())
+
+		annotations := annotationMap[bulk.GetID().String()]
+		require.Len(t, annotations, 1)
+		assert.Equal(t, annotation.GetID(), annotations[0].GetID())
+
+		skipped := updaters[0].(*ReferenceEntry).SkippedBy(annotations)
+		assert.Equal(t, refName == "refs/heads/feature", skipped)
+	}
+
+	entry, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/main"), IsUnskipped())
+	require.NoError(t, err)
+	assert.Equal(t, bulk.GetID(), entry.GetID())
+
+	_, _, err = GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/feature"), IsUnskipped())
+	assert.ErrorIs(t, err, ErrRSLEntryNotFound)
+}
+
+func TestAnnotationQualifierValidationOnCommit(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	require.NoError(t, NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false))
+	single, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+		{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+	}).Commit(repo, false))
+	bulk, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{single.GetID()}, map[string][]string{single.GetID().String(): {"refs/heads/main"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID()}, map[string][]string{bulk.GetID().String(): {"refs/heads/other"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID()}, map[string][]string{single.GetID().String(): {"refs/heads/main"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID()}, map[string][]string{bulk.GetID().String(): {"refs/heads/feature"}}, true, "").Commit(repo, false)
+	require.NoError(t, err)
+
+	latest, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+	annotation := latest.(*AnnotationEntry)
+	assert.Equal(t, map[string][]string{bulk.GetID().String(): {"refs/heads/feature"}}, annotation.Refs)
+
+	require.NoError(t, NewPropagationEntry("refs/heads/downstream", gitinterface.ZeroHash, "https://example.com/upstream", gitinterface.ZeroHash).Commit(repo, false))
+	propagation, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{propagation.GetID()}, map[string][]string{propagation.GetID().String(): {"refs/heads/downstream"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{annotation.GetID()}, map[string][]string{annotation.GetID().String(): {"refs/heads/feature"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	// A qualified entry ID listed twice is rejected because the codec emits
+	// the qualifiers once per occurrence.
+	err = NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID(), bulk.GetID()}, map[string][]string{bulk.GetID().String(): {"refs/heads/feature"}}, true, "").Commit(repo, false)
+	assert.ErrorIs(t, err, ErrInvalidAnnotationQualifier)
+
+	// An unqualified entry ID listed twice stays legal.
+	require.NoError(t, NewAnnotationEntry([]githash.Hash{bulk.GetID(), bulk.GetID()}, true, "").Commit(repo, false))
+}
+
+func TestGetFirstReferenceUpdaterEntryForCommitWithBulk(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+
+	mainCommit, err := repo.Commit(emptyTree, "refs/heads/main", "main\n", false)
+	require.NoError(t, err)
+	featureCommit, err := repo.Commit(emptyTree, "refs/heads/feature", "feature\n", false)
+	require.NoError(t, err)
+
+	require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: mainCommit},
+		{RefName: "refs/heads/feature", TargetID: featureCommit},
+	}).Commit(repo, false))
+	firstBulk, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	// Both refs advance and are recorded together again. Every later
+	// update contains the earlier commits, which is the contiguity the
+	// walker assumes.
+	mainCommit2, err := repo.Commit(emptyTree, "refs/heads/main", "main 2\n", false)
+	require.NoError(t, err)
+	featureCommit2, err := repo.Commit(emptyTree, "refs/heads/feature", "feature 2\n", false)
+	require.NoError(t, err)
+	require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: mainCommit2},
+		{RefName: "refs/heads/feature", TargetID: featureCommit2},
+	}).Commit(repo, false))
+	secondBulk, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	// featureCommit is reachable only through the feature update of each
+	// bulk entry. The first entry recording it is the first bulk entry.
+	entry, _, err := GetFirstReferenceUpdaterEntryForCommit(repo, featureCommit)
+	require.NoError(t, err)
+	assert.Equal(t, firstBulk.GetID(), entry.GetID())
+	assert.Equal(t, "refs/heads/feature", entry.GetRefName())
+
+	entry, _, err = GetFirstReferenceUpdaterEntryForCommit(repo, mainCommit)
+	require.NoError(t, err)
+	assert.Equal(t, firstBulk.GetID(), entry.GetID())
+	assert.Equal(t, "refs/heads/main", entry.GetRefName())
+
+	entry, _, err = GetFirstReferenceUpdaterEntryForCommit(repo, featureCommit2)
+	require.NoError(t, err)
+	assert.Equal(t, secondBulk.GetID(), entry.GetID())
+	assert.Equal(t, "refs/heads/feature", entry.GetRefName())
+
+	unknown, err := repo.Commit(emptyTree, "refs/heads/unrecorded", "unrecorded\n", false)
+	require.NoError(t, err)
+	_, _, err = GetFirstReferenceUpdaterEntryForCommit(repo, unknown)
+	assert.ErrorIs(t, err, ErrNoRecordOfCommit)
+}
+
+func TestSkipAllInvalidReferenceEntriesForRefWithBulk(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	treeBuilder := gitinterface.NewTreeBuilder(repo)
+	emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+
+	oldMain, err := repo.Commit(emptyTree, "refs/heads/main", "old main\n", false)
+	require.NoError(t, err)
+	feature, err := repo.Commit(emptyTree, "refs/heads/feature", "feature\n", false)
+	require.NoError(t, err)
+
+	require.NoError(t, NewBulkReferenceEntry([]ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: oldMain},
+		{RefName: "refs/heads/feature", TargetID: feature},
+	}).Commit(repo, false))
+	bulk, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	// Rewrite main so oldMain is no longer reachable.
+	require.NoError(t, repo.DeleteReference("refs/heads/main"))
+	newMain, err := repo.Commit(emptyTree, "refs/heads/main", "rewritten main\n", false)
+	require.NoError(t, err)
+	require.NoError(t, NewReferenceEntry("refs/heads/main", newMain).Commit(repo, false))
+
+	require.NoError(t, SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false))
+
+	latest, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+	annotation, isAnnotation := latest.(*AnnotationEntry)
+	require.True(t, isAnnotation)
+	assert.True(t, annotation.Skip)
+	assert.Equal(t, []githash.Hash{bulk.GetID()}, annotation.RSLEntryIDs)
+	assert.Equal(t, map[string][]string{bulk.GetID().String(): {"refs/heads/main"}}, annotation.Refs)
+
+	// The feature update in the same bulk entry stays unskipped.
+	entry, _, err := GetLatestReferenceUpdaterEntry(repo, ForReference("refs/heads/feature"), IsUnskipped())
+	require.NoError(t, err)
+	assert.Equal(t, bulk.GetID(), entry.GetID())
+}
+
+func TestCommitDetectsConcurrentRSLWrite(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+
+	require.NoError(t, NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false))
+	first, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+
+	// The interleaving this pins is unreachable through the public API, so
+	// the test drives setEntryNumber and commitEntry directly.
+	entry := NewReferenceEntry("refs/heads/feature", gitinterface.ZeroHash)
+	observedTip, err := entry.setEntryNumber(repo)
+	require.NoError(t, err)
+	assert.Equal(t, first.GetID(), observedTip)
+
+	// Another writer advances the RSL between numbering and commit.
+	require.NoError(t, NewReferenceEntry("refs/heads/other", gitinterface.ZeroHash).Commit(repo, false))
+
+	message, err := entry.createCommitMessage(true)
+	require.NoError(t, err)
+	err = commitEntry(repo, message, false, observedTip)
+	assert.ErrorContains(t, err, "unable to set Git reference")
+
+	latest, err := GetLatestEntry(repo)
+	require.NoError(t, err)
+	assert.Equal(t, "refs/heads/other", latest.(*ReferenceEntry).RefName)
+	assert.Equal(t, uint64(2), latest.GetNumber())
 }

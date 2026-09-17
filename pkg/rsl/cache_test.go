@@ -11,6 +11,10 @@ import (
 )
 
 func TestRSLCache(t *testing.T) {
+	// The cache is package level state shared with every other test in the
+	// package, and the assertions below require it to start empty.
+	newRSLCache()
+
 	// Add test entries
 	// Using fake hashes (these are commits in the gittuf repo itself)
 	entry1 := NewReferenceEntry("refs/heads/main", githash.ZeroHash)

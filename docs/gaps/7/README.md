@@ -93,10 +93,15 @@ Git ref that points to a blob.
 
 ### Supported Types
 
-All three RSL entry types carry custom fields: reference entries, annotation
-entries, and propagation entries. The key grammar, value alphabet, and length
-and count limits are identical across them and are enforced by a single shared
-implementation.
+Every RSL entry type carries custom fields: reference entries, bulk reference
+entries, annotation entries, and propagation entries. The key grammar, value
+alphabet, and length and count limits are identical across them and are
+enforced by a single shared implementation.
+
+The entry types differ in what they do with a key they do not recognize.
+Reference, annotation, and propagation entries ignore it, as they always have.
+A bulk reference entry rejects it, because that entry type fails closed on
+anything a client does not implement.
 
 Nothing outside the RSL carries custom fields, including policy metadata and
 the commits that record it. The RSL is where an application's context about a
@@ -300,8 +305,10 @@ what makes the rule "a field a canonical writer could not have produced is
 never surfaced by a read" checkable, and leaves the validation package free of
 any assumption that custom fields are carried as commit message lines.
 
-In the RSL package, `ReferenceEntry`, `AnnotationEntry`, and
-`PropagationEntry` each carry a `CustomFields` map. The keyed read lives on a
+In the RSL package, `ReferenceEntry`, `BulkReferenceEntry`, `AnnotationEntry`,
+and `PropagationEntry` each carry a `CustomFields` map. The per-ref views a
+bulk entry expands into share the entry's map, so a field set on a bulk entry
+is readable from every update it records. The keyed read lives on a
 `CustomFieldEntry` interface rather than on `Entry`, so adding it does not
 break existing implementations of `Entry`: they continue to satisfy `Entry`,
 and simply do not satisfy `CustomFieldEntry`. Callers holding an `Entry` reach

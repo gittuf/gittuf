@@ -41,6 +41,7 @@ var (
 	ErrNetworkRepositoryDoesNotDeclareRequiredController = errors.New("network repository does not declare required controller repository")
 	ErrNetworkRepositoryHasStaleControllerMetadata       = errors.New("network repository has not fetched latest controller metadata")
 	ErrMetadataRollbackDetected                          = errors.New("gittuf policy metadata rollback detected")
+	ErrUnexpectedEntryInVerificationSet                  = errors.New("unexpected entry type in verification set")
 )
 
 // PolicyVerifier implements various gittuf verification workflows.
@@ -99,7 +100,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gith
 		slog.Debug("Cache is enabled, checking for last verified entry...")
 		entryNumber, entryID := v.persistentCache.GetLastVerifiedEntryForRef(target)
 		if entryNumber != 0 {
-			firstEntry, err = loadRSLReferenceUpdaterEntry(v.repo, entryID)
+			firstEntry, err = loadRSLReferenceUpdaterEntry(v.repo, entryID, target)
 			if err != nil {
 				return gitinterface.ZeroHash, err
 			}
@@ -133,7 +134,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gith
 func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID githash.Hash) (githash.Hash, error) {
 	// Load starting point entry
 	slog.Debug("Identifying starting RSL entry...")
-	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
+	fromEntryT, err := rsl.GetReferenceUpdaterEntryForRef(v.repo, entryID, target)
 	if err != nil {
 		return gitinterface.ZeroHash, err
 	}
@@ -586,6 +587,9 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					return ErrPolicyNotFound
 				}
 				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
+					// The ref name matters when the entry is a view of a bulk
+					// entry, where several refs share one entry ID.
+					err = fmt.Errorf("%w: update to %s in entry %s", err, entry.GetRefName(), entry.GetID().String())
 					slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
 					slog.Debug("Checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
@@ -609,6 +613,9 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				}
 
 				continue
+
+			default:
+				return fmt.Errorf("%w: %T", ErrUnexpectedEntryInVerificationSet, entry)
 			}
 		}
 
@@ -710,6 +717,9 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				if !newEntry.SkippedBy(annotations[newEntry.ID.String()]) {
 					invalidIntermediateEntries = append(invalidIntermediateEntries, newEntry)
 				}
+
+			default:
+				return fmt.Errorf("%w: %T", ErrUnexpectedEntryInVerificationSet, newEntry)
 			}
 		}
 
@@ -1308,7 +1318,12 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				// its predecessor entry.
 				// Why? Because the rule type only accepts git:<> as patterns.
 				// If we have another object here, we've gone wrong somewhere.
-				currentEntry, err := rsl.GetEntry(policy.repository, gitID)
+				// target is a rule pattern, so it carries the git scheme
+				// prefix. The rule type only matches git patterns, so the
+				// remainder is the ref name being verified.
+				targetRef := strings.TrimPrefix(target, gitReferenceRuleScheme+":")
+
+				currentEntry, err := rsl.GetReferenceUpdaterEntryForRef(policy.repository, gitID, targetRef)
 				if err != nil {
 					slog.Debug(fmt.Sprintf("unable to load RSL entry for '%s': %v", gitID.String(), err))
 					return "", false, err

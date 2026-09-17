@@ -2294,3 +2294,419 @@ func TestRecordRSLEntryForReferenceSigningKeyBytesIgnoredWhenUnsigned(t *testing
 	err = gitobject.Verify(testCtx, publicKey, payload, signature)
 	assert.Error(t, err, "entry must not be signed when signCommit=false")
 }
+
+func TestReconcileLocalRSLWithRemoteBulkAndAnnotation(t *testing.T) {
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	tmpDir := t.TempDir()
+	remoteRepo := createTestRepositoryWithPolicy(t, tmpDir)
+	remoteR := remoteRepo.r
+
+	treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+	emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+
+	_, err = remoteR.Commit(emptyTreeHash, refName, "Test commit", false)
+	require.NoError(t, err)
+	require.NoError(t, remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()))
+
+	localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+	defer os.RemoveAll(localTmpDir) //nolint:errcheck
+	localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref, policy.PolicyRef}, true)
+	require.NoError(t, err)
+	require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+	require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+	localRepo := &Repository{r: localR}
+
+	// The entry both RSLs share, recorded before they diverge. It is not
+	// replayed, so annotations that refer to it keep its ID.
+	sharedEntry, err := rsl.GetLatestEntry(localR)
+	require.NoError(t, err)
+	sharedEntryID := sharedEntry.GetID()
+
+	_, err = remoteR.Commit(emptyTreeHash, refName, "Test commit", false)
+	require.NoError(t, err)
+	require.NoError(t, remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()))
+
+	featureID, err := localR.Commit(emptyTreeHash, "refs/heads/feature", "Test commit", false)
+	require.NoError(t, err)
+	releaseID, err := localR.Commit(emptyTreeHash, "refs/heads/release", "Test commit", false)
+	require.NoError(t, err)
+	updates := []rsl.ReferenceUpdate{
+		{RefName: "refs/heads/feature", TargetID: featureID},
+		{RefName: "refs/heads/release", TargetID: releaseID},
+	}
+	require.NoError(t, rsl.NewBulkReferenceEntry(updates).Commit(localR, false))
+	originalBulk, err := rsl.GetLatestEntry(localR)
+	require.NoError(t, err)
+	originalBulkID := originalBulk.GetID()
+
+	downstreamID, err := localR.Commit(emptyTreeHash, "refs/heads/downstream", "Test commit", false)
+	require.NoError(t, err)
+	require.NoError(t, rsl.NewPropagationEntry("refs/heads/downstream", downstreamID, "https://example.com/upstream", sharedEntryID).Commit(localR, false))
+
+	// The annotation refers to the shared entry and to the bulk entry. Only
+	// the bulk entry is replayed, so only its ID is rewritten.
+	require.NoError(t, rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{sharedEntryID, originalBulkID}, map[string][]string{originalBulkID.String(): {"refs/heads/feature"}}, true, "rewritten feature").Commit(localR, false))
+
+	require.NoError(t, localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false))
+
+	tip, err := rsl.GetLatestEntry(localR)
+	require.NoError(t, err)
+	annotation, isAnnotation := tip.(*rsl.AnnotationEntry)
+	require.True(t, isAnnotation)
+
+	replayedPropagationT, err := rsl.GetParentForEntry(localR, tip)
+	require.NoError(t, err)
+	replayedPropagation, isPropagation := replayedPropagationT.(*rsl.PropagationEntry)
+	require.True(t, isPropagation)
+	assert.Equal(t, "refs/heads/downstream", replayedPropagation.RefName)
+	assert.Equal(t, downstreamID, replayedPropagation.TargetID)
+	assert.Equal(t, "https://example.com/upstream", replayedPropagation.UpstreamRepository)
+	assert.Equal(t, sharedEntryID, replayedPropagation.UpstreamEntryID)
+
+	replayedBulkT, err := rsl.GetParentForEntry(localR, replayedPropagation)
+	require.NoError(t, err)
+	replayedBulk, isBulk := replayedBulkT.(*rsl.BulkReferenceEntry)
+	require.True(t, isBulk)
+	assert.NotEqual(t, originalBulkID, replayedBulk.ID)
+	assert.Equal(t, updates, replayedBulk.Updates)
+
+	assert.Equal(t, []githash.Hash{sharedEntryID, replayedBulk.ID}, annotation.RSLEntryIDs)
+	assert.Equal(t, map[string][]string{replayedBulk.ID.String(): {"refs/heads/feature"}}, annotation.Refs)
+	assert.True(t, annotation.Skip)
+
+	remoteTip, err := remoteR.GetReference(rsl.Ref)
+	require.NoError(t, err)
+	parentOfBulk, err := rsl.GetParentForEntry(localR, replayedBulk)
+	require.NoError(t, err)
+	assert.Equal(t, remoteTip, parentOfBulk.GetID())
+}
+
+func TestGetLatestRefTipsFromRSLEntriesWithBulk(t *testing.T) {
+	t.Parallel()
+
+	bulkID, err := gitinterface.NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	require.NoError(t, err)
+	target, err := gitinterface.NewHash("1111111111111111111111111111111111111111")
+	require.NoError(t, err)
+
+	bulk := &rsl.BulkReferenceEntry{ID: bulkID, Updates: []rsl.ReferenceUpdate{
+		{RefName: "refs/heads/main", TargetID: target},
+		{RefName: "refs/heads/feature", TargetID: target},
+	}}
+
+	t.Run("qualified skip", func(t *testing.T) {
+		t.Parallel()
+
+		annotation := rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{bulkID}, map[string][]string{bulkID.String(): {"refs/heads/feature"}}, true, "")
+
+		// entries are newest first, as getRSLEntriesUntil returns them
+		tips := getLatestRefTipsFromRSLEntries([]rsl.Entry{annotation, bulk})
+		assert.Equal(t, map[string]githash.Hash{"refs/heads/main": target}, tips)
+	})
+
+	t.Run("unqualified skip", func(t *testing.T) {
+		t.Parallel()
+
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{bulkID}, true, "")
+
+		tips := getLatestRefTipsFromRSLEntries([]rsl.Entry{annotation, bulk})
+		assert.Equal(t, map[string]githash.Hash{}, tips)
+	})
+}
+
+func TestRecordRSLEntryForReferences(t *testing.T) {
+	setup := func(t *testing.T) (*Repository, githash.Hash, githash.Hash) {
+		t.Helper()
+		tempDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		repo := &Repository{r: r}
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+		mainID, err := repo.r.Commit(emptyTreeHash, "refs/heads/main", "main\n", false)
+		require.NoError(t, err)
+		featureID, err := repo.r.Commit(emptyTreeHash, "refs/heads/feature", "feature\n", false)
+		require.NoError(t, err)
+		return repo, mainID, featureID
+	}
+
+	t.Run("more than one update produces one bulk entry", func(t *testing.T) {
+		repo, mainID, featureID := setup(t)
+
+		err := repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{
+			{RefName: "refs/heads/main"},
+			{RefName: "refs/heads/feature"},
+		}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		bulk, isBulk := latest.(*rsl.BulkReferenceEntry)
+		require.True(t, isBulk)
+		assert.Equal(t, []rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainID},
+			{RefName: "refs/heads/feature", TargetID: featureID},
+		}, bulk.Updates)
+	})
+
+	t.Run("overridden ref name is the one recorded", func(t *testing.T) {
+		repo, mainID, featureID := setup(t)
+
+		err := repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{
+			{RefName: "refs/heads/main"},
+			{RefName: "feature", RefNameOverride: "refs/heads/feature-remote"},
+		}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		bulk, isBulk := latest.(*rsl.BulkReferenceEntry)
+		require.True(t, isBulk)
+		assert.Equal(t, []rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: mainID},
+			{RefName: "refs/heads/feature-remote", TargetID: featureID},
+		}, bulk.Updates)
+	})
+
+	t.Run("single update is never bulk", func(t *testing.T) {
+		repo, mainID, _ := setup(t)
+
+		err := repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{{RefName: "refs/heads/main"}}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		entry, isRef := latest.(*rsl.ReferenceEntry)
+		require.True(t, isRef)
+		assert.Equal(t, mainID, entry.TargetID)
+		assert.False(t, entry.FromBulkEntry())
+	})
+
+	t.Run("repeated recorded ref is collapsed with the last tip", func(t *testing.T) {
+		repo, _, _ := setup(t)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+		laterMainID, err := repo.r.Commit(emptyTreeHash, "refs/heads/main", "main again\n", false)
+		require.NoError(t, err)
+		featureID, err := repo.r.GetReference("refs/heads/feature")
+		require.NoError(t, err)
+
+		err = repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{
+			{RefName: "refs/heads/main"},
+			{RefName: "refs/heads/feature"},
+			{RefName: "main", RefNameOverride: "refs/heads/main"},
+		}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		bulk, isBulk := latest.(*rsl.BulkReferenceEntry)
+		require.True(t, isBulk)
+		assert.Equal(t, []rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: laterMainID},
+			{RefName: "refs/heads/feature", TargetID: featureID},
+		}, bulk.Updates)
+	})
+
+	t.Run("filtering runs after collapsing repeated refs", func(t *testing.T) {
+		repo, mainID, featureID := setup(t)
+
+		// The RSL records main at its first tip, which is also the tip the
+		// first request for main in the batch resolves to.
+		require.NoError(t, repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly()))
+		require.NoError(t, repo.r.SetReference("refs/heads/earlier-main", mainID))
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+		laterMainID, err := repo.r.Commit(emptyTreeHash, "refs/heads/main", "main again\n", false)
+		require.NoError(t, err)
+
+		err = repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{
+			{RefName: "refs/heads/earlier-main", RefNameOverride: "refs/heads/main"},
+			{RefName: "refs/heads/feature"},
+			{RefName: "refs/heads/main"},
+		}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		bulk, isBulk := latest.(*rsl.BulkReferenceEntry)
+		require.True(t, isBulk)
+		assert.Equal(t, []rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: laterMainID},
+			{RefName: "refs/heads/feature", TargetID: featureID},
+		}, bulk.Updates)
+	})
+
+	t.Run("one remaining update after filtering is not a bulk entry", func(t *testing.T) {
+		repo, mainID, featureID := setup(t)
+
+		require.NoError(t, repo.RecordRSLEntryForReference(testCtx, "refs/heads/main", false, rslopts.WithRecordLocalOnly()))
+
+		err := repo.RecordRSLEntryForReferences(testCtx, []ReferenceUpdateRequest{
+			{RefName: "refs/heads/main"},
+			{RefName: "refs/heads/feature"},
+		}, false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latest, err := rsl.GetLatestEntry(repo.r)
+		require.NoError(t, err)
+		entry, isRef := latest.(*rsl.ReferenceEntry)
+		require.True(t, isRef)
+		assert.Equal(t, "refs/heads/feature", entry.RefName)
+		assert.Equal(t, featureID, entry.TargetID)
+		assert.False(t, entry.FromBulkEntry())
+
+		parent, err := rsl.GetParentForEntry(repo.r, latest)
+		require.NoError(t, err)
+		previous, isRef := parent.(*rsl.ReferenceEntry)
+		require.True(t, isRef)
+		assert.Equal(t, "refs/heads/main", previous.RefName)
+		assert.Equal(t, mainID, previous.TargetID)
+	})
+}
+
+func TestReconcileLocalRSLWithRemoteDivergenceDetection(t *testing.T) {
+	t.Parallel()
+
+	remoteName := "origin"
+	refName := "refs/heads/main"
+
+	setup := func(t *testing.T) (*Repository, *Repository, githash.Hash) {
+		t.Helper()
+
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+
+		_, err = remoteR.Commit(emptyTreeHash, refName, "Test commit", false)
+		require.NoError(t, err)
+		require.NoError(t, remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()))
+
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		t.Cleanup(func() {
+			os.RemoveAll(localTmpDir) //nolint:errcheck
+		})
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		require.NoError(t, err)
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+
+		// The remote records another entry for refName after the clone, so the
+		// two RSLs diverge.
+		_, err = remoteR.Commit(emptyTreeHash, refName, "Test commit", false)
+		require.NoError(t, err)
+		require.NoError(t, remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()))
+
+		return remoteRepo, &Repository{r: localR}, emptyTreeHash
+	}
+
+	t.Run("local propagation entry for the ref the remote also updated", func(t *testing.T) {
+		t.Parallel()
+
+		remoteRepo, localRepo, emptyTreeHash := setup(t)
+
+		sharedEntry, err := rsl.GetLatestEntry(localRepo.r)
+		require.NoError(t, err)
+
+		mainID, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false)
+		require.NoError(t, err)
+		require.NoError(t, rsl.NewPropagationEntry(refName, mainID, "https://example.com/upstream", sharedEntry.GetID()).Commit(localRepo.r, false))
+
+		originalLocalTip, err := localRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		originalRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.ErrorContains(t, err, "changes to the same ref")
+		assert.ErrorContains(t, err, refName)
+
+		currentLocalTip, err := localRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		currentRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		assert.Equal(t, originalLocalTip, currentLocalTip)
+		assert.Equal(t, originalRemoteTip, currentRemoteTip)
+	})
+
+	t.Run("local bulk entry whose second update is for the ref the remote also updated", func(t *testing.T) {
+		t.Parallel()
+
+		remoteRepo, localRepo, emptyTreeHash := setup(t)
+
+		featureID, err := localRepo.r.Commit(emptyTreeHash, "refs/heads/feature", "Test commit", false)
+		require.NoError(t, err)
+		mainID, err := localRepo.r.Commit(emptyTreeHash, refName, "Test commit", false)
+		require.NoError(t, err)
+		require.NoError(t, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/feature", TargetID: featureID},
+			{RefName: refName, TargetID: mainID},
+		}).Commit(localRepo.r, false))
+
+		originalLocalTip, err := localRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		originalRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.ErrorContains(t, err, "changes to the same ref")
+		assert.ErrorContains(t, err, refName)
+
+		currentLocalTip, err := localRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		currentRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		assert.Equal(t, originalLocalTip, currentLocalTip)
+		assert.Equal(t, originalRemoteTip, currentRemoteTip)
+	})
+
+	t.Run("local bulk entry for refs the remote did not update", func(t *testing.T) {
+		t.Parallel()
+
+		remoteRepo, localRepo, emptyTreeHash := setup(t)
+
+		featureID, err := localRepo.r.Commit(emptyTreeHash, "refs/heads/feature", "Test commit", false)
+		require.NoError(t, err)
+		releaseID, err := localRepo.r.Commit(emptyTreeHash, "refs/heads/release", "Test commit", false)
+		require.NoError(t, err)
+		updates := []rsl.ReferenceUpdate{
+			{RefName: "refs/heads/feature", TargetID: featureID},
+			{RefName: "refs/heads/release", TargetID: releaseID},
+		}
+		require.NoError(t, rsl.NewBulkReferenceEntry(updates).Commit(localRepo.r, false))
+
+		originalBulk, err := rsl.GetLatestEntry(localRepo.r)
+		require.NoError(t, err)
+		originalRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+
+		require.NoError(t, localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false))
+
+		tip, err := rsl.GetLatestEntry(localRepo.r)
+		require.NoError(t, err)
+		replayedBulk, isBulk := tip.(*rsl.BulkReferenceEntry)
+		require.True(t, isBulk)
+		assert.NotEqual(t, originalBulk.GetID(), replayedBulk.ID)
+		assert.Equal(t, updates, replayedBulk.Updates)
+
+		parentOfBulk, err := rsl.GetParentForEntry(localRepo.r, replayedBulk)
+		require.NoError(t, err)
+		assert.Equal(t, originalRemoteTip, parentOfBulk.GetID())
+
+		currentRemoteTip, err := remoteRepo.r.GetReference(rsl.Ref)
+		require.NoError(t, err)
+		assert.Equal(t, originalRemoteTip, currentRemoteTip)
+	})
+}

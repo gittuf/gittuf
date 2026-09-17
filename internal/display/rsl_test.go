@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRSLLog(t *testing.T) {
@@ -742,4 +743,311 @@ func TestWriteRSLPropagationEntryWithCustomFields(t *testing.T) {
 	err := writeRSLPropagationEntry(testWriter, entry, false)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedOutput, output.String())
+}
+
+func TestWriteRSLBulkReferenceEntry(t *testing.T) {
+	// Set colorer to off for tests
+	colorer = colorerOff
+
+	newEntry := func() *rsl.BulkReferenceEntry {
+		entry := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		})
+		entry.ID = gitinterface.ZeroHash
+		return entry
+	}
+
+	t.Run("no parent", func(t *testing.T) {
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, newEntry(), nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("has parent", func(t *testing.T) {
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, newEntry(), nil, true)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("with number, no parent", func(t *testing.T) {
+		entry := newEntry()
+		entry.Number = 3
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 3
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, entry, nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("unqualified skip annotation, no parent", func(t *testing.T) {
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, true, "rewritten")
+		annotation.ID = gitinterface.ZeroHash
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000 (skipped)
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+    Annotation ID: 0000000000000000000000000000000000000000
+    Skip:          yes
+    Message:
+      rewritten
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, newEntry(), []*rsl.AnnotationEntry{annotation}, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("annotation with message but no skip, no parent", func(t *testing.T) {
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{gitinterface.ZeroHash}, false, "just a note")
+		annotation.ID = gitinterface.ZeroHash
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+    Annotation ID: 0000000000000000000000000000000000000000
+    Skip:          no
+    Message:
+      just a note
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, newEntry(), []*rsl.AnnotationEntry{annotation}, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("custom fields", func(t *testing.T) {
+		entry := rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}, rsl.WithCustomFields(rsl.CustomFields{
+			"custom.gitforge.com/server-version": "v4.2.0-c0ffee",
+			"custom.gitforge.com/pusher":         "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)",
+		}))
+		entry.ID = gitinterface.ZeroHash
+		entry.Number = 2
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 2
+  Custom Fields:
+    custom.gitforge.com/pusher: jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)
+    custom.gitforge.com/server-version: v4.2.0-c0ffee
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, entry, nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("qualified skip annotation, has parent", func(t *testing.T) {
+		annotation := rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{gitinterface.ZeroHash}, map[string][]string{gitinterface.ZeroHash.String(): {"refs/heads/feature"}}, true, "rewritten")
+		annotation.ID = gitinterface.ZeroHash
+
+		expectedOutput := `bulk entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+    Annotation ID: 0000000000000000000000000000000000000000
+    Skip:          yes
+    Refs:          refs/heads/feature
+    Message:
+      rewritten
+
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLBulkReferenceEntry(testWriter, newEntry(), []*rsl.AnnotationEntry{annotation}, true)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+}
+
+func TestRSLLogBulkEntry(t *testing.T) {
+	// Set colorer to off for tests
+	colorer = colorerOff
+
+	t.Run("unqualified skip", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		require.NoError(t, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}).Commit(repo, false))
+		bulk, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		require.NoError(t, rsl.NewAnnotationEntry([]githash.Hash{bulk.GetID()}, true, "rewritten").Commit(repo, false))
+		annotation, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		expectedOutput := fmt.Sprintf(`bulk entry %s (skipped)
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 1
+
+    Annotation ID: %s
+    Skip:          yes
+    Number:        2
+    Message:
+      rewritten
+`, bulk.GetID().String(), annotation.GetID().String())
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		assert.Nil(t, RSLLog(repo, writer))
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("qualified skip", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		require.NoError(t, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}).Commit(repo, false))
+		bulk, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		require.NoError(t, rsl.NewAnnotationEntryWithQualifiers([]githash.Hash{bulk.GetID()}, map[string][]string{bulk.GetID().String(): {"refs/heads/feature"}}, true, "rewritten").Commit(repo, false))
+		annotation, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		expectedOutput := fmt.Sprintf(`bulk entry %s
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 1
+
+    Annotation ID: %s
+    Skip:          yes
+    Refs:          refs/heads/feature
+    Number:        2
+    Message:
+      rewritten
+`, bulk.GetID().String(), annotation.GetID().String())
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		assert.Nil(t, RSLLog(repo, writer))
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("with filtering refs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		require.NoError(t, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}).Commit(repo, false))
+		bulk, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		// refs/heads/other is not in the entry, refs/heads/main is, so the
+		// whole entry renders.
+		expectedOutput := fmt.Sprintf(`bulk entry %s
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/feature
+  Target: 0000000000000000000000000000000000000000
+
+  Number: 1
+`, bulk.GetID().String())
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		assert.Nil(t, RSLLog(repo, writer, WithReferences([]string{"refs/heads/main", "refs/heads/other"})))
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("with filtering refs, no update matches", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		require.NoError(t, rsl.NewBulkReferenceEntry([]rsl.ReferenceUpdate{
+			{RefName: "refs/heads/main", TargetID: gitinterface.ZeroHash},
+			{RefName: "refs/heads/feature", TargetID: gitinterface.ZeroHash},
+		}).Commit(repo, false))
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+		assert.Nil(t, RSLLog(repo, writer, WithReferences([]string{"refs/heads/other"})))
+		assert.Equal(t, "", output.String())
+	})
 }
