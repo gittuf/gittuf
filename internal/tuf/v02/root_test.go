@@ -224,6 +224,59 @@ func TestRootMetadata(t *testing.T) {
 	})
 }
 
+// TestAddControllerAndNetworkRepositoryDuplicateDetectionWithPersons is a
+// regression test for a bug where AddControllerRepository and
+// AddNetworkRepository only considered Key principals when checking for
+// duplicate repositories. Since Person principals were skipped entirely,
+// any two repositories declared using only Person principals were always
+// treated as duplicates of one another, regardless of their name, location,
+// or the actual Person principals involved (empty principal ID sets are
+// always equal).
+func TestAddControllerAndNetworkRepositoryDuplicateDetectionWithPersons(t *testing.T) {
+	alice := &Person{PersonID: "alice@example.com"}
+	bob := &Person{PersonID: "bob@example.com"}
+
+	t.Run("controller repositories identified only by different persons are not duplicates", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+
+		err := rootMetadata.AddControllerRepository("controller-one", "https://example.com/one", []tuf.Principal{alice})
+		assert.Nil(t, err)
+
+		// Different name, location, and principal: must not be rejected as a
+		// duplicate just because neither repository has a Key principal.
+		err = rootMetadata.AddControllerRepository("controller-two", "https://example.com/two", []tuf.Principal{bob})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(rootMetadata.MultiRepository.ControllerRepositories))
+
+		// A genuine duplicate (same Person, different name/location) must
+		// still be rejected.
+		err = rootMetadata.AddControllerRepository("controller-three", "https://example.com/three", []tuf.Principal{alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+		assert.Equal(t, 2, len(rootMetadata.MultiRepository.ControllerRepositories))
+	})
+
+	t.Run("network repositories identified only by different persons are not duplicates", func(t *testing.T) {
+		rootMetadata := NewRootMetadata()
+		err := rootMetadata.EnableController()
+		assert.Nil(t, err)
+
+		err = rootMetadata.AddNetworkRepository("network-one", "https://example.com/one", []tuf.Principal{alice})
+		assert.Nil(t, err)
+
+		// Different name, location, and principal: must not be rejected as a
+		// duplicate just because neither repository has a Key principal.
+		err = rootMetadata.AddNetworkRepository("network-two", "https://example.com/two", []tuf.Principal{bob})
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(rootMetadata.MultiRepository.NetworkRepositories))
+
+		// A genuine duplicate (same Person, different name/location) must
+		// still be rejected.
+		err = rootMetadata.AddNetworkRepository("network-three", "https://example.com/three", []tuf.Principal{alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+		assert.Equal(t, 2, len(rootMetadata.MultiRepository.NetworkRepositories))
+	})
+}
+
 func TestRootMetadataUnmarshalling(t *testing.T) {
 	// Setup test key pair
 	keys := []struct {

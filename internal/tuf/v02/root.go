@@ -671,34 +671,23 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		}
 	}
 
-	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	newPrincipalIDs := set.NewSet[string]()
 	for _, principal := range initialRootPrincipals {
-		switch p := principal.(type) {
-		case *Key:
-			newKeyIDs = append(newKeyIDs, p)
-		case *Person:
-			// don't need to be checked for duplicates skip
+		switch principal.(type) {
+		case *Key, *Person:
+			newPrincipalIDs.Add(principal.ID())
 		default:
 			return tuf.ErrInvalidPrincipalType
 		}
 	}
 
 	for _, repo := range r.MultiRepository.ControllerRepositories {
-		existingKeyIDSet := set.NewSet[string]()
+		existingPrincipalIDs := set.NewSet[string]()
 		for _, existingPrincipal := range repo.InitialRootPrincipals {
-			if key, isKey := existingPrincipal.(*Key); isKey {
-				existingKeyIDSet.Add(key.KeyID)
-			}
+			existingPrincipalIDs.Add(existingPrincipal.ID())
 		}
 
-		newKeyIDSet := set.NewSet[string]()
-		for _, principal := range newKeyIDs {
-			if key, isKey := principal.(*Key); isKey {
-				newKeyIDSet.Add(key.KeyID)
-			}
-		}
-
-		if newKeyIDSet.Equal(existingKeyIDSet) {
+		if newPrincipalIDs.Equal(existingPrincipalIDs) {
 			return tuf.ErrDuplicateControllerRepository
 		}
 	}
@@ -744,34 +733,23 @@ func (r *RootMetadata) AddNetworkRepository(name, location string, initialRootPr
 		}
 	}
 
-	newKeyIDs := make([]tuf.Principal, 0, len(initialRootPrincipals))
+	newPrincipalIDs := set.NewSet[string]()
 	for _, principal := range initialRootPrincipals {
-		switch p := principal.(type) {
-		case *Key:
-			newKeyIDs = append(newKeyIDs, p)
-		case *Person:
-			// don't need to be checked for duplicates skip
+		switch principal.(type) {
+		case *Key, *Person:
+			newPrincipalIDs.Add(principal.ID())
 		default:
 			return tuf.ErrInvalidPrincipalType
 		}
 	}
 
 	for _, repo := range r.MultiRepository.NetworkRepositories {
-		existingKeyIDSet := set.NewSet[string]()
+		existingPrincipalIDs := set.NewSet[string]()
 		for _, existingPrincipal := range repo.InitialRootPrincipals {
-			if key, isKey := existingPrincipal.(*Key); isKey {
-				existingKeyIDSet.Add(key.KeyID)
-			}
+			existingPrincipalIDs.Add(existingPrincipal.ID())
 		}
 
-		newKeyIDSet := set.NewSet[string]()
-		for _, principal := range newKeyIDs {
-			if key, isKey := principal.(*Key); isKey {
-				newKeyIDSet.Add(key.KeyID)
-			}
-		}
-
-		if newKeyIDSet.Equal(existingKeyIDSet) {
+		if newPrincipalIDs.Equal(existingPrincipalIDs) {
 			return tuf.ErrDuplicateNetworkRepository
 		}
 	}
