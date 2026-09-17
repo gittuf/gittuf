@@ -227,6 +227,7 @@ func (s *policyPrincipalsScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea
 			} else {
 				m.footer = "Principal removed successfully!"
 				s.refreshPrincipals(m.ctx, m.options)
+				m.invalidateDiffCache()
 			}
 		}
 		s.confirmDelete = false
@@ -276,15 +277,17 @@ func (s *policyPrincipalsScreen) renderChoiceMenu(m *model) string {
 }
 
 func (s *policyPrincipalsScreen) View(m *model) string {
-	overlay := ""
+	var overlays string
 	if s.confirmDelete {
-		overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-	}
-	hint := ""
-	if !m.readOnly {
-		hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-			"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-		)
+		overlays = renderDeleteOverlay("principal", s.deleteTarget)
+	} else if !s.addChoice {
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
+			)
+		}
+		overlays = renderActionHints(m.readOnly) + hint
 	}
 
 	var listView string
@@ -292,11 +295,6 @@ func (s *policyPrincipalsScreen) View(m *model) string {
 		listView = s.renderChoiceMenu(m)
 	} else {
 		listView = m.renderListOrEmpty(s.list, len(s.principals), "No principals configured")
-	}
-
-	overlays := overlay
-	if !s.addChoice {
-		overlays += renderActionHints(m.readOnly) + hint
 	}
 
 	return m.renderScreen("Home › Policy › Principals", listView, overlays)
@@ -422,6 +420,7 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 	} else {
 		m.footer = "Principal updated successfully!"
 	}
+	m.invalidateDiffCache()
 	m.screen = screenPolicyPrincipals
 	return *m, nil
 }

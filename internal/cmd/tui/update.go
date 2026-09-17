@@ -52,6 +52,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Resize all lists now that readOnly/signerError are known — the earlier
 		// WindowSizeMsg fired before these flags were set, so sizes must be corrected.
 		m.resizeLists()
+		m.invalidateDiffCache()
 		m.screen = screenChoice
 		return m, nil
 
@@ -61,6 +62,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.closeErrorDialog()
 			m.footer = msg.msg
+			m.invalidateDiffCache()
 		}
 		return m, nil
 
@@ -83,6 +85,27 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logViewport.Height = msg.Height - 6
 		} else {
 			m.logViewport.Height = msg.Height
+		}
+		if m.showDiffOverlay {
+			w := m.width - 6
+			h := m.height - 3
+			if w < 28 {
+				w = 28
+			}
+			if h < 6 {
+				h = 6
+			}
+			vpHeight := h - 8
+			if vpHeight < 2 {
+				vpHeight = 2
+			}
+			vpWidth := w - 4
+			if vpWidth < 20 {
+				vpWidth = 20
+			}
+			m.diffViewport.Width = vpWidth
+			m.diffViewport.Height = vpHeight
+			m.diffViewport.SetContent(m.generateStagedDiff(vpWidth))
 		}
 		return m, nil
 
