@@ -57,6 +57,9 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		err := delegations.addKey(key)
 		assert.Nil(t, err)
 		assert.Equal(t, key, delegations.Keys[key.KeyID])
+
+		err = delegations.addKey(nil)
+		assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
 	})
 
 	t.Run("test removeKey", func(t *testing.T) {
@@ -270,6 +273,29 @@ func TestAddRuleAndGetRules(t *testing.T) {
 	rules := targetsMetadata.GetRules()
 	assert.Equal(t, 2, len(rules))
 	assert.Equal(t, []tuf.Rule{rule, AllowRule()}, rules)
+
+	t.Run("error cases", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		err := targetsMetadata.AddRule(tuf.AllowRuleName, nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		err = targetsMetadata.AddRule("test-rule", []string{"missing-principal"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.AddRule("test-rule", []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
+
+	t.Run("nil delegations", func(t *testing.T) {
+		targetsMetadata := &TargetsMetadata{}
+
+		assert.Nil(t, targetsMetadata.GetRules())
+	})
 }
 
 func TestUpdateDelegation(t *testing.T) {
@@ -314,6 +340,44 @@ func TestUpdateDelegation(t *testing.T) {
 		Terminating: false,
 		Role:        Role{KeyIDs: set.NewSetFromItems(key1.KeyID, key2.KeyID), Threshold: 1},
 	}, targetsMetadata.Delegations.Roles[0])
+
+	t.Run("error cases", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+
+		err := targetsMetadata.UpdateRule(tuf.AllowRuleName, nil, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+		err = targetsMetadata.UpdateRule("test-rule", []string{"missing-principal"}, nil, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+
+		err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
+
+	t.Run("preserves rules before updated rule", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+		if err := targetsMetadata.AddRule("first-rule", []string{key1.KeyID}, []string{"first/"}, 1); err != nil {
+			t.Fatal(err)
+		}
+		if err := targetsMetadata.AddRule("second-rule", []string{key1.KeyID}, []string{"second/"}, 1); err != nil {
+			t.Fatal(err)
+		}
+
+		err := targetsMetadata.UpdateRule("second-rule", []string{key1.KeyID}, []string{"updated/"}, 1)
+		assert.Nil(t, err)
+
+		rules := targetsMetadata.GetRules()
+		assert.Equal(t, "first-rule", rules[0].ID())
+		assert.Equal(t, "second-rule", rules[1].ID())
+		assert.Equal(t, []string{"updated/"}, rules[1].GetProtectedNamespaces())
+	})
 }
 
 func TestReorderRules(t *testing.T) {
@@ -413,6 +477,9 @@ func TestRemoveRule(t *testing.T) {
 	assert.Equal(t, 1, len(targetsMetadata.Delegations.Roles))
 	assert.Contains(t, targetsMetadata.Delegations.Roles, AllowRule())
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+
+	err = targetsMetadata.RemoveRule(tuf.AllowRuleName)
+	assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
 }
 
 func TestRemovePrincipal(t *testing.T) {
