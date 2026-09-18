@@ -5,11 +5,14 @@ package tui
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/stretchr/testify/require"
 )
 
 func TestViewHelperFunctions(t *testing.T) {
@@ -47,9 +50,21 @@ func TestViewHelperFunctions(t *testing.T) {
 	}
 
 	// Test renderDeleteOverlay
-	delOverlay := renderDeleteOverlay("test-target")
-	if !strings.Contains(delOverlay, "Delete rule \"test-target\"?") {
-		t.Errorf("expected delete overlay string, got %q", delOverlay)
+	delRuleOverlay := renderDeleteOverlay("rule", "test-target")
+	if !strings.Contains(delRuleOverlay, "Delete rule \"test-target\"? [y/n]") {
+		t.Errorf("expected delete rule overlay string, got %q", delRuleOverlay)
+	}
+	delPrincipalOverlay := renderDeleteOverlay("principal", "test-principal")
+	if !strings.Contains(delPrincipalOverlay, "Delete principal \"test-principal\"? [y/n]") {
+		t.Errorf("expected delete principal overlay string, got %q", delPrincipalOverlay)
+	}
+	delGlobalOverlay := renderDeleteOverlay("global rule", "test-gr")
+	if !strings.Contains(delGlobalOverlay, "Delete global rule \"test-gr\"? [y/n]") {
+		t.Errorf("expected delete global rule overlay string, got %q", delGlobalOverlay)
+	}
+	delDefaultOverlay := renderDeleteOverlay("", "test-default")
+	if !strings.Contains(delDefaultOverlay, "Delete rule \"test-default\"? [y/n]") {
+		t.Errorf("expected default to 'rule', got %q", delDefaultOverlay)
 	}
 
 	// Test renderActionHints for readOnly vs edit mode
@@ -65,6 +80,13 @@ func TestViewHelperFunctions(t *testing.T) {
 }
 
 func TestDiffOverlayRendering(t *testing.T) {
+	tmpDir := t.TempDir()
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(currentDir) //nolint:errcheck
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
 	o := &options{
 		readOnly:  true,
 		targetRef: "policy",
@@ -92,6 +114,13 @@ func TestDiffOverlayRendering(t *testing.T) {
 }
 
 func TestGenerateStagedDiffEqualTips(t *testing.T) {
+	tmpDir := t.TempDir()
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(currentDir) //nolint:errcheck
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
 	o := &options{
 		readOnly:  true,
 		targetRef: "policy",
@@ -253,5 +282,94 @@ func TestModelViewScreenStates(t *testing.T) {
 	viewStr = m.View()
 	if !strings.Contains(viewStr, "Unknown screen") {
 		t.Errorf("expected 'Unknown screen' for unknown screen enum, got %q", viewStr)
+	}
+}
+
+func TestWrapDiffLine(t *testing.T) {
+	// Short line should not be wrapped
+	short := "  - short line"
+	if wrapped := wrapDiffLine(short, 50, "    "); wrapped != short {
+		t.Errorf("expected %q, got %q", short, wrapped)
+	}
+
+	// Long line with spaces should be wrapped with hanging indent
+	long := "  - Authorized Principals: key1, key2, key3, key4, key5"
+	wrapped := wrapDiffLine(long, 30, "      ")
+	lines := strings.Split(wrapped, "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected line to wrap into multiple lines, got %d lines", len(lines))
+	}
+	for i, l := range lines {
+		if len(l) > 30 {
+			t.Errorf("line %d exceeds maxWidth 30: %q (len %d)", i, l, len(l))
+		}
+		if i > 0 && !strings.HasPrefix(l, "      ") {
+			t.Errorf("expected continuation line %d to have hanging indent, got %q", i, l)
+		}
+	}
+
+	// Very long single word should be hard broken without exceeding maxWidth
+	longWord := "ssh-ed25519-AAAAC3NzaC1lZDI1NTE5AAAAIExampleVeryLongSingleWordKeyStringThatDoesNotHaveAnySpacesInIt"
+	wrappedWord := wrapDiffLine(longWord, 25, "  ")
+	for i, l := range strings.Split(wrappedWord, "\n") {
+		if len(l) > 25 {
+			t.Errorf("line %d exceeds maxWidth 25: %q", i, l)
+		}
+	}
+}
+
+func TestDiffCacheInvalidation(t *testing.T) {
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	m.stagedDiffCache = "cached diff output"
+	m.stagedDiffDirty = false
+	m.cachedDiffWidth = 60
+
+	// Invalidate cache
+	m.invalidateDiffCache()
+	if m.stagedDiffCache != "" {
+		t.Error("expected stagedDiffCache to be cleared")
+	}
+	if !m.stagedDiffDirty {
+		t.Error("expected stagedDiffDirty to be true")
+	}
+}
+
+func TestDiffCacheHit(t *testing.T) {
+	tmpDir := t.TempDir()
+	currentDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(currentDir) //nolint:errcheck
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	}
+
+	m := initialModel(context.Background(), o)
+	m.stagedDiffCache = "my-cached-diff"
+	m.stagedDiffDirty = false
+	m.cachedPolicyTip = ""
+	m.cachedStagingTip = ""
+	m.cachedDiffWidth = 80
+
+	// Calling generateStagedDiff with matching cached width and no repo changes should return cache directly
+	diff := m.generateStagedDiff(80)
+	if diff != "my-cached-diff" {
+		t.Errorf("expected cached diff 'my-cached-diff', got %q", diff)
+	}
+
+	// Width mismatch should bypass cache
+	diffResized := m.generateStagedDiff(40)
+	if diffResized == "my-cached-diff" {
+		t.Error("expected cache bypass on width change")
 	}
 }
