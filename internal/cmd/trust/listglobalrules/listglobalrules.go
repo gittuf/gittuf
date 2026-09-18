@@ -36,7 +36,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	stdOut := cmd.OutOrStdout()
 
-	rulesByRepository, err := repo.ListGlobalRulesByRepository(cmd.Context(), o.targetRef)
+	rulesByRepository, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
 	if err != nil {
 		return err
 	}
@@ -50,36 +50,32 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			fmt.Fprintf(stdOut, "Controller repository: %s\n", repository.RepositoryName)
 			fmt.Fprintf(stdOut, indentString+"Location: %s\n", repository.RepositoryLocation)
 		}
-		printGlobalRules(stdOut, repository.Rules)
-	}
+		thresholdRules := []tuf.GlobalRuleThreshold{}
+		blockForcePushesRules := []tuf.GlobalRuleBlockForcePushes{}
+		for _, curRule := range repository.Rules {
+			switch globalRule := curRule.(type) {
+			case tuf.GlobalRuleThreshold:
+				thresholdRules = append(thresholdRules, globalRule)
+			case tuf.GlobalRuleBlockForcePushes:
+				blockForcePushesRules = append(blockForcePushesRules, globalRule)
+			}
+		}
 
-	return nil
-}
+		for _, curRule := range thresholdRules {
+			fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+			fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
+			printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+			fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
+		}
 
-func printGlobalRules(stdOut io.Writer, rules []tuf.GlobalRule) {
-	thresholdRules := []tuf.GlobalRuleThreshold{}
-	blockForcePushesRules := []tuf.GlobalRuleBlockForcePushes{}
-	for _, curRule := range rules {
-		switch globalRule := curRule.(type) {
-		case tuf.GlobalRuleThreshold:
-			thresholdRules = append(thresholdRules, globalRule)
-		case tuf.GlobalRuleBlockForcePushes:
-			blockForcePushesRules = append(blockForcePushesRules, globalRule)
+		for _, curRule := range blockForcePushesRules {
+			fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+			fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
+			printNamespaces(stdOut, curRule.GetProtectedNamespaces())
 		}
 	}
 
-	for _, curRule := range thresholdRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
-		fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
-	}
-
-	for _, curRule := range blockForcePushesRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
-	}
+	return nil
 }
 
 func New() *cobra.Command {

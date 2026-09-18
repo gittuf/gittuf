@@ -199,36 +199,17 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
-// ListGlobalRules returns the current repository's global rules.
-func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
-	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
-		targetRef = "refs/gittuf/" + targetRef
-	}
-
-	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
-	if err != nil {
-		return nil, err
-	}
-
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, err
-	}
-
-	return rootMetadata.GetGlobalRules(), nil
-}
-
 // GlobalRulesForRepository groups global rules by repository.
+// RepositoryName and RepositoryLocation are empty for local rules.
 type GlobalRulesForRepository struct {
 	RepositoryName     string
 	RepositoryLocation string
 	Rules              []tuf.GlobalRule
 }
 
-// ListGlobalRulesByRepository returns global rules grouped by repository,
-// starting with local rules.
-func (r *Repository) ListGlobalRulesByRepository(ctx context.Context, targetRef string) ([]GlobalRulesForRepository, error) {
+// ListGlobalRules returns global rules grouped by repository, starting with local
+// rules, followed by controller rules sorted by repository name and location.
+func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]GlobalRulesForRepository, error) {
 	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
 		targetRef = "refs/gittuf/" + targetRef
 	}

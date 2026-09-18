@@ -5,6 +5,7 @@ package gittuf
 
 import (
 	"encoding/base64"
+	"errors"
 	"testing"
 
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
@@ -1788,112 +1789,152 @@ func TestUpdateGlobalRule(t *testing.T) {
 }
 
 func TestListGlobalRules(t *testing.T) {
-	t.Run("list global rules after add and remove", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
+	t.Run("local rules", func(t *testing.T) {
+		rule := tufv01.NewGlobalRuleThreshold("require-approval-for-main", []string{"git:refs/heads/main"}, 1)
+		localRules := []GlobalRulesForRepository{
+			{
+				Rules: []tuf.GlobalRule{rule},
+			},
+		}
+		tests := map[string]struct {
+			targetRef  string
+			removeRule bool
+			expected   []GlobalRulesForRepository
+		}{
+			"full ref": {
+				targetRef: policy.PolicyStagingRef,
+				expected:  localRules,
+			},
+			"short ref": {
+				targetRef: "policy-staging",
+				expected:  localRules,
+			},
+			"removed rule": {
+				targetRef:  policy.PolicyStagingRef,
+				removeRule: true,
+				expected:   nil,
+			},
+		}
+		for name, test := range tests {
+			t.Run(name, func(t *testing.T) {
+				r := createTestRepositoryWithRoot(t, "")
+				rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+				require.NoError(t, r.AddGlobalRuleThreshold(testCtx, rootSigner, rule.GetName(), rule.GetProtectedNamespaces(), rule.GetThreshold(), false, trustpolicyopts.WithRSLEntry()))
+				if test.removeRule {
+					require.NoError(t, r.RemoveGlobalRule(testCtx, rootSigner, rule.GetName(), false, trustpolicyopts.WithRSLEntry()))
+				}
 
-		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false, trustpolicyopts.WithRSLEntry())
-		assert.Nil(t, err)
-
-		globalRules, err := r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
-		assert.Nil(t, err)
-		assert.Len(t, globalRules, 1)
-
-		groupedRules, err := r.ListGlobalRulesByRepository(testCtx, "policy-staging")
-		require.NoError(t, err)
-		assert.Equal(t, []GlobalRulesForRepository{{Rules: globalRules}}, groupedRules)
-
-		err = r.RemoveGlobalRule(testCtx, rootSigner, "require-approval-for-main", false, trustpolicyopts.WithRSLEntry())
-		assert.Nil(t, err)
-
-		globalRules, err = r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
-		assert.Nil(t, err)
-		assert.Empty(t, globalRules)
-
-		groupedRules, err = r.ListGlobalRulesByRepository(testCtx, policy.PolicyStagingRef)
-		require.NoError(t, err)
-		assert.Empty(t, groupedRules)
-	})
-}
-
-func TestListGlobalRulesByRepositoryControllerIdentities(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-	r := createTestRepositoryWithRoot(t, "")
-	signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
-
-	const name = "release-team"
-	const directLocation = "https://example.com/b"
-	const transitiveLocation = "https://example.com/a"
-	require.NoError(t, r.AddControllerRepository(testCtx, signer, name, directLocation, nil, false, trustpolicyopts.WithRSLEntry()))
-
-	directRoot := tufv01.NewRootMetadata()
-	require.NoError(t, directRoot.AddControllerRepository(name, transitiveLocation, nil))
-	directRule := tufv01.NewGlobalRuleThreshold("require-approval", []string{"git:refs/heads/main"}, 2)
-	require.NoError(t, directRoot.AddGlobalRule(directRule))
-	directEnvelope, err := dsse.CreateEnvelope(directRoot)
-	require.NoError(t, err)
-
-	transitiveRoot := tufv01.NewRootMetadata()
-	transitiveRule := tufv01.NewGlobalRuleThreshold("require-approval", []string{"git:refs/heads/main"}, 3)
-	require.NoError(t, transitiveRoot.AddGlobalRule(transitiveRule))
-	transitiveEnvelope, err := dsse.CreateEnvelope(transitiveRoot)
-	require.NoError(t, err)
-
-	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-	require.NoError(t, err)
-	state.ControllerMetadata = map[string]*policy.StateMetadata{
-		name + "-" + base64.URLEncoding.EncodeToString([]byte(directLocation)):     {RootEnvelope: directEnvelope},
-		name + "-" + base64.URLEncoding.EncodeToString([]byte(transitiveLocation)): {RootEnvelope: transitiveEnvelope},
-	}
-	require.NoError(t, state.Commit(r.r, "Add propagated controller metadata", true, false))
-
-	rules, err := r.ListGlobalRulesByRepository(testCtx, policy.PolicyStagingRef)
-	require.NoError(t, err)
-	assert.Equal(t, []GlobalRulesForRepository{
-		{RepositoryName: name, RepositoryLocation: transitiveLocation, Rules: []tuf.GlobalRule{transitiveRule}},
-		{RepositoryName: name, RepositoryLocation: directLocation, Rules: []tuf.GlobalRule{directRule}},
-	}, rules)
-}
-
-func TestListGlobalRulesByRepositoryErrors(t *testing.T) {
-	t.Run("unknown ref", func(t *testing.T) {
-		r := createTestRepositoryWithRoot(t, "")
-		rules, err := r.ListGlobalRulesByRepository(testCtx, "does-not-exist")
-		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
-		assert.Nil(t, rules)
+				rules, err := r.ListGlobalRules(testCtx, test.targetRef)
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, rules)
+			})
+		}
 	})
 
-	for _, test := range []struct {
-		name         string
-		payload      string
-		err          error
-		errorMessage string
-	}{
-		{name: "invalid base64", payload: "!", errorMessage: "unable to base64 decode payload"},
-		{name: "invalid root JSON", payload: base64.StdEncoding.EncodeToString([]byte("{")), errorMessage: "unable to unmarshal root metadata"},
-		{name: "unknown root version", payload: base64.StdEncoding.EncodeToString([]byte(`{"schemaVersion":"unknown"}`)), err: tuf.ErrUnknownRootMetadataVersion},
-		{name: "unknown global rule type", payload: base64.StdEncoding.EncodeToString([]byte(`{"globalRules":[{"name":"unknown","type":"unknown"}]}`)), err: tuf.ErrUnknownGlobalRuleType},
-		{name: "missing controller declaration", payload: base64.StdEncoding.EncodeToString([]byte(`{"globalRules":[{"name":"approval","type":"threshold","threshold":1}]}`)), errorMessage: "unable to identify controller repository"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+	t.Run("controller identities", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "1")
+		r := createTestRepositoryWithRoot(t, "")
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		name := "release-team"
+		directLocation := "https://example.com/b"
+		transitiveLocation := "https://example.com/a"
+		require.NoError(t, r.AddControllerRepository(testCtx, signer, name, directLocation, nil, false, trustpolicyopts.WithRSLEntry()))
+
+		directRoot := tufv01.NewRootMetadata()
+		require.NoError(t, directRoot.AddControllerRepository(name, transitiveLocation, nil))
+		directRule := tufv01.NewGlobalRuleThreshold("require-approval", []string{"git:refs/heads/main"}, 2)
+		require.NoError(t, directRoot.AddGlobalRule(directRule))
+		directEnvelope, err := dsse.CreateEnvelope(directRoot)
+		require.NoError(t, err)
+
+		transitiveRoot := tufv01.NewRootMetadata()
+		transitiveRule := tufv01.NewGlobalRuleThreshold("require-approval", []string{"git:refs/heads/main"}, 3)
+		require.NoError(t, transitiveRoot.AddGlobalRule(transitiveRule))
+		transitiveEnvelope, err := dsse.CreateEnvelope(transitiveRoot)
+		require.NoError(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		require.NoError(t, err)
+		state.ControllerMetadata = map[string]*policy.StateMetadata{
+			name + "-" + base64.URLEncoding.EncodeToString([]byte(directLocation)):     {RootEnvelope: directEnvelope},
+			name + "-" + base64.URLEncoding.EncodeToString([]byte(transitiveLocation)): {RootEnvelope: transitiveEnvelope},
+		}
+		require.NoError(t, state.Commit(r.r, "Add propagated controller metadata", true, false))
+
+		expected := []GlobalRulesForRepository{
+			{
+				RepositoryName:     name,
+				RepositoryLocation: transitiveLocation,
+				Rules:              []tuf.GlobalRule{transitiveRule},
+			},
+			{
+				RepositoryName:     name,
+				RepositoryLocation: directLocation,
+				Rules:              []tuf.GlobalRule{directRule},
+			},
+		}
+		rules, err := r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
+		require.NoError(t, err)
+		assert.Equal(t, expected, rules)
+	})
+
+	t.Run("error checking", func(t *testing.T) {
+		t.Run("unknown ref", func(t *testing.T) {
 			r := createTestRepositoryWithRoot(t, "")
-			state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
-			require.NoError(t, err)
-			state.ControllerMetadata = map[string]*policy.StateMetadata{
-				"controller": {RootEnvelope: &sslibdsse.Envelope{Payload: test.payload}},
-			}
-			require.NoError(t, state.Commit(r.r, "Add malformed controller metadata", true, false))
-
-			rules, err := r.ListGlobalRulesByRepository(testCtx, policy.PolicyStagingRef)
-			if test.err != nil {
-				assert.ErrorIs(t, err, test.err)
-			} else {
-				assert.ErrorContains(t, err, test.errorMessage)
-			}
+			rules, err := r.ListGlobalRules(testCtx, "does-not-exist")
+			assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 			assert.Nil(t, rules)
 		})
-	}
+
+		tests := map[string]struct {
+			payload       string
+			expectedError error
+			matchError    bool
+		}{
+			"invalid base64": {
+				payload:       "!",
+				expectedError: errors.New("unable to base64 decode payload"),
+			},
+			"invalid root JSON": {
+				payload:       base64.StdEncoding.EncodeToString([]byte("{")),
+				expectedError: errors.New("unable to unmarshal root metadata"),
+			},
+			"unknown root version": {
+				payload:       base64.StdEncoding.EncodeToString([]byte(`{"schemaVersion":"unknown"}`)),
+				expectedError: tuf.ErrUnknownRootMetadataVersion,
+				matchError:    true,
+			},
+			"unknown global rule type": {
+				payload:       base64.StdEncoding.EncodeToString([]byte(`{"globalRules":[{"name":"unknown","type":"unknown"}]}`)),
+				expectedError: tuf.ErrUnknownGlobalRuleType,
+				matchError:    true,
+			},
+			"missing controller declaration": {
+				payload:       base64.StdEncoding.EncodeToString([]byte(`{"globalRules":[{"name":"approval","type":"threshold","threshold":1}]}`)),
+				expectedError: errors.New("unable to identify controller repository"),
+			},
+		}
+		for name, test := range tests {
+			t.Run(name, func(t *testing.T) {
+				r := createTestRepositoryWithRoot(t, "")
+				state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+				require.NoError(t, err)
+				state.ControllerMetadata = map[string]*policy.StateMetadata{
+					"controller": {RootEnvelope: &sslibdsse.Envelope{Payload: test.payload}},
+				}
+				require.NoError(t, state.Commit(r.r, "Add malformed controller metadata", true, false))
+
+				rules, err := r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
+				if test.matchError {
+					assert.ErrorIs(t, err, test.expectedError)
+				} else {
+					assert.ErrorContains(t, err, test.expectedError.Error())
+				}
+				assert.Nil(t, rules)
+			})
+		}
+	})
 }
 
 func TestAddPropagationDirective(t *testing.T) {
