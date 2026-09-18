@@ -1107,7 +1107,7 @@ func (s *State) GetRootMetadata(migrate bool) (tuf.RootMetadata, error) {
 
 func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetadata, error) {
 	metadata, has := s.ControllerMetadata[controllerName]
-	if !has {
+	if !has || metadata == nil || metadata.RootEnvelope == nil {
 		return nil, fmt.Errorf("%w: '%s'", ErrControllerMetadataNotFound, controllerName)
 	}
 

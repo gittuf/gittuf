@@ -39,15 +39,24 @@ func getGlobalRules(ctx context.Context, o *options) []globalRule {
 	return getGlobalRulesForRef(ctx, repo, o.targetRef)
 }
 
-// getGlobalRulesForRef returns global rules for a given target ref
+// getGlobalRulesForRef returns local global rules for a given target ref.
 func getGlobalRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []globalRule {
 	if repo == nil {
 		return nil
 	}
 
-	rules, err := repo.ListGlobalRules(ctx, targetRef)
+	rulesByRepository, err := repo.ListGlobalRules(ctx, targetRef)
 	if err != nil {
 		return nil
+	}
+
+	// Controller rules cannot be edited through the local trust screen.
+	var rules []tuf.GlobalRule
+	for _, repository := range rulesByRepository {
+		if repository.RepositoryLocation == "" {
+			rules = repository.Rules
+			break
+		}
 	}
 
 	var currRules = make([]globalRule, len(rules))
