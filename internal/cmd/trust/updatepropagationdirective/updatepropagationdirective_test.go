@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/internal/dev"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -151,6 +152,9 @@ func TestUpdatePropagationDirective(t *testing.T) {
 
 		require.NoError(t, repo.AddPropagationDirective(t.Context(), signer, "test-directive", "origin", "refs/heads/main", "foo", "refs/heads/main", "bar", false, trustpolicyopts.WithRSLEntry()))
 
+		entryBeforeUpdate, err := rsl.GetLatestEntry(repo.GetGitRepository())
+		require.NoError(t, err)
+
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,
 			WithRSLEntry: true,
@@ -165,5 +169,9 @@ func TestUpdatePropagationDirective(t *testing.T) {
 			"--into-path", "new-bar",
 		)
 		assert.NoError(t, err)
+
+		entryAfterUpdate, err := rsl.GetLatestEntry(repo.GetGitRepository())
+		require.NoError(t, err)
+		assert.NotEqual(t, entryBeforeUpdate.GetID().String(), entryAfterUpdate.GetID().String(), "expected a new RSL entry to be created for the update-propagation-directive command")
 	})
 }
