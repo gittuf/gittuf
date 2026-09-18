@@ -372,7 +372,7 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 		if cRaw == "" {
 			continue
 		}
-		split := strings.Split(cRaw, "=")
+		split := strings.SplitN(cRaw, "=", 2)
 		if len(split) != 2 {
 			m.errorMsg = fmt.Sprintf("Error: invalid format for custom metadata '%s'", cRaw)
 			return *m, nil
