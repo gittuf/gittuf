@@ -36,6 +36,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	stdOut := cmd.OutOrStdout()
 
+	if len(directives) == 0 {
+		fmt.Fprintln(stdOut, "No propagation directives are currently defined.")
+		return nil
+	}
+
 	// TODO: switch to the display package
 	fmt.Fprintln(stdOut, "Propagation Directives in the gittuf root of trust:")
 	for _, pd := range directives {
