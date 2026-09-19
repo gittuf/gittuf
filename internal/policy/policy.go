@@ -5,6 +5,7 @@ package policy
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,14 +66,15 @@ type State struct {
 
 	GitHubApps map[string]tuf.GitHubApp
 
-	repository          gitstore.Storer
-	loadedEntry         rsl.ReferenceUpdaterEntry
-	verifiersCache      map[string][]*SignatureVerifier
-	globalRulesVerifier *SignatureVerifier
-	ruleNames           *set.Set[string]
-	allPrincipals       map[string]tuf.Principal
-	hasFileRule         bool
-	globalRules         map[string][]tuf.GlobalRule
+	repository           gitstore.Storer
+	loadedEntry          rsl.ReferenceUpdaterEntry
+	verifiersCache       map[string][]*SignatureVerifier
+	globalRulesVerifiers map[string]*SignatureVerifier
+	ruleNames            *set.Set[string]
+	allPrincipals        map[string]tuf.Principal
+	controllerPrincipals map[string]map[string]tuf.Principal
+	hasFileRule          bool
+	globalRules          map[string][]tuf.GlobalRule
 }
 
 type StateMetadata struct {
@@ -436,29 +438,50 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 }
 
 // getVerifierForGlobalRules returns a verifier that trusts every principal
-// declared in the policy. Global rules are not delegations of trust: they
-// constrain a namespace irrespective of who is trusted for it, so they are
-// evaluated against every principal that signed rather than only the principals
-// trusted by the rules protecting the namespace. Accordingly, the returned
-// verifier MUST NOT be used to decide whether the rules protecting a namespace
-// are met, as it accepts principals who are not trusted for that namespace. It
-// is only used to enumerate the principals the global rules are evaluated
-// against.
+// declared by the source identified by controllerName ("" for the current
+// repository's own root/targets/delegated metadata, or the name of a
+// controller repository for the principals it declares). Global rules are
+// not delegations of trust: they constrain a namespace irrespective of who
+// is trusted for it, so they are evaluated against every principal declared
+// by their source that signed, rather than only the principals trusted by
+// the rules protecting the namespace. Accordingly, the returned verifier
+// MUST NOT be used to decide whether the rules protecting a namespace are
+// met, as it accepts principals who are not trusted for that namespace. It
+// is only used to enumerate the principals the global rules from that source
+// are evaluated against.
 //
-// nil is returned when the policy declares no global rules.
-func (s *State) getVerifierForGlobalRules() *SignatureVerifier {
-	if len(s.globalRules) == 0 {
+// A controller's global rules must only be checked against principals that
+// controller itself declares: the current repository's own principals (or
+// another controller's) are not automatically trusted for it, since that is
+// a distinct trust decision from declaring the rule.
+//
+// nil is returned when the identified source declares no principals.
+func (s *State) getVerifierForGlobalRules(controllerName string) *SignatureVerifier {
+	if s.globalRulesVerifiers == nil {
+		s.globalRulesVerifiers = map[string]*SignatureVerifier{}
+	} else if verifier, cached := s.globalRulesVerifiers[controllerName]; cached {
+		return verifier
+	}
+
+	principalsSource := s.allPrincipals
+	if controllerName != "" {
+		principalsSource = s.controllerPrincipals[controllerName]
+	}
+
+	if len(principalsSource) == 0 {
+		s.globalRulesVerifiers[controllerName] = nil
 		return nil
 	}
 
-	if s.globalRulesVerifier != nil {
-		return s.globalRulesVerifier
+	if controllerName == "" {
+		slog.Debug("Global constraints found, creating exhaustive verifier...")
+	} else {
+		slog.Debug(fmt.Sprintf("Global constraints found for controller repository '%s', creating exhaustive verifier...", controllerName))
 	}
 
-	slog.Debug("Global constraints found, creating exhaustive verifier...")
-
 	// Unlike the verifiers for rules, this verifier is not specific to a path:
-	// it trusts every principal for every path, so it's built once per state.
+	// it trusts every principal for every path, so it's built once per state
+	// per global rules source.
 	verifier := &SignatureVerifier{
 		repository: s.repository,
 		name:       tuf.ExhaustiveVerifierName,
@@ -469,7 +492,7 @@ func (s *State) getVerifierForGlobalRules() *SignatureVerifier {
 		verifyExhaustively: true, // very important!
 	}
 
-	for _, principal := range s.allPrincipals {
+	for _, principal := range principalsSource {
 		verifier.principals = append(verifier.principals, principal)
 	}
 
@@ -482,7 +505,7 @@ func (s *State) getVerifierForGlobalRules() *SignatureVerifier {
 	// would also want to verify every applicable global constraint for
 	// safety, so we would be doing extra work for no reason.
 
-	s.globalRulesVerifier = verifier
+	s.globalRulesVerifiers[controllerName] = verifier
 	return verifier
 }
 
@@ -1249,9 +1272,77 @@ func (s *State) preprocess() error {
 
 			s.globalRules[controllerName] = globalRules
 		}
+
+		// A controller's global rules are evaluated against the principals
+		// that controller itself declares (across its root, top-level
+		// targets, and delegated targets metadata, mirroring how this
+		// repository's own principals are collected above) only when this
+		// repository has explicitly opted into trusting that controller's
+		// principals. A controller is not always an internal/trusted
+		// repository whose identities should automatically be trusted, so
+		// this is opt-in rather than automatic: without the opt-in, a
+		// controller-only principal simply cannot satisfy that controller's
+		// global rules, same as before this trust was made available.
+		if !trustsControllerPrincipalsForGlobalRules(rootMetadata, controllerName) {
+			continue
+		}
+
+		controllerAllPrincipals := map[string]tuf.Principal{}
+		for principalID, principal := range controllerRootMetadata.GetPrincipals() {
+			controllerAllPrincipals[principalID] = principal
+		}
+
+		controllerMetadata := s.ControllerMetadata[controllerName]
+		if controllerMetadata.TargetsEnvelope != nil {
+			controllerTargetsMetadata, err := controllerMetadata.GetTargetsMetadata(TargetsRoleName, false)
+			if err != nil {
+				return err
+			}
+			for principalID, principal := range controllerTargetsMetadata.GetPrincipals() {
+				controllerAllPrincipals[principalID] = principal
+			}
+
+			for delegatedRoleName := range controllerMetadata.DelegationEnvelopes {
+				delegatedMetadata, err := controllerMetadata.GetTargetsMetadata(delegatedRoleName, false)
+				if err != nil {
+					return err
+				}
+				for principalID, principal := range delegatedMetadata.GetPrincipals() {
+					controllerAllPrincipals[principalID] = principal
+				}
+			}
+		}
+
+		if len(controllerAllPrincipals) > 0 {
+			if s.controllerPrincipals == nil {
+				s.controllerPrincipals = map[string]map[string]tuf.Principal{}
+			}
+
+			s.controllerPrincipals[controllerName] = controllerAllPrincipals
+		}
 	}
 
 	return nil
+}
+
+// trustsControllerPrincipalsForGlobalRules indicates whether rootMetadata
+// (the current repository's own root metadata) has opted into trusting the
+// controller repository's own principals to satisfy that controller's
+// global rules. controllerName is the key used in s.ControllerMetadata,
+// which is "<declared name>-<base64 of the controller's location>" (see the
+// gittuf-controller subtree layout), not the plain name a controller was
+// declared under via AddControllerRepository, so declared controller
+// repositories are matched by reconstructing that same key rather than by
+// name alone.
+func trustsControllerPrincipalsForGlobalRules(rootMetadata tuf.RootMetadata, controllerName string) bool {
+	for _, controllerRepository := range rootMetadata.GetControllerRepositories() {
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepository.GetLocation()))
+		if fmt.Sprintf("%s-%s", controllerRepository.GetName(), encodedLocation) == controllerName {
+			return controllerRepository.GetTrustPrincipalsForGlobalRules()
+		}
+	}
+
+	return false
 }
 
 func (s *State) getRootVerifier() (*SignatureVerifier, error) {

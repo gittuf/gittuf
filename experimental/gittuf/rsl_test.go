@@ -1997,7 +1997,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
-		err := downstreamRepo.AddControllerRepository(testCtx, signer, "controller", controllerRepoLocation, initialRootPrincipals, false)
+		err := downstreamRepo.AddControllerRepository(testCtx, signer, "controller", controllerRepoLocation, initialRootPrincipals, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2067,7 +2067,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}
-		err := directControllerRepo.AddControllerRepository(testCtx, signer, "leaf-controller", leafControllerRepoLocation, initialRootPrincipals, false)
+		err := directControllerRepo.AddControllerRepository(testCtx, signer, "leaf-controller", leafControllerRepoLocation, initialRootPrincipals, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2081,7 +2081,7 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		downstreamRepoLocation := t.TempDir()
 		downstreamRepo := createTestRepositoryWithRoot(t, downstreamRepoLocation)
 
-		err = downstreamRepo.AddControllerRepository(testCtx, signer, "direct-controller", directControllerRepoLocation, initialRootPrincipals, false)
+		err = downstreamRepo.AddControllerRepository(testCtx, signer, "direct-controller", directControllerRepoLocation, initialRootPrincipals, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}

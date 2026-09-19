@@ -185,8 +185,12 @@ type RootMetadata interface {
 	// DisableController marks the current repository as not-a-controller.
 	DisableController() error
 	// AddControllerRepository adds the specified repository as a controller
-	// for the current repository.
-	AddControllerRepository(name, location string, initialRootPrincipals []Principal) error
+	// for the current repository. trustPrincipalsForGlobalRules opts the
+	// current repository into trusting the controller's own principals to
+	// satisfy that controller's global rules; it defaults to false, since a
+	// controller is not always an internal/trusted repository whose
+	// identities should automatically be trusted.
+	AddControllerRepository(name, location string, initialRootPrincipals []Principal, trustPrincipalsForGlobalRules bool) error
 	// AddNetworkRepository adds the specified repository as part of the
 	// network for which the current repository is a controller. The current
 	// repository must be marked as a controller before this can be used.
@@ -371,6 +375,12 @@ type OtherRepository interface {
 	// GetInitialRootPrincipals returns the set of principals trusted to
 	// sign the other repository's initial gittuf root of trust metadata.
 	GetInitialRootPrincipals() []Principal
+
+	// GetTrustPrincipalsForGlobalRules indicates whether the current
+	// repository trusts this controller repository's own principals to
+	// satisfy the global rules the controller propagates. It is only
+	// meaningful for controller repository entries.
+	GetTrustPrincipalsForGlobalRules() bool
 }
 
 type GitHubApp interface {

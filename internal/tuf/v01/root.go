@@ -570,8 +570,10 @@ func (r *RootMetadata) DisableController() error {
 }
 
 // AddControllerRepository adds the specified repository as a controller for the
-// current repository.
-func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
+// current repository. trustPrincipalsForGlobalRules opts the current
+// repository into trusting the controller's own principals to satisfy that
+// controller's global rules.
+func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal, trustPrincipalsForGlobalRules bool) error {
 	if r.MultiRepository == nil {
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
@@ -607,9 +609,10 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 	}
 
 	otherRepository := &OtherRepository{
-		Name:                  name,
-		Location:              location,
-		InitialRootPrincipals: make([]*Key, 0, len(initialRootPrincipals)),
+		Name:                          name,
+		Location:                      location,
+		InitialRootPrincipals:         make([]*Key, 0, len(initialRootPrincipals)),
+		TrustPrincipalsForGlobalRules: trustPrincipalsForGlobalRules,
 	}
 
 	for _, principal := range initialRootPrincipals {
@@ -948,9 +951,10 @@ func (m *MultiRepository) GetNetworkRepositories() []tuf.OtherRepository {
 }
 
 type OtherRepository struct {
-	Name                  string `json:"name"`
-	Location              string `json:"location"`
-	InitialRootPrincipals []*Key `json:"initialRootPrincipals"`
+	Name                          string `json:"name"`
+	Location                      string `json:"location"`
+	InitialRootPrincipals         []*Key `json:"initialRootPrincipals"`
+	TrustPrincipalsForGlobalRules bool   `json:"trustPrincipalsForGlobalRules,omitempty"`
 }
 
 func (o *OtherRepository) GetName() string {
@@ -967,6 +971,10 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 		initialRootPrincipals = append(initialRootPrincipals, key)
 	}
 	return initialRootPrincipals
+}
+
+func (o *OtherRepository) GetTrustPrincipalsForGlobalRules() bool {
+	return o.TrustPrincipalsForGlobalRules
 }
 
 type GitHubApp struct {

@@ -84,7 +84,7 @@ func TestMigrateRootMetadataV01ToV02(t *testing.T) {
 		err = v01Root.EnableController()
 		assert.Nil(t, err)
 
-		err = v01Root.AddControllerRepository("controller-repo", "https://example.com/controller", []tuf.Principal{key})
+		err = v01Root.AddControllerRepository("controller-repo", "https://example.com/controller", []tuf.Principal{key}, true)
 		assert.Nil(t, err)
 
 		err = v01Root.AddNetworkRepository("network-repo", "https://example.com/network", []tuf.Principal{key})
