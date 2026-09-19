@@ -23,8 +23,6 @@ func (s *trustScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 					m.trustGlobalRulesScreen.refreshGlobalRules(m.ctx, m.options)
 				case "Keys & Thresholds":
 					m.screen = screenTrustKeysThresholds
-				case "Hooks":
-					m.screen = screenTrustHooks
 				case "Propagation":
 					m.screen = screenTrustPropagation
 				case "GitHub App":
