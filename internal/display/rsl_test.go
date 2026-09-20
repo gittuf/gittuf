@@ -577,3 +577,169 @@ func TestWriteRSLPropagationEntry(t *testing.T) {
 		assert.Equal(t, expectedOutput, output.String())
 	})
 }
+
+func TestRSLLogWithCustomFields(t *testing.T) {
+	colorer = colorerOff
+
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	referenceFields := rsl.CustomFields{
+		"custom.gitforge.com/server-version": "v4.2.0-c0ffee",
+		"custom.gitforge.com/pusher":         "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)",
+	}
+	if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, rsl.WithCustomFields(referenceFields)).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	annotationFields := rsl.CustomFields{"custom.gitforge.com/reason": "force push"}
+	if err := rsl.NewAnnotationEntry([]githash.Hash{entry.GetID()}, true, "msg", rsl.WithCustomFields(annotationFields)).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	annotationEntry, err := rsl.GetLatestEntry(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedOutput := fmt.Sprintf(`entry %s (skipped)
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+  Custom Fields:
+    custom.gitforge.com/pusher: jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)
+    custom.gitforge.com/server-version: v4.2.0-c0ffee
+
+    Annotation ID: %s
+    Skip:          yes
+    Number:        2
+    Custom Fields:
+      custom.gitforge.com/reason: force push
+    Message:
+      msg
+`, entry.GetID().String(), annotationEntry.GetID().String())
+
+	output := &bytes.Buffer{}
+	writer := &noopwritecloser{writer: output}
+	err = RSLLog(repo, writer)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedOutput, output.String())
+}
+
+func TestWriteRSLReferenceEntryWithCustomFields(t *testing.T) {
+	colorer = colorerOff
+
+	t.Run("fields sorted by key", func(t *testing.T) {
+		fields := rsl.CustomFields{
+			"custom.gitforge.com/server-version": "v4.2.0-c0ffee",
+			"custom.gitforge.com/pusher":         "jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)",
+		}
+		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, rsl.WithCustomFields(fields))
+		entry.ID = gitinterface.ZeroHash
+		entry.Number = 1
+
+		expectedOutput := `entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+  Custom Fields:
+    custom.gitforge.com/pusher: jane (01ARZ3NDEKTSV4RRFFQ69G5FAV)
+    custom.gitforge.com/server-version: v4.2.0-c0ffee
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLReferenceEntry(testWriter, entry, nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("without number", func(t *testing.T) {
+		fields := rsl.CustomFields{"custom.gitforge.com/pusher": "jane"}
+		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash, rsl.WithCustomFields(fields))
+		entry.ID = gitinterface.ZeroHash
+
+		expectedOutput := `entry 0000000000000000000000000000000000000000
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Custom Fields:
+    custom.gitforge.com/pusher: jane
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLReferenceEntry(testWriter, entry, nil, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+
+	t.Run("on the annotation only", func(t *testing.T) {
+		entry := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash)
+		entry.ID = gitinterface.ZeroHash
+		entry.Number = 1
+
+		annotationFields := rsl.CustomFields{"custom.gitforge.com/reason": "force push"}
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{entry.ID}, true, "msg", rsl.WithCustomFields(annotationFields))
+		annotation.ID = gitinterface.ZeroHash
+		annotation.Number = 2
+
+		expectedOutput := `entry 0000000000000000000000000000000000000000 (skipped)
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+    Annotation ID: 0000000000000000000000000000000000000000
+    Skip:          yes
+    Number:        2
+    Custom Fields:
+      custom.gitforge.com/reason: force push
+    Message:
+      msg
+`
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err := writeRSLReferenceEntry(testWriter, entry, []*rsl.AnnotationEntry{annotation}, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
+}
+
+func TestWriteRSLPropagationEntryWithCustomFields(t *testing.T) {
+	colorer = colorerOff
+
+	fields := rsl.CustomFields{
+		"custom.gitforge.com/mirror": "eu-west",
+		"custom.gitforge.com/job":    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+	}
+	entry := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "https://git.example.com/repository", gitinterface.ZeroHash, rsl.WithCustomFields(fields))
+	entry.ID = gitinterface.ZeroHash
+	entry.Number = 1
+
+	expectedOutput := `propagation entry 0000000000000000000000000000000000000000
+
+  Ref:           refs/heads/main
+  Target:        0000000000000000000000000000000000000000
+  UpstreamRepo:  https://git.example.com/repository
+  UpstreamEntry: 0000000000000000000000000000000000000000
+  Number:        1
+  Custom Fields:
+    custom.gitforge.com/job: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+    custom.gitforge.com/mirror: eu-west
+`
+
+	output := &bytes.Buffer{}
+	testWriter := &noopwritecloser{writer: output}
+	err := writeRSLPropagationEntry(testWriter, entry, false)
+	assert.Nil(t, err)
+	assert.Equal(t, expectedOutput, output.String())
+}

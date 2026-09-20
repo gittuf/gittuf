@@ -110,6 +110,24 @@ func TestSSH(t *testing.T) {
 	}
 }
 
+func TestVerifyMalformedSignature(t *testing.T) {
+	sslibKey := &signerverifier.SSLibKey{
+		KeyID:   "SHA256:cewFulOIcROWnolPTGEQXG4q7xvLIn3kNTCMqdfoP4E",
+		KeyType: "ssh",
+		Scheme:  "ssh-ed25519",
+		KeyVal:  signerverifier.KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
+	}
+
+	verifier, err := NewVerifierFromKey(sslibKey)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	err = verifier.Verify(context.Background(), []byte("DATA"), []byte("not-an-ssh-signature"))
+
+	assert.ErrorContains(t, err, "failed to parse ssh signature")
+}
+
 // Test parseSSH2Key helper function (rsa only)
 func TestParseSSH2Key(t *testing.T) {
 	data := `---- BEGIN SSH2 PUBLIC KEY ----
@@ -129,6 +147,24 @@ COb1zE7zaJacJ42tNdVq7Z3x+Hik9PRfgBPt1oF41SFSCp0YRPLxLMFdTjNgV3HZXVNlq6
 		t.Fatalf("%v", err)
 	}
 	assert.Equal(t, key.Type(), "ssh-rsa")
+	t.Run("invalid begin marker", func(t *testing.T) {
+		data := `---- INVALID BEGIN MARKER ----
+AAAAB3NzaC1yc2EAAAADAQAB
+---- END SSH2 PUBLIC KEY ----`
+
+		_, err := parseSSH2Key(data)
+
+		assert.ErrorContains(t, err, "expected '---- BEGIN SSH2 PUBLIC KEY ----'")
+	})
+	t.Run("invalid end marker", func(t *testing.T) {
+		data := `---- BEGIN SSH2 PUBLIC KEY ----
+AAAAB3NzaC1yc2EAAAADAQAB
+---- INVALID END MARKER ----`
+
+		_, err := parseSSH2Key(data)
+
+		assert.ErrorContains(t, err, "expected '---- END SSH2 PUBLIC KEY ----'")
+	})
 }
 
 func TestNewVerifierFromKey(t *testing.T) {
@@ -146,4 +182,30 @@ func TestNewVerifierFromKey(t *testing.T) {
 
 	keyid, _ := verifier.KeyID()
 	assert.Equal(t, sslibKey.KeyID, keyid)
+
+	t.Run("wrong key type", func(t *testing.T) {
+		sslibKey := &signerverifier.SSLibKey{
+			KeyID:   "test-key",
+			KeyType: "gpg",
+			Scheme:  "ssh-ed25519",
+			KeyVal:  signerverifier.KeyVal{Public: "AAAAC3NzaC1lZDI1NTE5AAAAIPu3Q15xYZOCg7kzYoApSgy/fPumLVHgSQO+bjSwdGQg"},
+		}
+
+		_, err := NewVerifierFromKey(sslibKey)
+
+		assert.ErrorContains(t, err, "wrong keyType")
+	})
+
+	t.Run("malformed public key material", func(t *testing.T) {
+		sslibKey := &signerverifier.SSLibKey{
+			KeyID:   "test-key",
+			KeyType: "ssh",
+			Scheme:  "ssh-ed25519",
+			KeyVal:  signerverifier.KeyVal{Public: "not-valid-base64!!"},
+		}
+
+		_, err := NewVerifierFromKey(sslibKey)
+
+		assert.ErrorContains(t, err, "failed to parse ssh public key material")
+	})
 }

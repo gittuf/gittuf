@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
@@ -100,5 +101,57 @@ func TestPerson(t *testing.T) {
 
 		customMetadata := test.person.CustomMetadata()
 		assert.Equal(t, test.expectedCustomMetadata, customMetadata, fmt.Sprintf("unexpected custom metadata in test '%s'", name))
+	}
+}
+
+func TestPersonValidate(t *testing.T) {
+	keyR := ssh.NewKeyFromBytes(t, rootPubKeyBytes)
+	key := NewKeyFromSSLibKey(keyR)
+
+	newPerson := func(custom map[string]string) *Person {
+		return &Person{
+			PersonID: "jane.doe",
+			PublicKeys: map[string]*Key{
+				key.KeyID: key,
+			},
+			AssociatedIdentities: map[string]string{
+				"https://github.com": "jane.doe",
+			},
+			Custom: custom,
+		}
+	}
+
+	rejected := map[string]string{
+		"colliding associated identity key": fmt.Sprintf("%s https://github.com", associatedIdentityKey),
+		"reserved prefix alone":             associatedIdentityKey,
+		"contains a space":                  "some key",
+		"contains an opening parenthesis":   "key(1)",
+		"contains a newline":                "key\nreserved value",
+		"trailing newline":                  "key\n",
+		"empty key":                         "",
+	}
+
+	for name, badKey := range rejected {
+		t.Run("rejected: "+name, func(t *testing.T) {
+			person := newPerson(map[string]string{badKey: "value"})
+
+			err := person.Validate()
+			assert.ErrorIs(t, err, tuf.ErrInvalidCustomMetadataKey)
+		})
+	}
+
+	accepted := map[string]string{
+		"simple word":       "department",
+		"dotted namespace":  "example.com/team",
+		"digits and dashes": "cost-center-42",
+		"underscores":       "internal_id",
+	}
+
+	for name, goodKey := range accepted {
+		t.Run("accepted: "+name, func(t *testing.T) {
+			person := newPerson(map[string]string{goodKey: "value"})
+
+			assert.NoError(t, person.Validate())
+		})
 	}
 }

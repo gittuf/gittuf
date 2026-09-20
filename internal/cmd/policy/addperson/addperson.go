@@ -47,7 +47,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		[]string{},
 		"authorized public key for the person (path to SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
-	cmd.MarkFlagRequired("public-key") //nolint:errcheck
 
 	cmd.Flags().StringArrayVar(
 		&o.associatedIdentities,
@@ -96,7 +95,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	custom := map[string]string{}
 	for _, customEntry := range o.customMetadata {
-		split := strings.Split(customEntry, "=")
+		split := strings.SplitN(customEntry, "=", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("invalid format for custom metadata '%s'", customEntry)
 		}

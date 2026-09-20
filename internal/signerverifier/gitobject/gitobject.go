@@ -24,7 +24,8 @@ import (
 	"github.com/sigstore/cosign/v3/pkg/cosign"
 	gitsignVerifier "github.com/sigstore/gitsign/pkg/git"
 	gitsignRekor "github.com/sigstore/gitsign/pkg/rekor"
-	"github.com/sigstore/sigstore/pkg/fulcioroots"
+	sigstoreroot "github.com/sigstore/sigstore-go/pkg/root"
+	"github.com/sigstore/sigstore-go/pkg/tuf"
 )
 
 const rekorPublicGoodInstance = "https://rekor.sigstore.dev"
@@ -115,13 +116,27 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 	var verifier *gitsignVerifier.CertVerifier
 	sigstoreRootFilePath := os.Getenv(sigstore.EnvSigstoreRootFile)
 	if sigstoreRootFilePath == "" {
-		root, err := fulcioroots.Get()
+		trustedRoot, err := sigstoreroot.FetchTrustedRootWithOptions(tuf.DefaultOptions().WithContext(ctx))
 		if err != nil {
 			return errors.Join(ErrVerifyingSigstoreSignature, err)
 		}
-		intermediate, err := fulcioroots.GetIntermediates()
-		if err != nil {
-			return errors.Join(ErrVerifyingSigstoreSignature, err)
+
+		// The trusted root carries each Fulcio CA's root and intermediates
+		// together, so both pools are built from the same walk.
+		root := x509.NewCertPool()
+		intermediate := x509.NewCertPool()
+		for _, ca := range trustedRoot.FulcioCertificateAuthorities() {
+			fulcioCA, ok := ca.(*sigstoreroot.FulcioCertificateAuthority)
+			if !ok {
+				return errors.Join(ErrVerifyingSigstoreSignature, fmt.Errorf("unexpected Fulcio CA type %T", ca))
+			}
+
+			if fulcioCA.Root != nil {
+				root.AddCert(fulcioCA.Root)
+			}
+			for _, cert := range fulcioCA.Intermediates {
+				intermediate.AddCert(cert)
+			}
 		}
 
 		checkOpts.RootCerts = root

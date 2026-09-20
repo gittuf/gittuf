@@ -90,6 +90,86 @@ func TestLoadGPGKeyFromBytes(t *testing.T) {
 	})
 }
 
+func TestMSYSPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "Windows path with backslashes",
+			path: `C:\Users\foo\AppData\Local\Temp\gittuf-gpg-123`,
+			want: "/c/Users/foo/AppData/Local/Temp/gittuf-gpg-123",
+		},
+		{
+			name: "Windows path with forward slashes",
+			path: "C:/Users/foo/AppData/Local/Temp/gittuf-gpg-123",
+			want: "/c/Users/foo/AppData/Local/Temp/gittuf-gpg-123",
+		},
+		{
+			name: "uppercase drive letter is lowercased",
+			path: `D:\gittuf-gpg-123`,
+			want: "/d/gittuf-gpg-123",
+		},
+		{
+			name: "already POSIX-style path is unchanged",
+			path: "/tmp/gittuf-gpg-123",
+			want: "/tmp/gittuf-gpg-123",
+		},
+		{
+			name: "relative path without a drive letter is unchanged",
+			path: "gittuf-gpg-123",
+			want: "gittuf-gpg-123",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, msysPath(test.path))
+		})
+	}
+}
+
+func TestIsMSYSGPGPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{
+			name: "Git for Windows usr/bin build",
+			path: `C:\Program Files\Git\usr\bin\gpg.exe`,
+			want: true,
+		},
+		{
+			name: "Git for Windows mingw64 build",
+			path: `C:\Program Files\Git\mingw64\bin\gpg.exe`,
+			want: true,
+		},
+		{
+			name: "native Gpg4win install",
+			path: `C:\Program Files\GnuPG\bin\gpg.exe`,
+			want: false,
+		},
+		{
+			name: "Linux system gpg is not mistaken for an MSYS build",
+			path: "/usr/bin/gpg",
+			want: false,
+		},
+		{
+			name: "macOS Homebrew gpg",
+			path: "/opt/homebrew/bin/gpg",
+			want: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, isMSYSGPGPath(test.path))
+		})
+	}
+}
+
 func TestNewVerifierFromKey(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		pubKey, err := LoadGPGKeyFromBytes(artifacts.GPGKey1Public)

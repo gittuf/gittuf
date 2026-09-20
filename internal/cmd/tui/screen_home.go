@@ -23,6 +23,8 @@ func (s *homeScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 					m.screen = screenPolicy
 				case "Trust":
 					m.screen = screenTrust
+				case "Verify":
+					m.screen = screenVerify
 				}
 			}
 			return *m, nil

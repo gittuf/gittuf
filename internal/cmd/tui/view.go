@@ -20,6 +20,7 @@ const (
 	colorFooter      = "#007AFF"
 	colorSubtext     = "#A0A0A0"
 	colorErrorMsg    = "#FF5252"
+	colorSuccessMsg  = "#4CAF50"
 	colorStatusBg    = "#1A1A2E"
 	colorEditMode    = "#007AFF"
 	colorReadOnly    = "#FF6B6B"
@@ -90,6 +91,16 @@ var (
 	helpDescStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(colorBlur)).
 			Padding(0, 1)
+
+	errorDialogStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color(colorErrorMsg)).
+				Background(lipgloss.Color(colorStatusBg)).
+				Padding(1, 2)
+
+	successStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colorSuccessMsg)).
+			Bold(true)
 )
 
 // renderWithMargin wraps content in the standard margin used by all screens.
@@ -97,8 +108,36 @@ func renderWithMargin(content string) string {
 	return lipgloss.NewStyle().Margin(1, 2).Render(content)
 }
 
-// renderFooter returns the footer text styled in the footer color.
+// isSuccessMessage returns true if the footer text indicates a successful operation.
+func isSuccessMessage(text string) bool {
+	if text == "" {
+		return false
+	}
+	lower := strings.ToLower(text)
+	if strings.HasPrefix(text, "✓") || strings.HasPrefix(text, "✔") {
+		return true
+	}
+	if strings.Contains(lower, "successfully") || strings.Contains(lower, "successful") {
+		return true
+	}
+	if strings.HasSuffix(text, "!") && !strings.Contains(lower, "error") && !strings.Contains(lower, "fail") && !strings.Contains(lower, "read-only") {
+		return true
+	}
+	return false
+}
+
+// renderFooter returns the footer text styled in green for success or blue for standard info.
 func renderFooter(text string) string {
+	if text == "" {
+		return ""
+	}
+	if isSuccessMessage(text) {
+		formattedText := text
+		if !strings.HasPrefix(formattedText, "✓") && !strings.HasPrefix(formattedText, "✔") {
+			formattedText = "✓ " + formattedText
+		}
+		return successStyle.Render(formattedText)
+	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(colorFooter)).Render(text)
 }
 
@@ -156,6 +195,93 @@ func renderErrorMsg(text string) string {
 	return "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Render(text)
 }
 
+func renderErrorDialog(m model) string {
+	if m.errorDialog == nil {
+		return ""
+	}
+
+	width := m.width - 12
+	if width > 72 {
+		width = 72
+	}
+	if width < 24 {
+		width = 24
+	}
+
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorErrorMsg)).
+		Bold(true).
+		Render(m.errorDialog.title)
+	message := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorRegularText)).
+		Render(m.errorDialog.message)
+	hint := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorSubtext)).
+		Render("Press Enter or Esc to close.")
+
+	return errorDialogStyle.Width(width).Render(
+		lipgloss.JoinVertical(lipgloss.Left, title, "", message, "", hint),
+	)
+}
+
+func renderPopupDialog(m model) string {
+	if m.showDiffOverlay {
+		return renderDiffOverlay(m)
+	}
+	dialog := renderErrorDialog(m)
+	if dialog == "" {
+		return ""
+	}
+
+	return dialog
+}
+
+func renderDiffOverlay(m model) string {
+	if !m.showDiffOverlay {
+		return ""
+	}
+
+	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
+	availableWidth := m.width - h - 4
+	availableHeight := m.height - v - 6
+
+	w := availableWidth - 6
+	if w > 74 {
+		w = 74
+	}
+	if w < 28 {
+		w = 28
+	}
+
+	vh := availableHeight - 6
+	if vh < 4 {
+		vh = 4
+	}
+
+	m.diffViewport.Width = w
+	m.diffViewport.Height = vh
+
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorFocus)).
+		Bold(true).
+		Render("Staged Policy & Trust Changes (Diff)")
+
+	content := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(colorFocus)).
+		Padding(1, 2).
+		Width(w).
+		Render(lipgloss.JoinVertical(lipgloss.Left,
+			title,
+			"",
+			m.diffViewport.View(),
+			"",
+			lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Press Esc or 'v' to close • Arrow keys to scroll"),
+		))
+
+	return content
+}
+
 // renderStatusBar renders the top status bar showing screen name and current mode.
 func renderStatusBar(screenName string, readOnly bool, width int) string {
 	if width == 0 {
@@ -193,24 +319,23 @@ func renderStatusBar(screenName string, readOnly bool, width int) string {
 
 // renderHelpKey renders a single styled key + description pair.
 func renderHelpKey(key, desc string) string {
-	k := helpKeyStyle.Render(key)
-	d := helpDescStyle.Render(desc)
-	return lipgloss.JoinHorizontal(lipgloss.Top, k, d)
+	return helpKeyStyle.Render(key) + helpDescStyle.Render(desc)
 }
 
-// renderStyledHelp renders the full help bar from a list of key/desc pairs.
-func renderStyledHelp(pairs [][2]string) string {
-	parts := make([]string, 0, len(pairs))
-	for _, p := range pairs {
-		parts = append(parts, renderHelpKey(p[0], p[1]))
+// renderStyledHelp formats keybinding pairs into a single horizontal help bar.
+func renderStyledHelp(keys [][2]string) string {
+	var parts []string
+	for _, pair := range keys {
+		parts = append(parts, renderHelpKey(pair[0], pair[1]))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top, parts...)
+	return strings.Join(parts, " ")
 }
 
 // renderActionHints returns the consistent action hints requested for the bottom of screens.
 func renderActionHints(readOnly bool) string {
 	if readOnly {
 		return "\n" + renderStyledHelp([][2]string{
+			{"v", "review diff"},
 			{"h", "help"},
 			{"esc", "back"},
 			{"q", "quit"},
@@ -220,6 +345,7 @@ func renderActionHints(readOnly bool) string {
 		{"a", "add"},
 		{"e", "edit"},
 		{"d", "delete"},
+		{"v", "review diff"},
 		{"h", "help"},
 		{"esc", "back"},
 		{"q", "quit"},
@@ -243,9 +369,15 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxWidth = 0
 	}
 
+	// When diff overlay is active, suppress bottom hints so status bar stays visible.
+	effectiveOverlays := overlays
+	if m.showDiffOverlay {
+		effectiveOverlays = ""
+	}
+
 	bottomHeight := 1
-	if overlays != "" {
-		bottomHeight += strings.Count(overlays, "\n") + 1
+	if effectiveOverlays != "" {
+		bottomHeight += strings.Count(effectiveOverlays, "\n") + 1
 	}
 	footerBox := renderFooterBox(m)
 	if footerBox != "" {
@@ -261,15 +393,25 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxHeight = 0
 	}
 
-	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(listContent)
+	contentBody := listContent
+	if dialog := renderPopupDialog(m); dialog != "" {
+		contentBody = lipgloss.Place(boxWidth-2, boxHeight, lipgloss.Center, lipgloss.Center, dialog)
+	}
+
+	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(contentBody)
+
+	errMsg := ""
+	if m.errorMsg != "" {
+		errMsg = "\n" + renderErrorMsg(m.errorMsg)
+	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		renderStatusBar(title, m.readOnly, m.width),
 		renderWithMargin(
 			content+"\n"+
-				overlays+
+				effectiveOverlays+
 				renderFooterBox(m)+
-				renderErrorMsg(m.errorMsg),
+				errMsg,
 		),
 	)
 }
@@ -311,51 +453,147 @@ func (m model) View() string {
 		return m.spinner.View() + " Loading TUI...\n"
 	}
 
+	if m.verifying {
+		content := lipgloss.JoinVertical(lipgloss.Left,
+			m.spinner.View()+" "+m.loadingMsg,
+			"",
+			lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				Width(m.logViewport.Width).
+				Height(m.logViewport.Height).
+				Render(m.logViewport.View()),
+		)
+		return renderWithMargin(
+			titleStyle.Render("gittuf TUI") + "\n\n" + content,
+		)
+	}
+
+	// Diff overlay takes over the full screen below the status bar.
+	// We determine the current screen's title to keep the status bar correct.
+	if m.showDiffOverlay {
+		screenTitle := m.currentScreenTitle()
+		statusBar := renderStatusBar(screenTitle, m.readOnly, m.width)
+		// Height available below status bar (1 row) minus margin (2 rows top+bottom)
+		overlayHeight := m.height - 3
+		if overlayHeight < 6 {
+			overlayHeight = 6
+		}
+		overlayWidth := m.width - 6
+		if overlayWidth > 76 {
+			overlayWidth = 76
+		}
+		if overlayWidth < 28 {
+			overlayWidth = 28
+		}
+		// viewport fits inside the box: subtract border(2) + padding(2) + title(1) + blank(1) + hint(1) + blank(1) = 8
+		vpHeight := overlayHeight - 8
+		if vpHeight < 2 {
+			vpHeight = 2
+		}
+		m.diffViewport.Width = overlayWidth - 4
+		m.diffViewport.Height = vpHeight
+
+		title := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(colorFocus)).
+			Bold(true).
+			Render("Staged Policy & Trust Changes (Diff)")
+
+		overlayBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(colorFocus)).
+			Padding(1, 2).
+			Width(overlayWidth).
+			Height(overlayHeight).
+			Render(lipgloss.JoinVertical(lipgloss.Left,
+				title,
+				"",
+				m.diffViewport.View(),
+				"",
+				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Press Esc or 'v' to close • Arrow keys to scroll"),
+			))
+
+		centeredOverlay := lipgloss.Place(m.width, overlayHeight, lipgloss.Center, lipgloss.Top, overlayBox)
+
+		return lipgloss.JoinVertical(lipgloss.Left,
+			statusBar,
+			centeredOverlay,
+		)
+	}
+
+	var view string
+
 	switch m.screen {
 	case screenLoading:
 		if m.errorMsg != "" {
-			return renderWithMargin(
+			view = renderWithMargin(
 				titleStyle.Render("gittuf TUI") + "\n\n" +
 					renderErrorMsg(m.errorMsg) + "\n\n" +
 					lipgloss.NewStyle().Foreground(lipgloss.Color(colorBlur)).Render("Press Q or Ctrl+C to quit."),
 			)
+			break
 		}
-		return renderWithMargin(
+		view = renderWithMargin(
 			titleStyle.Render("gittuf TUI") + "\n\n" +
 				m.spinner.View() + " Loading, please wait...\n",
 		)
 
 	case screenChoice:
-		return m.homeScreen.View(&m)
+		view = m.homeScreen.View(&m)
 
 	case screenPolicy:
-		return m.policyScreen.View(&m)
+		view = m.policyScreen.View(&m)
 
 	case screenPolicyLifecycle, screenPolicyLifecycleForm:
-		return m.policyLifecycleScreen.View(&m)
+		view = m.policyLifecycleScreen.View(&m)
 
 	case screenTrust:
-		return m.trustScreen.View(&m)
+		view = m.trustScreen.View(&m)
 
 	case screenPolicyRules:
-		return m.policyRulesScreen.View(&m)
+		view = m.policyRulesScreen.View(&m)
 
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
-		return m.trustGlobalRulesScreen.View(&m)
+		view = m.trustGlobalRulesScreen.View(&m)
+
+	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+		return m.trustKeysScreen.View(&m)
 
 	case screenPolicyPrincipals:
-		return m.policyPrincipalsScreen.View(&m)
+		view = m.policyPrincipalsScreen.View(&m)
 
 	case screenPolicyPrincipalsForm:
-		return m.policyPrincipalsFormScreen.View(&m)
+		view = m.policyPrincipalsFormScreen.View(&m)
+
+	case screenTrustLifecycle:
+		return m.trustLifecycleScreen.View(&m)
+
+	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+		return m.trustPropagationScreen.View(&m)
+
+	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+		return m.trustGitHubAppScreen.View(&m)
+
+	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+		return m.trustRepoNetworkScreen.View(&m)
 
 	case screenPolicyAddRule, screenPolicyEditRule:
-		return m.policyRulesScreen.View(&m)
+		view = m.policyRulesScreen.View(&m)
 
 	case screenHelp:
-		return m.helpScreen.View(&m)
+		view = m.helpScreen.View(&m)
+
+	case screenVerify:
+		return m.verifyScreen.View(&m)
+
+	case screenVerifyRefForm:
+		return m.verifyRefScreen.View(&m)
+
+	case screenVerifyMergeableForm:
+		return m.verifyMergeableScreen.View(&m)
 
 	default:
-		return "Unknown screen"
+		view = "Unknown screen"
 	}
+
+	return view
 }

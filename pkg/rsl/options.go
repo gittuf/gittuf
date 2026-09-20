@@ -5,6 +5,39 @@ package rsl
 
 import "github.com/gittuf/gittuf/pkg/githash"
 
+type entryOptions struct {
+	customFields CustomFields
+}
+
+type EntryOption func(*entryOptions)
+
+// WithCustomFields adds custom fields to an RSL entry. The fields are copied so
+// subsequent changes to the supplied map do not affect the entry, and the entry
+// holds the only defensive copy. Supplying no fields is a no-op, so an entry
+// without custom fields keeps a nil map rather than an empty one. A key repeated
+// across multiple WithCustomFields options keeps its first value, matching how
+// the reader resolves repeated fields.
+//
+// Fields with an empty value are skipped: an empty value means the field is
+// absent, and the encoder drops it, so keeping it in the entry would report a
+// field as set that no commit ever carries.
+func WithCustomFields(fields CustomFields) EntryOption {
+	return func(o *entryOptions) {
+		for key, value := range fields {
+			if value == "" {
+				continue
+			}
+			if o.customFields == nil {
+				o.customFields = make(CustomFields, len(fields))
+			}
+			if _, exists := o.customFields[key]; exists {
+				continue
+			}
+			o.customFields[key] = value
+		}
+	}
+}
+
 type GetLatestReferenceUpdaterEntryOptions struct {
 	Reference string
 

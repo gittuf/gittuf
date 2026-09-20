@@ -5,15 +5,18 @@ package gittuf
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 
 	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
+	githubopts "github.com/gittuf/gittuf/experimental/gittuf/options/github"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
+	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -25,6 +28,7 @@ import (
 )
 
 func TestApplyAttestations(t *testing.T) {
+	remoteName := "origin"
 	testDir := t.TempDir()
 	r := gitinterface.CreateTestGitRepository(t, testDir, false)
 	repo := &Repository{r: r}
@@ -60,7 +64,7 @@ func TestApplyAttestations(t *testing.T) {
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
 	err = repo.ApplyAttestations(testCtx, "", true, false)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo.r, rsl.ForReference(attestations.Ref))
 	if err != nil {
@@ -78,6 +82,21 @@ func TestApplyAttestations(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Len(t, env.Signatures, 1)
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.ApplyAttestations(testCtx, remoteName, false, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+	})
 }
 
 func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
@@ -154,7 +173,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		// First authorization attestation signature
 		err = repo.AddReferenceAuthorization(testCtx, firstSigner, absTargetRef, absFeatureRef, false, attestopts.WithRSLEntry())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		allAttestations, err := attestations.LoadCurrentAttestations(r)
 		if err != nil {
@@ -170,7 +189,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		// Second authorization attestation signature
 		err = repo.AddReferenceAuthorization(testCtx, secondSigner, absTargetRef, absFeatureRef, false, attestopts.WithRSLEntry())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
 		if err != nil {
@@ -187,7 +206,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		// Remove second authorization attestation signature
 		err = repo.RemoveReferenceAuthorization(testCtx, secondSigner, absTargetRef, fromCommitID.String(), targetTreeID.String(), false, attestopts.WithRSLEntry())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
 		if err != nil {
@@ -245,7 +264,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		}
 
 		err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry(), attestopts.WithRSLEntry())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		allAttestations, err := attestations.LoadCurrentAttestations(r)
 		if err != nil {
@@ -253,7 +272,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		}
 
 		env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, env.Signatures, 1)
 		assert.Equal(t, keyID, env.Signatures[0].KeyID)
 
@@ -272,7 +291,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		assert.ErrorIs(t, err, gitinterface.ErrTagAlreadyExists)
 
 		err = repo.RemoveReferenceAuthorization(testCtx, signer, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String(), false, attestopts.WithRSLEntry())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		allAttestations, err = attestations.LoadCurrentAttestations(r)
 		if err != nil {
@@ -281,6 +300,121 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 
 		_, err = allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.ErrorIs(t, err, authorizations.ErrAuthorizationNotFound)
+	})
+
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddReferenceAuthorization(testCtx, nil, "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		err = nr.RemoveReferenceAuthorization(testCtx, nil, "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test nonexistent target ref
+		err = nr.AddReferenceAuthorization(testCtx, nil, "nonexistent", "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+
+		err = nr.RemoveReferenceAuthorization(testCtx, targetsSigner, "nonexistent", "", "", false)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
+	})
+}
+
+func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestAttestationForCommit(testCtx, nil, "", "", "", "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestAttestationForCommit(testCtx, nil, "", "", "", "", false)
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+}
+
+func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, false)
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+}
+
+func TestAddGitHubPullRequestApprover(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.AddGitHubPullRequestApprover(testCtx, nil, "", "", 1, 1, "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test no GitHub token
+		err = nr.AddGitHubPullRequestApprover(testCtx, targetsSigner, "", "", 1, 1, "", false)
+		assert.ErrorIs(t, err, ErrNoGitHubToken)
+	})
+}
+
+func TestDismissGitHubPullRequestApprover(t *testing.T) {
+	t.Run("miscellaneous error checking", func(t *testing.T) {
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		nr := &Repository{r: repo}
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+
+		// Test signCommit
+		err := repo.SetGitConfig("user.signingkey", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nr.DismissGitHubPullRequestApprover(testCtx, nil, 1, "", true)
+		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
+
+		// Test non-existent review
+		err = nr.DismissGitHubPullRequestApprover(testCtx, targetsSigner, 1, "", false)
+		assert.ErrorIs(t, err, github.ErrGitHubReviewIDNotFound)
 	})
 }
 
@@ -323,7 +457,7 @@ func TestAddReferenceAuthorizationForNewTagZeroHashFormat(t *testing.T) {
 
 			// AddReferenceAuthorization calls r.r.ZeroHash() for the tag's fromID.
 			err = repo.AddReferenceAuthorization(testCtx, signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 			allAttestations, err := attestations.LoadCurrentAttestations(r)
 			if err != nil {
@@ -333,7 +467,7 @@ func TestAddReferenceAuthorizationForNewTagZeroHashFormat(t *testing.T) {
 			// The format-correct zero hash must retrieve the authorization.
 			formatZero := repo.r.ZeroHash().String()
 			env, err := allAttestations.GetReferenceAuthorizationFor(repo.r, targetTagRef, formatZero, initialCommitID.String())
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Len(t, env.Signatures, 1)
 
 			// On a SHA-256 repo, looking up with the SHA-1 zero (40 zeros)
@@ -471,4 +605,49 @@ func TestIndexPathToComponents(t *testing.T) {
 		assert.Equal(t, test.from, from, fmt.Sprintf("unexpected 'from' in test '%s'", name))
 		assert.Equal(t, test.to, to, fmt.Sprintf("unexpected 'to' in test '%s'", name))
 	}
+}
+
+func TestGetGitHubClient(t *testing.T) {
+	t.Run("default baseURL keeps github.com endpoints", func(t *testing.T) {
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "test-token")
+		assert.NoError(t, err)
+		assert.NotNil(t, client)
+
+		// Default go-github BaseURL is api.github.com
+		assert.Equal(t, "https://api.github.com/", client.BaseURL.String())
+		assert.Equal(t, "https://uploads.github.com/", client.UploadURL.String())
+	})
+
+	t.Run("enterprise baseURL gets /api/v3 and /api/uploads paths", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.example.com", "test-token")
+		assert.NoError(t, err)
+		assert.NotNil(t, client)
+
+		assert.Equal(t, "https://github.example.com/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.example.com/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("trailing slash in baseURL is normalized", func(t *testing.T) {
+		client, err := getGitHubClient("https://github.example.com/", "test-token")
+		assert.NoError(t, err)
+		assert.NotNil(t, client)
+
+		// Should produce the same paths as the no-trailing-slash case
+		assert.Equal(t, "https://github.example.com/api/v3/", client.BaseURL.String())
+		assert.Equal(t, "https://github.example.com/api/uploads/", client.UploadURL.String())
+	})
+
+	t.Run("invalid baseURL returns error", func(t *testing.T) {
+		_, err := getGitHubClient("://no-scheme", "test-token")
+		var urlErr *url.Error
+		assert.ErrorAs(t, err, &urlErr)
+	})
+
+	t.Run("empty token still produces a usable client", func(t *testing.T) {
+		// getGitHubClient itself doesn't enforce non-empty token;
+		// callers do (via ErrNoGitHubToken). This documents that behavior.
+		client, err := getGitHubClient(githubopts.DefaultGitHubBaseURL, "")
+		assert.NoError(t, err)
+		assert.NotNil(t, client)
+	})
 }

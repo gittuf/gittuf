@@ -16,9 +16,22 @@ func (s *trustScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		if msg.String() == "enter" {
-			if _, ok := s.trustScreenList.SelectedItem().(item); ok {
-				m.screen = screenTrustGlobalRules
-				m.trustGlobalRulesScreen.refreshGlobalRules(m.ctx, m.options)
+			if sel, ok := s.trustScreenList.SelectedItem().(item); ok {
+				switch sel.title {
+				case "View Global Rules":
+					m.screen = screenTrustGlobalRules
+					m.trustGlobalRulesScreen.refreshGlobalRules(m.ctx, m.options)
+				case "Keys & Thresholds":
+					m.screen = screenTrustKeysThresholds
+				case "Propagation":
+					m.screen = screenTrustPropagation
+				case "GitHub App":
+					m.screen = screenTrustGitHubApp
+				case "Lifecycle":
+					m.screen = screenTrustLifecycle
+				case "Repo/Network":
+					m.screen = screenTrustRepoNetwork
+				}
 			}
 			return *m, nil
 		}

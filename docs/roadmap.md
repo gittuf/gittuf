@@ -81,13 +81,13 @@ Git hooks today, such as secure distribution and sandboxing of these programs.
 ### Develop Hash Algorithm Agility Extension
 
 The
-[hash algorithm agility](/docs/extensions/hash-algorithm-agility.md) extension
-describes how gittuf can be used to maintain a record of object hashes using
-stronger hash algorithms like SHA-256 while continuing to use SHA-1. While Git
-is working on SHA-256 support, it is currently not backwards compatible with
-existing repositories and unsupported by major Git hosts and forges. This
-feature needs to be fleshed out as the current document merely records some
-early ideas.
+[hash algorithm agility](/docs/gaps/1/README.md) extension describes how
+gittuf can be used to maintain a record of object hashes using stronger hash
+algorithms like SHA-256 while continuing to use SHA-1. While Git is working
+on SHA-256 support, it is currently not backwards compatible with existing
+repositories and unsupported by major Git hosts and forges. This feature
+needs to be fleshed out as the current document merely records some early
+ideas.
 
 ## Reached
 

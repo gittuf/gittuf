@@ -115,6 +115,39 @@ func TestAddPerson(t *testing.T) {
 		assert.ErrorContains(t, err, "invalid format for custom metadata")
 	})
 
+	t.Run("custom metadata value containing '='", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		newKeyPath := filepath.Join(tmpDir, "new-test-key")
+		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
+		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		// Initialize the repository first
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
+
+		pOpts := &persistent.Options{
+			SigningKey: keyPath,
+		}
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", newKeyPath+".pub", "--custom", "profile=https://example.com/u?ref=1")
+		assert.NoError(t, err)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)

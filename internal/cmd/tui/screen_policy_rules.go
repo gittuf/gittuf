@@ -155,7 +155,7 @@ func (s *policyRulesScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea.Mode
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "y" {
 			if err := repoRemoveRule(m.ctx, m.options, rule{name: s.deleteTarget}); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing rule: %v", err)
+				m.openErrorDialog("Remove Rule Failed", err.Error())
 			} else {
 				m.footer = "Rule removed successfully!"
 				s.refreshRules(m.ctx, m.options)
@@ -171,7 +171,7 @@ func (s *policyRulesScreen) handleReorderUp(m *model) (tea.Model, tea.Cmd) {
 	if i := s.ruleList.Index(); i > 0 {
 		s.rules[i], s.rules[i-1] = s.rules[i-1], s.rules[i]
 		if err := repoReorderRules(m.ctx, m.options, s.rules); err != nil {
-			m.errorMsg = fmt.Sprintf("Error reordering rules: %v", err)
+			m.openErrorDialog("Reorder Rules Failed", err.Error())
 			return *m, nil
 		}
 		s.updateRuleList()
@@ -184,7 +184,7 @@ func (s *policyRulesScreen) handleReorderDown(m *model) (tea.Model, tea.Cmd) {
 	if i := s.ruleList.Index(); i < len(s.rules)-1 {
 		s.rules[i], s.rules[i+1] = s.rules[i+1], s.rules[i]
 		if err := repoReorderRules(m.ctx, m.options, s.rules); err != nil {
-			m.errorMsg = fmt.Sprintf("Error reordering rules: %v", err)
+			m.openErrorDialog("Reorder Rules Failed", err.Error())
 			return *m, nil
 		}
 		s.updateRuleList()
@@ -218,7 +218,11 @@ func (s *policyRulesScreen) handlePolicyFormSubmit(m *model) (tea.Model, tea.Cmd
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		title := "Update Rule Failed"
+		if m.screen == screenPolicyAddRule {
+			title = "Add Rule Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 
@@ -261,6 +265,9 @@ func (s *policyRulesScreen) View(m *model) string {
 }
 
 func (s *policyRulesScreen) renderFormScreen(m *model, formTitle string, breadcrumb string) string {
+	if dialog := renderPopupDialog(*m); dialog != "" {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
+	}
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(formTitle) + "\n\n")
 	for _, input := range s.inputs {
@@ -281,8 +288,16 @@ func getCurrRules(ctx context.Context, o *options) []rule {
 	if err != nil {
 		return nil
 	}
+	return getRulesForRef(ctx, repo, o.targetRef)
+}
 
-	rules, err := repo.ListRules(ctx, o.targetRef)
+// getRulesForRef returns the rules from a specific policy ref (e.g. policy or policy-staging).
+func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef string) []rule {
+	if repo == nil {
+		return nil
+	}
+
+	rules, err := repo.ListRules(ctx, targetRef)
 	if err != nil {
 		return nil
 	}

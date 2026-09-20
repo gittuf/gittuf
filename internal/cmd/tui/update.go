@@ -4,12 +4,30 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 )
+
+func isFormScreen(s screen) bool {
+	switch s {
+	case screenPolicyAddRule, screenPolicyEditRule,
+		screenPolicyPrincipalsForm,
+		screenTrustAddGlobalRule, screenTrustEditGlobalRule,
+		screenTrustKeyForm, screenTrustThresholdForm,
+		screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm,
+		screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm,
+		screenTrustRepoForm, screenTrustRepoLocationForm,
+		screenVerifyRefForm, screenVerifyMergeableForm:
+		return true
+	default:
+		return false
+	}
+}
 
 // Update updates the model based on the message received.
 func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -28,6 +46,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.trustGlobalRulesScreen.globalRules = msg.globalRules
 		m.readOnly = msg.readOnly
 		m.footer = msg.footer
+		m.applyReadOnlyMenus()
 		m.policyRulesScreen.updateRuleList()
 		m.trustGlobalRulesScreen.updateGlobalRuleList()
 		// Resize all lists now that readOnly/signerError are known — the earlier
@@ -38,14 +57,15 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case policyLifecycleResultMsg:
 		if msg.err != nil {
-			m.errorMsg = msg.err.Error()
+			m.openErrorDialog(msg.action+" Failed", msg.err.Error())
 		} else {
+			m.closeErrorDialog()
 			m.footer = msg.msg
 		}
 		return m, nil
 
 	case spinner.TickMsg:
-		if m.screen == screenLoading {
+		if m.screen == screenLoading || m.verifying {
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
 		}
@@ -54,31 +74,115 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.resizeLists()
+		if msg.Width > 4 {
+			m.logViewport.Width = msg.Width - 4
+		} else {
+			m.logViewport.Width = msg.Width
+		}
+		if msg.Height > 6 {
+			m.logViewport.Height = msg.Height - 6
+		} else {
+			m.logViewport.Height = msg.Height
+		}
+		return m, nil
+
+	case logBatchMsg:
+		if len(msg.lines) > 0 {
+			for _, line := range msg.lines {
+				m.logsBuf.WriteString(line)
+				m.logsBuf.WriteByte('\n')
+			}
+			m.logViewport.SetContent(m.logsBuf.String())
+			m.logViewport.GotoBottom()
+		}
+		if m.verifying {
+			return m, logFlushTick(m.logCh)
+		}
+		return m, nil
+
+	case verifyResultMsg:
+		m.verifying = false
+		if m.logCh != nil {
+			remaining := drainLogChannel(m.logCh)
+			for _, line := range remaining {
+				m.logsBuf.WriteString(line)
+				m.logsBuf.WriteByte('\n')
+			}
+			if len(remaining) > 0 {
+				m.logViewport.SetContent(m.logsBuf.String())
+				m.logViewport.GotoBottom()
+			}
+			m.logCh = nil
+		}
+		if msg.err != nil {
+			m.errorMsg = fmt.Sprintf("Verification failed: %v", msg.err)
+		} else {
+			m.errorMsg = ""
+			m.footer = msg.successMsg
+			m.screen = screenVerify
+		}
 		return m, nil
 
 	case tea.KeyMsg:
-		// Global handlers (quit, back navigation)
-		switch msg.String() {
-		case "ctrl+c":
+		if m.showDiffOverlay {
+			switch msg.String() {
+			case "esc", "v", "q":
+				m.showDiffOverlay = false
+				return m, nil
+			case "up", "k":
+				m.diffViewport.ScrollUp(1)
+				return m, nil
+			case "down", "j":
+				m.diffViewport.ScrollDown(1)
+				return m, nil
+			case "pgup":
+				m.diffViewport.HalfPageUp()
+				return m, nil
+			case "pgdown":
+				m.diffViewport.HalfPageDown()
+				return m, nil
+			}
+			m.diffViewport, cmd = m.diffViewport.Update(msg)
+			return m, cmd
+		}
+		if m.verifying {
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m.logViewport, cmd = m.logViewport.Update(msg)
+			return m, cmd
+		}
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+		if m.errorDialog != nil {
+			switch msg.String() {
+			case "q":
+				return m, tea.Quit
+			case "enter", "esc":
+				m.closeErrorDialog()
+			}
+			return m, nil
+		}
+
+		switch msg.String() {
+		case "v":
+			if !isFormScreen(m.screen) {
+				m.toggleDiffOverlay()
+				return m, nil
+			}
 		case "q":
-			// Only quit from non-form screens (avoid consuming 'q' in text inputs)
-			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
+			if !isFormScreen(m.screen) {
 				return m, tea.Quit
 			}
 		case "h":
-			// Toggle help screen if not in form mode
-			if m.screen != screenPolicyAddRule && m.screen != screenPolicyEditRule &&
-				m.screen != screenTrustAddGlobalRule && m.screen != screenTrustEditGlobalRule &&
-				m.screen != screenPolicyPrincipalsForm && m.screen != screenPolicyLifecycleForm {
+			if !isFormScreen(m.screen) {
+				m.footer = ""
+				m.errorMsg = ""
 				if m.screen == screenHelp {
-					// Toggle back
 					m.screen = m.helpScreen.previousScreen
 					return m, nil
 				}
-				// Go to help screen
 				m.helpScreen.previousScreen = m.screen
 				m.screen = screenHelp
 				return m, nil
@@ -87,7 +191,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.footer = ""
 			m.errorMsg = ""
 			switch m.screen {
-			case screenPolicy, screenTrust:
+			case screenPolicy, screenTrust, screenVerify:
 				m.screen = screenChoice
 			case screenPolicyRules:
 				if m.policyRulesScreen.confirmDelete {
@@ -117,11 +221,26 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = m.helpScreen.previousScreen
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.trustGlobalRulesScreen.handleEsc(&m)
+			case screenTrustKeysThresholds:
+				m.screen = screenTrust
+			case screenTrustKeyForm, screenTrustThresholdForm:
+				m.screen = screenTrustKeysThresholds
+			case screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+				m.screen = screenTrustPropagation
+			case screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+				m.screen = screenTrustGitHubApp
+			case screenTrustRepoForm, screenTrustRepoLocationForm:
+				m.screen = screenTrustRepoNetwork
+			case screenTrustLifecycle, screenTrustGitHubApp, screenTrustRepoNetwork:
+				m.screen = screenTrust
+			case screenTrustPropagation:
+				m.screen = screenTrust
+			case screenVerifyRefForm, screenVerifyMergeableForm:
+				m.screen = screenVerify
 			}
 			return m, nil
 		}
 
-		// Screen-specific input handling
 		switch m.screen {
 		case screenChoice:
 			return m.homeScreen.Update(msg, &m)
@@ -131,6 +250,8 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.trustScreen.Update(msg, &m)
 		case screenPolicyLifecycle, screenPolicyLifecycleForm:
 			return m.policyLifecycleScreen.Update(msg, &m)
+		case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+			return m.trustKeysScreen.Update(msg, &m)
 		case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 			return m.policyRulesScreen.Update(msg, &m)
 		case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -139,10 +260,23 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.policyPrincipalsScreen.Update(msg, &m)
 		case screenPolicyPrincipalsForm:
 			return m.policyPrincipalsFormScreen.Update(msg, &m)
+		case screenTrustLifecycle:
+			return m.trustLifecycleScreen.Update(msg, &m)
+		case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+			return m.trustPropagationScreen.Update(msg, &m)
+		case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+			return m.trustGitHubAppScreen.Update(msg, &m)
+		case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+			return m.trustRepoNetworkScreen.Update(msg, &m)
+		case screenVerify:
+			return m.verifyScreen.Update(msg, &m)
+		case screenVerifyRefForm:
+			return m.verifyRefScreen.Update(msg, &m)
+		case screenVerifyMergeableForm:
+			return m.verifyMergeableScreen.Update(msg, &m)
 		}
 	}
 
-	// Delegate to active bubbles component per screen
 	switch m.screen {
 	case screenChoice:
 		return m.homeScreen.Update(msg, &m)
@@ -154,6 +288,8 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.policyLifecycleScreen.Update(msg, &m)
 	case screenTrust:
 		return m.trustScreen.Update(msg, &m)
+	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
+		return m.trustKeysScreen.Update(msg, &m)
 	case screenPolicyRules, screenPolicyAddRule, screenPolicyEditRule:
 		return m.policyRulesScreen.Update(msg, &m)
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
@@ -162,6 +298,20 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.policyPrincipalsScreen.Update(msg, &m)
 	case screenPolicyPrincipalsForm:
 		return m.policyPrincipalsFormScreen.Update(msg, &m)
+	case screenTrustLifecycle:
+		return m.trustLifecycleScreen.Update(msg, &m)
+	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
+		return m.trustPropagationScreen.Update(msg, &m)
+	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
+		return m.trustGitHubAppScreen.Update(msg, &m)
+	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
+		return m.trustRepoNetworkScreen.Update(msg, &m)
+	case screenVerify:
+		return m.verifyScreen.Update(msg, &m)
+	case screenVerifyRefForm:
+		return m.verifyRefScreen.Update(msg, &m)
+	case screenVerifyMergeableForm:
+		return m.verifyMergeableScreen.Update(msg, &m)
 	}
 
 	return m, cmd
@@ -185,4 +335,39 @@ func splitAndTrim(s string) []string {
 		parts[i] = strings.TrimSpace(parts[i])
 	}
 	return parts
+}
+
+// collectLogsCmd reads lines from scanner into a buffered channel.
+// It runs as a goroutine and does not send a tea.Msg per line.
+func collectLogsCmd(scanner *bufio.Scanner, ch chan<- string) tea.Cmd {
+	return func() tea.Msg {
+		for scanner.Scan() {
+			ch <- scanner.Text()
+		}
+		close(ch)
+		return nil
+	}
+}
+
+// drainLogChannel reads all available lines from ch without blocking.
+func drainLogChannel(ch <-chan string) []string {
+	var lines []string
+	for {
+		select {
+		case line, ok := <-ch:
+			if !ok {
+				return lines
+			}
+			lines = append(lines, line)
+		default:
+			return lines
+		}
+	}
+}
+
+// logFlushTick sends a logBatchMsg every 100ms by draining the log channel.
+func logFlushTick(ch <-chan string) tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(_ time.Time) tea.Msg {
+		return logBatchMsg{lines: drainLogChannel(ch)}
+	})
 }

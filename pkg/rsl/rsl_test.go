@@ -9,8 +9,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/gittuf/gittuf/pkg/customfields"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsRelevantGittufRef(t *testing.T) {
@@ -451,6 +453,66 @@ func TestParseRSLEntryTextRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestReferenceEntryRefNameWithNewline(t *testing.T) {
+	t.Parallel()
+
+	targetID, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refNames := map[string]string{
+		"forged targetID":       fmt.Sprintf("refs/heads/main\n%s: %s", TargetIDKey, githash.ZeroHash.String()),
+		"forged number":         fmt.Sprintf("refs/heads/main\n%s: 999", NumberKey),
+		"bare trailing newline": "refs/heads/main\n",
+		"carriage return":       "refs/heads/main\rrefs/heads/other",
+	}
+
+	for name, refName := range refNames {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			entry := &ReferenceEntry{RefName: refName, TargetID: targetID}
+			_, err := entry.createCommitMessage(true)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+		})
+	}
+}
+
+func TestPropagationEntryFieldWithNewline(t *testing.T) {
+	t.Parallel()
+
+	targetID, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	base := PropagationEntry{
+		RefName:            "refs/heads/main",
+		TargetID:           targetID,
+		UpstreamRepository: "https://git.example.com/example/repository",
+		UpstreamEntryID:    githash.ZeroHash,
+	}
+
+	t.Run("ref name with newline", func(t *testing.T) {
+		t.Parallel()
+
+		entry := base
+		entry.RefName = fmt.Sprintf("refs/heads/main\n%s: 999", NumberKey)
+		_, err := entry.createCommitMessage(true)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+
+	t.Run("upstream repository with newline", func(t *testing.T) {
+		t.Parallel()
+
+		entry := base
+		entry.UpstreamRepository = fmt.Sprintf("https://git.example.com/repo\n%s: 999", NumberKey)
+		_, err := entry.createCommitMessage(true)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	})
+}
+
 func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 	t.Parallel()
 
@@ -491,6 +553,47 @@ func TestParseRSLEntryTextForwardCompatibility(t *testing.T) {
 			assert.Equal(t, test.expectedEntry, entry)
 		})
 	}
+}
+
+func TestParseRSLEntryTextTreatsEmptyCustomFieldValueAsAbsent(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	emptyKey := customfields.Prefix + "example.com/empty"
+	setKey := customfields.Prefix + "example.com/set"
+
+	// A canonical writer never emits an empty value, so an entry carrying one
+	// must not report the field as set: the value would not round-trip.
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s:\n%s: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, emptyKey, setKey, "value")
+
+	entry, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+
+	value, has := entry.(*ReferenceEntry).GetCustomField(emptyKey)
+	assert.False(t, has)
+	assert.Empty(t, value)
+
+	value, has = entry.(*ReferenceEntry).GetCustomField(setKey)
+	assert.True(t, has)
+	assert.Equal(t, "value", value)
+}
+
+func TestParseRSLEntryTextEmptyCustomFieldValueDoesNotShadow(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	key := customfields.Prefix + "example.com/field"
+
+	message := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s:\n%s: %s",
+		ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, zero, key, key, "value")
+
+	entry, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+
+	value, has := entry.(*ReferenceEntry).GetCustomField(key)
+	assert.True(t, has)
+	assert.Equal(t, "value", value)
 }
 
 const (

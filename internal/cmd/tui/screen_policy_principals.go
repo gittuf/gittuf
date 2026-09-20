@@ -223,7 +223,7 @@ func (s *policyPrincipalsScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "y" {
 			if err := repoRemovePrincipal(m.ctx, m.options, s.deleteTarget); err != nil {
-				m.errorMsg = fmt.Sprintf("Error removing principal: %v", err)
+				m.openErrorDialog("Remove Principal Failed", err.Error())
 			} else {
 				m.footer = "Principal removed successfully!"
 				s.refreshPrincipals(m.ctx, m.options)
@@ -408,7 +408,11 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 	}
 
 	if err != nil {
-		m.errorMsg = fmt.Sprintf("Error: %v", err)
+		title := "Update Principal Failed"
+		if f.action == "Add Person" {
+			title = "Add Principal Failed"
+		}
+		m.openErrorDialog(title, err.Error())
 		return *m, nil
 	}
 
@@ -423,6 +427,9 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 }
 
 func (f *policyPrincipalsFormScreen) View(m *model) string {
+	if dialog := renderPopupDialog(*m); dialog != "" {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dialog)
+	}
 	breadcrumb := fmt.Sprintf("Home › Policy › Principals › %s", f.action)
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(f.action))
@@ -450,7 +457,14 @@ func getCurrPrincipals(ctx context.Context, o *options) []tuf.Principal {
 	if err != nil {
 		return nil
 	}
-	principalsMap, err := repo.ListPrincipals(ctx, "policy", o.policyName)
+	return getPrincipalsForRef(ctx, repo, "policy", o.policyName)
+}
+
+func getPrincipalsForRef(ctx context.Context, repo *gittuf.Repository, targetRef, policyName string) []tuf.Principal {
+	if repo == nil {
+		return nil
+	}
+	principalsMap, err := repo.ListPrincipals(ctx, targetRef, policyName)
 	if err != nil {
 		return nil
 	}
