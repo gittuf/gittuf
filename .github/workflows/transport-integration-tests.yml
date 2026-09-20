@@ -22,7 +22,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          go-version: '1.26'
+          go-version: '1.27'
       - name: Install openssh-server
         run: sudo apt-get update && sudo apt-get install -y openssh-server
       - name: Build gittuf

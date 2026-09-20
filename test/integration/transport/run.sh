@@ -8,9 +8,8 @@ FAILURES=0
 
 # Isolate git config from the developer's environment so a global
 # user.signingkey / commit.gpgsign can't interfere with the test repos.
-export GIT_CONFIG_GLOBAL="$WORKDIR/gitconfig-empty"
+export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_SYSTEM=/dev/null
-touch "$GIT_CONFIG_GLOBAL"
 
 cleanup() {
   [[ -n "${HTTP_PID:-}" ]] && kill "$HTTP_PID" 2>/dev/null
