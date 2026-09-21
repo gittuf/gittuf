@@ -7,7 +7,7 @@
 * **Implemented:** No
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Aditya Sirish A Yelgundhalli (adityasaky), Patrick Zielinski (patzielinski)
-* **Last Modified:** January 21, 2025
+* **Last Modified:** September 21st, 2026
 
 ## Abstract
 
@@ -251,10 +251,11 @@ constraint type
 * preserve global constraints when making changes to the repository's root of
 trust metadata, even if the client entirely lacks support for global constraints
 
-## Prototype Implementation
+## Implementation
 
-Initial support for global constraints has been implemented as a gittuf
-developer mode feature.
+Support for global constraints has been implemented as a gittuf feature in
+`v0.9.0`. See https://gittuf.dev/documentation/maintainers/multirepo for more
+information.
 
 ## References
 
