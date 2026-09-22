@@ -538,6 +538,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 			objectFormat := repo.GetGitRepository().GetObjectFormat()
 			pushObjects := set.NewSet[string]()
 			dstRefs := set.NewSet[string]()
+			rslUpdates := []gittuf.ReferenceUpdateRequest{}
 			for i, refSpec := range pushRefSpecs {
 				refSpecSplit := strings.Split(refSpec, ":")
 				if len(refSpecSplit) < 2 {
@@ -560,9 +561,7 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 
 				if !strings.HasPrefix(dstRef, gittufRefPrefix) {
 					// TODO: skipping propagation; invoke it once total instead of per ref
-					if err := repo.RecordRSLEntryForReference(ctx, srcRef, true, rslopts.WithOverrideRefName(dstRef), rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
-						return nil, false, err
-					}
+					rslUpdates = append(rslUpdates, gittuf.ReferenceUpdateRequest{RefName: srcRef, RefNameOverride: dstRef})
 				}
 
 				oldTip := remoteRefTips[dstRef]
@@ -599,6 +598,15 @@ func handleSSH(ctx context.Context, repo *gittuf.Repository, remoteName, url str
 				}
 				if oldTip != zeroHash {
 					pushObjects.Add(fmt.Sprintf("^%s", oldTip)) // this is passed on to git rev-list to enumerate objects, and we're saying don't send the old objects
+				}
+			}
+
+			// The RSL entries must exist before the RSL tip is read and
+			// pushed below. Recording all of the updates in one call keeps
+			// the local RSL either fully updated or untouched.
+			if len(rslUpdates) != 0 {
+				if err := repo.RecordRSLEntryForReferences(ctx, rslUpdates, true, rslopts.WithSkipCheckForDuplicateEntry(), rslopts.WithRecordLocalOnly()); err != nil {
+					return nil, false, err
 				}
 			}
 

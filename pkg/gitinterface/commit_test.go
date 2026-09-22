@@ -877,3 +877,47 @@ func TestEnsureIsCommit(t *testing.T) {
 		assert.ErrorContains(t, err, "unable to inspect if object is commit")
 	})
 }
+
+func TestCommitWithExpectedTip(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	treeBuilder := NewTreeBuilder(repo)
+	emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+
+	first, err := repo.CommitWithExpectedTip(emptyTree, "refs/heads/main", "first\n", false, ZeroHash)
+	require.NoError(t, err)
+
+	second, err := repo.CommitWithExpectedTip(emptyTree, "refs/heads/main", "second\n", false, first)
+	require.NoError(t, err)
+
+	_, err = repo.CommitWithExpectedTip(emptyTree, "refs/heads/main", "stale\n", false, first)
+	assert.ErrorContains(t, err, "unable to set Git reference")
+
+	tip, err := repo.GetReference("refs/heads/main")
+	require.NoError(t, err)
+	assert.Equal(t, second, tip)
+}
+
+func TestCommitUsingSpecificKeyWithExpectedTip(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	treeBuilder := NewTreeBuilder(repo)
+	emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.NoError(t, err)
+
+	first, err := repo.CommitUsingSpecificKeyWithExpectedTip(emptyTree, "refs/heads/main", "first\n", artifacts.SSHRSAPrivate, ZeroHash)
+	require.NoError(t, err)
+
+	second, err := repo.CommitUsingSpecificKeyWithExpectedTip(emptyTree, "refs/heads/main", "second\n", artifacts.SSHRSAPrivate, first)
+	require.NoError(t, err)
+
+	_, err = repo.CommitUsingSpecificKeyWithExpectedTip(emptyTree, "refs/heads/main", "stale\n", artifacts.SSHRSAPrivate, first)
+	assert.ErrorContains(t, err, "unable to set Git reference")
+
+	tip, err := repo.GetReference("refs/heads/main")
+	require.NoError(t, err)
+	assert.Equal(t, second, tip)
+}

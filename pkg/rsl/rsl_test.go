@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/pkg/customfields"
@@ -607,6 +608,7 @@ func FuzzParseRSLEntryText(f *testing.F) {
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, fuzzZeroHash))
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s", AnnotationEntryHeader, EntryIDKey, fuzzZeroHash, SkipKey, "true"))
 	f.Add(fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s", PropagationEntryHeader, RefKey, "refs/heads/main", TargetIDKey, fuzzZeroHash, UpstreamRepositoryKey, "https://git.example.com:8443/repo", UpstreamEntryIDKey, fuzzNonZeroHash))
+	f.Add(fmt.Sprintf("%s\n\nrefs/heads/main: %s\nrefs/heads/feature: %s\n\n%s: %d", BulkReferenceEntryHeader, fuzzZeroHash, fuzzNonZeroHash, NumberKey, 3))
 
 	f.Fuzz(func(_ *testing.T, text string) {
 		_, _ = parseRSLEntryText(githash.ZeroHash, text)
@@ -697,4 +699,237 @@ func BenchmarkParseRSLEntryText(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestParseRSLEntryTextUnknownHeader(t *testing.T) {
+	t.Parallel()
+
+	_, err := parseRSLEntryText(githash.ZeroHash, "RSL Future Entry\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+	assert.ErrorContains(t, err, `"RSL Future Entry"`)
+	assert.ErrorContains(t, err, "Upgrade gittuf to the latest release")
+
+	longHeader := "RSL " + strings.Repeat("x", 200) + " Entry"
+	_, err = parseRSLEntryText(githash.ZeroHash, longHeader+"\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorContains(t, err, longHeader[:maxHeaderInError]+"...")
+	assert.NotContains(t, err.Error(), longHeader)
+}
+
+func TestAnnotationEntryQualifiersCodec(t *testing.T) {
+	t.Parallel()
+
+	nonZeroHash, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+	zero := githash.ZeroHash.String()
+
+	annotation := NewAnnotationEntryWithQualifiers(
+		[]githash.Hash{githash.ZeroHash, nonZeroHash},
+		map[string][]string{zero: {"refs/heads/feature", "refs/tags/v1"}},
+		true,
+		"",
+	)
+	annotation.Number = 40
+
+	expected := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: true\n%s: %d",
+		AnnotationEntryHeader,
+		EntryIDKey, zero,
+		RefKey, "refs/heads/feature",
+		RefKey, "refs/tags/v1",
+		EntryIDKey, nonZeroHash.String(),
+		SkipKey,
+		NumberKey, 40)
+
+	message, err := annotation.createCommitMessage(true)
+	require.NoError(t, err)
+	assert.Equal(t, expected, message)
+
+	parsed, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+	annotation.ID = githash.ZeroHash
+	assert.Equal(t, annotation, parsed)
+}
+
+func TestAnnotationEntryQualifiersCodecDuplicateEntryID(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+
+	annotation := NewAnnotationEntryWithQualifiers(
+		[]githash.Hash{githash.ZeroHash, githash.ZeroHash},
+		map[string][]string{zero: {"refs/heads/feature"}},
+		true,
+		"",
+	)
+	annotation.Number = 41
+
+	expected := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %s\n%s: %s\n%s: true\n%s: %d",
+		AnnotationEntryHeader,
+		EntryIDKey, zero,
+		RefKey, "refs/heads/feature",
+		EntryIDKey, zero,
+		RefKey, "refs/heads/feature",
+		SkipKey,
+		NumberKey, 41)
+
+	message, err := annotation.createCommitMessage(true)
+	require.NoError(t, err)
+	assert.Equal(t, expected, message)
+
+	// The writer emits the qualifier once per occurrence of the entry ID, so
+	// the parser must not grow the list when the ID occurs again.
+	parsed, err := parseRSLEntryText(githash.ZeroHash, message)
+	require.NoError(t, err)
+	annotation.ID = githash.ZeroHash
+	assert.Equal(t, annotation, parsed)
+}
+
+func TestAnnotationEntryQualifiersCodecRejectsInvalidRefs(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+
+	tests := map[string]struct {
+		refName       string
+		expectedError error
+	}{
+		"not fully qualified": {
+			refName:       "main",
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"gittuf namespace": {
+			refName:       "refs/gittuf/policy",
+			expectedError: ErrGittufReferenceInBulkEntry,
+		},
+		"surrounding whitespace": {
+			refName:       " refs/heads/main ",
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"line break": {
+			refName:       "refs/heads/main\nref: refs/heads/other",
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"empty": {
+			refName:       "",
+			expectedError: ErrInvalidRSLEntry,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			annotation := &AnnotationEntry{
+				RSLEntryIDs: []githash.Hash{githash.ZeroHash},
+				Refs:        map[string][]string{zero: {test.refName}},
+				Skip:        true,
+				Number:      1,
+			}
+			_, err := annotation.createCommitMessage(true)
+			assert.ErrorIs(t, err, test.expectedError)
+		})
+	}
+}
+
+func TestParseAnnotationEntryTextQualifiers(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+
+	tests := map[string]struct {
+		message       string
+		expectedRefs  map[string][]string
+		expectedError error
+	}{
+		"no qualifiers leaves Refs nil": {
+			message:      fmt.Sprintf("%s\n\n%s: %s\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, SkipKey),
+			expectedRefs: nil,
+		},
+		"one qualifier": {
+			message:      fmt.Sprintf("%s\n\n%s: %s\n%s: refs/heads/a\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, RefKey, SkipKey),
+			expectedRefs: map[string][]string{zero: {"refs/heads/a"}},
+		},
+		"empty ref value": {
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s:\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, RefKey, SkipKey),
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"qualifier attaches to the preceding entryID": {
+			message:      fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: refs/heads/a\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, EntryIDKey, "abcdef12345678900987654321fedcbaabcdef12", RefKey, SkipKey),
+			expectedRefs: map[string][]string{"abcdef12345678900987654321fedcbaabcdef12": {"refs/heads/a"}},
+		},
+		"ref before any entryID": {
+			message:       fmt.Sprintf("%s\n\n%s: refs/heads/a\n%s: %s\n%s: true", AnnotationEntryHeader, RefKey, EntryIDKey, zero, SkipKey),
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"ref after skip": {
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s: true\n%s: refs/heads/a", AnnotationEntryHeader, EntryIDKey, zero, SkipKey, RefKey),
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"not fully qualified": {
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s: main\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, RefKey, SkipKey),
+			expectedError: ErrInvalidRSLEntry,
+		},
+		"gittuf namespace": {
+			message:       fmt.Sprintf("%s\n\n%s: %s\n%s: refs/gittuf/policy\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, RefKey, SkipKey),
+			expectedError: ErrGittufReferenceInBulkEntry,
+		},
+		"duplicate ref for the same entry is deduped": {
+			message:      fmt.Sprintf("%s\n\n%s: %s\n%s: refs/heads/a\n%s: refs/heads/a\n%s: refs/heads/b\n%s: true", AnnotationEntryHeader, EntryIDKey, zero, RefKey, RefKey, RefKey, SkipKey),
+			expectedRefs: map[string][]string{zero: {"refs/heads/a", "refs/heads/b"}},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			entry, err := parseRSLEntryText(githash.ZeroHash, test.message)
+			if test.expectedError != nil {
+				assert.ErrorIs(t, err, test.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedRefs, entry.(*AnnotationEntry).Refs)
+		})
+	}
+}
+
+func TestAnnotationAppliesTo(t *testing.T) {
+	t.Parallel()
+
+	nonZeroHash, err := NewHash("abcdef12345678900987654321fedcbaabcdef12")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unqualified := NewAnnotationEntry([]githash.Hash{githash.ZeroHash}, true, "")
+	assert.True(t, unqualified.AppliesTo(githash.ZeroHash, "refs/heads/any"))
+	assert.False(t, unqualified.AppliesTo(nonZeroHash, "refs/heads/any"))
+
+	qualified := NewAnnotationEntryWithQualifiers([]githash.Hash{githash.ZeroHash}, map[string][]string{githash.ZeroHash.String(): {"refs/heads/a"}}, true, "")
+	assert.True(t, qualified.AppliesTo(githash.ZeroHash, "refs/heads/a"))
+	assert.False(t, qualified.AppliesTo(githash.ZeroHash, "refs/heads/b"))
+	assert.True(t, qualified.RefersTo(githash.ZeroHash))
+
+	view := &ReferenceEntry{ID: githash.ZeroHash, RefName: "refs/heads/b", isView: true}
+	assert.False(t, view.SkippedBy([]*AnnotationEntry{qualified}))
+	assert.True(t, view.SkippedBy([]*AnnotationEntry{unqualified}))
+}
+
+func TestNewAnnotationEntryWithQualifiers(t *testing.T) {
+	t.Parallel()
+
+	zero := githash.ZeroHash.String()
+	refs := map[string][]string{zero: {"refs/heads/a"}, "unqualified": {}}
+
+	annotation := NewAnnotationEntryWithQualifiers([]githash.Hash{githash.ZeroHash}, refs, true, "")
+	assert.Equal(t, map[string][]string{zero: {"refs/heads/a"}}, annotation.Refs)
+
+	refs[zero][0] = "refs/heads/mutated"
+	refs["added"] = []string{"refs/heads/b"}
+	assert.Equal(t, map[string][]string{zero: {"refs/heads/a"}}, annotation.Refs)
+
+	pruned := NewAnnotationEntryWithQualifiers([]githash.Hash{githash.ZeroHash}, map[string][]string{zero: {}}, true, "")
+	assert.Nil(t, pruned.Refs)
 }
