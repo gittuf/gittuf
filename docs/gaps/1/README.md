@@ -7,7 +7,7 @@
 * **Implemented:** No
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Aditya Sirish A Yelgundhalli (adityasaky)
-* **Last Modified:** January 20, 2025
+* **Last Modified:** September 21st, 2026
 
 ## Abstract
 
@@ -97,10 +97,8 @@ of the correct SHA-256 hash.
 
 By default, Git uses the SHA-1 hash algorithm to calculate unique identifiers.
 Due to known weaknesses with SHA-1, the Git community has proposed moving to
-SHA-256. There is experimental support for SHA-256 identifiers, but:
-1. repositories can't currently use both SHA-1 and SHA-256 identifiers, so
-   converting existing repositories means the loss of development history.
-1. most Git servers or forges don't support SHA-256 identifiers.
+SHA-256 starting with Git `v3`. There is support for SHA-256 identifiers, but
+most Git servers or forges don't support SHA-256 identifiers.
 
 Since gittuf maintains a separate set of metadata about the Git objects in a
 repository, it can also provide a mapping to SHA-256 identifiers. This requires
@@ -149,7 +147,10 @@ TODO: A detailed security analysis is necessary before this GAP can be implement
 
 ## Prototype Implementation
 
-A prototype implementation was proposed in https://github.com/gittuf/gittuf/pull/105.
+A prototype implementation was proposed in
+https://github.com/gittuf/gittuf/pull/105. Support for SHA-256 repositories
+(without compatibility mode) in gittuf was added in
+https://github.com/gittuf/gittuf/pull/1472.
 
 ## Changelog
 
