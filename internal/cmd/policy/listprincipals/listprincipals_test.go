@@ -36,6 +36,42 @@ func TestListPrincipals(t *testing.T) {
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
+	t.Run("success empty", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
+		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		require.NoError(t, err)
+
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
+
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
+
+		require.NoError(t, repo.ApplyPolicy(t.Context(), "", true, false))
+
+		_, stdout, _, err := cmd.ExecuteCommandC(New())
+		assert.NoError(t, err)
+
+		output := stdout.String()
+		assert.Contains(t, output, "No principals are currently defined.")
+		assert.NotContains(t, output, "Principal ")
+	})
+
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)

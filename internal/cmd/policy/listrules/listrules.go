@@ -37,6 +37,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	stdOut := cmd.OutOrStdout()
 
+	if len(rules) == 0 {
+		fmt.Fprintln(stdOut, "No rules are currently defined.")
+		return nil
+	}
+
 	// Iterate through the rules, they are already in order, and the depth tells us how to indent.
 	// The order is a pre-order traversal of the delegation tree, so that the parent is always before the children.
 

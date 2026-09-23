@@ -73,8 +73,8 @@ func TestListPropagationDirectives(t *testing.T) {
 		assert.NoError(t, err)
 
 		output := stdout.String()
-		assert.Contains(t, output, "Propagation Directives in the gittuf root of trust:")
-		// No directives should be outputted, only the header
+		assert.Contains(t, output, "No propagation directives are currently defined.")
+		assert.NotContains(t, output, "Propagation Directives in the gittuf root of trust:")
 		assert.NotContains(t, output, "Propagation Directive:")
 	})
 
