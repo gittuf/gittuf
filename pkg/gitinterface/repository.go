@@ -23,7 +23,14 @@ const (
 	binary           = "git"
 	committerTimeKey = "GIT_COMMITTER_DATE"
 	authorTimeKey    = "GIT_AUTHOR_DATE"
+	CompatModeKey    = "GITTUF_COMPAT_MODE"
 )
+
+// InCompatMode returns true if gittuf compatibility mode is enabled via environment variable.
+func InCompatMode() bool {
+	val := strings.ToLower(strings.TrimSpace(os.Getenv(CompatModeKey)))
+	return val == "1" || val == "true" || val == "yes"
+}
 
 var (
 	ErrRepositoryPathNotSpecified    = errors.New("repository path not specified")
@@ -34,15 +41,27 @@ var (
 // Repository is a lightweight wrapper around a Git repository. It stores the
 // location of the repository's GIT_DIR.
 type Repository struct {
-	gitDirPath   string
-	objectFormat ObjectFormat
-	clock        clockwork.Clock
+	gitDirPath         string
+	objectFormat       ObjectFormat
+	compatObjectFormat ObjectFormat
+	clock              clockwork.Clock
 }
 
 // GetObjectFormat returns the hash algorithm the repository uses for its object
 // IDs.
 func (r *Repository) GetObjectFormat() ObjectFormat {
 	return r.objectFormat
+}
+
+// GetCompatObjectFormat returns the compatibility hash algorithm the repository uses,
+// if configured and compatibility mode is enabled.
+func (r *Repository) GetCompatObjectFormat() ObjectFormat {
+	return r.compatObjectFormat
+}
+
+// IsCompatMode returns true if the repository has a compatObjectFormat configured.
+func (r *Repository) IsCompatMode() bool {
+	return r.compatObjectFormat != ""
 }
 
 // readObjectFormat queries Git for the repository's object format (hash
@@ -61,11 +80,11 @@ func (r *Repository) readObjectFormat() (ObjectFormat, error) {
 	}
 }
 
-// ensureNoCompatObjectFormat returns an error if the repository is in dual
-// hash interop mode (extensions.compatObjectFormat). In that mode Git
-// maintains both SHA-1 and SHA-256 representations of every object and stores
-// additional compat signatures under headers gittuf does not process, so
-// signing and verification results would be unreliable. The config file is
+// ensureNoCompatObjectFormat checks if the repository is in dual hash interop
+// mode (extensions.compatObjectFormat). In that mode Git maintains both SHA-1
+// and SHA-256 representations of every object. When InCompatMode() is enabled,
+// it logs a warning and stores the compat object format on the Repository.
+// Otherwise, it returns ErrCompatObjectFormatUnsupported. The config file is
 // read directly (without invoking Git) because Git builds without compat
 // support refuse to open such repositories at all.
 func (r *Repository) ensureNoCompatObjectFormat() error {
@@ -82,7 +101,11 @@ func (r *Repository) ensureNoCompatObjectFormat() error {
 	}
 	compatFormat := gitConfig.Raw.Section("extensions").Options.Get("compatObjectFormat")
 	if compatFormat != "" {
-		return fmt.Errorf("%w: compat object format is set to '%s'", ErrCompatObjectFormatUnsupported, compatFormat)
+		if !InCompatMode() {
+			return fmt.Errorf("%w: compat object format is set to '%s'", ErrCompatObjectFormatUnsupported, compatFormat)
+		}
+		slog.Warn(fmt.Sprintf("Repository has extensions.compatObjectFormat set to '%s'; compatibility mode is enabled via %s", compatFormat, CompatModeKey))
+		r.compatObjectFormat = ObjectFormat(compatFormat)
 	}
 
 	return nil

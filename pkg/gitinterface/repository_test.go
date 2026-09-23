@@ -102,6 +102,25 @@ func TestEnsureNoCompatObjectFormat(t *testing.T) {
 		assert.ErrorIs(t, err, ErrCompatObjectFormatUnsupported)
 	})
 
+	t.Run("compat object format with compatibility mode enabled", func(t *testing.T) {
+		t.Setenv(CompatModeKey, "1")
+		assert.True(t, InCompatMode())
+
+		tmpDir := t.TempDir()
+		repo := CreateTestGitRepository(t, tmpDir, false, WithSHA256Format())
+
+		require.Nil(t, repo.SetGitConfig("extensions.compatObjectFormat", "sha1"))
+
+		assert.Nil(t, repo.ensureNoCompatObjectFormat())
+		assert.True(t, repo.IsCompatMode())
+		assert.Equal(t, ObjectFormatSHA1, repo.GetCompatObjectFormat())
+
+		loadedRepo, err := LoadRepository(tmpDir)
+		assert.Nil(t, err)
+		assert.True(t, loadedRepo.IsCompatMode())
+		assert.Equal(t, ObjectFormatSHA1, loadedRepo.GetCompatObjectFormat())
+	})
+
 	t.Run("missing config", func(t *testing.T) {
 		repo := &Repository{gitDirPath: t.TempDir()}
 
