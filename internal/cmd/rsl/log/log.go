@@ -30,7 +30,7 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return display.RSLLog(repo.GetGitRepository(), display.NewDisplayWriter(os.Stdout), display.WithReferences(o.refs))
+	return display.RSLLog(repo.GetStorer(), display.NewDisplayWriter(os.Stdout), display.WithReferences(o.refs))
 }
 
 func New() *cobra.Command {

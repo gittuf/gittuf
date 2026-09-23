@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/teatest"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
@@ -406,6 +407,10 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 }
 
 func TestTrustPropagationBackendErrorUsesErrorDialog(t *testing.T) {
+	// The directive update is gated on developer mode, and this test asserts
+	// the resulting error reaches the dialog, so the gate must be shut.
+	t.Setenv(dev.DevModeKey, "")
+
 	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
 	m.screen = screenTrustUpdatePropagationForm
 	m.trustPropagationScreen.selectedAction = trustUpdateDirectiveAction

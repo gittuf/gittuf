@@ -67,7 +67,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		return nil, errors.Join(ErrCloningRepository, err)
 	}
 
-	repository := &Repository{r: r}
+	repository := &Repository{r: newStorer(r)}
 
 	if len(expectedRootKeys) > 0 {
 		slog.Debug("Verifying if root keys are expected root keys...")
@@ -76,7 +76,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 			return expectedRootKeys[i].ID() < expectedRootKeys[j].ID()
 		})
 
-		state, err := policy.LoadFirstState(ctx, r)
+		state, err := policy.LoadFirstState(ctx, repository.GetStorer())
 		if err != nil {
 			return repository, errors.Join(ErrCloningRepository, err)
 		}

@@ -140,7 +140,7 @@ func getGittufWantsAndHaves(repo *gittuf.Repository, remoteTips map[string]strin
 	wants := map[string]string{}
 	currentTips := set.NewSet[string]()
 	for remoteRef, tip := range remoteTips {
-		currentTip, err := repo.GetGitRepository().GetReference(remoteRef)
+		currentTip, err := repo.GetStorer().GetReference(remoteRef)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -165,7 +165,7 @@ func getSSHCommand(repo *gittuf.Repository) ([]string, error) {
 		return []string{sshCmd}, nil
 	}
 
-	sshCmd, ok, err := repo.GetGitRepository().LookupConfig(gitstore.ConfigCoreSSHCommand)
+	sshCmd, ok, err := repo.GetStorer().LookupConfig(gitstore.ConfigCoreSSHCommand)
 	if err != nil {
 		return nil, err
 	}
