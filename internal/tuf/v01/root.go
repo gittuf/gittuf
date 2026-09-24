@@ -108,6 +108,10 @@ func (r *RootMetadata) DeleteRootPrincipal(keyID string) error {
 	}
 
 	rootRole := r.Roles[tuf.RootRoleName]
+	if !rootRole.KeyIDs.Has(keyID) {
+		return tuf.ErrPrincipalNotFound
+	}
+
 	if rootRole.KeyIDs.Len() <= rootRole.Threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -158,6 +162,10 @@ func (r *RootMetadata) DeletePrimaryRuleFilePrincipal(keyID string) error {
 	targetsRole, ok := r.Roles[tuf.TargetsRoleName]
 	if !ok {
 		return tuf.ErrPrimaryRuleFileInformationNotFoundInRoot
+	}
+
+	if !targetsRole.KeyIDs.Has(keyID) {
+		return tuf.ErrPrincipalNotFound
 	}
 
 	if targetsRole.KeyIDs.Len() <= targetsRole.Threshold {

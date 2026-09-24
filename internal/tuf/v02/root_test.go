@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -387,6 +388,11 @@ func TestDeleteRootPrincipal(t *testing.T) {
 	err = rootMetadata.AddRootPrincipal(person)
 	assert.Nil(t, err)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeleteRootPrincipal(strings.ToLower(newRootKey.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID, newRootKey.KeyID, person.PersonID), rootMetadata.Roles[tuf.RootRoleName].PrincipalIDs)
+
 	err = rootMetadata.DeleteRootPrincipal(newRootKey.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, newRootKey, rootMetadata.Principals[newRootKey.KeyID])
@@ -396,6 +402,9 @@ func TestDeleteRootPrincipal(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, person, rootMetadata.Principals[person.PersonID])
 	assert.Equal(t, set.NewSetFromItems(key.KeyID), rootMetadata.Roles[tuf.RootRoleName].PrincipalIDs)
+
+	err = rootMetadata.DeleteRootPrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeleteRootPrincipal(key.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
@@ -449,6 +458,11 @@ func TestDeletePrimaryRuleFilePrincipal(t *testing.T) {
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal("")
 	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal(strings.ToLower(targetsKey1.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(targetsKey1.KeyID, targetsKey2.KeyID), rootMetadata.Roles[tuf.TargetsRoleName].PrincipalIDs)
+
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey1.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey1, rootMetadata.Principals[targetsKey1.KeyID])
@@ -469,6 +483,9 @@ func TestDeletePrimaryRuleFilePrincipal(t *testing.T) {
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(person.PersonID)
 	assert.Nil(t, err)
 	assert.False(t, rootMetadata.Roles[tuf.TargetsRoleName].PrincipalIDs.Has(person.PersonID))
+
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey2.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)

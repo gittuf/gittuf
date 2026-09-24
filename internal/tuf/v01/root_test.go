@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -354,11 +355,19 @@ func TestDeleteRootPrincipal(t *testing.T) {
 	err := rootMetadata.AddRootPrincipal(newRootKey)
 	assert.Nil(t, err)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeleteRootPrincipal(strings.ToLower(newRootKey.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID, newRootKey.KeyID), rootMetadata.Roles[tuf.RootRoleName].KeyIDs)
+
 	err = rootMetadata.DeleteRootPrincipal(newRootKey.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
 	assert.Equal(t, set.NewSetFromItems(key.KeyID), rootMetadata.Roles[tuf.RootRoleName].KeyIDs)
+
+	err = rootMetadata.DeleteRootPrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeleteRootPrincipal(key.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
@@ -400,12 +409,20 @@ func TestDeletePrimaryRuleFilePrincipal(t *testing.T) {
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal("")
 	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal(strings.ToLower(targetsKey1.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(targetsKey1.KeyID, targetsKey2.KeyID), rootMetadata.Roles[tuf.TargetsRoleName].KeyIDs)
+
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey1.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey1, rootMetadata.Keys[targetsKey1.KeyID])
 	assert.Equal(t, targetsKey2, rootMetadata.Keys[targetsKey2.KeyID])
 	targetsRole := rootMetadata.Roles[tuf.TargetsRoleName]
 	assert.True(t, targetsRole.KeyIDs.Has(targetsKey2.KeyID))
+
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey2.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)

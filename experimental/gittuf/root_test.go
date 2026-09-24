@@ -379,8 +379,12 @@ func TestRemoveRootKey(t *testing.T) {
 		err = r.RemoveRootKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 
-		// Test error with removing key
+		// Test removing a key that isn't a root principal
 		err = r.RemoveRootKey(testCtx, originalSigner, newRootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test error with removing key
+		err = r.RemoveRootKey(testCtx, originalSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
@@ -519,8 +523,12 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		err = r.RemoveTopLevelTargetsKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 
-		// Test error with removing key
+		// Test removing a key that isn't a policy principal
 		err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test error with removing key
+		err = r.RemoveTopLevelTargetsKey(testCtx, sv, targetsKey.KeyID, false)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
