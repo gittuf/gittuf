@@ -59,6 +59,7 @@ func TestValidate(t *testing.T) {
 	testRef := "refs/heads/main"
 	testAnotherRef := "refs/heads/feature"
 	testID := gitinterface.ZeroHash.String()
+	testAnotherID := "another-id"
 	mainZeroZero := createTestEnvelope(t, testRef, testID, testID)
 	featureZeroZero := createTestEnvelope(t, testAnotherRef, testID, testID)
 
@@ -70,6 +71,29 @@ func TestValidate(t *testing.T) {
 
 	err = Validate(mainZeroZero, testAnotherRef, testID, testID)
 	assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+
+	t.Run("mismatched subject target tree ID", func(t *testing.T) {
+		authorization := createTestEnvelope(t, testRef, testID, testAnotherID)
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
+	t.Run("mismatched predicate target tree ID", func(t *testing.T) {
+		authorization := createTestEnvelope(t, testRef, testID, testAnotherID, func(statement *ita.Statement) {
+			statement.Subject[0].Digest[digestGitTreeKey] = testID
+		})
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
+	t.Run("mismatched predicate from revision ID", func(t *testing.T) {
+		authorization := createTestEnvelope(t, testRef, testAnotherID, testID)
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		// Test invalid base64
@@ -90,12 +114,15 @@ func TestValidate(t *testing.T) {
 	})
 }
 
-func createTestEnvelope(t *testing.T, refName, fromID, toID string) *sslibdsse.Envelope {
+func createTestEnvelope(t *testing.T, refName, fromID, toID string, mutations ...func(*ita.Statement)) *sslibdsse.Envelope {
 	t.Helper()
 
 	authorization, err := NewReferenceAuthorization(refName, fromID, toID)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, mutate := range mutations {
+		mutate(authorization)
 	}
 	env, err := dsse.CreateEnvelope(authorization)
 	if err != nil {
