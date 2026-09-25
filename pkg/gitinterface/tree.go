@@ -307,18 +307,22 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 		return nil, err
 	}
 
-	if !r.IsBare() {
+	worktree, err := r.GetWorktree()
+	if err != nil {
+		// bare repositories have no worktree to update
+		if !errors.Is(err, ErrNoWorktree) {
+			return nil, err
+		}
+	} else {
 		head, err := r.GetSymbolicReferenceTarget("HEAD")
 		if err != nil {
 			return nil, err
 		}
 		if head == localRef {
-			worktree := strings.TrimSuffix(r.gitDirPath, ".git") // TODO: this doesn't support detached git dir
-
-			if _, err := r.executor("restore", "--staged", localPath).withDir(worktree).executeString(); err != nil {
+			if _, err := r.executor("restore", "--staged", "--", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
-			if _, err := r.executor("restore", localPath).withDir(worktree).executeString(); err != nil {
+			if _, err := r.executor("restore", "--", localPath).withDir(worktree).executeString(); err != nil {
 				return nil, err
 			}
 		}
