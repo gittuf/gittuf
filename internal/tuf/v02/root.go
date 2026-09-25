@@ -560,6 +560,10 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 // AddPropagationDirective adds a propagation directive to the root metadata.
 func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirective) error {
 	for _, existing := range r.Propagations {
+		if existing.GetName() == directive.GetName() {
+			return tuf.ErrPropagationDirectiveAlreadyExists
+		}
+
 		if existing.GetUpstreamRepository() == directive.GetUpstreamRepository() &&
 			existing.GetUpstreamReference() == directive.GetUpstreamReference() &&
 			existing.GetUpstreamPath() == directive.GetUpstreamPath() &&

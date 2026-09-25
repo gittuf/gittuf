@@ -114,6 +114,32 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, 1, len(directives))
 		assert.Equal(t, directive, directives[0])
 
+		duplicateNameDirective := &PropagationDirective{
+			Name:                "test",
+			UpstreamRepository:  "https://example.org/git/other-repository",
+			UpstreamReference:   "refs/heads/feature",
+			DownstreamReference: "refs/heads/feature",
+			DownstreamPath:      "other-upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(duplicateNameDirective)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
+		duplicateTupleDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.com/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(duplicateTupleDirective)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
 		updatedDirective := &PropagationDirective{
 			Name:                "test",
 			UpstreamRepository:  "https://example.org/git/repository",

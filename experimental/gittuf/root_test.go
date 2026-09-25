@@ -1830,6 +1830,9 @@ func TestAddPropagationDirective(t *testing.T) {
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
 
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/other-repository", "refs/heads/feature", "", "refs/heads/feature", "other-upstream/", false)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
@@ -1868,6 +1871,9 @@ func TestAddPropagationDirective(t *testing.T) {
 
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
+
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/other-repository", "refs/heads/feature", "otherUpstreamPath/", "refs/heads/feature", "other-upstream/", false)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
 
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
