@@ -4,8 +4,6 @@
 package removerootkey
 
 import (
-	"strings"
-
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
@@ -42,7 +40,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.RemoveRootKey(cmd.Context(), signer, strings.ToLower(o.rootKeyID), true, opts...)
+	return repo.RemoveRootKey(cmd.Context(), signer, o.rootKeyID, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
