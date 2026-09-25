@@ -386,10 +386,10 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 		index  int
 		screen screen
 	}{
-		{name: "keys and thresholds", index: 2, screen: screenTrustKeysThresholds},
+		{name: "root users", index: 2, screen: screenTrustKeysThresholds},
 		{name: "github app", index: 3, screen: screenTrustGitHubApp},
 		{name: "lifecycle", index: 4, screen: screenTrustLifecycle},
-		{name: "repo network", index: 5, screen: screenTrustRepoNetwork},
+		{name: "additional information", index: 5, screen: screenTrustRepoNetwork},
 	}
 
 	for _, tt := range tests {
@@ -404,6 +404,20 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 			assert.Equal(t, tt.screen, typed.screen)
 		})
 	}
+}
+
+func TestTrustMenuIncludesIssueSpecificScreens(t *testing.T) {
+	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+
+	items := m.trustScreen.trustScreenList.Items()
+	labels := make([]string, 0, len(items))
+	for _, it := range items {
+		labels = append(labels, it.(item).title)
+	}
+
+	assert.Contains(t, labels, "Root Users")
+	assert.Contains(t, labels, "Additional Information")
+	assert.Contains(t, labels, "View Global Rules")
 }
 
 func TestTrustPropagationBackendErrorUsesErrorDialog(t *testing.T) {

@@ -70,11 +70,11 @@ func (s *trustRepoNetworkScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 func (s *trustRepoNetworkScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustRepoNetwork:
-		return m.renderScreen("Home › Trust › Repo/Network", s.operationList.View(), renderActionHints(m.readOnly))
+		return m.renderScreen("Home › Trust › Additional Information", s.operationList.View(), renderActionHints(m.readOnly))
 	case screenTrustRepoForm:
-		return m.renderScreen("Home › Trust › Repo/Network › Repository", s.renderRepoForm(), renderActionHints(m.readOnly))
+		return m.renderScreen("Home › Trust › Additional Information › Repository", s.renderRepoForm(), renderActionHints(m.readOnly))
 	case screenTrustRepoLocationForm:
-		return m.renderScreen("Home › Trust › Repo/Network › Location", s.renderLocationForm(), renderActionHints(m.readOnly))
+		return m.renderScreen("Home › Trust › Additional Information › Location", s.renderLocationForm(), renderActionHints(m.readOnly))
 	default:
 		return ""
 	}

@@ -74,11 +74,11 @@ func (s *trustKeysThresholdsScreen) Update(msg tea.Msg, m *model) (tea.Model, te
 func (s *trustKeysThresholdsScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustKeysThresholds:
-		return m.renderScreen("Home › Trust › Keys & Thresholds", s.operationList.View(), renderActionHints(m.readOnly))
+		return m.renderScreen("Home › Trust › Root Users", s.operationList.View(), renderActionHints(m.readOnly))
 	case screenTrustKeyForm:
-		return s.renderFormScreen(m, "Trust Key Form", "Home › Trust › Keys & Thresholds › Key Form")
+		return s.renderFormScreen(m, "Trust Key Form", "Home › Trust › Root Users › Key Form")
 	case screenTrustThresholdForm:
-		return s.renderFormScreen(m, "Threshold Form", "Home › Trust › Keys & Thresholds › Threshold Form")
+		return s.renderFormScreen(m, "Threshold Form", "Home › Trust › Root Users › Threshold Form")
 	default:
 		return ""
 	}
