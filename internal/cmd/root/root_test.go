@@ -69,3 +69,17 @@ func TestReportStorerTraceIsSilentWhenDisabled(t *testing.T) {
 	ReportStorerTrace(out)
 	assert.Empty(t, out.String())
 }
+
+func TestNew(t *testing.T) {
+	cmd := New()
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "gittuf", cmd.Use)
+
+	// Check if all subcommands are added
+	assert.True(t, cmd.HasSubCommands())
+
+	// Check flags
+	assert.NotNil(t, cmd.PersistentFlags().Lookup("no-color"))
+	assert.NotNil(t, cmd.PersistentFlags().Lookup("verbose"))
+	assert.NotNil(t, cmd.PersistentFlags().Lookup("profile"))
+}
