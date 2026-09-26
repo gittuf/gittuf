@@ -25,20 +25,6 @@ import (
 )
 
 func TestListGlobalRules(t *testing.T) {
-	createRepositoryWithRoot := func(t *testing.T, location string, privateKey, publicKey []byte) (*gittuf.Repository, *ssh.Signer) {
-		t.Helper()
-		gitinterface.CreateTestGitRepository(t, location, false)
-		keyPath := filepath.Join(location, "test-key")
-		require.NoError(t, os.WriteFile(keyPath, privateKey, 0o600))
-		require.NoError(t, os.WriteFile(keyPath+".pub", publicKey, 0o600))
-		repo, err := gittuf.LoadRepository(location)
-		require.NoError(t, err)
-		signer, err := ssh.NewSignerFromFile(keyPath)
-		require.NoError(t, err)
-		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		return repo, signer
-	}
-
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
@@ -69,8 +55,25 @@ func TestListGlobalRules(t *testing.T) {
 
 	t.Run("success no rules", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		createRepositoryWithRoot(t, tmpDir, artifacts.SSHED25519Private, artifacts.SSHED25519PublicSSH)
-		t.Chdir(tmpDir)
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		_, stdout, _, err := cmd.ExecuteCommandC(New(), "--target-ref", "policy-staging")
 		assert.NoError(t, err)
@@ -79,8 +82,25 @@ func TestListGlobalRules(t *testing.T) {
 
 	t.Run("success with rules", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		repo, signer := createRepositoryWithRoot(t, tmpDir, artifacts.SSHED25519Private, artifacts.SSHED25519PublicSSH)
-		t.Chdir(tmpDir)
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
 		// Add threshold global rule
 		require.NoError(t, repo.AddGlobalRuleThreshold(t.Context(), signer, "require-approval-for-main", []string{"git:refs/heads/main", "file:src/*"}, 1, false, trustpolicyopts.WithRSLEntry()))
@@ -175,7 +195,17 @@ Global Rule: block-force-pushes-for-main
 		for name, test := range tests {
 			t.Run(name, func(t *testing.T) {
 				location := t.TempDir()
-				repo, signer := createRepositoryWithRoot(t, location, artifacts.SSHRSAPrivate, artifacts.SSHRSAPublicSSH)
+				gitinterface.CreateTestGitRepository(t, location, false)
+
+				keyPath := filepath.Join(location, "test-key")
+				require.NoError(t, os.WriteFile(keyPath, artifacts.SSHRSAPrivate, 0o600))
+				require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
+
+				repo, err := gittuf.LoadRepository(location)
+				require.NoError(t, err)
+				signer, err := gittuf.LoadSigner(repo, keyPath)
+				require.NoError(t, err)
+				require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 				if test.localRules {
 					require.NoError(t, repo.AddGlobalRuleThreshold(t.Context(), signer, "require-approval-for-main", []string{"git:refs/heads/main"}, 2, false))
 				}
@@ -183,7 +213,17 @@ Global Rule: block-force-pushes-for-main
 				for _, controller := range test.controllers {
 					controllerLocation := filepath.Join(test.controllerDirectory, controller)
 					keys := controllerKeys[controller]
-					controllerRepo, controllerSigner := createRepositoryWithRoot(t, controllerLocation, keys.private, keys.public)
+					gitinterface.CreateTestGitRepository(t, controllerLocation, false)
+
+					controllerKeyPath := filepath.Join(controllerLocation, "test-key")
+					require.NoError(t, os.WriteFile(controllerKeyPath, keys.private, 0o600))
+					require.NoError(t, os.WriteFile(controllerKeyPath+".pub", keys.public, 0o600))
+
+					controllerRepo, err := gittuf.LoadRepository(controllerLocation)
+					require.NoError(t, err)
+					controllerSigner, err := ssh.NewSignerFromFile(controllerKeyPath)
+					require.NoError(t, err)
+					require.NoError(t, controllerRepo.InitializeRoot(t.Context(), controllerSigner, false, rootopts.WithRSLEntry()))
 					require.NoError(t, controllerRepo.EnableController(t.Context(), controllerSigner, false))
 					require.NoError(t, controllerRepo.AddGlobalRuleBlockForcePushes(t.Context(), controllerSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false))
 					require.NoError(t, controllerRepo.AddGlobalRuleThreshold(t.Context(), controllerSigner, "require-approval-for-main", []string{"git:refs/heads/main", "file:src/*", "git:refs/tags/*", "file:docs/*"}, 3, false))
