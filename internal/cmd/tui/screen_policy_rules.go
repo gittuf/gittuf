@@ -159,6 +159,7 @@ func (s *policyRulesScreen) handleDeleteConfirm(msg tea.Msg, m *model) (tea.Mode
 			} else {
 				m.footer = "Rule removed successfully!"
 				s.refreshRules(m.ctx, m.options)
+				m.invalidateDiffCache()
 			}
 		}
 		s.confirmDelete = false
@@ -176,6 +177,7 @@ func (s *policyRulesScreen) handleReorderUp(m *model) (tea.Model, tea.Cmd) {
 		}
 		s.updateRuleList()
 		m.footer = "Rules reordered successfully!"
+		m.invalidateDiffCache()
 	}
 	return *m, nil
 }
@@ -189,6 +191,7 @@ func (s *policyRulesScreen) handleReorderDown(m *model) (tea.Model, tea.Cmd) {
 		}
 		s.updateRuleList()
 		m.footer = "Rules reordered successfully!"
+		m.invalidateDiffCache()
 	}
 	return *m, nil
 }
@@ -232,6 +235,7 @@ func (s *policyRulesScreen) handlePolicyFormSubmit(m *model) (tea.Model, tea.Cmd
 	} else {
 		m.footer = "Rule updated successfully!"
 	}
+	m.invalidateDiffCache()
 	m.screen = screenPolicyRules
 	return *m, nil
 }
@@ -239,20 +243,20 @@ func (s *policyRulesScreen) handlePolicyFormSubmit(m *model) (tea.Model, tea.Cmd
 func (s *policyRulesScreen) View(m *model) string {
 	switch m.screen {
 	case screenPolicyRules:
-		overlay := ""
+		var overlays string
 		if s.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-			)
+			overlays = renderDeleteOverlay("rule", s.deleteTarget)
+		} else {
+			hint := ""
+			if !m.readOnly {
+				hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+					"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
+				)
+			}
+			overlays = renderActionHints(m.readOnly) + hint
 		}
 
 		listView := m.renderListOrEmpty(s.ruleList, len(s.rules), "No rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
-
 		return m.renderScreen("Home › Policy › Rules", listView, overlays)
 
 	case screenPolicyAddRule:

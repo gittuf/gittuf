@@ -241,25 +241,20 @@ func renderDiffOverlay(m model) string {
 		return ""
 	}
 
-	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
-	availableWidth := m.width - h - 4
-	availableHeight := m.height - v - 6
-
-	w := availableWidth - 6
-	if w > 74 {
-		w = 74
+	overlayHeight := m.height - 3
+	if overlayHeight < 6 {
+		overlayHeight = 6
 	}
-	if w < 28 {
-		w = 28
+	overlayWidth := m.width - 6
+	if overlayWidth < 28 {
+		overlayWidth = 28
 	}
-
-	vh := availableHeight - 6
-	if vh < 4 {
-		vh = 4
+	vpHeight := overlayHeight - 8
+	if vpHeight < 2 {
+		vpHeight = 2
 	}
-
-	m.diffViewport.Width = w
-	m.diffViewport.Height = vh
+	m.diffViewport.Width = overlayWidth - 4
+	m.diffViewport.Height = vpHeight
 
 	title := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(colorFocus)).
@@ -270,7 +265,8 @@ func renderDiffOverlay(m model) string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(colorFocus)).
 		Padding(1, 2).
-		Width(w).
+		Width(overlayWidth).
+		Height(overlayHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			title,
 			"",
@@ -352,12 +348,16 @@ func renderActionHints(readOnly bool) string {
 	})
 }
 
-// renderDeleteOverlay renders the delete confirmation prompt.
-func renderDeleteOverlay(target string) string {
+// renderDeleteOverlay renders the delete confirmation prompt with the appropriate entity type.
+func renderDeleteOverlay(itemType, target string) string {
+	label := "rule"
+	if itemType != "" {
+		label = itemType
+	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FF0000")).
+		Foreground(lipgloss.Color(colorErrorMsg)).
 		Bold(true).
-		Render(fmt.Sprintf("Delete rule %q? [y/n]", target))
+		Render(fmt.Sprintf("Delete %s %q? [y/n]", label, target))
 }
 
 // renderScreen provides unified boilerplate layout containing the title, central visual box, and footers.
@@ -375,20 +375,34 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		effectiveOverlays = ""
 	}
 
-	bottomHeight := 1
+	var footerItems []string
 	if effectiveOverlays != "" {
-		bottomHeight += strings.Count(effectiveOverlays, "\n") + 1
+		if trimmed := strings.Trim(effectiveOverlays, "\n"); trimmed != "" {
+			footerItems = append(footerItems, trimmed)
+		}
 	}
-	footerBox := renderFooterBox(m)
-	if footerBox != "" {
-		bottomHeight += strings.Count(footerBox, "\n") + 1
+	if fb := strings.Trim(renderFooterBox(m), "\n"); fb != "" {
+		footerItems = append(footerItems, fb)
 	}
-	errorMsg := renderErrorMsg(m.errorMsg)
-	if errorMsg != "" {
-		bottomHeight += strings.Count(errorMsg, "\n") + 1
+	if m.errorMsg != "" {
+		if errMsg := strings.Trim(renderErrorMsg(m.errorMsg), "\n"); errMsg != "" {
+			footerItems = append(footerItems, errMsg)
+		}
 	}
 
-	boxHeight := m.height - v - 4 - bottomHeight
+	footerHeight := 0
+	footerContent := strings.Join(footerItems, "\n")
+	if len(footerItems) > 0 {
+		footerHeight = strings.Count(footerContent, "\n") + 1
+	}
+
+	// status bar (1) + vertical margin (v=2) + box border (2) + spacing (1 if footer exists) + footerHeight
+	reservedHeight := 1 + v + 2 + footerHeight
+	if footerHeight > 0 {
+		reservedHeight++
+	}
+
+	boxHeight := m.height - reservedHeight
 	if boxHeight < 0 {
 		boxHeight = 0
 	}
@@ -400,19 +414,16 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 
 	content := screenBoxStyle.Width(boxWidth).Height(boxHeight).Render(contentBody)
 
-	errMsg := ""
-	if m.errorMsg != "" {
-		errMsg = "\n" + renderErrorMsg(m.errorMsg)
+	var innerContent string
+	if footerHeight > 0 {
+		innerContent = content + "\n\n" + footerContent
+	} else {
+		innerContent = content
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
 		renderStatusBar(title, m.readOnly, m.width),
-		renderWithMargin(
-			content+"\n"+
-				effectiveOverlays+
-				renderFooterBox(m)+
-				errMsg,
-		),
+		renderWithMargin(innerContent),
 	)
 }
 
@@ -473,45 +484,11 @@ func (m model) View() string {
 	if m.showDiffOverlay {
 		screenTitle := m.currentScreenTitle()
 		statusBar := renderStatusBar(screenTitle, m.readOnly, m.width)
-		// Height available below status bar (1 row) minus margin (2 rows top+bottom)
 		overlayHeight := m.height - 3
 		if overlayHeight < 6 {
 			overlayHeight = 6
 		}
-		overlayWidth := m.width - 6
-		if overlayWidth > 76 {
-			overlayWidth = 76
-		}
-		if overlayWidth < 28 {
-			overlayWidth = 28
-		}
-		// viewport fits inside the box: subtract border(2) + padding(2) + title(1) + blank(1) + hint(1) + blank(1) = 8
-		vpHeight := overlayHeight - 8
-		if vpHeight < 2 {
-			vpHeight = 2
-		}
-		m.diffViewport.Width = overlayWidth - 4
-		m.diffViewport.Height = vpHeight
-
-		title := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorFocus)).
-			Bold(true).
-			Render("Staged Policy & Trust Changes (Diff)")
-
-		overlayBox := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorFocus)).
-			Padding(1, 2).
-			Width(overlayWidth).
-			Height(overlayHeight).
-			Render(lipgloss.JoinVertical(lipgloss.Left,
-				title,
-				"",
-				m.diffViewport.View(),
-				"",
-				lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Press Esc or 'v' to close • Arrow keys to scroll"),
-			))
-
+		overlayBox := renderDiffOverlay(m)
 		centeredOverlay := lipgloss.Place(m.width, overlayHeight, lipgloss.Center, lipgloss.Top, overlayBox)
 
 		return lipgloss.JoinVertical(lipgloss.Left,
