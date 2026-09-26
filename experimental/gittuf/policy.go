@@ -5,9 +5,11 @@ package gittuf
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
@@ -197,8 +199,17 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 	return metadata.GetPrincipals(), nil
 }
 
-// ListGlobalRules returns a list of all global rules as an array of tuf.GlobalRules.
-func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]tuf.GlobalRule, error) {
+// GlobalRulesForRepository groups global rules by repository.
+// RepositoryName and RepositoryLocation are empty for local rules.
+type GlobalRulesForRepository struct {
+	RepositoryName     string
+	RepositoryLocation string
+	Rules              []tuf.GlobalRule
+}
+
+// ListGlobalRules returns global rules grouped by repository, starting with local
+// rules, followed by controller rules sorted by repository name and location.
+func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]GlobalRulesForRepository, error) {
 	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
 		targetRef = "refs/gittuf/" + targetRef
 	}
@@ -214,7 +225,51 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 		return nil, err
 	}
 
-	return rootMetadata.GetGlobalRules(), nil
+	controllerRepositories := rootMetadata.GetControllerRepositories()
+	controllerRoots := map[string]tuf.RootMetadata{}
+	for controllerName := range state.ControllerMetadata {
+		controllerRoot, err := state.GetControllerRootMetadata(controllerName)
+		if err != nil {
+			return nil, err
+		}
+		controllerRoots[controllerName] = controllerRoot
+		controllerRepositories = append(controllerRepositories, controllerRoot.GetControllerRepositories()...)
+	}
+
+	// Match controllers by name and location.
+	controllers := map[string]tuf.OtherRepository{}
+	for _, controller := range controllerRepositories {
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controller.GetLocation()))
+		controllers[controller.GetName()+"-"+encodedLocation] = controller
+	}
+
+	var rules []GlobalRulesForRepository
+	if localRules := rootMetadata.GetGlobalRules(); len(localRules) > 0 {
+		rules = append(rules, GlobalRulesForRepository{Rules: localRules})
+	}
+	for controllerName, controllerRoot := range controllerRoots {
+		controllerRules := controllerRoot.GetGlobalRules()
+		if len(controllerRules) == 0 {
+			continue
+		}
+		controller, has := controllers[controllerName]
+		if !has {
+			return nil, fmt.Errorf("unable to identify controller repository for propagated metadata '%s'", controllerName)
+		}
+		rules = append(rules, GlobalRulesForRepository{
+			RepositoryName:     controller.GetName(),
+			RepositoryLocation: controller.GetLocation(),
+			Rules:              controllerRules,
+		})
+	}
+	sort.Slice(rules, func(i, j int) bool {
+		if rules[i].RepositoryName == rules[j].RepositoryName {
+			return rules[i].RepositoryLocation < rules[j].RepositoryLocation
+		}
+		return rules[i].RepositoryName < rules[j].RepositoryName
+	})
+
+	return rules, nil
 }
 
 func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOnly, signCommit bool) error {

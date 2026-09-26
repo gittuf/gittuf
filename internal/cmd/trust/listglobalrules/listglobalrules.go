@@ -36,36 +36,43 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	stdOut := cmd.OutOrStdout()
 
-	rules, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
-	if len(rules) == 0 {
-		fmt.Fprintln(stdOut, "No global rules are currently defined.")
-	}
+	rulesByRepository, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
 	if err != nil {
 		return err
 	}
+	if len(rulesByRepository) == 0 {
+		fmt.Fprintln(stdOut, "No global rules are currently defined.")
+		return nil
+	}
 
-	thresholdRules := []tuf.GlobalRuleThreshold{}
-	blockForcePushesRules := []tuf.GlobalRuleBlockForcePushes{}
-	for _, curRule := range rules {
-		switch globalRule := curRule.(type) {
-		case tuf.GlobalRuleThreshold:
-			thresholdRules = append(thresholdRules, globalRule)
-		case tuf.GlobalRuleBlockForcePushes:
-			blockForcePushesRules = append(blockForcePushesRules, globalRule)
+	for _, repository := range rulesByRepository {
+		if repository.RepositoryLocation != "" {
+			fmt.Fprintf(stdOut, "Controller repository: %s\n", repository.RepositoryName)
+			fmt.Fprintf(stdOut, indentString+"Location: %s\n", repository.RepositoryLocation)
 		}
-	}
+		thresholdRules := []tuf.GlobalRuleThreshold{}
+		blockForcePushesRules := []tuf.GlobalRuleBlockForcePushes{}
+		for _, curRule := range repository.Rules {
+			switch globalRule := curRule.(type) {
+			case tuf.GlobalRuleThreshold:
+				thresholdRules = append(thresholdRules, globalRule)
+			case tuf.GlobalRuleBlockForcePushes:
+				blockForcePushesRules = append(blockForcePushesRules, globalRule)
+			}
+		}
 
-	for _, curRule := range thresholdRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
-		fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
-	}
+		for _, curRule := range thresholdRules {
+			fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+			fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
+			printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+			fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
+		}
 
-	for _, curRule := range blockForcePushesRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+		for _, curRule := range blockForcePushesRules {
+			fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
+			fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
+			printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+		}
 	}
 
 	return nil
@@ -76,7 +83,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "list-global-rules",
 		Short:             "List global rules for the current state",
-		Long:              "The 'list-global-rules' command lists the global rules currently defined in the repository's root of trust. It is used to review the repository-wide constraints in effect, with output grouped by rule type.",
+		Long:              "The 'list-global-rules' command lists the global rules defined in the repository's root of trust and propagated from controller repositories. Local rules are shown first, followed by controller rules grouped by repository name and location. Rules within each repository are grouped by rule type.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
