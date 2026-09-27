@@ -956,7 +956,9 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 	entriesToSkip := []githash.Hash{}
 
 	for {
-		if entry, ok := iterator.(*ReferenceEntry); ok {
+		// Only entries for the target ref are relevant, entries for other refs
+		// must neither be skipped nor end the search
+		if entry, ok := iterator.(*ReferenceEntry); ok && entry.RefName == targetRef {
 			isAncestor, err := storer.KnowsCommit(latestEntry.GetTargetID(), entry.TargetID)
 			if err != nil {
 				return err
