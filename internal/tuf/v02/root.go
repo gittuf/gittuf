@@ -502,16 +502,24 @@ func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
 func (r *RootMetadata) DeleteGlobalRule(ruleName string) error {
 	allGlobalRules := r.GlobalRules
 	updatedGlobalRules := []tuf.GlobalRule{}
+	found := false
 
 	if len(allGlobalRules) == 0 {
 		return tuf.ErrGlobalRuleNotFound
 	}
 
 	for _, rule := range allGlobalRules {
-		if rule.GetName() != ruleName {
+		if rule.GetName() == ruleName {
+			found = true
+		} else {
 			updatedGlobalRules = append(updatedGlobalRules, rule)
 		}
 	}
+
+	if !found {
+		return tuf.ErrGlobalRuleNotFound
+	}
+
 	r.GlobalRules = updatedGlobalRules
 	return nil
 }
