@@ -1,7 +1,7 @@
 header:
   schema-version: 2.0.0
-  last-updated: '2025-11-20'
-  last-reviewed: '2025-11-20'
+  last-updated: '2026-09-28'
+  last-reviewed: '2026-09-28'
   url: https://github.com/gittuf/gittuf
 
 project:
@@ -98,10 +98,10 @@ repository:
       email:       patrick.z@nyu.edu
       social:      https://github.com/patzielinski
       primary:     false
-    - name:        Neil Naveen
-      affiliation: New York University
-      email:       naveen.neil@icloud.com
-      social:      https://github.com/neilnaveen
+    - name:        Paulo Gomes
+      affiliation: Entire
+      email:       paulo@entire.io
+      social:      https://github.com/pjbgf
       primary:     false
   documentation:
     contributing-guide: https://github.com/gittuf/gittuf/blob/main/CONTRIBUTING.md
