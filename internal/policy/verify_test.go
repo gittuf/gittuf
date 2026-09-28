@@ -14,7 +14,6 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations"
 	authorizationsv01 "github.com/gittuf/gittuf/internal/attestations/authorizations/v01"
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
-	"github.com/gittuf/gittuf/internal/cache"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/propagation"
@@ -66,17 +65,6 @@ func TestVerifyRefFull(t *testing.T) {
 	currentTip, err := verifier.VerifyRefFull(testCtx, refName)
 	assert.Nil(t, err)
 	assert.Equal(t, commitIDs[0], currentTip)
-
-	t.Run("with persistent cache", func(t *testing.T) {
-		err = cache.PopulatePersistentCache(repo)
-		require.Nil(t, err)
-
-		verifier = NewPolicyVerifier(repo)
-
-		currentTip, err := verifier.VerifyRefFull(testCtx, refName)
-		assert.Nil(t, err)
-		assert.Equal(t, commitIDs[0], currentTip)
-	})
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
