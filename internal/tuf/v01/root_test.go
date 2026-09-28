@@ -894,6 +894,12 @@ func TestGlobalRules(t *testing.T) {
 	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
 	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
 
+	err = rootMetadata.DeleteGlobalRule("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
 	err = rootMetadata.DeleteGlobalRule("threshold-2-main")
 	assert.Nil(t, err)
 	err = rootMetadata.DeleteGlobalRule("block-force-pushes")

@@ -1390,6 +1390,35 @@ func TestRemoveGlobalRule(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
 	})
 
+	t.Run("remove non-existent global rule when others exist", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
+		assert.Nil(t, err)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "does-not-exist", false)
+		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules := rootMetadata.GetGlobalRules()
+		assert.Len(t, globalRules, 1)
+		assert.Equal(t, "block-force-pushes-for-main", globalRules[0].GetName())
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
