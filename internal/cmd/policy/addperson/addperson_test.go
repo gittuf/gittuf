@@ -22,16 +22,12 @@ func TestAddPerson(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "dummy-pub-key")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "dummy-pub-key")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -39,16 +35,12 @@ func TestAddPerson(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "dummy-pub-key")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "dummy-pub-key")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
@@ -60,16 +52,12 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "non-existent-pub-key")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", "non-existent-pub-key")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
@@ -81,16 +69,12 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", keyPath+".pub", "--associated-identity", "invalid-format")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", keyPath+".pub", "--associated-identity", "invalid-format")
 		assert.ErrorContains(t, err, "invalid format for associated identity")
 	})
 
@@ -102,16 +86,12 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", keyPath+".pub", "--custom", "invalid-format")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", keyPath+".pub", "--custom", "invalid-format")
 		assert.ErrorContains(t, err, "invalid format for custom metadata")
 	})
 
@@ -127,11 +107,7 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")
@@ -160,11 +136,7 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")
@@ -193,11 +165,7 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")
@@ -227,11 +195,7 @@ func TestAddPerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		// Initialize the repository first
 		repo, err := gittuf.LoadRepository(".")

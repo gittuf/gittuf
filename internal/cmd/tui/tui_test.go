@@ -6,7 +6,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -27,10 +26,7 @@ func init() {
 
 func TestTUI(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 

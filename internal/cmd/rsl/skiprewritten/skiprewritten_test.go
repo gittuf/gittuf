@@ -4,7 +4,6 @@
 package skiprewritten
 
 import (
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -18,14 +17,9 @@ import (
 func TestSkipRewritten(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "refs/heads/main")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -33,13 +27,9 @@ func TestSkipRewritten(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 	})
 
@@ -47,13 +37,9 @@ func TestSkipRewritten(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		err = r.SetGitConfig("gpg.format", "ssh")
+		err := r.SetGitConfig("gpg.format", "ssh")
 		require.NoError(t, err)
 
 		err = r.SetGitConfig("user.signingkey", "")

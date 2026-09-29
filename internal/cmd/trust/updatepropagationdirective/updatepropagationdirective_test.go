@@ -41,17 +41,13 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		t.Setenv(dev.DevModeKey, "1")
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts),
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts),
 			"--name", "test-directive",
 			"--from-repository", "origin",
 			"--from-reference", "refs/heads/main",
@@ -66,17 +62,13 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts),
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts),
 			"--name", "test-directive",
 			"--from-repository", "origin",
 			"--from-reference", "refs/heads/main",
@@ -95,11 +87,7 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -135,11 +123,7 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)

@@ -4,52 +4,35 @@
 package remote
 
 import (
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRemoteCommands(t *testing.T) {
 	t.Run("no repository - pull", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "pull", "origin")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "pull", "origin")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("no repository - push", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "push", "origin")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "push", "origin")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("no repository - reconcile", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "reconcile", "origin")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "reconcile", "origin")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -57,13 +40,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "pull")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "pull")
 		assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 	})
 
@@ -71,13 +50,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "push")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "push")
 		assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 	})
 
@@ -85,13 +60,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "reconcile")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "reconcile")
 		assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 	})
 
@@ -99,13 +70,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "pull", "non-existent")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "pull", "non-existent")
 		assert.ErrorContains(t, err, "non-existent")
 	})
 
@@ -113,13 +80,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "push", "non-existent")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "push", "non-existent")
 		assert.ErrorContains(t, err, "non-existent")
 	})
 
@@ -127,13 +90,9 @@ func TestRemoteCommands(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "reconcile", "non-existent")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "reconcile", "non-existent")
 		assert.ErrorContains(t, err, "No such remote")
 	})
 }

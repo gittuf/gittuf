@@ -23,16 +23,12 @@ func TestAddRule(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize", "dummy-principal", "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize", "dummy-principal", "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -40,16 +36,12 @@ func TestAddRule(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize", "dummy-principal", "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize", "dummy-principal", "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
@@ -61,16 +53,12 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize-key", "non-existent-pub-key", "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--authorize-key", "non-existent-pub-key", "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
@@ -86,11 +74,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -122,11 +106,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -158,11 +138,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
 		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)

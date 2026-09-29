@@ -21,40 +21,31 @@ import (
 func TestDisableGitHubAppApprovals(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts))
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts))
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("invalid signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts))
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts))
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
 	t.Run("success already untrusted", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -77,10 +68,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 
 	t.Run("success disable trusted app", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -130,10 +118,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 
 	t.Run("success disable trusted app with RSL entry", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 

@@ -4,7 +4,6 @@
 package annotate
 
 import (
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -20,14 +19,9 @@ import (
 func TestAnnotate(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message", "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message", "--local-only")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -35,13 +29,9 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "-m", "annotation message", "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "-m", "annotation message", "--local-only")
 		assert.ErrorContains(t, err, "requires at least 1 arg")
 	})
 
@@ -49,13 +39,9 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "some-entry-id", "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "some-entry-id", "--local-only")
 		assert.ErrorContains(t, err, "required flag(s) \"message\" not set")
 	})
 
@@ -63,13 +49,9 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message")
 		assert.ErrorContains(t, err, "at least one of the flags in the group [remote-name local-only] is required")
 	})
 
@@ -77,13 +59,9 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message", "--local-only", "--remote-name", "origin")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "some-entry-id", "-m", "annotation message", "--local-only", "--remote-name", "origin")
 		assert.ErrorContains(t, err, "if any flags in the group [remote-name local-only] are set")
 	})
 
@@ -91,13 +69,9 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), gitinterface.ZeroHash.String(), "-m", "annotation message", "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), gitinterface.ZeroHash.String(), "-m", "annotation message", "--local-only")
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
@@ -105,11 +79,7 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		libRepo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -145,11 +115,7 @@ func TestAnnotate(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		libRepo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
