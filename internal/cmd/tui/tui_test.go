@@ -141,6 +141,7 @@ func TestTUI(t *testing.T) {
 			return strings.Contains(content, "Home › Trust") &&
 				strings.Contains(content, "View Global Rules") &&
 				strings.Contains(content, "Propagation") &&
+				strings.Contains(content, "Additional Information") &&
 				!strings.Contains(content, "Keys & Thresholds") &&
 				!strings.Contains(content, "GitHub App") &&
 				!strings.Contains(content, "Lifecycle") &&
@@ -159,7 +160,6 @@ func TestTUI(t *testing.T) {
 
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
-		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyDown})
 		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
 
@@ -386,10 +386,9 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 		index  int
 		screen screen
 	}{
-		{name: "root users", index: 2, screen: screenTrustKeysThresholds},
+		{name: "additional information", index: 2, screen: screenTrustRepoNetwork},
 		{name: "github app", index: 3, screen: screenTrustGitHubApp},
 		{name: "lifecycle", index: 4, screen: screenTrustLifecycle},
-		{name: "additional information", index: 5, screen: screenTrustRepoNetwork},
 	}
 
 	for _, tt := range tests {
@@ -415,9 +414,28 @@ func TestTrustMenuIncludesIssueSpecificScreens(t *testing.T) {
 		labels = append(labels, it.(item).title)
 	}
 
-	assert.Contains(t, labels, "Root Users")
 	assert.Contains(t, labels, "Additional Information")
 	assert.Contains(t, labels, "View Global Rules")
+	assert.NotContains(t, labels, "Root Users")
+
+	infoItems := m.trustRepoNetworkScreen.operationList.Items()
+	infoLabels := make([]string, 0, len(infoItems))
+	for _, it := range infoItems {
+		infoLabels = append(infoLabels, it.(item).title)
+	}
+
+	assert.Contains(t, infoLabels, "Schema Version")
+	assert.Contains(t, infoLabels, "Repository Location")
+
+	writeInfoItems := trustRepoNetworkMenuItems(false)
+	writeInfoLabels := make([]string, 0, len(writeInfoItems))
+	for _, it := range writeInfoItems {
+		writeInfoLabels = append(writeInfoLabels, it.(item).title)
+	}
+	assert.Contains(t, writeInfoLabels, "Add Controller Repository")
+	assert.Contains(t, writeInfoLabels, "Add Network Repository")
+	assert.Contains(t, writeInfoLabels, "Set Repository Location")
+	assert.Contains(t, writeInfoLabels, "Make Controller")
 }
 
 func TestTrustPropagationBackendErrorUsesErrorDialog(t *testing.T) {

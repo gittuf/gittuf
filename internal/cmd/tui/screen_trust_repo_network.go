@@ -9,6 +9,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/policy"
 )
 
 type trustRepoNetworkAction int
@@ -34,15 +36,14 @@ func (s *trustRepoNetworkScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 	switch m.screen {
 	case screenTrustRepoNetwork:
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
-			if sel, ok := s.operationList.SelectedItem().(item); ok {
-				s.selectAction(sel.title, m)
+			if selected, ok := s.operationList.SelectedItem().(item); ok {
+				s.selectAction(selected.title, m)
 				if s.selectedAction == trustRepoNetworkActionMakeController {
 					return s.handleFormSubmit(m)
 				}
 				return *m, nil
 			}
 		}
-
 		s.operationList, cmd = s.operationList.Update(msg)
 		return *m, cmd
 
@@ -57,13 +58,11 @@ func (s *trustRepoNetworkScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 				return *m, nil
 			}
 		}
-
 		if len(s.inputs) > 0 {
 			s.inputs[s.focusIndex], cmd = s.inputs[s.focusIndex].Update(msg)
 		}
 		return *m, cmd
 	}
-
 	return *m, nil
 }
 
@@ -81,9 +80,11 @@ func (s *trustRepoNetworkScreen) View(m *model) string {
 }
 
 func (s *trustRepoNetworkScreen) selectAction(title string, m *model) {
+	if title == "Schema Version" || title == "Repository Location" {
+		return
+	}
 	if m.readOnly {
 		m.footer = "Read-only mode: action unavailable."
-		s.selectedAction = trustRepoNetworkActionNone
 		return
 	}
 
@@ -115,8 +116,6 @@ func (s *trustRepoNetworkScreen) selectAction(title string, m *model) {
 		m.screen = screenTrustRepoLocationForm
 	case "Make Controller":
 		s.selectedAction = trustRepoNetworkActionMakeController
-	default:
-		s.selectedAction = trustRepoNetworkActionNone
 	}
 }
 
@@ -124,21 +123,17 @@ func (s *trustRepoNetworkScreen) cycleFocus(key string) {
 	if len(s.inputs) == 0 {
 		return
 	}
-
 	if key == "up" || key == "shift+tab" {
 		if s.focusIndex > 0 {
 			s.focusIndex--
 		} else {
 			s.focusIndex = len(s.inputs) - 1
 		}
+	} else if s.focusIndex < len(s.inputs)-1 {
+		s.focusIndex++
 	} else {
-		if s.focusIndex < len(s.inputs)-1 {
-			s.focusIndex++
-		} else {
-			s.focusIndex = 0
-		}
+		s.focusIndex = 0
 	}
-
 	for i := range s.inputs {
 		if i == s.focusIndex {
 			s.inputs[i].Focus()
@@ -189,6 +184,55 @@ func (s *trustRepoNetworkScreen) actionLabel() string {
 	}
 }
 
+func (s *trustRepoNetworkScreen) refreshRootMetadata(m *model) {
+	readOnly := m.readOnly || (m.options != nil && m.options.readOnly)
+	repo := m.repo
+	if repo == nil {
+		var err error
+		repo, err = gittuf.LoadRepository(".")
+		if err != nil {
+			s.setMetadataError(err, readOnly)
+			return
+		}
+	}
+
+	targetRef := policy.PolicyRef
+	if m.options != nil && m.options.targetRef != "" {
+		targetRef = m.options.targetRef
+	}
+
+	if !strings.HasPrefix(targetRef, "refs/gittuf/") {
+		targetRef = "refs/gittuf/" + targetRef
+	}
+
+	state, err := policy.LoadCurrentState(m.ctx, repo.GetStorer(), targetRef)
+	if err != nil {
+		s.setMetadataError(err, readOnly)
+		return
+	}
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		s.setMetadataError(err, readOnly)
+		return
+	}
+
+	repositoryLocation := rootMetadata.GetRepositoryLocation()
+	if repositoryLocation == "" {
+		repositoryLocation = "Not set"
+	}
+	items := trustRepoNetworkMenuItems(readOnly)
+	items[0] = item{title: "Schema Version", desc: rootMetadata.GetSchemaVersion()}
+	items[1] = item{title: "Repository Location", desc: repositoryLocation}
+	s.operationList.SetItems(items)
+}
+
+func (s *trustRepoNetworkScreen) setMetadataError(err error, readOnly bool) {
+	items := trustRepoNetworkMenuItems(readOnly)
+	items[0] = item{title: "Schema Version", desc: err.Error()}
+	items[1] = item{title: "Repository Location", desc: err.Error()}
+	s.operationList.SetItems(items)
+}
+
 func (s *trustRepoNetworkScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd) {
 	if m.readOnly {
 		m.errorMsg = "cannot perform action in read-only mode"
@@ -196,7 +240,6 @@ func (s *trustRepoNetworkScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd)
 	}
 
 	var err error
-
 	switch s.selectedAction {
 	case trustRepoNetworkActionAddControllerRepository, trustRepoNetworkActionAddNetworkRepository:
 		name := strings.TrimSpace(s.inputs[0].Value())
@@ -250,5 +293,6 @@ func (s *trustRepoNetworkScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd)
 	s.focusIndex = 0
 	s.selectedAction = trustRepoNetworkActionNone
 	m.screen = screenTrustRepoNetwork
+	s.refreshRootMetadata(m)
 	return *m, nil
 }
