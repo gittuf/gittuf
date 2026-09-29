@@ -12,7 +12,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
-	"github.com/gittuf/gittuf/internal/tuf/v02"
+	v02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

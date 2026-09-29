@@ -123,16 +123,19 @@ func (s *trustRepoNetworkScreen) cycleFocus(key string) {
 	if len(s.inputs) == 0 {
 		return
 	}
-	if key == "up" || key == "shift+tab" {
+	switch key {
+	case "up", "shift+tab":
 		if s.focusIndex > 0 {
 			s.focusIndex--
 		} else {
 			s.focusIndex = len(s.inputs) - 1
 		}
-	} else if s.focusIndex < len(s.inputs)-1 {
-		s.focusIndex++
-	} else {
-		s.focusIndex = 0
+	default:
+		if s.focusIndex < len(s.inputs)-1 {
+			s.focusIndex++
+		} else {
+			s.focusIndex = 0
+		}
 	}
 	for i := range s.inputs {
 		if i == s.focusIndex {
