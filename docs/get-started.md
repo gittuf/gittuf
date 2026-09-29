@@ -162,4 +162,4 @@ the gittuf repository.
 [open an issue]: https://github.com/gittuf/gittuf/issues/new/choose
 [dogfooding]: /docs/dogfood.md
 [Initialize gittuf]: #initialize-gittuf
-[gittuf transport]: /internal/git-remote-gittuf/README.md
+[gittuf transport]: https://github.com/gittuf/git-remote-gittuf

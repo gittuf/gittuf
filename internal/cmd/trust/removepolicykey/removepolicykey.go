@@ -4,8 +4,6 @@
 package removepolicykey
 
 import (
-	"strings"
-
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
@@ -42,7 +40,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.RemoveTopLevelTargetsKey(cmd.Context(), signer, strings.ToLower(o.targetsKeyID), true, opts...)
+	return repo.RemoveTopLevelTargetsKey(cmd.Context(), signer, o.targetsKeyID, true, opts...)
 }
 
 func New(persistent *persistent.Options) *cobra.Command {
