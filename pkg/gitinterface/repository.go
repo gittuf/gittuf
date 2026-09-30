@@ -387,6 +387,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
+	discoveredWorktreePath := worktreePath
 	if has {
 		repo.gitDirPath = gitDirPath
 		repo.worktreePath = worktreePath
@@ -427,6 +428,30 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	if err == nil {
 		if worktreeContents, readErr := io.ReadAll(stdOut); readErr == nil {
 			if worktree := strings.TrimSpace(string(worktreeContents)); worktree != "" {
+				worktree = resolvePath(worktree)
+				if !isUsableWorktree(repo.gitDirPath, worktree) {
+					return nil, fmt.Errorf("Git reported unusable worktree '%s' for repository '%s'", worktree, repo.gitDirPath)
+				}
+
+				// A caller-provided GIT_WORK_TREE is an explicit trust decision.
+				// Otherwise, accept only a path found from the requested checkout
+				// or linked back to this GIT_DIR, not a redirect from local config.
+				if os.Getenv("GIT_WORK_TREE") == "" {
+					if discoveredWorktreePath != "" {
+						if resolvePath(discoveredWorktreePath) != worktree {
+							return nil, fmt.Errorf("Git worktree '%s' does not match the worktree discovered at '%s'", worktree, discoveredWorktreePath)
+						}
+					} else if worktree != resolvePath(repositoryPath) {
+						belongs, err := gitDirBelongsTo(worktree, repo.gitDirPath)
+						if err != nil {
+							return nil, fmt.Errorf("unable to validate Git-reported worktree: %w", err)
+						}
+						if !belongs {
+							return nil, fmt.Errorf("Git-reported worktree '%s' is not linked to repository '%s'", worktree, repo.gitDirPath)
+						}
+					}
+				}
+
 				slog.Debug(fmt.Sprintf("Setting worktree for repository to '%s'...", worktree))
 				repo.worktreePath = worktree
 			}
