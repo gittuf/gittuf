@@ -393,7 +393,6 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	discoveredWorktreePath := worktreePath
 	if has {
 		repo.gitDirPath = gitDirPath
 		repo.worktreePath = worktreePath
@@ -439,15 +438,14 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 					return nil, fmt.Errorf("Git reported unusable worktree '%s' for repository '%s'", worktree, repo.gitDirPath)
 				}
 
-				// A caller-provided GIT_WORK_TREE is an explicit trust decision.
-				// Otherwise, accept only a path found from the requested checkout
-				// or linked back to this GIT_DIR, not a redirect from local config.
+				// A caller-provided GIT_WORK_TREE or directly requested GIT_DIR is
+				// an explicit trust decision. Otherwise, accept the requested
+				// directory itself or require the worktree's .git entry to link
+				// back to this GIT_DIR, so local config cannot redirect callers.
 				if os.Getenv("GIT_WORK_TREE") == "" {
-					if discoveredWorktreePath != "" {
-						if resolvePath(discoveredWorktreePath) != worktree {
-							return nil, fmt.Errorf("Git worktree '%s' does not match the worktree discovered at '%s'", worktree, discoveredWorktreePath)
-						}
-					} else if worktree != resolvePath(repositoryPath) {
+					requestedPath := resolvePath(repositoryPath)
+					requestedGitDir := requestedPath == resolvePath(repo.gitDirPath)
+					if worktree != requestedPath && !requestedGitDir {
 						belongs, err := gitDirBelongsTo(worktree, repo.gitDirPath)
 						if err != nil {
 							return nil, fmt.Errorf("unable to validate Git-reported worktree: %w", err)
