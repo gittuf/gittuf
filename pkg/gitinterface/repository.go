@@ -305,12 +305,20 @@ func (r *Repository) GetWorktree() (string, error) {
 			worktree = filepath.Join(r.gitDirPath, worktree)
 		}
 		worktree = resolvePath(worktree)
-		if isUsableWorktree(r.gitDirPath, worktree) {
-			// Git treats core.worktree as the authoritative worktree path.
-			// Do not require the worktree's .git entry to point back here,
-			// since Git supports other layouts for this configuration.
-			return worktree, nil
+		if !isUsableWorktree(r.gitDirPath, worktree) {
+			return "", fmt.Errorf("configured worktree '%s' is not usable", worktree)
 		}
+		belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
+		if err != nil {
+			return "", fmt.Errorf("unable to validate configured worktree: %w", err)
+		}
+		if !belongs {
+			return "", fmt.Errorf("configured worktree '%s' is not linked to repository '%s'", worktree, r.gitDirPath)
+		}
+		// This fallback is for Repository values without a worktree
+		// captured by LoadRepository. Require a .git link to this GIT_DIR
+		// before trusting a path read directly from local configuration.
+		return worktree, nil
 	}
 
 	if filepath.Base(r.gitDirPath) == ".git" {
