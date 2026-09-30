@@ -214,8 +214,8 @@ func (r *Repository) IsBare() bool {
 
 // GetWorktree returns the absolute path of the repository's worktree, i.e.
 // the directory containing the checked out files. It returns an error wrapping
-// ErrNoWorktree if the repository is bare or if the worktree cannot be
-// determined.
+// ErrNoWorktree if the repository is bare. An error is returned if the
+// worktree of a non-bare repository cannot be determined.
 //
 // Resolves:
 //  1. linked worktrees record the location of their `.git` file in
@@ -229,7 +229,10 @@ func (r *Repository) IsBare() bool {
 //
 // Callers can test for ErrNoWorktree with errors.Is.
 func (r *Repository) GetWorktree() (string, error) {
-	if r.IsBare() {
+	// Only Git's explicit result distinguishes a bare repository from one
+	// whose worktree cannot be determined. IsBare's fallback is necessarily
+	// heuristic when Git cannot be consulted.
+	if stdOut, err := r.executor("rev-parse", "--is-bare-repository").executeString(); err == nil && stdOut == "true" {
 		return "", ErrNoWorktree
 	}
 
@@ -277,7 +280,7 @@ func (r *Repository) GetWorktree() (string, error) {
 		return resolvePath(filepath.Dir(r.gitDirPath)), nil
 	}
 
-	return "", fmt.Errorf("%w: unable to determine worktree for '%s'", ErrNoWorktree, r.gitDirPath)
+	return "", fmt.Errorf("unable to determine worktree for '%s'", r.gitDirPath)
 }
 
 // gitDirBelongsTo returns true if the `.git` entry at the specified worktree
