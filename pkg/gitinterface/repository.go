@@ -262,10 +262,12 @@ func (r *Repository) GetWorktree() (string, error) {
 		return "", ErrNoWorktree
 	}
 
+	hasLinkedWorktreeRecord := false
 	gitdirPath := filepath.Join(r.gitDirPath, "gitdir")
 	if contents, found, err := readOptionalRegularFile(gitdirPath); err != nil {
 		return "", fmt.Errorf("unable to read linked worktree location: %w", err)
 	} else if found {
+		hasLinkedWorktreeRecord = true
 		gitDirFilePath := strings.TrimSpace(string(contents))
 		if gitDirFilePath != "" {
 			worktree := filepath.Dir(gitDirFilePath)
@@ -292,10 +294,22 @@ func (r *Repository) GetWorktree() (string, error) {
 	if r.worktreePath != "" {
 		worktree := resolvePath(r.worktreePath)
 		if isUsableWorktree(r.gitDirPath, worktree) {
-			// LoadRepository records this path from Git's --show-toplevel
-			// output. It remains authoritative for GIT_DIR/GIT_WORK_TREE
-			// layouts, which may have no .git entry in the worktree.
-			return worktree, nil
+			if !hasLinkedWorktreeRecord {
+				// LoadRepository records this path from Git's --show-toplevel
+				// output. It remains authoritative for detached GIT_DIR layouts,
+				// which may have no .git entry in the worktree.
+				return worktree, nil
+			}
+
+			// A linked worktree has a GIT_DIR/gitdir record, so recheck the
+			// reverse link before trusting a path cached during LoadRepository.
+			belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
+			if err != nil {
+				return "", fmt.Errorf("unable to validate discovered linked worktree: %w", err)
+			}
+			if belongs {
+				return worktree, nil
+			}
 		}
 	}
 
