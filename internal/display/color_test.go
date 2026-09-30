@@ -41,3 +41,21 @@ func TestColorer(t *testing.T) {
 		}
 	})
 }
+
+func TestColorCodeDefault(t *testing.T) {
+	c := color(99) // Invalid color
+	assert.Equal(t, "", c.Code())
+}
+
+func TestEnableDisableColor(t *testing.T) {
+	t.Cleanup(DisableColor)
+	testString := "gittuf"
+
+	DisableColor()
+	coloredString := colorer(testString, red)
+	assert.Equal(t, testString, coloredString)
+
+	EnableColor()
+	coloredString = colorer(testString, red)
+	assert.Equal(t, fmt.Sprintf("%s%s%s", red.Code(), testString, reset.Code()), coloredString)
+}
