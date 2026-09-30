@@ -268,11 +268,10 @@ func (r *Repository) GetWorktree() (string, error) {
 		}
 		worktree = resolvePath(worktree)
 		if isUsableWorktree(r.gitDirPath, worktree) {
-			// The worktree must belong to this repository, so core.worktree
-			// cannot redirect resolution to an unrelated directory.
-			if gitDirBelongsTo(worktree, r.gitDirPath) {
-				return worktree, nil
-			}
+			// Git treats core.worktree as the authoritative worktree path.
+			// Do not require the worktree's .git entry to point back here,
+			// since Git supports other layouts for this configuration.
+			return worktree, nil
 		}
 	}
 
