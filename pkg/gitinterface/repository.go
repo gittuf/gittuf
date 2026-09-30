@@ -257,7 +257,8 @@ func (r *Repository) GetWorktree() (string, error) {
 	// Only Git's explicit result distinguishes a bare repository from one
 	// whose worktree cannot be determined. IsBare's fallback is necessarily
 	// heuristic when Git cannot be consulted.
-	if stdOut, err := r.executor("rev-parse", "--is-bare-repository").executeString(); err == nil && stdOut == "true" {
+	isBareOutput, bareErr := r.executor("rev-parse", "--is-bare-repository").executeString()
+	if bareErr == nil && isBareOutput == "true" {
 		return "", ErrNoWorktree
 	}
 
@@ -322,7 +323,17 @@ func (r *Repository) GetWorktree() (string, error) {
 	}
 
 	if filepath.Base(r.gitDirPath) == ".git" {
-		return resolvePath(filepath.Dir(r.gitDirPath)), nil
+		worktree := resolvePath(filepath.Dir(r.gitDirPath))
+		if bareErr != nil || isBareOutput != "false" || !isUsableWorktree(r.gitDirPath, worktree) {
+			return "", fmt.Errorf("unable to determine worktree for '%s'", r.gitDirPath)
+		}
+		belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
+		if err != nil {
+			return "", fmt.Errorf("unable to validate worktree for '%s': %w", r.gitDirPath, err)
+		}
+		if belongs {
+			return worktree, nil
+		}
 	}
 
 	return "", fmt.Errorf("unable to determine worktree for '%s'", r.gitDirPath)
