@@ -104,9 +104,9 @@ func TestGetWorktree(t *testing.T) {
 
 	t.Run("explicit relative core.worktree", func(t *testing.T) {
 		// Git interprets relative core.worktree values relative to the
-		// GIT_DIR; submodules are configured this way. The repository is
-		// constructed directly so that no load-time discovery takes
-		// precedence and the core.worktree branch is exercised.
+		// GIT_DIR; submodules are configured this way. LoadRepository captures
+		// the resolved path from Git so detached-GIT_DIR layouts need no .git
+		// entry in the worktree.
 		t.Parallel()
 
 		tmpDir := t.TempDir()
@@ -118,6 +118,9 @@ func TestGetWorktree(t *testing.T) {
 
 		repo := &Repository{gitDirPath: gitDirPath}
 		_, _, err := repo.executor("config", "core.worktree", "../../worktree").execute()
+		require.Nil(t, err)
+
+		repo, err = LoadRepository(worktreeDir)
 		require.Nil(t, err)
 
 		worktree, err := repo.GetWorktree()

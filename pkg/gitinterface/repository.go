@@ -247,9 +247,7 @@ func (r *Repository) IsBare() bool {
 //     `$GIT_DIR/gitdir`; the link is verified in both directions
 //  2. the worktree discovered while loading the repository, which is the only
 //     reliable source for repositories with a detached GIT_DIR
-//  3. `core.worktree` from the repository-local configuration, set explicitly
-//     for repositories like submodules
-//  4. otherwise, a `$GIT_DIR` named `.git` implies its parent directory is
+//  3. otherwise, a `$GIT_DIR` named `.git` implies its parent directory is
 //     the worktree
 //
 // Callers can test for ErrNoWorktree with errors.Is.
@@ -311,29 +309,6 @@ func (r *Repository) GetWorktree() (string, error) {
 				return worktree, nil
 			}
 		}
-	}
-
-	if worktree, err := r.executor("config", "--local", "--get", "core.worktree").executeString(); err == nil && worktree != "" {
-		if !filepath.IsAbs(worktree) {
-			// Git interprets relative core.worktree values relative to the
-			// GIT_DIR.
-			worktree = filepath.Join(r.gitDirPath, worktree)
-		}
-		worktree = resolvePath(worktree)
-		if !isUsableWorktree(r.gitDirPath, worktree) {
-			return "", fmt.Errorf("configured worktree '%s' is not usable", worktree)
-		}
-		belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
-		if err != nil {
-			return "", fmt.Errorf("unable to validate configured worktree: %w", err)
-		}
-		if !belongs {
-			return "", fmt.Errorf("configured worktree '%s' is not linked to repository '%s'", worktree, r.gitDirPath)
-		}
-		// This fallback is for Repository values without a worktree
-		// captured by LoadRepository. Require a .git link to this GIT_DIR
-		// before trusting a path read directly from local configuration.
-		return worktree, nil
 	}
 
 	if filepath.Base(r.gitDirPath) == ".git" {
