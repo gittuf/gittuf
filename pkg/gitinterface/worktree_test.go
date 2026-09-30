@@ -23,6 +23,8 @@ func mustRunGit(t *testing.T, args ...string) {
 
 	cmd := exec.Command(binary, args...) //nolint:gosec
 	env := []string{}
+	for _, entry := range os.Environ() {
+		key := strings.ToUpper(strings.SplitN(entry, "=", 2)[0])
 		if !strings.HasPrefix(key, "GIT_") {
 			env = append(env, entry)
 		}
