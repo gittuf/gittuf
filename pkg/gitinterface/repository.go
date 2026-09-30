@@ -210,6 +210,12 @@ func resolvePath(path string) string {
 	return resolvedPath
 }
 
+// trimGitPathOutput removes the line ending Git adds after printing a path.
+// Unlike strings.TrimSpace, it preserves spaces that are part of the path.
+func trimGitPathOutput(output []byte) string {
+	return strings.TrimSuffix(string(output), "\n")
+}
+
 // GetGoGitRepository returns the go-git representation of a repository. We use
 // this in certain signing and verifying workflows.
 func (r *Repository) GetGoGitRepository() (*git.Repository, error) {
@@ -411,7 +417,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		return nil, fmt.Errorf("unable to identify git directory for repository: %w", err)
 	}
 
-	absPath, err := filepath.EvalSymlinks(strings.TrimSpace(string(stdOutContents)))
+	absPath, err := filepath.EvalSymlinks(trimGitPathOutput(stdOutContents))
 	if err != nil {
 		return nil, err
 	}
@@ -427,7 +433,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	stdOut, stdErr, err = repo.executor("rev-parse", "--show-toplevel").withoutGitDir().withDir(repositoryPath).execute()
 	if err == nil {
 		if worktreeContents, readErr := io.ReadAll(stdOut); readErr == nil {
-			if worktree := strings.TrimSpace(string(worktreeContents)); worktree != "" {
+			if worktree := trimGitPathOutput(worktreeContents); worktree != "" {
 				worktree = resolvePath(worktree)
 				if !isUsableWorktree(repo.gitDirPath, worktree) {
 					return nil, fmt.Errorf("Git reported unusable worktree '%s' for repository '%s'", worktree, repo.gitDirPath)
