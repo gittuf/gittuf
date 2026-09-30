@@ -257,7 +257,10 @@ func (r *Repository) GetWorktree() (string, error) {
 	}
 
 	if r.worktreePath != "" {
-		return resolvePath(r.worktreePath), nil
+		worktree := resolvePath(r.worktreePath)
+		if isUsableWorktree(r.gitDirPath, worktree) && gitDirBelongsTo(worktree, r.gitDirPath) {
+			return worktree, nil
+		}
 	}
 
 	if worktree, err := r.executor("config", "--local", "--get", "core.worktree").executeString(); err == nil && worktree != "" {
