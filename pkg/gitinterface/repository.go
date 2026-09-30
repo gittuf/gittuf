@@ -78,7 +78,10 @@ func (r *Repository) ensureNoCompatObjectFormat() error {
 	// Linked worktrees do not have their own config file: configuration lives
 	// in the repository's common Git directory, whose location is recorded in
 	// $GIT_DIR/commondir.
-	if contents, err := os.ReadFile(filepath.Join(r.gitDirPath, "commondir")); err == nil {
+	commondirPath := filepath.Join(r.gitDirPath, "commondir")
+	if contents, found, err := readOptionalRegularFile(commondirPath); err != nil {
+		return fmt.Errorf("unable to read repository common directory: %w", err)
+	} else if found {
 		commonDirPath := strings.TrimSpace(string(contents))
 		if commonDirPath != "" {
 			if !filepath.IsAbs(commonDirPath) {
@@ -144,7 +147,7 @@ func findGitDirPath(startPath string) (string, string, bool, error) {
 }
 
 func readGitDirFile(gitDirFilePath, worktreePath string) (string, error) {
-	contents, err := os.ReadFile(gitDirFilePath)
+	contents, err := readRegularFile(gitDirFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -159,6 +162,28 @@ func readGitDirFile(gitDirFilePath, worktreePath string) (string, error) {
 	}
 
 	return filepath.Abs(gitDirPath)
+}
+
+func readRegularFile(path string) ([]byte, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !fileInfo.Mode().IsRegular() {
+		return nil, fmt.Errorf("'%s' is not a regular file", path)
+	}
+	return os.ReadFile(path)
+}
+
+func readOptionalRegularFile(path string) ([]byte, bool, error) {
+	contents, err := readRegularFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return contents, true, nil
 }
 
 func isBareGitDir(path string) bool {
@@ -236,7 +261,10 @@ func (r *Repository) GetWorktree() (string, error) {
 		return "", ErrNoWorktree
 	}
 
-	if contents, err := os.ReadFile(filepath.Join(r.gitDirPath, "gitdir")); err == nil {
+	gitdirPath := filepath.Join(r.gitDirPath, "gitdir")
+	if contents, found, err := readOptionalRegularFile(gitdirPath); err != nil {
+		return "", fmt.Errorf("unable to read linked worktree location: %w", err)
+	} else if found {
 		gitDirFilePath := strings.TrimSpace(string(contents))
 		if gitDirFilePath != "" {
 			worktree := filepath.Dir(gitDirFilePath)
@@ -249,7 +277,11 @@ func (r *Repository) GetWorktree() (string, error) {
 			// points at must reference this GIT_DIR, so a stale pointer that
 			// now belongs to a different repository is rejected.
 			if isUsableWorktree(r.gitDirPath, worktree) {
-				if gitDirBelongsTo(worktree, r.gitDirPath) {
+				belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
+				if err != nil {
+					return "", fmt.Errorf("unable to validate linked worktree: %w", err)
+				}
+				if belongs {
 					return worktree, nil
 				}
 			}
@@ -258,8 +290,14 @@ func (r *Repository) GetWorktree() (string, error) {
 
 	if r.worktreePath != "" {
 		worktree := resolvePath(r.worktreePath)
-		if isUsableWorktree(r.gitDirPath, worktree) && gitDirBelongsTo(worktree, r.gitDirPath) {
-			return worktree, nil
+		if isUsableWorktree(r.gitDirPath, worktree) {
+			belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
+			if err != nil {
+				return "", fmt.Errorf("unable to validate discovered worktree: %w", err)
+			}
+			if belongs {
+				return worktree, nil
+			}
 		}
 	}
 
@@ -289,29 +327,32 @@ func (r *Repository) GetWorktree() (string, error) {
 // resolves to the supplied GIT_DIR. A conventional `.git` directory matches
 // only when its resolved path is the GIT_DIR; a `.git` file matches when its
 // `gitdir:` pointer resolves to the GIT_DIR.
-func gitDirBelongsTo(worktree, gitDirPath string) bool {
+func gitDirBelongsTo(worktree, gitDirPath string) (bool, error) {
 	resolvedGitDir := resolvePath(gitDirPath)
 	gitEntryPath := filepath.Join(worktree, ".git") //nolint:gosec // worktree is resolved and validated before being passed in here
 	fileInfo, err := os.Stat(gitEntryPath)          //nolint:gosec // gitEntryPath is on the already-validated worktree path
 	if err != nil {
-		return false
+		return false, nil
 	}
 	if fileInfo.IsDir() {
-		return filepath.Clean(resolvePath(gitEntryPath)) == filepath.Clean(resolvedGitDir)
+		return filepath.Clean(resolvePath(gitEntryPath)) == filepath.Clean(resolvedGitDir), nil
 	}
-	gitFileContents, err := os.ReadFile(gitEntryPath) //nolint:gosec // gitEntryPath is on the already-validated worktree path
+	gitFileContents, err := readRegularFile(gitEntryPath) //nolint:gosec // gitEntryPath is on the already-validated worktree path
 	if err != nil {
-		return false
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
 	}
 	link, has := strings.CutPrefix(strings.TrimSpace(string(gitFileContents)), "gitdir:")
 	if !has {
-		return false
+		return false, nil
 	}
 	link = strings.TrimSpace(link)
 	if !filepath.IsAbs(link) {
 		link = filepath.Join(worktree, link)
 	}
-	return filepath.Clean(resolvePath(link)) == filepath.Clean(resolvedGitDir)
+	return filepath.Clean(resolvePath(link)) == filepath.Clean(resolvedGitDir), nil
 }
 
 // isUsableWorktree returns true if the candidate path is an existing directory
