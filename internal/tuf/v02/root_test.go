@@ -543,15 +543,22 @@ func TestDeleteGitHubAppPrincipal(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
 	// Cover nil check
-	rootMetadata.DeleteGitHubAppPrincipal("")
+	err := rootMetadata.DeleteGitHubAppPrincipal("")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
 	assert.Nil(t, rootMetadata.GitHubApps)
 
 	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
+	err = rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
 	assert.Nil(t, err)
 
-	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
+	// Non-existent app when other apps are present
+	err = rootMetadata.DeleteGitHubAppPrincipal("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.Contains(t, rootMetadata.GitHubApps, tuf.GitHubAppRoleName)
+
+	err = rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
+	assert.Nil(t, err)
 	assert.NotContains(t, rootMetadata.GitHubApps, tuf.GitHubAppRoleName)
 }
 
@@ -564,8 +571,13 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
 	require.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	err = rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.Nil(t, err)
 	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
+
+	err = rootMetadata.EnableGitHubAppApprovals("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.NotContains(t, rootMetadata.GitHubApps, "does-not-exist")
 }
 
 func TestDisableGitHubAppApprovals(t *testing.T) {
@@ -577,11 +589,17 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
 	require.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	err = rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.Nil(t, err)
 	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
 
-	rootMetadata.DisableGitHubAppApprovals(appName)
+	err = rootMetadata.DisableGitHubAppApprovals(appName)
+	assert.Nil(t, err)
 	assert.False(t, rootMetadata.GitHubApps[appName].Trusted)
+
+	err = rootMetadata.DisableGitHubAppApprovals("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.NotContains(t, rootMetadata.GitHubApps, "does-not-exist")
 }
 
 func TestGetGitHubAppEntries(t *testing.T) {
@@ -785,7 +803,8 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
 	assert.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	err = rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	assert.Nil(t, err)
 	trusted := rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName)
 	assert.True(t, trusted)
 }

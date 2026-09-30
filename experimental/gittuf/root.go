@@ -399,7 +399,9 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
 		appName = tuf.GitHubAppRoleName
 	}
-	rootMetadata.DeleteGitHubAppPrincipal(appName)
+	if err := rootMetadata.DeleteGitHubAppPrincipal(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Remove GitHub app key from root"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -447,7 +449,9 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	slog.Debug("Marking GitHub app approvals as trusted in root...")
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	if err := rootMetadata.EnableGitHubAppApprovals(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Mark GitHub app approvals as trusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -489,13 +493,23 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
 		appName = tuf.GitHubAppRoleName
 	}
-	if !rootMetadata.IsGitHubAppApprovalTrusted(appName) {
+	apps, err := rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return err
+	}
+	app, has := apps[appName]
+	if !has {
+		return tuf.ErrGitHubAppNotFound
+	}
+	if !app.IsTrusted() {
 		slog.Debug("GitHub app approvals are already untrusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as untrusted in root...")
-	rootMetadata.DisableGitHubAppApprovals(appName)
+	if err := rootMetadata.DisableGitHubAppApprovals(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Mark GitHub app approvals as untrusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
