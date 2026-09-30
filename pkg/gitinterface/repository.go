@@ -291,13 +291,10 @@ func (r *Repository) GetWorktree() (string, error) {
 	if r.worktreePath != "" {
 		worktree := resolvePath(r.worktreePath)
 		if isUsableWorktree(r.gitDirPath, worktree) {
-			belongs, err := gitDirBelongsTo(worktree, r.gitDirPath)
-			if err != nil {
-				return "", fmt.Errorf("unable to validate discovered worktree: %w", err)
-			}
-			if belongs {
-				return worktree, nil
-			}
+			// LoadRepository records this path from Git's --show-toplevel
+			// output. It remains authoritative for GIT_DIR/GIT_WORK_TREE
+			// layouts, which may have no .git entry in the worktree.
+			return worktree, nil
 		}
 	}
 
