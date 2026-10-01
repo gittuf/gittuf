@@ -38,6 +38,7 @@ var (
 	ErrInvalidOperationForMetadataVersion              = errors.New("invalid operation for metadata version")
 	ErrPrimaryRuleFileInformationNotFoundInRoot        = errors.New("root metadata does not contain primary rule file information")
 	ErrGitHubAppInformationNotFoundInRoot              = errors.New("the special GitHub app role is not defined, but GitHub app approvals is set to trusted")
+	ErrGitHubAppNotFound                               = errors.New("GitHub app not found")
 	ErrDuplicatedRuleName                              = errors.New("two rules with same name found in policy")
 	ErrDuplicateControllerRepository                   = errors.New("controller repository already exists")
 	ErrDuplicateNetworkRepository                      = errors.New("network repository already exists")
@@ -143,15 +144,15 @@ type RootMetadata interface {
 	AddGitHubAppPrincipal(appName string, principal Principal) error
 	// DeleteGitHubAppPrincipal removes the GitHub app attestations role from
 	// the root of trust metadata.
-	DeleteGitHubAppPrincipal(appName string)
+	DeleteGitHubAppPrincipal(appName string) error
 	// EnableGitHubAppApprovals indicates attestations from the GitHub app role
 	// must be trusted.
 	// TODO: this needs to be generalized across tools
-	EnableGitHubAppApprovals(appName string)
+	EnableGitHubAppApprovals(appName string) error
 	// DisableGitHubAppApprovals indicates attestations from the GitHub app role
 	// must not be trusted thereafter.
 	// TODO: this needs to be generalized across tools
-	DisableGitHubAppApprovals(appName string)
+	DisableGitHubAppApprovals(appName string) error
 	// IsGitHubAppApprovalTrusted indicates if the GitHub app is trusted.
 	// TODO: this needs to be generalized across tools
 	IsGitHubAppApprovalTrusted(appName string) bool

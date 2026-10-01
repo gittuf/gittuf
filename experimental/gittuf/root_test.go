@@ -715,6 +715,26 @@ func TestRemoveGitHubApp(t *testing.T) {
 		_, err = rootMetadata.GetGitHubAppPrincipals(tuf.GitHubAppRoleName)
 		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 	})
+
+	t.Run("non-existent app", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+		err := r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+		require.Nil(t, err)
+
+		policyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		err = r.RemoveGitHubApp(testCtx, sv, "does-not-exist", false)
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+
+		// No new root metadata must have been committed
+		currentPolicyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, policyTip, currentPolicyTip)
+	})
 }
 
 func TestTrustGitHubApp(t *testing.T) {
@@ -806,6 +826,33 @@ func TestTrustGitHubApp(t *testing.T) {
 		rootMetadata, err := state.GetRootMetadata(false)
 		require.Nil(t, err)
 		assert.True(t, rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName))
+	})
+
+	t.Run("non-existent app", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+		err := r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+		require.Nil(t, err)
+
+		policyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		err = r.TrustGitHubApp(testCtx, sv, "gihub-app", false)
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+
+		// No new root metadata must have been committed
+		currentPolicyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, policyTip, currentPolicyTip)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.Nil(t, err)
+		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("github-app"))
 	})
 }
 
@@ -914,6 +961,26 @@ func TestUntrustGitHubApp(t *testing.T) {
 		rootMetadata, err := state.GetRootMetadata(false)
 		require.Nil(t, err)
 		assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName))
+	})
+
+	t.Run("non-existent app", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		sv := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		key := tufv01.NewKeyFromSSLibKey(sv.MetadataKey())
+
+		err := r.AddGitHubApp(testCtx, sv, "github-app", key, false)
+		require.Nil(t, err)
+
+		policyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		err = r.UntrustGitHubApp(testCtx, sv, "does-not-exist", false)
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+
+		// No new root metadata must have been committed
+		currentPolicyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+		require.Nil(t, err)
+		assert.Equal(t, policyTip, currentPolicyTip)
 	})
 }
 

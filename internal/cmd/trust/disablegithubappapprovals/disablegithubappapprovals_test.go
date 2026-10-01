@@ -13,6 +13,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,6 +50,38 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
+	t.Run("non-existent app", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		currentDir, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(tmpDir))
+		defer os.Chdir(currentDir) //nolint:errcheck
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		key, err := gittuf.LoadPublicKey(keyPath)
+		require.NoError(t, err)
+
+		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
+		require.NoError(t, err)
+
+		pOpts := &persistent.Options{
+			SigningKey: keyPath,
+		}
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--app-name", "does-not-exist")
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	})
+
 	t.Run("success already untrusted", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		currentDir, err := os.Getwd()
@@ -67,6 +100,12 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		key, err := gittuf.LoadPublicKey(keyPath)
+		require.NoError(t, err)
+
+		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
+		require.NoError(t, err)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
