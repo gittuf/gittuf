@@ -21,16 +21,13 @@ import (
 func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 	t.Run("custom metadata value containing '='", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-		require.NoError(t, os.Chdir(tmpDir))
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)

@@ -21,15 +21,9 @@ func TestInspectRoot(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -37,15 +31,9 @@ func TestInspectRoot(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.Error(t, err)
 	})
 
@@ -57,13 +45,7 @@ func TestInspectRoot(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		if err != nil {

@@ -4,7 +4,6 @@
 package sync
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -20,25 +19,19 @@ import (
 func TestSync(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("no remote", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		_, _, _, err = cmd.ExecuteCommandC(New(), "custom-remote")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "custom-remote")
 		assert.ErrorContains(t, err, "No such remote")
 	})
 
@@ -68,10 +61,7 @@ func TestSync(t *testing.T) {
 		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
 		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
 
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(localTmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		// 3. Make Remote and Local Diverge
 		// Remote Action:

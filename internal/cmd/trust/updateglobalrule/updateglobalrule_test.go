@@ -24,17 +24,13 @@ func TestUpdateGlobalRule(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType, "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType, "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -42,17 +38,13 @@ func TestUpdateGlobalRule(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType, "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType, "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
@@ -64,17 +56,13 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType)
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleThresholdType)
 		assert.ErrorContains(t, err, "required flag --rule-pattern not set for global rule type 'threshold'")
 	})
 
@@ -86,17 +74,13 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleBlockForcePushesType)
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", tuf.GlobalRuleBlockForcePushesType)
 		assert.ErrorContains(t, err, "required flag --rule-pattern not set for global rule type 'block-force-pushes'")
 	})
 
@@ -108,17 +92,13 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", "invalid-type", "--rule-pattern", "git:refs/heads/main")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--rule-name", "test-rule", "--type", "invalid-type", "--rule-pattern", "git:refs/heads/main")
 		assert.ErrorIs(t, err, tuf.ErrUnknownGlobalRuleType)
 	})
 
@@ -130,11 +110,7 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -162,11 +138,7 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -194,11 +166,7 @@ func TestUpdateGlobalRule(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)

@@ -20,67 +20,50 @@ import (
 func TestRecordApproval(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("invalid repository format", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--repository", "owner-repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--repository", "owner-repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
 		assert.ErrorContains(t, err, "invalid format for repository, must be {owner}/{repo}")
 	})
 
 	t.Run("invalid signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
 	t.Run("no token error", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -88,7 +71,7 @@ func TestRecordApproval(t *testing.T) {
 		// Clean the env token just in case
 		t.Setenv("GITHUB_TOKEN", "")
 
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--repository", "owner/repo", "--pull-request-number", "1", "--review-ID", "123", "--approver", "jane.doe")
 		assert.ErrorIs(t, err, gittuf.ErrNoGitHubToken)
 	})
 }

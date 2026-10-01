@@ -5,7 +5,6 @@ package tui
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
@@ -14,15 +13,11 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTrustGlobalRulesScreenInitialization(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	s := &trustGlobalRulesScreen{}
@@ -58,10 +53,7 @@ func TestTrustGlobalRulesScreenInitialization(t *testing.T) {
 
 func TestTrustGlobalRulesScreenFocusCycle(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	s := &trustGlobalRulesScreen{}
@@ -92,10 +84,7 @@ func TestTrustGlobalRulesScreenFocusCycle(t *testing.T) {
 
 func TestTrustGlobalRulesScreenHandleEscNavigation(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{
@@ -132,10 +121,7 @@ func TestTrustGlobalRulesScreenHandleEscNavigation(t *testing.T) {
 
 func TestTrustGlobalRulesScreenKeyActions(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{
@@ -184,10 +170,7 @@ func TestTrustGlobalRulesScreenKeyActions(t *testing.T) {
 
 func TestTrustGlobalRulesScreenFormNavigationAndSubmit(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{
@@ -228,10 +211,7 @@ func TestTrustGlobalRulesScreenFormNavigationAndSubmit(t *testing.T) {
 
 func TestTrustGlobalRulesScreenViewRendering(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{

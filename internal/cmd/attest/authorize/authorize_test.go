@@ -21,60 +21,49 @@ import (
 func TestAuthorize(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "refs/tags/v1")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "refs/tags/v1")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("invalid signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "refs/tags/v1")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "refs/tags/v1")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
 	t.Run("insufficient parameters for revoking", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 		keyPath := filepath.Join(tmpDir, "test-key")
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "--revoke", "refs/tags/v1")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "--revoke", "refs/tags/v1")
 		assert.ErrorContains(t, err, "insufficient parameters for revoking authorization, requires <targetRef> <fromID> <targetTreeID>")
 	})
 
 	t.Run("success authorize", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -92,12 +81,6 @@ func TestAuthorize(t *testing.T) {
 		_, err = repo.GetGitRepository().Commit(emptyTreeID, fromRef, "Initial commit\n", false)
 		require.NoError(t, err)
 		require.NoError(t, repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -108,6 +91,8 @@ func TestAuthorize(t *testing.T) {
 
 	t.Run("success authorize with RSL entry", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -125,12 +110,6 @@ func TestAuthorize(t *testing.T) {
 		_, err = repo.GetGitRepository().Commit(emptyTreeID, fromRef, "Initial commit\n", false)
 		require.NoError(t, err)
 		require.NoError(t, repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,
@@ -142,6 +121,8 @@ func TestAuthorize(t *testing.T) {
 
 	t.Run("success revoke", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -164,12 +145,6 @@ func TestAuthorize(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
