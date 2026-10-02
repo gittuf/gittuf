@@ -119,6 +119,10 @@ type model struct {
 	logCh                      chan string
 	showDiffOverlay            bool
 	diffViewport               viewport.Model
+	stagedDiffCache            string
+	cachedPolicyTip            string
+	cachedStagingTip           string
+	cachedDiffWidth            int
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -524,41 +528,105 @@ func (m *model) currentScreenTitle() string {
 	}
 }
 
+// wrapDiffLine wraps a line to maxWidth while preserving any leading indent
+// and applying a hanging indent to subsequent wrapped lines.
+func wrapDiffLine(line string, maxWidth int, hangingIndent string) string {
+	if maxWidth <= 0 || len(line) <= maxWidth {
+		return line
+	}
+
+	if strings.Contains(line, "\n") {
+		sublines := strings.Split(line, "\n")
+		for i, sl := range sublines {
+			sublines[i] = wrapDiffLine(sl, maxWidth, hangingIndent)
+		}
+		return strings.Join(sublines, "\n")
+	}
+
+	trimmed := strings.TrimLeft(line, " ")
+	if trimmed == "" {
+		return line
+	}
+	leadSpaces := line[:len(line)-len(trimmed)]
+
+	words := strings.Fields(trimmed)
+	if len(words) == 0 {
+		return line
+	}
+
+	indent := hangingIndent
+	if len(indent) >= maxWidth {
+		indent = ""
+	}
+
+	var lines []string
+
+	currentLine := leadSpaces + words[0]
+	for len(currentLine) > maxWidth {
+		lines = append(lines, currentLine[:maxWidth])
+		rem := currentLine[maxWidth:]
+		if len(rem) == 0 {
+			currentLine = ""
+			break
+		}
+		currentLine = indent + rem
+	}
+
+	for _, word := range words[1:] {
+		if currentLine != "" && len(currentLine)+1+len(word) <= maxWidth {
+			currentLine += " " + word
+		} else {
+			if len(currentLine) > 0 {
+				lines = append(lines, currentLine)
+			}
+			currentLine = indent + word
+			for len(currentLine) > maxWidth {
+				lines = append(lines, currentLine[:maxWidth])
+				rem := currentLine[maxWidth:]
+				if len(rem) == 0 {
+					currentLine = ""
+					break
+				}
+				currentLine = indent + rem
+			}
+		}
+	}
+	if len(currentLine) > 0 {
+		lines = append(lines, currentLine)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func (m *model) toggleDiffOverlay() {
 	if m.showDiffOverlay {
 		m.showDiffOverlay = false
 		return
 	}
 	m.showDiffOverlay = true
-	w := m.width - 10
-	h := m.height - 8
-	if w < 30 {
-		w = 30
-	}
-	if h < 6 {
-		h = 6
-	}
-	m.diffViewport = viewport.New(w, h)
-	m.diffViewport.SetContent(m.generateStagedDiff())
+	_, _, vpWidth, vpHeight := diffOverlayDimensions(m.width, m.height)
+	m.diffViewport = viewport.New(vpWidth, vpHeight)
+	m.diffViewport.SetContent(m.generateStagedDiff(vpWidth))
 }
 
-func (m *model) generateStagedDiff() string {
-	var b strings.Builder
+func (m *model) generateStagedDiff(wrapWidth ...int) string {
+	targetWidth := 0
+	if len(wrapWidth) > 0 && wrapWidth[0] > 0 {
+		targetWidth = wrapWidth[0]
+	}
 
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Bold(true)
 	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#28A745"))
-	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5252"))
-	modStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68"))
 	sectionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus)).Bold(true)
 	subtextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext))
-
-	b.WriteString(headerStyle.Render("--- Active Policy (refs/gittuf/policy)\n+++ Staged Policy Changes (refs/gittuf/policy-staging)") + "\n\n")
 
 	repo := m.repo
 	if repo == nil {
 		var err error
 		repo, err = gittuf.LoadRepository(".")
 		if err != nil {
+			var b strings.Builder
+			b.WriteString(headerStyle.Render("--- Active Policy (refs/gittuf/policy)\n+++ Staged Policy Changes (refs/gittuf/policy-staging)") + "\n\n")
 			b.WriteString("No staged policy changes detected.\n\n")
 			b.WriteString(subtextStyle.Render("Tip: Add, edit, or remove policy rules & principals, then press 'v' to review unapplied staged changes."))
 			return b.String()
@@ -569,18 +637,47 @@ func (m *model) generateStagedDiff() string {
 	policyTip, errPolicy := storer.GetReference(policy.PolicyRef)
 	stagingTip, errStaging := storer.GetReference(policy.PolicyStagingRef)
 
+	var policyTipStr string
+	if errPolicy == nil {
+		policyTipStr = policyTip.String()
+	}
+	var stagingTipStr string
+	if errStaging == nil {
+		stagingTipStr = stagingTip.String()
+	}
+
+	if m.stagedDiffCache != "" &&
+		m.cachedPolicyTip == policyTipStr &&
+		m.cachedStagingTip == stagingTipStr &&
+		(targetWidth == 0 || m.cachedDiffWidth == targetWidth) {
+		return m.stagedDiffCache
+	}
+
+	var b strings.Builder
+	b.WriteString(headerStyle.Render("--- Active Policy (refs/gittuf/policy)\n+++ Staged Policy Changes (refs/gittuf/policy-staging)") + "\n\n")
+
 	// If staging ref does not exist, nothing is staged.
 	if errStaging != nil {
 		b.WriteString("No staged policy changes detected.\n\n")
 		b.WriteString(subtextStyle.Render("Policy staging reference (refs/gittuf/policy-staging) does not exist."))
-		return b.String()
+		res := b.String()
+		m.stagedDiffCache = res
+		m.cachedPolicyTip = policyTipStr
+		m.cachedStagingTip = ""
+		m.cachedDiffWidth = targetWidth
+		return res
 	}
 
 	// If policy ref exists and tips are identical, staging is fully in sync with policy.
 	if errPolicy == nil && policyTip.Equal(stagingTip) {
 		b.WriteString("No staged policy changes detected.\n\n")
 		b.WriteString(subtextStyle.Render("Policy staging is up to date with active policy (tips are identical)."))
-		return b.String()
+		res := b.String()
+		m.stagedDiffCache = res
+		m.cachedPolicyTip = policyTipStr
+		m.cachedStagingTip = stagingTipStr
+		m.cachedDiffWidth = targetWidth
+		return res
 	}
 
 	var activeRules []rule
@@ -604,6 +701,52 @@ func (m *model) generateStagedDiff() string {
 		activePrincipals = getPrincipalsForRef(m.ctx, repo, policy.PolicyRef, policyName)
 	}
 	stagedPrincipals := getPrincipalsForRef(m.ctx, repo, policy.PolicyStagingRef, policyName)
+
+	activeRuleMap := make(map[string]rule, len(activeRules))
+	for _, r := range activeRules {
+		activeRuleMap[r.name] = r
+	}
+	stagedRuleMap := make(map[string]rule, len(stagedRules))
+	for _, r := range stagedRules {
+		stagedRuleMap[r.name] = r
+	}
+
+	diffContent, hasChanges := formatStagedDiff(activeRules, stagedRules, activeGlobalRules, stagedGlobalRules, activePrincipals, stagedPrincipals, targetWidth)
+	if hasChanges {
+		b.WriteString(diffContent)
+	} else {
+		filesChanged, _ := storer.GetFilePathsChangedByCommit(stagingTip)
+		if len(filesChanged) > 0 {
+			b.WriteString(sectionStyle.Render("Staged Trust Metadata Changes:") + "\n")
+			for _, f := range filesChanged {
+				line := fmt.Sprintf("+ Modified %s", f)
+				if targetWidth > 0 {
+					line = wrapDiffLine(line, targetWidth, "  ")
+				}
+				b.WriteString(addStyle.Render(line) + "\n")
+			}
+		} else {
+			b.WriteString("No staged policy changes detected.\n\n")
+			b.WriteString(subtextStyle.Render("Policy staging has no rule, principal, or metadata differences."))
+		}
+	}
+
+	res := b.String()
+	m.stagedDiffCache = res
+	m.cachedPolicyTip = policyTipStr
+	m.cachedStagingTip = stagingTipStr
+	m.cachedDiffWidth = targetWidth
+	return res
+}
+
+// formatStagedDiff formats the staged policy rules, global rules, and principals differences
+// with selective highlighting for modified fields.
+func formatStagedDiff(activeRules, stagedRules []rule, activeGlobalRules, stagedGlobalRules []globalRule, activePrincipals, stagedPrincipals []tuf.Principal, targetWidth int) (string, bool) {
+	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#28A745"))
+	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5252"))
+	modStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#E0AF68"))
+	sectionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorFocus)).Bold(true)
+	subtextStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext))
 
 	activeRuleMap := make(map[string]rule, len(activeRules))
 	for _, r := range activeRules {
@@ -689,30 +832,68 @@ func (m *model) generateStagedDiff() string {
 	}
 
 	hasChanges := false
+	var b strings.Builder
 
 	// Policy Rules
 	if len(addedRules) > 0 || len(removedRules) > 0 || len(modifiedRules) > 0 {
 		hasChanges = true
 		b.WriteString(sectionStyle.Render("Staged Rules:") + "\n")
 		for _, r := range addedRules {
-			b.WriteString(addStyle.Render(fmt.Sprintf("+ Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)) + "\n")
+			line := fmt.Sprintf("+ Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)
+			if targetWidth > 0 {
+				line = wrapDiffLine(line, targetWidth, "  ")
+			}
+			b.WriteString(addStyle.Render(line) + "\n")
 			if r.key != "" {
-				b.WriteString(subtextStyle.Render(fmt.Sprintf("  Authorized Principals: %s", r.key)) + "\n")
+				keyLine := fmt.Sprintf("  Authorized Principals: %s", r.key)
+				if targetWidth > 0 {
+					keyLine = wrapDiffLine(keyLine, targetWidth, "      ")
+				}
+				b.WriteString(subtextStyle.Render(keyLine) + "\n")
 			}
 		}
 		for _, r := range removedRules {
-			b.WriteString(delStyle.Render(fmt.Sprintf("- Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)) + "\n")
+			line := fmt.Sprintf("- Rule: %s (pattern: %s, threshold: %d)", r.name, r.pattern, r.threshold)
+			if targetWidth > 0 {
+				line = wrapDiffLine(line, targetWidth, "  ")
+			}
+			b.WriteString(delStyle.Render(line) + "\n")
 			if r.key != "" {
-				b.WriteString(subtextStyle.Render(fmt.Sprintf("  Authorized Principals: %s", r.key)) + "\n")
+				keyLine := fmt.Sprintf("  Authorized Principals: %s", r.key)
+				if targetWidth > 0 {
+					keyLine = wrapDiffLine(keyLine, targetWidth, "      ")
+				}
+				b.WriteString(subtextStyle.Render(keyLine) + "\n")
 			}
 		}
 		for _, mr := range modifiedRules {
 			b.WriteString(modStyle.Render(fmt.Sprintf("~ Rule: %s", mr.newRule.name)) + "\n")
-			b.WriteString(delStyle.Render(fmt.Sprintf("  - pattern: %s, threshold: %d", mr.oldRule.pattern, mr.oldRule.threshold)) + "\n")
-			b.WriteString(addStyle.Render(fmt.Sprintf("  + pattern: %s, threshold: %d", mr.newRule.pattern, mr.newRule.threshold)) + "\n")
+			patternChanged := mr.oldRule.pattern != mr.newRule.pattern || mr.oldRule.threshold != mr.newRule.threshold
+			if patternChanged {
+				oldLine := fmt.Sprintf("  - pattern: %s, threshold: %d", mr.oldRule.pattern, mr.oldRule.threshold)
+				newLine := fmt.Sprintf("  + pattern: %s, threshold: %d", mr.newRule.pattern, mr.newRule.threshold)
+				if targetWidth > 0 {
+					oldLine = wrapDiffLine(oldLine, targetWidth, "      ")
+					newLine = wrapDiffLine(newLine, targetWidth, "      ")
+				}
+				b.WriteString(delStyle.Render(oldLine) + "\n")
+				b.WriteString(addStyle.Render(newLine) + "\n")
+			} else {
+				ctxLine := fmt.Sprintf("    pattern: %s, threshold: %d", mr.newRule.pattern, mr.newRule.threshold)
+				if targetWidth > 0 {
+					ctxLine = wrapDiffLine(ctxLine, targetWidth, "      ")
+				}
+				b.WriteString(subtextStyle.Render(ctxLine) + "\n")
+			}
 			if mr.oldRule.key != mr.newRule.key {
-				b.WriteString(delStyle.Render(fmt.Sprintf("  - Authorized Principals: %s", mr.oldRule.key)) + "\n")
-				b.WriteString(addStyle.Render(fmt.Sprintf("  + Authorized Principals: %s", mr.newRule.key)) + "\n")
+				oldKey := fmt.Sprintf("  - Authorized Principals: %s", mr.oldRule.key)
+				newKey := fmt.Sprintf("  + Authorized Principals: %s", mr.newRule.key)
+				if targetWidth > 0 {
+					oldKey = wrapDiffLine(oldKey, targetWidth, "      ")
+					newKey = wrapDiffLine(newKey, targetWidth, "      ")
+				}
+				b.WriteString(delStyle.Render(oldKey) + "\n")
+				b.WriteString(addStyle.Render(newKey) + "\n")
 			}
 		}
 	}
@@ -725,15 +906,41 @@ func (m *model) generateStagedDiff() string {
 		hasChanges = true
 		b.WriteString(sectionStyle.Render("Staged Global Rules:") + "\n")
 		for _, gr := range addedGRs {
-			b.WriteString(addStyle.Render(fmt.Sprintf("+ Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)) + "\n")
+			grLine := fmt.Sprintf("+ Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)
+			if targetWidth > 0 {
+				grLine = wrapDiffLine(grLine, targetWidth, "  ")
+			}
+			b.WriteString(addStyle.Render(grLine) + "\n")
 		}
 		for _, gr := range removedGRs {
-			b.WriteString(delStyle.Render(fmt.Sprintf("- Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)) + "\n")
+			grLine := fmt.Sprintf("- Global Rule: %s (type: %s, patterns: %v)", gr.ruleName, gr.ruleType, gr.rulePatterns)
+			if targetWidth > 0 {
+				grLine = wrapDiffLine(grLine, targetWidth, "  ")
+			}
+			b.WriteString(delStyle.Render(grLine) + "\n")
 		}
 		for _, mgr := range modifiedGRs {
 			b.WriteString(modStyle.Render(fmt.Sprintf("~ Global Rule: %s", mgr.newGR.ruleName)) + "\n")
-			b.WriteString(delStyle.Render(fmt.Sprintf("  - type: %s, patterns: %v", mgr.oldGR.ruleType, mgr.oldGR.rulePatterns)) + "\n")
-			b.WriteString(addStyle.Render(fmt.Sprintf("  + type: %s, patterns: %v", mgr.newGR.ruleType, mgr.newGR.rulePatterns)) + "\n")
+			if mgr.oldGR.ruleType != mgr.newGR.ruleType {
+				b.WriteString(delStyle.Render(fmt.Sprintf("  - type: %s", mgr.oldGR.ruleType)) + "\n")
+				b.WriteString(addStyle.Render(fmt.Sprintf("  + type: %s", mgr.newGR.ruleType)) + "\n")
+			}
+			if mgr.oldGR.threshold != mgr.newGR.threshold {
+				b.WriteString(delStyle.Render(fmt.Sprintf("  - threshold: %d", mgr.oldGR.threshold)) + "\n")
+				b.WriteString(addStyle.Render(fmt.Sprintf("  + threshold: %d", mgr.newGR.threshold)) + "\n")
+			}
+			oldPatterns := strings.Join(mgr.oldGR.rulePatterns, ", ")
+			newPatterns := strings.Join(mgr.newGR.rulePatterns, ", ")
+			if oldPatterns != newPatterns {
+				oldLine := fmt.Sprintf("  - patterns: [%s]", oldPatterns)
+				newLine := fmt.Sprintf("  + patterns: [%s]", newPatterns)
+				if targetWidth > 0 {
+					oldLine = wrapDiffLine(oldLine, targetWidth, "      ")
+					newLine = wrapDiffLine(newLine, targetWidth, "      ")
+				}
+				b.WriteString(delStyle.Render(oldLine) + "\n")
+				b.WriteString(addStyle.Render(newLine) + "\n")
+			}
 		}
 	}
 
@@ -745,25 +952,20 @@ func (m *model) generateStagedDiff() string {
 		hasChanges = true
 		b.WriteString(sectionStyle.Render("Staged Principals:") + "\n")
 		for _, p := range addedPrincipals {
-			b.WriteString(addStyle.Render(fmt.Sprintf("+ Principal: %s", p.ID())) + "\n")
+			pLine := fmt.Sprintf("+ Principal: %s", p.ID())
+			if targetWidth > 0 {
+				pLine = wrapDiffLine(pLine, targetWidth, "    ")
+			}
+			b.WriteString(addStyle.Render(pLine) + "\n")
 		}
 		for _, p := range removedPrincipals {
-			b.WriteString(delStyle.Render(fmt.Sprintf("- Principal: %s", p.ID())) + "\n")
-		}
-	}
-
-	if !hasChanges {
-		filesChanged, _ := storer.GetFilePathsChangedByCommit(stagingTip)
-		if len(filesChanged) > 0 {
-			b.WriteString(sectionStyle.Render("Staged Trust Metadata Changes:") + "\n")
-			for _, f := range filesChanged {
-				b.WriteString(addStyle.Render(fmt.Sprintf("+ Modified %s", f)) + "\n")
+			pLine := fmt.Sprintf("- Principal: %s", p.ID())
+			if targetWidth > 0 {
+				pLine = wrapDiffLine(pLine, targetWidth, "    ")
 			}
-		} else {
-			b.WriteString("No staged policy changes detected.\n\n")
-			b.WriteString(subtextStyle.Render("Policy staging has no rule, principal, or metadata differences."))
+			b.WriteString(delStyle.Render(pLine) + "\n")
 		}
 	}
 
-	return b.String()
+	return b.String(), hasChanges
 }
