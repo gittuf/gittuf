@@ -123,6 +123,7 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		return tuf.ErrCannotMeetThreshold
 	}
 
+	ruleFound := false
 	allDelegations := []*Delegation{}
 	for _, delegation := range t.Delegations.Roles {
 		if delegation.ID() == tuf.AllowRuleName {
@@ -140,9 +141,13 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 				KeyIDs:    set.NewSetFromItems(authorizedPrincipalIDs...),
 				Threshold: threshold,
 			}
+			ruleFound = true
 		}
 
 		allDelegations = append(allDelegations, delegation)
+	}
+	if !ruleFound {
+		return tuf.ErrRuleNotFound
 	}
 	allDelegations = append(allDelegations, AllowRule())
 	t.Delegations.Roles = allDelegations
@@ -209,11 +214,17 @@ func (t *TargetsMetadata) RemoveRule(ruleName string) error {
 
 	allDelegations := t.Delegations.Roles
 	updatedDelegations := []*Delegation{}
+	ruleFound := false
 
 	for _, delegation := range allDelegations {
 		if delegation.Name != ruleName {
 			updatedDelegations = append(updatedDelegations, delegation)
+		} else {
+			ruleFound = true
 		}
+	}
+	if !ruleFound {
+		return tuf.ErrRuleNotFound
 	}
 	t.Delegations.Roles = updatedDelegations
 	return nil
@@ -286,6 +297,9 @@ func (d *Delegations) addKey(key tuf.Principal) error {
 
 func (d *Delegations) removeKey(keyID string) error {
 	if d.Keys == nil {
+		return tuf.ErrPrincipalNotFound
+	}
+	if _, exists := d.Keys[keyID]; !exists {
 		return tuf.ErrPrincipalNotFound
 	}
 	for _, curRole := range d.Roles {
