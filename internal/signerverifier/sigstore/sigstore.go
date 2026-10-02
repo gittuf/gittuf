@@ -7,9 +7,11 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"log/slog"
+	"os"
 	"time"
 
 	signeropts "github.com/gittuf/gittuf/internal/signerverifier/sigstore/options/signer"
@@ -19,6 +21,7 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
@@ -32,7 +35,9 @@ const (
 
 	ExtensionMimeType = "application/vnd.dev.sigstore.verificationmaterial;version=0.3"
 
-	EnvSigstoreRootFile = "SIGSTORE_ROOT_FILE"
+	EnvSigstoreRootFile           = "SIGSTORE_ROOT_FILE"
+	EnvSigstoreCTLogPublicKeyFile = "SIGSTORE_CT_LOG_PUBLIC_KEY_FILE"
+	EnvSigstoreRekorPublicKey     = "SIGSTORE_REKOR_PUBLIC_KEY"
 
 	sigstoreBundleMimeType = "application/vnd.dev.sigstore.bundle+json;version=0.3"
 )
@@ -64,7 +69,7 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	slog.Debug("Using Sigstore verifier...")
 
-	trustedRoot, err := cosign.TrustedRoot()
+	trustedRoot, err := getTrustedMaterial(v.rekorURL)
 	if err != nil {
 		slog.Debug(fmt.Sprintf("Error getting TUF root: %v", err))
 		return err
@@ -298,4 +303,95 @@ func (s *Signer) getRekorInstance() *sign.Rekor {
 		Retries: 1,
 	}
 	return sign.NewRekor(rekorOpts)
+}
+
+func getTrustedMaterial(rekorURL string) (root.TrustedMaterial, error) {
+	trustedRoot, err := cosign.TrustedRoot()
+
+	fulcioRootFilePath := os.Getenv(EnvSigstoreRootFile)
+	ctLogPublicKeyFilePath := os.Getenv(EnvSigstoreCTLogPublicKeyFile)
+	rekorPublicKeyFilePath := os.Getenv(EnvSigstoreRekorPublicKey)
+
+	if fulcioRootFilePath == "" && ctLogPublicKeyFilePath == "" && rekorPublicKeyFilePath == "" {
+		return trustedRoot, err
+	}
+
+	if (fulcioRootFilePath == "" || ctLogPublicKeyFilePath == "" || rekorPublicKeyFilePath == "") && err != nil {
+		return nil, fmt.Errorf("unable to load default TUF root for fallback: %w", err)
+	}
+
+	slog.Debug("Using environment variables to establish trust for Sigstore instance...")
+
+	var fulcioCertAuthorities []root.CertificateAuthority
+	switch {
+	case fulcioRootFilePath != "":
+		cert, err := parsePEMFile(fulcioRootFilePath)
+		if err != nil {
+			return nil, err
+		}
+		fulcioCertAuthorities = []root.CertificateAuthority{cert}
+
+	case trustedRoot != nil:
+		fulcioCertAuthorities = trustedRoot.FulcioCertificateAuthorities()
+
+	default:
+		return nil, fmt.Errorf("fulcio root is required but neither env var nor TUF root is available")
+	}
+
+	var rekorLogs map[string]*root.TransparencyLog
+	switch {
+	case rekorPublicKeyFilePath != "":
+		pubKey, keyHash, err := parsePubKey(rekorPublicKeyFilePath)
+		if err != nil {
+			return nil, err
+		}
+		keyID := hex.EncodeToString(keyHash)
+		rekorLogs = map[string]*root.TransparencyLog{
+			keyID: {
+				BaseURL:           rekorURL,
+				HashFunc:          crypto.SHA256,
+				ID:                keyHash,
+				PublicKey:         pubKey,
+				SignatureHashFunc: crypto.SHA256,
+			},
+		}
+
+	case trustedRoot != nil:
+		rekorLogs = trustedRoot.RekorLogs()
+
+	default:
+		return nil, fmt.Errorf("rekor public key is required but neither env var nor TUF root is available")
+	}
+
+	var ctLogs map[string]*root.TransparencyLog
+	switch {
+	case ctLogPublicKeyFilePath != "":
+		pubKey, keyHash, err := parsePubKey(ctLogPublicKeyFilePath)
+		if err != nil {
+			return nil, err
+		}
+		keyID := hex.EncodeToString(keyHash)
+		ctLogs = map[string]*root.TransparencyLog{
+			keyID: {
+				BaseURL:           "",
+				HashFunc:          crypto.SHA256,
+				ID:                keyHash,
+				PublicKey:         pubKey,
+				SignatureHashFunc: crypto.SHA256,
+			},
+		}
+
+	case trustedRoot != nil:
+		ctLogs = trustedRoot.CTLogs()
+
+	default:
+		return nil, fmt.Errorf("ctlog public key is required but neither env var nor TUF root is available")
+	}
+
+	var tsas []root.TimestampingAuthority
+	if trustedRoot != nil {
+		tsas = trustedRoot.TimestampingAuthorities()
+	}
+
+	return root.NewTrustedRoot(root.TrustedRootMediaType01, fulcioCertAuthorities, ctLogs, tsas, rekorLogs)
 }
