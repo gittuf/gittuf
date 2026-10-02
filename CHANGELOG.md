@@ -2,6 +2,32 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.16.1
+
+This release addresses a performance issue with verification of data signed with
+Sigstore, as well as an experimental new go-git storage backend.
+
+### Added
+
+- Added support for application-defined custom fields in the RSL
+- Added an experimental, significantly faster go-git storage backend (currently
+  `GITTUF_DEV` only)
+- 
+
+### Updated
+
+- Optimized Sigstore metadata fetch process
+- Improved support for custom metadata containing the `=` character (e.g.
+  base64, etc.)
+- Improved support for GPG keys on Windows
+- Various updates to the TUI
+- Various updates to documentation
+- Updated various dependencies and CI workflows
+
+### Removed
+
+- Removed gittuf native hooks
+
 ## v0.16.0
 
 This release adds support for SHA-256 Git repositories and reworks gittuf's
