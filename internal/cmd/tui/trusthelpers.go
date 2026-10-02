@@ -5,6 +5,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -28,6 +29,14 @@ type trustPropagationDirective struct {
 	upstreamPath        string
 	downstreamReference string
 	downstreamPath      string
+}
+
+// trustKeys holds the root and top-level policy keys shown in the TUI.
+type trustKeys struct {
+	rootKeys        []tuf.Principal
+	rootThreshold   int
+	policyKeys      []tuf.Principal
+	policyThreshold int
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
@@ -160,6 +169,38 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+// repoListTrustKeys returns the root and top-level policy keys for the TUI
+func repoListTrustKeys(ctx context.Context, o *options) (*trustKeys, error) {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil, err
+	}
+
+	rootKeys, rootThreshold, err := repo.ListRootKeys(ctx, o.targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := &trustKeys{
+		rootKeys:      rootKeys,
+		rootThreshold: rootThreshold,
+	}
+
+	// Top-level policy keys are not set until a policy key is added, which
+	// is not an error for listing purposes
+	policyKeys, policyThreshold, err := repo.ListTopLevelTargetsKeys(ctx, o.targetRef)
+	if err != nil {
+		if !errors.Is(err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot) {
+			return nil, err
+		}
+		return keys, nil
+	}
+
+	keys.policyKeys = policyKeys
+	keys.policyThreshold = policyThreshold
+	return keys, nil
 }
 
 // repoAddRootKey take the TUI input and adds a root key to the repository
@@ -614,4 +655,41 @@ func (s *trustPropagationScreen) renderDirectives() string {
 	}
 
 	return strings.TrimSpace(b.String())
+}
+
+// renderTrustKeys turns root and top-level policy keys into screen text.
+func (s *trustKeysThresholdsScreen) renderTrustKeys() string {
+	if s.keys == nil {
+		return "No keys loaded."
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "Root Keys (threshold: %d)\n", s.keys.rootThreshold)
+	writeTrustKeyPrincipals(&b, s.keys.rootKeys)
+
+	b.WriteString("\n")
+	if len(s.keys.policyKeys) == 0 {
+		b.WriteString("Top-Level Policy Keys\n")
+	} else {
+		fmt.Fprintf(&b, "Top-Level Policy Keys (threshold: %d)\n", s.keys.policyThreshold)
+	}
+	writeTrustKeyPrincipals(&b, s.keys.policyKeys)
+
+	return strings.TrimSpace(b.String())
+}
+
+// writeTrustKeyPrincipals writes each principal as a line in a list.
+func writeTrustKeyPrincipals(b *strings.Builder, principals []tuf.Principal) {
+	if len(principals) == 0 {
+		b.WriteString("  None configured.\n")
+		return
+	}
+
+	for _, principal := range principals {
+		fmt.Fprintf(b, "  • %s", principal.ID())
+		if keys := principal.Keys(); len(keys) > 0 {
+			fmt.Fprintf(b, " (%s)", keys[0].KeyType)
+		}
+		b.WriteString("\n")
+	}
 }
