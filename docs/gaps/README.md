@@ -31,6 +31,7 @@ the gittuf/community repository.
 | 5 | [Principals, not Keys](/docs/gaps/5/README.md) | No | No |
 | 6 | [Code Review Tool Attestations](/docs/gaps/6/README.md) | No | No |
 | 7 | [Application-Defined Custom Fields](/docs/gaps/7/README.md) | Yes | No |
+| 8 | [Metadata Versioning Policy](/docs/gaps/draft/README.md) | Yes | No |
 
 ## GAP Format
 
