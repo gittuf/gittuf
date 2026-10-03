@@ -265,3 +265,46 @@ func TestFileStatusUntracked(t *testing.T) {
 		assert.False(t, fs.Untracked())
 	})
 }
+
+func TestStatusWhitespaceFilenames(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd) //nolint:errcheck
+
+	leadingSpace := " leading-space.txt"
+	innerSpaces := "foo bar baz.txt"
+
+	if err := os.WriteFile(leadingSpace, []byte("test"), 0o644); err != nil { //nolint:gosec
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(innerSpaces, []byte("test"), 0o644); err != nil { //nolint:gosec
+		t.Fatal(err)
+	}
+
+	statuses, err := repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		leadingSpace: {X: StatusCodeUntracked, Y: StatusCodeUntracked},
+		innerSpaces:  {X: StatusCodeUntracked, Y: StatusCodeUntracked},
+	}, statuses)
+
+	// Stage the files
+	if _, err := repo.executor("add", leadingSpace, innerSpaces).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, map[string]FileStatus{
+		leadingSpace: {X: StatusCodeAdded, Y: StatusCodeUnmodified},
+		innerSpaces:  {X: StatusCodeAdded, Y: StatusCodeUnmodified},
+	}, statuses)
+}
