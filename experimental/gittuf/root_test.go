@@ -59,7 +59,7 @@ func TestInitializeRoot(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -90,7 +90,7 @@ func TestInitializeRoot(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
 
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		// Make a test GPG keyring in tempdir to use for tests
 		gpg.SetupTestGPGHomeDir(t, artifacts.GPGKey1Private)
@@ -143,7 +143,7 @@ func TestInitializeRoot(t *testing.T) {
 	t.Run("fails when root staged but not applied (policy-staging has root)", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		err := r.InitializeRoot(testCtx, signer, false)
@@ -156,7 +156,7 @@ func TestInitializeRoot(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		// Test signCommit
@@ -193,7 +193,7 @@ func TestSetRepositoryLocation(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		// Test signCommit
@@ -251,7 +251,7 @@ func TestAddRootKey(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -357,7 +357,7 @@ func TestRemoveRootKey(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		r := &Repository{r: repo}
+		r := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -381,8 +381,12 @@ func TestRemoveRootKey(t *testing.T) {
 		err = r.RemoveRootKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 
-		// Test error with removing key
+		// Test removing a key that isn't a root principal
 		err = r.RemoveRootKey(testCtx, originalSigner, newRootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test error with removing key
+		err = r.RemoveRootKey(testCtx, originalSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
@@ -415,7 +419,7 @@ func TestAddTopLevelTargetsKey(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -500,7 +504,7 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -521,8 +525,12 @@ func TestRemoveTopLevelTargetsKey(t *testing.T) {
 		err = r.RemoveTopLevelTargetsKey(testCtx, unauthorizedSigner, rootKey.KeyID, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 
-		// Test error with removing key
+		// Test removing a key that isn't a policy principal
 		err = r.RemoveTopLevelTargetsKey(testCtx, sv, rootKey.KeyID, false)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+
+		// Test error with removing key
+		err = r.RemoveTopLevelTargetsKey(testCtx, sv, targetsKey.KeyID, false)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
@@ -558,7 +566,7 @@ func TestAddGitHubApp(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -664,7 +672,7 @@ func TestRemoveGitHubApp(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -755,7 +763,7 @@ func TestTrustGitHubApp(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -860,7 +868,7 @@ func TestUntrustGitHubApp(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -975,7 +983,7 @@ func TestUpdateRootThreshold(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -1064,7 +1072,7 @@ func TestUpdateTopLevelTargetsThreshold(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -1119,7 +1127,7 @@ func TestSignRoot(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -1182,7 +1190,7 @@ func TestAddGlobalRuleThreshold(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -1249,7 +1257,7 @@ func TestAddGlobalRuleBlockForcePushes(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err = repo.SetGitConfig("user.signingkey", "")
@@ -1384,10 +1392,39 @@ func TestRemoveGlobalRule(t *testing.T) {
 		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
 	})
 
+	t.Run("remove non-existent global rule when others exist", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleBlockForcePushes(testCtx, rootSigner, "block-force-pushes-for-main", []string{"git:refs/heads/main"}, false)
+		assert.Nil(t, err)
+
+		err = r.RemoveGlobalRule(testCtx, rootSigner, "does-not-exist", false)
+		assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		globalRules := rootMetadata.GetGlobalRules()
+		assert.Len(t, globalRules, 1)
+		assert.Equal(t, "block-force-pushes-for-main", globalRules[0].GetName())
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -1754,7 +1791,7 @@ func TestUpdateGlobalRule(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -1946,6 +1983,9 @@ func TestAddPropagationDirective(t *testing.T) {
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
 
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/other-repository", "refs/heads/feature", "", "refs/heads/feature", "other-upstream/", false)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
@@ -1985,6 +2025,9 @@ func TestAddPropagationDirective(t *testing.T) {
 		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/repository", "refs/heads/main", "upstreamPath/", "refs/heads/main", "upstream/", false)
 		assert.Nil(t, err)
 
+		err = r.AddPropagationDirective(testCtx, rootSigner, "test", "https://example.com/git/other-repository", "refs/heads/feature", "otherUpstreamPath/", "refs/heads/feature", "other-upstream/", false)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
@@ -2006,7 +2049,7 @@ func TestAddPropagationDirective(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2127,7 +2170,7 @@ func TestUpdatePropagationDirective(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2278,7 +2321,7 @@ func TestRemovePropagationDirective(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2337,7 +2380,7 @@ func TestIncrementRootVersion(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2449,7 +2492,7 @@ func TestEnableController(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2500,7 +2543,7 @@ func TestDisableController(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2550,7 +2593,7 @@ func TestAddControllerRepository(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")
@@ -2612,7 +2655,7 @@ func TestAddNetworkRepository(t *testing.T) {
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
-		nr := &Repository{r: repo}
+		nr := &Repository{r: newStorer(repo)}
 
 		// Test signCommit
 		err := repo.SetGitConfig("user.signingkey", "")

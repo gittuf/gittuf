@@ -15,8 +15,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.26', '1.27']
+        go-version: ['1.27']
+        storer: [binary, go-git]
     runs-on: ${{ matrix.os }}
+    env:
+      GITTUF_STORER: ${{ matrix.storer }}
+      # The go-git backend is experimental, so selecting it requires developer
+      # mode.
+      GITTUF_DEV: ${{ matrix.storer == 'go-git' && '1' || '' }}
     steps:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -54,7 +60,7 @@ jobs:
         persist-credentials: false
     - name: Test in FreeBSD
       id: test
-      uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1
+      uses: vmactions/freebsd-vm@4469451fe39bee80be4066836c5170362e9349f3
       with:
         usesh: true
         prepare: |

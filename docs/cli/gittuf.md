@@ -14,6 +14,8 @@ gittuf is a security layer for Git repositories, powered by TUF. The CLI provide
       --profile                      enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
+      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
       --verbose                      enable verbose logging
 ```
 
@@ -21,7 +23,6 @@ gittuf is a security layer for Git repositories, powered by TUF. The CLI provide
 
 * [gittuf add-hooks](gittuf_add-hooks.md)	 - Add git hooks that automatically create and sync RSL
 * [gittuf attest](gittuf_attest.md)	 - Tools for attesting to code contributions
-* [gittuf cache](gittuf_cache.md)	 - Manage gittuf's caching functionality
 * [gittuf clone](gittuf_clone.md)	 - Clone repository and its gittuf references
 * [gittuf policy](gittuf_policy.md)	 - Tools to manage gittuf policies
 * [gittuf rsl](gittuf_rsl.md)	 - Tools to manage the repository's reference state log

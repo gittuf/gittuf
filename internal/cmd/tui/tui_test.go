@@ -6,7 +6,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/exp/teatest"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
@@ -26,10 +26,7 @@ func init() {
 
 func TestTUI(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -406,6 +403,10 @@ func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
 }
 
 func TestTrustPropagationBackendErrorUsesErrorDialog(t *testing.T) {
+	// The directive update is gated on developer mode, and this test asserts
+	// the resulting error reaches the dialog, so the gate must be shut.
+	t.Setenv(dev.DevModeKey, "")
+
 	m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
 	m.screen = screenTrustUpdatePropagationForm
 	m.trustPropagationScreen.selectedAction = trustUpdateDirectiveAction

@@ -26,13 +26,9 @@ func TestRemovePerson(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(&persistent.Options{}), "--person-ID", "dummy-person")
+		_, _, _, err := cmd.ExecuteCommandC(New(&persistent.Options{}), "--person-ID", "dummy-person")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -44,11 +40,7 @@ func TestRemovePerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -93,11 +85,7 @@ func TestRemovePerson(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -136,14 +124,10 @@ func TestRemovePerson(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		command := New(&persistent.Options{SigningKey: "invalid-key"})
-		_, _, _, err = cmd.ExecuteCommandC(command, "--person-ID", "dummy-person")
+		_, _, _, err := cmd.ExecuteCommandC(command, "--person-ID", "dummy-person")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 }

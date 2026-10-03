@@ -31,6 +31,8 @@ gittuf trust add-propagation-directive [flags]
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
   -k, --signing-key string           signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
       --verbose                      enable verbose logging
 ```
 

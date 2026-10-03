@@ -211,7 +211,7 @@ func repoRemoveRootKey(ctx context.Context, o *options, keyInput string) error {
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.RemoveRootKey(ctx, signer, strings.ToLower(keyInput), true, opts...)
+	return repo.RemoveRootKey(ctx, signer, keyInput, true, opts...)
 }
 
 // repoAddPolicyKey takes the TUI input and adds a policy key to the repository
@@ -254,7 +254,7 @@ func repoRemovePolicyKey(ctx context.Context, o *options, keyInput string) error
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
 	}
-	return repo.RemoveTopLevelTargetsKey(ctx, signer, strings.ToLower(keyInput), true, opts...)
+	return repo.RemoveTopLevelTargetsKey(ctx, signer, keyInput, true, opts...)
 }
 
 func repoUpdateRootThreshold(ctx context.Context, o *options, thresholdInput int) error {
@@ -395,7 +395,12 @@ func repoUpdatePropagationDirective(ctx context.Context, o *options, name, upstr
 		return err
 	}
 
-	return repo.UpdatePropagationDirective(ctx, signer, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.UpdatePropagationDirective(ctx, signer, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath, true, opts...)
 }
 
 // repoRemovePropagationDirective removes a propagation directive.

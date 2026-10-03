@@ -109,6 +109,10 @@ func (r *RootMetadata) DeleteRootPrincipal(principalID string) error {
 		return tuf.ErrInvalidRootMetadata
 	}
 
+	if !rootRole.PrincipalIDs.Has(principalID) {
+		return tuf.ErrPrincipalNotFound
+	}
+
 	if rootRole.PrincipalIDs.Len() <= rootRole.Threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
@@ -159,6 +163,10 @@ func (r *RootMetadata) DeletePrimaryRuleFilePrincipal(principalID string) error 
 	targetsRole, ok := r.Roles[tuf.TargetsRoleName]
 	if !ok {
 		return tuf.ErrPrimaryRuleFileInformationNotFoundInRoot
+	}
+
+	if !targetsRole.PrincipalIDs.Has(principalID) {
+		return tuf.ErrPrincipalNotFound
 	}
 
 	if targetsRole.PrincipalIDs.Len() <= targetsRole.Threshold {
@@ -494,16 +502,24 @@ func (r *RootMetadata) AddGlobalRule(globalRule tuf.GlobalRule) error {
 func (r *RootMetadata) DeleteGlobalRule(ruleName string) error {
 	allGlobalRules := r.GlobalRules
 	updatedGlobalRules := []tuf.GlobalRule{}
+	found := false
 
 	if len(allGlobalRules) == 0 {
 		return tuf.ErrGlobalRuleNotFound
 	}
 
 	for _, rule := range allGlobalRules {
-		if rule.GetName() != ruleName {
+		if rule.GetName() == ruleName {
+			found = true
+		} else {
 			updatedGlobalRules = append(updatedGlobalRules, rule)
 		}
 	}
+
+	if !found {
+		return tuf.ErrGlobalRuleNotFound
+	}
+
 	r.GlobalRules = updatedGlobalRules
 	return nil
 }
@@ -560,6 +576,10 @@ func (r *RootMetadata) GetGlobalRules() []tuf.GlobalRule {
 // AddPropagationDirective adds a propagation directive to the root metadata.
 func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirective) error {
 	for _, existing := range r.Propagations {
+		if existing.GetName() == directive.GetName() {
+			return tuf.ErrPropagationDirectiveAlreadyExists
+		}
+
 		if existing.GetUpstreamRepository() == directive.GetUpstreamRepository() &&
 			existing.GetUpstreamReference() == directive.GetUpstreamReference() &&
 			existing.GetUpstreamPath() == directive.GetUpstreamPath() &&

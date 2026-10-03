@@ -48,6 +48,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	stdOut := cmd.OutOrStdout()
 
+	if len(principals) == 0 {
+		fmt.Fprintln(stdOut, "No principals are currently defined.")
+		return nil
+	}
+
 	count := 0
 	for _, principal := range principals {
 		fmt.Fprintf(stdOut, "Principal %s:\n", principal.ID())

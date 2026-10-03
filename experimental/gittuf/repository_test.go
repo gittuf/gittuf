@@ -68,7 +68,7 @@ func TestUnauthorizedKey(t *testing.T) {
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
-	r := &Repository{r: repo}
+	r := &Repository{r: newStorer(repo)}
 	if err := r.InitializeRoot(testCtx, rootSigner, false); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestGetGitRepository(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	r := &Repository{r: repo}
+	r := &Repository{r: newStorer(repo)}
 	result := r.GetGitRepository()
 	assert.Equal(t, repo, result)
 }

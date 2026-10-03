@@ -17,25 +17,19 @@ import (
 func TestAddHooks(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)
 
 		hookPath := filepath.Join(".git", "hooks", "pre-push")
@@ -46,10 +40,7 @@ func TestAddHooks(t *testing.T) {
 
 	t.Run("already exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -68,10 +59,7 @@ func TestAddHooks(t *testing.T) {
 
 	t.Run("force overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		require.NoError(t, err)
-		require.NoError(t, os.Chdir(tmpDir))
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -80,7 +68,7 @@ func TestAddHooks(t *testing.T) {
 		require.NoError(t, os.MkdirAll(hookPath, 0755))
 		dummyHookPath := filepath.Join(hookPath, "pre-push")
 		require.NoError(t, os.WriteFile(dummyHookPath, []byte("dummy hook content"), 0o600))
-		_, _, _, err = cmd.ExecuteCommandC(New(), "--force")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "--force")
 		assert.NoError(t, err)
 
 		content, err := os.ReadFile(dummyHookPath)

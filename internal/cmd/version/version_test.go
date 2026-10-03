@@ -12,6 +12,8 @@ import (
 
 func TestVersion(t *testing.T) {
 	t.Run("default (no dev mode env var)", func(t *testing.T) {
+		t.Setenv("GITTUF_DEV", "")
+
 		_, stdOut, _, err := cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)
 

@@ -7,7 +7,7 @@
 * **Implemented:** No
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Aditya Sirish A Yelgundhalli (adityasaky)
-* **Last Modified:** March 25, 2025
+* **Last Modified:** September 21st, 2026
 
 ## Abstract
 
@@ -223,10 +223,9 @@ responsible for declaring policies have to write unintuitive rules, and
 misconfigurations that allow a single developer to be counted multiple times
 towards the threshold are likelier.
 
-## Prototype Implementation
+## Implementation
 
-See v0.2 policy metadata. To use this metadata, set `GITTUF_DEV=1` and
-`GITTUF_ALLOW_V02_POLICY=1`.
+See v0.2 policy metadata, which is the default in gittuf since `v0.10.0`.
 
 ## References
 

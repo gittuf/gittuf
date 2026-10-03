@@ -9,14 +9,25 @@ import (
 	"errors"
 
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
 )
+
+// DownstreamRepository is the storage propagation writes into. It is a Storer
+// plus the one operation that needs both repositories at once, which only the
+// git binary can do.
+type DownstreamRepository interface {
+	gitstore.Storer
+
+	CreateSubtreeFromUpstreamRepository(upstream *gitinterface.Repository, upstreamCommitID githash.Hash, upstreamPath, localRef, localPath string) (githash.Hash, error)
+}
 
 // PropagateChangesFromUpstreamRepository executes gittuf's propagation workflow
 // to create a subtree of the contents of an upstream repository's reference
 // into the specified reference and path in the downstream repository.
-func PropagateChangesFromUpstreamRepository(downstreamRepo, upstreamRepo *gitinterface.Repository, details []tuf.PropagationDirective, sign bool) error {
+func PropagateChangesFromUpstreamRepository(downstreamRepo DownstreamRepository, upstreamRepo *gitinterface.Repository, details []tuf.PropagationDirective, sign bool) error {
 	// FIXME: We assume here that downstreamRepo and upstreamRepo have their
 	// gittuf refs already synced.
 

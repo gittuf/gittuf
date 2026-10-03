@@ -12,6 +12,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,6 +67,9 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 		err = delegations.addPrincipal(person)
 		assert.Nil(t, err)
 		assert.Equal(t, person, delegations.Principals[person.PersonID])
+
+		err = delegations.addPrincipal(nil)
+		assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
 	})
 
 	t.Run("test removePrincipal", func(t *testing.T) {
@@ -135,6 +139,19 @@ func TestDelegationsUnmarshalJSON(t *testing.T) {
 		err := json.Unmarshal([]byte(`{"principals":{"unknown":{"name":"unknown"}}}`), delegations)
 		assert.ErrorContains(t, err, "unrecognized principal type")
 	})
+
+	tests := map[string]string{
+		"invalid key":    `{"principals":{"invalid":{"keyid":[]}}}`,
+		"invalid person": `{"principals":{"invalid":{"personID":[]}}}`,
+	}
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			delegations := &Delegations{}
+
+			err := json.Unmarshal([]byte(data), delegations)
+			assert.ErrorContains(t, err, "cannot unmarshal array into Go struct field")
+		})
+	}
 }
 
 func TestDelegation(t *testing.T) {
@@ -345,6 +362,12 @@ func TestAddRuleAndGetRules(t *testing.T) {
 	assert.Equal(t, 2, len(rules))
 	assert.Equal(t, []tuf.Rule{rule, AllowRule()}, rules)
 
+	t.Run("nil delegations", func(t *testing.T) {
+		targetsMetadata := &TargetsMetadata{}
+
+		assert.Nil(t, targetsMetadata.GetRules())
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		targetsMetadata := initialTestTargetsMetadata(t)
 
@@ -427,6 +450,27 @@ func TestUpdateDelegation(t *testing.T) {
 
 		err = targetsMetadata.UpdateRule(("rule"), []string{key1.KeyID}, nil, 2)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+	})
+
+	t.Run("preserves rules before updated rule", func(t *testing.T) {
+		targetsMetadata := initialTestTargetsMetadata(t)
+		if err := targetsMetadata.AddPrincipal(key1); err != nil {
+			t.Fatal(err)
+		}
+		if err := targetsMetadata.AddRule("first-rule", []string{key1.KeyID}, []string{"first/"}, 1); err != nil {
+			t.Fatal(err)
+		}
+		if err := targetsMetadata.AddRule("second-rule", []string{key1.KeyID}, []string{"second/"}, 1); err != nil {
+			t.Fatal(err)
+		}
+
+		err := targetsMetadata.UpdateRule("second-rule", []string{key1.KeyID}, []string{"updated/"}, 1)
+		assert.Nil(t, err)
+
+		rules := targetsMetadata.GetRules()
+		assert.Equal(t, "first-rule", rules[0].ID())
+		assert.Equal(t, "second-rule", rules[1].ID())
+		assert.Equal(t, []string{"updated/"}, rules[1].GetProtectedNamespaces())
 	})
 }
 
@@ -595,11 +639,18 @@ func TestUpdatePrincipal(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, key1, targetsMetadata.Delegations.Principals[key1.KeyID])
 
+	err = targetsMetadata.UpdatePrincipal(key1)
+	assert.Nil(t, err)
+	assert.Equal(t, key1, targetsMetadata.Delegations.Principals[key1.KeyID])
+
 	err = targetsMetadata.UpdatePrincipal(key2)
 	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	// Test updating with nil principal
 	err = targetsMetadata.UpdatePrincipal(nil)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	err = targetsMetadata.UpdatePrincipal(&unsupportedPrincipal{id: key1.KeyID})
 	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
 
 	// Test updating person
@@ -676,4 +727,20 @@ func TestAddAndUpdatePrincipalValidatesPerson(t *testing.T) {
 
 	err = targetsMetadata.UpdatePrincipal(invalidPerson)
 	assert.ErrorIs(t, err, tuf.ErrInvalidCustomMetadataKey)
+}
+
+type unsupportedPrincipal struct {
+	id string
+}
+
+func (p *unsupportedPrincipal) ID() string {
+	return p.id
+}
+
+func (p *unsupportedPrincipal) Keys() []*signerverifier.SSLibKey {
+	return nil
+}
+
+func (p *unsupportedPrincipal) CustomMetadata() map[string]string {
+	return nil
 }

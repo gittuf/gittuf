@@ -50,9 +50,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		state, err = policy.LoadStateFromCommit(repo.GetGitRepository(), commitID)
+		state, err = policy.LoadStateFromCommit(repo.GetStorer(), commitID)
 	} else {
-		state, err = policy.LoadCurrentState(cmd.Context(), repo.GetGitRepository(), policy.PolicyStagingRef, policyopts.BypassRSL())
+		state, err = policy.LoadCurrentState(cmd.Context(), repo.GetStorer(), policy.PolicyStagingRef, policyopts.BypassRSL())
 	}
 	if err != nil {
 		return err

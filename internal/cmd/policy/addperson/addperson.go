@@ -95,7 +95,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	custom := map[string]string{}
 	for _, customEntry := range o.customMetadata {
-		split := strings.Split(customEntry, "=")
+		split := strings.SplitN(customEntry, "=", 2)
 		if len(split) != 2 {
 			return fmt.Errorf("invalid format for custom metadata '%s'", customEntry)
 		}

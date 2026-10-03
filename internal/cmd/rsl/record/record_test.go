@@ -4,7 +4,6 @@
 package record
 
 import (
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/cmd"
@@ -16,14 +15,9 @@ import (
 func TestRecord(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "main", "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "main", "--local-only")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -31,13 +25,9 @@ func TestRecord(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "--local-only")
 		assert.ErrorContains(t, err, "accepts 1 arg(s), received 0")
 	})
 
@@ -45,13 +35,9 @@ func TestRecord(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "main")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "main")
 		assert.ErrorContains(t, err, "at least one of the flags in the group [remote-name local-only] is required")
 	})
 
@@ -59,13 +45,9 @@ func TestRecord(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "main", "--local-only", "--remote-name", "origin")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "main", "--local-only", "--remote-name", "origin")
 		assert.ErrorContains(t, err, "if any flags in the group [remote-name local-only] are set")
 	})
 
@@ -73,13 +55,9 @@ func TestRecord(t *testing.T) {
 		tmpDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		err = r.SetGitConfig("user.signingkey", "")
+		err := r.SetGitConfig("user.signingkey", "")
 		require.NoError(t, err)
 
 		treeBuilder := gitinterface.NewTreeBuilder(r)

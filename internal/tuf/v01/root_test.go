@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,6 +97,32 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, directive, directives[0])
 
 		err = rootMetadata.AddPropagationDirective(directive)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
+		duplicateNameDirective := &PropagationDirective{
+			Name:                "test",
+			UpstreamRepository:  "https://example.org/git/other-repository",
+			UpstreamReference:   "refs/heads/feature",
+			DownstreamReference: "refs/heads/feature",
+			DownstreamPath:      "other-upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(duplicateNameDirective)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+		directives = rootMetadata.GetPropagationDirectives()
+		assert.Equal(t, 1, len(directives))
+		assert.Equal(t, directive, directives[0])
+
+		duplicateTupleDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.com/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(duplicateTupleDirective)
 		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
 		directives = rootMetadata.GetPropagationDirectives()
 		assert.Equal(t, 1, len(directives))
@@ -354,11 +381,19 @@ func TestDeleteRootPrincipal(t *testing.T) {
 	err := rootMetadata.AddRootPrincipal(newRootKey)
 	assert.Nil(t, err)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeleteRootPrincipal(strings.ToLower(newRootKey.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(key.KeyID, newRootKey.KeyID), rootMetadata.Roles[tuf.RootRoleName].KeyIDs)
+
 	err = rootMetadata.DeleteRootPrincipal(newRootKey.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, key, rootMetadata.Keys[key.KeyID])
 	assert.Equal(t, newRootKey, rootMetadata.Keys[newRootKey.KeyID])
 	assert.Equal(t, set.NewSetFromItems(key.KeyID), rootMetadata.Roles[tuf.RootRoleName].KeyIDs)
+
+	err = rootMetadata.DeleteRootPrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeleteRootPrincipal(key.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
@@ -400,12 +435,20 @@ func TestDeletePrimaryRuleFilePrincipal(t *testing.T) {
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal("")
 	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalID)
 
+	// SSH key IDs are case-sensitive, a lowercased ID must not match
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal(strings.ToLower(targetsKey1.KeyID))
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	assert.Equal(t, set.NewSetFromItems(targetsKey1.KeyID, targetsKey2.KeyID), rootMetadata.Roles[tuf.TargetsRoleName].KeyIDs)
+
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey1.KeyID)
 	assert.Nil(t, err)
 	assert.Equal(t, targetsKey1, rootMetadata.Keys[targetsKey1.KeyID])
 	assert.Equal(t, targetsKey2, rootMetadata.Keys[targetsKey2.KeyID])
 	targetsRole := rootMetadata.Roles[tuf.TargetsRoleName]
 	assert.True(t, targetsRole.KeyIDs.Has(targetsKey2.KeyID))
+
+	err = rootMetadata.DeletePrimaryRuleFilePrincipal("unknown")
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = rootMetadata.DeletePrimaryRuleFilePrincipal(targetsKey2.KeyID)
 	assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
@@ -846,6 +889,12 @@ func TestGlobalRules(t *testing.T) {
 		Threshold: 4,
 	}
 	err = rootMetadata.UpdateGlobalRule(differentNameGlobalRule)
+	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
+	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())
+	assert.Equal(t, "block-force-pushes", rootMetadata.GlobalRules[1].GetName())
+
+	err = rootMetadata.DeleteGlobalRule("does-not-exist")
 	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
 	assert.Equal(t, 2, len(rootMetadata.GlobalRules))
 	assert.Equal(t, "threshold-2-main", rootMetadata.GlobalRules[0].GetName())

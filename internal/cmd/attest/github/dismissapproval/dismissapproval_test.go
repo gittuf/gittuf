@@ -23,39 +23,32 @@ import (
 func TestDismissApproval(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--dismiss-approver", "jane.doe", "--review-ID", "123")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--dismiss-approver", "jane.doe", "--review-ID", "123")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("invalid signer", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: "non-existent-key",
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--dismiss-approver", "jane.doe", "--review-ID", "123")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--dismiss-approver", "jane.doe", "--review-ID", "123")
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
 	t.Run("success dismiss-approval", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -88,12 +81,6 @@ func TestDismissApproval(t *testing.T) {
 
 		err = currentAttestations.Commit(repo.GetGitRepository(), "Add GitHub pull request approval", true, false)
 		require.NoError(t, err)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
@@ -104,6 +91,8 @@ func TestDismissApproval(t *testing.T) {
 
 	t.Run("success dismiss-approval with RSL entry", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -136,12 +125,6 @@ func TestDismissApproval(t *testing.T) {
 
 		err = currentAttestations.Commit(repo.GetGitRepository(), "Add GitHub pull request approval", true, false)
 		require.NoError(t, err)
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		pOpts := &persistent.Options{
 			SigningKey:   keyPath,

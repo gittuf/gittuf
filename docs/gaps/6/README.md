@@ -8,7 +8,7 @@
 * **Withdrawn/Rejected:** No
 * **Sponsors:** Aditya Sirish A Yelgundhalli (adityasaky)
 * **Related GAPs:** [GAP-3](/docs/gaps/3/README.md), [GAP-5](/docs/gaps/5/README.md)
-* **Last Modified:** March 25, 2025
+* **Last Modified:** September 21st, 2026
 
 ## Abstract
 
@@ -156,7 +156,7 @@ that watches GitHub pull requests), where multiple, isolated integrations can be
 used. However, if the issuer is the code review tool itself, then we cannot
 employ thresholds.
 
-## Prototype Implementation
+## Implementation
 
 See support for GitHub pull request approval attestations.
 

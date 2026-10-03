@@ -51,7 +51,7 @@ func createTestRepositoryWithRoot(t *testing.T, location string, opts ...gitinte
 		repo = gitinterface.CreateTestGitRepository(t, location, false, opts...)
 	}
 
-	r := &Repository{r: repo}
+	r := &Repository{r: newStorer(repo)}
 
 	if err := r.InitializeRoot(testCtx, signer, false); err != nil {
 		t.Fatal(err)

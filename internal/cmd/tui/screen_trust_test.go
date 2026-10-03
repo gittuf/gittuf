@@ -5,7 +5,6 @@ package tui
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -31,10 +30,7 @@ func selectItemByTitle(t *testing.T, l *list.Model, title string) {
 
 func TestTrustScreenMenuSelectionAndRendering(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{
@@ -64,10 +60,7 @@ func TestTrustScreenMenuSelectionAndRendering(t *testing.T) {
 
 func TestTrustScreenInteractiveNavigation(t *testing.T) {
 	tmpDir := t.TempDir()
-	currentDir, err := os.Getwd()
-	require.NoError(t, err)
-	require.NoError(t, os.Chdir(tmpDir))
-	defer os.Chdir(currentDir) //nolint:errcheck
+	t.Chdir(tmpDir)
 	gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
 	o := &options{

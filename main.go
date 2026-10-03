@@ -18,6 +18,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "unexpected profiling error: %s\n", err.Error())
 		}
 
+		root.ReportStorerTrace(os.Stderr)
+
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "unexpected error: %s\n\n", fmt.Sprint(r))
 			debug.PrintStack()
@@ -29,6 +31,10 @@ func main() {
 
 	rootCmd := root.New()
 	if err := rootCmd.Execute(); err != nil {
+		// Deferred functions do not run under os.Exit, so report here too. It
+		// emits at most once.
+		root.ReportStorerTrace(os.Stderr)
+
 		// We can ignore the linter here (deferred functions are not executed
 		// when os.Exit is invoked) because if we do have an error, we don't
 		// have a panic, which is what the deferred function is looking for.

@@ -565,9 +565,9 @@ func (m *model) generateStagedDiff() string {
 		}
 	}
 
-	gitRepo := repo.GetGitRepository()
-	policyTip, errPolicy := gitRepo.GetReference(policy.PolicyRef)
-	stagingTip, errStaging := gitRepo.GetReference(policy.PolicyStagingRef)
+	storer := repo.GetStorer()
+	policyTip, errPolicy := storer.GetReference(policy.PolicyRef)
+	stagingTip, errStaging := storer.GetReference(policy.PolicyStagingRef)
 
 	// If staging ref does not exist, nothing is staged.
 	if errStaging != nil {
@@ -753,7 +753,7 @@ func (m *model) generateStagedDiff() string {
 	}
 
 	if !hasChanges {
-		filesChanged, _ := gitRepo.GetFilePathsChangedByCommit(stagingTip)
+		filesChanged, _ := storer.GetFilePathsChangedByCommit(stagingTip)
 		if len(filesChanged) > 0 {
 			b.WriteString(sectionStyle.Render("Staged Trust Metadata Changes:") + "\n")
 			for _, f := range filesChanged {

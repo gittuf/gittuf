@@ -20,19 +20,16 @@ import (
 func TestApply(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New(), "--local-only")
+		_, _, _, err := cmd.ExecuteCommandC(New(), "--local-only")
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -55,12 +52,6 @@ func TestApply(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "--local-only")
 		assert.NoError(t, err)
@@ -68,6 +59,8 @@ func TestApply(t *testing.T) {
 
 	t.Run("remote not defined in repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repo, err := gittuf.LoadRepository(tmpDir)
 		require.NoError(t, err)
@@ -90,12 +83,6 @@ func TestApply(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false))
-
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
 
 		_, _, _, err = cmd.ExecuteCommandC(New(), "origin")
 		assert.Error(t, err)

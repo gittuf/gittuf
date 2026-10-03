@@ -23,13 +23,9 @@ func TestListPropagationDirectives(t *testing.T) {
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
@@ -37,13 +33,9 @@ func TestListPropagationDirectives(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
-		require.NoError(t, os.Chdir(tmpDir))
-
-		_, _, _, err = cmd.ExecuteCommandC(New())
+		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to find RSL entry")
 	})
 
@@ -55,11 +47,7 @@ func TestListPropagationDirectives(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)
@@ -73,8 +61,8 @@ func TestListPropagationDirectives(t *testing.T) {
 		assert.NoError(t, err)
 
 		output := stdout.String()
-		assert.Contains(t, output, "Propagation Directives in the gittuf root of trust:")
-		// No directives should be outputted, only the header
+		assert.Contains(t, output, "No propagation directives are currently defined.")
+		assert.NotContains(t, output, "Propagation Directives in the gittuf root of trust:")
 		assert.NotContains(t, output, "Propagation Directive:")
 	})
 
@@ -86,11 +74,7 @@ func TestListPropagationDirectives(t *testing.T) {
 		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
 		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
 
-		cwd, err := os.Getwd()
-		require.NoError(t, err)
-		defer os.Chdir(cwd) //nolint:errcheck
-
-		require.NoError(t, os.Chdir(tmpDir))
+		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
 		require.NoError(t, err)

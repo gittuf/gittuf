@@ -160,14 +160,14 @@ func LoadSigner(repo *Repository, key string) (sslibdsse.SignerVerifier, error) 
 	case strings.HasPrefix(key, GPGKeyPrefix):
 		keyID := strings.TrimPrefix(key, GPGKeyPrefix)
 
-		opts, err := getGPGOptions(repo.GetGitRepository())
+		opts, err := getGPGOptions(repo.GetStorer())
 		if err != nil {
 			return nil, err
 		}
 
 		return gpg.NewSignerFromKeyID(keyID, opts...)
 	case strings.HasPrefix(key, FulcioPrefix):
-		opts, err := getSigstoreOptions(repo.GetGitRepository())
+		opts, err := getSigstoreOptions(repo.GetStorer())
 		if err != nil {
 			return nil, err
 		}
