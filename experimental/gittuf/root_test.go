@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -1821,6 +1822,45 @@ func TestUpdateGlobalRule(t *testing.T) {
 		err = r.UpdateGlobalRuleBlockForcePushes(testCtx, sv, "", nil, false)
 		assert.ErrorIs(t, err, ErrUnauthorizedKey)
 	})
+}
+
+func TestUpdateGlobalRuleThresholdDoesNotDropUnsyncedStagedChanges(t *testing.T) {
+	r := createTestRepositoryWithRoot(t, "")
+	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+	err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "rule-one", []string{"git:refs/heads/main"}, 1, false)
+	require.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	err = r.AddGlobalRuleThreshold(testCtx, rootSigner, "rule-two", []string{"git:refs/heads/dev"}, 1, false)
+	require.Nil(t, err)
+
+	err = r.UpdateGlobalRuleThreshold(testCtx, rootSigner, "rule-one", []string{"git:refs/heads/main"}, 5, false)
+	require.Nil(t, err)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
+	require.Nil(t, err)
+
+	rootMetadata, err := state.GetRootMetadata(false)
+	require.Nil(t, err)
+
+	globalRules := rootMetadata.GetGlobalRules()
+	require.Len(t, globalRules, 2, "rule-two was silently dropped by UpdateGlobalRuleThreshold")
+
+	rulesByName := map[string]tuf.GlobalRuleThreshold{}
+	for _, rule := range globalRules {
+		rulesByName[rule.GetName()] = rule.(tuf.GlobalRuleThreshold)
+	}
+
+	ruleOne, ok := rulesByName["rule-one"]
+	require.True(t, ok, "rule-one should still be present")
+	assert.Equal(t, 5, ruleOne.GetThreshold())
+
+	ruleTwo, ok := rulesByName["rule-two"]
+	require.True(t, ok, "rule-two should not have been dropped")
+	assert.Equal(t, 1, ruleTwo.GetThreshold())
 }
 
 func TestListGlobalRules(t *testing.T) {
