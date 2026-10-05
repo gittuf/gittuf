@@ -5,6 +5,7 @@ package gitinterface
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -269,42 +270,43 @@ func TestFileStatusUntracked(t *testing.T) {
 func TestStatusWhitespaceFilenames(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(cwd) //nolint:errcheck
+	t.Chdir(tmpDir)
 
 	leadingSpace := " leading-space.txt"
 	innerSpaces := "foo bar baz.txt"
+	testFiles := []string{leadingSpace, innerSpaces}
 
-	if err := os.WriteFile(leadingSpace, []byte("test"), 0o644); err != nil { //nolint:gosec
-		t.Fatal(err)
+	// Windows Win32 file APIs strip trailing spaces from filenames when creating them on disk.
+	if runtime.GOOS != "windows" {
+		trailingSpace := "trailing-space.txt "
+		trailingTab := "trailing-tab.txt\t"
+		testFiles = append(testFiles, trailingSpace, trailingTab)
 	}
-	if err := os.WriteFile(innerSpaces, []byte("test"), 0o644); err != nil { //nolint:gosec
-		t.Fatal(err)
+
+	for _, file := range testFiles {
+		if err := os.WriteFile(file, []byte("test"), 0o644); err != nil { //nolint:gosec
+			t.Fatal(err)
+		}
+	}
+
+	expectedUntracked := map[string]FileStatus{}
+	expectedAdded := map[string]FileStatus{}
+	for _, file := range testFiles {
+		expectedUntracked[file] = FileStatus{X: StatusCodeUntracked, Y: StatusCodeUntracked}
+		expectedAdded[file] = FileStatus{X: StatusCodeAdded, Y: StatusCodeUnmodified}
 	}
 
 	statuses, err := repo.Status()
 	assert.Nil(t, err)
-	assert.Equal(t, map[string]FileStatus{
-		leadingSpace: {X: StatusCodeUntracked, Y: StatusCodeUntracked},
-		innerSpaces:  {X: StatusCodeUntracked, Y: StatusCodeUntracked},
-	}, statuses)
+	assert.Equal(t, expectedUntracked, statuses)
 
 	// Stage the files
-	if _, err := repo.executor("add", leadingSpace, innerSpaces).executeString(); err != nil {
+	addArgs := append([]string{"add"}, testFiles...)
+	if _, err := repo.executor(addArgs...).executeString(); err != nil {
 		t.Fatal(err)
 	}
 
 	statuses, err = repo.Status()
 	assert.Nil(t, err)
-	assert.Equal(t, map[string]FileStatus{
-		leadingSpace: {X: StatusCodeAdded, Y: StatusCodeUnmodified},
-		innerSpaces:  {X: StatusCodeAdded, Y: StatusCodeUnmodified},
-	}, statuses)
+	assert.Equal(t, expectedAdded, statuses)
 }
