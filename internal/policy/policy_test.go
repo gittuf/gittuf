@@ -163,6 +163,89 @@ func TestLoadState(t *testing.T) {
 		require.Nil(t, loadedState)
 	})
 
+	t.Run("fail loading multiple states when first targets is signed by wrong key", func(t *testing.T) {
+		initialState := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		tempDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
+		initialState.repository = repo
+
+		if err := initialState.Commit(repo, "Initial state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		validState := createTestStateWithPolicy(t)
+		validState.repository = repo
+		if err := validState.Commit(repo, "Valid state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err = repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+		require.Nil(t, loadedState)
+	})
+
+	t.Run("fail loading multiple states when intermediate targets is signed by wrong key", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+
+		invalidState := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		invalidState.repository = repo
+		if err := invalidState.Commit(repo, "Invalid intermediate state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		validState := createTestStateWithPolicy(t)
+		validState.repository = repo
+		if err := validState.Commit(repo, "Valid final state", true, false); err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err = repo.GetReference(PolicyStagingRef)
+		require.Nil(t, err)
+
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		loadedState, err := LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+		require.Nil(t, loadedState)
+	})
+
 	t.Run("fail loading when targets is signed by invalid metadata", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
 
@@ -338,6 +421,48 @@ func TestLoadState(t *testing.T) {
 		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
 		_, err = LoadState(context.Background(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
 		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("initial root principals are verified before controller metadata", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		state := createTestStateWithOnlyRoot(t)
+		state.repository = repo
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.NoError(t, err)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		controllerLocation := path.Join(t.TempDir(), "missing")
+		err = rootMetadata.AddControllerRepository("controller", controllerLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.NoError(t, err)
+
+		rootEnvelope, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnvelope, err = dsse.SignEnvelope(t.Context(), rootEnvelope, signer)
+		require.NoError(t, err)
+		state.Metadata.RootEnvelope = rootEnvelope
+		state.ControllerMetadata = map[string]*StateMetadata{
+			"controller": createTestStateWithOnlyRoot(t).Metadata,
+		}
+		require.NoError(t, state.preprocess())
+		require.NoError(t, state.Commit(repo, "Initial state with controller", true, false))
+
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.NoError(t, err)
+		require.NoError(t, repo.SetReference(PolicyRef, policyStagingTip))
+		require.NoError(t, rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false))
+
+		require.NoError(t, state.Commit(repo, "Second state", true, false))
+		policyStagingTip, err = repo.GetReference(PolicyStagingRef)
+		require.NoError(t, err)
+		require.NoError(t, repo.SetReference(PolicyRef, policyStagingTip))
+		require.NoError(t, rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
 }
 
@@ -1080,6 +1205,32 @@ func TestApply(t *testing.T) {
 
 		// After Apply, the policy ref was fast-forward merged with the staging ref
 		assertStatesEqual(t, staging, policy)
+	})
+
+	t.Run("staged root is not trusted by current policy", func(t *testing.T) {
+		repo, state := createTestRepository(t, createTestStateWithOnlyRoot)
+		policyTip, err := repo.GetReference(PolicyRef)
+		require.NoError(t, err)
+
+		unauthorizedSigner := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		unauthorizedKey := tufv01.NewKeyFromSSLibKey(unauthorizedSigner.MetadataKey())
+		rootMetadata, err := InitializeRootMetadata(unauthorizedKey)
+		require.NoError(t, err)
+
+		rootEnvelope, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnvelope, err = dsse.SignEnvelope(testCtx, rootEnvelope, unauthorizedSigner)
+		require.NoError(t, err)
+
+		state.Metadata.RootEnvelope = rootEnvelope
+		require.NoError(t, state.Commit(repo, "Replace root with unauthorized root", true, false))
+
+		err = Apply(testCtx, repo, false)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+
+		updatedPolicyTip, err := repo.GetReference(PolicyRef)
+		require.NoError(t, err)
+		assert.Equal(t, policyTip, updatedPolicyTip)
 	})
 
 	t.Run("policy out of sync with RSL, entry does not exist", func(t *testing.T) {
