@@ -356,6 +356,9 @@ func TestUpdateDelegation(t *testing.T) {
 
 		err = targetsMetadata.UpdateRule("test-rule", []string{key1.KeyID}, nil, 2)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+		err = targetsMetadata.UpdateRule("non-existent-rule", []string{key1.KeyID}, []string{"test/"}, 1)
+		assert.ErrorIs(t, err, tuf.ErrRuleNotFound)
 	})
 
 	t.Run("preserves rules before updated rule", func(t *testing.T) {
@@ -480,6 +483,9 @@ func TestRemoveRule(t *testing.T) {
 
 	err = targetsMetadata.RemoveRule(tuf.AllowRuleName)
 	assert.ErrorIs(t, err, tuf.ErrCannotManipulateRulesWithGittufPrefix)
+
+	err = targetsMetadata.RemoveRule("non-existent-rule")
+	assert.ErrorIs(t, err, tuf.ErrRuleNotFound)
 }
 
 func TestRemovePrincipal(t *testing.T) {
@@ -493,6 +499,10 @@ func TestRemovePrincipal(t *testing.T) {
 	err = targetsMetadata.AddPrincipal(key)
 	assert.Nil(t, err)
 	assert.Contains(t, targetsMetadata.Delegations.Keys, key.KeyID)
+
+	key2 := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	err = targetsMetadata.RemovePrincipal(key2.KeyID)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 
 	err = targetsMetadata.AddRule("test-rule", []string{key.KeyID}, []string{"test/"}, 1)
 	assert.Nil(t, err)
