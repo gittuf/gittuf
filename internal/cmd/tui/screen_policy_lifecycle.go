@@ -279,7 +279,7 @@ func handlePolicyLifecycleCommand(m *model, action string, policyName string, re
 			return m.repo.ApplyPolicy(m.ctx, remote, localOnly, true)
 		case "Discard Changes":
 			successMsg = "Successfully discarded policy changes."
-			return m.repo.DiscardPolicy()
+			return m.repo.DiscardPolicy(true)
 		case "Pull Policy":
 			successMsg = fmt.Sprintf("Successfully pulled policy from remote %q.", remote)
 			return m.repo.PullPolicy(remote)
