@@ -135,6 +135,12 @@ func NewKeyFromBytes(t *testing.T, keyB []byte) *signerverifier.SSLibKey {
 	return key
 }
 
+// NewKeyFromPublicKey returns an ssh SSLibKey for an already parsed SSH public
+// key. The KeyID is the SHA-256 SSH fingerprint.
+func NewKeyFromPublicKey(key ssh.PublicKey) *signerverifier.SSLibKey {
+	return newSSHKey(key, "")
+}
+
 // NewVerifierFromKey creates a new Verifier from SSlibKey of type ssh.
 func NewVerifierFromKey(key *signerverifier.SSLibKey) (*Verifier, error) {
 	if key.KeyType != KeyType {
