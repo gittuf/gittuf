@@ -10,6 +10,7 @@ import (
 
 	"github.com/gittuf/gittuf/internal/cmd/profile"
 	"github.com/gittuf/gittuf/internal/cmd/root"
+	"github.com/gittuf/gittuf/internal/version"
 )
 
 func main() {
@@ -34,6 +35,10 @@ func main() {
 		// Deferred functions do not run under os.Exit, so report here too. It
 		// emits at most once.
 		root.ReportStorerTrace(os.Stderr)
+
+		if root.IsUpgradeRequiredError(err) {
+			fmt.Fprintf(os.Stderr, "\n%s\nThis client is gittuf %s.\n", root.UpgradeGuidance, version.GetVersion())
+		}
 
 		// We can ignore the linter here (deferred functions are not executed
 		// when os.Exit is invoked) because if we do have an error, we don't
