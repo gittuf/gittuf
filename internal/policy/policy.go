@@ -742,26 +742,7 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 		commitMessage = DefaultCommitMessage
 	}
 
-	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
-	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
-	if err != nil {
-		return err
-	}
-	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
-
-	for absoluteControllerPath, metadata := range s.ControllerMetadata {
-		stateMetadataTreeID, err := metadata.WriteTree(repo)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, gitstore.TreeEntry{
-			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
-			ID:   stateMetadataTreeID,
-			Kind: gitstore.KindSubtree,
-		})
-	}
-
-	policyRootTreeID, err := repo.WriteTree(entries)
+	policyRootTreeID, err := s.WriteTree(repo)
 	if err != nil {
 		return err
 	}
@@ -790,6 +771,33 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 	}
 
 	return nil
+}
+
+// WriteTree writes the State's metadata to repo and returns the ID of the
+// policy tree holding it. It writes no commit and sets no reference, so a
+// caller that manages its own commit and reference handling can use it in place
+// of Commit.
+func (s *State) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
+	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
+	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
+	if err != nil {
+		return nil, err
+	}
+	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
+
+	for absoluteControllerPath, metadata := range s.ControllerMetadata {
+		stateMetadataTreeID, err := metadata.WriteTree(repo)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, gitstore.TreeEntry{
+			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
+			ID:   stateMetadataTreeID,
+			Kind: gitstore.KindSubtree,
+		})
+	}
+
+	return repo.WriteTree(entries)
 }
 
 // Apply takes valid changes from the policy staging ref, and fast-forward
