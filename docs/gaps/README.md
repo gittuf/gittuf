@@ -31,6 +31,9 @@ the gittuf/community repository.
 | 5 | [Principals, not Keys](/docs/gaps/5/README.md) | No | No |
 | 6 | [Code Review Tool Attestations](/docs/gaps/6/README.md) | No | No |
 | 7 | [Application-Defined Custom Fields](/docs/gaps/7/README.md) | Yes | No |
+| 9 | [gittuf Guarantees for Repository Subtrees](/docs/gaps/9/README.md) | No | No |
+| 10 | [Policy Inheritance across gittuf Repositories](/docs/gaps/10/README.md) | No | No |
+| 11 | [Enforcing Consistency in Policy Inheritance](/docs/gaps/11/README.md) | No | No |
 
 ## GAP Format
 
