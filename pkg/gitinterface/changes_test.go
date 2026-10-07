@@ -209,6 +209,17 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		assert.Equal(t, []string{"a"}, diffs)
 	})
 
+	t.Run("no parent, empty tree", func(t *testing.T) {
+		cA, err := repo.Commit(emptyTree, testNameToRefName(t.Name()), "Test commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		diffs, err := repo.GetFilePathsChangedByCommit(cA)
+		assert.Nil(t, err)
+		assert.Nil(t, diffs)
+	})
+
 	t.Run("merge commit with commit matching parent", func(t *testing.T) {
 		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
 		if err != nil {
