@@ -176,13 +176,12 @@ func trustMenuItems(readOnly bool) []list.Item {
 	items := []list.Item{
 		item{title: "View Global Rules", desc: "View and manage global rules"},
 		item{title: "Propagation", desc: "Manage propagation directives"},
+		item{title: "Additional Information", desc: "View root metadata details"},
 	}
 	if !readOnly {
 		items = append(items,
-			item{title: "Keys & Thresholds", desc: "Manage root keys, policy keys, and thresholds"},
 			item{title: "GitHub App", desc: "Manage trusted GitHub App settings"},
 			item{title: "Lifecycle", desc: "Stage, sign, and apply trust changes"},
-			item{title: "Repo/Network", desc: "Manage controller, network, and repository settings"},
 		)
 	}
 	return items
@@ -240,15 +239,19 @@ func trustGitHubAppMenuItems(readOnly bool) []list.Item {
 }
 
 func trustRepoNetworkMenuItems(readOnly bool) []list.Item {
-	if readOnly {
-		return nil
+	items := []list.Item{
+		item{title: "Schema Version", desc: "Loading root metadata..."},
+		item{title: "Repository Location", desc: "Loading root metadata..."},
 	}
-	return []list.Item{
-		item{title: "Add Controller Repository", desc: "Add a controller repository"},
-		item{title: "Add Network Repository", desc: "Add a network repository"},
-		item{title: "Set Repository Location", desc: "Set this repository's canonical location"},
-		item{title: "Make Controller", desc: "Mark this repository as a controller"},
+	if !readOnly {
+		items = append(items,
+			item{title: "Add Controller Repository", desc: "Add a controller repository"},
+			item{title: "Add Network Repository", desc: "Add a network repository"},
+			item{title: "Set Repository Location", desc: "Set this repository's canonical location"},
+			item{title: "Make Controller", desc: "Mark this repository as a controller"},
+		)
 	}
+	return items
 }
 
 // initInputs creates a slice of text inputs from field definitions.
@@ -343,7 +346,7 @@ func initialModel(ctx context.Context, o *options) model {
 			globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 		},
 		trustKeysScreen: trustKeysThresholdsScreen{
-			operationList: newMenuList("Keys & Thresholds", trustKeysMenuItems(o.readOnly), delegate),
+			operationList: newMenuList("Trust Keys", trustKeysMenuItems(o.readOnly), delegate),
 		},
 		trustLifecycleScreen: trustLifecycleScreen{
 			operationList: newMenuList("Trust Lifecycle", trustLifecycleMenuItems(o.readOnly), delegate),
@@ -355,7 +358,7 @@ func initialModel(ctx context.Context, o *options) model {
 			operationList: newMenuList("Trust GitHub App", trustGitHubAppMenuItems(o.readOnly), delegate),
 		},
 		trustRepoNetworkScreen: trustRepoNetworkScreen{
-			operationList: newMenuList("Trust Repo/Network", trustRepoNetworkMenuItems(o.readOnly), delegate),
+			operationList: newMenuList("Trust Additional Information", trustRepoNetworkMenuItems(o.readOnly), delegate),
 		},
 		policyPrincipalsScreen: policyPrincipalsScreen{
 			list: newMenuList("Policy Principals", []list.Item{}, delegateMultiline),
@@ -502,7 +505,7 @@ func (m *model) currentScreenTitle() string {
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		return "Home › Trust › Global Rules"
 	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
-		return "Home › Trust › Keys & Thresholds"
+		return "Home › Trust › Keys"
 	case screenTrustLifecycle:
 		return "Home › Trust › Lifecycle"
 	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
@@ -510,7 +513,7 @@ func (m *model) currentScreenTitle() string {
 	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
 		return "Home › Trust › GitHub App"
 	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
-		return "Home › Trust › Repo/Network"
+		return "Home › Trust › Additional Information"
 	case screenVerify:
 		return "Home › Verify"
 	case screenVerifyRefForm:
