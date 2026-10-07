@@ -68,39 +68,59 @@ func TestVerifyRefFull(t *testing.T) {
 }
 
 func TestVerifyRefFromEntry(t *testing.T) {
-	// Test no RSL
-	tmpDir := t.TempDir()
-	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+	t.Run("reference starting entry", func(t *testing.T) {
+		// Test no RSL
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
-	verifier := NewPolicyVerifier(repo)
+		verifier := NewPolicyVerifier(repo)
 
-	_, err := verifier.VerifyRefFromEntry(testCtx, "main", gitinterface.ZeroHash)
-	assert.ErrorContains(t, err, rsl.ErrRSLEntryNotFound.Error())
+		_, err := verifier.VerifyRefFromEntry(testCtx, "main", gitinterface.ZeroHash)
+		assert.ErrorContains(t, err, rsl.ErrRSLEntryNotFound.Error())
 
-	repo, _ = createTestRepository(t, createTestStateWithPolicy)
-	refName := "refs/heads/main"
+		repo, _ = createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
 
-	// Policy violation
-	commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
-	entry := rsl.NewReferenceEntry(refName, commitIDs[2])
-	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		// Policy violation
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[2])
+		common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
 
-	// Not policy violation by itself
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
-	entry = rsl.NewReferenceEntry(refName, commitIDs[2])
-	entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		// Not policy violation by itself
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[2])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 
-	// Not policy violation by itself
-	commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
-	entry = rsl.NewReferenceEntry(refName, commitIDs[1])
-	common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		// Not policy violation by itself
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[1])
+		common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 
-	verifier = NewPolicyVerifier(repo)
+		verifier = NewPolicyVerifier(repo)
 
-	// Verification passes because it's from a non-violating state only
-	currentTip, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
-	assert.Nil(t, err)
-	assert.Equal(t, commitIDs[1], currentTip)
+		// Verification passes because it's from a non-violating state only
+		currentTip, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
+		assert.Nil(t, err)
+		assert.Equal(t, commitIDs[1], currentTip)
+	})
+
+	t.Run("non-reference starting entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		verifier := NewPolicyVerifier(repo)
+
+		refName := "refs/heads/main"
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{entryID}, false, "test annotation")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+
+		_, err := verifier.VerifyRefFromEntry(testCtx, refName, annotationID)
+		assert.ErrorContains(t, err, "starting entry is not an RSL reference entry")
+	})
 }
 
 func TestVerifyRelativeForRefUsingPersons(t *testing.T) {

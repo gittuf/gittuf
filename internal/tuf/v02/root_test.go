@@ -249,6 +249,85 @@ func TestRootMetadata(t *testing.T) {
 		networkRepositories = rootMetadata.GetNetworkRepositories()
 		assert.Nil(t, networkRepositories)
 	})
+
+	t.Run("duplicate controller and network repository detection", func(t *testing.T) {
+		alice := &Person{PersonID: "alice@example.com"}
+		bob := &Person{PersonID: "bob@example.com"}
+		k1 := &Key{KeyID: "key1"}
+		k2 := &Key{KeyID: "key2"}
+
+		rootMetadata := NewRootMetadata()
+
+		// 1. Person-only repositories: different persons succeed
+		err := rootMetadata.AddControllerRepository("controller-person-one", "https://example.com/p1", []tuf.Principal{alice})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddControllerRepository("controller-person-two", "https://example.com/p2", []tuf.Principal{bob})
+		assert.NoError(t, err)
+
+		// Duplicate Person-only repository fails
+		err = rootMetadata.AddControllerRepository("controller-person-dup", "https://example.com/p3", []tuf.Principal{alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+
+		// 2. Key-only repositories: different keys succeed
+		err = rootMetadata.AddControllerRepository("controller-key-one", "https://example.com/k1", []tuf.Principal{k1})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddControllerRepository("controller-key-two", "https://example.com/k2", []tuf.Principal{k2})
+		assert.NoError(t, err)
+
+		// Duplicate Key-only repository fails
+		err = rootMetadata.AddControllerRepository("controller-key-dup", "https://example.com/k3", []tuf.Principal{k1})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+
+		// 3. Mixed repositories: {k1, alice} vs {k1, bob} succeed
+		err = rootMetadata.AddControllerRepository("controller-mixed-one", "https://example.com/m1", []tuf.Principal{k1, alice})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddControllerRepository("controller-mixed-two", "https://example.com/m2", []tuf.Principal{k1, bob})
+		assert.NoError(t, err)
+
+		// Duplicate mixed repository fails
+		err = rootMetadata.AddControllerRepository("controller-mixed-dup", "https://example.com/m3", []tuf.Principal{k1, alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
+
+		// Network repositories
+		err = rootMetadata.EnableController()
+		assert.NoError(t, err)
+
+		// 1. Person-only repositories: different persons succeed
+		err = rootMetadata.AddNetworkRepository("network-person-one", "https://example.com/p1", []tuf.Principal{alice})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddNetworkRepository("network-person-two", "https://example.com/p2", []tuf.Principal{bob})
+		assert.NoError(t, err)
+
+		// Duplicate Person-only repository fails
+		err = rootMetadata.AddNetworkRepository("network-person-dup", "https://example.com/p3", []tuf.Principal{alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+
+		// 2. Key-only repositories: different keys succeed
+		err = rootMetadata.AddNetworkRepository("network-key-one", "https://example.com/k1", []tuf.Principal{k1})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddNetworkRepository("network-key-two", "https://example.com/k2", []tuf.Principal{k2})
+		assert.NoError(t, err)
+
+		// Duplicate Key-only repository fails
+		err = rootMetadata.AddNetworkRepository("network-key-dup", "https://example.com/k3", []tuf.Principal{k1})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+
+		// 3. Mixed repositories: {k1, alice} vs {k1, bob} succeed
+		err = rootMetadata.AddNetworkRepository("network-mixed-one", "https://example.com/m1", []tuf.Principal{k1, alice})
+		assert.NoError(t, err)
+
+		err = rootMetadata.AddNetworkRepository("network-mixed-two", "https://example.com/m2", []tuf.Principal{k1, bob})
+		assert.NoError(t, err)
+
+		// Duplicate mixed repository fails
+		err = rootMetadata.AddNetworkRepository("network-mixed-dup", "https://example.com/m3", []tuf.Principal{k1, alice})
+		assert.ErrorIs(t, err, tuf.ErrDuplicateNetworkRepository)
+	})
 }
 
 func TestRootMetadataUnmarshalling(t *testing.T) {

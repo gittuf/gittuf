@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/pkg/customfields"
@@ -696,5 +697,51 @@ func BenchmarkParseRSLEntryText(b *testing.B) {
 		if _, err := parseRSLEntryText(githash.ZeroHash, text); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestParseRSLEntryTextUnknownHeader(t *testing.T) {
+	t.Parallel()
+
+	for _, header := range []string{
+		"RSL Future Entry",
+		ReferenceEntryHeader + " v2",
+		AnnotationEntryHeader + " v2",
+		PropagationEntryHeader + " v2",
+	} {
+		t.Run(header, func(t *testing.T) {
+			t.Parallel()
+
+			entry, err := parseRSLEntryText(githash.ZeroHash, header+"\n\nsomething: else")
+			assert.Nil(t, entry)
+			assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+			assert.ErrorContains(t, err, fmt.Sprintf("%q", header))
+		})
+	}
+
+	longHeader := "RSL " + strings.Repeat("x", 200) + " Entry"
+	_, err := parseRSLEntryText(githash.ZeroHash, longHeader+"\n\nsomething: else")
+	assert.ErrorIs(t, err, ErrUnknownRSLEntryType)
+	assert.ErrorContains(t, err, longHeader[:maxHeaderInError]+"...")
+	assert.NotContains(t, err.Error(), longHeader)
+}
+
+func TestParseRSLEntryTextMissingHeader(t *testing.T) {
+	t.Parallel()
+
+	for name, text := range map[string]string{
+		"empty":                 "",
+		"blank first line":      "\nref: refs/heads/main",
+		"whitespace first line": "   \n\nref: refs/heads/main",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			entry, err := parseRSLEntryText(githash.ZeroHash, text)
+			assert.Nil(t, entry)
+			assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+			assert.NotErrorIs(t, err, ErrUnknownRSLEntryType)
+		})
 	}
 }
