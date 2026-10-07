@@ -708,6 +708,180 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		assert.Equal(t, originalEntry.(*rsl.ReferenceEntry).TargetID, currentEntry.(*rsl.ReferenceEntry).TargetID)
 	})
 
+	t.Run("remote and local have diverged, skip annotation on reapplied entry is preserved", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		// Simulate remote actions on refName, so local and remote diverge
+		// without touching the same ref
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions: record an entry for a different ref, then
+		// immediately skip it via an annotation
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		skippedEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := localRepo.RecordRSLAnnotation(testCtx, []string{skippedEntryID.String()}, true, "skip bad entry", false, rslopts.WithAnnotateLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Sanity check: prior to reconciliation, the entry is skipped
+		latestBefore, annotationsBefore, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Equal(t, skippedEntryID, latestBefore.GetID())
+		require.True(t, latestBefore.(*rsl.ReferenceEntry).SkippedBy(annotationsBefore))
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		// After reconciliation, the reapplied entry (which now has a
+		// different ID) must still be marked as skipped by the reapplied
+		// annotation
+		latestAfter, annotationsAfter, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.NotEqual(t, skippedEntryID, latestAfter.GetID(), "test is invalid if entry's ID didn't change on reapply")
+		assert.True(t, latestAfter.(*rsl.ReferenceEntry).SkippedBy(annotationsAfter), "skip annotation must still apply to the reapplied entry")
+	})
+
+	t.Run("remote and local have diverged, annotation separated from its target is preserved", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: remoteR}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: localR}
+
+		// Simulate remote actions on refName, so local and remote diverge
+		// without touching the same ref
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions: record an entry for a different ref...
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+		annotatedEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// ...then record one more, unrelated entry before annotating the
+		// first one, so the annotation is not immediately adjacent to its
+		// target in the RSL
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit 2", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly(), rslopts.WithSkipCheckForDuplicateEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Not a skip, just informational
+		if err := localRepo.RecordRSLAnnotation(testCtx, []string{annotatedEntryID.String()}, false, "informational note", false, rslopts.WithAnnotateLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.Nil(t, err)
+
+		// Walk the reconciled RSL for anotherRefName and confirm the
+		// reapplied annotation refers to the reapplied entry it originally
+		// annotated, using the entry's new ID rather than the stale one
+		firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(localRepo.r, anotherRefName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lastEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries, annotationMap, err := rsl.GetReferenceUpdaterEntriesInRangeForRef(localRepo.r, firstEntry.GetID(), lastEntry.GetID(), anotherRefName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Len(t, entries, 2)
+
+		reapplyingEntryID := entries[0].GetID()
+		assert.NotEqual(t, annotatedEntryID, reapplyingEntryID, "test is invalid if entry's ID didn't change on reapply")
+
+		annotations, has := annotationMap[reapplyingEntryID.String()]
+		require.True(t, has, "reapplied annotation must still refer to the reapplied entry")
+		require.Len(t, annotations, 1)
+		assert.Equal(t, "informational note", annotations[0].Message)
+	})
+
 	t.Run("remote and local have diverged but modify same ref", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
