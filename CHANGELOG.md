@@ -2,12 +2,39 @@
 
 This file tracks the changes introduced by gittuf versions.
 
-## Unreleased
+## v0.17.0
+
+This release addresses a performance issue with verification of data signed with
+Sigstore, ships an experimental new go-git storage backend that is significantly
+faster, and makes various improvements across gittuf.
 
 ### Added
 
-- A clear upgrade message when the RSL contains an entry type or the policy
-  metadata uses a schema version this client does not implement
+- Added support for application-defined custom fields in the RSL
+- Added an experimental, significantly faster go-git storage backend (currently
+  `GITTUF_DEV` only)
+- Added a clear upgrade message when the RSL contains an entry type or the
+  policy metadata uses a schema version this client does not implement
+- Added end-to-end testing framework
+
+### Updated
+
+- Optimized Sigstore metadata fetch process
+- Improved support for custom metadata containing the `=` character (e.g.
+  base64, etc.)
+- Improved support for GPG keys on Windows
+- Fixed removal of SSH keys from root and top-level policy
+- Various improvements to metadata manipulation commands
+- Various updates to the TUI
+- Various updates to documentation
+- Updated various dependencies and CI workflows
+
+### Removed
+
+- Removed gittuf native hooks
+- Removed persistent cache
+- Moved git-remote-gittuf to its own repository (see
+  https://github.com/gittuf/git-remote-gittuf)
 
 ## v0.16.0
 
