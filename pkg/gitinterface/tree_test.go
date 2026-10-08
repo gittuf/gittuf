@@ -4,6 +4,8 @@
 package gitinterface
 
 import (
+	"bytes"
+	"fmt"
 	"os"
 	"testing"
 
@@ -1194,6 +1196,55 @@ func TestEnsureIsTree(t *testing.T) {
 
 	err = repo.ensureIsTree(ZeroHash)
 	assert.ErrorContains(t, err, "unable to inspect if object is tree")
+}
+
+func TestTreePathsWithSpecialCharacters(t *testing.T) {
+	repo := CreateTestGitRepository(t, t.TempDir(), false)
+	blobID, err := repo.WriteBlob([]byte("contents"))
+	require.Nil(t, err)
+
+	for _, name := range []string{
+		"file with spaces.txt",
+		" leading.txt",
+		"trailing.txt ",
+		"tab\tname.txt",
+		"newline\nname.txt",
+		"quote\"name.txt",
+		"backslash\\name.txt",
+		"unicode-\u00e9.txt",
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Use NUL-delimited input so Git stores the filename verbatim.
+			treeIDString, err := repo.executor("mktree", "-z").withStdIn(bytes.NewBufferString(
+				fmt.Sprintf("100644 blob %s\t%s\x00", blobID.String(), name),
+			)).executeString()
+			require.Nil(t, err)
+			treeID, err := NewHash(treeIDString)
+			require.Nil(t, err)
+
+			entries, err := repo.GetEntriesInTree(treeID)
+			require.Nil(t, err)
+			assert.Equal(t, []TreeEntry{NewEntryBlob(name, blobID)}, entries)
+
+			pathID, err := repo.GetPathIDInTree(treeID, name)
+			assert.Nil(t, err)
+			assert.Equal(t, blobID, pathID)
+
+			files, err := repo.GetAllFilesInTree(treeID)
+			require.Nil(t, err)
+			assert.Equal(t, map[string]Hash{name: blobID}, files)
+
+			rootTreeID, err := repo.WriteTree([]TreeEntry{NewEntryTree("nested dir", treeID)})
+			require.Nil(t, err)
+			entries, err = repo.GetEntriesInTree(rootTreeID)
+			require.Nil(t, err)
+			assert.Equal(t, []TreeEntry{NewEntryTree("nested dir", treeID)}, entries)
+
+			files, err = repo.GetAllFilesInTree(rootTreeID)
+			require.Nil(t, err)
+			assert.Equal(t, map[string]Hash{"nested dir/" + name: blobID}, files)
+		})
+	}
 }
 
 func TestGetAllFilesInTree(t *testing.T) {
