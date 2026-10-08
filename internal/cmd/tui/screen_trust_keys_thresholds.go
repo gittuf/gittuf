@@ -18,6 +18,7 @@ type trustKeysAction int
 
 const (
 	trustKeysActionNone trustKeysAction = iota
+	trustKeysActionListKeys
 	trustKeysActionAddRootKey
 	trustKeysActionRemoveRootKey
 	trustKeysActionAddPolicyKey
@@ -31,6 +32,8 @@ type trustKeysThresholdsScreen struct {
 	inputs         []textinput.Model
 	focusIndex     int
 	selectedAction trustKeysAction
+	keys           *trustKeys
+	showKeys       bool
 }
 
 func (s *trustKeysThresholdsScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
@@ -38,6 +41,11 @@ func (s *trustKeysThresholdsScreen) Update(msg tea.Msg, m *model) (tea.Model, te
 
 	switch m.screen {
 	case screenTrustKeysThresholds:
+		if s.showKeys {
+			// The key list is read-only; Esc returns to the menu
+			return *m, nil
+		}
+
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 			if sel, ok := s.operationList.SelectedItem().(item); ok {
 				s.selectAction(sel.title, m)
@@ -74,6 +82,9 @@ func (s *trustKeysThresholdsScreen) Update(msg tea.Msg, m *model) (tea.Model, te
 func (s *trustKeysThresholdsScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustKeysThresholds:
+		if s.showKeys {
+			return m.renderScreen("Home › Trust › Keys & Thresholds › List Keys", s.renderTrustKeys(), renderActionHints(m.readOnly))
+		}
 		return m.renderScreen("Home › Trust › Keys & Thresholds", s.operationList.View(), renderActionHints(m.readOnly))
 	case screenTrustKeyForm:
 		return s.renderFormScreen(m, "Trust Key Form", "Home › Trust › Keys & Thresholds › Key Form")
@@ -86,6 +97,18 @@ func (s *trustKeysThresholdsScreen) View(m *model) string {
 
 func (s *trustKeysThresholdsScreen) selectAction(title string, m *model) {
 	switch title {
+	case "List Keys":
+		keys, err := repoListTrustKeys(m.ctx, m.options)
+		if err != nil {
+			m.openErrorDialog("List Keys Failed", err.Error())
+			return
+		}
+
+		m.errorMsg = ""
+		m.footer = ""
+		s.keys = keys
+		s.showKeys = true
+		s.selectedAction = trustKeysActionNone
 	case "Add Root Key":
 		s.selectedAction = trustKeysActionAddRootKey
 		s.initKeyInputs("Public key path or key material")
@@ -300,6 +323,8 @@ func (s *trustKeysThresholdsScreen) handleFormSubmit(m *model) (tea.Model, tea.C
 
 func (s *trustKeysThresholdsScreen) actionLabel() string {
 	switch s.selectedAction {
+	case trustKeysActionListKeys:
+		return "list keys"
 	case trustKeysActionAddRootKey:
 		return "add root key"
 	case trustKeysActionRemoveRootKey:

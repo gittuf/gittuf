@@ -987,6 +987,70 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 	return rootMetadata.GetPropagationDirectives(), nil
 }
 
+// ListRootKeys lists the principals trusted to sign the root of trust metadata
+// along with the root threshold.
+func (r *Repository) ListRootKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
+		policyRef = "refs/gittuf/" + policyRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	threshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	return principals, threshold, nil
+}
+
+// ListTopLevelTargetsKeys lists the principals trusted to sign the top-level
+// policy (primary rule file) along with its threshold.
+func (r *Repository) ListTopLevelTargetsKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
+		policyRef = "refs/gittuf/" + policyRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	return principals, threshold, nil
+}
+
 // EnableController makes the current repository a "controller" repository used
 // to specify gittuf policies for other repositories.
 func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
