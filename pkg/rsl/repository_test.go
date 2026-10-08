@@ -1841,6 +1841,62 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 
 		assert.Equal(t, originalLatestEntry, newLatestEntry)
 	})
+
+	t.Run("skip multiple entries with interleaved other branches", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		// 1. Initial main commit
+		mainCommit1, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial main commit\n", false)
+		require.Nil(t, err)
+		if err := NewReferenceEntry("refs/heads/main", mainCommit1).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// 2. Interleaved feature commit
+		featureCommit1, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature commit\n", false)
+		require.Nil(t, err)
+		if err := NewReferenceEntry("refs/heads/feature", featureCommit1).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// 3. Second main commit (to be rewritten)
+		mainCommit2, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Second main commit\n", false)
+		require.Nil(t, err)
+		if err := NewReferenceEntry("refs/heads/main", mainCommit2).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		mainCommit2Entry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		// 4. Rebase main from mainCommit1, creating new mainCommit3
+		if err := repo.SetReference("refs/heads/main", mainCommit1); err != nil {
+			t.Fatal(err)
+		}
+		mainCommit3, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Rewritten main commit\n", false)
+		require.Nil(t, err)
+		if err := NewReferenceEntry("refs/heads/main", mainCommit3).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Skip rewritten on main
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		annotationEntry, isAnnotation := latestEntry.(*AnnotationEntry)
+		require.True(t, isAnnotation)
+
+		// Only mainCommit2Entry should be skipped, NOT the feature branch entry
+		assert.Equal(t, []githash.Hash{mainCommit2Entry.GetID()}, annotationEntry.RSLEntryIDs)
+	})
 }
 
 func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
