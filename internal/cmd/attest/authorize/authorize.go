@@ -26,7 +26,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"ref to authorize merging changes from",
 	)
-	cmd.MarkFlagRequired("from-ref") //nolint:errcheck
 
 	cmd.Flags().BoolVarP(
 		&o.revoke,
@@ -54,6 +53,10 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		}
 
 		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true)
+	}
+
+	if len(o.fromRef) == 0 {
+		return fmt.Errorf("required flag --from-ref not set")
 	}
 
 	opts := []attestopts.Option{}
