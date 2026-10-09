@@ -67,6 +67,7 @@ func MigrateRootMetadataV01ToV02(rootMetadata *tufv01.RootMetadata) *tufv02.Root
 				Name:                  otherRepository.GetName(),
 				Location:              otherRepository.GetLocation(),
 				InitialRootPrincipals: otherRepository.GetInitialRootPrincipals(),
+				InheritPrincipals:     otherRepository.InheritsPrincipals(),
 			})
 		}
 
@@ -115,6 +116,8 @@ func MigrateTargetsMetadataV01ToV02(targetsMetadata *tufv01.TargetsMetadata) *tu
 
 		newTargetsMetadata.Delegations.Roles = append(newTargetsMetadata.Delegations.Roles, newRole)
 	}
+
+	newTargetsMetadata.SetInheritedPrincipals(targetsMetadata.GetInheritedPrincipals())
 
 	return newTargetsMetadata
 }

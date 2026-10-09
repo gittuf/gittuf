@@ -115,7 +115,7 @@ func createControllerAndNetworkRepositories(t *testing.T) (*gitinterface.Reposit
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+	err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
 	if err != nil {
 		t.Fatal(err)
 	}

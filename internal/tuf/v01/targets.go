@@ -24,6 +24,8 @@ type TargetsMetadata struct {
 	Version     uint64         `json:"version"`
 	Targets     map[string]any `json:"targets"`
 	Delegations *Delegations   `json:"delegations"`
+
+	inheritedPrincipals map[string]tuf.Principal
 }
 
 // NewTargetsMetadata returns a new instance of TargetsMetadata.
@@ -56,6 +58,18 @@ func (t *TargetsMetadata) IncrementVersion() {
 	t.Version++
 }
 
+// SetInheritedPrincipals sets the principals inherited from controller
+// repositories.
+func (t *TargetsMetadata) SetInheritedPrincipals(principals map[string]tuf.Principal) {
+	t.inheritedPrincipals = principals
+}
+
+// GetInheritedPrincipals returns the principals inherited from controller
+// repositories.
+func (t *TargetsMetadata) GetInheritedPrincipals() map[string]tuf.Principal {
+	return t.inheritedPrincipals
+}
+
 // Validate ensures the instance of TargetsMetadata matches gittuf expectations.
 func (t *TargetsMetadata) Validate() error {
 	if len(t.Targets) != 0 {
@@ -71,9 +85,13 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 	}
 
 	for _, principalID := range authorizedPrincipalIDs {
-		if _, has := t.Delegations.Keys[principalID]; !has {
-			return tuf.ErrPrincipalNotFound
+		if _, has := t.Delegations.Keys[principalID]; has {
+			continue
 		}
+		if _, has := t.inheritedPrincipals[principalID]; has {
+			continue
+		}
+		return tuf.ErrPrincipalNotFound
 	}
 
 	if threshold <= 0 {
@@ -110,9 +128,13 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 	}
 
 	for _, principalID := range authorizedPrincipalIDs {
-		if _, has := t.Delegations.Keys[principalID]; !has {
-			return tuf.ErrPrincipalNotFound
+		if _, has := t.Delegations.Keys[principalID]; has {
+			continue
 		}
+		if _, has := t.inheritedPrincipals[principalID]; has {
+			continue
+		}
+		return tuf.ErrPrincipalNotFound
 	}
 
 	if threshold <= 0 {

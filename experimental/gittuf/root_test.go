@@ -2472,6 +2472,26 @@ func TestAddControllerRepository(t *testing.T) {
 	require.Len(t, controllerRepos, 1)
 	assert.Equal(t, "controller-repo", controllerRepos[0].GetName())
 	assert.Equal(t, "https://example.com/controller", controllerRepos[0].GetLocation())
+	assert.False(t, controllerRepos[0].InheritsPrincipals())
+
+	t.Run("with inherit principals option", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		err := r.AddControllerRepository(testCtx, rootSigner, "controller-repo", "https://example.com/controller", []tuf.Principal{rootPrincipal}, false, trustpolicyopts.WithInheritPrincipals())
+		require.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.Nil(t, err)
+
+		controllerRepos := rootMetadata.GetControllerRepositories()
+		require.Len(t, controllerRepos, 1)
+		assert.True(t, controllerRepos[0].InheritsPrincipals())
+	})
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()

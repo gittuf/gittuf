@@ -3711,7 +3711,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
 		require.Nil(t, err)
-		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
 		require.Nil(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
 		require.Nil(t, err)
@@ -3782,6 +3782,209 @@ func TestVerifyEntry(t *testing.T) {
 
 		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("verify controller principal inheritance in network repository", func(t *testing.T) {
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithPolicy(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		targets1Signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		controllerKey := tufv01.NewKeyFromSSLibKey(targets1Signer.MetadataKey())
+
+		controllerTargetsMetadata, err := controllerState.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+		err = controllerTargetsMetadata.AddPrincipal(controllerKey)
+		require.Nil(t, err)
+		controllerTargetsEnv, err := dsse.CreateEnvelope(controllerTargetsMetadata)
+		require.Nil(t, err)
+		controllerTargetsEnv, err = dsse.SignEnvelope(testCtx, controllerTargetsEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.TargetsEnvelope = controllerTargetsEnv
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		// Set up network repository with inheritPrincipals = true
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, true)
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		// Verify that controllerKey is inherited and can be used in local rules
+		networkTargetsMetadata, err := networkState.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+
+		inherited := networkTargetsMetadata.GetInheritedPrincipals()
+		require.NotNil(t, inherited)
+		_, hasKey := inherited[controllerKey.KeyID]
+		assert.True(t, hasKey)
+
+		// Adding a rule targeting inherited controller key succeeds without adding it locally
+		err = networkTargetsMetadata.AddRule("inherited-rule", []string{controllerKey.KeyID}, []string{"git:refs/heads/feature"}, 1)
+		require.Nil(t, err)
+
+		networkTargetsEnv, err := dsse.CreateEnvelope(networkTargetsMetadata)
+		require.Nil(t, err)
+		networkTargetsEnv, err = dsse.SignEnvelope(testCtx, networkTargetsEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.TargetsEnvelope = networkTargetsEnv
+		err = networkState.Commit(networkRepository, "Add rule with inherited key\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		refName := "refs/heads/main"
+		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
+		commitTreeID, err := networkRepository.GetCommitTreeID(commitIDs[0])
+		require.Nil(t, err)
+
+		// Create authorization signed by the controller root key
+		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+		env, err := dsse.CreateEnvelope(authorization)
+		require.Nil(t, err)
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		require.Nil(t, err)
+
+		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
+		require.Nil(t, err)
+		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
+		require.Nil(t, err)
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(networkRepository)
+		require.Nil(t, err)
+
+		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		// Verification succeeds because signer is inherited from controller
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("verify controller principals not inherited when inheritPrincipals is false", func(t *testing.T) {
+		controllerRepositoryLocation := t.TempDir()
+		networkRepositoryLocation := t.TempDir()
+
+		controllerRepository := gitinterface.CreateTestGitRepository(t, controllerRepositoryLocation, true)
+		controllerState := createTestStateWithGlobalConstraintThreshold(t)
+		controllerState.repository = controllerRepository
+
+		networkRepository := gitinterface.CreateTestGitRepository(t, networkRepositoryLocation, false)
+		networkState := createTestStateWithPolicy(t)
+		networkState.repository = networkRepository
+
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		targets1Signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		controllerKey := tufv01.NewKeyFromSSLibKey(targets1Signer.MetadataKey())
+
+		controllerTargetsMetadata, err := controllerState.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+		err = controllerTargetsMetadata.AddPrincipal(controllerKey)
+		require.Nil(t, err)
+		controllerTargetsEnv, err := dsse.CreateEnvelope(controllerTargetsMetadata)
+		require.Nil(t, err)
+		controllerTargetsEnv, err = dsse.SignEnvelope(testCtx, controllerTargetsEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.TargetsEnvelope = controllerTargetsEnv
+
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = controllerRootMetadata.EnableController()
+		require.Nil(t, err)
+		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.Nil(t, err)
+		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
+		require.Nil(t, err)
+		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
+		require.Nil(t, err)
+		controllerState.Metadata.RootEnvelope = controllerRootEnv
+		err = controllerState.preprocess()
+		require.Nil(t, err)
+		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, controllerRepository, false)
+		require.Nil(t, err)
+		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
+		require.Nil(t, err)
+		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
+
+		// Set up network repository with inheritPrincipals = false
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		require.Nil(t, err)
+		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())}, false)
+		require.Nil(t, err)
+		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
+		require.Nil(t, err)
+		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
+		require.Nil(t, err)
+		networkState.Metadata.RootEnvelope = networkRootEnv
+		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
+		require.Nil(t, err)
+		err = Apply(testCtx, networkRepository, false)
+		require.Nil(t, err)
+
+		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
+		require.Nil(t, err)
+
+		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		require.Nil(t, err)
+
+		networkTargetsMetadata, err := networkState.GetTargetsMetadata(TargetsRoleName, false)
+		require.Nil(t, err)
+
+		// Adding rule targeting non-inherited controller key fails
+		err = networkTargetsMetadata.AddRule("uninherited-rule", []string{controllerKey.KeyID}, []string{"git:refs/heads/feature"}, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
 	})
 
 	t.Run("both global and policy rule declared, global rule threshold less than policy rule", func(t *testing.T) {

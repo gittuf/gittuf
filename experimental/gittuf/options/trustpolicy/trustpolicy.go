@@ -4,7 +4,8 @@
 package trustpolicy
 
 type Options struct {
-	CreateRSLEntry bool
+	CreateRSLEntry    bool
+	InheritPrincipals bool
 }
 
 type Option func(o *Options)
@@ -12,5 +13,11 @@ type Option func(o *Options)
 func WithRSLEntry() Option {
 	return func(o *Options) {
 		o.CreateRSLEntry = true
+	}
+}
+
+func WithInheritPrincipals() Option {
+	return func(o *Options) {
+		o.InheritPrincipals = true
 	}
 }

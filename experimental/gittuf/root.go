@@ -1103,7 +1103,7 @@ func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibds
 	}
 
 	slog.Debug("Adding controller repository...")
-	if err := rootMetadata.AddControllerRepository(repositoryName, repositoryLocation, initialRootPrincipals); err != nil {
+	if err := rootMetadata.AddControllerRepository(repositoryName, repositoryLocation, initialRootPrincipals, options.InheritPrincipals); err != nil {
 		return err
 	}
 

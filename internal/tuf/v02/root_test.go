@@ -180,32 +180,41 @@ func TestRootMetadata(t *testing.T) {
 		location := "http://git.example.com/repository"
 		initialRootPrincipals := []tuf.Principal{key, person}
 
-		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals, false)
 		assert.Nil(t, err)
 
 		// Testing duplicate controller repository detection
 		// Duplicate keys
-		err = rootMetadata.AddControllerRepository("test-non-duplicate", "http://git.example.com/repository-non-duplicate", initialRootPrincipals)
+		err = rootMetadata.AddControllerRepository("test-non-duplicate", "http://git.example.com/repository-non-duplicate", initialRootPrincipals, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate names and locations
-		err = rootMetadata.AddControllerRepository(name, location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository(name, location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate names
-		err = rootMetadata.AddControllerRepository(name, "http://git.example.com/repository-non-duplicate", []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository(name, "http://git.example.com/repository-non-duplicate", []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate locations
-		err = rootMetadata.AddControllerRepository("test-non-duplicate", location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository("test-non-duplicate", location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		controllerRepositories := rootMetadata.GetControllerRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals}}, controllerRepositories)
+		assert.False(t, controllerRepositories[0].InheritsPrincipals())
+
+		// Test controller repository with inheritPrincipals
+		rootWithInherit := NewRootMetadata()
+		err = rootWithInherit.AddControllerRepository(name, location, initialRootPrincipals, true)
+		assert.Nil(t, err)
+		controllerReposWithInherit := rootWithInherit.GetControllerRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: initialRootPrincipals, InheritPrincipals: true}}, controllerReposWithInherit)
+		assert.True(t, controllerReposWithInherit[0].InheritsPrincipals())
 
 		err = rootMetadata.AddNetworkRepository(name, location, initialRootPrincipals)
 		assert.ErrorIs(t, err, tuf.ErrNotAControllerRepository)
@@ -259,36 +268,36 @@ func TestRootMetadata(t *testing.T) {
 		rootMetadata := NewRootMetadata()
 
 		// 1. Person-only repositories: different persons succeed
-		err := rootMetadata.AddControllerRepository("controller-person-one", "https://example.com/p1", []tuf.Principal{alice})
+		err := rootMetadata.AddControllerRepository("controller-person-one", "https://example.com/p1", []tuf.Principal{alice}, false)
 		assert.NoError(t, err)
 
-		err = rootMetadata.AddControllerRepository("controller-person-two", "https://example.com/p2", []tuf.Principal{bob})
+		err = rootMetadata.AddControllerRepository("controller-person-two", "https://example.com/p2", []tuf.Principal{bob}, false)
 		assert.NoError(t, err)
 
 		// Duplicate Person-only repository fails
-		err = rootMetadata.AddControllerRepository("controller-person-dup", "https://example.com/p3", []tuf.Principal{alice})
+		err = rootMetadata.AddControllerRepository("controller-person-dup", "https://example.com/p3", []tuf.Principal{alice}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 
 		// 2. Key-only repositories: different keys succeed
-		err = rootMetadata.AddControllerRepository("controller-key-one", "https://example.com/k1", []tuf.Principal{k1})
+		err = rootMetadata.AddControllerRepository("controller-key-one", "https://example.com/k1", []tuf.Principal{k1}, false)
 		assert.NoError(t, err)
 
-		err = rootMetadata.AddControllerRepository("controller-key-two", "https://example.com/k2", []tuf.Principal{k2})
+		err = rootMetadata.AddControllerRepository("controller-key-two", "https://example.com/k2", []tuf.Principal{k2}, false)
 		assert.NoError(t, err)
 
 		// Duplicate Key-only repository fails
-		err = rootMetadata.AddControllerRepository("controller-key-dup", "https://example.com/k3", []tuf.Principal{k1})
+		err = rootMetadata.AddControllerRepository("controller-key-dup", "https://example.com/k3", []tuf.Principal{k1}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 
 		// 3. Mixed repositories: {k1, alice} vs {k1, bob} succeed
-		err = rootMetadata.AddControllerRepository("controller-mixed-one", "https://example.com/m1", []tuf.Principal{k1, alice})
+		err = rootMetadata.AddControllerRepository("controller-mixed-one", "https://example.com/m1", []tuf.Principal{k1, alice}, false)
 		assert.NoError(t, err)
 
-		err = rootMetadata.AddControllerRepository("controller-mixed-two", "https://example.com/m2", []tuf.Principal{k1, bob})
+		err = rootMetadata.AddControllerRepository("controller-mixed-two", "https://example.com/m2", []tuf.Principal{k1, bob}, false)
 		assert.NoError(t, err)
 
 		// Duplicate mixed repository fails
-		err = rootMetadata.AddControllerRepository("controller-mixed-dup", "https://example.com/m3", []tuf.Principal{k1, alice})
+		err = rootMetadata.AddControllerRepository("controller-mixed-dup", "https://example.com/m3", []tuf.Principal{k1, alice}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 
 		// Network repositories

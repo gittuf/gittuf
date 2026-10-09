@@ -14,6 +14,7 @@ gittuf trust add-controller-repository [flags]
 
 ```
   -h, --help                                 help for add-controller-repository
+      --inherit-principals                   inherit principals from controller repository
       --initial-root-principal stringArray   initial root principals of the controller repository (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
       --location string                      location of controller repository
       --name string                          name of controller repository

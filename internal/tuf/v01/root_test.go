@@ -161,7 +161,7 @@ func TestRootMetadata(t *testing.T) {
 		location := "http://git.example.com/repository"
 		initialRootPrincipals := []tuf.Principal{key}
 
-		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals)
+		err := rootMetadata.AddControllerRepository(name, location, initialRootPrincipals, false)
 		assert.Nil(t, err)
 
 		controllerRepositories := rootMetadata.GetControllerRepositories()
@@ -187,27 +187,36 @@ func TestRootMetadata(t *testing.T) {
 
 		// Testing controller  repositories duplicates
 		// Duplicate keys
-		err = rootMetadata.AddControllerRepository("test-non-duplicate", "http://git.example.com/repository-non-duplicate", initialRootPrincipals)
+		err = rootMetadata.AddControllerRepository("test-non-duplicate", "http://git.example.com/repository-non-duplicate", initialRootPrincipals, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate names and locations
-		err = rootMetadata.AddControllerRepository(name, location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository(name, location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate names
-		err = rootMetadata.AddControllerRepository(name, "http://git.example.com/repository-non-duplicate", []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository(name, "http://git.example.com/repository-non-duplicate", []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		// Duplicate locations
-		err = rootMetadata.AddControllerRepository("test-non-duplicate", location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))})
+		err = rootMetadata.AddControllerRepository("test-non-duplicate", location, []tuf.Principal{NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}, false)
 		assert.ErrorIs(t, err, tuf.ErrDuplicateControllerRepository)
 		assert.Equal(t, 1, len(rootMetadata.MultiRepository.ControllerRepositories))
 
 		controllerRepositories = rootMetadata.GetControllerRepositories()
 		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: []*Key{key}}}, controllerRepositories)
+		assert.False(t, controllerRepositories[0].InheritsPrincipals())
+
+		// Test controller repository with inheritPrincipals
+		rootWithInherit := NewRootMetadata()
+		err = rootWithInherit.AddControllerRepository(name, location, initialRootPrincipals, true)
+		assert.Nil(t, err)
+		controllerReposWithInherit := rootWithInherit.GetControllerRepositories()
+		assert.Equal(t, []tuf.OtherRepository{&OtherRepository{Name: name, Location: location, InitialRootPrincipals: []*Key{key}, InheritPrincipals: true}}, controllerReposWithInherit)
+		assert.True(t, controllerReposWithInherit[0].InheritsPrincipals())
 
 		// Test network repositories duplicates
 		rootMetadata = NewRootMetadata()

@@ -11,6 +11,7 @@ import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -145,4 +146,47 @@ func TestAddControllerRepository(t *testing.T) {
 		)
 		assert.NoError(t, err)
 	})
+
+	t.Run("success with inherit principals", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		principalKeyPath := filepath.Join(tmpDir, "principal-key")
+		require.NoError(t, os.WriteFile(principalKeyPath, artifacts.SSHRSAPrivate, 0o600))
+		require.NoError(t, os.WriteFile(principalKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
+
+		t.Chdir(tmpDir)
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		pOpts := &persistent.Options{
+			SigningKey:   keyPath,
+			WithRSLEntry: true,
+		}
+
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts),
+			"--name", "test-controller",
+			"--location", "example.com",
+			"--initial-root-principal", principalKeyPath+".pub",
+			"--inherit-principals",
+		)
+		assert.NoError(t, err)
+
+		state, err := policy.LoadCurrentState(t.Context(), repo.GetGitRepository(), policy.PolicyStagingRef)
+		require.NoError(t, err)
+		rootMeta, err := state.GetRootMetadata(false)
+		require.NoError(t, err)
+		controllerRepos := rootMeta.GetControllerRepositories()
+		require.Len(t, controllerRepos, 1)
+		assert.True(t, controllerRepos[0].InheritsPrincipals())
+	})
 }
+

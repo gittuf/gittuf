@@ -5,6 +5,7 @@ package policy
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -532,7 +533,13 @@ func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifi
 					threshold:  delegation.GetThreshold(),
 				}
 				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-					verifier.principals = append(verifier.principals, allPrincipals[principalID])
+					principal, has := allPrincipals[principalID]
+					if !has {
+						principal = s.allPrincipals[principalID]
+					}
+					if principal != nil {
+						verifier.principals = append(verifier.principals, principal)
+					}
 				}
 				verifiers = append(verifiers, verifier)
 
@@ -644,7 +651,11 @@ func (s *State) Verify(ctx context.Context) error {
 
 				principals := []tuf.Principal{}
 				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-					principals = append(principals, delegationKeys[principalID])
+					principal, has := delegationKeys[principalID]
+					if !has {
+						principal = s.allPrincipals[principalID]
+					}
+					principals = append(principals, principal)
 				}
 
 				verifier := &SignatureVerifier{
@@ -1118,7 +1129,14 @@ func (s *State) GetControllerRootMetadata(controllerName string) (tuf.RootMetada
 // TargetsEnvelope for the specified `roleName`.  The `migrate` parameter
 // determines if the schema must be converted to a newer version.
 func (s *State) GetTargetsMetadata(roleName string, migrate bool) (tuf.TargetsMetadata, error) {
-	return s.Metadata.GetTargetsMetadata(roleName, migrate)
+	targetsMetadata, err := s.Metadata.GetTargetsMetadata(roleName, migrate)
+	if err != nil {
+		return nil, err
+	}
+	if len(s.allPrincipals) > 0 {
+		targetsMetadata.SetInheritedPrincipals(s.allPrincipals)
+	}
+	return targetsMetadata, nil
 }
 
 func (s *State) HasTargetsRole(roleName string) bool {
@@ -1161,6 +1179,49 @@ func (s *State) preprocess() error {
 	s.GitHubApps, err = rootMetadata.GetGitHubAppEntries()
 	if err != nil {
 		return err
+	}
+
+	for controllerName := range s.ControllerMetadata {
+		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName)
+		if err != nil {
+			return err
+		}
+
+		globalRules := controllerRootMetadata.GetGlobalRules()
+		if len(globalRules) > 0 {
+			if s.globalRules == nil {
+				s.globalRules = map[string][]tuf.GlobalRule{}
+			}
+
+			s.globalRules[controllerName] = globalRules
+		}
+
+		if trustsControllerPrincipals(rootMetadata, controllerName) {
+			for principalID, principal := range controllerRootMetadata.GetPrincipals() {
+				s.allPrincipals[principalID] = principal
+			}
+
+			controllerMetadata := s.ControllerMetadata[controllerName]
+			if controllerMetadata.TargetsEnvelope != nil {
+				controllerTargetsMetadata, err := controllerMetadata.GetTargetsMetadata(TargetsRoleName, false)
+				if err != nil {
+					return err
+				}
+				for principalID, principal := range controllerTargetsMetadata.GetPrincipals() {
+					s.allPrincipals[principalID] = principal
+				}
+
+				for delegatedRoleName := range controllerMetadata.DelegationEnvelopes {
+					delegatedMetadata, err := controllerMetadata.GetTargetsMetadata(delegatedRoleName, false)
+					if err != nil {
+						return err
+					}
+					for principalID, principal := range delegatedMetadata.GetPrincipals() {
+						s.allPrincipals[principalID] = principal
+					}
+				}
+			}
+		}
 	}
 
 	if s.Metadata.TargetsEnvelope == nil {
@@ -1235,23 +1296,18 @@ func (s *State) preprocess() error {
 		}
 	}
 
-	for controllerName := range s.ControllerMetadata {
-		controllerRootMetadata, err := s.GetControllerRootMetadata(controllerName)
-		if err != nil {
-			return err
-		}
+	return nil
+}
 
-		globalRules := controllerRootMetadata.GetGlobalRules()
-		if len(globalRules) > 0 {
-			if s.globalRules == nil {
-				s.globalRules = map[string][]tuf.GlobalRule{}
-			}
-
-			s.globalRules[controllerName] = globalRules
+func trustsControllerPrincipals(rootMetadata tuf.RootMetadata, controllerName string) bool {
+	for _, controllerRepository := range rootMetadata.GetControllerRepositories() {
+		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepository.GetLocation()))
+		if fmt.Sprintf("%s-%s", controllerRepository.GetName(), encodedLocation) == controllerName || controllerRepository.GetName() == controllerName {
+			return controllerRepository.InheritsPrincipals()
 		}
 	}
 
-	return nil
+	return false
 }
 
 func (s *State) getRootVerifier() (*SignatureVerifier, error) {

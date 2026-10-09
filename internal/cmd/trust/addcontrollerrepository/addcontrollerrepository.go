@@ -16,6 +16,7 @@ type options struct {
 	repositoryName        string
 	repositoryLocation    string
 	initialRootPrincipals []string
+	inheritPrincipals     bool
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -42,6 +43,13 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"initial root principals of the controller repository (each a path to an SSH public key, \"gpg:<fingerprint>\" for GPG, or \"fulcio:<identity>::<issuer>\" for Sigstore)",
 	)
 	cmd.MarkFlagRequired("initial-root-principal") //nolint:errcheck
+
+	cmd.Flags().BoolVar(
+		&o.inheritPrincipals,
+		"inherit-principals",
+		false,
+		"inherit principals from controller repository",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
@@ -67,6 +75,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	opts := []trustpolicyopts.Option{}
 	if o.p.WithRSLEntry {
 		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	if o.inheritPrincipals {
+		opts = append(opts, trustpolicyopts.WithInheritPrincipals())
 	}
 
 	return repo.AddControllerRepository(cmd.Context(), signer, o.repositoryName, o.repositoryLocation, initialRootPrincipals, true, opts...)

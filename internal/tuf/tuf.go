@@ -186,7 +186,7 @@ type RootMetadata interface {
 	DisableController() error
 	// AddControllerRepository adds the specified repository as a controller
 	// for the current repository.
-	AddControllerRepository(name, location string, initialRootPrincipals []Principal) error
+	AddControllerRepository(name, location string, initialRootPrincipals []Principal, inheritPrincipals bool) error
 	// AddNetworkRepository adds the specified repository as part of the
 	// network for which the current repository is a controller. The current
 	// repository must be marked as a controller before this can be used.
@@ -217,6 +217,14 @@ type TargetsMetadata interface {
 
 	// GetPrincipals returns all the principals in the rule file.
 	GetPrincipals() map[string]Principal
+
+	// SetInheritedPrincipals sets the principals inherited from controller
+	// repositories.
+	SetInheritedPrincipals(principals map[string]Principal)
+
+	// GetInheritedPrincipals returns the principals inherited from controller
+	// repositories.
+	GetInheritedPrincipals() map[string]Principal
 
 	// GetRules returns all the rules in the metadata.
 	GetRules() []Rule
@@ -371,6 +379,10 @@ type OtherRepository interface {
 	// GetInitialRootPrincipals returns the set of principals trusted to
 	// sign the other repository's initial gittuf root of trust metadata.
 	GetInitialRootPrincipals() []Principal
+
+	// InheritsPrincipals indicates if principals declared by the controller
+	// repository should be inherited by this repository.
+	InheritsPrincipals() bool
 }
 
 type GitHubApp interface {

@@ -680,7 +680,7 @@ func (r *RootMetadata) DisableController() error {
 
 // AddControllerRepository adds the specified repository as a controller for the
 // current repository.
-func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
+func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal, inheritPrincipals bool) error {
 	if r.MultiRepository == nil {
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
@@ -716,6 +716,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		Name:                  name,
 		Location:              location,
 		InitialRootPrincipals: make([]tuf.Principal, 0, len(initialRootPrincipals)),
+		InheritPrincipals:     inheritPrincipals,
 	}
 
 	for _, principal := range initialRootPrincipals {
@@ -896,6 +897,7 @@ type OtherRepository struct {
 	Name                  string          `json:"name"`
 	Location              string          `json:"location"`
 	InitialRootPrincipals []tuf.Principal `json:"initialRootPrincipals"`
+	InheritPrincipals     bool            `json:"inheritPrincipals,omitempty"`
 }
 
 func (o *OtherRepository) GetName() string {
@@ -910,11 +912,16 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 	return o.InitialRootPrincipals
 }
 
+func (o *OtherRepository) InheritsPrincipals() bool {
+	return o.InheritPrincipals
+}
+
 func (o *OtherRepository) UnmarshalJSON(data []byte) error {
 	type tempType struct {
 		Name                  string            `json:"name"`
 		Location              string            `json:"location"`
 		InitialRootPrincipals []json.RawMessage `json:"initialRootPrincipals"`
+		InheritPrincipals     bool              `json:"inheritPrincipals,omitempty"`
 	}
 
 	temp := &tempType{}
@@ -924,6 +931,7 @@ func (o *OtherRepository) UnmarshalJSON(data []byte) error {
 
 	o.Name = temp.Name
 	o.Location = temp.Location
+	o.InheritPrincipals = temp.InheritPrincipals
 
 	o.InitialRootPrincipals = make([]tuf.Principal, 0, len(temp.InitialRootPrincipals))
 	for _, principalBytes := range temp.InitialRootPrincipals {

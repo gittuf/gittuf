@@ -591,7 +591,7 @@ func (r *RootMetadata) DisableController() error {
 
 // AddControllerRepository adds the specified repository as a controller for the
 // current repository.
-func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal) error {
+func (r *RootMetadata) AddControllerRepository(name, location string, initialRootPrincipals []tuf.Principal, inheritPrincipals bool) error {
 	if r.MultiRepository == nil {
 		r.MultiRepository = &MultiRepository{ControllerRepositories: []*OtherRepository{}}
 	}
@@ -630,6 +630,7 @@ func (r *RootMetadata) AddControllerRepository(name, location string, initialRoo
 		Name:                  name,
 		Location:              location,
 		InitialRootPrincipals: make([]*Key, 0, len(initialRootPrincipals)),
+		InheritPrincipals:     inheritPrincipals,
 	}
 
 	for _, principal := range initialRootPrincipals {
@@ -971,6 +972,7 @@ type OtherRepository struct {
 	Name                  string `json:"name"`
 	Location              string `json:"location"`
 	InitialRootPrincipals []*Key `json:"initialRootPrincipals"`
+	InheritPrincipals     bool   `json:"inheritPrincipals,omitempty"`
 }
 
 func (o *OtherRepository) GetName() string {
@@ -987,6 +989,10 @@ func (o *OtherRepository) GetInitialRootPrincipals() []tuf.Principal {
 		initialRootPrincipals = append(initialRootPrincipals, key)
 	}
 	return initialRootPrincipals
+}
+
+func (o *OtherRepository) InheritsPrincipals() bool {
+	return o.InheritPrincipals
 }
 
 type GitHubApp struct {
