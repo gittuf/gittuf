@@ -13,12 +13,19 @@ to get started!
 
 ## Contributor Workflow
 
+We ask that contributors review the currently open
+[issues](https://github.com/gittuf/gittuf/issues) first. If there is an issue of
+interest, we ask that you comment on the issue to check if it is currently being
+worked on, to help avoid duplicate work being performed. Pull requests opened
+for issues that already have a pull request opened or contributor already
+assigned may be closed without further review or reviewed later.
+
 When submitting changes to the gittuf docs or implementation, contributors must
 open a GitHub pull request to the repository. If a proposed change is a
 significant deviation from gittuf's [design document](/docs/design-document.md),
-a [GAP](/docs/gaps/README.md) may be necessary. When in doubt, contributors are
-advised to file an issue in the repository for the
-[maintainers](MAINTAINERS.txt) to determine the best way forward.
+a [GAP](/docs/gaps/README.md) may be necessary. **When in doubt, contributors
+are advised to file an issue in the repository for the
+[maintainers](MAINTAINERS.txt) to determine the best way forward.**
 
 gittuf uses the NYU Secure Systems Lab [development
 workflow](https://github.com/secure-systems-lab/lab-guidelines/blob/master/dev-workflow.md).
@@ -28,6 +35,15 @@ automated testing such as (but not limited to):
 * Unit and build testing
 * Static analysis using linters
 * Developer Certificate of Origin (DCO) check
+
+Pull requests should consist of a reasonable amount of commits, and maintainers
+may ask contributors to squash and redo commits as needed to ensure gittuf's Git
+history remains clean and legible. Most pull requests will only need one commit,
+but larger changes may warrant multiple commits.
+
+Pull request descriptions must adhere to the [pull request
+template](https://github.com/gittuf/.github/blob/main/pull_request_template.md),
+which auto-populates when opening a new pull request on GitHub's website.
 
 ### Running Tests on Windows
 
@@ -50,6 +66,11 @@ changes you are submitting to gittuf, the following requirements apply:
 - Changes are well-documented and reviewable by a maintainer.
 - The contributor fully understands the content they are submitting.
 - Changes do not infringe on copyright/trademarks/etc.
+
+Contributors should always read gittuf's [design
+document](/docs/design-document.md) as well as the official [gittuf
+website](https://gittuf.dev) before making changes, as AI-generated
+documentation may be incorrect, or of poor quality.
 
 Low-quality contributions or outright "AI slop" reduce the amount of time
 maintainers have to review other changes. These types of pull
