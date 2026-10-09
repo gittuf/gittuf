@@ -5,6 +5,7 @@ package github
 
 import (
 	"context"
+	"net/http"
 	"os"
 )
 
@@ -25,6 +26,8 @@ type Options struct {
 	GitHubBaseURL     string
 	CreateRSLEntry    bool
 	UseGitHubAPI      bool
+
+	GitHubMockedClient *http.Client // This is only for testing purposes
 }
 
 var DefaultOptions = &Options{

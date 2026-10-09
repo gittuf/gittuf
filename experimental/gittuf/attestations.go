@@ -18,6 +18,7 @@ import (
 	"github.com/gittuf/gittuf/internal/attestations/authorizations"
 	"github.com/gittuf/gittuf/internal/attestations/github"
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
@@ -271,8 +272,7 @@ func (r *Repository) RemoveReferenceAuthorization(ctx context.Context, signer ss
 // specified commit ID and triggers AddGitHubPullRequestAttestationForNumber for
 // that pull request. The source of the authentication token for the GitHub API
 // can be passed in as an option. If a source is not provided, the token is read
-// from the GITHUB_TOKEN environment variable. A custom GitHub instance can be
-// specified via opts.
+// from the GITHUB_TOKEN environment variable.
 func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Context, signer sslibdsse.SignerVerifier, owner, repository, commitID, baseBranch string, signCommit bool, opts ...githubopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -287,17 +287,28 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 		fn(options)
 	}
 
-	token, err := options.GitHubTokenSource.Token(ctx)
-	if err != nil {
-		return err
-	}
-	if token == "" {
-		return ErrNoGitHubToken
-	}
+	var client *gogithub.Client
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
-	if err != nil {
-		return err
+	// A custom GitHub client is only intended for testing, and to prevent
+	// abuse, this is gated behind devmode.
+	if options.GitHubMockedClient != nil {
+		if !dev.InDevMode() {
+			return dev.ErrNotInDevMode
+		}
+		client = gogithub.NewClient(options.GitHubMockedClient)
+	} else {
+		token, err := options.GitHubTokenSource.Token(ctx)
+		if err != nil {
+			return err
+		}
+		if token == "" {
+			return ErrNoGitHubToken
+		}
+
+		client, err = getGitHubClient(options.GitHubBaseURL, token)
+		if err != nil {
+			return err
+		}
 	}
 
 	slog.Debug("Identifying GitHub pull requests for commit...")
@@ -344,18 +355,23 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		fn(options)
 	}
 
-	token, err := options.GitHubTokenSource.Token(ctx)
-	if err != nil {
-		return err
-	}
-	if token == "" {
-		return ErrNoGitHubToken
-	}
+	var client *gogithub.Client
 
-	client, err := getGitHubClient(options.GitHubBaseURL, token)
+	if options.GitHubMockedClient != nil {
+		client = gogithub.NewClient(options.GitHubMockedClient)
+	} else {
+		token, err := options.GitHubTokenSource.Token(ctx)
+		if err != nil {
+			return err
+		}
+		if token == "" {
+			return ErrNoGitHubToken
+		}
 
-	if err != nil {
-		return err
+		client, err = getGitHubClient(options.GitHubBaseURL, token)
+		if err != nil {
+			return err
+		}
 	}
 
 	slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequestNumber))
@@ -400,15 +416,26 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 	}
 	appName := tuf.GitHubAppRoleName // TODO: make this configurable, check appName's key matches signer
 
-	token, err := options.GitHubTokenSource.Token(ctx)
-	if err != nil {
-		return err
-	}
-	if token == "" {
-		return ErrNoGitHubToken
+	var client *gogithub.Client
+
+	if options.GitHubMockedClient != nil {
+		client = gogithub.NewClient(options.GitHubMockedClient)
+	} else {
+		token, err := options.GitHubTokenSource.Token(ctx)
+		if err != nil {
+			return err
+		}
+		if token == "" {
+			return ErrNoGitHubToken
+		}
+
+		client, err = getGitHubClient(options.GitHubBaseURL, token)
+		if err != nil {
+			return err
+		}
 	}
 
-	baseRef, fromID, toID, err := r.getGitHubPullRequestReviewDetails(ctx, currentAttestations, options.GitHubBaseURL, token, owner, repository, pullRequestNumber, reviewID, options.UseGitHubAPI)
+	baseRef, fromID, toID, err := r.getGitHubPullRequestReviewDetails(ctx, currentAttestations, client, options.GitHubBaseURL, owner, repository, pullRequestNumber, reviewID, options.UseGitHubAPI)
 	if err != nil {
 		return err
 	}
@@ -643,7 +670,7 @@ func indexPathToComponents(indexPath string) (string, string, string) {
 	return base, from, to
 }
 
-func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, githubBaseURL, githubToken, owner, repository string, pullRequestNumber int, reviewID int64, useGitHubAPI bool) (string, string, string, error) {
+func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, currentAttestations *attestations.Attestations, client *gogithub.Client, githubBaseURL, owner, repository string, pullRequestNumber int, reviewID int64, useGitHubAPI bool) (string, string, string, error) {
 	indexPath, has, err := currentAttestations.GetGitHubPullRequestApprovalIndexPathForReviewID(githubBaseURL, reviewID)
 	if err != nil {
 		return "", "", "", err
@@ -657,11 +684,6 @@ func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, curr
 	// other times we use the existing indexPath for the reviewID
 	// Note: there's the potential for a TOCTOU issue here, we may query the
 	// repo after things have moved in either branch.
-
-	client, err := getGitHubClient(githubBaseURL, githubToken)
-	if err != nil {
-		return "", "", "", err
-	}
 
 	pullRequest, _, err := client.PullRequests.Get(ctx, owner, repository, pullRequestNumber)
 	if err != nil {
@@ -711,8 +733,10 @@ func (r *Repository) getGitHubPullRequestReviewDetails(ctx context.Context, curr
 		if err != nil {
 			return "", "", "", err
 		}
-		if err := r.r.FetchObject(pullRequest.GetHead().GetRepo().GetCloneURL(), headHash); err != nil {
-			return "", "", "", err
+		if !r.r.HasObject(headHash) {
+			if err := r.r.FetchObject(pullRequest.GetHead().GetRepo().GetCloneURL(), headHash); err != nil {
+				return "", "", "", err
+			}
 		}
 
 		// Now compute the merge tree ID
