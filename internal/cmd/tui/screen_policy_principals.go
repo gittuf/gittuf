@@ -276,15 +276,17 @@ func (s *policyPrincipalsScreen) renderChoiceMenu(m *model) string {
 }
 
 func (s *policyPrincipalsScreen) View(m *model) string {
-	overlay := ""
+	var overlays string
 	if s.confirmDelete {
-		overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-	}
-	hint := ""
-	if !m.readOnly {
-		hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-			"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
-		)
+		overlays = renderDeleteOverlay("principal", s.deleteTarget)
+	} else if !s.addChoice {
+		hint := ""
+		if !m.readOnly {
+			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+				"Run `gittuf policy apply` to apply staged changes to the selected policy file.",
+			)
+		}
+		overlays = renderActionHints(m.readOnly) + hint
 	}
 
 	var listView string
@@ -292,11 +294,6 @@ func (s *policyPrincipalsScreen) View(m *model) string {
 		listView = s.renderChoiceMenu(m)
 	} else {
 		listView = m.renderListOrEmpty(s.list, len(s.principals), "No principals configured")
-	}
-
-	overlays := overlay
-	if !s.addChoice {
-		overlays += renderActionHints(m.readOnly) + hint
 	}
 
 	return m.renderScreen("Home › Policy › Principals", listView, overlays)
@@ -457,22 +454,26 @@ func getCurrPrincipals(ctx context.Context, o *options) []tuf.Principal {
 	if err != nil {
 		return nil
 	}
-	return getPrincipalsForRef(ctx, repo, "policy", o.policyName)
+	principals, err := getPrincipalsForRef(ctx, repo, "policy", o.policyName)
+	if err != nil {
+		return nil
+	}
+	return principals
 }
 
-func getPrincipalsForRef(ctx context.Context, repo *gittuf.Repository, targetRef, policyName string) []tuf.Principal {
+func getPrincipalsForRef(ctx context.Context, repo *gittuf.Repository, targetRef, policyName string) ([]tuf.Principal, error) {
 	if repo == nil {
-		return nil
+		return nil, nil
 	}
 	principalsMap, err := repo.ListPrincipals(ctx, targetRef, policyName)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	var principals []tuf.Principal
 	for _, p := range principalsMap {
 		principals = append(principals, p)
 	}
-	return principals
+	return principals, nil
 }
 
 func repoAddKeys(ctx context.Context, o *options, keys []tuf.Principal) error {
