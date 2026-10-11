@@ -2356,7 +2356,7 @@ func TestListRootKeys(t *testing.T) {
 		rootKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
 
 		principals, threshold, err := r.ListRootKeys(testCtx, policy.PolicyRef)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Len(t, principals, 1)
 		assert.Equal(t, rootKey.KeyID, principals[0].ID())
 		assert.Equal(t, 1, threshold)
