@@ -2371,7 +2371,7 @@ func TestListRootKeys(t *testing.T) {
 		require.Nil(t, err)
 
 		principals, threshold, err = r.ListRootKeys(testCtx, "policy-staging")
-		require.Nil(t, err)
+		assert.NoErrort, err)
 		assert.Len(t, principals, 2)
 		assert.Equal(t, 1, threshold)
 	})
