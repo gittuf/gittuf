@@ -178,7 +178,7 @@ func repoListTrustKeys(ctx context.Context, o *options) (*trustKeys, error) {
 		return nil, err
 	}
 
-	rootKeys, rootThreshold, err := repo.ListRootKeys(ctx, o.targetRef)
+	rootKeys, rootThreshold, err := repo.ListRootThresholdAndKeys(ctx, o.targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func repoListTrustKeys(ctx context.Context, o *options) (*trustKeys, error) {
 
 	// Top-level policy keys are not set until a policy key is added, which
 	// is not an error for listing purposes
-	policyKeys, policyThreshold, err := repo.ListTopLevelTargetsKeys(ctx, o.targetRef)
+	policyKeys, policyThreshold, err := repo.ListTopLevelTargetsThresholdAndKeys(ctx, o.targetRef)
 	if err != nil {
 		if !errors.Is(err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot) {
 			return nil, err
@@ -653,27 +653,6 @@ func (s *trustPropagationScreen) renderDirectives() string {
 		b.WriteString("Downstream Reference: " + directive.downstreamReference + "\n")
 		b.WriteString("Downstream Path: " + directive.downstreamPath + "\n\n")
 	}
-
-	return strings.TrimSpace(b.String())
-}
-
-// renderTrustKeys turns root and top-level policy keys into screen text.
-func (s *trustKeysThresholdsScreen) renderTrustKeys() string {
-	if s.keys == nil {
-		return "No keys loaded."
-	}
-
-	var b strings.Builder
-	fmt.Fprintf(&b, "Root Keys (threshold: %d)\n", s.keys.rootThreshold)
-	writeTrustKeyPrincipals(&b, s.keys.rootKeys)
-
-	b.WriteString("\n")
-	if len(s.keys.policyKeys) == 0 {
-		b.WriteString("Top-Level Policy Keys\n")
-	} else {
-		fmt.Fprintf(&b, "Top-Level Policy Keys (threshold: %d)\n", s.keys.policyThreshold)
-	}
-	writeTrustKeyPrincipals(&b, s.keys.policyKeys)
 
 	return strings.TrimSpace(b.String())
 }

@@ -2349,13 +2349,13 @@ func TestListPropagationDirectives(t *testing.T) {
 	})
 }
 
-func TestListRootKeys(t *testing.T) {
+func TestListRootThresholdAndKeys(t *testing.T) {
 	t.Run("list root keys after add", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 		rootKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
 
-		principals, threshold, err := r.ListRootKeys(testCtx, policy.PolicyRef)
+		principals, threshold, err := r.ListRootThresholdAndKeys(testCtx, policy.PolicyRef)
 		require.NoError(t, err)
 		require.Len(t, principals, 1)
 		assert.Equal(t, rootKey.KeyID, principals[0].ID())
@@ -2370,26 +2370,27 @@ func TestListRootKeys(t *testing.T) {
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
-		principals, threshold, err = r.ListRootKeys(testCtx, "policy-staging")
-		assert.NoErrort, err)
-		assert.Len(t, principals, 2)
+		principals, threshold, err = r.ListRootThresholdAndKeys(testCtx, "policy-staging")
+		assert.NoError(t, err)
+		require.Len(t, principals, 2)
+		assert.ElementsMatch(t, []string{rootKey.KeyID, targetsKey.KeyID}, []string{principals[0].ID(), principals[1].ID()})
 		assert.Equal(t, 1, threshold)
 	})
 
 	t.Run("returns error for unknown policy ref", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
-		principals, _, err := r.ListRootKeys(testCtx, "does-not-exist")
-		assert.Error(t, err)
+		principals, _, err := r.ListRootThresholdAndKeys(testCtx, "does-not-exist")
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 		assert.Nil(t, principals)
 	})
 }
 
-func TestListTopLevelTargetsKeys(t *testing.T) {
+func TestListTopLevelTargetsThresholdAndKeys(t *testing.T) {
 	t.Run("returns error when no top-level policy keys are set", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
-		principals, _, err := r.ListTopLevelTargetsKeys(testCtx, policy.PolicyRef)
+		principals, _, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, policy.PolicyRef)
 		assert.ErrorIs(t, err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot)
 		assert.Nil(t, principals)
 	})
@@ -2407,7 +2408,7 @@ func TestListTopLevelTargetsKeys(t *testing.T) {
 		err = r.StagePolicy(testCtx, "", true, false)
 		require.Nil(t, err)
 
-		principals, threshold, err := r.ListTopLevelTargetsKeys(testCtx, policy.PolicyStagingRef)
+		principals, threshold, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, policy.PolicyStagingRef)
 		require.Nil(t, err)
 		require.Len(t, principals, 1)
 		assert.Equal(t, targetsKey.KeyID, principals[0].ID())
@@ -2417,7 +2418,7 @@ func TestListTopLevelTargetsKeys(t *testing.T) {
 	t.Run("returns error for unknown policy ref", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
-		principals, _, err := r.ListTopLevelTargetsKeys(testCtx, "does-not-exist")
+		principals, _, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, "does-not-exist")
 		assert.Error(t, err)
 		assert.Nil(t, principals)
 	})

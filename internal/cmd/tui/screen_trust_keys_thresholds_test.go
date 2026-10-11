@@ -57,7 +57,7 @@ func TestTrustKeysListKeys(t *testing.T) {
 		m := newTestModel(keyPath)
 		s := &m.trustKeysScreen
 
-		selectItemByTitle(t, &s.operationList, "List Keys")
+		selectItemByTitle(t, &s.operationList, "List Root Keys")
 		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 		resModel := updatedModel.(model)
 
@@ -69,11 +69,26 @@ func TestTrustKeysListKeys(t *testing.T) {
 		assert.Empty(t, resModel.trustKeysScreen.keys.policyKeys)
 
 		viewStr := resModel.trustKeysScreen.View(&resModel)
-		assert.Contains(t, viewStr, "Home › Trust › Keys & Thresholds › List Keys")
+		assert.Contains(t, viewStr, "Home › Trust › Keys & Thresholds › List Root Keys")
 		assert.Contains(t, viewStr, "Root Keys (threshold: 1)")
 		assert.Contains(t, viewStr, resModel.trustKeysScreen.keys.rootKeys[0].ID())
-		assert.Contains(t, viewStr, "Top-Level Policy Keys")
+		assert.NotContains(t, viewStr, "Top-Level Policy Keys")
+	})
+
+	t.Run("lists policy keys when none are configured", func(t *testing.T) {
+		keyPath, _ := setup(t)
+		m := newTestModel(keyPath)
+		s := &m.trustKeysScreen
+
+		selectItemByTitle(t, &s.operationList, "List Policy Keys")
+		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		require.Nil(t, resModel.errorDialog)
+		viewStr := resModel.trustKeysScreen.View(&resModel)
+		assert.Contains(t, viewStr, "Top-Level Policy Keys (threshold: not configured)")
 		assert.Contains(t, viewStr, "None configured.")
+		assert.NotContains(t, viewStr, "Root Keys")
 	})
 
 	t.Run("lists root and top-level policy keys", func(t *testing.T) {
@@ -90,7 +105,7 @@ func TestTrustKeysListKeys(t *testing.T) {
 		m := newTestModel(keyPath)
 		s := &m.trustKeysScreen
 
-		selectItemByTitle(t, &s.operationList, "List Keys")
+		selectItemByTitle(t, &s.operationList, "List Policy Keys")
 		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 		resModel := updatedModel.(model)
 
@@ -100,8 +115,10 @@ func TestTrustKeysListKeys(t *testing.T) {
 		assert.Equal(t, policyKey.ID(), resModel.trustKeysScreen.keys.policyKeys[0].ID())
 
 		viewStr := resModel.trustKeysScreen.View(&resModel)
+		assert.Contains(t, viewStr, "Home › Trust › Keys & Thresholds › List Policy Keys")
 		assert.Contains(t, viewStr, "Top-Level Policy Keys (threshold: 1)")
-		assert.Equal(t, 2, strings.Count(viewStr, policyKey.ID()))
+		assert.Equal(t, 1, strings.Count(viewStr, policyKey.ID()))
+		assert.NotContains(t, viewStr, "Root Keys")
 	})
 
 	t.Run("esc closes key list before leaving screen", func(t *testing.T) {
@@ -128,12 +145,29 @@ func TestTrustKeysListKeys(t *testing.T) {
 		m := newTestModel("")
 		s := &m.trustKeysScreen
 
-		selectItemByTitle(t, &s.operationList, "List Keys")
+		selectItemByTitle(t, &s.operationList, "List Root Keys")
 		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
 		resModel := updatedModel.(model)
 
 		require.NotNil(t, resModel.errorDialog)
-		assert.Equal(t, "List Keys Failed", resModel.errorDialog.title)
+		assert.Equal(t, "List Root Keys Failed", resModel.errorDialog.title)
 		assert.False(t, resModel.trustKeysScreen.showKeys)
 	})
+}
+
+func TestTrustKeysMenuSeparatesRootAndPolicyKeys(t *testing.T) {
+	items := trustKeysMenuItems(false)
+	titles := make([]string, 0, len(items))
+	descriptions := make([]string, 0, len(items))
+	for _, menuItem := range items {
+		item := menuItem.(item)
+		titles = append(titles, item.title)
+		descriptions = append(descriptions, item.desc)
+	}
+
+	assert.Contains(t, titles, "List Root Keys")
+	assert.Contains(t, titles, "List Policy Keys")
+	assert.Contains(t, strings.Join(descriptions, "\n"), "root keys and their signature threshold")
+	assert.Contains(t, strings.Join(descriptions, "\n"), "policy keys and their signature threshold")
+	assert.NotContains(t, titles, "List Keys")
 }

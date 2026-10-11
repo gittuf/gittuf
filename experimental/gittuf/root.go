@@ -234,6 +234,38 @@ func (r *Repository) RemoveRootKey(ctx context.Context, signer sslibdsse.SignerV
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
+// ListRootThresholdAndKeys lists the principals trusted to sign the root of
+// trust metadata along with the root threshold.
+func (r *Repository) ListRootThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
+		policyRef = "refs/gittuf/" + policyRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	principals, err := rootMetadata.GetRootPrincipals()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	threshold, err := rootMetadata.GetRootThreshold()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	return principals, threshold, nil
+}
+
 // AddTopLevelTargetsKey is the interface for the user to add an authorized key
 // for the top level Targets role / policy file.
 func (r *Repository) AddTopLevelTargetsKey(ctx context.Context, signer sslibdsse.SignerVerifier, targetsKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
@@ -314,6 +346,38 @@ func (r *Repository) RemoveTopLevelTargetsKey(ctx context.Context, signer sslibd
 
 	commitMessage := fmt.Sprintf("Remove policy key '%s' from root", targetsKeyID)
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
+}
+
+// ListTopLevelTargetsThresholdAndKeys lists the principals trusted to sign the
+// top-level policy (primary rule file) along with its threshold.
+func (r *Repository) ListTopLevelTargetsThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
+		policyRef = "refs/gittuf/" + policyRef
+	}
+
+	slog.Debug("Loading current policy...")
+	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	slog.Debug("Loading root metadata...")
+	rootMetadata, err := state.GetRootMetadata(false)
+	if err != nil {
+		return nil, -1, err
+	}
+
+	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
+	if err != nil {
+		return nil, -1, err
+	}
+
+	return principals, threshold, nil
 }
 
 // AddGitHubApp is the interface for the user to add the authorized key for the
@@ -985,70 +1049,6 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 	}
 
 	return rootMetadata.GetPropagationDirectives(), nil
-}
-
-// ListRootKeys lists the principals trusted to sign the root of trust metadata
-// along with the root threshold.
-func (r *Repository) ListRootThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
-	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
-		policyRef = "refs/gittuf/" + policyRef
-	}
-
-	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	slog.Debug("Loading root metadata...")
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	principals, err := rootMetadata.GetRootPrincipals()
-	if err != nil {
-		return nil, -1, err
-	}
-
-	threshold, err := rootMetadata.GetRootThreshold()
-	if err != nil {
-		return nil, -1, err
-	}
-
-	return principals, threshold, nil
-}
-
-// ListTopLevelTargetsKeys lists the principals trusted to sign the top-level
-// policy (primary rule file) along with its threshold.
-func (r *Repository) ListTopLevelTargetsThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
-	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
-		policyRef = "refs/gittuf/" + policyRef
-	}
-
-	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	slog.Debug("Loading root metadata...")
-	rootMetadata, err := state.GetRootMetadata(false)
-	if err != nil {
-		return nil, -1, err
-	}
-
-	principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
-	if err != nil {
-		return nil, -1, err
-	}
-
-	threshold, err := rootMetadata.GetPrimaryRuleFileThreshold()
-	if err != nil {
-		return nil, -1, err
-	}
-
-	return principals, threshold, nil
 }
 
 // EnableController makes the current repository a "controller" repository used
