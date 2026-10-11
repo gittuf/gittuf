@@ -291,11 +291,11 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 
 	// A custom GitHub client is only intended for testing, and to prevent
 	// abuse, this is gated behind devmode.
-	if options.GitHubMockedClient != nil {
+	if options.MockHTTPClient() != nil {
 		if !dev.InDevMode() {
 			return dev.ErrNotInDevMode
 		}
-		client = gogithub.NewClient(options.GitHubMockedClient)
+		client = gogithub.NewClient(options.MockHTTPClient())
 	} else {
 		token, err := options.GitHubTokenSource.Token(ctx)
 		if err != nil {
@@ -357,8 +357,8 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 
 	var client *gogithub.Client
 
-	if options.GitHubMockedClient != nil {
-		client = gogithub.NewClient(options.GitHubMockedClient)
+	if options.MockHTTPClient() != nil {
+		client = gogithub.NewClient(options.MockHTTPClient())
 	} else {
 		token, err := options.GitHubTokenSource.Token(ctx)
 		if err != nil {
@@ -418,8 +418,8 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 
 	var client *gogithub.Client
 
-	if options.GitHubMockedClient != nil {
-		client = gogithub.NewClient(options.GitHubMockedClient)
+	if options.MockHTTPClient() != nil {
+		client = gogithub.NewClient(options.MockHTTPClient())
 	} else {
 		token, err := options.GitHubTokenSource.Token(ctx)
 		if err != nil {

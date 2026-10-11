@@ -5,10 +5,12 @@ package gittuf
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -23,12 +25,15 @@ import (
 	githubv01 "github.com/gittuf/gittuf/internal/attestations/github/v01"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
+	signingdsse "github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
+	tuf "github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	gogithub "github.com/google/go-github/v61/github"
+	ita "github.com/in-toto/attestation/go/v1"
 	gogithubmock "github.com/migueleliasweb/go-github-mock/src/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -360,15 +365,19 @@ func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
 	t.Setenv("GITTUF_DEV", "1")
 
 	t.Run("test mocked API", func(t *testing.T) {
+		const mergedCommitID = "0123456789012345678901234567890123456789"
 		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposCommitsPullsByOwnerByRepoByCommitSha,
 				[]gogithub.PullRequest{
 					{
-						ID: gogithub.Int64(1),
+						ID:             gogithub.Int64(1),
+						Number:         gogithub.Int(1),
+						MergeCommitSHA: gogithub.String(mergedCommitID),
 						Base: &gogithub.PullRequestBranch{
-							Ref: gogithub.String("main"),
-							SHA: gogithub.String("a"),
+							Ref:  gogithub.String("main"),
+							User: &gogithub.User{Login: gogithub.String("exampleorg"), ID: gogithub.Int64(42)},
+							SHA:  gogithub.String("a"),
 						},
 						MergedAt: &gogithub.Timestamp{
 							Time: time.Now(),
@@ -393,7 +402,7 @@ func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -401,7 +410,7 @@ func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -431,10 +440,10 @@ func TestAddGitHubPullRequestAttestationForCommit(t *testing.T) {
 		// Create signer
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		err = repo.AddGitHubPullRequestAttestationForCommit(context.Background(), signer, "exampleorg", "example", "aa", "main", false, withMockedGitHubAPIClient(mockedHTTPClient))
-		assert.NoError(t, err)
+		err = repo.AddGitHubPullRequestAttestationForCommit(context.Background(), signer, "exampleorg", "example", mergedCommitID, "main", false, withMockedGitHubAPIClient(mockedHTTPClient))
+		require.NoError(t, err)
 
-		// TODO: Check attestation
+		assertStoredGitHubPullRequest(t, repo, signer.Verifier, mergedCommitID)
 	})
 }
 
@@ -450,13 +459,6 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, true)
-		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
-
-		// Test no GitHub token
-		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, false)
-		assert.ErrorIs(t, err, ErrNoGitHubToken)
-	})
 		err = nr.AddGitHubPullRequestAttestationForNumber(testCtx, nil, "", "", 1, true, withMockedGitHubAPIClient(nil))
 		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
@@ -468,14 +470,18 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 	t.Setenv("GITTUF_DEV", "1")
 
 	t.Run("test mocked API", func(t *testing.T) {
+		const mergedCommitID = "0123456789012345678901234567890123456789"
 		mockedHTTPClient := gogithubmock.NewMockedHTTPClient(
 			gogithubmock.WithRequestMatch(
 				gogithubmock.GetReposPullsByOwnerByRepoByPullNumber,
 				gogithub.PullRequest{
-					ID: gogithub.Int64(1),
+					ID:             gogithub.Int64(1),
+					Number:         gogithub.Int(1),
+					MergeCommitSHA: gogithub.String(mergedCommitID),
 					Base: &gogithub.PullRequestBranch{
-						Ref: gogithub.String("main"),
-						SHA: gogithub.String("a"),
+						Ref:  gogithub.String("main"),
+						User: &gogithub.User{Login: gogithub.String("exampleorg"), ID: gogithub.Int64(42)},
+						SHA:  gogithub.String("a"),
 					},
 					MergedAt: &gogithub.Timestamp{
 						Time: time.Now(),
@@ -499,7 +505,7 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -507,7 +513,7 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -538,9 +544,9 @@ func TestAddGitHubPullRequestAttestationForNumber(t *testing.T) {
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		err = repo.AddGitHubPullRequestAttestationForNumber(context.Background(), signer, "exampleorg", "example", 1, false, withMockedGitHubAPIClient(mockedHTTPClient))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		// TODO: Check attestation
+		assertStoredGitHubPullRequest(t, repo, signer.Verifier, mergedCommitID)
 	})
 }
 
@@ -558,13 +564,6 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = nr.AddGitHubPullRequestApprover(testCtx, nil, "", "", 1, 1, "", true)
-		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
-
-		// Test no GitHub token
-		err = nr.AddGitHubPullRequestApprover(testCtx, targetsSigner, "", "", 1, 1, "", false)
-		assert.ErrorIs(t, err, ErrNoGitHubToken)
-	})
 		err = nr.AddGitHubPullRequestApprover(testCtx, nil, "", "", 1, 1, "", true, withMockedGitHubAPIClient(nil))
 		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 
@@ -591,7 +590,7 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -599,7 +598,7 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -665,7 +664,19 @@ func TestAddGitHubPullRequestApprover(t *testing.T) {
 		err = repo.AddGitHubPullRequestApprover(context.Background(), signer, "exampleorg", "example", 1, 123, "bob", false, withMockedGitHubAPIClient(mockedHTTPClient))
 		assert.NoError(t, err)
 
-		// TODO: Check attestation
+		err = repo.ApplyAttestations(testCtx, "", true, false)
+		assert.NoError(t, err)
+
+		allAttestations, err := attestations.LoadCurrentAttestations(repo.r)
+		require.NoError(t, err)
+
+		env, err := allAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(repo.r, githubopts.DefaultGitHubBaseURL, 123, tuf.GitHubAppRoleName)
+		require.NoError(t, err)
+		assert.NotNil(t, env)
+
+		predicate, err := getGitHubPullRequestApprovalPredicateFromEnvelope(env)
+		require.NoError(t, err)
+		assert.Contains(t, predicate.GetApprovers(), "bob")
 	})
 }
 
@@ -709,7 +720,7 @@ func TestDismissGitHubPullRequestApprover(t *testing.T) {
 		}
 		defer os.Chdir(pwd) //nolint:errcheck
 
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -717,7 +728,7 @@ func TestDismissGitHubPullRequestApprover(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -800,7 +811,20 @@ func TestDismissGitHubPullRequestApprover(t *testing.T) {
 		err = repo.DismissGitHubPullRequestApprover(context.Background(), signer, 123, "bob", false, withMockedGitHubAPIClient(mockedHTTPClient))
 		require.NoError(t, err)
 
-		// TODO: Check attestation
+		err = repo.ApplyAttestations(testCtx, "", true, false)
+		assert.NoError(t, err)
+
+		allAttestations, err := attestations.LoadCurrentAttestations(repo.r)
+		require.NoError(t, err)
+
+		env, err := allAttestations.GetGitHubPullRequestApprovalAttestationForReviewID(repo.r, githubopts.DefaultGitHubBaseURL, 123, tuf.GitHubAppRoleName)
+		require.NoError(t, err)
+		assert.NotNil(t, env)
+
+		predicate, err := getGitHubPullRequestApprovalPredicateFromEnvelope(env)
+		require.NoError(t, err)
+		assert.NotContains(t, predicate.GetApprovers(), "bob")
+		assert.Contains(t, predicate.GetDismissedApprovers(), "bob")
 	})
 }
 
@@ -1042,7 +1066,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 	t.Run("review is already stored in the attestations state", func(t *testing.T) {
 		testDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, testDir, false)
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -1050,7 +1074,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -1088,7 +1112,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		mergeCommitID := r.CommitWithParents(t, mergeTreeID, []githash.Hash{targetHeadCommitID, featureHeadCommitID}, "Merge feature into main", false)
 
 		err = r.SetReference(absTargetRef, mergeCommitID)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		t.Setenv("GITTUF_DEV", "1")
 
@@ -1167,19 +1191,24 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
-		mockedGoGitHubClient := gogithub.NewClient(mockedHTTPClient)
-
 		err = repo.AddGitHubPullRequestAttestationForNumber(testCtx, signer, "owner", "repo", 1, false, withMockedGitHubAPIClient(mockedHTTPClient), githubopts.WithRSLEntry())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		err = repo.AddGitHubPullRequestApprover(testCtx, signer, "owner", "repo", 1, 123, "bob", false, withMockedGitHubAPIClient(mockedHTTPClient), githubopts.WithRSLEntry())
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		attestations, err := attestations.LoadCurrentAttestations(repo.r)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		baseRef, fromID, toID, err := repo.getGitHubPullRequestReviewDetails(testCtx, attestations, mockedGoGitHubClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, true)
-		assert.NoError(t, err)
+		// Cached review details must not rely on the matching API fixtures above.
+		requests := 0
+		cachedClient := gogithub.NewClient(&http.Client{Transport: githubRejectingTransport(func(*http.Request) (*http.Response, error) {
+			requests++
+			return nil, fmt.Errorf("unexpected GitHub request for cached review")
+		})})
+		baseRef, fromID, toID, err := repo.getGitHubPullRequestReviewDetails(testCtx, attestations, cachedClient, githubopts.DefaultGitHubBaseURL, "owner", "repo", 1, 123, true)
+		require.NoError(t, err)
 
+		assert.Zero(t, requests)
 		assert.Equal(t, "refs/heads/main", baseRef)
 		assert.Equal(t, toID, mergeTreeID.String())
 		assert.Equal(t, fromID, targetHeadCommitID.String())
@@ -1188,7 +1217,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 	t.Run("review is not in attestations state and useGitHubAPI is true", func(t *testing.T) {
 		testDir := t.TempDir()
 		r := gitinterface.CreateTestGitRepository(t, testDir, false)
-		repo := &Repository{r: r}
+		repo := &Repository{r: newStorer(r)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -1196,7 +1225,7 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		treeBuilder := gitinterface.NewTreeBuilder(repo.r)
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
 		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
 		if err != nil {
 			t.Fatal(err)
@@ -1299,11 +1328,11 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 	t.Run("review is not in attestations state and useGitHubAPI is false but head hash is not locally found", func(t *testing.T) {
 		remoteDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, remoteDir, false)
-		remoteRepo := &Repository{r: remoteR}
+		remoteRepo := &Repository{r: newStorer(remoteR)}
 
 		localDir := t.TempDir()
 		localR := gitinterface.CreateTestGitRepository(t, localDir, false)
-		localRepo := &Repository{r: localR}
+		localRepo := &Repository{r: newStorer(localR)}
 
 		targetRef := "main"
 		absTargetRef := "refs/heads/main"
@@ -1311,9 +1340,9 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 		absFeatureRef := "refs/heads/feature"
 
 		// Create common base for main and feature branches
-		// remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.r)
+		// remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.GetGitRepository())
 		// localTreeBuilder := gitinterface.NewTreeBuilder(localRepo.r)
-		remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.r)
+		remoteTreeBuilder := gitinterface.NewTreeBuilder(remoteRepo.GetGitRepository())
 
 		emptyRemoteTreeID, err := remoteTreeBuilder.WriteTreeFromEntries(nil)
 
@@ -1419,7 +1448,48 @@ func TestGetGitHubPullRequestReviewDetails(t *testing.T) {
 // WithMockedGitHubAPIClient is used to supply a client that mocks GitHub API
 // responses, used only for testing.
 func withMockedGitHubAPIClient(client *http.Client) githubopts.Option {
-	return func(o *githubopts.Options) {
-		o.GitHubMockedClient = client
-	}
+	return githubopts.WithTestMockHTTPClient(client)
+}
+
+// Inspect the committed ref directly: default creation stages the attestation
+// without publishing an RSL entry, so LoadCurrentAttestations can still be empty.
+func assertStoredGitHubPullRequest(t *testing.T, repo *Repository, verifier dsse.Verifier, mergedCommitID string) {
+	t.Helper()
+	commitID, err := repo.r.GetReference(attestations.Ref)
+	require.NoError(t, err)
+	treeID, err := repo.r.GetCommitTreeID(commitID)
+	require.NoError(t, err)
+	files, err := repo.r.GetAllFilesInTree(treeID)
+	require.NoError(t, err)
+	attestationPath := path.Join("github-pull-requests", attestations.GitHubPullRequestAttestationPath("exampleorg-42/refs/heads/main", mergedCommitID))
+	require.Contains(t, files, attestationPath)
+	blob, err := repo.r.ReadBlob(files[attestationPath])
+	require.NoError(t, err)
+	envelope := &dsse.Envelope{}
+	require.NoError(t, json.Unmarshal(blob, envelope))
+	accepted, err := signingdsse.VerifyEnvelope(testCtx, envelope, []dsse.Verifier{verifier}, 1)
+	require.NoError(t, err)
+	require.Len(t, accepted, 1)
+	payload, err := envelope.DecodeB64Payload()
+	require.NoError(t, err)
+	statement := &ita.Statement{}
+	require.NoError(t, json.Unmarshal(payload, statement))
+	assert.Equal(t, ita.StatementTypeUri, statement.GetType())
+	assert.Equal(t, githubv01.PullRequestPredicateType, statement.GetPredicateType())
+	require.Len(t, statement.GetSubject(), 1)
+	assert.Equal(t, "https://github.com/exampleorg/example/pull/1", statement.GetSubject()[0].GetUri())
+	assert.Equal(t, map[string]string{"gitCommit": mergedCommitID}, statement.GetSubject()[0].GetDigest())
+	predicate := statement.GetPredicate().AsMap()
+	assert.Equal(t, float64(1), predicate["number"])
+	assert.Equal(t, mergedCommitID, predicate["merge_commit_sha"])
+	base, ok := predicate["base"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "main", base["ref"])
+	assert.Equal(t, "a", base["sha"])
+}
+
+type githubRejectingTransport func(*http.Request) (*http.Response, error)
+
+func (transport githubRejectingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	return transport(request)
 }
