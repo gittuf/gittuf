@@ -753,7 +753,7 @@ func (r *Repository) UpdateGlobalRuleThreshold(ctx context.Context, signer sslib
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -793,7 +793,7 @@ func (r *Repository) UpdateGlobalRuleBlockForcePushes(ctx context.Context, signe
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -928,7 +928,7 @@ func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer ssli
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}
@@ -975,7 +975,7 @@ func (r *Repository) IncrementRootVersion(ctx context.Context, signer sslibdsse.
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef)
+	state, err := policy.LoadCurrentState(ctx, r.r, policy.PolicyStagingRef, policyopts.BypassRSL())
 	if err != nil {
 		return err
 	}

@@ -59,7 +59,7 @@ func TestIncrementVersion(t *testing.T) {
 		}
 
 		_, _, _, err := cmd.ExecuteCommandC(New(pOpts))
-		assert.ErrorContains(t, err, "unable to find RSL entry")
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 
 	t.Run("uninitialized policy with RSL", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestIncrementVersion(t *testing.T) {
 		}
 
 		_, _, _, err := cmd.ExecuteCommandC(New(pOpts))
-		assert.ErrorContains(t, err, "unable to find RSL entry")
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 	})
 
 	t.Run("success", func(t *testing.T) {

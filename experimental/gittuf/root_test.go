@@ -20,7 +20,6 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
-	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1807,10 +1806,10 @@ func TestUpdateGlobalRule(t *testing.T) {
 		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = nr.UpdateGlobalRuleThreshold(testCtx, sv, "", nil, 1, false)
-		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		err = nr.UpdateGlobalRuleBlockForcePushes(testCtx, sv, "", nil, false)
-		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
@@ -2069,7 +2068,7 @@ func TestUpdatePropagationDirective(t *testing.T) {
 		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = nr.UpdatePropagationDirective(testCtx, sv, "", "", "", "", "", "", false)
-		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
@@ -2279,7 +2278,7 @@ func TestIncrementRootVersion(t *testing.T) {
 		sv := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
 
 		err = nr.IncrementRootVersion(testCtx, sv, false)
-		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		assert.ErrorIs(t, err, gitinterface.ErrReferenceNotFound)
 
 		// Test unauthorized signer
 		r := createTestRepositoryWithRoot(t, "")
