@@ -1021,7 +1021,7 @@ func (r *Repository) ListRootThresholdAndKeys(ctx context.Context, policyRef str
 
 // ListTopLevelTargetsKeys lists the principals trusted to sign the top-level
 // policy (primary rule file) along with its threshold.
-func (r *Repository) ListTopLevelTargetsKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+func (r *Repository) ListTopLevelTargetsThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
 	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
 		policyRef = "refs/gittuf/" + policyRef
 	}
