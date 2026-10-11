@@ -989,7 +989,7 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 
 // ListRootKeys lists the principals trusted to sign the root of trust metadata
 // along with the root threshold.
-func (r *Repository) ListRootKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
+func (r *Repository) ListRootThresholdAndKeys(ctx context.Context, policyRef string) ([]tuf.Principal, int, error) {
 	if !strings.HasPrefix(policyRef, "refs/gittuf/") {
 		policyRef = "refs/gittuf/" + policyRef
 	}
