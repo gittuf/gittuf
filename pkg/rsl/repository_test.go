@@ -1841,6 +1841,142 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 
 		assert.Equal(t, originalLatestEntry, newLatestEntry)
 	})
+
+	t.Run("entries for other refs are not skipped", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		skippedEntries := []githash.Hash{}
+
+		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", initialCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		toBeSkippedEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+		skippedEntries = append(skippedEntries, toBeSkippedEntry.GetID())
+
+		// Record an unrelated ref whose commit is not in main's history
+		featureCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/feature", featureCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		secondCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Second commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", secondCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		toBeSkippedEntry, err = GetLatestEntry(repo)
+		require.Nil(t, err)
+		skippedEntries = append(skippedEntries, toBeSkippedEntry.GetID())
+
+		// Create a different commit and override the ref
+		if err := repo.SetReference("refs/heads/main", gitinterface.ZeroHash); err != nil {
+			t.Fatal(err)
+		}
+		newCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Real initial commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", newCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		annotationEntry, isAnnotation := latestEntry.(*AnnotationEntry)
+		if !isAnnotation {
+			t.Fatal("invalid entry type")
+		}
+
+		// we have to reverse the order of one of the lists
+		slices.Reverse(skippedEntries)
+		assert.Equal(t, skippedEntries, annotationEntry.RSLEntryIDs)
+	})
+
+	t.Run("entries for other refs do not end the search", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		skippedEntries := []githash.Hash{}
+
+		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", initialCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		toBeSkippedEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+		skippedEntries = append(skippedEntries, toBeSkippedEntry.GetID())
+
+		// Record an unrelated ref whose commit main is later rewritten on top of
+		featureCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/feature", featureCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		secondCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Second commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", secondCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		toBeSkippedEntry, err = GetLatestEntry(repo)
+		require.Nil(t, err)
+		skippedEntries = append(skippedEntries, toBeSkippedEntry.GetID())
+
+		// Rewrite main on top of the feature commit
+		if err := repo.SetReference("refs/heads/main", featureCommitHash); err != nil {
+			t.Fatal(err)
+		}
+		newCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Rewritten commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", newCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		annotationEntry, isAnnotation := latestEntry.(*AnnotationEntry)
+		if !isAnnotation {
+			t.Fatal("invalid entry type")
+		}
+
+		// we have to reverse the order of one of the lists
+		slices.Reverse(skippedEntries)
+		assert.Equal(t, skippedEntries, annotationEntry.RSLEntryIDs)
+	})
 }
 
 func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
