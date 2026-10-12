@@ -39,3 +39,10 @@ Neil Naveen
   Email: naveen.neil@icloud.com
   GitHub username: @neilnaveen
   Affiliation: NYU
+
+Current reviewers:
+
+Pratham Hegde
+  Email: prathamgithub16@gmail.com
+  GitHub username: @PratGit1606
+  Affiliation: Independent
