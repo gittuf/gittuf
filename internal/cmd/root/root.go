@@ -186,11 +186,15 @@ func ReportStorerTrace(errOut io.Writer) {
 	}
 
 	if storerTraceFile == "" {
-		fmt.Fprint(errOut, report)
+		if _, err := fmt.Fprint(errOut, report); err != nil {
+			slog.Error("unable to write storer trace report", "error", err)
+		}
 		return
 	}
 
 	if err := os.WriteFile(storerTraceFile, []byte(report), 0o600); err != nil {
-		fmt.Fprintf(errOut, "unable to write storer trace to '%s': %v\n", storerTraceFile, err)
+		if _, writeErr := fmt.Fprintf(errOut, "unable to write storer trace to '%s': %v\n", storerTraceFile, err); writeErr != nil {
+			slog.Error("unable to report storer trace write failure", "traceError", err, "error", writeErr)
+		}
 	}
 }

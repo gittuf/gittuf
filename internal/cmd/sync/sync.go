@@ -41,11 +41,17 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 	divergedRefs, err := repo.Sync(cmd.Context(), remoteName, o.overwriteLocalRefs, true)
 	switch {
 	case errors.Is(err, gittuf.ErrDivergedRefs):
-		fmt.Fprintln(stdOut, "References have diverged:")
-		for _, refName := range divergedRefs {
-			fmt.Fprintln(stdOut, refName)
+		if _, err := fmt.Fprintln(stdOut, "References have diverged:"); err != nil {
+			return err
 		}
-		fmt.Fprintln(stdOut, "To apply upstream changes locally, rerun the command with --overwrite. WARNING: this operation may result in the loss of local work!")
+		for _, refName := range divergedRefs {
+			if _, err := fmt.Fprintln(stdOut, refName); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintln(stdOut, "To apply upstream changes locally, rerun the command with --overwrite. WARNING: this operation may result in the loss of local work!"); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return err

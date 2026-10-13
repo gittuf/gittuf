@@ -21,10 +21,14 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		v = v[1:]
 	}
 	stdOut := cmd.OutOrStdout()
-	fmt.Fprintf(stdOut, "gittuf version %s\n", v)
+	if _, err := fmt.Fprintf(stdOut, "gittuf version %s\n", v); err != nil {
+		return err
+	}
 
 	if dev.InDevMode() {
-		fmt.Fprintf(stdOut, "gittuf is operating in developer mode. Override by setting %s=0.\n", dev.DevModeKey)
+		if _, err := fmt.Fprintf(stdOut, "gittuf is operating in developer mode. Override by setting %s=0.\n", dev.DevModeKey); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -37,10 +37,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	stdOut := cmd.OutOrStdout()
 
 	rules, err := repo.ListGlobalRules(cmd.Context(), o.targetRef)
-	if len(rules) == 0 {
-		fmt.Fprintln(stdOut, "No global rules are currently defined.")
-	}
 	if err != nil {
+		return err
+	}
+	if len(rules) == 0 {
+		_, err := fmt.Fprintln(stdOut, "No global rules are currently defined.")
 		return err
 	}
 
@@ -56,16 +57,30 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	}
 
 	for _, curRule := range thresholdRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
-		fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold())
+		if _, err := fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleThresholdType); err != nil {
+			return err
+		}
+		if err := printNamespaces(stdOut, curRule.GetProtectedNamespaces()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, indentString+"Threshold: %d\n", curRule.GetThreshold()); err != nil {
+			return err
+		}
 	}
 
 	for _, curRule := range blockForcePushesRules {
-		fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName())
-		fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType)
-		printNamespaces(stdOut, curRule.GetProtectedNamespaces())
+		if _, err := fmt.Fprintf(stdOut, "Global Rule: %v\n", curRule.GetName()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(stdOut, indentString+"Type: "+tuf.GlobalRuleBlockForcePushesType); err != nil {
+			return err
+		}
+		if err := printNamespaces(stdOut, curRule.GetProtectedNamespaces()); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -85,7 +100,7 @@ func New() *cobra.Command {
 	return cmd
 }
 
-func printNamespaces(stdOut io.Writer, namespaces []string) {
+func printNamespaces(stdOut io.Writer, namespaces []string) error {
 	gitpaths, filepaths := []string{}, []string{}
 	for _, path := range namespaces {
 		if strings.HasPrefix(path, "git:") {
@@ -95,15 +110,24 @@ func printNamespaces(stdOut io.Writer, namespaces []string) {
 		}
 	}
 	if len(filepaths) > 0 {
-		fmt.Fprintln(stdOut, indentString+"Paths affected:")
+		if _, err := fmt.Fprintln(stdOut, indentString+"Paths affected:"); err != nil {
+			return err
+		}
 		for _, path := range filepaths {
-			fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path)
+			if _, err := fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path); err != nil {
+				return err
+			}
 		}
 	}
 	if len(gitpaths) > 0 {
-		fmt.Fprintln(stdOut, indentString+"Refs affected:")
+		if _, err := fmt.Fprintln(stdOut, indentString+"Refs affected:"); err != nil {
+			return err
+		}
 		for _, path := range gitpaths {
-			fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path)
+			if _, err := fmt.Fprintln(stdOut, strings.Repeat(indentString, 2)+path); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
