@@ -893,7 +893,9 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrust(t *testing.T) *State {
 	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
-	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	if err := rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName); err != nil {
+		t.Fatal(err)
+	}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
@@ -988,7 +990,9 @@ func createTestStateWithThresholdPolicyAndGitHubAppTrustForMixedAttestations(t *
 	if err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey); err != nil {
 		t.Fatal(err)
 	}
-	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	if err := rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName); err != nil {
+		t.Fatal(err)
+	}
 
 	rootEnv, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {

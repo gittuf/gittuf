@@ -48,6 +48,40 @@ func TestRemoveGitHubApp(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
+	t.Run("non-existent app", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		cwd, err := os.Getwd()
+		require.NoError(t, err)
+		defer os.Chdir(cwd) //nolint:errcheck
+
+		require.NoError(t, os.Chdir(tmpDir))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		key := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, artifacts.SSHED25519PublicSSH))
+
+		require.NoError(t, repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, key, false))
+
+		pOpts := &persistent.Options{
+			SigningKey: keyPath,
+		}
+
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--app-name", "does-not-exist")
+		assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
