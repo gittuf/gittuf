@@ -9,7 +9,6 @@ import (
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/common/set"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -1958,8 +1957,6 @@ func TestAddPropagationDirective(t *testing.T) {
 }
 
 func TestUpdatePropagationDirective(t *testing.T) {
-	t.Setenv(dev.DevModeKey, "1")
-
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 

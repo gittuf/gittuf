@@ -4,12 +4,9 @@
 package updatepropagationdirective
 
 import (
-	"fmt"
-
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
 
@@ -73,10 +70,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -98,8 +91,8 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "update-propagation-directive",
-		Short:             fmt.Sprintf("Update propagation directive in the root of trust (developer mode only, set %s=1)", dev.DevModeKey),
-		Long:              fmt.Sprintf("The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to change how content is propagated between repositories. It requires developer mode to be enabled by setting the environment variable %s=1.", dev.DevModeKey),
+		Short:             "Update propagation directive in the root of trust",
+		Long:              "The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to change how content is propagated between repositories.",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
