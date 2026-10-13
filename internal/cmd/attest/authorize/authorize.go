@@ -26,7 +26,6 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"ref to authorize merging changes from",
 	)
-	cmd.MarkFlagRequired("from-ref") //nolint:errcheck
 
 	cmd.Flags().BoolVarP(
 		&o.revoke,
@@ -35,6 +34,9 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		false,
 		"revoke existing authorization",
 	)
+
+	cmd.MarkFlagsOneRequired("from-ref", "revoke")
+	cmd.MarkFlagsMutuallyExclusive("from-ref", "revoke")
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
