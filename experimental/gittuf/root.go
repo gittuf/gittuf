@@ -12,7 +12,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/common"
@@ -841,10 +840,6 @@ func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibds
 }
 
 func (r *Repository) UpdatePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()

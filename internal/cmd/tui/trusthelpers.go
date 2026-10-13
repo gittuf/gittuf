@@ -10,7 +10,6 @@ import (
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
-	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/tuf"
 )
 
@@ -372,10 +371,6 @@ func repoAddPropagationDirective(ctx context.Context, o *options, name, upstream
 
 // repoUpdatePropagationDirective updates a propagation directive.
 func repoUpdatePropagationDirective(ctx context.Context, o *options, name, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string) error {
-	if !dev.InDevMode() {
-		return dev.ErrNotInDevMode
-	}
-
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err

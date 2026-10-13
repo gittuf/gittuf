@@ -13,7 +13,6 @@ import (
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
-	"github.com/gittuf/gittuf/internal/dev"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -21,24 +20,7 @@ import (
 )
 
 func TestUpdatePropagationDirective(t *testing.T) {
-	t.Run("not in dev mode", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "0")
-
-		pOpts := &persistent.Options{}
-		c := New(pOpts)
-
-		_, _, _, err := cmd.ExecuteCommandC(c,
-			"--name", "test-directive",
-			"--from-repository", "origin",
-			"--from-reference", "refs/heads/main",
-			"--into-reference", "refs/heads/main",
-			"--into-path", "bar",
-		)
-		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
-	})
-
 	t.Run("no repository", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
 		tmpDir := t.TempDir()
 
 		t.Chdir(tmpDir)
@@ -58,7 +40,6 @@ func TestUpdatePropagationDirective(t *testing.T) {
 	})
 
 	t.Run("invalid signer", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -79,7 +60,6 @@ func TestUpdatePropagationDirective(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
@@ -115,7 +95,6 @@ func TestUpdatePropagationDirective(t *testing.T) {
 	})
 
 	t.Run("success with RSL entry", func(t *testing.T) {
-		t.Setenv(dev.DevModeKey, "1")
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 
