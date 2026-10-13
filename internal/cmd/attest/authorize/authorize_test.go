@@ -43,6 +43,34 @@ func TestAuthorize(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to run command")
 	})
 
+	t.Run("missing from-ref and revoke", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		pOpts := &persistent.Options{
+			SigningKey: keyPath,
+		}
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "refs/tags/v1")
+		assert.ErrorContains(t, err, "at least one of the flags in the group [from-ref revoke] is required")
+	})
+
+	t.Run("both from-ref and revoke", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		pOpts := &persistent.Options{
+			SigningKey: "dummy-key",
+		}
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "--revoke", "refs/tags/v1")
+		assert.ErrorContains(t, err, "if any flags in the group [from-ref revoke] are set none of the others can be")
+	})
+
 	t.Run("insufficient parameters for revoking", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)
@@ -56,7 +84,7 @@ func TestAuthorize(t *testing.T) {
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--from-ref", "refs/heads/main", "--revoke", "refs/tags/v1")
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--revoke", "refs/tags/v1")
 		assert.ErrorContains(t, err, "insufficient parameters for revoking authorization, requires <targetRef> <fromID> <targetTreeID>")
 	})
 
@@ -149,7 +177,7 @@ func TestAuthorize(t *testing.T) {
 		pOpts := &persistent.Options{
 			SigningKey: keyPath,
 		}
-		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--from-ref", fromRef, "--revoke", targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--revoke", targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.NoError(t, err)
 	})
 }
