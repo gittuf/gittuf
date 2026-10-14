@@ -10,6 +10,7 @@ import (
 
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 )
@@ -742,4 +743,93 @@ func TestWriteRSLPropagationEntryWithCustomFields(t *testing.T) {
 	err := writeRSLPropagationEntry(testWriter, entry, false)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedOutput, output.String())
+}
+
+type failingWriter struct{}
+
+func (f *failingWriter) Write(_ []byte) (int, error) { return 0, fmt.Errorf("write error") }
+func (f *failingWriter) Close() error                { return nil }
+
+func TestRSLLog_ErrorCases(t *testing.T) {
+	t.Run("empty RSL", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+
+		err := RSLLog(repo, writer)
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+	})
+
+	t.Run("write error on reference entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := RSLLog(repo, &failingWriter{})
+		// writeRSLReferenceEntry fails, RSLLog traps it and returns nil to avoid noisy output
+		assert.Nil(t, err)
+	})
+
+	t.Run("write error on propagation entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "repo", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		err := RSLLog(repo, &failingWriter{})
+		// writeRSLPropagationEntry fails, RSLLog traps it and returns nil
+		assert.Nil(t, err)
+	})
+
+	t.Run("propagation entry filtered by reference", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		if err := rsl.NewPropagationEntry("refs/heads/main", gitinterface.ZeroHash, "repo", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry("refs/heads/other", gitinterface.ZeroHash, "repo", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		output := &bytes.Buffer{}
+		writer := &noopwritecloser{writer: output}
+
+		err := RSLLog(repo, writer, WithReferences([]string{"refs/heads/main"}))
+		assert.Nil(t, err)
+
+		// output should only contain refs/heads/main
+		assert.Contains(t, output.String(), "refs/heads/main")
+		assert.NotContains(t, output.String(), "refs/heads/other")
+	})
+}
+
+type mockStorer struct {
+	gitstore.Storer
+}
+
+func (m *mockStorer) GetCommitParentIDs(_ githash.Hash) ([]githash.Hash, error) {
+	return nil, fmt.Errorf("mock error")
+}
+
+func TestRSLLog_GetParentError(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+		t.Fatal(err)
+	}
+
+	output := &bytes.Buffer{}
+	writer := &noopwritecloser{writer: output}
+
+	err := RSLLog(&mockStorer{Storer: repo}, writer)
+	assert.ErrorContains(t, err, "mock error")
 }
