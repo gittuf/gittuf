@@ -12,6 +12,7 @@ import (
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/rsl"
 )
@@ -101,6 +102,18 @@ func (r *Repository) DiscardPolicy() error {
 	return policy.Discard(r.r)
 }
 
+// loadStateForInspection loads the policy state at the specified ref for read
+// only operations such as listing rules or principals. Changes to the policy
+// staging ref are not required to have RSL entries, so it is loaded directly
+// from the ref's tip. Other refs are loaded using their latest RSL entry.
+func (r *Repository) loadStateForInspection(ctx context.Context, targetRef string) (*policy.State, error) {
+	if targetRef == policy.PolicyStagingRef {
+		return policy.LoadCurrentState(ctx, r.r, targetRef, policyopts.BypassRSL())
+	}
+
+	return policy.LoadCurrentState(ctx, r.r, targetRef)
+}
+
 type DelegationWithDepth struct {
 	Delegation tuf.Rule
 	Depth      int
@@ -111,7 +124,7 @@ func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*Delega
 		targetRef = "refs/gittuf/" + targetRef
 	}
 
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +193,7 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 		targetRef = "refs/gittuf/" + targetRef
 	}
 
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +217,7 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}

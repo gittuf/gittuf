@@ -16,6 +16,7 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPushPolicy(t *testing.T) {
@@ -365,9 +366,45 @@ func TestListRules(t *testing.T) {
 		}
 		assert.Equal(t, expectedRules, rules)
 	})
+
+	t.Run("staged rule without RSL entry", func(t *testing.T) {
+		r := createTestRepositoryWithPolicy(t, "")
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		targetsPubKey := tufv02.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+		err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{targetsPubKey}, false)
+		require.Nil(t, err)
+
+		err = r.AddDelegation(testCtx, targetsSigner, policy.TargetsRoleName, "staged-rule", []string{targetsPubKey.KeyID}, []string{"git:refs/heads/staged"}, 1, false)
+		require.Nil(t, err)
+
+		rules, err := r.ListRules(testCtx, policy.PolicyStagingRef)
+		require.Nil(t, err)
+
+		ruleNames := []string{}
+		for _, rule := range rules {
+			ruleNames = append(ruleNames, rule.Delegation.ID())
+		}
+		assert.Contains(t, ruleNames, "staged-rule")
+	})
 }
 
 func TestListPrincipals(t *testing.T) {
+	t.Run("staged principal without RSL entry", func(t *testing.T) {
+		r := createTestRepositoryWithPolicy(t, "")
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		targetsPubKey := tufv02.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+		err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{targetsPubKey}, false)
+		require.Nil(t, err)
+
+		principals, err := r.ListPrincipals(testCtx, policy.PolicyStagingRef, tuf.TargetsRoleName)
+		require.Nil(t, err)
+		assert.Contains(t, principals, targetsPubKey.KeyID)
+	})
+
 	repo := createTestRepositoryWithPolicyWithFileRule(t, "")
 
 	t.Run("policy exists", func(t *testing.T) {
