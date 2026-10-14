@@ -30,6 +30,10 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 			return nil, fmt.Errorf("unable to identify all commit file paths: %w", err)
 		}
 
+		if filePaths == "" {
+			return nil, nil
+		}
+
 		paths := strings.Split(filePaths, "\n")
 		return paths, nil
 	}
