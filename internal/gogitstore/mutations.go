@@ -55,6 +55,18 @@ func (s *Storer) DeleteReference(refName string) error {
 	return s.Repository.DeleteReference(refName)
 }
 
+func (s *Storer) CheckAndSetReference(refName string, newGitID, oldGitID githash.Hash) error {
+	defer s.record("CheckAndSetReference", time.Now(), true)
+	defer s.invalidate()
+	return s.Repository.CheckAndSetReference(refName, newGitID, oldGitID)
+}
+
+func (s *Storer) CheckAndDeleteReference(refName string, oldGitID githash.Hash) error {
+	defer s.record("CheckAndDeleteReference", time.Now(), true)
+	defer s.invalidate()
+	return s.Repository.CheckAndDeleteReference(refName, oldGitID)
+}
+
 func (s *Storer) ResetDueToError(cause error, refName string, commitID githash.Hash) error {
 	defer s.record("ResetDueToError", time.Now(), true)
 	defer s.invalidate()
