@@ -19,6 +19,7 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2342,6 +2343,81 @@ func TestListPropagationDirectives(t *testing.T) {
 		directives, err := r.ListPropagationDirectives(testCtx, "does-not-exist")
 		assert.Error(t, err)
 		assert.Nil(t, directives)
+	})
+}
+
+func TestListRootThresholdAndKeys(t *testing.T) {
+	t.Run("list root keys after add", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		rootKey := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
+
+		principals, threshold, err := r.ListRootThresholdAndKeys(testCtx, policy.PolicyRef)
+		require.NoError(t, err)
+		require.Len(t, principals, 1)
+		assert.Equal(t, rootKey.KeyID, principals[0].ID())
+		assert.Equal(t, 1, threshold)
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+		err = r.AddRootKey(testCtx, rootSigner, targetsKey, false)
+		require.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		principals, threshold, err = r.ListRootThresholdAndKeys(testCtx, "policy-staging")
+		assert.NoError(t, err)
+		require.Len(t, principals, 2)
+		assert.ElementsMatch(t, []string{rootKey.KeyID, targetsKey.KeyID}, []string{principals[0].ID(), principals[1].ID()})
+		assert.Equal(t, 1, threshold)
+	})
+
+	t.Run("returns error for unknown policy ref", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		principals, _, err := r.ListRootThresholdAndKeys(testCtx, "does-not-exist")
+		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
+		assert.Nil(t, principals)
+	})
+}
+
+func TestListTopLevelTargetsThresholdAndKeys(t *testing.T) {
+	t.Run("returns error when no top-level policy keys are set", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		principals, _, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, policy.PolicyRef)
+		assert.ErrorIs(t, err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot)
+		assert.Nil(t, principals)
+	})
+
+	t.Run("list top-level policy keys after add", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+		targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+		err := r.AddTopLevelTargetsKey(testCtx, rootSigner, targetsKey, false)
+		require.Nil(t, err)
+
+		err = r.StagePolicy(testCtx, "", true, false)
+		require.Nil(t, err)
+
+		principals, threshold, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, policy.PolicyStagingRef)
+		require.Nil(t, err)
+		require.Len(t, principals, 1)
+		assert.Equal(t, targetsKey.KeyID, principals[0].ID())
+		assert.Equal(t, 1, threshold)
+	})
+
+	t.Run("returns error for unknown policy ref", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		principals, _, err := r.ListTopLevelTargetsThresholdAndKeys(testCtx, "does-not-exist")
+		assert.Error(t, err)
+		assert.Nil(t, principals)
 	})
 }
 
