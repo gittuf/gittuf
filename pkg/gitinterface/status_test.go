@@ -5,6 +5,7 @@ package gitinterface
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -264,4 +265,48 @@ func TestFileStatusUntracked(t *testing.T) {
 		fs := FileStatus{X: StatusCodeModified, Y: StatusCodeUnmodified}
 		assert.False(t, fs.Untracked())
 	})
+}
+
+func TestStatusWhitespaceFilenames(t *testing.T) {
+	tmpDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tmpDir, false)
+	t.Chdir(tmpDir)
+
+	leadingSpace := " leading-space.txt"
+	innerSpaces := "foo bar baz.txt"
+	testFiles := []string{leadingSpace, innerSpaces}
+
+	// Windows Win32 file APIs strip trailing spaces from filenames when creating them on disk.
+	if runtime.GOOS != "windows" {
+		trailingSpace := "trailing-space.txt "
+		trailingTab := "trailing-tab.txt\t"
+		testFiles = append(testFiles, trailingSpace, trailingTab)
+	}
+
+	for _, file := range testFiles {
+		if err := os.WriteFile(file, []byte("test"), 0o644); err != nil { //nolint:gosec
+			t.Fatal(err)
+		}
+	}
+
+	expectedUntracked := map[string]FileStatus{}
+	expectedAdded := map[string]FileStatus{}
+	for _, file := range testFiles {
+		expectedUntracked[file] = FileStatus{X: StatusCodeUntracked, Y: StatusCodeUntracked}
+		expectedAdded[file] = FileStatus{X: StatusCodeAdded, Y: StatusCodeUnmodified}
+	}
+
+	statuses, err := repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, expectedUntracked, statuses)
+
+	// Stage the files
+	addArgs := append([]string{"add"}, testFiles...)
+	if _, err := repo.executor(addArgs...).executeString(); err != nil {
+		t.Fatal(err)
+	}
+
+	statuses, err = repo.Status()
+	assert.Nil(t, err)
+	assert.Equal(t, expectedAdded, statuses)
 }
