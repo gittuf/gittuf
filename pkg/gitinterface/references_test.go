@@ -506,3 +506,66 @@ func TestAbsoluteReference(t *testing.T) {
 		assert.ErrorIs(t, err, ErrReferenceNotFound)
 	})
 }
+
+func TestCheckAndDeleteReference(t *testing.T) {
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	firstCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	require.Nil(t, err)
+	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
+	require.Nil(t, err)
+
+	t.Run("error when old value mismatches", func(t *testing.T) {
+		err := repo.CheckAndDeleteReference(refName, firstCommitID)
+		assert.ErrorContains(t, err, "unable to delete Git reference")
+
+		refTip, err := repo.GetReference(refName)
+		require.Nil(t, err)
+		assert.Equal(t, secondCommitID, refTip)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		err := repo.CheckAndDeleteReference(refName, secondCommitID)
+		assert.Nil(t, err)
+
+		_, err = repo.GetReference(refName)
+		assert.ErrorIs(t, err, ErrReferenceNotFound)
+	})
+}
+
+func TestCheckAndDeleteReferenceRejectsUnsetExpectedID(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	repo := CreateTestGitRepository(t, tempDir, false)
+
+	refName := "refs/heads/main"
+	treeBuilder := NewTreeBuilder(repo)
+	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+	require.Nil(t, err)
+
+	commitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+	require.Nil(t, err)
+
+	for name, oldGitID := range map[string]Hash{
+		"nil hash":  nil,
+		"zero hash": repo.ZeroHash(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			err := repo.CheckAndDeleteReference(refName, oldGitID)
+			assert.ErrorIs(t, err, ErrExpectedGitIDNotSpecified)
+
+			refTip, err := repo.GetReference(refName)
+			require.Nil(t, err)
+			assert.Equal(t, commitID, refTip)
+		})
+	}
+}

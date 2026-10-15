@@ -32,6 +32,19 @@ type Storer interface {
 	// DeleteReference deletes the specified reference.
 	DeleteReference(refName string) error
 
+	// CheckAndSetReference sets the specified reference to the provided Git
+	// ID, but only while the reference is set to oldGitID. It is the atomic
+	// form of SetReference, for a caller that must not overwrite a concurrent
+	// writer's update.
+	CheckAndSetReference(refName string, newGitID, oldGitID githash.Hash) error
+
+	// CheckAndDeleteReference deletes the specified reference, but only while
+	// the reference is set to oldGitID. It is the atomic form of
+	// DeleteReference, for a caller undoing only its own writes. A nil or
+	// zero oldGitID names no value to match, so it must be rejected rather
+	// than read as an unconditional delete.
+	CheckAndDeleteReference(refName string, oldGitID githash.Hash) error
+
 	// ReadBlob returns the contents of the specified blob.
 	ReadBlob(blobID githash.Hash) ([]byte, error)
 
