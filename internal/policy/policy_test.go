@@ -1746,3 +1746,18 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 
 	return controllerRepository, networkRepository, signer
 }
+
+func TestPreprocessRejectsStateWithoutRootMetadata(t *testing.T) {
+	t.Parallel()
+
+	for name, state := range map[string]*State{
+		"no metadata":      {},
+		"no root envelope": {Metadata: &StateMetadata{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(t, state.preprocess(), ErrRootMetadataNotFound)
+		})
+	}
+}
