@@ -5,6 +5,7 @@ package github
 
 import (
 	"context"
+	"net/http"
 	"os"
 )
 
@@ -25,6 +26,13 @@ type Options struct {
 	GitHubBaseURL     string
 	CreateRSLEntry    bool
 	UseGitHubAPI      bool
+
+	mockHTTPClient *http.Client
+}
+
+// MockHTTPClient returns the mocked HTTP client set for testing.
+func (o *Options) MockHTTPClient() *http.Client {
+	return o.mockHTTPClient
 }
 
 var DefaultOptions = &Options{
@@ -64,6 +72,15 @@ func WithUseGitHubAPI() Option {
 
 // TokenSourceEnvironment reads the GitHub API token from the GITHUB_TOKEN
 // environment variable. It implements the TokenSource interface.
+
+// WithTestMockHTTPClient sets an unexported mock HTTP client on Options.
+// This is intended only for testing purposes.
+func WithTestMockHTTPClient(client *http.Client) Option {
+	return func(o *Options) {
+		o.mockHTTPClient = client
+	}
+}
+
 type TokenSourceEnvironment struct{}
 
 func (t *TokenSourceEnvironment) Token(_ context.Context) (string, error) {

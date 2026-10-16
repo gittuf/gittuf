@@ -252,7 +252,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents
-		cM := repo.commitWithParents(t, treeB, []Hash{cA, cB}, "Merge commit\n", false)
+		cM := repo.CommitWithParents(t, treeB, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
@@ -298,7 +298,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents and a different tree
-		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+		cM := repo.CommitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
@@ -344,7 +344,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		}
 
 		// Create a merge commit with two parents and an overlapping tree
-		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+		cM := repo.CommitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
 
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
