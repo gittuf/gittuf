@@ -39,6 +39,32 @@ func TestStateMetadataWriteTreeStorerError(t *testing.T) {
 	assert.ErrorIs(t, err, injected)
 }
 
+func StateTestGetControllerRootMetadata(t *testing.T) {
+	t.Run("error checking", func(t *testing.T) {
+		tests := map[string]struct {
+			metadata map[string]*StateMetadata
+		}{
+			"no controller": {
+				metadata: nil,
+			},
+			"no metadata": {
+				metadata: map[string]*StateMetadata{"controller": nil},
+			},
+			"no root envelope": {
+				metadata: map[string]*StateMetadata{"controller": {}},
+			},
+		}
+		for name, test := range tests {
+			t.Run(name, func(t *testing.T) {
+				state := &State{ControllerMetadata: test.metadata}
+				metadata, err := state.GetControllerRootMetadata("controller")
+				assert.ErrorIs(t, err, ErrControllerMetadataNotFound)
+				assert.Nil(t, metadata)
+			})
+		}
+	})
+}
+
 func TestLoadState(t *testing.T) {
 	t.Run("loading while verifying multiple states", func(t *testing.T) {
 		repo, state := createTestRepository(t, createTestStateWithPolicy)
