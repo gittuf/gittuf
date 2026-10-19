@@ -258,25 +258,27 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 			return nil, err
 		}
 
+		if len(options.InitialRootPrincipals) == 0 {
+			slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+		} else {
+			slog.Debug("Verifying root of trust using provided initial root principals...")
+			verifier := &SignatureVerifier{
+				repository: repo,
+				name:       "initial-root-verifier",
+				principals: options.InitialRootPrincipals,
+				threshold:  len(options.InitialRootPrincipals),
+			}
+
+			if _, err := verifier.Verify(ctx, nil, state.Metadata.RootEnvelope); err != nil {
+				return state, err
+			}
+		}
+
 		if err := state.Verify(ctx); err != nil {
 			return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 		}
 
-		if len(options.InitialRootPrincipals) == 0 {
-			slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
-			return state, nil
-		}
-
-		slog.Debug("Verifying root of trust using provided initial root principals...")
-		verifier := &SignatureVerifier{
-			repository: repo,
-			name:       "initial-root-verifier",
-			principals: options.InitialRootPrincipals,
-			threshold:  len(options.InitialRootPrincipals),
-		}
-
-		_, err = verifier.Verify(ctx, nil, state.Metadata.RootEnvelope)
-		return state, err
+		return state, nil
 	}
 
 	// check if firstPolicyEntry is **after** requested entry
@@ -303,8 +305,10 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		return nil, err
 	}
 
-	// We load the very first policy entry with no additional verification,
-	// the root keys are implicitly trusted
+	// We load the very first policy entry. We check that the state is
+	// internally valid, and if root keys are explicitly provided, we verify
+	// that the root of trust is correctly signed by them. Else, we trust the
+	// root of the initial state implicitly.
 	initialPolicyState, err := loadStateForEntry(repo, firstPolicyEntry)
 	if err != nil {
 		return nil, err
@@ -326,6 +330,10 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		}
 	}
 
+	if err := initialPolicyState.Verify(ctx); err != nil {
+		return nil, err
+	}
+
 	verifiedState := initialPolicyState
 	for _, entry := range allPolicyEntries[1:] {
 		if entry.GetRefName() != PolicyRef {
@@ -342,6 +350,9 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.GetID().String()))
 		if err := verifiedState.VerifyNewState(ctx, underTestState); err != nil {
 			return nil, fmt.Errorf("unable to verify roots of trust for policy states: %w", err)
+		}
+		if err := underTestState.Verify(ctx); err != nil {
+			return nil, err
 		}
 
 		verifiedState = underTestState
@@ -396,7 +407,9 @@ func LoadCurrentState(ctx context.Context, repo gitstore.Storer, ref string, opt
 }
 
 // LoadFirstState returns the State corresponding to the repository's first
-// active policy. It does not verify the root of trust since it is the initial policy.
+// active policy. It does not verify the root of trust since it is the initial
+// policy unless the caller passes in root of trust keys. Irrespective of that,
+// the initial policy state is verified for internal consistency.
 func LoadFirstState(ctx context.Context, repo gitstore.Storer, opts ...policyopts.LoadStateOption) (*State, error) {
 	firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(repo, PolicyRef)
 	if err != nil {
@@ -736,7 +749,10 @@ func (s *State) Verify(ctx context.Context) error {
 	return nil
 }
 
-// Commit verifies and writes the State to the policy-staging namespace.
+// Commit writes the State to the policy-staging namespace. state.Verify() is
+// not invoked as the policy is only being staged. Verification may fail due to
+// as-yet missing signatures, and so it's performed when the staged policy is
+// applied.
 func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntry, signCommit bool) error {
 	if len(commitMessage) == 0 {
 		commitMessage = DefaultCommitMessage
@@ -862,13 +878,22 @@ func Apply(ctx context.Context, repo gitstore.Storer, signRSLEntry bool) error {
 		}
 	}
 
-	// using LoadCurrentState to load and verify if the PolicyStagingRef's
-	// latest state is valid
-	state, err := LoadCurrentState(ctx, repo, PolicyStagingRef)
+	stagedState, err := LoadCurrentState(ctx, repo, PolicyStagingRef)
 	if err != nil {
 		return fmt.Errorf("failed to load current state: %w", err)
 	}
-	if err := state.Verify(ctx); err != nil {
+	// Check that the staged policy's root is valid according to prior applied
+	// policy if it exists.
+	if entryFound {
+		currentState, err := LoadState(ctx, repo, policyEntry)
+		if err != nil {
+			return fmt.Errorf("failed to load current policy state: %w", err)
+		}
+		if err := currentState.VerifyNewState(ctx, stagedState); err != nil {
+			return fmt.Errorf("staged policy has an invalid root of trust: %w", err)
+		}
+	}
+	if err := stagedState.Verify(ctx); err != nil {
 		return fmt.Errorf("staged policy is invalid: %w", err)
 	}
 
