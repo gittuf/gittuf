@@ -1977,6 +1977,57 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 		slices.Reverse(skippedEntries)
 		assert.Equal(t, skippedEntries, annotationEntry.RSLEntryIDs)
 	})
+
+	t.Run("propagation entries for the target ref are skipped", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		initialCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", initialCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Record main via a propagation entry, then rewrite main
+		propagatedCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Propagated commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewPropagationEntry("refs/heads/main", propagatedCommitHash, "https://example.com/repository", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		propagationEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		if err := repo.SetReference("refs/heads/main", initialCommitHash); err != nil {
+			t.Fatal(err)
+		}
+		newCommitHash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Rewritten commit\n", false)
+		require.Nil(t, err)
+
+		if err := NewReferenceEntry("refs/heads/main", newCommitHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/main", false); err != nil {
+			t.Fatal(err)
+		}
+
+		latestEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		annotationEntry, isAnnotation := latestEntry.(*AnnotationEntry)
+		if !isAnnotation {
+			t.Fatal("invalid entry type")
+		}
+
+		assert.Equal(t, []githash.Hash{propagationEntry.GetID()}, annotationEntry.RSLEntryIDs)
+	})
 }
 
 func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
