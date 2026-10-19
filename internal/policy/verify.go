@@ -518,15 +518,20 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 						// verifying from the beginning of the
 						// RSL entry and we only have staging
 						// refs
-						slog.Debug("Verifying new policy using current policy...")
+						slog.Debug("Verifying new policy's root of trust using current policy...")
 						if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
 							return err
 						}
-						slog.Debug("Updating current policy...")
 					} else {
-						slog.Debug("Setting current policy...")
+						slog.Debug("No current policy, using new policy as initial policy...")
 					}
 
+					slog.Debug("Verifying new policy...")
+					if err := newPolicy.Verify(ctx); err != nil {
+						return err
+					}
+
+					slog.Debug("Updating current policy...")
 					currentPolicy = newPolicy
 
 					continue

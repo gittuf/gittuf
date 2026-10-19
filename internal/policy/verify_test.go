@@ -2235,6 +2235,77 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, ErrPolicyNotFound)
 	})
 
+	t.Run("invalidly signed metadata in policy transition", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		state.repository = repo
+		if err := state.Commit(repo, "Invalid policy", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		lastPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstPolicyEntry, lastPolicyEntry, refName)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("invalidly signed metadata in first policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		refName := "refs/heads/main"
+
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		state.repository = repo
+		if err := state.Commit(repo, "Invalid policy", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		firstEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyStagingRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		lastEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, lastEntry, refName)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
