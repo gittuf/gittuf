@@ -386,6 +386,10 @@ func TestAddRuleAndGetRules(t *testing.T) {
 
 		err = targetsMetadata.AddRule(("rule"), []string{key1.KeyID}, nil, 2)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+		// Test duplicated principal IDs are counted once for threshold
+		err = targetsMetadata.AddRule(("rule"), []string{key1.KeyID, key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 	})
 }
 
@@ -449,6 +453,10 @@ func TestUpdateDelegation(t *testing.T) {
 		}
 
 		err = targetsMetadata.UpdateRule(("rule"), []string{key1.KeyID}, nil, 2)
+		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
+
+		// Test duplicated principal IDs are counted once for threshold
+		err = targetsMetadata.UpdateRule(("rule"), []string{key1.KeyID, key1.KeyID}, nil, 2)
 		assert.ErrorIs(t, err, tuf.ErrCannotMeetThreshold)
 
 		// Test non-existent rule
