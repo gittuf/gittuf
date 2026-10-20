@@ -178,6 +178,12 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 		}
 	}
 
+	slog.Debug("Identifying absolute reference path...")
+	targetRef, err := r.r.AbsoluteReference(targetRef)
+	if err != nil {
+		return err
+	}
+
 	return rsl.SkipAllInvalidReferenceEntriesForRef(r.r, targetRef, signCommit)
 }
 
