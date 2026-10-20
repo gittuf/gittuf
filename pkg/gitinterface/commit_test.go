@@ -662,136 +662,142 @@ oYBpMWLgg6AUzpxx9mITZ2EKr4c=
 	return commitHash
 }
 
-func TestRepositoryGetCommitMessage(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
+func TestGetCommitInfo(t *testing.T) {
+	for _, objectFormat := range []ObjectFormat{ObjectFormatSHA1, ObjectFormatSHA256} {
+		t.Run(string(objectFormat), func(t *testing.T) {
+			repo := CreateTestGitRepository(t, t.TempDir(), false, WithObjectFormat(objectFormat))
 
-	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
+			refName := "refs/heads/main"
+			treeBuilder := NewTreeBuilder(repo)
 
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
+			emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+			require.NoError(t, err)
+			blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
+			require.NoError(t, err)
+			treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
+			require.NoError(t, err)
+
+			rootID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
+			require.NoError(t, err)
+			linearID, err := repo.Commit(treeID, refName, "Add README\n", false)
+			require.NoError(t, err)
+			sideID := repo.commitWithParents(t, emptyTreeID, []Hash{rootID}, "Side commit\n", false)
+			mergeID := repo.commitWithParents(t, treeID, []Hash{linearID, sideID}, "Merge commit\n", false)
+
+			shallowID := repo.commitWithParents(t, treeID, []Hash{linearID}, "Shallow boundary\n", false)
+			err = os.WriteFile(filepath.Join(repo.GetGitDir(), "shallow"), []byte(shallowID.String()+"\n"), 0o600)
+			require.NoError(t, err)
+
+			replacedID := repo.commitWithParents(t, treeID, []Hash{rootID}, "True commit\n", false)
+			decoyID := repo.commitWithParents(t, emptyTreeID, nil, "Decoy commit\n", false)
+			_, err = repo.executor("replace", replacedID.String(), decoyID.String()).executeString()
+			require.NoError(t, err)
+
+			formatLikeMessage := "%H%x00%T%x00%P%x00%B%x00" + strings.Repeat("0", 32) + "\n\n" + rootID.String() + " " + emptyTreeID.String()
+			formatLikeID := repo.commitWithParents(t, emptyTreeID, []Hash{rootID}, formatLikeMessage+"\n", false)
+
+			nulCommit := "tree " + emptyTreeID.String() + "\nauthor Jane Doe <jane.doe@example.com> 0 +0000\ncommitter Jane Doe <jane.doe@example.com> 0 +0000\n\nbefore\x00after\n"
+			stdOut, err := repo.executor("hash-object", "-t", "commit", "-w", "--literally", "--stdin").withStdIn(bytes.NewBufferString(nulCommit)).executeString()
+			require.NoError(t, err)
+			nulID, err := NewHash(stdOut)
+			require.NoError(t, err)
+
+			_, err = repo.executor("tag", "-a", "-m", "Release\n", "v1", rootID.String()).executeString()
+			require.NoError(t, err)
+			tagID, err := repo.GetReference("refs/tags/v1")
+			require.NoError(t, err)
+
+			missingID, err := NewHash(strings.Repeat("a", len(rootID.String())))
+			require.NoError(t, err)
+
+			tests := map[string]struct {
+				commitID    Hash
+				wantTreeID  Hash
+				wantParents []Hash
+				wantMessage string
+				wantErr     string
+			}{
+				"root commit": {
+					commitID:    rootID,
+					wantTreeID:  emptyTreeID,
+					wantMessage: "Initial commit",
+				},
+				"linear commit": {
+					commitID:    linearID,
+					wantTreeID:  treeID,
+					wantParents: []Hash{rootID},
+					wantMessage: "Add README",
+				},
+				"merge commit": {
+					commitID:    mergeID,
+					wantTreeID:  treeID,
+					wantParents: []Hash{linearID, sideID},
+					wantMessage: "Merge commit",
+				},
+				"shallow boundary": {
+					commitID:    shallowID,
+					wantTreeID:  treeID,
+					wantMessage: "Shallow boundary",
+				},
+				"replace ref ignored": {
+					commitID:    replacedID,
+					wantTreeID:  treeID,
+					wantParents: []Hash{rootID},
+					wantMessage: "True commit",
+				},
+				"message resembling format": {
+					commitID:    formatLikeID,
+					wantTreeID:  emptyTreeID,
+					wantParents: []Hash{rootID},
+					wantMessage: formatLikeMessage,
+				},
+				"message containing NUL": {
+					commitID:    nulID,
+					wantTreeID:  emptyTreeID,
+					wantMessage: "before",
+				},
+				"annotated tag": {
+					commitID: tagID,
+					wantErr:  "is not a commit object",
+				},
+				"blob": {
+					commitID: blobID,
+					wantErr:  "is it a commit?",
+				},
+				"tree": {
+					commitID: treeID,
+					wantErr:  "is it a commit?",
+				},
+				"missing object": {
+					commitID: missingID,
+					wantErr:  "unable to read commit",
+				},
+			}
+
+			for name, test := range tests {
+				t.Run(name, func(t *testing.T) {
+					info, err := repo.GetCommitInfo(test.commitID)
+					if test.wantErr != "" {
+						assert.ErrorContains(t, err, test.wantErr)
+						return
+					}
+
+					require.NoError(t, err)
+					assert.Equal(t, test.wantTreeID, info.TreeID)
+					assert.Equal(t, test.wantParents, info.ParentIDs)
+					assert.Equal(t, test.wantMessage, info.Message)
+				})
+			}
+
+			t.Run("single git invocation", func(t *testing.T) {
+				before := repo.GitInvocationCount()
+				_, err := repo.GetCommitInfo(rootID)
+				require.NoError(t, err)
+				assert.Equal(t, uint64(1), repo.GitInvocationCount()-before)
+			})
+		})
 	}
-
-	message := "Initial commit"
-	commit, err := repo.Commit(emptyTreeID, refName, message, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	commitMessage, err := repo.GetCommitMessage(commit)
-	assert.Nil(t, err)
-	assert.Equal(t, message, commitMessage)
-
-	t.Run("non-commit object", func(t *testing.T) {
-		blobID, err := repo.WriteBlob([]byte("test"))
-		require.Nil(t, err)
-
-		_, err = repo.GetCommitMessage(blobID)
-		assert.ErrorContains(t, err, "is not a commit object")
-	})
 }
-
-func TestGetCommitTreeID(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
-	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
-
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Write second tree
-	blobID, err := repo.WriteBlob([]byte("Hello, world!\n"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	treeWithContentsID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("README.md", blobID)})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create initial commit with no tree
-	initialCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	initialCommitTreeID, err := repo.GetCommitTreeID(initialCommitID)
-	assert.Nil(t, err)
-	assert.Equal(t, emptyTreeID, initialCommitTreeID)
-
-	// Create second commit with tree
-	secondCommitID, err := repo.Commit(treeWithContentsID, refName, "Add README\n", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	secondCommitTreeID, err := repo.GetCommitTreeID(secondCommitID)
-	assert.Nil(t, err)
-	assert.Equal(t, treeWithContentsID, secondCommitTreeID)
-
-	t.Run("non-commit object", func(t *testing.T) {
-		blobID, err := repo.WriteBlob([]byte("test"))
-		require.Nil(t, err)
-
-		_, err = repo.GetCommitTreeID(blobID)
-		assert.ErrorContains(t, err, "is not a commit object")
-	})
-}
-
-func TestGetCommitParentIDs(t *testing.T) {
-	tempDir := t.TempDir()
-	repo := CreateTestGitRepository(t, tempDir, false)
-
-	refName := "refs/heads/main"
-	treeBuilder := NewTreeBuilder(repo)
-
-	// Write empty tree
-	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Create initial commit
-	initialCommitID, err := repo.Commit(emptyTreeID, refName, "Initial commit\n", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	initialCommitParentIDs, err := repo.GetCommitParentIDs(initialCommitID)
-	assert.Nil(t, err)
-	assert.Empty(t, initialCommitParentIDs)
-
-	// Create second commit
-	secondCommitID, err := repo.Commit(emptyTreeID, refName, "Add README\n", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	secondCommitParentIDs, err := repo.GetCommitParentIDs(secondCommitID)
-	assert.Nil(t, err)
-	assert.Equal(t, []Hash{initialCommitID}, secondCommitParentIDs)
-
-	// Create merge commit
-	mergeCommitID := repo.commitWithParents(t, emptyTreeID, []Hash{initialCommitID, secondCommitID}, "Merge commit\n", false)
-
-	mergeCommitParentIDs, err := repo.GetCommitParentIDs(mergeCommitID)
-	assert.Nil(t, err)
-	assert.Equal(t, []Hash{initialCommitID, secondCommitID}, mergeCommitParentIDs)
-
-	blobID, err := repo.WriteBlob([]byte("test"))
-	require.Nil(t, err)
-	_, err = repo.GetCommitParentIDs(blobID)
-	assert.ErrorContains(t, err, "is not a commit object")
-}
-
 func TestGetCommonAncestor(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)

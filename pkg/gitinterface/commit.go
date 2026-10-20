@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/go-git/go-git/v6/plumbing/object"
@@ -164,73 +165,42 @@ func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Ha
 	return commitID
 }
 
-// GetCommitMessage returns the commit's message.
-func (r *Repository) GetCommitMessage(commitID Hash) (string, error) {
-	if err := r.ensureIsCommit(commitID); err != nil {
-		return "", err
-	}
-
-	commitMessage, err := r.executor("show", "-s", "--format=%B", commitID.String()).executeString()
+// GetCommitInfo returns the commit's tree ID, parent IDs, and message using a
+// single Git invocation. It returns an error if the requested ID is not a
+// commit.
+func (r *Repository) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, error) {
+	stdOut, err := r.executor("show", "-s", "--format=%H%x00%T%x00%P%x00%B", commitID.String()).executeString()
 	if err != nil {
-		return "", fmt.Errorf("unable to identify message for commit '%s': %w", commitID.String(), err)
+		return gitstore.CommitInfo{}, fmt.Errorf("unable to read commit '%s': %w", commitID.String(), err)
 	}
 
-	return commitMessage, nil
-}
-
-// GetCommitTreeID returns the commit's Git tree ID.
-func (r *Repository) GetCommitTreeID(commitID Hash) (Hash, error) {
-	if err := r.ensureIsCommit(commitID); err != nil {
-		return ZeroHash, err
+	fields := strings.Split(stdOut, "\x00")
+	if len(fields) != 4 {
+		return gitstore.CommitInfo{}, fmt.Errorf("unexpected output reading '%s', is it a commit?", commitID.String())
+	}
+	if fields[0] != commitID.String() {
+		return gitstore.CommitInfo{}, fmt.Errorf("requested Git ID '%s' is not a commit object", commitID.String())
 	}
 
-	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^{tree}", commitID.String())).executeString()
+	treeID, err := githash.NewHash(fields[1])
 	if err != nil {
-		return ZeroHash, fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
+		return gitstore.CommitInfo{}, fmt.Errorf("invalid tree ID '%s' for commit '%s': %w", fields[1], commitID.String(), err)
 	}
 
-	hash, err := NewHash(stdOut)
-	if err != nil {
-		return ZeroHash, fmt.Errorf("invalid tree for commit ID '%s': %w", commitID, err)
-	}
-	return hash, nil
-}
-
-// GetCommitParentIDs returns the commit's parent commit IDs.
-func (r *Repository) GetCommitParentIDs(commitID Hash) ([]Hash, error) {
-	if err := r.ensureIsCommit(commitID); err != nil {
-		return nil, err
-	}
-
-	stdOut, err := r.executor("rev-parse", fmt.Sprintf("%s^@", commitID.String())).executeString()
-	if err != nil {
-		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
-	}
-
-	commitIDSplit := strings.Split(stdOut, "\n")
-	if len(commitIDSplit) == 0 {
-		return nil, nil
-	}
-
-	commitIDs := []Hash{}
-	for _, commitID := range commitIDSplit {
-		if commitID == "" {
-			continue
-		}
-
-		hash, err := NewHash(commitID)
+	var parentIDs []githash.Hash
+	for _, parent := range strings.Fields(fields[2]) {
+		parentID, err := githash.NewHash(parent)
 		if err != nil {
-			return nil, fmt.Errorf("invalid parent commit ID '%s': %w", commitID, err)
+			return gitstore.CommitInfo{}, fmt.Errorf("invalid parent commit ID '%s': %w", parent, err)
 		}
-
-		commitIDs = append(commitIDs, hash)
+		parentIDs = append(parentIDs, parentID)
 	}
 
-	if len(commitIDs) == 0 {
-		return nil, nil
-	}
-
-	return commitIDs, nil
+	return gitstore.CommitInfo{
+		TreeID:    treeID,
+		ParentIDs: parentIDs,
+		Message:   strings.TrimSpace(fields[3]),
+	}, nil
 }
 
 // KnowsCommit returns true if the `testCommit` is a descendent of the

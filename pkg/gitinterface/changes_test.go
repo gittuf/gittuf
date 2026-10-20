@@ -356,6 +356,23 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		require.Nil(t, err)
 
 		_, err = repo.GetFilePathsChangedByCommit(blobID)
-		assert.ErrorContains(t, err, "is not a commit object")
+		assert.ErrorContains(t, err, "is it a commit?")
+	})
+
+	t.Run("single parent commit uses two git invocations", func(t *testing.T) {
+		tree, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
+		require.NoError(t, err)
+
+		refName := testNameToRefName(t.Name())
+		_, err = repo.Commit(emptyTree, refName, "Initial commit\n", false)
+		require.NoError(t, err)
+		commitID, err := repo.Commit(tree, refName, "Add a\n", false)
+		require.NoError(t, err)
+
+		before := repo.GitInvocationCount()
+		diffs, err := repo.GetFilePathsChangedByCommit(commitID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"a"}, diffs)
+		assert.Equal(t, uint64(2), repo.GitInvocationCount()-before)
 	})
 }
