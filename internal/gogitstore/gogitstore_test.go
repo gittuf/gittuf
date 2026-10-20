@@ -86,27 +86,7 @@ func commitChain(t *testing.T, repo *gitinterface.Repository, refName string, n 
 	return ids
 }
 
-func TestGetCommitMessage(t *testing.T) {
-	t.Parallel()
-
-	for _, objectFormat := range objectFormats {
-		t.Run(string(objectFormat), func(t *testing.T) {
-			t.Parallel()
-
-			binary, fast := newBackends(t, objectFormat)
-			ids := commitChain(t, binary, "refs/heads/main", 1)
-
-			want, err := binary.GetCommitMessage(ids[0])
-			require.Nil(t, err)
-
-			got, err := fast.GetCommitMessage(ids[0])
-			require.Nil(t, err)
-			assert.Equal(t, want, got)
-		})
-	}
-}
-
-func TestGetCommitParentIDs(t *testing.T) {
+func TestGetCommitInfo(t *testing.T) {
 	t.Parallel()
 
 	for _, objectFormat := range objectFormats {
@@ -116,43 +96,50 @@ func TestGetCommitParentIDs(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 			ids := commitChain(t, binary, "refs/heads/main", 2)
 
-			t.Run("commit with a parent", func(t *testing.T) {
-				want, err := binary.GetCommitParentIDs(ids[1])
-				require.Nil(t, err)
+			treeID, err := binary.EmptyTree()
+			require.NoError(t, err)
+			mergeID, err := githash.NewHash(git(t, binary, "", "commit-tree", "-p", ids[1].String(), "-p", ids[0].String(), "-m", "merge", treeID.String()))
+			require.NoError(t, err)
 
-				got, err := fast.GetCommitParentIDs(ids[1])
-				require.Nil(t, err)
-				assert.Equal(t, want, got)
-			})
+			blobID, err := binary.WriteBlob([]byte("not a commit"))
+			require.NoError(t, err)
 
 			t.Run("initial commit has no parents", func(t *testing.T) {
-				want, err := binary.GetCommitParentIDs(ids[0])
-				require.Nil(t, err)
+				want, err := binary.GetCommitInfo(ids[0])
+				require.NoError(t, err)
+				require.Nil(t, want.ParentIDs)
 
-				got, err := fast.GetCommitParentIDs(ids[0])
-				require.Nil(t, err)
+				got, err := fast.GetCommitInfo(ids[0])
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 			})
-		})
-	}
-}
 
-func TestGetCommitTreeID(t *testing.T) {
-	t.Parallel()
+			t.Run("commit with a parent", func(t *testing.T) {
+				want, err := binary.GetCommitInfo(ids[1])
+				require.NoError(t, err)
 
-	for _, objectFormat := range objectFormats {
-		t.Run(string(objectFormat), func(t *testing.T) {
-			t.Parallel()
+				got, err := fast.GetCommitInfo(ids[1])
+				require.NoError(t, err)
+				assert.Equal(t, want, got)
+			})
 
-			binary, fast := newBackends(t, objectFormat)
-			ids := commitChain(t, binary, "refs/heads/main", 1)
+			t.Run("merge commit keeps parent order", func(t *testing.T) {
+				want, err := binary.GetCommitInfo(mergeID)
+				require.NoError(t, err)
+				require.Equal(t, []githash.Hash{ids[1], ids[0]}, want.ParentIDs)
 
-			want, err := binary.GetCommitTreeID(ids[0])
-			require.Nil(t, err)
+				got, err := fast.GetCommitInfo(mergeID)
+				require.NoError(t, err)
+				assert.Equal(t, want, got)
+			})
 
-			got, err := fast.GetCommitTreeID(ids[0])
-			require.Nil(t, err)
-			assert.Equal(t, want, got)
+			t.Run("non-commit object", func(t *testing.T) {
+				_, err := binary.GetCommitInfo(blobID)
+				assert.NotNil(t, err)
+
+				_, err = fast.GetCommitInfo(blobID)
+				assert.NotNil(t, err)
+			})
 		})
 	}
 }
@@ -215,9 +202,9 @@ func TestShallowHistory(t *testing.T) {
 				assert.Equal(t, want, got)
 			}
 			for _, id := range ids {
-				want, err := binary.GetCommitParentIDs(id)
+				want, err := binary.GetCommitInfo(id)
 				require.NoError(t, err)
-				got, err := fast.GetCommitParentIDs(id)
+				got, err := fast.GetCommitInfo(id)
 				require.NoError(t, err)
 				assert.Equal(t, want, got)
 			}

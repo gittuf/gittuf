@@ -101,16 +101,8 @@ func TestReadsDoNotForkGit(t *testing.T) {
 			_, err := s.ReadBlob(f.blobID)
 			return err
 		},
-		"GetCommitMessage": func(s *gogitstore.Storer) error {
-			_, err := s.GetCommitMessage(f.commitID)
-			return err
-		},
-		"GetCommitParentIDs": func(s *gogitstore.Storer) error {
-			_, err := s.GetCommitParentIDs(f.commitID)
-			return err
-		},
-		"GetCommitTreeID": func(s *gogitstore.Storer) error {
-			_, err := s.GetCommitTreeID(f.commitID)
+		"GetCommitInfo": func(s *gogitstore.Storer) error {
+			_, err := s.GetCommitInfo(f.commitID)
 			return err
 		},
 		"GetEntriesInTree": func(s *gogitstore.Storer) error {

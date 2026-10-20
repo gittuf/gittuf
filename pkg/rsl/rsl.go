@@ -598,12 +598,12 @@ func GetEntry(storer gitstore.Storer, entryID githash.Hash) (Entry, error) {
 		return entry, nil
 	}
 
-	commitMessage, err := storer.GetCommitMessage(entryID)
+	commitInfo, err := storer.GetCommitInfo(entryID)
 	if err != nil {
 		return nil, errors.Join(ErrRSLEntryNotFound, err)
 	}
 
-	entry, err = parseRSLEntryText(entryID, commitMessage)
+	entry, err = parseRSLEntryText(entryID, commitInfo.Message)
 	if err != nil {
 		return nil, err
 	}
@@ -621,20 +621,20 @@ func GetParentForEntry(storer gitstore.Storer, entry Entry) (Entry, error) {
 		return GetEntry(storer, parentID)
 	}
 
-	parentIDs, err := storer.GetCommitParentIDs(entry.GetID())
+	commitInfo, err := storer.GetCommitInfo(entry.GetID())
 	if err != nil {
 		return nil, err
 	}
 
-	if parentIDs == nil {
+	if commitInfo.ParentIDs == nil {
 		return nil, ErrRSLEntryNotFound
 	}
 
-	if len(parentIDs) > 1 {
+	if len(commitInfo.ParentIDs) > 1 {
 		return nil, ErrRSLBranchDetected
 	}
 
-	parentID = parentIDs[0]
+	parentID = commitInfo.ParentIDs[0]
 	parentEntry, err := GetEntry(storer, parentID)
 	if err != nil {
 		return nil, err

@@ -687,11 +687,11 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 
 		// The current remote tip must be the parent of the current
 		// local tip
-		parents, err := localRepo.r.GetCommitParentIDs(currentLocalRSLTip)
+		currentLocalRSLTipInfo, err := localRepo.r.GetCommitInfo(currentLocalRSLTip)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, currentRemoteRSLTip, parents[0])
+		assert.Equal(t, currentRemoteRSLTip, currentLocalRSLTipInfo.ParentIDs[0])
 
 		// The current local tip and original local tip must have same
 		// entry ref and target ID
@@ -1405,10 +1405,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
 		assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1564,10 +1565,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
 		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath1)
 		if err != nil {
 			t.Fatal(err)
@@ -1748,10 +1750,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1763,10 +1766,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
 
 		// Do the same thing for the other propagation entry's tree (this is a different ref!)
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry1.TargetID.Bytes()))
+		downstreamRootCommitInfo, err = downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry1.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err = downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1946,10 +1950,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		expectedUpstreamIDs.Remove(propagationEntry2.UpstreamEntryID.String())
 		assert.Equal(t, 0, expectedUpstreamIDs.Len())
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath1)
 		if err != nil {
 			t.Fatal(err)
@@ -2031,10 +2036,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 		assert.Equal(t, controllerPolicyEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(githash.Hash(controllerPolicyEntry.GetTargetID().Bytes()))
+		controllerPolicyCommitInfo, err := controllerRepo.r.GetCommitInfo(githash.Hash(controllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		controllerPolicyTreeID := controllerPolicyCommitInfo.TreeID
 		controllerMetadataTreeID, err := controllerRepo.r.GetPathIDInTree(controllerPolicyTreeID, "metadata")
 		if err != nil {
 			t.Fatal(err)
@@ -2044,10 +2050,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
+		downstreamPolicyCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamPolicyTreeID := downstreamPolicyCommitInfo.TreeID
 
 		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepoLocation))
 		controllerPath := fmt.Sprintf("%s/controller-%s", tuf.GittufControllerPrefix, encodedLocation)
@@ -2133,10 +2140,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
+		downstreamPolicyCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamPolicyTreeID := downstreamPolicyCommitInfo.TreeID
 
 		encodedDirectControllerLocation := base64.URLEncoding.EncodeToString([]byte(directControllerRepoLocation))
 		directControllerPath := fmt.Sprintf("%s/direct-controller-%s", tuf.GittufControllerPrefix, encodedDirectControllerLocation)
@@ -2156,10 +2164,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(githash.Hash(leafControllerPolicyEntry.GetTargetID().Bytes()))
+		leafControllerPolicyCommitInfo, err := leafControllerRepo.r.GetCommitInfo(githash.Hash(leafControllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		leafControllerPolicyTreeID := leafControllerPolicyCommitInfo.TreeID
 		leafControllerMetadataTreeID, err := leafControllerRepo.r.GetPathIDInTree(leafControllerPolicyTreeID, "metadata")
 		if err != nil {
 			t.Fatal(err)

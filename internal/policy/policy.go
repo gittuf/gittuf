@@ -1347,12 +1347,12 @@ func loadStateForEntry(repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry) (*
 // specified commit. This allows a specific revision of the policy metadata to
 // be inspected directly, bypassing the RSL.
 func LoadStateFromCommit(repo gitstore.Storer, commitID githash.Hash) (*State, error) {
-	commitTreeID, err := repo.GetCommitTreeID(commitID)
+	commitInfo, err := repo.GetCommitInfo(commitID)
 	if err != nil {
 		return nil, err
 	}
 
-	treeEntries, err := repo.GetEntriesInTree(commitTreeID)
+	treeEntries, err := repo.GetEntriesInTree(commitInfo.TreeID)
 	if err != nil {
 		return nil, err
 	}

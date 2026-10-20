@@ -377,19 +377,14 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitMessage, err := repo.GetCommitMessage(currentTip)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	parentIDs, err := repo.GetCommitParentIDs(currentTip)
+	commitInfo, err := repo.GetCommitInfo(currentTip)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedMessage := fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 1)
-	assert.Equal(t, expectedMessage, commitMessage)
-	assert.Nil(t, parentIDs)
+	assert.Equal(t, expectedMessage, commitInfo.Message)
+	assert.Nil(t, commitInfo.ParentIDs)
 
 	if err := NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
 		t.Fatal(err)
@@ -400,19 +395,14 @@ func TestNewReferenceEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commitMessage, err = repo.GetCommitMessage(newTip)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	parentIDs, err = repo.GetCommitParentIDs(newTip)
+	commitInfo, err = repo.GetCommitInfo(newTip)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	expectedMessage = fmt.Sprintf("%s\n\n%s: %s\n%s: %s\n%s: %d", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String(), NumberKey, 2)
-	assert.Equal(t, expectedMessage, commitMessage)
-	assert.Contains(t, parentIDs, currentTip)
+	assert.Equal(t, expectedMessage, commitInfo.Message)
+	assert.Contains(t, commitInfo.ParentIDs, currentTip)
 }
 
 func TestCommitUsingSpecificKey(t *testing.T) {
@@ -2387,8 +2377,8 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		entryID, err := repo.GetReference(Ref)
 		require.Nil(t, err)
 
-		injected := errors.New("get commit message failure")
-		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitMessageErr: injected}
+		injected := errors.New("get commit info failure")
+		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitInfoErr: injected}
 
 		err = NewAnnotationEntry([]githash.Hash{entryID}, true, annotationMessage).Commit(storer, false)
 		assert.ErrorIs(t, err, injected)
@@ -2402,8 +2392,8 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		entryID, err := repo.GetReference(Ref)
 		require.Nil(t, err)
 
-		injected := errors.New("get commit message failure")
-		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitMessageErr: injected}
+		injected := errors.New("get commit info failure")
+		storer := &gitstoretest.FakeStorer{Storer: repo, GetCommitInfoErr: injected}
 
 		err = NewAnnotationEntry([]githash.Hash{entryID}, true, annotationMessage).CommitUsingSpecificKey(storer, artifacts.SSHED25519Private)
 		assert.ErrorIs(t, err, injected)

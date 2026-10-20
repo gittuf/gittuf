@@ -18,13 +18,12 @@ type FakeStorer struct {
 
 	EmptyTreeErr          error
 	GetReferenceErr       error
-	GetCommitTreeIDErr    error
+	GetCommitInfoErr      error
 	GetAllFilesInTreeErr  error
 	WriteTreeErr          error
 	ReadBlobErr           error
 	WriteBlobErr          error
 	CommitErr             error
-	GetCommitMessageErr   error
 	GetObjectSignatureErr error
 
 	// Config supplies canned config values keyed by ConfigKey. A key present
@@ -49,11 +48,11 @@ func (f *FakeStorer) GetReference(refName string) (githash.Hash, error) {
 	return f.Storer.GetReference(refName)
 }
 
-func (f *FakeStorer) GetCommitTreeID(commitID githash.Hash) (githash.Hash, error) {
-	if f.GetCommitTreeIDErr != nil {
-		return nil, f.GetCommitTreeIDErr
+func (f *FakeStorer) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, error) {
+	if f.GetCommitInfoErr != nil {
+		return gitstore.CommitInfo{}, f.GetCommitInfoErr
 	}
-	return f.Storer.GetCommitTreeID(commitID)
+	return f.Storer.GetCommitInfo(commitID)
 }
 
 func (f *FakeStorer) GetAllFilesInTree(treeID githash.Hash) (map[string]githash.Hash, error) {
@@ -89,13 +88,6 @@ func (f *FakeStorer) Commit(treeID githash.Hash, targetRef, message string, sign
 		return nil, f.CommitErr
 	}
 	return f.Storer.Commit(treeID, targetRef, message, sign)
-}
-
-func (f *FakeStorer) GetCommitMessage(commitID githash.Hash) (string, error) {
-	if f.GetCommitMessageErr != nil {
-		return "", f.GetCommitMessageErr
-	}
-	return f.Storer.GetCommitMessage(commitID)
 }
 
 func (f *FakeStorer) GetObjectSignature(objectID githash.Hash) ([]byte, []byte, error) {

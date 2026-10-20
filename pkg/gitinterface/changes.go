@@ -15,14 +15,11 @@ import (
 // If there is a matching parent, we return no changes. If there is no matching
 // parent commit, we return the changes between the commit and each of its parents.
 func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error) {
-	if err := r.ensureIsCommit(commitID); err != nil {
-		return nil, err
-	}
-
-	parentCommitIDs, err := r.GetCommitParentIDs(commitID)
+	commitInfo, err := r.GetCommitInfo(commitID)
 	if err != nil {
 		return nil, err
 	}
+	parentCommitIDs := commitInfo.ParentIDs
 
 	if len(parentCommitIDs) == 0 {
 		filePaths, err := r.executor("ls-tree", "--name-only", "-r", commitID.String()).executeString()
