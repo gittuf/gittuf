@@ -40,16 +40,16 @@ func TestFetchInvalidatesCachedHandle(t *testing.T) {
 					// Keep fetched objects packed to exercise the cached pack index.
 					git(t, local, "", "config", "fetch.unpackLimit", "1")
 					localID := commitChain(t, local, "refs/heads/local", 2)[1]
-					_, err = fast.GetCommitMessage(localID)
+					_, err = fast.GetCommitInfo(localID)
 					require.NoError(t, err)
 					require.NoError(t, fast.AddRemote("origin", remoteDir))
 					require.NoError(t, fetch(fast, remoteID))
 					packs, err := filepath.Glob(filepath.Join(local.GetGitDir(), "objects", "pack", "*.pack"))
 					require.NoError(t, err)
 					require.NotEmpty(t, packs)
-					message, err := fast.GetCommitMessage(remoteID)
+					info, err := fast.GetCommitInfo(remoteID)
 					require.NoError(t, err)
-					assert.Equal(t, "remote", message)
+					assert.Equal(t, "remote", info.Message)
 				})
 			}
 		})
@@ -63,8 +63,8 @@ func TestWriteThenReadThroughWrapper(t *testing.T) {
 	fast := gogitstore.New(local, true)
 
 	existing := commitChain(t, local, "refs/heads/main", 1)
-	_, err := fast.GetCommitMessage(existing[0])
-	require.Nil(t, err)
+	_, err := fast.GetCommitInfo(existing[0])
+	require.NoError(t, err)
 
 	blobID, err := fast.WriteBlob([]byte("written after the handle was opened"))
 	require.Nil(t, err)
