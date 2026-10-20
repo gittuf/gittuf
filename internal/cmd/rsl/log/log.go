@@ -30,7 +30,17 @@ func (o *options) Run(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	return display.RSLLog(repo.GetStorer(), display.NewDisplayWriter(os.Stdout), display.WithReferences(o.refs))
+	gitRepo := repo.GetGitRepository()
+	refs := make([]string, 0, len(o.refs))
+	for _, ref := range o.refs {
+		absRef, err := gitRepo.AbsoluteReference(ref)
+		if err != nil {
+			return err
+		}
+		refs = append(refs, absRef)
+	}
+
+	return display.RSLLog(repo.GetStorer(), display.NewDisplayWriter(os.Stdout), display.WithReferences(refs))
 }
 
 func New() *cobra.Command {
