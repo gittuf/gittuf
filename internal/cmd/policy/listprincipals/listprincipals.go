@@ -49,28 +49,42 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	stdOut := cmd.OutOrStdout()
 
 	if len(principals) == 0 {
-		fmt.Fprintln(stdOut, "No principals are currently defined.")
+		if _, err := fmt.Fprintln(stdOut, "No principals are currently defined."); err != nil {
+			return err
+		}
 		return nil
 	}
 
 	count := 0
 	for _, principal := range principals {
-		fmt.Fprintf(stdOut, "Principal %s:\n", principal.ID())
+		if _, err := fmt.Fprintf(stdOut, "Principal %s:\n", principal.ID()); err != nil {
+			return err
+		}
 
-		fmt.Fprintf(stdOut, indentString+"Keys:\n")
+		if _, err := fmt.Fprintf(stdOut, indentString+"Keys:\n"); err != nil {
+			return err
+		}
 		for _, key := range principal.Keys() {
-			fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType)
+			if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType); err != nil {
+				return err
+			}
 		}
 
 		customMetadata := principal.CustomMetadata()
 		if len(customMetadata) > 0 {
-			fmt.Fprintf(stdOut, indentString+"Custom Metadata:\n")
+			if _, err := fmt.Fprintf(stdOut, indentString+"Custom Metadata:\n"); err != nil {
+				return err
+			}
 			for key, value := range principal.CustomMetadata() {
-				fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, value)
+				if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, value); err != nil {
+					return err
+				}
 			}
 		}
 		if count < len(principals)-1 {
-			fmt.Fprintln(stdOut)
+			if _, err := fmt.Fprintln(stdOut); err != nil {
+				return err
+			}
 		}
 		count++
 	}

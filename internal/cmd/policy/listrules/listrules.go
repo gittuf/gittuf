@@ -38,7 +38,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	stdOut := cmd.OutOrStdout()
 
 	if len(rules) == 0 {
-		fmt.Fprintln(stdOut, "No rules are currently defined.")
+		if _, err := fmt.Fprintln(stdOut, "No rules are currently defined."); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -46,7 +48,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	// The order is a pre-order traversal of the delegation tree, so that the parent is always before the children.
 
 	for i, curRule := range rules {
-		fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.ID())
+		if _, err := fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth)+"Rule %s:\n", curRule.Delegation.ID()); err != nil {
+			return err
+		}
 		gitpaths, filepaths := []string{}, []string{}
 		for _, path := range curRule.Delegation.GetProtectedNamespaces() {
 			if strings.HasPrefix(path, "git:") {
@@ -56,26 +60,42 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			}
 		}
 		if len(filepaths) > 0 {
-			fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Paths affected:")
+			if _, err := fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Paths affected:"); err != nil {
+				return err
+			}
 			for _, v := range filepaths {
-				fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", v)
+				if _, err := fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", v); err != nil {
+					return err
+				}
 			}
 		}
 		if len(gitpaths) > 0 {
-			fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Refs affected:")
+			if _, err := fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Refs affected:"); err != nil {
+				return err
+			}
 			for _, v := range gitpaths {
-				fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", v)
+				if _, err := fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", v); err != nil {
+					return err
+				}
 			}
 		}
 
-		fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Authorized keys:")
+		if _, err := fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Authorized keys:"); err != nil {
+			return err
+		}
 		for _, key := range curRule.Delegation.GetPrincipalIDs().Contents() {
-			fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", key)
+			if _, err := fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", key); err != nil {
+				return err
+			}
 		}
 
-		fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.GetThreshold()))
+		if _, err := fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+fmt.Sprintf("Required valid signatures: %d", curRule.Delegation.GetThreshold())); err != nil {
+			return err
+		}
 		if i < len(rules)-1 {
-			fmt.Fprintln(stdOut)
+			if _, err := fmt.Fprintln(stdOut); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -37,19 +37,35 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	stdOut := cmd.OutOrStdout()
 
 	if len(directives) == 0 {
-		fmt.Fprintln(stdOut, "No propagation directives are currently defined.")
+		if _, err := fmt.Fprintln(stdOut, "No propagation directives are currently defined."); err != nil {
+			return err
+		}
 		return nil
 	}
 
 	// TODO: switch to the display package
-	fmt.Fprintln(stdOut, "Propagation Directives in the gittuf root of trust:")
+	if _, err := fmt.Fprintln(stdOut, "Propagation Directives in the gittuf root of trust:"); err != nil {
+		return err
+	}
 	for _, pd := range directives {
-		fmt.Fprintf(stdOut, "Propagation Directive: %s\n", pd.GetName())
-		fmt.Fprintf(stdOut, "  Upstream Repository:   %s\n", pd.GetUpstreamRepository())
-		fmt.Fprintf(stdOut, "  Upstream Reference:    %s\n", pd.GetUpstreamReference())
-		fmt.Fprintf(stdOut, "  Upstream Path:         %s\n", pd.GetUpstreamPath())
-		fmt.Fprintf(stdOut, "  Downstream Reference:  %s\n", pd.GetDownstreamReference())
-		fmt.Fprintf(stdOut, "  Downstream Path:       %s\n", pd.GetDownstreamPath())
+		if _, err := fmt.Fprintf(stdOut, "Propagation Directive: %s\n", pd.GetName()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, "  Upstream Repository:   %s\n", pd.GetUpstreamRepository()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, "  Upstream Reference:    %s\n", pd.GetUpstreamReference()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, "  Upstream Path:         %s\n", pd.GetUpstreamPath()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, "  Downstream Reference:  %s\n", pd.GetDownstreamReference()); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(stdOut, "  Downstream Path:       %s\n", pd.GetDownstreamPath()); err != nil {
+			return err
+		}
 	}
 
 	return nil
