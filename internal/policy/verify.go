@@ -1056,6 +1056,10 @@ type verifyGitObjectAndAttestationsOptions struct {
 	// trusted verifier, then we can skip verifying the signature again.
 	trustedVerifier string
 	tagObjectID     githash.Hash
+
+	// nativeFacts, when set, receives facts computed by the native decision
+	// that callers would otherwise not see. Used by the Cedar overlay.
+	nativeFacts *nativeDecisionFacts
 }
 
 type verifyGitObjectAndAttestationsOption func(o *verifyGitObjectAndAttestationsOptions)
@@ -1096,7 +1100,10 @@ func withTagObjectID(objID githash.Hash) verifyGitObjectAndAttestationsOption {
 	}
 }
 
-func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target string, gitID githash.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
+// verifyGitObjectAndAttestationsNative is gittuf's built-in decision for a
+// target. It is wrapped by verifyGitObjectAndAttestations, which may apply an
+// experimental Cedar overlay after this decision succeeds (see cedar.go).
+func verifyGitObjectAndAttestationsNative(ctx context.Context, policy *State, target string, gitID githash.Hash, authorizationAttestation *sslibdsse.Envelope, opts ...verifyGitObjectAndAttestationsOption) (string, bool, error) {
 	options := &verifyGitObjectAndAttestationsOptions{}
 	for _, fn := range opts {
 		fn(options)
@@ -1160,9 +1167,13 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 			}
 		}
 
-		verifiedUsing, _, rslSignatureNeededForThreshold, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
+		var acceptedPrincipalIDs *set.Set[string]
+		verifiedUsing, acceptedPrincipalIDs, rslSignatureNeededForThreshold, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
 		if err != nil {
 			return "", false, err
+		}
+		if options.nativeFacts != nil {
+			options.nativeFacts.acceptedPrincipalIDs = acceptedPrincipalIDs
 		}
 
 		if !options.tagObjectID.IsZero() {

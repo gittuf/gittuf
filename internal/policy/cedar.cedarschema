@@ -1,0 +1,52 @@
+// Copyright The gittuf Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// SKETCH (cedar-integration-sketch, not for merge): Cedar schema for the facts
+// gittuf passes to the experimental Cedar overlay (see cedar.go). Cedar never
+// verifies signatures; every attribute is computed by gittuf.
+namespace Gittuf {
+  // A named group of principals. Membership is read from the signed gittuf
+  // policy: tufv02.Person.Custom["cedar-groups"], comma separated.
+  entity Group;
+
+  // A gittuf principal (person ID or key ID).
+  entity Principal in [Group];
+
+  // The change being verified: the RSL entry ID, or "mergeable" when
+  // verifying whether a change can be merged.
+  entity Change;
+
+  // The rule target, e.g. scheme "git", name "refs/heads/main".
+  entity Target = {
+    scheme: String,
+    name: String,
+  };
+
+  type PullRequest = {
+    number: Long,
+    // "<login>+<id>", the format the gittuf GitHub app records approvers in.
+    authorIdentity: String,
+    // Set when a policy person's AssociatedIdentities maps authorIdentity
+    // for a trusted app.
+    author?: Principal,
+    labels: Set<String>,
+  };
+
+  action "updateRef", "updateTag" appliesTo {
+    principal: [Change],
+    resource: [Target],
+    context: {
+      mergeable: Bool,
+      // Principals counted toward the rule gittuf used to accept the change
+      // (signers plus approvers trusted by that rule).
+      credited: Set<Principal>,
+      creditedGroups: Set<Group>,
+      // Principals matched from trusted app approvals, and the raw identities.
+      approvers: Set<Principal>,
+      approverIdentities: Set<String>,
+      // The rule gittuf's native decision used, "" if the target is unprotected.
+      verifiedUsing: String,
+      pr?: PullRequest,
+    },
+  };
+}
