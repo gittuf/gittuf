@@ -158,17 +158,23 @@ func (s *verifyMergeableScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 		func() tea.Msg {
 			defer pw.Close()
 			opts := []verifymergeableopts.Option{}
-			mergeable, err := m.repo.VerifyMergeable(m.ctx, baseBranch, featureBranch, opts...)
+			needRSLSignature, err := m.repo.VerifyMergeable(m.ctx, baseBranch, featureBranch, opts...)
 
 			// Reset logger
 			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-			if err == nil && !mergeable {
-				err = fmt.Errorf("branch %s is NOT mergeable into %s", featureBranch, baseBranch)
+			// The boolean doesn't say whether the merge is possible, a nil
+			// error does. It says whether the merge must be performed by an
+			// authorized user who signs the merge's RSL entry.
+			if err != nil {
+				return verifyResultMsg{err: err}
 			}
 
 			successMsg := fmt.Sprintf("Successfully verified %s is mergeable into %s!", featureBranch, baseBranch)
-			return verifyResultMsg{err: err, successMsg: successMsg}
+			if needRSLSignature {
+				successMsg = fmt.Sprintf("Successfully verified %s is mergeable into %s, but the merge must be performed by an authorized user!", featureBranch, baseBranch)
+			}
+			return verifyResultMsg{successMsg: successMsg}
 		},
 	)
 }
