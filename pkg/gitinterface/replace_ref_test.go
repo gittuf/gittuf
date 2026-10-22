@@ -67,9 +67,9 @@ func TestReplaceRefsDoNotAffectVerificationReads(t *testing.T) {
 	require.Equal(t, trueTree.String(), goGitCommit.TreeHash.String(),
 		"go-git (signature path) must read the true object")
 
-	gotTree, err := repo.GetCommitTreeID(trueCommit)
+	gotInfo, err := repo.GetCommitInfo(trueCommit)
 	require.NoError(t, err)
-	assert.Equal(t, trueTree.String(), gotTree.String(),
+	assert.Equal(t, trueTree.String(), gotInfo.TreeID.String(),
 		"refs/replace/ must not alter the tree gittuf verifies")
 
 	gotPaths, err := repo.GetFilePathsChangedByCommit(trueCommit)
@@ -77,8 +77,6 @@ func TestReplaceRefsDoNotAffectVerificationReads(t *testing.T) {
 	assert.Equal(t, []string{"secret"}, gotPaths,
 		"refs/replace/ must not hide the protected-path change from file-policy verification")
 
-	gotMessage, err := repo.GetCommitMessage(trueCommit)
-	require.NoError(t, err)
-	assert.Equal(t, "TRUE: adds secret", gotMessage,
+	assert.Equal(t, "TRUE: adds secret", gotInfo.Message,
 		"refs/replace/ must not alter the commit message gittuf reads")
 }

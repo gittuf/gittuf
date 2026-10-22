@@ -178,7 +178,11 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 
 	if commitAID.IsZero() {
 		// fast-forward merge -> use tree ID from commitB
-		return r.GetCommitTreeID(commitBID)
+		commitBInfo, err := r.GetCommitInfo(commitBID)
+		if err != nil {
+			return ZeroHash, err
+		}
+		return commitBInfo.TreeID, nil
 	}
 
 	// Only commitB needs to be non-zero, we can allow fast-forward merges when
@@ -222,11 +226,11 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 
 	entries := []TreeEntry{}
 	if !currentTip.IsZero() {
-		currentRefTree, err := r.GetCommitTreeID(currentTip)
+		currentRefCommitInfo, err := r.GetCommitInfo(currentTip)
 		if err != nil {
 			return nil, err
 		}
-		currentFiles, err := r.GetAllFilesInTree(currentRefTree)
+		currentFiles, err := r.GetAllFilesInTree(currentRefCommitInfo.TreeID)
 		if err != nil {
 			return nil, err
 		}
@@ -252,10 +256,11 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	// Remove trailing "/" now
 	localPath = strings.TrimSuffix(localPath, "/")
 
-	treeID, err := upstream.GetCommitTreeID(upstreamCommitID)
+	upstreamCommitInfo, err := upstream.GetCommitInfo(upstreamCommitID)
 	if err != nil {
 		return nil, err
 	}
+	treeID := upstreamCommitInfo.TreeID
 
 	if upstreamPath != "" {
 		// If upstreamPath is empty, then the entire tree is copied over,
