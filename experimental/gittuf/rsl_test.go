@@ -1007,6 +1007,112 @@ func TestSync(t *testing.T) {
 		assert.NotEqual(t, originalRSLTip, currentRSLTip)
 	})
 
+	t.Run("local is strictly ahead of remote with propagation entry", func(t *testing.T) {
+		propagatedRefName := "refs/heads/propagated"
+
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate local propagation into a ref that the remote doesn't have
+		propagatedCommitID, err := localRepo.r.Commit(emptyTreeHash, propagatedRefName, "Propagated commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry(propagatedRefName, propagatedCommitID, "https://example.com/upstream", upstreamEntryID).Commit(localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Remote must have both the RSL and the propagated ref
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, propagatedRefName)
+	})
+
+	t.Run("local is strictly behind remote with propagation entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Nil(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.Nil(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate propagation on the remote
+		propagatedCommitID, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Propagated commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntryID, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry(refName, propagatedCommitID, "https://example.com/upstream", upstreamEntryID).Commit(remoteRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.Nil(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Local ref must be updated to the propagated commit
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
+	})
+
 	t.Run("local RSL has diverged, not allowed to overwrite", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
