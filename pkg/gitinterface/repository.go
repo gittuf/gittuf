@@ -285,23 +285,34 @@ func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
 	return e
 }
 
-// executeString runs the constructed Git command and returns the contents of
-// stdout.  Leading and trailing spaces and newlines are removed. This function
-// should be used almost every time; the only exception is when the output is
-// desired without any processing such as the removal of space characters.
-func (e *executor) executeString() (string, error) {
+// executeBytes runs the constructed Git command and returns the raw contents of
+// stdout without removing whitespace or newlines.
+func (e *executor) executeBytes() ([]byte, error) {
 	stdOut, stdErr, err := e.execute()
 	if err != nil {
 		stdErrContents, newErr := io.ReadAll(stdErr)
 		if newErr != nil {
-			return "", fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
+			return nil, fmt.Errorf("unable to read stderr contents: %w; original err: %w", newErr, err)
 		}
-		return "", fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(e.args, " "), string(stdErrContents))
+		return nil, fmt.Errorf("%w when executing `git %s`: %s", err, strings.Join(e.args, " "), string(stdErrContents))
 	}
 
 	stdOutContents, err := io.ReadAll(stdOut)
 	if err != nil {
-		return "", fmt.Errorf("unable to read stdout contents: %w", err)
+		return nil, fmt.Errorf("unable to read stdout contents: %w", err)
+	}
+
+	return stdOutContents, nil
+}
+
+// executeString runs the constructed Git command and returns the contents of
+// stdout. Leading and trailing spaces and newlines are removed. This function
+// should be used almost every time; the only exception is when the output is
+// desired without any processing such as the removal of space characters.
+func (e *executor) executeString() (string, error) {
+	stdOutContents, err := e.executeBytes()
+	if err != nil {
+		return "", err
 	}
 
 	return strings.TrimSpace(string(stdOutContents)), nil

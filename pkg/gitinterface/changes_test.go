@@ -4,6 +4,7 @@
 package gitinterface
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -191,6 +192,66 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cB)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a", "b"}, diffs)
+	})
+
+	t.Run("special characters", func(t *testing.T) {
+		testFiles := []string{
+			"file with spaces.txt",
+			" leading.txt",
+			"trailing.txt ",
+			"tab\tname.txt",
+			"newline\nname.txt",
+			"quote\"name.txt",
+			"backslash\\name.txt",
+			"unicode-\u00e9.txt",
+		}
+
+		for idx, name := range testFiles {
+			refName := fmt.Sprintf("refs/heads/special-chars-%d", idx)
+
+			// 1. Root commit (no parent)
+			treeAString, err := repo.executor("mktree", "-z").withStdIn(bytes.NewBufferString(
+				fmt.Sprintf("100644 blob %s\t%s\x00", blobIDs[0].String(), name),
+			)).executeString()
+			require.NoError(t, err)
+			treeA, err := NewHash(treeAString)
+			require.NoError(t, err)
+
+			cA, err := repo.Commit(treeA, refName, "Root commit\n", false)
+			require.NoError(t, err)
+
+			diffs, err := repo.GetFilePathsChangedByCommit(cA)
+			require.NoError(t, err)
+			assert.Equal(t, []string{name}, diffs)
+
+			// 2. Child commit (single parent)
+			treeBString, err := repo.executor("mktree", "-z").withStdIn(bytes.NewBufferString(
+				fmt.Sprintf("100644 blob %s\t%s\x00", blobIDs[1].String(), name),
+			)).executeString()
+			require.NoError(t, err)
+			treeB, err := NewHash(treeBString)
+			require.NoError(t, err)
+
+			cB, err := repo.Commit(treeB, refName, "Child commit\n", false)
+			require.NoError(t, err)
+
+			diffs, err = repo.GetFilePathsChangedByCommit(cB)
+			require.NoError(t, err)
+			assert.Equal(t, []string{name}, diffs)
+
+			// 3. Merge commit with special characters
+			treeCString, err := repo.executor("mktree", "-z").withStdIn(bytes.NewBufferString(
+				fmt.Sprintf("100644 blob %s\t%s\x00", blobIDs[2].String(), name),
+			)).executeString()
+			require.NoError(t, err)
+			treeC, err := NewHash(treeCString)
+			require.NoError(t, err)
+
+			cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+			diffs, err = repo.GetFilePathsChangedByCommit(cM)
+			require.NoError(t, err)
+			assert.Equal(t, []string{name}, diffs)
+		}
 	})
 
 	t.Run("no parent", func(t *testing.T) {
