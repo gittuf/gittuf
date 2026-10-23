@@ -1908,6 +1908,20 @@ func TestListGlobalRules(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Empty(t, globalRules)
 	})
+
+	t.Run("staged global rule without RSL entry", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddGlobalRuleThreshold(testCtx, rootSigner, "require-approval-for-main", []string{"git:refs/heads/main"}, 1, false)
+		require.Nil(t, err)
+
+		globalRules, err := r.ListGlobalRules(testCtx, policy.PolicyStagingRef)
+		require.Nil(t, err)
+		require.Len(t, globalRules, 1)
+		assert.Equal(t, "require-approval-for-main", globalRules[0].GetName())
+	})
 }
 
 func TestAddPropagationDirective(t *testing.T) {
@@ -2381,6 +2395,19 @@ func TestListPropagationDirectives(t *testing.T) {
 		directives, err = r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
 		require.Nil(t, err)
 		assert.Empty(t, directives)
+	})
+
+	t.Run("staged propagation directive without RSL entry", func(t *testing.T) {
+		r := createTestRepositoryWithRoot(t, "")
+		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+
+		err := r.AddPropagationDirective(testCtx, rootSigner, "sync-main", "https://example.com/upstream", "refs/heads/main", "", "refs/heads/main", "upstream/", false)
+		require.Nil(t, err)
+
+		directives, err := r.ListPropagationDirectives(testCtx, policy.PolicyStagingRef)
+		require.Nil(t, err)
+		require.Len(t, directives, 1)
+		assert.Equal(t, "sync-main", directives[0].GetName())
 	})
 
 	t.Run("with shorthand policy reference", func(t *testing.T) {
