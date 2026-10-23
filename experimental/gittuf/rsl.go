@@ -745,6 +745,8 @@ func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash
 			if _, has := refTips[entry.GetRefName()]; has {
 				continue
 			}
+
+			refTips[entry.GetRefName()] = entry.GetTargetID()
 		case *rsl.AnnotationEntry:
 			for _, referencedEntryID := range entry.RSLEntryIDs {
 				if _, has := annotationsMap[referencedEntryID.String()]; !has {
