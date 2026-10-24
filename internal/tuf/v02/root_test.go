@@ -1328,4 +1328,3 @@ func TestRootMetadataUpdateGlobalRuleAndPropagationErrors(t *testing.T) {
 	err = rootMetadata.UpdatePropagationDirective(pdNotFound)
 	assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
 }
-
