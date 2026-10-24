@@ -61,3 +61,19 @@ func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 		assert.Equal(t, "Principal added successfully!", m.footer)
 	})
 }
+
+func TestPolicyPrincipalsDeletePrompt(t *testing.T) {
+	s := &policyPrincipalsScreen{
+		confirmDelete: true,
+		deleteTarget:  "test-principal-key",
+	}
+	m := &model{
+		screen: screenPolicyPrincipals,
+		width:  80,
+		height: 24,
+	}
+
+	out := s.View(m)
+	assert.Contains(t, out, `Delete principal "test-principal-key"? [y/n]`)
+	assert.NotContains(t, out, `Delete rule`)
+}
