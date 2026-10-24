@@ -21,6 +21,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -886,6 +887,8 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	assert.NoError(t, err)
 	trusted := rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName)
 	assert.True(t, trusted)
+
+	assert.False(t, rootMetadata.IsGitHubAppApprovalTrusted("non-existent-app"))
 }
 
 func TestGlobalRules(t *testing.T) {
@@ -1108,3 +1111,221 @@ func TestGlobalRules(t *testing.T) {
 	err = rootMetadata.DeleteGlobalRule("")
 	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
 }
+
+type unsupportedRootPrincipal struct {
+	id string
+}
+
+func (p *unsupportedRootPrincipal) ID() string {
+	return p.id
+}
+
+func (p *unsupportedRootPrincipal) Keys() []*signerverifier.SSLibKey {
+	return nil
+}
+
+func (p *unsupportedRootPrincipal) CustomMetadata() map[string]string {
+	return nil
+}
+
+func TestRootMetadataUnsupportedPrincipal(t *testing.T) {
+	rootMetadata := NewRootMetadata()
+	unsupported := &unsupportedRootPrincipal{id: "unsupported"}
+
+	err := rootMetadata.AddRootPrincipal(unsupported)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	err = rootMetadata.AddPrimaryRuleFilePrincipal(unsupported)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	err = rootMetadata.AddGitHubAppPrincipal("app", unsupported)
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	err = rootMetadata.AddControllerRepository("test", "loc", []tuf.Principal{unsupported})
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+
+	err = rootMetadata.EnableController()
+	assert.Nil(t, err)
+
+	err = rootMetadata.AddNetworkRepository("test", "loc", []tuf.Principal{unsupported})
+	assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
+}
+
+func TestOtherRepositoryMethods(t *testing.T) {
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	repo := &OtherRepository{
+		Name:                  "repo-name",
+		Location:              "repo-loc",
+		InitialRootPrincipals: []tuf.Principal{key},
+	}
+
+	assert.Equal(t, "repo-name", repo.GetName())
+	assert.Equal(t, "repo-loc", repo.Location)
+	assert.Equal(t, "repo-loc", repo.GetLocation())
+	assert.Equal(t, []tuf.Principal{key}, repo.GetInitialRootPrincipals())
+
+	t.Run("UnmarshalJSON person and key", func(t *testing.T) {
+		person := &Person{PersonID: "alice", PublicKeys: map[string]*Key{key.KeyID: key}}
+		other := &OtherRepository{
+			Name:                  "mixed",
+			Location:              "loc",
+			InitialRootPrincipals: []tuf.Principal{key, person},
+		}
+
+		data, err := json.Marshal(other)
+		assert.Nil(t, err)
+
+		got := &OtherRepository{}
+		err = json.Unmarshal(data, got)
+		assert.Nil(t, err)
+		assert.Equal(t, other.Name, got.Name)
+		assert.Equal(t, other.Location, got.Location)
+		assert.Len(t, got.InitialRootPrincipals, 2)
+	})
+
+	t.Run("UnmarshalJSON errors", func(t *testing.T) {
+		err := json.Unmarshal([]byte(`{"initialRootPrincipals": ["bad"]}`), &OtherRepository{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		err = json.Unmarshal([]byte(`{"initialRootPrincipals": [{"keyid": []}]}`), &OtherRepository{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		err = json.Unmarshal([]byte(`{"initialRootPrincipals": [{"personID": []}]}`), &OtherRepository{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		err = json.Unmarshal([]byte(`{"initialRootPrincipals": [{"unknown": true}]}`), &OtherRepository{})
+		assert.ErrorContains(t, err, "unrecognized principal type")
+	})
+}
+
+func TestRootMetadataUnmarshalJSON(t *testing.T) {
+	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+	person := &Person{PersonID: "alice", PublicKeys: map[string]*Key{key.KeyID: key}}
+
+	rootMetadata := NewRootMetadata()
+	err := rootMetadata.AddRootPrincipal(key)
+	assert.Nil(t, err)
+	err = rootMetadata.AddRootPrincipal(person)
+	assert.Nil(t, err)
+
+	ruleThreshold := NewGlobalRuleThreshold("gr-thresh", []string{"git:refs/heads/main"}, 1)
+	err = rootMetadata.AddGlobalRule(ruleThreshold)
+	assert.Nil(t, err)
+
+	ruleForcePushes, err := NewGlobalRuleBlockForcePushes("gr-fp", []string{"git:refs/heads/main"})
+	assert.Nil(t, err)
+	err = rootMetadata.AddGlobalRule(ruleForcePushes)
+	assert.Nil(t, err)
+
+	pd := NewPropagationDirective("pd", "upstream", "refs/heads/main", "", "refs/heads/main", "")
+	err = rootMetadata.AddPropagationDirective(pd)
+	assert.Nil(t, err)
+
+	data, err := json.Marshal(rootMetadata)
+	assert.Nil(t, err)
+
+	got := &RootMetadata{}
+	err = json.Unmarshal(data, got)
+	assert.Nil(t, err)
+	assert.Equal(t, rootMetadata.Type, got.Type)
+	assert.Equal(t, rootMetadata.SchemaVersion, got.SchemaVersion)
+	assert.Len(t, got.Principals, 2)
+	assert.Len(t, got.GlobalRules, 2)
+	assert.Len(t, got.Propagations, 1)
+
+	t.Run("UnmarshalJSON error cases", func(t *testing.T) {
+		// Invalid principal JSON
+		err := json.Unmarshal([]byte(`{"principals": {"p": "bad"}}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Malformed key principal
+		err = json.Unmarshal([]byte(`{"principals": {"p": {"keyid": []}}}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Malformed person principal
+		err = json.Unmarshal([]byte(`{"principals": {"p": {"personID": []}}}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Unknown principal type
+		err = json.Unmarshal([]byte(`{"principals": {"p": {"unknown": true}}}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unrecognized principal type")
+
+		// Invalid global rule JSON
+		err = json.Unmarshal([]byte(`{"globalRules": ["bad"]}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Malformed threshold global rule
+		err = json.Unmarshal([]byte(`{"globalRules": [{"type": "threshold", "threshold": "invalid"}]}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Malformed block-force-pushes global rule
+		err = json.Unmarshal([]byte(`{"globalRules": [{"type": "block-force-pushes", "paths": "invalid"}]}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+
+		// Unknown global rule type
+		err = json.Unmarshal([]byte(`{"globalRules": [{"type": "unknown"}]}`), &RootMetadata{})
+		assert.ErrorIs(t, err, tuf.ErrUnknownGlobalRuleType)
+
+		// Invalid propagation directive JSON
+		err = json.Unmarshal([]byte(`{"propagations": ["bad"]}`), &RootMetadata{})
+		assert.ErrorContains(t, err, "unable to unmarshal json for propagation directive")
+	})
+}
+
+func TestRootMetadataControllerToggle(t *testing.T) {
+	rootMetadata := NewRootMetadata()
+	assert.Nil(t, rootMetadata.MultiRepository)
+
+	err := rootMetadata.DisableController()
+	assert.Nil(t, err)
+
+	err = rootMetadata.EnableController()
+	assert.Nil(t, err)
+	assert.True(t, rootMetadata.IsController())
+
+	err = rootMetadata.DisableController()
+	assert.Nil(t, err)
+	assert.False(t, rootMetadata.IsController())
+}
+
+func TestRootMetadataUpdateGlobalRuleAndPropagationErrors(t *testing.T) {
+	rootMetadata := NewRootMetadata()
+
+	// UpdateGlobalRule on empty rules
+	ruleThreshold := NewGlobalRuleThreshold("gr-thresh", []string{"git:refs/heads/main"}, 1)
+	err := rootMetadata.UpdateGlobalRule(ruleThreshold)
+	assert.ErrorIs(t, err, tuf.ErrGlobalRuleNotFound)
+
+	// UpdatePropagationDirective on empty propagations
+	pd := NewPropagationDirective("pd", "upstream", "refs/heads/main", "", "refs/heads/main", "")
+	err = rootMetadata.UpdatePropagationDirective(pd)
+	assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
+
+	// Add rules and test type mismatch
+	err = rootMetadata.AddGlobalRule(ruleThreshold)
+	assert.Nil(t, err)
+
+	ruleForcePushes, err := NewGlobalRuleBlockForcePushes("gr-thresh", []string{"git:refs/heads/main"})
+	assert.Nil(t, err)
+	err = rootMetadata.UpdateGlobalRule(ruleForcePushes)
+	assert.ErrorIs(t, err, tuf.ErrCannotUpdateGlobalRuleType)
+
+	// Add force pushes rule and try updating with threshold rule with same name
+	ruleFP2, err := NewGlobalRuleBlockForcePushes("gr-fp", []string{"git:refs/heads/main"})
+	assert.Nil(t, err)
+	err = rootMetadata.AddGlobalRule(ruleFP2)
+	assert.Nil(t, err)
+
+	ruleThreshMismatch := NewGlobalRuleThreshold("gr-fp", []string{"git:refs/heads/main"}, 1)
+	err = rootMetadata.UpdateGlobalRule(ruleThreshMismatch)
+	assert.ErrorIs(t, err, tuf.ErrCannotUpdateGlobalRuleType)
+
+	// Add propagation directive and test not found on non-empty list
+	err = rootMetadata.AddPropagationDirective(pd)
+	assert.Nil(t, err)
+
+	pdNotFound := NewPropagationDirective("pd-non-existent", "upstream", "refs/heads/main", "", "refs/heads/main", "")
+	err = rootMetadata.UpdatePropagationDirective(pdNotFound)
+	assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveNotFound)
+}
+
