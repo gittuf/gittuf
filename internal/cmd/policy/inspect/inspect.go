@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/pkg/githash"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.revision,
 		"revision",
 		"",
-		"commit ID of the gittuf policy-staging ref to inspect (defaults to the current state)",
+		"policy revision to inspect (commit ID, short SHA, or ref name; defaults to the current state)",
 	)
 }
 
@@ -45,7 +45,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	var state *policy.State
 	if o.revision != "" {
 		var commitID githash.Hash
-		commitID, err = gitinterface.NewHash(o.revision)
+		commitID, err = common.ResolveRevision(repo.GetStorer(), o.revision)
 		if err != nil {
 			return err
 		}
@@ -77,7 +77,7 @@ func New() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "inspect",
 		Short:             "Inspect policy metadata",
-		Long:              "This command displays a gittuf policy (rule) file's metadata in a human-readable format. Use --policy-name to select which policy file to display (defaults to the primary 'targets' file), and --revision to inspect the metadata as it was recorded in a specific policy commit.",
+		Long:              "This command displays a gittuf policy (rule) file's metadata in a human-readable format. Use --policy-name to select which policy file to display (defaults to the primary 'targets' file), and --revision to inspect the metadata as it was recorded in a specific policy revision (commit ID, short SHA, or ref name).",
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}
