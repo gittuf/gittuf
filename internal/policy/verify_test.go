@@ -765,6 +765,170 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, fix entry is valid", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid (unauthorized
+		// committer) and is skipped. A subsequent entry by an authorized user
+		// should be accepted as the recovery fix. This tests the fix for
+		// https://github.com/gittuf/gittuf/issues/1282.
+		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
+		refName := "refs/heads/main"
+
+		// Use the policy RSL entry as firstEntry (so that our bad commit is
+		// literally the first RSL entry for refName)
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// The entry should be invalid (unauthorized)
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+
+		// Skip the invalid entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Create a valid fix entry by an authorized user
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/temp", 1, gpgKeyBytes)
+		err = repo.SetReference(refName, commitIDs[0])
+		require.Nil(t, err)
+		fixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		fixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, fixEntry, gpgKeyBytes)
+		fixEntry.ID = fixEntryID
+
+		// Verification should now pass: invalid first entry was skipped and
+		// the fix entry is valid according to policy.
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, fixEntry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, fix entry is also invalid", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid and skipped,
+		// but the attempted fix entry is also unauthorized, so verification
+		// must still fail. This ensures we do not blindly trust any fix when
+		// there is no prior good state.
+		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// Skip the invalid entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Create another unauthorized "fix" entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		unauthorizedFixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		unauthorizedFixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, unauthorizedFixEntry, gpgUnauthorizedKeyBytes)
+		unauthorizedFixEntry.ID = unauthorizedFixEntryID
+
+		// Verification should still fail: the fix itself violates policy.
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, unauthorizedFixEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, multiple intermediate invalid entries, then valid fix", func(t *testing.T) {
+		// Scenario: The very first entry is invalid and skipped. Then several
+		// more invalid entries follow (all unauthorized and skipped), and
+		// finally a valid authorized fix entry is added. All intermediate
+		// invalid entries must be skipped and the valid fix must pass.
+		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create the first (invalid) entry on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry1 := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntry1ID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry1, gpgUnauthorizedKeyBytes)
+		invalidEntry1.ID = invalidEntry1ID
+
+		// Create a second invalid entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry2 := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntry2ID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry2, gpgUnauthorizedKeyBytes)
+		invalidEntry2.ID = invalidEntry2ID
+
+		// Verification should fail (multiple invalid entries)
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry2, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+
+		// Skip both invalid entries with annotations
+		annotation1 := rsl.NewAnnotationEntry([]githash.Hash{invalidEntry1ID}, true, "first entry was invalid")
+		annotation1ID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation1, gpgKeyBytes)
+		annotation1.ID = annotation1ID
+
+		annotation2 := rsl.NewAnnotationEntry([]githash.Hash{invalidEntry2ID}, true, "second entry was also invalid")
+		annotation2ID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation2, gpgKeyBytes)
+		annotation2.ID = annotation2ID
+
+		// Create a valid fix entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/temp", 1, gpgKeyBytes)
+		err = repo.SetReference(refName, commitIDs[0])
+		require.Nil(t, err)
+		fixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		fixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, fixEntry, gpgKeyBytes)
+		fixEntry.ID = fixEntryID
+
+		// Verification should now pass
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, fixEntry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, no fix entry exists", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid and skipped,
+		// but no fix entry is ever added. Verification must still fail with
+		// ErrVerificationFailed (not a panic or unexpected error).
+		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// Skip the invalid entry — but add NO fix entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Verification must fail: invalid entry was skipped but no fix exists.
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
 }
 
 func TestVerifyMergeable(t *testing.T) {
@@ -2991,6 +3155,170 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, fix entry is valid", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid (unauthorized
+		// committer) and is skipped. A subsequent entry by an authorized user
+		// should be accepted as the recovery fix. This tests the fix for
+		// https://github.com/gittuf/gittuf/issues/1282.
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		// Use the policy RSL entry as firstEntry (so that our bad commit is
+		// literally the first RSL entry for refName)
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// The entry should be invalid (unauthorized)
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+
+		// Skip the invalid entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Create a valid fix entry by an authorized user
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/temp", 1, gpgKeyBytes)
+		err = repo.SetReference(refName, commitIDs[0])
+		require.Nil(t, err)
+		fixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		fixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, fixEntry, gpgKeyBytes)
+		fixEntry.ID = fixEntryID
+
+		// Verification should now pass: invalid first entry was skipped and
+		// the fix entry is valid according to policy.
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, fixEntry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, fix entry is also invalid", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid and skipped,
+		// but the attempted fix entry is also unauthorized, so verification
+		// must still fail. This ensures we do not blindly trust any fix when
+		// there is no prior good state.
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// Skip the invalid entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Create another unauthorized "fix" entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		unauthorizedFixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		unauthorizedFixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, unauthorizedFixEntry, gpgUnauthorizedKeyBytes)
+		unauthorizedFixEntry.ID = unauthorizedFixEntryID
+
+		// Verification should still fail: the fix itself violates policy.
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, unauthorizedFixEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, multiple intermediate invalid entries, then valid fix", func(t *testing.T) {
+		// Scenario: The very first entry is invalid and skipped. Then several
+		// more invalid entries follow (all unauthorized and skipped), and
+		// finally a valid authorized fix entry is added. All intermediate
+		// invalid entries must be skipped and the valid fix must pass.
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create the first (invalid) entry on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry1 := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntry1ID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry1, gpgUnauthorizedKeyBytes)
+		invalidEntry1.ID = invalidEntry1ID
+
+		// Create a second invalid entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry2 := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntry2ID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry2, gpgUnauthorizedKeyBytes)
+		invalidEntry2.ID = invalidEntry2ID
+
+		// Verification should fail (multiple invalid entries)
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry2, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+
+		// Skip both invalid entries with annotations
+		annotation1 := rsl.NewAnnotationEntry([]githash.Hash{invalidEntry1ID}, true, "first entry was invalid")
+		annotation1ID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation1, gpgKeyBytes)
+		annotation1.ID = annotation1ID
+
+		annotation2 := rsl.NewAnnotationEntry([]githash.Hash{invalidEntry2ID}, true, "second entry was also invalid")
+		annotation2ID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation2, gpgKeyBytes)
+		annotation2.ID = annotation2ID
+
+		// Create a valid fix entry
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/temp", 1, gpgKeyBytes)
+		err = repo.SetReference(refName, commitIDs[0])
+		require.Nil(t, err)
+		fixEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		fixEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, fixEntry, gpgKeyBytes)
+		fixEntry.ID = fixEntryID
+
+		// Verification should now pass
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, fixEntry, refName)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with recovery, first RSL entry for ref is invalid and skipped, no fix entry exists", func(t *testing.T) {
+		// Scenario: The very first RSL entry for a ref is invalid and skipped,
+		// but no fix entry is ever added. Verification must still fail with
+		// ErrVerificationFailed (not a panic or unexpected error).
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstEntry, _, err := rsl.GetFirstEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create an unauthorized first commit on refName
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		invalidEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		invalidEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, invalidEntry, gpgUnauthorizedKeyBytes)
+		invalidEntry.ID = invalidEntryID
+
+		// Skip the invalid entry — but add NO fix entry
+		annotation := rsl.NewAnnotationEntry([]githash.Hash{invalidEntryID}, true, "first entry was invalid")
+		annotationID := common.CreateTestRSLAnnotationEntryCommit(t, repo, annotation, gpgKeyBytes)
+		annotation.ID = annotationID
+
+		// Verification must fail: invalid entry was skipped but no fix exists.
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, invalidEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
 }
 
 func TestVerifyEntry(t *testing.T) {
@@ -3006,7 +3334,7 @@ func TestVerifyEntry(t *testing.T) {
 				entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 				entry.ID = entryID
 
-				err := verifyEntry(testCtx, repo, state, nil, entry)
+				err := verifyEntry(testCtx, repo, state, nil, entry, false)
 				assert.Nil(t, err)
 			})
 		}
@@ -3020,7 +3348,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err := verifyEntry(testCtx, repo, state, nil, entry)
+		err := verifyEntry(testCtx, repo, state, nil, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3074,7 +3402,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3132,7 +3460,7 @@ func TestVerifyEntry(t *testing.T) {
 				entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 				entry.ID = entryID
 
-				err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+				err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 				assert.Nil(t, err)
 			})
 		}
@@ -3189,7 +3517,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3244,7 +3572,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3323,7 +3651,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3402,7 +3730,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3456,7 +3784,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3542,7 +3870,7 @@ func TestVerifyEntry(t *testing.T) {
 		// We have an RSL signature from jane.doe, a GitHub approval from
 		// john.doe and a reference authorization from john.doe
 		// Insufficient to meet threshold 3
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3595,7 +3923,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3648,7 +3976,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3667,7 +3995,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Only one entry, this is fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 
 		// Add more entries
@@ -3677,7 +4005,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 
 		// Rewrite history altogether
@@ -3694,7 +4022,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Not fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3714,7 +4042,7 @@ func TestVerifyEntry(t *testing.T) {
 		}
 
 		// Only one entry, this is fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 
 		// Add more entries
@@ -3724,7 +4052,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 
 		// Rewrite history altogether
@@ -3741,7 +4069,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// Still fine; this ref is not protected
-		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
+		err = verifyEntry(testCtx, repo, state, currentAttestations, entry, false)
 		assert.Nil(t, err)
 	})
 
@@ -3842,7 +4170,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		// We meet the threshold of with the reference authorization, so this should be successful
-		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry, false)
 		assert.Nil(t, err)
 
 		// Make another change without reference authorization
@@ -3851,7 +4179,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
+		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
@@ -3868,7 +4196,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, nil, entry)
+		err = verifyEntry(testCtx, repo, state, nil, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Test that a keyholder not authorized for main but still added to
@@ -3884,7 +4212,7 @@ func TestVerifyEntry(t *testing.T) {
 		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
 		entry.ID = entryID
 
-		err = verifyEntry(testCtx, repo, state, nil, entry)
+		err = verifyEntry(testCtx, repo, state, nil, entry, false)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 }
@@ -4093,7 +4421,7 @@ func TestGetCommits(t *testing.T) {
 		return expectedCommitIDs[i].String() < expectedCommitIDs[j].String()
 	})
 
-	commitIDs, err := getCommits(repo, secondEntry)
+	commitIDs, err := getCommits(repo, secondEntry, false)
 	assert.Nil(t, err)
 	assert.Equal(t, expectedCommitIDs, commitIDs)
 }
