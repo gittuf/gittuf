@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -245,7 +246,15 @@ func (r *Repository) KnowsCommit(testCommitID, ancestorCommitID Hash) (bool, err
 	}
 
 	_, err := r.executor("merge-base", "--is-ancestor", ancestorCommitID.String(), testCommitID.String()).executeString()
-	return err == nil, nil
+	if err == nil {
+		return true, nil
+	}
+
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+
+	return false, err
 }
 
 // GetCommonAncestor finds the common ancestor commit for the two supplied
