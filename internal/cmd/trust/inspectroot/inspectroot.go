@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/policy"
 	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/pkg/githash"
-	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		&o.revision,
 		"revision",
 		"",
-		"commit ID of the gittuf policy-staging ref to inspect (defaults to the current state)",
+		"policy revision to inspect (commit ID or short SHA; defaults to the current state)",
 	)
 }
 
@@ -37,7 +37,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	var state *policy.State
 	if o.revision != "" {
 		var commitID githash.Hash
-		commitID, err = gitinterface.NewHash(o.revision)
+		commitID, err = common.ResolveRevision(repo.GetStorer(), o.revision)
 		if err != nil {
 			return err
 		}

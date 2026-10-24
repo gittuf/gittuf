@@ -15,7 +15,7 @@ gittuf policy inspect [flags]
 ```
   -h, --help                 help for inspect
       --policy-name string   name of policy file to inspect (default "targets")
-      --revision string      commit ID of the gittuf policy-staging ref to inspect (defaults to the current state)
+      --revision string      policy revision to inspect (commit ID or short SHA; defaults to the current state)
 ```
 
 ### Options inherited from parent commands
