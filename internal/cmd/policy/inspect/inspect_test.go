@@ -61,6 +61,33 @@ func TestInspect(t *testing.T) {
 		_, stdout, _, err := cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		commitID, err := repo.GetGitRepository().GetReference(policy.PolicyStagingRef)
+		require.NoError(t, err)
+
+		// Test full commit SHA
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", commitID.String())
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		// Test short commit SHA
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", commitID.String()[:7])
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		// Test full ref name
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", policy.PolicyStagingRef)
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		// Test short gittuf ref name
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", "policy-staging")
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		// Test non-existent revision
+		_, _, _, err = cmd.ExecuteCommandC(New(), "--revision", "non-existent-revision")
+		assert.ErrorContains(t, err, "unable to resolve revision 'non-existent-revision'")
 	})
 
 	t.Run("invalid policy name", func(t *testing.T) {

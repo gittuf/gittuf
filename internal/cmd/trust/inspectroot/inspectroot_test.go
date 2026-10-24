@@ -68,10 +68,27 @@ func TestInspectRoot(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		command := New()
-		command.SetArgs([]string{"--revision", commitID.String()})
-		_, stdout, _, err = cmd.ExecuteCommandC(command)
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", commitID.String())
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "root"`)
+
+		// Test short commit SHA
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", commitID.String()[:7])
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "root"`)
+
+		// Test full ref name
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", policy.PolicyStagingRef)
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "root"`)
+
+		// Test short gittuf ref name
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", "policy-staging")
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "root"`)
+
+		// Test non-existent revision
+		_, _, _, err = cmd.ExecuteCommandC(New(), "--revision", "non-existent-revision")
+		assert.ErrorContains(t, err, "unable to resolve revision 'non-existent-revision'")
 	})
 }
