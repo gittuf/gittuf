@@ -512,8 +512,27 @@ func TestKnowsCommit(t *testing.T) {
 	})
 
 	t.Run("check that an unknown commit can't know a known commit", func(t *testing.T) {
-		knows, _ := repo.KnowsCommit(unknownCommitID, firstCommitID)
+		knows, err := repo.KnowsCommit(unknownCommitID, firstCommitID)
+		assert.NoError(t, err)
 		assert.False(t, knows)
+	})
+
+	t.Run("fatal git error during merge-base is returned", func(t *testing.T) {
+		thirdCommitID, err := repo.Commit(emptyTreeID, refName, "Third commit", false)
+		require.NoError(t, err)
+
+		// Corrupt the intermediate commit (secondCommitID). Both firstCommitID
+		// and thirdCommitID remain valid commit objects, so ensureIsCommit succeeds
+		// for both, but merge-base --is-ancestor fails with a fatal error (exit code 128).
+		objPath := filepath.Join(tmpDir, ".git", "objects", secondCommitID.String()[:2], secondCommitID.String()[2:])
+		err = os.Chmod(objPath, 0o644)
+		require.NoError(t, err)
+		err = os.WriteFile(objPath, []byte("garbage"), 0o600) //nolint:gosec
+		require.NoError(t, err)
+
+		knows, err := repo.KnowsCommit(thirdCommitID, firstCommitID)
+		assert.False(t, knows)
+		assert.ErrorContains(t, err, "is corrupt")
 	})
 
 	t.Run("non-commit object as first arg", func(t *testing.T) {
