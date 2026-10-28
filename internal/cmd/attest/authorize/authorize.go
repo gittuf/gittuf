@@ -50,17 +50,17 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	opts := []attestopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, attestopts.WithRSLEntry())
+	}
+
 	if o.revoke {
 		if len(args) < 3 {
 			return fmt.Errorf("insufficient parameters for revoking authorization, requires <targetRef> <fromID> <targetTreeID>")
 		}
 
-		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true)
-	}
-
-	opts := []attestopts.Option{}
-	if o.p.WithRSLEntry {
-		opts = append(opts, attestopts.WithRSLEntry())
+		return repo.RemoveReferenceAuthorization(cmd.Context(), signer, args[0], args[1], args[2], true, opts...)
 	}
 
 	return repo.AddReferenceAuthorization(cmd.Context(), signer, args[0], o.fromRef, true, opts...)
