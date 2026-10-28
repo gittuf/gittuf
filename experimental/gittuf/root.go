@@ -982,7 +982,7 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	state, err := r.loadStateForInspection(ctx, policyRef)
 	if err != nil {
 		return nil, err
 	}
