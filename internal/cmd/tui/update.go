@@ -231,7 +231,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.screen = screenTrustGitHubApp
 			case screenTrustRepoForm, screenTrustRepoLocationForm:
 				m.screen = screenTrustRepoNetwork
-			case screenTrustLifecycle, screenTrustGitHubApp, screenTrustRepoNetwork:
+			case screenTrustLifecycle, screenTrustGitHubApp, screenTrustRepoNetwork, screenTrustAdditionalInformation:
 				m.screen = screenTrust
 			case screenTrustPropagation:
 				m.screen = screenTrust
@@ -266,6 +266,8 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.trustPropagationScreen.Update(msg, &m)
 		case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
 			return m.trustGitHubAppScreen.Update(msg, &m)
+		case screenTrustAdditionalInformation:
+			return m.trustAdditionalInformationScreen.Update(msg, &m)
 		case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
 			return m.trustRepoNetworkScreen.Update(msg, &m)
 		case screenVerify:
@@ -304,6 +306,8 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.trustPropagationScreen.Update(msg, &m)
 	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
 		return m.trustGitHubAppScreen.Update(msg, &m)
+	case screenTrustAdditionalInformation:
+		return m.trustAdditionalInformationScreen.Update(msg, &m)
 	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
 		return m.trustRepoNetworkScreen.Update(msg, &m)
 	case screenVerify:

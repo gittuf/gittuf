@@ -573,6 +573,8 @@ func (m model) View() string {
 	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
 		return m.trustGitHubAppScreen.View(&m)
 
+	case screenTrustAdditionalInformation:
+		return m.trustAdditionalInformationScreen.View(&m)
 	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
 		return m.trustRepoNetworkScreen.View(&m)
 

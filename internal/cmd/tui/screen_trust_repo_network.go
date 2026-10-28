@@ -34,15 +34,14 @@ func (s *trustRepoNetworkScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 	switch m.screen {
 	case screenTrustRepoNetwork:
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
-			if sel, ok := s.operationList.SelectedItem().(item); ok {
-				s.selectAction(sel.title, m)
+			if selected, ok := s.operationList.SelectedItem().(item); ok {
+				s.selectAction(selected.title, m)
 				if s.selectedAction == trustRepoNetworkActionMakeController {
 					return s.handleFormSubmit(m)
 				}
 				return *m, nil
 			}
 		}
-
 		s.operationList, cmd = s.operationList.Update(msg)
 		return *m, cmd
 
@@ -57,13 +56,11 @@ func (s *trustRepoNetworkScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 				return *m, nil
 			}
 		}
-
 		if len(s.inputs) > 0 {
 			s.inputs[s.focusIndex], cmd = s.inputs[s.focusIndex].Update(msg)
 		}
 		return *m, cmd
 	}
-
 	return *m, nil
 }
 
@@ -83,7 +80,6 @@ func (s *trustRepoNetworkScreen) View(m *model) string {
 func (s *trustRepoNetworkScreen) selectAction(title string, m *model) {
 	if m.readOnly {
 		m.footer = "Read-only mode: action unavailable."
-		s.selectedAction = trustRepoNetworkActionNone
 		return
 	}
 
@@ -115,8 +111,6 @@ func (s *trustRepoNetworkScreen) selectAction(title string, m *model) {
 		m.screen = screenTrustRepoLocationForm
 	case "Make Controller":
 		s.selectedAction = trustRepoNetworkActionMakeController
-	default:
-		s.selectedAction = trustRepoNetworkActionNone
 	}
 }
 
@@ -124,21 +118,20 @@ func (s *trustRepoNetworkScreen) cycleFocus(key string) {
 	if len(s.inputs) == 0 {
 		return
 	}
-
-	if key == "up" || key == "shift+tab" {
+	switch key {
+	case "up", "shift+tab":
 		if s.focusIndex > 0 {
 			s.focusIndex--
 		} else {
 			s.focusIndex = len(s.inputs) - 1
 		}
-	} else {
+	default:
 		if s.focusIndex < len(s.inputs)-1 {
 			s.focusIndex++
 		} else {
 			s.focusIndex = 0
 		}
 	}
-
 	for i := range s.inputs {
 		if i == s.focusIndex {
 			s.inputs[i].Focus()
@@ -196,7 +189,6 @@ func (s *trustRepoNetworkScreen) handleFormSubmit(m *model) (tea.Model, tea.Cmd)
 	}
 
 	var err error
-
 	switch s.selectedAction {
 	case trustRepoNetworkActionAddControllerRepository, trustRepoNetworkActionAddNetworkRepository:
 		name := strings.TrimSpace(s.inputs[0].Value())

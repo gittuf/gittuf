@@ -50,6 +50,7 @@ const (
 	screenTrustAddGitHubAppForm                    // Form: add a trusted GitHub App
 	screenTrustGitHubAppActionForm                 // Form: manage GitHub App trust actions
 	screenTrustLifecycle                           // Trust lifecycle operations.
+	screenTrustAdditionalInformation               // Read-only root metadata details.
 	screenTrustRepoNetwork                         // Repo/network management screens.
 	screenTrustRepoForm                            // Form: add or update trust repo settings
 	screenTrustRepoLocationForm                    // Form: set the repository location
@@ -79,46 +80,47 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 type model struct {
-	ctx                        context.Context
-	screen                     screen
-	spinner                    spinner.Model
-	logViewport                viewport.Model
-	homeScreen                 homeScreen
-	helpScreen                 helpScreen
-	policyScreen               policyScreen
-	policyLifecycleScreen      policyLifecycleScreen
-	trustScreen                trustScreen
-	policyRulesScreen          policyRulesScreen
-	trustGlobalRulesScreen     trustGlobalRulesScreen
-	policyPrincipalsScreen     policyPrincipalsScreen
-	policyPrincipalsFormScreen policyPrincipalsFormScreen
-	trustKeysScreen            trustKeysThresholdsScreen
-	trustLifecycleScreen       trustLifecycleScreen
-	trustPropagationScreen     trustPropagationScreen
-	trustGitHubAppScreen       trustGitHubAppScreen
-	trustRepoNetworkScreen     trustRepoNetworkScreen
-	verifyScreen               verifyScreen
-	verifyRefScreen            verifyRefScreen
-	verifyMergeableScreen      verifyMergeableScreen
-	cursorMode                 cursor.Mode
-	repo                       *gittuf.Repository
-	signer                     dsse.SignerVerifier
-	policyName                 string
-	options                    *options
-	footer                     string
-	errorMsg                   string
-	errorDialog                *errorDialog
-	readOnly                   bool
-	width                      int
-	height                     int
-	showHelp                   bool
-	signerError                string
-	verifying                  bool
-	loadingMsg                 string
-	logsBuf                    *strings.Builder
-	logCh                      chan string
-	showDiffOverlay            bool
-	diffViewport               viewport.Model
+	ctx                              context.Context
+	screen                           screen
+	spinner                          spinner.Model
+	logViewport                      viewport.Model
+	homeScreen                       homeScreen
+	helpScreen                       helpScreen
+	policyScreen                     policyScreen
+	policyLifecycleScreen            policyLifecycleScreen
+	trustScreen                      trustScreen
+	policyRulesScreen                policyRulesScreen
+	trustGlobalRulesScreen           trustGlobalRulesScreen
+	policyPrincipalsScreen           policyPrincipalsScreen
+	policyPrincipalsFormScreen       policyPrincipalsFormScreen
+	trustKeysScreen                  trustKeysThresholdsScreen
+	trustLifecycleScreen             trustLifecycleScreen
+	trustPropagationScreen           trustPropagationScreen
+	trustGitHubAppScreen             trustGitHubAppScreen
+	trustAdditionalInformationScreen trustAdditionalInformationScreen
+	trustRepoNetworkScreen           trustRepoNetworkScreen
+	verifyScreen                     verifyScreen
+	verifyRefScreen                  verifyRefScreen
+	verifyMergeableScreen            verifyMergeableScreen
+	cursorMode                       cursor.Mode
+	repo                             *gittuf.Repository
+	signer                           dsse.SignerVerifier
+	policyName                       string
+	options                          *options
+	footer                           string
+	errorMsg                         string
+	errorDialog                      *errorDialog
+	readOnly                         bool
+	width                            int
+	height                           int
+	showHelp                         bool
+	signerError                      string
+	verifying                        bool
+	loadingMsg                       string
+	logsBuf                          *strings.Builder
+	logCh                            chan string
+	showDiffOverlay                  bool
+	diffViewport                     viewport.Model
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
@@ -176,10 +178,11 @@ func trustMenuItems(readOnly bool) []list.Item {
 	items := []list.Item{
 		item{title: "View Global Rules", desc: "View and manage global rules"},
 		item{title: "Propagation", desc: "Manage propagation directives"},
+		item{title: "Additional Information", desc: "View root metadata details"},
 	}
 	if !readOnly {
 		items = append(items,
-			item{title: "Keys & Thresholds", desc: "Manage root keys, policy keys, and thresholds"},
+			item{title: "Keys & Thresholds", desc: "Manage root/policy keys and signature thresholds"},
 			item{title: "GitHub App", desc: "Manage trusted GitHub App settings"},
 			item{title: "Lifecycle", desc: "Stage, sign, and apply trust changes"},
 			item{title: "Repo/Network", desc: "Manage controller, network, and repository settings"},
@@ -343,7 +346,7 @@ func initialModel(ctx context.Context, o *options) model {
 			globalRuleList: newMenuList("Global Rules", []list.Item{}, delegate),
 		},
 		trustKeysScreen: trustKeysThresholdsScreen{
-			operationList: newMenuList("Keys & Thresholds", trustKeysMenuItems(o.readOnly), delegate),
+			operationList: newMenuList("Trust Keys", trustKeysMenuItems(o.readOnly), delegate),
 		},
 		trustLifecycleScreen: trustLifecycleScreen{
 			operationList: newMenuList("Trust Lifecycle", trustLifecycleMenuItems(o.readOnly), delegate),
@@ -353,6 +356,9 @@ func initialModel(ctx context.Context, o *options) model {
 		},
 		trustGitHubAppScreen: trustGitHubAppScreen{
 			operationList: newMenuList("Trust GitHub App", trustGitHubAppMenuItems(o.readOnly), delegate),
+		},
+		trustAdditionalInformationScreen: trustAdditionalInformationScreen{
+			operationList: newMenuList("Trust Additional Information", trustAdditionalInformationMenuItems(), delegate),
 		},
 		trustRepoNetworkScreen: trustRepoNetworkScreen{
 			operationList: newMenuList("Trust Repo/Network", trustRepoNetworkMenuItems(o.readOnly), delegate),
@@ -430,6 +436,7 @@ func (m *model) resizeLists() {
 	m.trustPropagationScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustGitHubAppScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.trustRepoNetworkScreen.operationList.SetSize(innerWidth, innerHeight)
+	m.trustAdditionalInformationScreen.operationList.SetSize(innerWidth, innerHeight)
 	m.verifyScreen.choiceList.SetSize(innerWidth, innerHeight)
 }
 
@@ -502,13 +509,15 @@ func (m *model) currentScreenTitle() string {
 	case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 		return "Home › Trust › Global Rules"
 	case screenTrustKeysThresholds, screenTrustKeyForm, screenTrustThresholdForm:
-		return "Home › Trust › Keys & Thresholds"
+		return "Home › Trust › Keys"
 	case screenTrustLifecycle:
 		return "Home › Trust › Lifecycle"
 	case screenTrustPropagation, screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
 		return "Home › Trust › Propagation"
 	case screenTrustGitHubApp, screenTrustAddGitHubAppForm, screenTrustGitHubAppActionForm:
 		return "Home › Trust › GitHub App"
+	case screenTrustAdditionalInformation:
+		return "Home › Trust › Additional Information"
 	case screenTrustRepoNetwork, screenTrustRepoForm, screenTrustRepoLocationForm:
 		return "Home › Trust › Repo/Network"
 	case screenVerify:
