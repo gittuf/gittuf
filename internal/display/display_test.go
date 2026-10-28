@@ -6,6 +6,7 @@ package display
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"runtime"
 	"strings"
 	"testing"
@@ -104,4 +105,76 @@ func TestNewDisplayWriter(t *testing.T) {
 			assert.Equal(t, string(test.contents), gotOutput, fmt.Sprintf("unexpected result in test '%s', got '%s', want '%s'", name, gotOutput, string(test.contents)))
 		})
 	}
+}
+
+type mockWriteCloser struct {
+	io.Writer
+}
+
+func (m mockWriteCloser) Close() error {
+	return nil
+}
+
+func TestNewDisplayWriter_WriteCloser(t *testing.T) {
+	getPager = getPagerTestNone
+	output := &mockWriteCloser{Writer: &bytes.Buffer{}}
+	writer := NewDisplayWriter(output)
+	assert.Equal(t, output, writer)
+}
+
+func TestGetPagerReal_NotFound(t *testing.T) {
+	t.Setenv("PATH", "")
+	t.Setenv("PAGER", "nonexistent-pager")
+	pager := getPagerReal()
+	assert.Nil(t, pager)
+}
+
+type pagerTestInvalid struct{}
+
+func getPagerTestInvalid() pager               { return &pagerTestInvalid{} }
+func (p *pagerTestInvalid) getBinary() string  { return "nonexistent-pager-binary" }
+func (p *pagerTestInvalid) getFlags() []string { return nil }
+
+func TestPagerWriteCloser_StartError(t *testing.T) {
+	getPager = getPagerTestInvalid
+	output := &bytes.Buffer{}
+	writer := NewDisplayWriter(output)
+
+	_, err := writer.Write([]byte("test"))
+	assert.Error(t, err)
+
+	// Close should also handle not started
+	err = writer.Close()
+	if err != nil {
+		// exec.Cmd.Start closes the pipe on failure, so this might return an error
+		t.Logf("Close returned error: %v", err)
+	}
+}
+func TestPagerWriteCloser_StdinPipeError(t *testing.T) {
+	getPager = getPagerTestCat
+	output := &bytes.Buffer{}
+	writer := NewDisplayWriter(output)
+
+	pagerWriter := writer.(*pagerWriteCloser)
+	_, _ = pagerWriter.command.StdinPipe() // call once
+
+	_, err := writer.Write([]byte("test"))
+	assert.Error(t, err)
+}
+
+func TestPagerWriteCloser_WaitError(t *testing.T) {
+	getPager = getPagerTestCat
+	output := &bytes.Buffer{}
+	writer := NewDisplayWriter(output)
+
+	// Start it normally
+	_, err := writer.Write([]byte("test"))
+	assert.NoError(t, err)
+
+	pagerWriter := writer.(*pagerWriteCloser)
+	// kill the process so Wait returns an error
+	_ = pagerWriter.command.Process.Kill()
+
+	err = writer.Close()
+	assert.Error(t, err)
 }
