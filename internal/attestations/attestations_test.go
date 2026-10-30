@@ -181,10 +181,11 @@ func TestAttestationsCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	currentTreeID, err := repo.GetCommitTreeID(currentTip)
+	currentCommitInfo, err := repo.GetCommitInfo(currentTip)
 	if err != nil {
 		t.Fatal(err)
 	}
+	currentTreeID := currentCommitInfo.TreeID
 	assert.Equal(t, expectedTreeID, currentTreeID)
 
 	attestations, err = LoadCurrentAttestations(repo)
@@ -325,13 +326,13 @@ func TestLoadAttestationsForEntryStorerErrors(t *testing.T) {
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryDoesNotMatchRef)
 	})
 
-	t.Run("get commit tree ID error", func(t *testing.T) {
+	t.Run("get commit info error", func(t *testing.T) {
 		t.Parallel()
 
 		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
-		injected := errors.New("get commit tree ID failure")
+		injected := errors.New("get commit info failure")
 
-		_, err := LoadAttestationsForEntry(&gitstoretest.FakeStorer{Storer: repo, GetCommitTreeIDErr: injected}, rsl.NewReferenceEntry(Ref, gitinterface.ZeroHash))
+		_, err := LoadAttestationsForEntry(&gitstoretest.FakeStorer{Storer: repo, GetCommitInfoErr: injected}, rsl.NewReferenceEntry(Ref, gitinterface.ZeroHash))
 		assert.ErrorIs(t, err, injected)
 	})
 

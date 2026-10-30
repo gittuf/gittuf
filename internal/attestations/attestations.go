@@ -95,12 +95,12 @@ func LoadAttestationsForEntry(repo gitstore.Storer, entry rsl.ReferenceUpdaterEn
 		return nil, rsl.ErrRSLEntryDoesNotMatchRef
 	}
 
-	attestationsRootTreeID, err := repo.GetCommitTreeID(entry.GetTargetID())
+	attestationsCommitInfo, err := repo.GetCommitInfo(entry.GetTargetID())
 	if err != nil {
 		return nil, err
 	}
 
-	treeContents, err := repo.GetAllFilesInTree(attestationsRootTreeID)
+	treeContents, err := repo.GetAllFilesInTree(attestationsCommitInfo.TreeID)
 	if err != nil {
 		return nil, err
 	}

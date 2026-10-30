@@ -850,8 +850,9 @@ func TestStateCommit(t *testing.T) {
 		stagingTip, err := repo.GetReference(PolicyStagingRef)
 		require.Nil(t, err)
 
-		treeID, err := repo.GetCommitTreeID(stagingTip)
-		require.Nil(t, err)
+		commitInfo, err := repo.GetCommitInfo(stagingTip)
+		require.NoError(t, err)
+		treeID := commitInfo.TreeID
 
 		allFiles, err := repo.GetAllFilesInTree(treeID)
 		require.Nil(t, err)
@@ -901,8 +902,9 @@ func TestStateCommit(t *testing.T) {
 		stagingTip, err := repo.GetReference(PolicyStagingRef)
 		require.Nil(t, err)
 
-		treeID, err := repo.GetCommitTreeID(stagingTip)
-		require.Nil(t, err)
+		commitInfo, err := repo.GetCommitInfo(stagingTip)
+		require.NoError(t, err)
+		treeID := commitInfo.TreeID
 
 		allFiles, err := repo.GetAllFilesInTree(treeID)
 		require.Nil(t, err)
@@ -952,8 +954,9 @@ func TestStateCommit(t *testing.T) {
 		stagingTip, err := repo.GetReference(PolicyStagingRef)
 		require.Nil(t, err)
 
-		treeID, err := repo.GetCommitTreeID(stagingTip)
-		require.Nil(t, err)
+		commitInfo, err := repo.GetCommitInfo(stagingTip)
+		require.NoError(t, err)
+		treeID := commitInfo.TreeID
 
 		allFiles, err := repo.GetAllFilesInTree(treeID)
 		require.Nil(t, err)
