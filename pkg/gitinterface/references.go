@@ -20,7 +20,13 @@ const (
 	RemoteRefPrefix = "refs/remotes/"
 )
 
-var ErrReferenceNotFound = gitstore.ErrReferenceNotFound
+var (
+	ErrReferenceNotFound = gitstore.ErrReferenceNotFound
+
+	// ErrExpectedGitIDNotSpecified is returned when a conditional operation
+	// that must match an existing value is given a nil or zero Git ID.
+	ErrExpectedGitIDNotSpecified = errors.New("expected Git ID not specified")
+)
 
 // GetReference returns the tip of the specified Git reference.
 func (r *Repository) GetReference(refName string) (Hash, error) {
@@ -60,11 +66,34 @@ func (r *Repository) DeleteReference(refName string) error {
 }
 
 // CheckAndSetReference sets the specified reference to the provided Git ID if
-// the reference is currently set to `oldGitID`.
+// the reference is currently set to `oldGitID`. A nil or zero `oldGitID` asks
+// Git to create the reference only while it does not exist yet.
+//
+// The update resolves symbolic references, so a symbolic `refName` sets the
+// reference it points to.
 func (r *Repository) CheckAndSetReference(refName string, newGitID, oldGitID Hash) error {
 	_, err := r.executor("update-ref", "--create-reflog", refName, newGitID.String(), oldGitID.String()).executeString()
 	if err != nil {
 		return fmt.Errorf("unable to set Git reference '%s' to '%s': %w", refName, newGitID.String(), err)
+	}
+
+	return nil
+}
+
+// CheckAndDeleteReference deletes the specified reference if it is currently
+// set to `oldGitID`. A nil or zero `oldGitID` is rejected, because Git reads it
+// as "any value" and deletes the reference unconditionally.
+//
+// The delete resolves symbolic references, so a symbolic `refName` deletes the
+// reference it points to.
+func (r *Repository) CheckAndDeleteReference(refName string, oldGitID Hash) error {
+	if oldGitID.IsZero() {
+		return fmt.Errorf("unable to delete Git reference '%s': %w", refName, ErrExpectedGitIDNotSpecified)
+	}
+
+	_, err := r.executor("update-ref", "-d", refName, oldGitID.String()).executeString()
+	if err != nil {
+		return fmt.Errorf("unable to delete Git reference '%s': %w", refName, err)
 	}
 
 	return nil

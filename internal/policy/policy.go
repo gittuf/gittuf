@@ -55,6 +55,7 @@ var (
 	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
 	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
+	ErrRootMetadataNotFound          = errors.New("policy state has no root metadata")
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -219,6 +220,35 @@ func (s *StateMetadata) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
 	return repo.WriteTree(entries)
 }
 
+// loadAnchoredState returns the state for entry on the paths where the RSL
+// offers no applied policy to verify it against. A caller that declared the
+// initial root principals gets no trust on sight: the state must carry valid
+// metadata and a root signed by that anchor.
+func loadAnchoredState(ctx context.Context, repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry, initialRootPrincipals []tuf.Principal) (*State, error) {
+	state, err := loadStateForEntry(repo, entry)
+	if err != nil || len(initialRootPrincipals) == 0 {
+		return state, err
+	}
+
+	if err := state.Verify(ctx); err != nil {
+		return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
+	}
+
+	slog.Debug("Verifying root of trust using provided initial root principals...")
+	verifier := &SignatureVerifier{
+		repository: repo,
+		name:       "initial-root-verifier",
+		principals: initialRootPrincipals,
+		threshold:  len(initialRootPrincipals),
+	}
+
+	if _, err := verifier.Verify(ctx, nil, state.Metadata.RootEnvelope); err != nil {
+		return nil, err
+	}
+
+	return state, nil
+}
+
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
 // entry in the RSL. If no policy states are found and the entry is for the
@@ -245,8 +275,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		if errors.Is(err, ErrPolicyNotFound) {
 			// we don't have a policy entry yet
 			// we just return the state for the requested entry
-			slog.Debug("No applied policy found, loading requested policy without further verification...")
-			return loadStateForEntry(repo, requestedEntry)
+			slog.Debug("No applied policy found, loading requested policy...")
+			return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 		}
 		return nil, err
 	}
@@ -293,8 +323,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		// the first policy entry knows the requested entry, meaning the
 		// requested entry is an ancestor of the first policy entry
 		// we just return the state for the requested entry
-		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy without verification...")
-		return loadStateForEntry(repo, requestedEntry)
+		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy...")
+		return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 	}
 
 	// If requestedEntry.RefName == policy, then allPolicyEntries includes requestedEntry
@@ -758,26 +788,7 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 		commitMessage = DefaultCommitMessage
 	}
 
-	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
-	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
-	if err != nil {
-		return err
-	}
-	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
-
-	for absoluteControllerPath, metadata := range s.ControllerMetadata {
-		stateMetadataTreeID, err := metadata.WriteTree(repo)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, gitstore.TreeEntry{
-			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
-			ID:   stateMetadataTreeID,
-			Kind: gitstore.KindSubtree,
-		})
-	}
-
-	policyRootTreeID, err := repo.WriteTree(entries)
+	policyRootTreeID, err := s.WriteTree(repo)
 	if err != nil {
 		return err
 	}
@@ -806,6 +817,33 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 	}
 
 	return nil
+}
+
+// WriteTree writes the State's metadata to repo and returns the ID of the
+// policy tree holding it. It writes no commit and sets no reference, so a
+// caller that manages its own commit and reference handling can use it in place
+// of Commit.
+func (s *State) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
+	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
+	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
+	if err != nil {
+		return nil, err
+	}
+	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
+
+	for absoluteControllerPath, metadata := range s.ControllerMetadata {
+		stateMetadataTreeID, err := metadata.WriteTree(repo)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, gitstore.TreeEntry{
+			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
+			ID:   stateMetadataTreeID,
+			Kind: gitstore.KindSubtree,
+		})
+	}
+
+	return repo.WriteTree(entries)
 }
 
 // Apply takes valid changes from the policy staging ref, and fast-forward
@@ -1163,6 +1201,14 @@ func (s *State) HasRuleName(name string) bool {
 // This includes things like loading the set of rule names present in the state,
 // checking if it has file rules, etc.
 func (s *State) preprocess() error {
+	// A policy tree can be missing root.json entirely, which leaves the
+	// envelope nil. Reject it here: callers reach this with candidate trees
+	// they have not authenticated, and dereferencing the envelope below would
+	// panic rather than refuse them.
+	if s.Metadata == nil || s.Metadata.RootEnvelope == nil {
+		return ErrRootMetadataNotFound
+	}
+
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return err
