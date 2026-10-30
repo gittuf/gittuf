@@ -140,6 +140,13 @@ func TestDelegationsUnmarshalJSON(t *testing.T) {
 		assert.ErrorContains(t, err, "unrecognized principal type")
 	})
 
+	t.Run("invalid principal JSON", func(t *testing.T) {
+		delegations := &Delegations{}
+
+		err := json.Unmarshal([]byte(`{"principals":{"invalid":"not-an-object"}}`), delegations)
+		assert.ErrorContains(t, err, "unable to unmarshal json")
+	})
+
 	tests := map[string]string{
 		"invalid key":    `{"principals":{"invalid":{"keyid":[]}}}`,
 		"invalid person": `{"principals":{"invalid":{"personID":[]}}}`,
