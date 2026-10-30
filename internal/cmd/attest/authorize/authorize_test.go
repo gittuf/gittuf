@@ -9,11 +9,14 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	attestopts "github.com/gittuf/gittuf/experimental/gittuf/options/attest"
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -179,5 +182,51 @@ func TestAuthorize(t *testing.T) {
 		}
 		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--revoke", targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
 		assert.NoError(t, err)
+	})
+
+	t.Run("success revoke with RSL entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		repo, err := gittuf.LoadRepository(tmpDir)
+		require.NoError(t, err)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		fromRef := "refs/heads/main"
+		targetTagRef := "refs/tags/v1"
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo.GetGitRepository())
+		emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+		initialCommitID, err := repo.GetGitRepository().Commit(emptyTreeID, fromRef, "Initial commit\n", false)
+		require.NoError(t, err)
+		require.NoError(t, repo.RecordRSLEntryForReference(t.Context(), fromRef, false, rslopts.WithRecordLocalOnly()))
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.AddReferenceAuthorization(t.Context(), signer, targetTagRef, fromRef, false, attestopts.WithRSLEntry()))
+
+		pOpts := &persistent.Options{
+			SigningKey:   keyPath,
+			WithRSLEntry: true,
+		}
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--revoke", targetTagRef, gitinterface.ZeroHash.String(), initialCommitID.String())
+		require.NoError(t, err)
+
+		attestationsTip, err := repo.GetGitRepository().GetReference(attestations.Ref)
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetGitRepository())
+		require.NoError(t, err)
+		require.IsType(t, &rsl.ReferenceEntry{}, latestEntry)
+
+		entry := latestEntry.(*rsl.ReferenceEntry)
+		assert.Equal(t, attestations.Ref, entry.RefName)
+		assert.Equal(t, attestationsTip, entry.TargetID)
 	})
 }
