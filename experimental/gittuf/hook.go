@@ -10,6 +10,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 type ErrHookExists struct {
@@ -22,9 +25,14 @@ func (e *ErrHookExists) Error() string {
 
 type HookType string
 
-var HookPrePush = HookType("pre-push")
+var (
+	HookPrePush      = HookType("pre-push")
+	ErrHooksDisabled = errors.New("cannot install hook: Git hooks are disabled by core.hooksPath")
+)
 
-// UpdateHook updates a git hook in the repository's .git/hooks folder.
+// UpdateGitHook updates a git hook in the repository's hooks folder.
+// If core.hooksPath is configured, the hook is placed in that directory.
+// Otherwise, it is placed in the repository's .git/hooks directory.
 // Existing hook files are not overwritten, unless force flag is set.
 func (r *Repository) UpdateGitHook(hookType HookType, content []byte, force bool) error {
 	// TODO: rely on go-git to find .git folder, once
@@ -36,6 +44,25 @@ func (r *Repository) UpdateGitHook(hookType HookType, content []byte, force bool
 	gitDir := r.r.GetGitDir()
 
 	hookFolder := filepath.Join(gitDir, "hooks")
+	hooksPath, ok, err := r.r.LookupConfig(gitstore.ConfigCoreHooksPath)
+	if err != nil {
+		return err
+	}
+	if ok && strings.TrimSpace(hooksPath) != "" {
+		hooksPath = strings.TrimSpace(hooksPath)
+		if hooksPath == "/dev/null" || hooksPath == os.DevNull || strings.EqualFold(hooksPath, "nul") {
+			return ErrHooksDisabled
+		}
+		if filepath.IsAbs(hooksPath) {
+			hookFolder = hooksPath
+		} else {
+			worktree := gitDir
+			if !r.r.IsBare() {
+				worktree = filepath.Dir(gitDir)
+			}
+			hookFolder = filepath.Join(worktree, hooksPath)
+		}
+	}
 	if err := os.MkdirAll(hookFolder, 0o750); err != nil {
 		return fmt.Errorf("making sure folder exist: %w", err)
 	}
