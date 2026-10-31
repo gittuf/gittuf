@@ -182,7 +182,7 @@ require (
 	github.com/theupdateframework/go-tuf v0.7.0 // indirect
 	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
 	github.com/tink-crypto/tink-go-awskms/v3 v3.0.0 // indirect
-	github.com/tink-crypto/tink-go-gcpkms/v2 v2.4.0 // indirect
+	github.com/tink-crypto/tink-go-gcpkms/v2 v2.4.1-0.20261029114539-099a18501d6b // indirect
 	github.com/tink-crypto/tink-go/v2 v2.9.0 // indirect
 	github.com/transparency-dev/formats v0.1.1 // indirect
 	github.com/transparency-dev/merkle v0.0.2 // indirect
