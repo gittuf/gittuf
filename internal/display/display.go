@@ -114,14 +114,11 @@ func (p *pagerLess) getBinary() string {
 }
 
 func (p *pagerLess) getFlags() []string {
-	options := os.Getenv("LESS") // see if user already has preferred LESS flags
-	if options != "" {
-		flags := make([]string, 0, len(options))
-		split := strings.Split(options, "")
-		for _, s := range split {
-			flags = append(flags, fmt.Sprintf("-%s", s)) // we prefix the "-" as this is passed to exec.Command
-		}
-		return flags
+	// If the user already has preferred LESS flags, less reads them from the
+	// environment itself, so we must not pass them again as arguments. Doing
+	// so mangles values like "-R" or "--mouse" into filenames.
+	if os.Getenv("LESS") != "" {
+		return nil
 	}
 
 	// These are the default flags to use with less, matches what Git sets
