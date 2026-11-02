@@ -489,6 +489,51 @@ func TestWriteRSLReferenceEntry(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, expectedOutput, output.String())
 	})
+
+	t.Run("with non-skip annotation, no parent, annotation message has multiple lines", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+
+		if err := rsl.NewReferenceEntry("refs/heads/main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		entry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := rsl.NewAnnotationEntry([]githash.Hash{entry.GetID()}, false, "first line\nsecond line\n\nfourth line\n").Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+		annotationEntryT, err := rsl.GetLatestEntry(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+		annotationEntry := annotationEntryT.(*rsl.AnnotationEntry)
+
+		expectedOutput := fmt.Sprintf(`entry %s
+
+  Ref:    refs/heads/main
+  Target: 0000000000000000000000000000000000000000
+  Number: 1
+
+    Annotation ID: %s
+    Skip:          no
+    Number:        2
+    Message:
+      first line
+      second line
+
+      fourth line
+`, entry.GetID().String(), annotationEntry.GetID().String())
+
+		output := &bytes.Buffer{}
+		testWriter := &noopwritecloser{writer: output}
+		err = writeRSLReferenceEntry(testWriter, entry.(*rsl.ReferenceEntry), []*rsl.AnnotationEntry{annotationEntry}, false)
+		assert.Nil(t, err)
+		assert.Equal(t, expectedOutput, output.String())
+	})
 }
 
 func TestWriteRSLPropagationEntry(t *testing.T) {
