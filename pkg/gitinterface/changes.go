@@ -25,22 +25,17 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 	}
 
 	if len(parentCommitIDs) == 0 {
-		filePaths, err := r.executor("ls-tree", "--name-only", "-r", commitID.String()).executeString()
+		filePaths, err := r.executor("ls-tree", "--name-only", "-r", "-z", commitID.String()).executeRaw()
 		if err != nil {
 			return nil, fmt.Errorf("unable to identify all commit file paths: %w", err)
 		}
 
-		if filePaths == "" {
-			return nil, nil
-		}
-
-		paths := strings.Split(filePaths, "\n")
-		return paths, nil
+		return splitNULTerminatedPaths(filePaths), nil
 	}
 
 	if len(parentCommitIDs) > 1 {
 		// Check if tree matches last commit
-		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).executeString()
+		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).executeRaw()
 		if err != nil {
 			return nil, fmt.Errorf("unable to diff commit against last parent commit: %w", err)
 		}
@@ -50,19 +45,12 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 
 		pathSet := map[string]bool{}
 		for _, parentCommitID := range parentCommitIDs {
-			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID.String(), commitID.String()).executeString()
+			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", parentCommitID.String(), commitID.String()).executeRaw()
 			if err != nil {
 				return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 			}
-			if stdOut == "" {
-				continue
-			}
 
-			paths := strings.Split(stdOut, "\n")
-			for _, path := range paths {
-				if path == "" {
-					continue
-				}
+			for _, path := range splitNULTerminatedPaths(stdOut) {
 				pathSet[path] = true
 			}
 		}
@@ -79,14 +67,23 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 		return paths, nil
 	}
 
-	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).executeString()
+	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).executeRaw()
 	if err != nil {
 		return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 	}
-	if stdOut == "" {
-		return nil, nil
+
+	return splitNULTerminatedPaths(stdOut), nil
+}
+
+// splitNULTerminatedPaths splits the output of a Git command run with -z into
+// paths. With -z, Git prints each path verbatim followed by a NUL byte instead
+// of quoting paths that contain unusual characters such as non-ASCII bytes,
+// tabs or double quotes. It returns nil if there are no paths.
+func splitNULTerminatedPaths(output string) []string {
+	output = strings.TrimSuffix(output, "\x00")
+	if output == "" {
+		return nil
 	}
 
-	paths := strings.Split(stdOut, "\n")
-	return paths, nil
+	return strings.Split(output, "\x00")
 }

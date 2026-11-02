@@ -290,6 +290,18 @@ func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
 // should be used almost every time; the only exception is when the output is
 // desired without any processing such as the removal of space characters.
 func (e *executor) executeString() (string, error) {
+	stdOut, err := e.executeRaw()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(stdOut), nil
+}
+
+// executeRaw runs the constructed Git command and returns the contents of
+// stdout without removing any characters. Use it when leading or trailing
+// space characters in the output are significant, such as in file paths.
+func (e *executor) executeRaw() (string, error) {
 	stdOut, stdErr, err := e.execute()
 	if err != nil {
 		stdErrContents, newErr := io.ReadAll(stdErr)
@@ -304,7 +316,7 @@ func (e *executor) executeString() (string, error) {
 		return "", fmt.Errorf("unable to read stdout contents: %w", err)
 	}
 
-	return strings.TrimSpace(string(stdOutContents)), nil
+	return string(stdOutContents), nil
 }
 
 // execute runs the constructed Git command and returns the raw stdout and

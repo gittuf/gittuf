@@ -4,6 +4,7 @@
 package gitinterface
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
@@ -349,6 +350,63 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cM)
 		assert.Nil(t, err)
 		assert.Equal(t, []string{"a"}, diffs)
+	})
+
+	t.Run("special characters", func(t *testing.T) {
+		for i, name := range []string{
+			"file with spaces.txt",
+			" leading.txt",
+			"trailing.txt ",
+			"tab\tname.txt",
+			"newline\nname.txt",
+			"quote\"name.txt",
+			"backslash\\name.txt",
+			"unicode-é.txt",
+		} {
+			// Some of these characters are invalid in ref names, so name each
+			// ref by its index instead of the test name
+			mainBranch := testNameToRefName(fmt.Sprintf("%s %d", t.Name(), i))
+
+			t.Run(name, func(t *testing.T) {
+				writeTree := func(blobID Hash) Hash {
+					// Use NUL-delimited input so Git stores the filename verbatim.
+					treeIDString, err := repo.executor("mktree", "-z").withStdIn(bytes.NewBufferString(
+						fmt.Sprintf("100644 blob %s\t%s\x00", blobID.String(), name),
+					)).executeString()
+					require.NoError(t, err)
+					treeID, err := NewHash(treeIDString)
+					require.NoError(t, err)
+					return treeID
+				}
+
+				treeA := writeTree(blobIDs[0])
+				treeB := writeTree(blobIDs[1])
+				treeC := writeTree(blobIDs[2])
+
+				// Root commit
+				cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+				require.NoError(t, err)
+
+				diffs, err := repo.GetFilePathsChangedByCommit(cA)
+				assert.NoError(t, err)
+				assert.Equal(t, []string{name}, diffs)
+
+				// Commit with a single parent
+				cB, err := repo.Commit(treeB, mainBranch, "Test commit\n", false)
+				require.NoError(t, err)
+
+				diffs, err = repo.GetFilePathsChangedByCommit(cB)
+				assert.NoError(t, err)
+				assert.Equal(t, []string{name}, diffs)
+
+				// Merge commit with no matching parent
+				cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+
+				diffs, err = repo.GetFilePathsChangedByCommit(cM)
+				assert.NoError(t, err)
+				assert.Equal(t, []string{name}, diffs)
+			})
+		}
 	})
 
 	t.Run("non-commit object", func(t *testing.T) {
