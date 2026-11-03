@@ -551,7 +551,8 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 				slog.Debug("Verifying changes...")
 				if currentPolicy == nil {
-					return ErrPolicyNotFound
+					slog.Debug(fmt.Sprintf("Entry '%s' does not have an associated policy, not verifying...", entry.GetID().String()))
+					continue
 				}
 				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
 					slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
