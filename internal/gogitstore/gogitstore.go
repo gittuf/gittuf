@@ -140,87 +140,55 @@ func (s *Storer) ReadBlob(blobID githash.Hash) ([]byte, error) {
 	return io.ReadAll(reader)
 }
 
-func (s *Storer) GetCommitMessage(commitID githash.Hash) (string, error) {
-	repo, done, err := s.beginRead("GetCommitMessage")
+// GetCommitInfo returns the commit's tree ID, parent IDs, and message. It
+// returns an error if the requested ID is not a commit. ParentIDs is nil for a
+// commit with no parents or at a shallow boundary, matching the gitinterface
+// implementation.
+func (s *Storer) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, error) {
+	repo, done, err := s.beginRead("GetCommitInfo")
 	defer done()
 	if err != nil {
-		return "", err
+		return gitstore.CommitInfo{}, err
 	}
 
 	if repo == nil {
-		return s.Repository.GetCommitMessage(commitID)
+		return s.Repository.GetCommitInfo(commitID)
 	}
 
 	commit, err := s.commit(repo, commitID)
 	if err != nil {
-		return "", fmt.Errorf("unable to identify message for commit '%s': %w", commitID.String(), err)
+		return gitstore.CommitInfo{}, fmt.Errorf("unable to read commit '%s': %w", commitID.String(), err)
 	}
 
-	// Match gitinterface whitespace trimming.
-	return strings.TrimSpace(commit.Message), nil
-}
-
-func (s *Storer) GetCommitTreeID(commitID githash.Hash) (githash.Hash, error) {
-	repo, done, err := s.beginRead("GetCommitTreeID")
-	defer done()
+	treeID, err := fromGoGit(commit.TreeHash)
 	if err != nil {
-		return nil, err
+		return gitstore.CommitInfo{}, fmt.Errorf("invalid tree ID '%s' for commit '%s': %w", commit.TreeHash.String(), commitID.String(), err)
 	}
 
-	if repo == nil {
-		return s.Repository.GetCommitTreeID(commitID)
-	}
-
-	commit, err := s.commit(repo, commitID)
-	if err != nil {
-		return s.ZeroHash(), fmt.Errorf("unable to identify tree for commit '%s': %w", commitID.String(), err)
-	}
-
-	return fromGoGit(commit.TreeHash)
-}
-
-// GetCommitParentIDs returns nil for a commit with no parents, as gitinterface
-// does.
-func (s *Storer) GetCommitParentIDs(commitID githash.Hash) ([]githash.Hash, error) {
-	repo, done, err := s.beginRead("GetCommitParentIDs")
-	defer done()
-	if err != nil {
-		return nil, err
-	}
-
-	if repo == nil {
-		return s.Repository.GetCommitParentIDs(commitID)
-	}
-
-	commit, err := s.commit(repo, commitID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to identify parents for commit '%s': %w", commitID.String(), err)
+	info := gitstore.CommitInfo{
+		TreeID:  treeID,
+		Message: strings.TrimSpace(commit.Message),
 	}
 
 	shallow, err := repo.Storer.Shallow()
 	if err != nil {
-		return nil, err
+		return gitstore.CommitInfo{}, err
 	}
 	for _, boundary := range shallow {
 		if boundary == commit.Hash {
-			return nil, nil
+			return info, nil
 		}
 	}
 
-	if len(commit.ParentHashes) == 0 {
-		return nil, nil
-	}
-
-	parentIDs := make([]githash.Hash, 0, len(commit.ParentHashes))
 	for _, parentHash := range commit.ParentHashes {
 		parentID, err := fromGoGit(parentHash)
 		if err != nil {
-			return nil, fmt.Errorf("invalid parent commit ID '%s': %w", parentHash.String(), err)
+			return gitstore.CommitInfo{}, fmt.Errorf("invalid parent commit ID '%s': %w", parentHash.String(), err)
 		}
-		parentIDs = append(parentIDs, parentID)
+		info.ParentIDs = append(info.ParentIDs, parentID)
 	}
 
-	return parentIDs, nil
+	return info, nil
 }
 
 // GetEntriesInTree returns nil for an empty tree, as gitinterface does.

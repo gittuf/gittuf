@@ -328,11 +328,11 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 	// We want the tree of the target commit in the policy ref entry. Actually,
 	// we want the tree ID of the `metadata` subtree. This subdirectory is what
 	// we expect to have been propagated into each network repo.
-	policyTreeID, err := v.repo.GetCommitTreeID(policyEntry.GetTargetID())
+	policyCommitInfo, err := v.repo.GetCommitInfo(policyEntry.GetTargetID())
 	if err != nil {
 		return err
 	}
-	policyMetadataTreeID, err := v.repo.GetPathIDInTree(policyTreeID, metadataTreeEntryName)
+	policyMetadataTreeID, err := v.repo.GetPathIDInTree(policyCommitInfo.TreeID, metadataTreeEntryName)
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 		slog.Debug(fmt.Sprintf("Network repository '%s' has declared required controller repository with name '%s'", entry.GetName(), declaredControllerName))
 
 		// Check if it has correctly propagated changes
-		networkPolicyTreeID, err := networkRepo.GetCommitTreeID(latestNetworkPolicyEntry.GetTargetID())
+		networkPolicyCommitInfo, err := networkRepo.GetCommitInfo(latestNetworkPolicyEntry.GetTargetID())
 		if err != nil {
 			return err
 		}
@@ -404,7 +404,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 		encodedLocation := base64.URLEncoding.EncodeToString([]byte(rootMetadata.GetRepositoryLocation()))
 
 		controllerPath := fmt.Sprintf("%s/%s-%s", tuf.GittufControllerPrefix, declaredControllerName, encodedLocation)
-		propagatedTreeID, err := networkRepo.GetPathIDInTree(networkPolicyTreeID, controllerPath)
+		propagatedTreeID, err := networkRepo.GetPathIDInTree(networkPolicyCommitInfo.TreeID, controllerPath)
 		if err != nil {
 			return err
 		}
@@ -610,7 +610,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 		// gittuf requires the fix to point to a commit that is tree-same as the
 		// last good state
-		lastGoodTreeID, err := v.repo.GetCommitTreeID(lastGoodEntry.GetTargetID())
+		lastGoodCommitInfo, err := v.repo.GetCommitInfo(lastGoodEntry.GetTargetID())
 		if err != nil {
 			return err
 		}
@@ -644,13 +644,13 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 				continue
 
 			case *rsl.ReferenceEntry:
-				newCommitTreeID, err := v.repo.GetCommitTreeID(newEntry.GetTargetID())
+				newCommitInfo, err := v.repo.GetCommitInfo(newEntry.GetTargetID())
 				if err != nil {
 					return err
 				}
 
 				slog.Debug("Checking if entry is tree-same with last valid state...")
-				if newCommitTreeID.Equal(lastGoodTreeID) {
+				if newCommitInfo.TreeID.Equal(lastGoodCommitInfo.TreeID) {
 					// Fix found, we append the rest of the current verification set
 					// to the new entry queue
 					// But first, we must check that this fix hasn't been skipped
@@ -932,11 +932,16 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo gitstore.Storer, 
 		isTag = true
 
 		toID, err = repo.GetTagTarget(entry.TargetID)
+		if err != nil {
+			return nil, nil, err
+		}
 	} else {
-		toID, err = repo.GetCommitTreeID(entry.TargetID)
-	}
-	if err != nil {
-		return nil, nil, err
+		commitInfo, err := repo.GetCommitInfo(entry.TargetID)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		toID = commitInfo.TreeID
 	}
 
 	return getApproverAttestationAndKeyIDsForIndex(ctx, repo, policy, attestationsState, entry.RefName, fromID, toID, isTag)

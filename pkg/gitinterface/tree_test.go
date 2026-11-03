@@ -936,8 +936,9 @@ func TestCreateSubtreeFromUpstreamRepository(t *testing.T) {
 				} else {
 					assert.Nil(t, err)
 
-					rootTreeID, err := downstreamRepository.GetCommitTreeID(downstreamCommitID)
-					require.Nil(t, err)
+					rootCommitInfo, err := downstreamRepository.GetCommitInfo(downstreamCommitID)
+					require.NoError(t, err)
+					rootTreeID := rootCommitInfo.TreeID
 
 					itemID, err := downstreamRepository.GetPathIDInTree(rootTreeID, test.localPath)
 					require.Nil(t, err)

@@ -107,10 +107,11 @@ func TestPropagateChangesFromUpstreamRepository(t *testing.T) {
 	assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
 	assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-	downstreamRootTreeID, err = downstreamRepo.GetCommitTreeID(propagationEntry.TargetID)
+	downstreamRootCommitInfo, err := downstreamRepo.GetCommitInfo(propagationEntry.TargetID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 	pathTreeID, err := downstreamRepo.GetPathIDInTree(downstreamRootTreeID, "upstream")
 	if err != nil {
 		t.Fatal(err)
