@@ -47,6 +47,48 @@ func TestGetTagTarget(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, commitID, targetID)
 
+	blobID, err := repo.WriteBlob([]byte("contents"))
+	require.Nil(t, err)
+	treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("file", blobID)})
+	require.Nil(t, err)
+
+	t.Run("tag pointing at tree", func(t *testing.T) {
+		tagID, err := repo.TagUsingSpecificKey(treeID, "tree-tag", "tree-tag\n", artifacts.SSHED25519Private)
+		require.Nil(t, err)
+
+		targetID, err := repo.GetTagTarget(tagID)
+		assert.Nil(t, err)
+		assert.Equal(t, treeID, targetID)
+	})
+
+	t.Run("tag pointing at blob", func(t *testing.T) {
+		tagID, err := repo.TagUsingSpecificKey(blobID, "blob-tag", "blob-tag\n", artifacts.SSHED25519Private)
+		require.Nil(t, err)
+
+		targetID, err := repo.GetTagTarget(tagID)
+		assert.Nil(t, err)
+		assert.Equal(t, blobID, targetID)
+	})
+
+	t.Run("tag pointing at tag", func(t *testing.T) {
+		innerTagID, err := repo.TagUsingSpecificKey(treeID, "inner-tag", "inner-tag\n", artifacts.SSHED25519Private)
+		require.Nil(t, err)
+		outerTagID, err := repo.TagUsingSpecificKey(innerTagID, "outer-tag", "outer-tag\n", artifacts.SSHED25519Private)
+		require.Nil(t, err)
+
+		targetID, err := repo.GetTagTarget(outerTagID)
+		assert.Nil(t, err)
+		assert.Equal(t, treeID, targetID)
+	})
+
+	t.Run("non-tag objects resolve to themselves", func(t *testing.T) {
+		for _, objectID := range []Hash{commitID, treeID, blobID} {
+			targetID, err := repo.GetTagTarget(objectID)
+			assert.Nil(t, err)
+			assert.Equal(t, objectID, targetID)
+		}
+	})
+
 	t.Run("non-existent tag", func(t *testing.T) {
 		_, err := repo.GetTagTarget(ZeroHash)
 		assert.ErrorContains(t, err, "unable to resolve tag's target ID")

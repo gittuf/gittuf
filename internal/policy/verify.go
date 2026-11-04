@@ -926,7 +926,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo gitstore.Storer, 
 	}
 
 	// We need to handle the case where we're approving a tag
-	// For a tag, the expected toID in the approval is the commit the tag points to
+	// For a tag, the expected toID in the approval is the object the tag points to
 	// Otherwise, the expected toID is the tree the commit points to
 	var (
 		toID  githash.Hash

@@ -279,16 +279,67 @@ func TestGetTagTarget(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 			ids := commitChain(t, binary, "refs/heads/main", 1)
 
-			tagID, err := binary.TagUsingSpecificKey(ids[0], "v1", "release\n", artifacts.SSHRSAPrivate)
+			blobID, err := binary.WriteBlob([]byte("contents"))
+			require.Nil(t, err)
+			treeID, err := gitinterface.NewTreeBuilder(binary).WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("file", blobID)})
 			require.Nil(t, err)
 
-			want, err := binary.GetTagTarget(tagID)
+			commitTagID, err := binary.TagUsingSpecificKey(ids[0], "v1", "release\n", artifacts.SSHRSAPrivate)
 			require.Nil(t, err)
-			require.Equal(t, ids[0], want)
+			treeTagID, err := binary.TagUsingSpecificKey(treeID, "tree", "tree\n", artifacts.SSHRSAPrivate)
+			require.Nil(t, err)
+			blobTagID, err := binary.TagUsingSpecificKey(blobID, "blob", "blob\n", artifacts.SSHRSAPrivate)
+			require.Nil(t, err)
+			nestedTagID, err := binary.TagUsingSpecificKey(treeTagID, "nested", "nested\n", artifacts.SSHRSAPrivate)
+			require.Nil(t, err)
 
-			got, err := fast.GetTagTarget(tagID)
-			require.Nil(t, err)
-			assert.Equal(t, want, got)
+			tests := map[string]struct {
+				objectID githash.Hash
+				wantID   githash.Hash
+			}{
+				"tag pointing at commit":    {objectID: commitTagID, wantID: ids[0]},
+				"tag pointing at tree":      {objectID: treeTagID, wantID: treeID},
+				"tag pointing at blob":      {objectID: blobTagID, wantID: blobID},
+				"tag pointing at tag":       {objectID: nestedTagID, wantID: treeID},
+				"commit resolves to itself": {objectID: ids[0], wantID: ids[0]},
+				"tree resolves to itself":   {objectID: treeID, wantID: treeID},
+				"blob resolves to itself":   {objectID: blobID, wantID: blobID},
+			}
+
+			for name, test := range tests {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+
+					want, err := binary.GetTagTarget(test.objectID)
+					require.Nil(t, err)
+					require.Equal(t, test.wantID, want)
+
+					got, err := fast.GetTagTarget(test.objectID)
+					require.Nil(t, err)
+					assert.Equal(t, want, got)
+				})
+			}
+
+			t.Run("missing object", func(t *testing.T) {
+				t.Parallel()
+
+				missingID := binary.ZeroHash()
+				_, wantErr := binary.GetTagTarget(missingID)
+				_, gotErr := fast.GetTagTarget(missingID)
+				assert.ErrorContains(t, wantErr, "unable to resolve tag's target ID")
+				assert.ErrorContains(t, gotErr, "unable to resolve tag's target ID")
+			})
+
+			t.Run("malformed tag", func(t *testing.T) {
+				t.Parallel()
+
+				malformedID, err := githash.NewHash(git(t, binary, "not a tag\n", "hash-object", "-t", "tag", "--literally", "-w", "--stdin"))
+				require.Nil(t, err)
+				_, wantErr := binary.GetTagTarget(malformedID)
+				_, gotErr := fast.GetTagTarget(malformedID)
+				assert.ErrorContains(t, wantErr, "unable to resolve tag's target ID")
+				assert.ErrorContains(t, gotErr, "unable to resolve tag's target ID")
+			})
 		})
 	}
 }

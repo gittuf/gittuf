@@ -16,6 +16,7 @@ import (
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gogitstore"
 	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -24,6 +25,7 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -4385,6 +4387,107 @@ func TestVerifyTagEntryObjectFormats(t *testing.T) {
 					assert.Nil(t, err)
 				}
 			})
+		}
+	}
+}
+
+func TestVerifyTagEntryNonCommitTargets(t *testing.T) {
+	t.Parallel()
+
+	writeTree := func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+		t.Helper()
+
+		blobID, err := repo.WriteBlob([]byte("contents"))
+		require.Nil(t, err)
+		treeID, err := gitinterface.NewTreeBuilder(repo).WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("file", blobID)})
+		require.Nil(t, err)
+		return treeID
+	}
+	writeBlob := func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+		t.Helper()
+
+		blobID, err := repo.WriteBlob([]byte("contents"))
+		require.Nil(t, err)
+		return blobID
+	}
+	lightweightTag := func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+		t.Helper()
+
+		require.Nil(t, repo.SetReference(gitinterface.TagReferenceName("v1"), target))
+		return target
+	}
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		createTag    func(*testing.T, *gitinterface.Repository) githash.Hash
+		wantErr      error
+	}{
+		"unsigned tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", writeTree(t, repo))
+			},
+		},
+		"unsigned tag pointing at blob": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", writeBlob(t, repo))
+			},
+		},
+		"lightweight tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeTree(t, repo))
+			},
+		},
+		"lightweight tag pointing at blob": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeBlob(t, repo))
+			},
+		},
+		"tag pointing at tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				innerTagID := common.CreateTestUnsignedTag(t, repo, "inner", writeTree(t, repo))
+				return common.CreateTestUnsignedTag(t, repo, "v1", innerTagID)
+			},
+		},
+		"lightweight tag pointing at tree under threshold policy": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeTree(t, repo))
+			},
+			wantErr: ErrVerificationFailed,
+		},
+	}
+
+	backends := map[string]func(*gitinterface.Repository) gitstore.Storer{
+		"git":    func(repo *gitinterface.Repository) gitstore.Storer { return repo },
+		"go-git": func(repo *gitinterface.Repository) gitstore.Storer { return gogitstore.New(repo, true) },
+	}
+
+	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+		for backendName, newStorer := range backends {
+			for name, test := range tests {
+				t.Run(fmt.Sprintf("%s/%s/%s", objectFormat, backendName, name), func(t *testing.T) {
+					t.Parallel()
+
+					repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
+
+					tagID := test.createTag(t, repo)
+
+					entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+					entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+					err := verifyTagEntry(testCtx, newStorer(repo), policy, nil, entry)
+					if test.wantErr != nil {
+						assert.ErrorIs(t, err, test.wantErr)
+					} else {
+						assert.Nil(t, err)
+					}
+				})
+			}
 		}
 	}
 }

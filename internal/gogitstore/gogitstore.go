@@ -371,8 +371,8 @@ func isFullReferenceName(refName string) bool {
 	return refName == "HEAD" || (strings.HasPrefix(refName, "refs/") && plumbing.ReferenceName(refName).Validate() == nil)
 }
 
-// GetTagTarget peels chained tags down to a commit. gitinterface uses
-// rev-list -n 1, which does the same, not the tag's immediate target.
+// GetTagTarget peels chained tags down to the first object that is not a tag,
+// matching gitinterface's use of rev-parse <id>^{}.
 func (s *Storer) GetTagTarget(tagID githash.Hash) (githash.Hash, error) {
 	repo, done, err := s.beginRead("GetTagTarget")
 	defer done()
@@ -389,20 +389,24 @@ func (s *Storer) GetTagTarget(tagID githash.Hash) (githash.Hash, error) {
 		return s.ZeroHash(), err
 	}
 
+	// Check the stored type before decoding, so a tag that fails to decode is
+	// an error rather than its own target.
 	for {
-		tag, err := repo.TagObject(id)
+		obj, err := repo.Storer.EncodedObject(plumbing.AnyObject, id)
 		if err != nil {
-			break
+			return s.ZeroHash(), fmt.Errorf("unable to resolve tag's target ID: %w", err)
+		}
+
+		if obj.Type() != plumbing.TagObject {
+			return fromGoGit(id)
+		}
+
+		tag, err := object.DecodeTag(repo.Storer, obj)
+		if err != nil {
+			return s.ZeroHash(), fmt.Errorf("unable to resolve tag's target ID: %w", err)
 		}
 		id = tag.Target
 	}
-
-	commit, err := repo.CommitObject(id)
-	if err != nil {
-		return s.ZeroHash(), fmt.Errorf("unable to resolve tag's target ID: %w", err)
-	}
-
-	return fromGoGit(commit.Hash)
 }
 
 // GetObjectSignature is already go-git in gitinterface. Overriding it reuses
