@@ -87,9 +87,11 @@ func (r *Repository) TagUsingSpecificKey(target Hash, name, message string, sign
 	return tagIDHash, r.SetReference(TagReferenceName(name), tagIDHash)
 }
 
-// GetTagTarget returns the ID of the Git object a tag points to.
+// GetTagTarget returns the ID of the Git object a tag points to. Chained tags
+// are peeled until an object that is not a tag is reached. That object may be
+// a commit, a tree or a blob. An object that is not a tag resolves to itself.
 func (r *Repository) GetTagTarget(tagID Hash) (Hash, error) {
-	targetID, err := r.executor("rev-list", "-n", "1", tagID.String()).executeString()
+	targetID, err := r.executor("rev-parse", "--verify", "--end-of-options", fmt.Sprintf("%s^{}", tagID.String())).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to resolve tag's target ID: %w", err)
 	}
