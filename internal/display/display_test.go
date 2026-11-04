@@ -129,3 +129,30 @@ func TestNewDisplayWriter(t *testing.T) {
 		})
 	}
 }
+
+type bufferWriteCloser struct {
+	bytes.Buffer
+	closed bool
+}
+
+func (b *bufferWriteCloser) Close() error {
+	b.closed = true
+	return nil
+}
+
+func TestNewDisplayWriterWithoutPagerUsesWriteCloser(t *testing.T) {
+	getPager = getPagerTestNone
+	defer func() { getPager = getPagerReal }()
+
+	output := &bufferWriteCloser{}
+	writer := NewDisplayWriter(output)
+
+	// An output that's already an io.WriteCloser is returned as is
+	assert.Same(t, output, writer)
+
+	_, err := writer.Write([]byte("Hello, world!"))
+	assert.Nil(t, err)
+	assert.Nil(t, writer.Close())
+	assert.Equal(t, "Hello, world!", output.String())
+	assert.True(t, output.closed)
+}
