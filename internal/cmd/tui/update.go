@@ -222,7 +222,12 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenTrustGlobalRules, screenTrustAddGlobalRule, screenTrustEditGlobalRule:
 				m.trustGlobalRulesScreen.handleEsc(&m)
 			case screenTrustKeysThresholds:
-				m.screen = screenTrust
+				if m.trustKeysScreen.showKeys {
+					m.trustKeysScreen.showKeys = false
+					m.trustKeysScreen.keys = nil
+				} else {
+					m.screen = screenTrust
+				}
 			case screenTrustKeyForm, screenTrustThresholdForm:
 				m.screen = screenTrustKeysThresholds
 			case screenTrustAddPropagationForm, screenTrustUpdatePropagationForm, screenTrustRemovePropagationForm:
