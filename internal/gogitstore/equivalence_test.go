@@ -9,11 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gogitstore"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -309,11 +311,15 @@ func TestGetObjectSignature(t *testing.T) {
 			require.Nil(t, err)
 			tagID, err := binary.TagUsingSpecificKey(signedID, "v1", "release\n", artifacts.SSHRSAPrivate)
 			require.Nil(t, err)
+			compatTagID := common.CreateTestTagWithCompatSignature(t, binary, "v2", signedID, artifacts.SSHRSAPrivate, artifacts.SSHED25519Private)
+			compatOnlyTagID := common.CreateTestTagWithCompatSignature(t, binary, "v3", signedID, nil, artifacts.SSHED25519Private)
 
 			cases := map[string]githash.Hash{
-				"signed commit":   signedID,
-				"unsigned commit": unsignedID,
-				"signed tag":      tagID,
+				"signed commit":                  signedID,
+				"unsigned commit":                unsignedID,
+				"signed tag":                     tagID,
+				"tag with compat signature":      compatTagID,
+				"tag with only compat signature": compatOnlyTagID,
 			}
 
 			for name, objectID := range cases {
@@ -332,6 +338,27 @@ func TestGetObjectSignature(t *testing.T) {
 				_, signature, err := fast.GetObjectSignature(signedID)
 				require.Nil(t, err)
 				assert.NotEmpty(t, signature)
+			})
+
+			t.Run("tag signature ignores gpgsig-sha256 header", func(t *testing.T) {
+				goGitRepo, err := binary.GetGoGitRepository()
+				require.Nil(t, err)
+				compatTag, err := goGitRepo.TagObject(plumbing.NewHash(compatTagID.String()))
+				require.Nil(t, err)
+				require.NotEmpty(t, compatTag.Signature)
+				require.NotEmpty(t, compatTag.SignatureSHA256)
+
+				payload, signature, err := fast.GetObjectSignature(compatTagID)
+				require.Nil(t, err)
+				assert.Equal(t, compatTag.Signature, string(signature))
+				assert.Equal(t, fmt.Sprintf("object %s\ntype commit\ntag v2\ntagger Jane Doe <jane.doe@example.com> 814698000 +0000\n\nv2\n", signedID), string(payload))
+			})
+
+			t.Run("tag with only gpgsig-sha256 header is unsigned", func(t *testing.T) {
+				payload, signature, err := fast.GetObjectSignature(compatOnlyTagID)
+				require.Nil(t, err)
+				assert.Empty(t, signature)
+				assert.NotContains(t, string(payload), "gpgsig")
 			})
 
 			t.Run("blob is neither commit nor tag", func(t *testing.T) {
