@@ -81,13 +81,14 @@ type pagerEnvVar struct {
 
 func newPagerEnvVar() *pagerEnvVar {
 	env := os.Getenv("PAGER") // look at what the user has configured
-	env = strings.TrimSpace(env)
 
-	if env == "" {
+	// Split on any run of whitespace so that extra spaces or tabs don't turn
+	// into empty arguments, which pagers like less treat as a filename.
+	split := strings.Fields(env)
+	if len(split) == 0 {
 		return &pagerEnvVar{}
 	}
 
-	split := strings.Split(env, " ")
 	return &pagerEnvVar{
 		binary: split[0],
 		flags:  split[1:],
