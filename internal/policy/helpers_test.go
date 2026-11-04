@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/attestations"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -17,6 +18,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 )
@@ -1213,4 +1215,40 @@ func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh
 	}
 
 	return signer
+}
+
+func addTestTagAuthorization(t *testing.T, repo *gitinterface.Repository, tagRefName string, targetID githash.Hash) *attestations.Attestations {
+	t.Helper()
+
+	authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), targetID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env, err := dsse.CreateEnvelope(authorization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env, err = dsse.SignEnvelope(testCtx, env, setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), targetID.String()); err != nil {
+		t.Fatal(err)
+	}
+	if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+		t.Fatal(err)
+	}
+
+	currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return currentAttestations
 }

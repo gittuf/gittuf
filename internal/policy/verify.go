@@ -893,7 +893,11 @@ func verifyTagEntry(ctx context.Context, repo gitstore.Storer, policy *State, at
 		return err
 	}
 
-	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.GetID(), authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs), withTagObjectID(entry.TargetID)); err != nil {
+	// The tag object's own signature is not considered. The RSL entry records
+	// the tag object's ID, so the entry's signature and any attestations
+	// already authenticate the tag. This matches how branches are verified,
+	// where commit signatures do not count towards Git reference rules.
+	if _, _, err := verifyGitObjectAndAttestations(ctx, policy, fmt.Sprintf("%s:%s", gitReferenceRuleScheme, entry.RefName), entry.GetID(), authorizationAttestation, withApproverPrincipalIDs(approverKeyIDs)); err != nil {
 		return fmt.Errorf("verifying tag entry failed, %w: %w", ErrVerificationFailed, err)
 	}
 
@@ -1060,7 +1064,6 @@ type verifyGitObjectAndAttestationsOptions struct {
 	// verify in the past. If the newly discovered set of verifiers includes the
 	// trusted verifier, then we can skip verifying the signature again.
 	trustedVerifier string
-	tagObjectID     githash.Hash
 }
 
 type verifyGitObjectAndAttestationsOption func(o *verifyGitObjectAndAttestationsOptions)
@@ -1089,15 +1092,6 @@ func withVerifyMergeable() verifyGitObjectAndAttestationsOption {
 func withTrustedVerifier(name string) verifyGitObjectAndAttestationsOption {
 	return func(o *verifyGitObjectAndAttestationsOptions) {
 		o.trustedVerifier = name
-	}
-}
-
-// withTagObjectID is used to set the Git ID of a tag object. When this is set,
-// the tag object's signature is also verified in addition to the RSL entry for
-// the tag.
-func withTagObjectID(objID githash.Hash) verifyGitObjectAndAttestationsOption {
-	return func(o *verifyGitObjectAndAttestationsOptions) {
-		o.tagObjectID = objID
 	}
 }
 
@@ -1168,34 +1162,6 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 		verifiedUsing, _, rslSignatureNeededForThreshold, err = verifyGitObjectAndAttestationsUsingVerifiers(ctx, verifiers, gitID, authorizationAttestation, appNames, options.approverPrincipalIDs, options.verifyMergeable)
 		if err != nil {
 			return "", false, err
-		}
-
-		if !options.tagObjectID.IsZero() {
-			// Verify tag object's signature as well
-			tagObjVerified := false
-			for _, verifier := range verifiers {
-				// explicitly not looking at the attestation
-				// that applies to the _push_
-				// thus, we also set threshold to 1
-				verifier.threshold = 1
-
-				_, err := verifier.Verify(ctx, options.tagObjectID, nil)
-				if err == nil {
-					// Signature verification succeeded
-					tagObjVerified = true
-					// TODO: should we check if a different verifier / signer was
-					// matched for the tag object compared with the RSL entry?
-					break
-				} else if !errors.Is(err, ErrVerifierConditionsUnmet) {
-					// Unexpected error
-					return "", false, err
-				}
-				// Haven't found a valid verifier, continue with next verifier
-			}
-
-			if !tagObjVerified {
-				return "", false, fmt.Errorf("verifying tag object's signature failed")
-			}
 		}
 	}
 

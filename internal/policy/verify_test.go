@@ -4103,6 +4103,220 @@ func TestVerifyTagEntry(t *testing.T) {
 		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
+
+	t.Run("with tag specific policy, unsigned annotated tag", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestUnsignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitIDs[len(commitIDs)-1]); err != nil {
+			t.Fatal(err)
+		}
+
+		entry = rsl.NewReferenceEntry(tagRefName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, tag signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgUnauthorizedKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, unsigned tag, unauthorized", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestUnsignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("with threshold tag specific policy, tag signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagRefName := "refs/tags/v1"
+
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgUnauthorizedKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag, unsigned commit", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		treeID, err := repo.EmptyTree()
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitID, err := repo.Commit(treeID, "refs/heads/main", "Unsigned commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitID); err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(tagRefName, commitID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err = verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag, commit signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgUnauthorizedKeyBytes)
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitIDs[0]); err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(tagRefName, commitIDs[0])
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.Nil(t, err)
+	})
+
+	t.Run("with tag specific policy, tag reference set to unexpected target", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		otherTagID := common.CreateTestSignedTag(t, repo, "other", commitIDs[0], gpgKeyBytes)
+		common.CreateTestSignedTag(t, repo, "v1", commitIDs[0], gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), otherTagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorContains(t, err, "tag reference set to unexpected target")
+	})
+
+	t.Run("with threshold tag specific policy, second entry for tag needs full threshold", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 2, gpgKeyBytes)
+		currentAttestations := addTestTagAuthorization(t, repo, "refs/tags/v1", commitIDs[0])
+		tagID := common.CreateTestSignedTag(t, repo, "v1", commitIDs[0], targets1KeyBytes)
+
+		entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		require.Nil(t, err)
+
+		tagID = common.CreateTestSignedTag(t, repo, "v1", commitIDs[1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err = verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
 }
 
 func TestGetCommits(t *testing.T) {

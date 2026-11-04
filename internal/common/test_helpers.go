@@ -12,7 +12,10 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
+	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/jonboulle/clockwork"
 )
 
@@ -131,6 +134,32 @@ func CreateTestSignedTag(t *testing.T, repo *gitinterface.Repository, tagName st
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)
 	tagID, err := repo.TagUsingSpecificKey(target, tagName, tagMessage, signingKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return tagID
+}
+
+// CreateTestUnsignedTag creates an unsigned annotated tag in the repository
+// pointing to the target object.
+func CreateTestUnsignedTag(t *testing.T, repo *gitinterface.Repository, tagName string, target githash.Hash) githash.Hash {
+	t.Helper()
+
+	goGitRepo, err := repo.GetGoGitRepository()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagRef, err := goGitRepo.CreateTag(tagName, plumbing.NewHash(target.String()), &git.CreateTagOptions{
+		Tagger:  &object.Signature{Name: testName, Email: testEmail, When: TestClock.Now()},
+		Message: fmt.Sprintf("%s\n", tagName),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagID, err := gitinterface.NewHash(tagRef.Hash().String())
 	if err != nil {
 		t.Fatal(err)
 	}
