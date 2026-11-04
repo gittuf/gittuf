@@ -44,47 +44,47 @@ func TestGetTagTarget(t *testing.T) {
 	}
 
 	targetID, err := repo.GetTagTarget(tagID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, commitID, targetID)
 
 	blobID, err := repo.WriteBlob([]byte("contents"))
-	require.Nil(t, err)
+	require.NoError(t, err)
 	treeID, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("file", blobID)})
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("tag pointing at tree", func(t *testing.T) {
 		tagID, err := repo.TagUsingSpecificKey(treeID, "tree-tag", "tree-tag\n", artifacts.SSHED25519Private)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		targetID, err := repo.GetTagTarget(tagID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, treeID, targetID)
 	})
 
 	t.Run("tag pointing at blob", func(t *testing.T) {
 		tagID, err := repo.TagUsingSpecificKey(blobID, "blob-tag", "blob-tag\n", artifacts.SSHED25519Private)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		targetID, err := repo.GetTagTarget(tagID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, blobID, targetID)
 	})
 
 	t.Run("tag pointing at tag", func(t *testing.T) {
 		innerTagID, err := repo.TagUsingSpecificKey(treeID, "inner-tag", "inner-tag\n", artifacts.SSHED25519Private)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		outerTagID, err := repo.TagUsingSpecificKey(innerTagID, "outer-tag", "outer-tag\n", artifacts.SSHED25519Private)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		targetID, err := repo.GetTagTarget(outerTagID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, treeID, targetID)
 	})
 
 	t.Run("non-tag objects resolve to themselves", func(t *testing.T) {
 		for _, objectID := range []Hash{commitID, treeID, blobID} {
 			targetID, err := repo.GetTagTarget(objectID)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, objectID, targetID)
 		}
 	})
@@ -138,12 +138,12 @@ func TestRepositoryVerifyTag(t *testing.T) {
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
 		err = verifyObjectSignature(t, repo, sshSignedTag, sshKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
 		err = verifyObjectSignature(t, repo, gpgSignedTag, gpgKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
@@ -168,7 +168,7 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 			verificationKey: func(t *testing.T) *signerverifier.SSLibKey {
 				t.Helper()
 				key, err := gpg.LoadGPGKeyFromBytes(artifacts.GPGKey1Public)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return key
 			},
 		},
@@ -179,7 +179,7 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 				keyPath := filepath.Join(t.TempDir(), "ssh-key.pub")
 				require.Nil(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
 				key, err := ssh.NewKeyFromFile(keyPath)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				return key
 			},
 		},
@@ -191,18 +191,18 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 			repo := CreateTestGitRepository(t, tempDir, false)
 
 			emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			goGitRepo, err := repo.GetGoGitRepository()
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			userName, _, err := repo.LookupConfig(gitstore.ConfigUserName)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			userEmail, _, err := repo.LookupConfig(gitstore.ConfigUserEmail)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			tag := &object.Tag{
 				Name: "test-tag",
@@ -217,10 +217,10 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 			}
 
 			tagContents, err := getTagBytesWithoutSignature(tag)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			sig, err := signGitObjectUsingKey(tagContents, test.signingKey)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// Two (individually valid) signature blocks, each on their own
 			// lines, must not verify against either block.
@@ -230,9 +230,9 @@ func TestVerifyTagSignatureRejectsMultipleSignatures(t *testing.T) {
 			tagEncoded := goGitRepo.Storer.NewEncodedObject()
 			require.Nil(t, tag.Encode(tagEncoded))
 			tagID, err := goGitRepo.Storer.SetEncodedObject(tagEncoded)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			tagHash, err := NewHash(tagID.String())
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			err = verifyObjectSignature(t, repo, tagHash, test.verificationKey(t))
 			assert.ErrorIs(t, err, gitobject.ErrIncorrectVerificationKey)
@@ -282,12 +282,12 @@ func TestRepositoryVerifyTagSHA256(t *testing.T) {
 
 	t.Run("ssh signed tag, verify with ssh key", func(t *testing.T) {
 		err = verifyObjectSignature(t, repo, sshSignedTag, sshKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("gpg signed tag, verify with gpg key", func(t *testing.T) {
 		err = verifyObjectSignature(t, repo, gpgSignedTag, gpgKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("unknown signing method", func(t *testing.T) {
@@ -304,15 +304,15 @@ func TestTagUsingSpecificKeySignatureHeader(t *testing.T) {
 			repo := CreateTestGitRepository(t, tmpDir, false, WithObjectFormat(objectFormat))
 
 			emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			tagID, err := repo.TagUsingSpecificKey(commitID, "v1", "v1\n", artifacts.SSHED25519Private)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			raw, err := repo.executor("cat-file", "tag", tagID.String()).executeString()
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// Git appends tag signatures to the tag payload regardless of
 			// the object format; the `gpgsig-sha256` header is only used for
@@ -324,7 +324,7 @@ func TestTagUsingSpecificKeySignatureHeader(t *testing.T) {
 			keyPath := filepath.Join(keyDir, "ssh-key.pub")
 			require.Nil(t, os.WriteFile(keyPath, artifacts.SSHED25519PublicSSH, 0o600))
 			sshKey, err := ssh.NewKeyFromFile(keyPath)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 		})
@@ -338,24 +338,24 @@ func TestVerifyTagSignatureGitCreatedTag(t *testing.T) {
 			repo := CreateTestGitRepository(t, tmpDir, false, WithObjectFormat(objectFormat))
 
 			emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			// Sign the tag with Git itself, using the repository's configured
 			// SSH signing key, to ensure verification handles tags exactly as
 			// Git creates them.
 			_, err = repo.executor("tag", "-s", "-m", "v1", "v1", commitID.String()).executeString()
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			tagID, err := repo.GetReference("refs/tags/v1")
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			keyDir := t.TempDir()
 			keyPath := filepath.Join(keyDir, "ssh-key.pub")
 			require.Nil(t, os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600))
 			sshKey, err := ssh.NewKeyFromFile(keyPath)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 		})
@@ -372,25 +372,25 @@ func TestVerifyTagSignatureArmorBlockInMessage(t *testing.T) {
 	repo := CreateTestGitRepository(t, tmpDir, false)
 
 	emptyTreeID, err := NewTreeBuilder(repo).WriteTreeFromEntries(nil)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	messageFile := filepath.Join(t.TempDir(), "message")
 	message := "release notes quoting a signature:\n-----BEGIN SSH SIGNATURE-----\nU1NIU0lHZHVtbXk=\n-----END SSH SIGNATURE-----\nend of notes\n"
 	require.Nil(t, os.WriteFile(messageFile, []byte(message), 0o600))
 
 	_, err = repo.executor("tag", "-s", "-F", messageFile, "v1", commitID.String()).executeString()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	tagID, err := repo.GetReference("refs/tags/v1")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	keyDir := t.TempDir()
 	keyPath := filepath.Join(keyDir, "ssh-key.pub")
 	require.Nil(t, os.WriteFile(keyPath, artifacts.SSHRSAPublicSSH, 0o600))
 	sshKey, err := ssh.NewKeyFromFile(keyPath)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Nil(t, verifyObjectSignature(t, repo, tagID, sshKey))
 }
@@ -401,16 +401,16 @@ func TestEnsureIsTag(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	emptyTreeID, err := treeBuilder.WriteTreeFromEntries(nil)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	commitID, err := repo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	tagID, err := repo.TagUsingSpecificKey(commitID, "test-tag", "test-tag\n", artifacts.SSHED25519Private)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = repo.ensureIsTag(tagID)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	err = repo.ensureIsTag(commitID)
 	assert.ErrorContains(t, err, "is not a tag object")
