@@ -55,6 +55,7 @@ var (
 	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
 	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
+	ErrRootMetadataNotFound          = errors.New("policy state has no root metadata")
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -219,10 +220,46 @@ func (s *StateMetadata) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
 	return repo.WriteTree(entries)
 }
 
+// loadAnchoredState returns the state for entry on the paths where the RSL
+// offers no applied policy to verify it against. The state must carry valid
+// metadata, and a caller that declared the initial root principals gets no
+// trust on sight: the root must also be signed by that anchor.
+//
+// The anchor is checked first. Verify fetches controller repositories named
+// in the root metadata, which must not happen for a root nobody trusts yet.
+func loadAnchoredState(ctx context.Context, repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry, initialRootPrincipals []tuf.Principal) (*State, error) {
+	state, err := loadStateForEntry(repo, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(initialRootPrincipals) != 0 {
+		slog.Debug("Verifying root of trust using provided initial root principals...")
+		verifier := &SignatureVerifier{
+			repository: repo,
+			name:       "initial-root-verifier",
+			principals: initialRootPrincipals,
+			threshold:  len(initialRootPrincipals),
+		}
+
+		if _, err := verifier.Verify(ctx, nil, state.Metadata.RootEnvelope); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := state.Verify(ctx); err != nil {
+		return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
+	}
+
+	return state, nil
+}
+
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
-// entry in the RSL. If no policy states are found and the entry is for the
-// policy-staging ref, that entry is returned with no verification.
+// entry in the RSL. If no applied policy precedes the entry, there is no root
+// of trust to verify it against, so the entry's state is returned once its own
+// metadata verifies and, when initial root principals are given, its root is
+// signed by them.
 func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.ReferenceUpdaterEntry, opts ...policyopts.LoadStateOption) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
@@ -245,8 +282,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		if errors.Is(err, ErrPolicyNotFound) {
 			// we don't have a policy entry yet
 			// we just return the state for the requested entry
-			slog.Debug("No applied policy found, loading requested policy without further verification...")
-			return loadStateForEntry(repo, requestedEntry)
+			slog.Debug("No applied policy found, loading requested policy...")
+			return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 		}
 		return nil, err
 	}
@@ -293,8 +330,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		// the first policy entry knows the requested entry, meaning the
 		// requested entry is an ancestor of the first policy entry
 		// we just return the state for the requested entry
-		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy without verification...")
-		return loadStateForEntry(repo, requestedEntry)
+		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy...")
+		return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 	}
 
 	// If requestedEntry.RefName == policy, then allPolicyEntries includes requestedEntry
@@ -1163,6 +1200,14 @@ func (s *State) HasRuleName(name string) bool {
 // This includes things like loading the set of rule names present in the state,
 // checking if it has file rules, etc.
 func (s *State) preprocess() error {
+	// A policy tree can be missing root.json entirely, which leaves the
+	// envelope nil. Reject it here: callers reach this with candidate trees
+	// they have not authenticated, and dereferencing the envelope below would
+	// panic rather than refuse them.
+	if s.Metadata == nil || s.Metadata.RootEnvelope == nil {
+		return ErrRootMetadataNotFound
+	}
+
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return err

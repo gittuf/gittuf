@@ -464,6 +464,94 @@ func TestLoadState(t *testing.T) {
 		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
 		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
+
+	// With no applied policy in the RSL there is no prior root to verify the
+	// requested entry against, so the state must at least verify on its own.
+	t.Run("unsigned state without applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		state := createTestStateWithOnlyRoot(t)
+		state.Metadata.RootEnvelope.Signatures = nil
+		require.NoError(t, state.Commit(repo, "Unsigned state", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, sslibdsse.ErrNoSignature)
+	})
+
+	t.Run("unsigned staged state before first applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		unsigned := createTestStateWithOnlyRoot(t)
+		unsigned.Metadata.RootEnvelope.Signatures = nil
+		require.NoError(t, unsigned.Commit(repo, "Unsigned staged state", true, false))
+
+		stagedEntry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		require.NoError(t, createTestStateWithOnlyRoot(t).Commit(repo, "Signed staged state", true, false))
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.NoError(t, err)
+		require.NoError(t, repo.SetReference(PolicyRef, stagingTip))
+		require.NoError(t, rsl.NewReferenceEntry(PolicyRef, stagingTip).Commit(repo, false))
+
+		_, err = LoadState(t.Context(), repo, stagedEntry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, sslibdsse.ErrNoSignature)
+	})
+
+	t.Run("initial root principals are verified before controller metadata without applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		state := createTestStateWithOnlyRoot(t)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.NoError(t, err)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		controllerLocation := path.Join(t.TempDir(), "missing")
+		err = rootMetadata.AddControllerRepository("controller", controllerLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.NoError(t, err)
+
+		rootEnvelope, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnvelope, err = dsse.SignEnvelope(t.Context(), rootEnvelope, signer)
+		require.NoError(t, err)
+		state.Metadata.RootEnvelope = rootEnvelope
+		state.ControllerMetadata = map[string]*StateMetadata{
+			"controller": createTestStateWithOnlyRoot(t).Metadata,
+		}
+		require.NoError(t, state.Commit(repo, "Staged state with controller", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("self-signed state without applied policy and wrong initial root principals", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		rootMetadata, err := InitializeRootMetadata(tufv01.NewKeyFromSSLibKey(signer.MetadataKey()))
+		require.NoError(t, err)
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnv, err = dsse.SignEnvelope(t.Context(), rootEnv, signer)
+		require.NoError(t, err)
+
+		state := &State{Metadata: &StateMetadata{RootEnvelope: rootEnv}}
+		require.NoError(t, state.Commit(repo, "Self-signed state", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.NoError(t, err)
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
 }
 
 func TestLoadCurrentState(t *testing.T) {
@@ -1899,4 +1987,19 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 	require.Nil(t, err)
 
 	return controllerRepository, networkRepository, signer
+}
+
+func TestPreprocessRejectsStateWithoutRootMetadata(t *testing.T) {
+	t.Parallel()
+
+	for name, state := range map[string]*State{
+		"no metadata":      {},
+		"no root envelope": {Metadata: &StateMetadata{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(t, state.preprocess(), ErrRootMetadataNotFound)
+		})
+	}
 }
