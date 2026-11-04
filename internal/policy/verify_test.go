@@ -3927,6 +3927,11 @@ func TestVerifyEntry(t *testing.T) {
 }
 
 func TestVerifyTagEntry(t *testing.T) {
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
 	t.Run("no tag specific policy", func(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
@@ -4322,7 +4327,10 @@ func TestVerifyTagEntry(t *testing.T) {
 }
 
 func TestVerifyTagEntryObjectFormats(t *testing.T) {
-	t.Parallel()
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	tests := map[string]struct {
 		stateCreator func(*testing.T) *State
@@ -4366,8 +4374,6 @@ func TestVerifyTagEntryObjectFormats(t *testing.T) {
 	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
 		for name, test := range tests {
 			t.Run(fmt.Sprintf("%s/%s", objectFormat, name), func(t *testing.T) {
-				t.Parallel()
-
 				repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
 				refName := "refs/heads/main"
 
@@ -4392,7 +4398,10 @@ func TestVerifyTagEntryObjectFormats(t *testing.T) {
 }
 
 func TestVerifyTagEntryNonCommitTargets(t *testing.T) {
-	t.Parallel()
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
 
 	writeTree := func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
 		t.Helper()
@@ -4471,8 +4480,6 @@ func TestVerifyTagEntryNonCommitTargets(t *testing.T) {
 		for backendName, newStorer := range backends {
 			for name, test := range tests {
 				t.Run(fmt.Sprintf("%s/%s/%s", objectFormat, backendName, name), func(t *testing.T) {
-					t.Parallel()
-
 					repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
 
 					tagID := test.createTag(t, repo)
