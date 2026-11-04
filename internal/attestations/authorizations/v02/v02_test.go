@@ -138,6 +138,44 @@ func TestValidate(t *testing.T) {
 		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
 	})
 
+	t.Run("mismatched commit subject digest", func(t *testing.T) {
+		testRef := "refs/heads/main"
+		testID := gitinterface.ZeroHash.String()
+		authorization := createTestEnvelope(t, testRef, testID, "another-id", false)
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
+	t.Run("mismatched tag subject digest", func(t *testing.T) {
+		testRef := "refs/tags/v1"
+		testID := gitinterface.ZeroHash.String()
+		authorization := createTestEnvelope(t, testRef, testID, "another-id", true)
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
+	t.Run("mismatched predicate target ID", func(t *testing.T) {
+		testRef := "refs/heads/main"
+		testID := gitinterface.ZeroHash.String()
+		authorization := createTestEnvelope(t, testRef, testID, "another-id", false, func(statement *ita.Statement) {
+			statement.Subject[0].Digest[digestGitTreeKey] = testID
+		})
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
+	t.Run("mismatched predicate from ID", func(t *testing.T) {
+		testRef := "refs/heads/main"
+		testID := gitinterface.ZeroHash.String()
+		authorization := createTestEnvelope(t, testRef, "another-id", testID, false)
+
+		err := Validate(authorization, testRef, testID, testID)
+		assert.ErrorIs(t, err, authorizations.ErrInvalidAuthorization)
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		// Test invalid base64
 		garbageEnv := &sslibdsse.Envelope{
@@ -157,7 +195,7 @@ func TestValidate(t *testing.T) {
 	})
 }
 
-func createTestEnvelope(t *testing.T, refName, fromID, toID string, tag bool) *sslibdsse.Envelope {
+func createTestEnvelope(t *testing.T, refName, fromID, toID string, tag bool, mutations ...func(*ita.Statement)) *sslibdsse.Envelope {
 	t.Helper()
 
 	var (
@@ -172,6 +210,9 @@ func createTestEnvelope(t *testing.T, refName, fromID, toID string, tag bool) *s
 	}
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, mutate := range mutations {
+		mutate(authorization)
 	}
 	env, err := dsse.CreateEnvelope(authorization)
 	if err != nil {
