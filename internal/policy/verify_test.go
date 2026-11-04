@@ -4319,6 +4319,76 @@ func TestVerifyTagEntry(t *testing.T) {
 	})
 }
 
+func TestVerifyTagEntryObjectFormats(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		createTag    func(*testing.T, *gitinterface.Repository, githash.Hash) githash.Hash
+		wantErr      error
+	}{
+		"unsigned tag": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", target)
+			},
+		},
+		"tag signed by key not in policy": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestSignedTag(t, repo, "v1", target, gpgUnauthorizedKeyBytes)
+			},
+		},
+		"tag with gpgsig-sha256 header": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestTagWithCompatSignature(t, repo, "v1", target, gpgUnauthorizedKeyBytes, targets1KeyBytes)
+			},
+		},
+		"tag signature does not count towards threshold": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestSignedTag(t, repo, "v1", target, targets1KeyBytes)
+			},
+			wantErr: ErrVerificationFailed,
+		},
+		"gpgsig-sha256 header does not count towards threshold": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestTagWithCompatSignature(t, repo, "v1", target, nil, targets1KeyBytes)
+			},
+			wantErr: ErrVerificationFailed,
+		},
+	}
+
+	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+		for name, test := range tests {
+			t.Run(fmt.Sprintf("%s/%s", objectFormat, name), func(t *testing.T) {
+				t.Parallel()
+
+				repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
+				refName := "refs/heads/main"
+
+				commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+				entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+				entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+				tagID := test.createTag(t, repo, commitIDs[0])
+
+				entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+				entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+				err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+				if test.wantErr != nil {
+					assert.ErrorIs(t, err, test.wantErr)
+				} else {
+					assert.Nil(t, err)
+				}
+			})
+		}
+	}
+}
+
 func TestGetCommits(t *testing.T) {
 	repo, _ := createTestRepository(t, createTestStateWithPolicy)
 
