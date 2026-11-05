@@ -229,19 +229,20 @@ func (s *trustGlobalRulesScreen) handleGlobalFormSubmit(m *model) (tea.Model, te
 func (s *trustGlobalRulesScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustGlobalRules:
-		overlay := ""
+		var overlays string
 		if s.confirmDelete {
-			overlay = "\n" + renderDeleteOverlay(s.deleteTarget) + "\n"
-		}
-		hint := ""
-		if !m.readOnly {
-			hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
-				"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
-			)
+			overlays = renderDeleteOverlay("global rule", s.deleteTarget)
+		} else {
+			hint := ""
+			if !m.readOnly {
+				hint = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+					"Run `gittuf trust apply` to apply staged changes to the selected policy file.",
+				)
+			}
+			overlays = renderActionHints(m.readOnly) + hint
 		}
 
 		listView := m.renderListOrEmpty(s.globalRuleList, len(s.globalRules), "No global rules configured")
-		overlays := overlay + renderActionHints(m.readOnly) + hint
 		return m.renderScreen("Home › Trust › Global Rules", listView, overlays)
 
 	case screenTrustAddGlobalRule:

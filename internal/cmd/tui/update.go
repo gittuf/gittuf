@@ -84,6 +84,12 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.logViewport.Height = msg.Height
 		}
+		if m.showDiffOverlay {
+			_, _, vpWidth, vpHeight := diffOverlayDimensions(m.width, m.height)
+			m.diffViewport.Width = vpWidth
+			m.diffViewport.Height = vpHeight
+			m.diffViewport.SetContent(m.generateStagedDiff(vpWidth))
+		}
 		return m, nil
 
 	case logBatchMsg:
