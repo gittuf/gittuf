@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode"
 )
 
 func NewDisplayWriter(output io.Writer) io.WriteCloser {
@@ -82,9 +83,7 @@ type pagerEnvVar struct {
 func newPagerEnvVar() *pagerEnvVar {
 	env := os.Getenv("PAGER") // look at what the user has configured
 
-	// Split on any run of whitespace so that extra spaces or tabs don't turn
-	// into empty arguments, which pagers like less treat as a filename.
-	split := strings.Fields(env)
+	split := splitPagerCommand(env)
 	if len(split) == 0 {
 		return &pagerEnvVar{}
 	}
@@ -93,6 +92,48 @@ func newPagerEnvVar() *pagerEnvVar {
 		binary: split[0],
 		flags:  split[1:],
 	}
+}
+
+// splitPagerCommand splits $PAGER into arguments the way a shell would for
+// simple cases: arguments are separated by any run of whitespace, and single or
+// double quotes group text containing spaces into a single argument. Backslash
+// escapes aren't handled so that Windows paths are left as is.
+func splitPagerCommand(command string) []string {
+	var (
+		args    []string
+		current strings.Builder
+		inArg   bool
+		quote   rune
+	)
+
+	for _, r := range command {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				current.WriteRune(r)
+			}
+		case r == '\'' || r == '"':
+			quote = r
+			inArg = true
+		case unicode.IsSpace(r):
+			if inArg {
+				args = append(args, current.String())
+				current.Reset()
+				inArg = false
+			}
+		default:
+			current.WriteRune(r)
+			inArg = true
+		}
+	}
+
+	if inArg {
+		args = append(args, current.String())
+	}
+
+	return args
 }
 
 func (p *pagerEnvVar) getBinary() string {
