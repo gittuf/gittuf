@@ -74,6 +74,7 @@ DOWNSTREAM_REPOSITORY="$(pwd)"
 # Set up repo and add first repo as controller
 setup_gittuf_basic
 
+export GITTUF_DEV=1
 $GITTUF_BIN trust -k ../keys/root add-controller-repository --location "$CONTROLLER_REPOSITORY" --name controller-repo --initial-root-principal "$CONTROLLER_ROOT_KEY"
 
 $GITTUF_BIN policy stage --local-only

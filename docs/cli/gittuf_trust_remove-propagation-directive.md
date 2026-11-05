@@ -1,10 +1,10 @@
 ## gittuf trust remove-propagation-directive
 
-Remove propagation directive from gittuf root of trust
+Remove propagation directive from gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'remove-propagation-directive' command removes a propagation directive from the repository's root of trust. It is used to delete an existing directive and stop the propagation of content between repositories.
+The 'remove-propagation-directive' command removes a propagation directive from the repository's root of trust. It is used to delete an existing directive and stop the propagation of content between repositories (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust remove-propagation-directive [flags]

@@ -1,10 +1,10 @@
 ## gittuf trust add-propagation-directive
 
-Add propagation directive into gittuf root of trust
+Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository.
+The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust add-propagation-directive [flags]
