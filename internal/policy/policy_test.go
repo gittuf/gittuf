@@ -21,6 +21,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
@@ -2002,4 +2003,155 @@ func TestPreprocessRejectsStateWithoutRootMetadata(t *testing.T) {
 			assert.ErrorIs(t, state.preprocess(), ErrRootMetadataNotFound)
 		})
 	}
+}
+
+func TestStateSatisfiedBy(t *testing.T) {
+	t.Parallel()
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.NoError(t, err)
+	gpgKeyID := gpgKeyR.KeyID
+	rootKeyID := ssh.NewKeyFromBytes(t, rootPubKeyBytes).KeyID
+	approverKeyID := ssh.NewKeyFromBytes(t, targets1PubKeyBytes).KeyID
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		target       string
+		principalIDs []string
+		wantRule     string
+		wantErr      error
+	}{
+		"trusted principal meets rule": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "protect-main",
+		},
+		"untrusted principal": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{rootKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"principal unknown to the policy": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{"unknown"},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"no principals": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"unprotected target": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/other",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrTargetNotProtected,
+		},
+		"one of two required principals": {
+			stateCreator: createTestStateWithThresholdPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"both required principals": {
+			stateCreator: createTestStateWithThresholdPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID, approverKeyID},
+			wantRule:     "protect-main",
+		},
+		"global threshold rule alone unmet": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"global threshold rule alone met": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID, rootKeyID},
+		},
+		"global threshold rule does not match target": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/other",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrTargetNotProtected,
+		},
+		"rule met alongside global threshold rule": {
+			stateCreator: createTestStateWithBranchProtectionAndGlobalConstraintThreshold,
+			target:       "git:refs/heads/feature",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "protect-feature",
+		},
+		"delegating rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:1/subpath1/a",
+			principalIDs: []string{rootKeyID},
+			wantRule:     "1",
+		},
+		"delegated rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:1/subpath1/a",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "3",
+		},
+		"delegated principal outside its rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:2/a",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			state := test.stateCreator(t)
+			rule, err := state.SatisfiedBy(test.target, set.NewSetFromItems(test.principalIDs...))
+			if test.wantErr != nil {
+				assert.ErrorIs(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantRule, rule)
+		})
+	}
+}
+
+// Deserialized metadata skips AddRule's checks, so a rule file can name a
+// principal it never defines. No key can sign as that ID.
+func TestStateSatisfiedByWithUndefinedPrincipal(t *testing.T) {
+	t.Parallel()
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.NoError(t, err)
+	defined := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	ghost := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	targetsMetadata := InitializeTargetsMetadata()
+	require.NoError(t, targetsMetadata.AddPrincipal(defined))
+	require.NoError(t, targetsMetadata.AddPrincipal(ghost))
+	require.NoError(t, targetsMetadata.AddRule("protect-main", []string{defined.KeyID, ghost.KeyID}, []string{"git:refs/heads/main"}, 1))
+	require.NoError(t, targetsMetadata.AddRule("protect-ghost", []string{ghost.KeyID}, []string{"git:refs/heads/ghost"}, 1))
+	delete(targetsMetadata.(*tufv02.TargetsMetadata).Delegations.Principals, ghost.KeyID)
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	require.NoError(t, err)
+
+	state := createTestStateWithOnlyRoot(t)
+	state.Metadata.TargetsEnvelope = targetsEnv
+	require.NoError(t, state.preprocess())
+
+	rule, err := state.SatisfiedBy("git:refs/heads/main", set.NewSetFromItems(defined.KeyID))
+	require.NoError(t, err)
+	assert.Equal(t, "protect-main", rule)
+
+	_, err = state.SatisfiedBy("git:refs/heads/main", set.NewSetFromItems(ghost.KeyID))
+	assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+
+	_, err = state.SatisfiedBy("git:refs/heads/ghost", set.NewSetFromItems(defined.KeyID, ghost.KeyID))
+	assert.ErrorIs(t, err, ErrInvalidVerifier)
 }
