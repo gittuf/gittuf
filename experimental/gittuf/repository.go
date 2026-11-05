@@ -91,10 +91,12 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	}, nil
 }
 
-func isKeyAuthorized(authorizedKeyIDs []tuf.Principal, keyID string) bool {
-	for _, k := range authorizedKeyIDs {
-		if k.ID() == keyID {
-			return true
+func isKeyAuthorized(authorizedPrincipals []tuf.Principal, keyID string) bool {
+	for _, principal := range authorizedPrincipals {
+		for _, k := range principal.Keys() {
+			if k.KeyID == keyID {
+				return true
+			}
 		}
 	}
 	return false
