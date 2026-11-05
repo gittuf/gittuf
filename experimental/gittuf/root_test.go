@@ -273,6 +273,59 @@ func TestAddRootKey(t *testing.T) {
 	})
 }
 
+func TestAddRootKeyPrincipalTypes(t *testing.T) {
+	key := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
+	person := &tufv02.Person{
+		PersonID:   "alice",
+		PublicKeys: map[string]*tufv02.Key{key.ID(): key},
+	}
+	assert.True(t, isKeyAuthorized([]tuf.Principal{person}, key.ID()))
+	assert.False(t, isKeyAuthorized([]tuf.Principal{person}, person.ID()))
+	assert.False(t, isKeyAuthorized([]tuf.Principal{person}, "unrelated-key"))
+	assert.False(t, isKeyAuthorized(nil, key.ID()))
+	for _, tc := range []struct {
+		name      string
+		principal tuf.Principal
+		message   string
+	}{
+		{"key", key, "Add root key '" + key.ID() + "' to root"},
+		{"person", person, "Add root person 'alice' to root"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := createTestRepositoryWithRoot(t, "")
+			signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+			originalKeyID, err := signer.KeyID()
+			require.NoError(t, err)
+			before, err := r.r.GetReference(policy.PolicyStagingRef)
+			require.NoError(t, err)
+			newSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+			require.ErrorIs(t, r.AddRootKey(testCtx, newSigner, tc.principal, false), ErrUnauthorizedKey)
+			after, err := r.r.GetReference(policy.PolicyStagingRef)
+			require.NoError(t, err)
+			assert.Equal(t, before, after)
+			require.NoError(t, r.AddRootKey(testCtx, signer, tc.principal, false))
+
+			tip, err := r.r.GetReference(policy.PolicyStagingRef)
+			require.NoError(t, err)
+			commit, err := r.r.GetCommitInfo(tip)
+			require.NoError(t, err)
+			assert.Equal(t, tc.message, commit.Message)
+			require.NoError(t, r.StagePolicy(testCtx, "", true, false))
+
+			state, err := policy.LoadStateFromCommit(r.r, tip)
+			require.NoError(t, err)
+			root, err := state.GetRootMetadata(false)
+			require.NoError(t, err)
+			assert.Equal(t, set.NewSetFromItems(originalKeyID, tc.principal.ID()), getRootPrincipalIDs(t, root))
+			_, err = dsse.VerifyEnvelope(testCtx, state.Metadata.RootEnvelope, []sslibdsse.Verifier{signer}, 1)
+			require.NoError(t, err)
+
+			// A key belonging to the new principal can authorize the next update.
+			require.NoError(t, r.SetRepositoryLocation(testCtx, newSigner, "https://example.com/repo", false))
+		})
+	}
+}
+
 func TestRemoveRootKey(t *testing.T) {
 	r := createTestRepositoryWithRoot(t, "")
 
