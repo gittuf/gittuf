@@ -3,6 +3,8 @@
 
 package signer
 
+import "github.com/sigstore/sigstore-go/pkg/sign"
+
 const (
 	defaultIssuerURL = "https://oauth2.sigstore.dev/auth"
 	defaultClientID  = "sigstore"
@@ -16,6 +18,8 @@ type Options struct {
 	RedirectURL string
 	FulcioURL   string
 	RekorURL    string
+	Fulcio      sign.CertificateProvider
+	Rekor       sign.Transparency
 }
 
 var DefaultOptions = &Options{
@@ -54,5 +58,17 @@ func WithFulcioURL(fulcioURL string) Option {
 func WithRekorURL(rekorURL string) Option {
 	return func(o *Options) {
 		o.RekorURL = rekorURL
+	}
+}
+
+func WithFulcio(fulcio sign.CertificateProvider) Option {
+	return func(o *Options) {
+		o.Fulcio = fulcio
+	}
+}
+
+func WithRekor(rekor sign.Transparency) Option {
+	return func(o *Options) {
+		o.Rekor = rekor
 	}
 }

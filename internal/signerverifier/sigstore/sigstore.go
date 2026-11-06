@@ -19,6 +19,7 @@ import (
 	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	"github.com/sigstore/sigstore-go/pkg/bundle"
+	"github.com/sigstore/sigstore-go/pkg/root"
 	"github.com/sigstore/sigstore-go/pkg/sign"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/sigstore/sigstore/pkg/oauthflow"
@@ -38,22 +39,24 @@ const (
 )
 
 type Verifier struct {
-	rekorURL string
-	issuer   string
-	identity string
-	ext      *structpb.Struct
+	rekorURL    string
+	issuer      string
+	identity    string
+	ext         *structpb.Struct
+	trustedRoot root.TrustedMaterial
 }
 
 func NewVerifierFromIdentityAndIssuer(identity, issuer string, opts ...verifieropts.Option) *Verifier {
-	options := verifieropts.DefaultOptions
+	options := *verifieropts.DefaultOptions
 	for _, fn := range opts {
-		fn(options)
+		fn(&options)
 	}
 
 	return &Verifier{
-		rekorURL: options.RekorURL,
-		issuer:   issuer,
-		identity: identity,
+		rekorURL:    options.RekorURL,
+		issuer:      issuer,
+		identity:    identity,
+		trustedRoot: options.TrustedRoot,
 	}
 }
 
@@ -64,12 +67,16 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	slog.Debug("Using Sigstore verifier...")
 
-	trustedRoot, err := cosign.TrustedRoot()
-	if err != nil {
-		slog.Debug(fmt.Sprintf("Error getting TUF root: %v", err))
-		return err
+	trustedRoot := v.trustedRoot
+	if trustedRoot == nil {
+		var err error
+		trustedRoot, err = cosign.TrustedRoot()
+		if err != nil {
+			slog.Debug(fmt.Sprintf("Error getting TUF root: %v", err))
+			return err
+		}
+		slog.Debug("Loaded Sigstore instance's root of trust")
 	}
-	slog.Debug("Loaded Sigstore instance's root of trust")
 
 	opts := []verify.VerifierOption{
 		verify.WithTransparencyLog(1),
@@ -160,13 +167,15 @@ type Signer struct {
 	fulcioURL   string
 	rekorURL    string
 	token       string
+	fulcio      sign.CertificateProvider
+	rekor       sign.Transparency
 	*Verifier
 }
 
 func NewSigner(opts ...signeropts.Option) *Signer {
-	options := signeropts.DefaultOptions
+	options := *signeropts.DefaultOptions
 	for _, fn := range opts {
-		fn(options)
+		fn(&options)
 	}
 
 	return &Signer{
@@ -175,6 +184,8 @@ func NewSigner(opts ...signeropts.Option) *Signer {
 		redirectURL: options.RedirectURL,
 		fulcioURL:   options.FulcioURL,
 		rekorURL:    options.RekorURL,
+		fulcio:      options.Fulcio,
+		rekor:       options.Rekor,
 		Verifier: &Verifier{
 			rekorURL: options.RekorURL,
 		},
@@ -282,7 +293,11 @@ func (s *Signer) getIDToken() (string, error) {
 	return s.token, nil
 }
 
-func (s *Signer) getFulcioInstance() *sign.Fulcio {
+func (s *Signer) getFulcioInstance() sign.CertificateProvider {
+	if s.fulcio != nil {
+		return s.fulcio
+	}
+
 	fulcioOpts := &sign.FulcioOptions{
 		BaseURL: s.fulcioURL,
 		Timeout: time.Minute,
@@ -291,7 +306,11 @@ func (s *Signer) getFulcioInstance() *sign.Fulcio {
 	return sign.NewFulcio(fulcioOpts)
 }
 
-func (s *Signer) getRekorInstance() *sign.Rekor {
+func (s *Signer) getRekorInstance() sign.Transparency {
+	if s.rekor != nil {
+		return s.rekor
+	}
+
 	rekorOpts := &sign.RekorOptions{
 		BaseURL: s.rekorURL,
 		Timeout: 90 * time.Second,
