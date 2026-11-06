@@ -814,6 +814,16 @@ func TestGetCommitInfo(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, uint64(1), repo.GitInvocationCount()-before)
 			})
+
+			t.Run("output encoding is UTF-8", func(t *testing.T) {
+				_, err := repo.executor("config", "i18n.logOutputEncoding", "ISO-8859-1").executeString()
+				require.NoError(t, err)
+				commitID, err := repo.Commit(emptyTreeID, refName, "café\n", false)
+				require.NoError(t, err)
+				info, err := repo.GetCommitInfo(commitID)
+				require.NoError(t, err)
+				assert.Equal(t, "café", info.Message)
+			})
 		})
 	}
 }
