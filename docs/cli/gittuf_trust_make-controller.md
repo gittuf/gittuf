@@ -1,10 +1,10 @@
 ## gittuf trust make-controller
 
-Make current repository a controller
+Make current repository a controller (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'make-controller' command sets the current repository as a controller in the repository's root of trust. It is used to allow downstream repositories to reuse this repository's policy.
+The 'make-controller' command sets the current repository as a controller in the repository's root of trust. It is used to allow downstream repositories to reuse this repository's policy (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust make-controller [flags]

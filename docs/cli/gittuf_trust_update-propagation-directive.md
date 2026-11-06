@@ -1,10 +1,10 @@
 ## gittuf trust update-propagation-directive
 
-Update propagation directive in the root of trust
+Update propagation directive in the root of trust (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to change how content is propagated between repositories.
+The 'update-propagation-directive' command modifies an existing propagation directive in the repository's root of trust. It is used to change how content is propagated between repositories. (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust update-propagation-directive [flags]

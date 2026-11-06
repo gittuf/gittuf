@@ -1,10 +1,10 @@
 ## gittuf trust add-network-repository
 
-Add a network repository
+Add a network repository (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified.
+The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust add-network-repository [flags]

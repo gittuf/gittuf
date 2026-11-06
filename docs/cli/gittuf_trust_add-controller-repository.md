@@ -1,10 +1,10 @@
 ## gittuf trust add-controller-repository
 
-Add a controller repository
+Add a controller repository (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'add-controller-repository' command adds a controller repository to the repository's root of trust. It is used to designate a repository whose global rules this repository inherits.
+The 'add-controller-repository' command adds a controller repository to the repository's root of trust. It is used to designate a repository whose global rules this repository inherits (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf trust add-controller-repository [flags]

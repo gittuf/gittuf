@@ -4,9 +4,12 @@
 package addpropagationdirective
 
 import (
+	"fmt"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
 
@@ -70,6 +73,10 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -91,8 +98,8 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "add-propagation-directive",
-		Short:             `Add propagation directive into gittuf root of trust`,
-		Long:              "The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository.",
+		Short:             fmt.Sprintf(`Add propagation directive into gittuf root of trust (developer mode only, set %s=1)`, dev.DevModeKey),
+		Long:              fmt.Sprintf("The 'add-propagation-directive' command registers a propagation directive in the repository's root of trust. It is used to define how contents from an upstream repository are automatically propagated into a downstream repository (developer mode only, set %s=1).", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

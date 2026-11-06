@@ -1,10 +1,10 @@
 ## gittuf rsl propagate
 
-Propagate contents of remote repositories into local repository
+Propagate contents of remote repositories into local repository (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'propagate' command propagates RSL contents from remote repositories defined in propagation directives into the local repository. It is used to record a snapshot of the propagated RSL and repository contents locally.
+The 'propagate' command propagates RSL contents from remote repositories defined in propagation directives into the local repository. It is used to record a snapshot of the propagated RSL and repository contents locally (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf rsl propagate [flags]
