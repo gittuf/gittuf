@@ -9,11 +9,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/gogitstore"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/go-git/go-git/v6/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func git(t *testing.T, repo *gitinterface.Repository, stdin string, args ...stri
 		cmd.Stdin = strings.NewReader(stdin)
 	}
 	out, err := cmd.Output()
-	require.Nil(t, err, "git %s", strings.Join(args, " "))
+	require.NoError(t, err, "git %s", strings.Join(args, " "))
 
 	return strings.TrimSpace(string(out))
 }
@@ -43,19 +45,19 @@ func TestGetEntriesInTree(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 
 			blobID, err := binary.WriteBlob([]byte("contents"))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			treeID, err := binary.WriteTree([]gitstore.TreeEntry{
 				{Path: "root.json", ID: blobID, Kind: gitstore.KindBlob},
 				{Path: "nested/targets.json", ID: blobID, Kind: gitstore.KindBlob},
 			})
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			t.Run("blobs and subtrees", func(t *testing.T) {
 				want, err := binary.GetEntriesInTree(treeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				got, err := fast.GetEntriesInTree(treeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 
 				kinds := map[string]gitstore.EntryKind{}
@@ -68,14 +70,14 @@ func TestGetEntriesInTree(t *testing.T) {
 
 			t.Run("empty tree yields nil, not an empty slice", func(t *testing.T) {
 				emptyTree, err := binary.EmptyTree()
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				want, err := binary.GetEntriesInTree(emptyTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.Nil(t, want)
 
 				got, err := fast.GetEntriesInTree(emptyTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Nil(t, got)
 			})
 
@@ -91,21 +93,21 @@ func TestGetEntriesInTree(t *testing.T) {
 
 			t.Run("submodule gitlink is reported as a blob", func(t *testing.T) {
 				commitID, err := binary.Commit(treeID, "refs/heads/sub", "sub\n", false)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				gitlinkTree := git(t, binary,
 					fmt.Sprintf("160000 commit %s\tsubmodule\n", commitID.String()),
 					"mktree")
 				gitlinkTreeID, err := githash.NewHash(gitlinkTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				want, err := binary.GetEntriesInTree(gitlinkTreeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.Len(t, want, 1)
 				require.Equal(t, gitstore.KindBlob, want[0].Kind)
 
 				got, err := fast.GetEntriesInTree(gitlinkTreeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 			})
 		})
@@ -122,52 +124,52 @@ func TestGetAllFilesInTree(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 
 			blobID, err := binary.WriteBlob([]byte("contents"))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			treeID, err := binary.WriteTree([]gitstore.TreeEntry{
 				{Path: "root.json", ID: blobID, Kind: gitstore.KindBlob},
 				{Path: "a/b/c/deep.json", ID: blobID, Kind: gitstore.KindBlob},
 			})
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			t.Run("flattens nested trees", func(t *testing.T) {
 				want, err := binary.GetAllFilesInTree(treeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				got, err := fast.GetAllFilesInTree(treeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 				assert.Contains(t, got, "a/b/c/deep.json")
 			})
 
 			t.Run("empty tree yields nil, not an empty map", func(t *testing.T) {
 				emptyTree, err := binary.EmptyTree()
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				want, err := binary.GetAllFilesInTree(emptyTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.Nil(t, want)
 
 				got, err := fast.GetAllFilesInTree(emptyTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Nil(t, got)
 			})
 
 			t.Run("submodule gitlink is included as a leaf", func(t *testing.T) {
 				commitID, err := binary.Commit(treeID, "refs/heads/sub2", "sub\n", false)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				gitlinkTree := git(t, binary,
 					fmt.Sprintf("160000 commit %s\tsubmodule\n", commitID.String()),
 					"mktree")
 				gitlinkTreeID, err := githash.NewHash(gitlinkTree)
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				want, err := binary.GetAllFilesInTree(gitlinkTreeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.Contains(t, want, "submodule")
 
 				got, err := fast.GetAllFilesInTree(gitlinkTreeID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 			})
 		})
@@ -184,20 +186,20 @@ func TestGetPathIDInTree(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 
 			blobID, err := binary.WriteBlob([]byte("contents"))
-			require.Nil(t, err)
+			require.NoError(t, err)
 			treeID, err := binary.WriteTree([]gitstore.TreeEntry{
 				{Path: "root.json", ID: blobID, Kind: gitstore.KindBlob},
 				{Path: "a/b/deep.json", ID: blobID, Kind: gitstore.KindBlob},
 			})
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			for _, treePath := range []string{"root.json", "a", "a/", "a/b", "a/b/deep.json"} {
 				t.Run(treePath, func(t *testing.T) {
 					want, err := binary.GetPathIDInTree(treeID, treePath)
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					got, err := fast.GetPathIDInTree(treeID, treePath)
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, want, got)
 				})
 			}
@@ -225,11 +227,11 @@ func TestGetReference(t *testing.T) {
 
 			t.Run("full reference name", func(t *testing.T) {
 				want, err := binary.GetReference("refs/heads/main")
-				require.Nil(t, err)
+				require.NoError(t, err)
 				require.Equal(t, ids[1], want)
 
 				got, err := fast.GetReference("refs/heads/main")
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, want, got)
 			})
 
@@ -247,7 +249,7 @@ func TestGetReference(t *testing.T) {
 				git(t, binary, "", "pack-refs", "--all")
 
 				got, err := fast.GetReference("refs/heads/main")
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, ids[1], got)
 			})
 
@@ -256,10 +258,10 @@ func TestGetReference(t *testing.T) {
 			t.Run("revision expressions are delegated", func(t *testing.T) {
 				for _, revision := range []string{"main", ids[1].String(), "refs/heads/main^{commit}", "refs/heads/main~1", "refs/heads/main@{0}"} {
 					want, err := binary.GetReference(revision)
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					got, err := fast.GetReference(revision)
-					require.Nil(t, err, "revision %s", revision)
+					require.NoError(t, err, "revision %s", revision)
 					assert.Equal(t, want, got)
 				}
 			})
@@ -277,16 +279,67 @@ func TestGetTagTarget(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 			ids := commitChain(t, binary, "refs/heads/main", 1)
 
-			tagID, err := binary.TagUsingSpecificKey(ids[0], "v1", "release\n", artifacts.SSHRSAPrivate)
-			require.Nil(t, err)
+			blobID, err := binary.WriteBlob([]byte("contents"))
+			require.NoError(t, err)
+			treeID, err := gitinterface.NewTreeBuilder(binary).WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("file", blobID)})
+			require.NoError(t, err)
 
-			want, err := binary.GetTagTarget(tagID)
-			require.Nil(t, err)
-			require.Equal(t, ids[0], want)
+			commitTagID, err := binary.TagUsingSpecificKey(ids[0], "v1", "release\n", artifacts.SSHRSAPrivate)
+			require.NoError(t, err)
+			treeTagID, err := binary.TagUsingSpecificKey(treeID, "tree", "tree\n", artifacts.SSHRSAPrivate)
+			require.NoError(t, err)
+			blobTagID, err := binary.TagUsingSpecificKey(blobID, "blob", "blob\n", artifacts.SSHRSAPrivate)
+			require.NoError(t, err)
+			nestedTagID, err := binary.TagUsingSpecificKey(treeTagID, "nested", "nested\n", artifacts.SSHRSAPrivate)
+			require.NoError(t, err)
 
-			got, err := fast.GetTagTarget(tagID)
-			require.Nil(t, err)
-			assert.Equal(t, want, got)
+			tests := map[string]struct {
+				objectID githash.Hash
+				wantID   githash.Hash
+			}{
+				"tag pointing at commit":    {objectID: commitTagID, wantID: ids[0]},
+				"tag pointing at tree":      {objectID: treeTagID, wantID: treeID},
+				"tag pointing at blob":      {objectID: blobTagID, wantID: blobID},
+				"tag pointing at tag":       {objectID: nestedTagID, wantID: treeID},
+				"commit resolves to itself": {objectID: ids[0], wantID: ids[0]},
+				"tree resolves to itself":   {objectID: treeID, wantID: treeID},
+				"blob resolves to itself":   {objectID: blobID, wantID: blobID},
+			}
+
+			for name, test := range tests {
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+
+					want, err := binary.GetTagTarget(test.objectID)
+					require.NoError(t, err)
+					require.Equal(t, test.wantID, want)
+
+					got, err := fast.GetTagTarget(test.objectID)
+					require.NoError(t, err)
+					assert.Equal(t, want, got)
+				})
+			}
+
+			t.Run("missing object", func(t *testing.T) {
+				t.Parallel()
+
+				missingID := binary.ZeroHash()
+				_, wantErr := binary.GetTagTarget(missingID)
+				_, gotErr := fast.GetTagTarget(missingID)
+				assert.ErrorContains(t, wantErr, "unable to resolve tag's target ID")
+				assert.ErrorContains(t, gotErr, "unable to resolve tag's target ID")
+			})
+
+			t.Run("malformed tag", func(t *testing.T) {
+				t.Parallel()
+
+				malformedID, err := githash.NewHash(git(t, binary, "not a tag\n", "hash-object", "-t", "tag", "--literally", "-w", "--stdin"))
+				require.NoError(t, err)
+				_, wantErr := binary.GetTagTarget(malformedID)
+				_, gotErr := fast.GetTagTarget(malformedID)
+				assert.ErrorContains(t, wantErr, "unable to resolve tag's target ID")
+				assert.ErrorContains(t, gotErr, "unable to resolve tag's target ID")
+			})
 		})
 	}
 }
@@ -301,28 +354,32 @@ func TestGetObjectSignature(t *testing.T) {
 			binary, fast := newBackends(t, objectFormat)
 
 			treeID, err := binary.EmptyTree()
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			signedID, err := binary.Commit(treeID, "refs/heads/signed", "signed\n", true)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			unsignedID, err := binary.Commit(treeID, "refs/heads/unsigned", "unsigned\n", false)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			tagID, err := binary.TagUsingSpecificKey(signedID, "v1", "release\n", artifacts.SSHRSAPrivate)
-			require.Nil(t, err)
+			require.NoError(t, err)
+			compatTagID := common.CreateTestTagWithCompatSignature(t, binary, "v2", signedID, artifacts.SSHRSAPrivate, artifacts.SSHED25519Private)
+			compatOnlyTagID := common.CreateTestTagWithCompatSignature(t, binary, "v3", signedID, nil, artifacts.SSHED25519Private)
 
 			cases := map[string]githash.Hash{
-				"signed commit":   signedID,
-				"unsigned commit": unsignedID,
-				"signed tag":      tagID,
+				"signed commit":                  signedID,
+				"unsigned commit":                unsignedID,
+				"signed tag":                     tagID,
+				"tag with compat signature":      compatTagID,
+				"tag with only compat signature": compatOnlyTagID,
 			}
 
 			for name, objectID := range cases {
 				t.Run(name, func(t *testing.T) {
 					wantPayload, wantSignature, err := binary.GetObjectSignature(objectID)
-					require.Nil(t, err)
+					require.NoError(t, err)
 
 					gotPayload, gotSignature, err := fast.GetObjectSignature(objectID)
-					require.Nil(t, err)
+					require.NoError(t, err)
 					assert.Equal(t, wantPayload, gotPayload)
 					assert.Equal(t, wantSignature, gotSignature)
 				})
@@ -330,13 +387,34 @@ func TestGetObjectSignature(t *testing.T) {
 
 			t.Run("signed commit actually carries a signature", func(t *testing.T) {
 				_, signature, err := fast.GetObjectSignature(signedID)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assert.NotEmpty(t, signature)
+			})
+
+			t.Run("tag signature ignores gpgsig-sha256 header", func(t *testing.T) {
+				goGitRepo, err := binary.GetGoGitRepository()
+				require.NoError(t, err)
+				compatTag, err := goGitRepo.TagObject(plumbing.NewHash(compatTagID.String()))
+				require.NoError(t, err)
+				require.NotEmpty(t, compatTag.Signature)
+				require.NotEmpty(t, compatTag.SignatureSHA256)
+
+				payload, signature, err := fast.GetObjectSignature(compatTagID)
+				require.NoError(t, err)
+				assert.Equal(t, compatTag.Signature, string(signature))
+				assert.Equal(t, fmt.Sprintf("object %s\ntype commit\ntag v2\ntagger Jane Doe <jane.doe@example.com> 814698000 +0000\n\nv2\n", signedID), string(payload))
+			})
+
+			t.Run("tag with only gpgsig-sha256 header is unsigned", func(t *testing.T) {
+				payload, signature, err := fast.GetObjectSignature(compatOnlyTagID)
+				require.NoError(t, err)
+				assert.Empty(t, signature)
+				assert.NotContains(t, string(payload), "gpgsig")
 			})
 
 			t.Run("blob is neither commit nor tag", func(t *testing.T) {
 				blobID, err := binary.WriteBlob([]byte("contents"))
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				_, _, wantErr := binary.GetObjectSignature(blobID)
 				require.ErrorIs(t, wantErr, gitinterface.ErrNotCommitOrTag)
@@ -355,12 +433,12 @@ func TestDisabledBackendDelegates(t *testing.T) {
 	disabled := gogitstore.New(binary, false)
 
 	blobID, err := binary.WriteBlob([]byte("contents"))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	want, err := binary.ReadBlob(blobID)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	got, err := disabled.ReadBlob(blobID)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }

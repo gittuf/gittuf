@@ -16,6 +16,7 @@ import (
 	authorizationsv02 "github.com/gittuf/gittuf/internal/attestations/authorizations/v02"
 	"github.com/gittuf/gittuf/internal/common"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/gogitstore"
 	"github.com/gittuf/gittuf/internal/propagation"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
@@ -24,6 +25,7 @@ import (
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +46,7 @@ func TestVerifyRef(t *testing.T) {
 	verifier := NewPolicyVerifier(repo)
 
 	currentTip, err := verifier.VerifyRef(testCtx, refName)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, commitIDs[0], currentTip)
 }
 
@@ -63,7 +65,7 @@ func TestVerifyRefFull(t *testing.T) {
 	verifier := NewPolicyVerifier(repo)
 
 	currentTip, err := verifier.VerifyRefFull(testCtx, refName)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, commitIDs[0], currentTip)
 }
 
@@ -100,7 +102,7 @@ func TestVerifyRefFromEntry(t *testing.T) {
 
 		// Verification passes because it's from a non-violating state only
 		currentTip, err := verifier.VerifyRefFromEntry(testCtx, refName, entryID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, commitIDs[1], currentTip)
 	})
 
@@ -140,7 +142,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
@@ -162,7 +164,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
@@ -216,7 +218,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -245,7 +247,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
@@ -264,7 +266,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -293,7 +295,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
@@ -312,7 +314,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -349,7 +351,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
@@ -368,7 +370,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -405,7 +407,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -424,7 +426,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -467,7 +469,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -486,7 +488,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -546,7 +548,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -575,7 +577,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Send it into invalid state again
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -604,7 +606,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
@@ -623,7 +625,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
 
@@ -635,7 +637,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -682,7 +684,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -719,7 +721,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Skip the recovery entry as well
 		annotation = rsl.NewAnnotationEntry([]githash.Hash{entryID}, true, "invalid entry")
@@ -746,7 +748,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -832,7 +834,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -918,7 +920,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -981,7 +983,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 
@@ -1123,7 +1125,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1224,7 +1226,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1302,7 +1304,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 
@@ -1411,7 +1413,7 @@ func TestVerifyMergeable(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeable(testCtx, refName, featureRefName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 }
@@ -1477,7 +1479,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1561,7 +1563,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1622,7 +1624,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 
@@ -1760,7 +1762,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1859,7 +1861,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, rslSignatureRequired)
 	})
 
@@ -1935,7 +1937,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 
@@ -2053,7 +2055,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		rslSignatureRequired, err := verifier.VerifyMergeableForCommit(testCtx, refName, featureID)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, rslSignatureRequired)
 	})
 }
@@ -2063,16 +2065,16 @@ func TestVerifyNetwork(t *testing.T) {
 		controllerRepository, networkRepository := createControllerAndNetworkRepositories(t)
 
 		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		verifier := NewPolicyVerifier(controllerRepository)
 		err = verifier.VerifyNetwork(testCtx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("propagation not performed", func(t *testing.T) {
@@ -2100,37 +2102,37 @@ func TestVerifyNetwork(t *testing.T) {
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootMetadata.SetRepositoryLocation(controllerRepositoryLocation)
 		err = controllerRootMetadata.EnableController()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = Apply(testCtx, controllerRepository, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkState.Metadata.RootEnvelope = networkRootEnv
 		err = networkState.preprocess()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = Apply(testCtx, networkRepository, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		verifier := NewPolicyVerifier(controllerRepository)
 		err = verifier.VerifyNetwork(testCtx)
@@ -2141,35 +2143,35 @@ func TestVerifyNetwork(t *testing.T) {
 		controllerRepository, networkRepository := createControllerAndNetworkRepositories(t)
 
 		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		newRootKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 		err = controllerRootMetadata.AddRootPrincipal(newRootKey)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerState.Commit(controllerRepository, "Add root principal\n", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = Apply(testCtx, controllerRepository, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		verifier := NewPolicyVerifier(controllerRepository)
 		err = verifier.VerifyNetwork(testCtx)
@@ -2194,7 +2196,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
@@ -2216,7 +2218,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		err = verifier.VerifyRelativeForRef(testCtx, entry, firstEntry, refName)
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
@@ -2341,7 +2343,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2370,7 +2372,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, recovered by unauthorized user", func(t *testing.T) {
@@ -2389,7 +2391,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2418,7 +2420,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, tree-same, recovered by authorized user", func(t *testing.T) {
@@ -2437,7 +2439,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2474,7 +2476,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, tree-same, recovered by unauthorized user", func(t *testing.T) {
@@ -2493,7 +2495,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2530,7 +2532,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, multiple invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -2549,7 +2551,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -2592,7 +2594,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, commit-same, unskipped invalid entries, recovered by authorized user", func(t *testing.T) {
@@ -2611,7 +2613,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
@@ -2671,7 +2673,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2700,7 +2702,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Send it into invalid state again
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2729,7 +2731,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with recovery, error because recovery goes back too far, recovered by authorized user", func(t *testing.T) {
@@ -2748,7 +2750,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		invalidLastGoodCommitID := commitIDs[len(commitIDs)-1]
 
@@ -2760,7 +2762,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2807,7 +2809,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		validCommitID := commitIDs[0] // track this for later
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
@@ -2844,7 +2846,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// No error anymore
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Skip the recovery entry as well
 		annotation = rsl.NewAnnotationEntry([]githash.Hash{entryID}, true, "invalid entry")
@@ -2871,7 +2873,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err := verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 5, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
@@ -2953,7 +2955,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// At this point, the verifier should pass; the change does not violate policy
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Do this again so we have two successive valid changes
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
@@ -2992,7 +2994,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// At this point, the verifier should pass; the change does not violate policy
 		verifier = NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Pretend the second valid change is actually invalid, "recover from
 		// it" but without the threshold validation
@@ -3031,7 +3033,7 @@ func TestVerifyEntry(t *testing.T) {
 				entry.ID = entryID
 
 				err := verifyEntry(testCtx, repo, state, nil, entry)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			})
 		}
 	})
@@ -3045,7 +3047,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err := verifyEntry(testCtx, repo, state, nil, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("successful verification with higher threshold using v0.1 reference authorization", func(t *testing.T) {
@@ -3100,7 +3102,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("successful verification with higher threshold using latest reference authorization", func(t *testing.T) {
@@ -3159,7 +3161,7 @@ func TestVerifyEntry(t *testing.T) {
 				entry.ID = entryID
 
 				err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			})
 		}
 	})
@@ -3217,7 +3219,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval due to invalid app key", func(t *testing.T) {
@@ -3353,7 +3355,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("unsuccessful verification with higher threshold but using GitHub approval from untrusted key and reference authorization v0.2", func(t *testing.T) {
@@ -3629,7 +3631,7 @@ func TestVerifyEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("unsuccessful verification with global threshold constraint", func(t *testing.T) {
@@ -3702,7 +3704,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Only one entry, this is fine
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Add more entries
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
@@ -3712,7 +3714,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Still fine
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Rewrite history altogether
 		// Delete ref
@@ -3749,7 +3751,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Only one entry, this is fine
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Add more entries
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
@@ -3759,7 +3761,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Still fine
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Rewrite history altogether
 		// Delete ref
@@ -3776,7 +3778,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// Still fine; this ref is not protected
 		err = verifyEntry(testCtx, repo, state, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("verify global rules applied from controller repository", func(t *testing.T) {
@@ -3794,59 +3796,59 @@ func TestVerifyEntry(t *testing.T) {
 		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
 		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerRootMetadata.EnableController()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerRootMetadata.AddNetworkRepository("test", networkRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootEnv, err := dsse.CreateEnvelope(controllerRootMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerRootEnv, err = dsse.SignEnvelope(testCtx, controllerRootEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerState.Metadata.RootEnvelope = controllerRootEnv
 		err = controllerState.preprocess()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = controllerState.Commit(controllerRepository, "Initial policy\n", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = Apply(testCtx, controllerRepository, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		latestControllerEntry, err := rsl.GetLatestEntry(controllerRepository)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		controllerState.loadedEntry = latestControllerEntry.(rsl.ReferenceUpdaterEntry)
 
 		networkRootMetadata, err := networkState.GetRootMetadata(false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = networkRootMetadata.AddControllerRepository("controller", controllerRepositoryLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootEnv, err := dsse.CreateEnvelope(networkRootMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkRootEnv, err = dsse.SignEnvelope(testCtx, networkRootEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkState.Metadata.RootEnvelope = networkRootEnv
 		networkTargetsMetadata, err := networkState.GetTargetsMetadata(TargetsRoleName, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = networkTargetsMetadata.AddPrincipal(tufv01.NewKeyFromSSLibKey(signer.MetadataKey()))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkTargetsEnv, err := dsse.CreateEnvelope(networkTargetsMetadata)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkTargetsEnv, err = dsse.SignEnvelope(testCtx, networkTargetsEnv, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		networkState.Metadata.TargetsEnvelope = networkTargetsEnv
 		err = networkState.Commit(networkRepository, "Initial policy\n", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = Apply(testCtx, networkRepository, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		networkState, err = LoadCurrentState(testCtx, networkRepository, PolicyRef)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		refName := "refs/heads/main" // this has threshold 1 in network repo but threshold 2 in controller repo
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(networkRepository)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
 
@@ -3857,20 +3859,20 @@ func TestVerifyEntry(t *testing.T) {
 		// Create authorization for this change
 		// This uses the latest reference authorization version
 		authorization, err := attestations.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		env, err := dsse.CreateEnvelope(authorization)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		env, err = dsse.SignEnvelope(testCtx, env, signer)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = currentAttestations.SetReferenceAuthorization(networkRepository, env, refName, gitinterface.ZeroHash.String(), commitTreeID.String())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = currentAttestations.Commit(networkRepository, "Add authorization", true, false)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		currentAttestations, err = attestations.LoadCurrentAttestations(networkRepository)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, entry, gpgKeyBytes)
@@ -3878,7 +3880,7 @@ func TestVerifyEntry(t *testing.T) {
 
 		// We meet the threshold of with the reference authorization, so this should be successful
 		err = verifyEntry(testCtx, networkRepository, networkState, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Make another change without reference authorization
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 2, gpgKeyBytes)
@@ -3909,10 +3911,10 @@ func TestVerifyEntry(t *testing.T) {
 		// Test that a keyholder not authorized for main but still added to
 		// policy cannot satisfy the branch protection rule
 		err = repo.DeleteReference(refName)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		err = repo.SetReference(rsl.Ref, rslTip)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
 		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
@@ -3925,6 +3927,11 @@ func TestVerifyEntry(t *testing.T) {
 }
 
 func TestVerifyTagEntry(t *testing.T) {
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
 	t.Run("no tag specific policy", func(t *testing.T) {
 		repo, policy := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
@@ -3942,7 +3949,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with tag specific policy", func(t *testing.T) {
@@ -3962,7 +3969,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with threshold tag specific policy", func(t *testing.T) {
@@ -4021,7 +4028,7 @@ func TestVerifyTagEntry(t *testing.T) {
 		entry.ID = entryID
 
 		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("with tag specific policy, unauthorized", func(t *testing.T) {
@@ -4103,6 +4110,393 @@ func TestVerifyTagEntry(t *testing.T) {
 		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
+
+	t.Run("with tag specific policy, unsigned annotated tag", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestUnsignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitIDs[len(commitIDs)-1]); err != nil {
+			t.Fatal(err)
+		}
+
+		entry = rsl.NewReferenceEntry(tagRefName, commitIDs[len(commitIDs)-1])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, tag signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgUnauthorizedKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, unsigned tag, unauthorized", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagID := common.CreateTestUnsignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1])
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
+	t.Run("with threshold tag specific policy, tag signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+		refName := "refs/heads/main"
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 3, gpgKeyBytes)
+		entry := rsl.NewReferenceEntry(refName, commitIDs[len(commitIDs)-1])
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		tagName := "v1"
+		tagRefName := "refs/tags/v1"
+
+		authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+
+		env, err := dsse.CreateEnvelope(authorization)
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err = dsse.SignEnvelope(testCtx, env, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), entry.TargetID.String()); err != nil {
+			t.Fatal(err)
+		}
+		if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		currentAttestations, err = attestations.LoadCurrentAttestations(repo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagID := common.CreateTestSignedTag(t, repo, tagName, commitIDs[len(commitIDs)-1], gpgUnauthorizedKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName(tagName), tagID)
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		err = verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag, unsigned commit", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		treeID, err := repo.EmptyTree()
+		if err != nil {
+			t.Fatal(err)
+		}
+		commitID, err := repo.Commit(treeID, "refs/heads/main", "Unsigned commit\n", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitID); err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(tagRefName, commitID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err = verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, lightweight tag, commit signed by key not in policy", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgUnauthorizedKeyBytes)
+
+		tagRefName := gitinterface.TagReferenceName("v1")
+		if err := repo.SetReference(tagRefName, commitIDs[0]); err != nil {
+			t.Fatal(err)
+		}
+
+		entry := rsl.NewReferenceEntry(tagRefName, commitIDs[0])
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.NoError(t, err)
+	})
+
+	t.Run("with tag specific policy, tag reference set to unexpected target", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 1, gpgKeyBytes)
+		otherTagID := common.CreateTestSignedTag(t, repo, "other", commitIDs[0], gpgKeyBytes)
+		common.CreateTestSignedTag(t, repo, "v1", commitIDs[0], gpgKeyBytes)
+
+		entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), otherTagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorContains(t, err, "tag reference set to unexpected target")
+	})
+
+	t.Run("with threshold tag specific policy, second entry for tag needs full threshold", func(t *testing.T) {
+		repo, policy := createTestRepository(t, createTestStateWithThresholdTagPolicy)
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, "refs/heads/main", 2, gpgKeyBytes)
+		currentAttestations := addTestTagAuthorization(t, repo, "refs/tags/v1", commitIDs[0])
+		tagID := common.CreateTestSignedTag(t, repo, "v1", commitIDs[0], targets1KeyBytes)
+
+		entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err := verifyTagEntry(testCtx, repo, policy, currentAttestations, entry)
+		require.NoError(t, err)
+
+		tagID = common.CreateTestSignedTag(t, repo, "v1", commitIDs[1], gpgKeyBytes)
+
+		entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+		entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+		err = verifyTagEntry(testCtx, repo, policy, nil, entry)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+}
+
+func TestVerifyTagEntryObjectFormats(t *testing.T) {
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		createTag    func(*testing.T, *gitinterface.Repository, githash.Hash) githash.Hash
+		wantErr      error
+	}{
+		"unsigned tag": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", target)
+			},
+		},
+		"tag signed by key not in policy": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestSignedTag(t, repo, "v1", target, gpgUnauthorizedKeyBytes)
+			},
+		},
+		"tag with gpgsig-sha256 header": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestTagWithCompatSignature(t, repo, "v1", target, gpgUnauthorizedKeyBytes, targets1KeyBytes)
+			},
+		},
+		"tag signature does not count towards threshold": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestSignedTag(t, repo, "v1", target, targets1KeyBytes)
+			},
+			wantErr: ErrVerificationFailed,
+		},
+		"gpgsig-sha256 header does not count towards threshold": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+				return common.CreateTestTagWithCompatSignature(t, repo, "v1", target, nil, targets1KeyBytes)
+			},
+			wantErr: ErrVerificationFailed,
+		},
+	}
+
+	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+		for name, test := range tests {
+			t.Run(fmt.Sprintf("%s/%s", objectFormat, name), func(t *testing.T) {
+				repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
+				refName := "refs/heads/main"
+
+				commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+				entry := rsl.NewReferenceEntry(refName, commitIDs[0])
+				entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+				tagID := test.createTag(t, repo, commitIDs[0])
+
+				entry = rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+				entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+				err := verifyTagEntry(testCtx, repo, policy, nil, entry)
+				if test.wantErr != nil {
+					assert.ErrorIs(t, err, test.wantErr)
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	}
+}
+
+func TestVerifyTagEntryNonCommitTargets(t *testing.T) {
+	// Isolate from the developer's global and system git config. go-git
+	// auto-signs unsigned tags when tag.gpgSign is set there.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
+	writeTree := func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+		t.Helper()
+
+		blobID, err := repo.WriteBlob([]byte("contents"))
+		require.NoError(t, err)
+		treeID, err := gitinterface.NewTreeBuilder(repo).WriteTreeFromEntries([]gitinterface.TreeEntry{gitinterface.NewEntryBlob("file", blobID)})
+		require.NoError(t, err)
+		return treeID
+	}
+	writeBlob := func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+		t.Helper()
+
+		blobID, err := repo.WriteBlob([]byte("contents"))
+		require.NoError(t, err)
+		return blobID
+	}
+	lightweightTag := func(t *testing.T, repo *gitinterface.Repository, target githash.Hash) githash.Hash {
+		t.Helper()
+
+		require.Nil(t, repo.SetReference(gitinterface.TagReferenceName("v1"), target))
+		return target
+	}
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		createTag    func(*testing.T, *gitinterface.Repository) githash.Hash
+		wantErr      error
+	}{
+		"unsigned tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", writeTree(t, repo))
+			},
+		},
+		"unsigned tag pointing at blob": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return common.CreateTestUnsignedTag(t, repo, "v1", writeBlob(t, repo))
+			},
+		},
+		"lightweight tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeTree(t, repo))
+			},
+		},
+		"lightweight tag pointing at blob": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeBlob(t, repo))
+			},
+		},
+		"tag pointing at tag pointing at tree": {
+			stateCreator: createTestStateWithTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				innerTagID := common.CreateTestUnsignedTag(t, repo, "inner", writeTree(t, repo))
+				return common.CreateTestUnsignedTag(t, repo, "v1", innerTagID)
+			},
+		},
+		"lightweight tag pointing at tree under threshold policy": {
+			stateCreator: createTestStateWithThresholdTagPolicy,
+			createTag: func(t *testing.T, repo *gitinterface.Repository) githash.Hash {
+				return lightweightTag(t, repo, writeTree(t, repo))
+			},
+			wantErr: ErrVerificationFailed,
+		},
+	}
+
+	backends := map[string]func(*gitinterface.Repository) gitstore.Storer{
+		"git":    func(repo *gitinterface.Repository) gitstore.Storer { return repo },
+		"go-git": func(repo *gitinterface.Repository) gitstore.Storer { return gogitstore.New(repo, true) },
+	}
+
+	for _, objectFormat := range []gitinterface.ObjectFormat{gitinterface.ObjectFormatSHA1, gitinterface.ObjectFormatSHA256} {
+		for backendName, newStorer := range backends {
+			for name, test := range tests {
+				t.Run(fmt.Sprintf("%s/%s/%s", objectFormat, backendName, name), func(t *testing.T) {
+					repo, policy := createTestRepository(t, test.stateCreator, gitinterface.WithObjectFormat(objectFormat))
+
+					tagID := test.createTag(t, repo)
+
+					entry := rsl.NewReferenceEntry(gitinterface.TagReferenceName("v1"), tagID)
+					entry.ID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+
+					err := verifyTagEntry(testCtx, newStorer(repo), policy, nil, entry)
+					if test.wantErr != nil {
+						assert.ErrorIs(t, err, test.wantErr)
+					} else {
+						assert.NoError(t, err)
+					}
+				})
+			}
+		}
+	}
 }
 
 func TestGetCommits(t *testing.T) {
@@ -4129,7 +4523,7 @@ func TestGetCommits(t *testing.T) {
 	})
 
 	commitIDs, err := getCommits(repo, secondEntry)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, expectedCommitIDs, commitIDs)
 }
 
@@ -4141,7 +4535,7 @@ func TestStateVerifyNewState(t *testing.T) {
 		newPolicy := createTestStateWithOnlyRoot(t)
 
 		err := currentPolicy.VerifyNewState(testCtx, newPolicy)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("invalid policy transition", func(t *testing.T) {
@@ -4184,7 +4578,7 @@ func TestStateVerifyNewState(t *testing.T) {
 		newPolicy := createTestStateWithPolicy(t)
 
 		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// The reverse should fail
 		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
@@ -4198,7 +4592,7 @@ func TestStateVerifyNewState(t *testing.T) {
 		newPolicy := createTestStateWithPolicy(t)
 
 		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// The reverse should fail
 		err = newPolicy.VerifyNewState(testCtx, oldPolicy)
@@ -4212,7 +4606,7 @@ func TestStateVerifyNewState(t *testing.T) {
 		newPolicy := createTestStateWithPolicy(t)
 
 		err := oldPolicy.VerifyNewState(testCtx, newPolicy)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// The reverse should fail
 		err = newPolicy.VerifyNewState(testCtx, oldPolicy)

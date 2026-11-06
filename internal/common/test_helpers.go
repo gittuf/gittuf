@@ -12,7 +12,10 @@ import (
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/gittuf/gittuf/pkg/rsl"
+	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/config"
+	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/jonboulle/clockwork"
 )
 
@@ -131,6 +134,86 @@ func CreateTestSignedTag(t *testing.T, repo *gitinterface.Repository, tagName st
 
 	tagMessage := fmt.Sprintf("%s\n", tagName)
 	tagID, err := repo.TagUsingSpecificKey(target, tagName, tagMessage, signingKeyBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return tagID
+}
+
+// CreateTestTagWithCompatSignature creates a tag whose `gpgsig-sha256` header
+// is signed using compatSigningKeyBytes. The appended signature is made using
+// signingKeyBytes, or left out when it is nil.
+func CreateTestTagWithCompatSignature(t *testing.T, repo *gitinterface.Repository, tagName string, target githash.Hash, signingKeyBytes, compatSigningKeyBytes []byte) githash.Hash {
+	t.Helper()
+
+	goGitRepo, err := repo.GetGoGitRepository()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The fixed clock makes every tag created here share a payload.
+	signedTag := func(keyBytes []byte) *object.Tag {
+		tagID := CreateTestSignedTag(t, repo, tagName, target, keyBytes)
+		tag, err := goGitRepo.TagObject(plumbing.NewHash(tagID.String()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tag
+	}
+
+	compatTag := signedTag(compatSigningKeyBytes)
+	tag := &object.Tag{
+		Name:            compatTag.Name,
+		Tagger:          compatTag.Tagger,
+		Message:         compatTag.Message,
+		TargetType:      compatTag.TargetType,
+		Target:          compatTag.Target,
+		SignatureSHA256: compatTag.Signature,
+	}
+	if signingKeyBytes != nil {
+		tag.Signature = signedTag(signingKeyBytes).Signature
+	}
+
+	obj := goGitRepo.Storer.NewEncodedObject()
+	if err := tag.Encode(obj); err != nil {
+		t.Fatal(err)
+	}
+	objID, err := goGitRepo.Storer.SetEncodedObject(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagID, err := gitinterface.NewHash(objID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetReference(gitinterface.TagReferenceName(tagName), tagID); err != nil {
+		t.Fatal(err)
+	}
+
+	return tagID
+}
+
+// CreateTestUnsignedTag creates an unsigned annotated tag in the repository
+// pointing to the target object.
+func CreateTestUnsignedTag(t *testing.T, repo *gitinterface.Repository, tagName string, target githash.Hash) githash.Hash {
+	t.Helper()
+
+	goGitRepo, err := repo.GetGoGitRepository()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagRef, err := goGitRepo.CreateTag(tagName, plumbing.NewHash(target.String()), &git.CreateTagOptions{
+		Tagger:  &object.Signature{Name: testName, Email: testEmail, When: TestClock.Now()},
+		Message: fmt.Sprintf("%s\n", tagName),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagID, err := gitinterface.NewHash(tagRef.Hash().String())
 	if err != nil {
 		t.Fatal(err)
 	}
