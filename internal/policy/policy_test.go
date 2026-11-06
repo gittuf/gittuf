@@ -21,6 +21,7 @@ import (
 	sslibdsse "github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
@@ -461,6 +462,94 @@ func TestLoadState(t *testing.T) {
 		require.NoError(t, err)
 		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
 
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	// With no applied policy in the RSL there is no prior root to verify the
+	// requested entry against, so the state must at least verify on its own.
+	t.Run("unsigned state without applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		state := createTestStateWithOnlyRoot(t)
+		state.Metadata.RootEnvelope.Signatures = nil
+		require.NoError(t, state.Commit(repo, "Unsigned state", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, sslibdsse.ErrNoSignature)
+	})
+
+	t.Run("unsigned staged state before first applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		unsigned := createTestStateWithOnlyRoot(t)
+		unsigned.Metadata.RootEnvelope.Signatures = nil
+		require.NoError(t, unsigned.Commit(repo, "Unsigned staged state", true, false))
+
+		stagedEntry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		require.NoError(t, createTestStateWithOnlyRoot(t).Commit(repo, "Signed staged state", true, false))
+		stagingTip, err := repo.GetReference(PolicyStagingRef)
+		require.NoError(t, err)
+		require.NoError(t, repo.SetReference(PolicyRef, stagingTip))
+		require.NoError(t, rsl.NewReferenceEntry(PolicyRef, stagingTip).Commit(repo, false))
+
+		_, err = LoadState(t.Context(), repo, stagedEntry.(*rsl.ReferenceEntry))
+		require.ErrorIs(t, err, sslibdsse.ErrNoSignature)
+	})
+
+	t.Run("initial root principals are verified before controller metadata without applied policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		state := createTestStateWithOnlyRoot(t)
+
+		rootMetadata, err := state.GetRootMetadata(false)
+		require.NoError(t, err)
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		controllerLocation := path.Join(t.TempDir(), "missing")
+		err = rootMetadata.AddControllerRepository("controller", controllerLocation, []tuf.Principal{tufv01.NewKeyFromSSLibKey(signer.MetadataKey())})
+		require.NoError(t, err)
+
+		rootEnvelope, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnvelope, err = dsse.SignEnvelope(t.Context(), rootEnvelope, signer)
+		require.NoError(t, err)
+		state.Metadata.RootEnvelope = rootEnvelope
+		state.ControllerMetadata = map[string]*StateMetadata{
+			"controller": createTestStateWithOnlyRoot(t).Metadata,
+		}
+		require.NoError(t, state.Commit(repo, "Staged state with controller", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))}
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
+		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("self-signed state without applied policy and wrong initial root principals", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+		signer := setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes)
+		rootMetadata, err := InitializeRootMetadata(tufv01.NewKeyFromSSLibKey(signer.MetadataKey()))
+		require.NoError(t, err)
+		rootEnv, err := dsse.CreateEnvelope(rootMetadata)
+		require.NoError(t, err)
+		rootEnv, err = dsse.SignEnvelope(t.Context(), rootEnv, signer)
+		require.NoError(t, err)
+
+		state := &State{Metadata: &StateMetadata{RootEnvelope: rootEnv}}
+		require.NoError(t, state.Commit(repo, "Self-signed state", true, false))
+
+		entry, err := rsl.GetLatestEntry(repo)
+		require.NoError(t, err)
+
+		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry))
+		require.NoError(t, err)
+
+		initialRootPrincipals := []tuf.Principal{tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))}
 		_, err = LoadState(t.Context(), repo, entry.(*rsl.ReferenceEntry), policyopts.WithInitialRootPrincipals(initialRootPrincipals))
 		require.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
@@ -1899,4 +1988,170 @@ func setupControllerAndNetworkRepositories(t *testing.T, controllerRepositoryLoc
 	require.Nil(t, err)
 
 	return controllerRepository, networkRepository, signer
+}
+
+func TestPreprocessRejectsStateWithoutRootMetadata(t *testing.T) {
+	t.Parallel()
+
+	for name, state := range map[string]*State{
+		"no metadata":      {},
+		"no root envelope": {Metadata: &StateMetadata{}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ErrorIs(t, state.preprocess(), ErrRootMetadataNotFound)
+		})
+	}
+}
+
+func TestStateSatisfiedBy(t *testing.T) {
+	t.Parallel()
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.NoError(t, err)
+	gpgKeyID := gpgKeyR.KeyID
+	rootKeyID := ssh.NewKeyFromBytes(t, rootPubKeyBytes).KeyID
+	approverKeyID := ssh.NewKeyFromBytes(t, targets1PubKeyBytes).KeyID
+
+	tests := map[string]struct {
+		stateCreator func(*testing.T) *State
+		target       string
+		principalIDs []string
+		wantRule     string
+		wantErr      error
+	}{
+		"trusted principal meets rule": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "protect-main",
+		},
+		"untrusted principal": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{rootKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"principal unknown to the policy": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{"unknown"},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"no principals": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/main",
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"unprotected target": {
+			stateCreator: createTestStateWithPolicy,
+			target:       "git:refs/heads/other",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrTargetNotProtected,
+		},
+		"one of two required principals": {
+			stateCreator: createTestStateWithThresholdPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"both required principals": {
+			stateCreator: createTestStateWithThresholdPolicy,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID, approverKeyID},
+			wantRule:     "protect-main",
+		},
+		"global threshold rule alone unmet": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+		"global threshold rule alone met": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/main",
+			principalIDs: []string{gpgKeyID, rootKeyID},
+		},
+		"global threshold rule does not match target": {
+			stateCreator: createTestStateWithGlobalConstraintThreshold,
+			target:       "git:refs/heads/other",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrTargetNotProtected,
+		},
+		"rule met alongside global threshold rule": {
+			stateCreator: createTestStateWithBranchProtectionAndGlobalConstraintThreshold,
+			target:       "git:refs/heads/feature",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "protect-feature",
+		},
+		"delegating rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:1/subpath1/a",
+			principalIDs: []string{rootKeyID},
+			wantRule:     "1",
+		},
+		"delegated rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:1/subpath1/a",
+			principalIDs: []string{gpgKeyID},
+			wantRule:     "3",
+		},
+		"delegated principal outside its rule": {
+			stateCreator: createTestStateWithDelegatedPolicies,
+			target:       "file:2/a",
+			principalIDs: []string{gpgKeyID},
+			wantErr:      ErrVerifierConditionsUnmet,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			state := test.stateCreator(t)
+			rule, err := state.SatisfiedBy(test.target, set.NewSetFromItems(test.principalIDs...))
+			if test.wantErr != nil {
+				assert.ErrorIs(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantRule, rule)
+		})
+	}
+}
+
+// Deserialized metadata skips AddRule's checks, so a rule file can name a
+// principal it never defines. No key can sign as that ID.
+func TestStateSatisfiedByWithUndefinedPrincipal(t *testing.T) {
+	t.Parallel()
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.NoError(t, err)
+	defined := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+	ghost := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+
+	targetsMetadata := InitializeTargetsMetadata()
+	require.NoError(t, targetsMetadata.AddPrincipal(defined))
+	require.NoError(t, targetsMetadata.AddPrincipal(ghost))
+	require.NoError(t, targetsMetadata.AddRule("protect-main", []string{defined.KeyID, ghost.KeyID}, []string{"git:refs/heads/main"}, 1))
+	require.NoError(t, targetsMetadata.AddRule("protect-ghost", []string{ghost.KeyID}, []string{"git:refs/heads/ghost"}, 1))
+	delete(targetsMetadata.(*tufv02.TargetsMetadata).Delegations.Principals, ghost.KeyID)
+
+	targetsEnv, err := dsse.CreateEnvelope(targetsMetadata)
+	require.NoError(t, err)
+
+	state := createTestStateWithOnlyRoot(t)
+	state.Metadata.TargetsEnvelope = targetsEnv
+	require.NoError(t, state.preprocess())
+
+	rule, err := state.SatisfiedBy("git:refs/heads/main", set.NewSetFromItems(defined.KeyID))
+	require.NoError(t, err)
+	assert.Equal(t, "protect-main", rule)
+
+	_, err = state.SatisfiedBy("git:refs/heads/main", set.NewSetFromItems(ghost.KeyID))
+	assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+
+	_, err = state.SatisfiedBy("git:refs/heads/ghost", set.NewSetFromItems(defined.KeyID, ghost.KeyID))
+	assert.ErrorIs(t, err, ErrInvalidVerifier)
 }
