@@ -170,7 +170,7 @@ func (r *Repository) commitWithParents(t *testing.T, treeID Hash, parentIDs []Ha
 // single Git invocation. It returns an error if the requested ID is not a
 // commit.
 func (r *Repository) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, error) {
-	stdOut, err := r.executor("rev-list", "--no-walk", "--no-commit-header", "--format=%H%x00%T%x00%P%x00%B", commitID.String()).executeString()
+	stdOut, err := r.executor("rev-list", "--no-walk", "--no-commit-header", "--encoding=UTF-8", "--format=%H%x00%T%x00%P%x00%B", commitID.String()).executeString()
 	if err != nil {
 		return gitstore.CommitInfo{}, fmt.Errorf("unable to read commit '%s': %w", commitID.String(), err)
 	}
