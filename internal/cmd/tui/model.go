@@ -119,18 +119,23 @@ type model struct {
 	logCh                      chan string
 	showDiffOverlay            bool
 	diffViewport               viewport.Model
+	showSetupWizard            bool
+	setupWizard                setupWizardModel
 }
 
 // initDoneMsg carries the result of the asynchronous TUI initialization.
 type initDoneMsg struct {
-	repo        *gittuf.Repository
-	signer      dsse.SignerVerifier
-	rules       []rule
-	globalRules []globalRule
-	readOnly    bool
-	footer      string
-	signerError string
-	err         error
+	repo          *gittuf.Repository
+	signer        dsse.SignerVerifier
+	rules         []rule
+	globalRules   []globalRule
+	readOnly      bool
+	footer        string
+	signerError   string
+	uninitialized bool
+	defaultBranch string
+	detectedKey   string
+	err           error
 }
 
 // verifyResultMsg carries the result of an async verification command.
@@ -461,14 +466,26 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 			}
 		}
 
+		hasPolicy, _ := repo.HasPolicy()
+		uninitialized := !hasPolicy && !o.readOnly
+		var defaultBranch string
+		var detectedKey string
+		if uninitialized {
+			defaultBranch = resolveDefaultBranch(repo)
+			detectedKey = discoverLocalKey(repo)
+		}
+
 		return initDoneMsg{
-			repo:        repo,
-			signer:      signer,
-			rules:       getCurrRules(ctx, o),
-			globalRules: getGlobalRules(ctx, o),
-			readOnly:    readOnly,
-			footer:      footer,
-			signerError: signerError,
+			repo:          repo,
+			signer:        signer,
+			rules:         getCurrRules(ctx, o),
+			globalRules:   getGlobalRules(ctx, o),
+			readOnly:      readOnly,
+			footer:        footer,
+			signerError:   signerError,
+			uninitialized: uninitialized,
+			defaultBranch: defaultBranch,
+			detectedKey:   detectedKey,
 		}
 	}
 }
