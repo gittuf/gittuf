@@ -31,7 +31,11 @@ else
 endif
 
 e2e : just-build
+ifeq ($(OS),Windows_NT)
+	GITTUF_BIN="$(CURDIR)/dist/gittuf.exe" bash ./tests/run_e2e_tests.sh
+else
 	GITTUF_BIN="$(CURDIR)/dist/gittuf" bash ./tests/run_e2e_tests.sh
+endif
 
 test :
 	go test -race -timeout 20m -v ./...

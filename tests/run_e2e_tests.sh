@@ -6,6 +6,23 @@ shopt -s nullglob
 PASS=0
 FAIL=0
 
+if [ -n "${GITTUF_BIN:-}" ]; then
+    if [ ! -f "$GITTUF_BIN" ] && [ -f "${GITTUF_BIN}.exe" ]; then
+        GITTUF_BIN="${GITTUF_BIN}.exe"
+    elif [ ! -f "$GITTUF_BIN" ] && [ -f "${GITTUF_BIN%.exe}" ]; then
+        GITTUF_BIN="${GITTUF_BIN%.exe}"
+    fi
+else
+    if [ -f "./dist/gittuf" ]; then
+        GITTUF_BIN="$(pwd)/dist/gittuf"
+    elif [ -f "./dist/gittuf.exe" ]; then
+        GITTUF_BIN="$(pwd)/dist/gittuf.exe"
+    else
+        GITTUF_BIN="gittuf"
+    fi
+fi
+export GITTUF_BIN
+
 tests_dir="$(dirname "$0")"
 tests=("$tests_dir"/gittuf*.sh)
 
