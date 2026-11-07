@@ -312,7 +312,7 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	// Unwrap and verify
 	// NOTE: For the sake of testing the contained key, we unwrap before we
