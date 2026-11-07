@@ -368,6 +368,9 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 		if err := os.WriteFile(keyPath, key.data, 0o600); err != nil {
 			t.Fatal(err)
 		}
+		if err := ssh.PrepareTestKeyFile(keyPath); err != nil {
+			t.Fatal(err)
+		}
 	}
 	keyPath := filepath.Join(tmpDir, "rsa")
 	sslibKeyO, err := ssh.NewKeyFromFile(keyPath)
