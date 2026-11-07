@@ -209,3 +209,11 @@ func TestNewVerifierFromKey(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to parse ssh public key material")
 	})
 }
+
+func TestSignerSignError(t *testing.T) {
+	signer := &Signer{
+		Path: filepath.Join(t.TempDir(), "non-existent-key"),
+	}
+	_, err := signer.Sign(context.Background(), []byte("data"))
+	assert.Error(t, err)
+}
