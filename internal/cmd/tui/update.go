@@ -103,12 +103,15 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case verifyResultMsg:
 		m.verifying = false
 		if m.logCh != nil {
-			remaining := drainLogChannel(m.logCh)
-			for _, line := range remaining {
+			// The verification writer is closed before this message is delivered,
+			// but the scanner may still be forwarding its final lines.
+			hasRemaining := false
+			for line := range m.logCh {
 				m.logsBuf.WriteString(line)
 				m.logsBuf.WriteByte('\n')
+				hasRemaining = true
 			}
-			if len(remaining) > 0 {
+			if hasRemaining {
 				m.logViewport.SetContent(m.logsBuf.String())
 				m.logViewport.GotoBottom()
 			}
