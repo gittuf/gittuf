@@ -9,6 +9,7 @@ import (
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/common/set"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -1911,6 +1912,8 @@ func TestListGlobalRules(t *testing.T) {
 }
 
 func TestAddPropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -2024,6 +2027,8 @@ func TestAddPropagationDirective(t *testing.T) {
 }
 
 func TestUpdatePropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -2143,6 +2148,8 @@ func TestUpdatePropagationDirective(t *testing.T) {
 }
 
 func TestRemovePropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("with tuf v01 metadata", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 
@@ -2353,6 +2360,8 @@ func TestIncrementRootVersion(t *testing.T) {
 }
 
 func TestListPropagationDirectives(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1") // Since we need to add directives
+
 	t.Run("list propagation directives after add and remove", func(t *testing.T) {
 		r := createTestRepositoryWithRoot(t, "")
 		rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
@@ -2413,6 +2422,8 @@ func TestListPropagationDirectives(t *testing.T) {
 }
 
 func TestEnableController(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	r := createTestRepositoryWithRoot(t, "")
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -2465,6 +2476,8 @@ func TestEnableController(t *testing.T) {
 }
 
 func TestDisableController(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	r := createTestRepositoryWithRoot(t, "")
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 
@@ -2516,6 +2529,8 @@ func TestDisableController(t *testing.T) {
 }
 
 func TestAddControllerRepository(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	r := createTestRepositoryWithRoot(t, "")
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	rootPrincipal := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())
@@ -2566,6 +2581,8 @@ func TestAddControllerRepository(t *testing.T) {
 }
 
 func TestAddNetworkRepository(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	r := createTestRepositoryWithRoot(t, "")
 	rootSigner := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
 	rootPrincipal := tufv01.NewKeyFromSSLibKey(rootSigner.MetadataKey())

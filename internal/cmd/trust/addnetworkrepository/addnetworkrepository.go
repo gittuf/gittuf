@@ -4,9 +4,12 @@
 package addnetworkrepository
 
 import (
+	"fmt"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +48,10 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -76,8 +83,8 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "add-network-repository",
-		Short:             `Add a network repository`,
-		Long:              "The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified.",
+		Short:             fmt.Sprintf(`Add a network repository (developer mode only, set %s=1)`, dev.DevModeKey),
+		Long:              fmt.Sprintf("The 'add-network-repository' command registers a network repository in the repository's root of trust. It is used to declare another repository that participates in this repository's network so its state can be tracked and verified (developer mode only, set %s=1).", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

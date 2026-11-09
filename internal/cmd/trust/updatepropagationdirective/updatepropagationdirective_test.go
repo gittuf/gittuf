@@ -13,6 +13,7 @@ import (
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/dev"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,8 @@ import (
 )
 
 func TestUpdatePropagationDirective(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
