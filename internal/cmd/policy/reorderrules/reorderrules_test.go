@@ -47,7 +47,7 @@ func TestReorderRules(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
@@ -102,7 +102,7 @@ func TestReorderRules(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
@@ -185,7 +185,7 @@ func TestReorderRules(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
@@ -210,7 +210,7 @@ func TestReorderRules(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
@@ -235,7 +235,7 @@ func TestReorderRules(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))

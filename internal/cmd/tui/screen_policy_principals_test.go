@@ -100,10 +100,10 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 		return m, repo, keyPath + ".pub", otherKeyPath
 	}
 
-	loadKey := func(t *testing.T, path string) *tufv02.Key {
+	loadKey := func(t *testing.T, repo *gittuf.Repository, path string) *tufv02.Key {
 		t.Helper()
 
-		key, err := gittuf.LoadPublicKey(path)
+		key, err := gittuf.LoadPublicKey(repo, path)
 		require.NoError(t, err)
 		return key.(*tufv02.Key)
 	}
@@ -152,7 +152,7 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 
 	t.Run("keep prefilled key IDs", func(t *testing.T) {
 		m, repo, keyPath, _ := setup(t)
-		key := loadKey(t, keyPath)
+		key := loadKey(t, repo, keyPath)
 		person := newPerson(key)
 		require.NoError(t, repoAddPrincipal(t.Context(), m.options, person))
 
@@ -165,8 +165,8 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 
 	t.Run("remove a prefilled key ID", func(t *testing.T) {
 		m, repo, keyPath, otherKeyPath := setup(t)
-		key := loadKey(t, keyPath)
-		otherKey := loadKey(t, otherKeyPath)
+		key := loadKey(t, repo, keyPath)
+		otherKey := loadKey(t, repo, otherKeyPath)
 		person := newPerson(key, otherKey)
 		require.NoError(t, repoAddPrincipal(t.Context(), m.options, person))
 
@@ -176,8 +176,8 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 
 	t.Run("keep a prefilled key ID and add a new key", func(t *testing.T) {
 		m, repo, keyPath, otherKeyPath := setup(t)
-		key := loadKey(t, keyPath)
-		otherKey := loadKey(t, otherKeyPath)
+		key := loadKey(t, repo, keyPath)
+		otherKey := loadKey(t, repo, otherKeyPath)
 		person := newPerson(key)
 		require.NoError(t, repoAddPrincipal(t.Context(), m.options, person))
 

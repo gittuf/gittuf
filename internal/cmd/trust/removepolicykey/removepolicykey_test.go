@@ -64,12 +64,12 @@ func TestRemovePolicyKey(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		targetsKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 
 		// Also add the signer's own public key as a targets key so that after
 		// removing targetsKey, at least one key remains to meet the threshold.
-		signerPubKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		signerPubKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, signerPubKey, true))
 
@@ -105,12 +105,12 @@ func TestRemovePolicyKey(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		targetsKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 
 		// Also add the signer's own public key as a targets key so that after
 		// removing targetsKey, at least one key remains to meet the threshold.
-		signerPubKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		signerPubKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, signerPubKey, true))
 

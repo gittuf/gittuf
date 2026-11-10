@@ -357,7 +357,7 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 			publicKeys[key.KeyID] = key
 			continue
 		}
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(m.repo, keyPath)
 		if err != nil {
 			m.errorMsg = fmt.Sprintf("Error loading public key '%s': %v", keyPath, err)
 			return *m, nil
