@@ -133,7 +133,6 @@ type initDoneMsg struct {
 	footer        string
 	signerError   string
 	uninitialized bool
-	defaultBranch string
 	detectedKey   string
 	err           error
 }
@@ -466,13 +465,22 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 			}
 		}
 
-		hasPolicy, _ := repo.HasPolicy()
-		uninitialized := !hasPolicy && !o.readOnly
-		var defaultBranch string
+		uninitialized := !hasPolicyOrStaging(repo) && !o.readOnly
+		if uninitialized {
+			// In an uninitialized repo without policy, don't drop to read-only mode
+			// just because no signing key was loaded yet: the setup wizard's job is
+			// to guide the user in selecting/confirming the key to initialize policy!
+			readOnly = false
+			footer = ""
+			signerError = ""
+		}
 		var detectedKey string
 		if uninitialized {
-			defaultBranch = resolveDefaultBranch(repo)
-			detectedKey = discoverLocalKey(repo)
+			if o.p != nil && o.p.SigningKey != "" {
+				detectedKey = o.p.SigningKey
+			} else {
+				detectedKey = discoverGitConfigKey(repo)
+			}
 		}
 
 		return initDoneMsg{
@@ -484,7 +492,6 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 			footer:        footer,
 			signerError:   signerError,
 			uninitialized: uninitialized,
-			defaultBranch: defaultBranch,
 			detectedKey:   detectedKey,
 		}
 	}

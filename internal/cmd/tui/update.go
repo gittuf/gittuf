@@ -55,7 +55,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.screen = screenChoice
 		if msg.uninitialized {
 			m.showSetupWizard = true
-			m.setupWizard = newSetupWizard(m.repo, msg.defaultBranch, msg.detectedKey)
+			m.setupWizard = newSetupWizard(m.repo, msg.detectedKey)
 		}
 		return m, nil
 
@@ -65,15 +65,21 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setupWizard.err = msg.err
 			return m, nil
 		}
-		m.showSetupWizard = false
+		if msg.signer != nil {
+			m.signer = msg.signer
+			m.signerError = ""
+		}
+		if m.options != nil && m.options.p != nil && msg.signingKey != "" {
+			m.options.p.SigningKey = msg.signingKey
+		}
 		m.readOnly = false
-		m.footer = "Repository policy initialized! Protected branch: " + m.setupWizard.defaultBranch
 		m.policyRulesScreen.rules = getCurrRules(m.ctx, m.options)
 		m.policyRulesScreen.updateRuleList()
 		m.trustGlobalRulesScreen.globalRules = getGlobalRules(m.ctx, m.options)
 		m.trustGlobalRulesScreen.updateGlobalRuleList()
 		m.applyReadOnlyMenus()
 		m.resizeLists()
+		m.setupWizard.step = wizardStepComplete
 		return m, nil
 
 	case policyLifecycleResultMsg:
