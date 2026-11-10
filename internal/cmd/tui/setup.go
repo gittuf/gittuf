@@ -163,6 +163,13 @@ func discoverGitConfigKey(repo *gittuf.Repository) string {
 		if strings.HasPrefix(signingKey, gittuf.GPGKeyPrefix) {
 			return signingKey
 		}
+		// gpg.format is unset but the key is an existing file (e.g., an SSH
+		// key): treat it as a file path instead of a GPG key ID.
+		if format == "" && isFileKeyPath(signingKey) {
+			if _, statErr := os.Stat(signingKey); statErr == nil {
+				return signingKey
+			}
+		}
 		return gittuf.GPGKeyPrefix + signingKey
 	case "ssh":
 		return signingKey
@@ -178,6 +185,13 @@ func discoverGitConfigKey(repo *gittuf.Repository) string {
 	default:
 		return ""
 	}
+}
+
+// isFileKeyPath reports whether keyRef is a plain file path rather than a
+// scheme-prefixed key reference (gpg:, fulcio:). A bare ':' is not enough to
+// tell them apart, as Windows paths contain a drive-letter colon (C:\...).
+func isFileKeyPath(keyRef string) bool {
+	return !strings.HasPrefix(keyRef, gittuf.GPGKeyPrefix) && !strings.HasPrefix(keyRef, gittuf.FulcioPrefix)
 }
 
 // formatKeyLabel converts a raw key reference into a clean, human-readable display string.
@@ -223,7 +237,7 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyPath, 
 
 		// Resolve signing key (private key) vs principal key (public key)
 		signingKeyPath, pubKeyPath := keyPath, keyPath
-		if !strings.Contains(keyPath, ":") {
+		if isFileKeyPath(keyPath) {
 			priv := strings.TrimSuffix(keyPath, ".pub")
 			if _, err := os.Stat(priv); err == nil {
 				signingKeyPath = priv

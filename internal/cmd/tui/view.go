@@ -443,7 +443,7 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 	statusBarTitle := title
 	var modeTagOverride string
 	if m.showSetupWizard {
-		statusBarTitle = "Setup Wizard"
+		statusBarTitle = "Setup"
 		modeTagOverride = statusSetupStyle.Render(" Setup ")
 	}
 
