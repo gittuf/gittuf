@@ -60,7 +60,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
@@ -89,7 +89,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
@@ -118,7 +118,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)
@@ -168,7 +168,7 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		key, err := gittuf.LoadPublicKey(keyPath)
+		key, err := gittuf.LoadPublicKey(repo, keyPath)
 		require.NoError(t, err)
 
 		err = repo.AddGitHubApp(t.Context(), signer, "github-app", key, false)

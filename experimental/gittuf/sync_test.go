@@ -5,13 +5,12 @@ package gittuf
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
-	"github.com/gittuf/gittuf/internal/signerverifier/ssh"
-	"github.com/gittuf/gittuf/internal/tuf"
 	tufv01 "github.com/gittuf/gittuf/internal/tuf/v01"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/rsl"
@@ -75,6 +74,17 @@ func TestClone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	keysDir := t.TempDir()
+	rootPubKeyPath := filepath.Join(keysDir, "root.pub")
+	if err := os.WriteFile(rootPubKeyPath, rootPubKeyBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	targetsPubKeyPath := filepath.Join(keysDir, "targets.pub")
+	if err := os.WriteFile(targetsPubKeyPath, targetsPubKeyBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gpgKeyRef := GPGKeyPrefix + "157507bbe151e378ce8126c1dcfe043cdd2db96e"
 
 	t.Run("successful clone without specifying dir, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
@@ -217,10 +227,7 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
-		targetsPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-
-		repo, err := Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{targetsPublicKey, rootPublicKey}, true)
+		repo, err := Clone(testCtx, remoteTmpDir, "", "", []string{targetsPubKeyPath, rootPubKeyPath}, true)
 		assert.Nil(t, err)
 
 		head, err := repo.r.GetReference("HEAD")
@@ -241,16 +248,35 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		badPublicKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-		if err != nil {
+		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
+
+		_, err := Clone(testCtx, remoteTmpDir, "", "", []string{rootPubKeyPath, gpgKeyRef}, true)
+		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+	})
+
+	t.Run("unsuccessful clone with error loading expected root keys, bare", func(t *testing.T) {
+		localTmpDir := t.TempDir()
+
+		if err := os.Chdir(localTmpDir); err != nil {
 			t.Fatal(err)
 		}
-		badPublicKey := tufv01.NewKeyFromSSLibKey(badPublicKeyR)
+		defer os.Chdir(currentDir) //nolint:errcheck
 
-		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
+		// Point gpg.program at a program that doesn't exist
+		configPath := filepath.Join(t.TempDir(), "gitconfig")
+		if err := os.WriteFile(configPath, []byte("[gpg]\n\tprogram = nonexistent-gpg\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("GIT_CONFIG_GLOBAL", configPath)
 
-		_, err = Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{rootPublicKey, badPublicKey}, true)
-		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+		dir := "clone-gpg-program"
+		_, err = Clone(testCtx, remoteTmpDir, dir, "", []string{gpgKeyRef}, true)
+		assert.ErrorIs(t, err, ErrCloningRepository)
+		assert.ErrorContains(t, err, "nonexistent-gpg")
+
+		// The clone is removed because the root key couldn't be loaded
+		_, statErr := os.Stat(dir)
+		assert.True(t, os.IsNotExist(statErr))
 	})
 
 	t.Run("successful clone without specifying dir, not bare", func(t *testing.T) {
@@ -394,10 +420,7 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
-		targetsPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targetsPubKeyBytes))
-
-		repo, err := Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{targetsPublicKey, rootPublicKey}, false)
+		repo, err := Clone(testCtx, remoteTmpDir, "", "", []string{targetsPubKeyPath, rootPubKeyPath}, false)
 		assert.Nil(t, err)
 
 		head, err := repo.r.GetReference("HEAD")
@@ -418,15 +441,9 @@ func TestClone(t *testing.T) {
 		}
 		defer os.Chdir(currentDir) //nolint:errcheck
 
-		badPublicKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		badPublicKey := tufv01.NewKeyFromSSLibKey(badPublicKeyR)
+		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
 
-		rootPublicKey := tufv01.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
-
-		_, err = Clone(testCtx, remoteTmpDir, "", "", []tuf.Principal{rootPublicKey, badPublicKey}, false)
+		_, err := Clone(testCtx, remoteTmpDir, "", "", []string{rootPubKeyPath, gpgKeyRef}, false)
 		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
 	})
 }

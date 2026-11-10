@@ -63,7 +63,7 @@ func TestUpdatePolicyThreshold(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		targetsKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, targetsKey, false))
 
@@ -93,7 +93,7 @@ func TestUpdatePolicyThreshold(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		targetsKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		targetsKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, targetsKey, false))
 

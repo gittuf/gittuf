@@ -64,7 +64,7 @@ func TestRemoveRootKey(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		rootKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		rootKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 
 		// Add the key first so we can remove it
@@ -99,7 +99,7 @@ func TestRemoveRootKey(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		rootKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		rootKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 
 		// Add the key first so we can remove it

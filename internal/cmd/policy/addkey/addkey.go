@@ -48,7 +48,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 
 	authorizedKeys := []tuf.Principal{}
 	for _, key := range o.authorizedKeys {
-		key, err := gittuf.LoadPublicKey(key)
+		key, err := gittuf.LoadPublicKey(repo, key)
 		if err != nil {
 			return err
 		}
