@@ -19,6 +19,21 @@ import (
 )
 
 func TestAddPropagationDirective(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		pOpts := &persistent.Options{
+			SigningKey: "dummy-key",
+		}
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts),
+			"--name", "test-directive",
+			"--from-repository", "https://github.com/example/test",
+			"--from-reference", "refs/heads/main",
+			"--from-path", "/",
+			"--into-reference", "refs/heads/main",
+			"--into-path", "/submodule",
+		)
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("no repository", func(t *testing.T) {
