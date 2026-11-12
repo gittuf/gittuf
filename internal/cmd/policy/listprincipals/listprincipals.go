@@ -4,11 +4,15 @@
 package listprincipals
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/spf13/cobra"
 )
 
@@ -55,8 +59,10 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	count := 0
-	for _, principal := range principals {
+	// principals is a map, so sort by ID to keep the output stable across runs
+	principalIDs := slices.Sorted(maps.Keys(principals))
+	for i, principalID := range principalIDs {
+		principal := principals[principalID]
 		if _, err := fmt.Fprintf(stdOut, "Principal %s:\n", principal.ID()); err != nil {
 			return err
 		}
@@ -64,7 +70,11 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		if _, err := fmt.Fprintf(stdOut, indentString+"Keys:\n"); err != nil {
 			return err
 		}
-		for _, key := range principal.Keys() {
+		keys := principal.Keys()
+		slices.SortFunc(keys, func(a, b *signerverifier.SSLibKey) int {
+			return cmp.Compare(a.KeyID, b.KeyID)
+		})
+		for _, key := range keys {
 			if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s (%s)\n", key.KeyID, key.KeyType); err != nil {
 				return err
 			}
@@ -75,18 +85,17 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			if _, err := fmt.Fprintf(stdOut, indentString+"Custom Metadata:\n"); err != nil {
 				return err
 			}
-			for key, value := range principal.CustomMetadata() {
-				if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, value); err != nil {
+			for _, key := range slices.Sorted(maps.Keys(customMetadata)) {
+				if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, customMetadata[key]); err != nil {
 					return err
 				}
 			}
 		}
-		if count < len(principals)-1 {
+		if i < len(principalIDs)-1 {
 			if _, err := fmt.Fprintln(stdOut); err != nil {
 				return err
 			}
 		}
-		count++
 	}
 	return nil
 }
