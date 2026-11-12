@@ -19,6 +19,18 @@ import (
 )
 
 func TestAddControllerRepository(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		pOpts := &persistent.Options{
+			SigningKey: "dummy-key",
+		}
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts),
+			"--name", "test-controller",
+			"--location", "example.com",
+			"--initial-root-principal", "dummy-principal",
+		)
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("no repository", func(t *testing.T) {

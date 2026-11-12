@@ -19,6 +19,15 @@ import (
 )
 
 func TestRemovePropagationDirective(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		pOpts := &persistent.Options{
+			SigningKey: "dummy-key",
+		}
+
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts), "--name", "test-directive")
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("no repository", func(t *testing.T) {
