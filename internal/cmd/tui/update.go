@@ -53,6 +53,33 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// WindowSizeMsg fired before these flags were set, so sizes must be corrected.
 		m.resizeLists()
 		m.screen = screenChoice
+		if msg.uninitialized {
+			m.showSetupWizard = true
+			m.setupWizard = newSetupWizard(m.repo, msg.detectedKey)
+		}
+		return m, nil
+
+	case setupDoneMsg:
+		if msg.err != nil {
+			m.setupWizard.step = wizardStepError
+			m.setupWizard.err = msg.err
+			return m, nil
+		}
+		if msg.signer != nil {
+			m.signer = msg.signer
+			m.signerError = ""
+		}
+		if m.options != nil && m.options.p != nil && msg.signingKey != "" {
+			m.options.p.SigningKey = msg.signingKey
+		}
+		m.readOnly = false
+		m.policyRulesScreen.rules = getCurrRules(m.ctx, m.options)
+		m.policyRulesScreen.updateRuleList()
+		m.trustGlobalRulesScreen.globalRules = getGlobalRules(m.ctx, m.options)
+		m.trustGlobalRulesScreen.updateGlobalRuleList()
+		m.applyReadOnlyMenus()
+		m.resizeLists()
+		m.setupWizard.step = wizardStepComplete
 		return m, nil
 
 	case policyLifecycleResultMsg:
@@ -65,6 +92,10 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case spinner.TickMsg:
+		if m.showSetupWizard && m.setupWizard.step == wizardStepApplying {
+			m.setupWizard.spinner, cmd = m.setupWizard.spinner.Update(msg)
+			return m, cmd
+		}
 		if m.screen == screenLoading || m.verifying {
 			m.spinner, cmd = m.spinner.Update(msg)
 			return m, cmd
@@ -144,6 +175,9 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.diffViewport, cmd = m.diffViewport.Update(msg)
 			return m, cmd
+		}
+		if m.showSetupWizard {
+			return m.updateSetupWizard(msg)
 		}
 		if m.verifying {
 			if msg.String() == "ctrl+c" {

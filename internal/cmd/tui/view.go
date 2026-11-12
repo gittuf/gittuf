@@ -76,6 +76,12 @@ var (
 				Padding(0, 1).
 				Bold(true)
 
+	statusSetupStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#2ea043")).
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Padding(0, 1).
+				Bold(true)
+
 	// Screen box — border around the content
 	screenBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -228,6 +234,9 @@ func renderPopupDialog(m model) string {
 	if m.showDiffOverlay {
 		return renderDiffOverlay(m)
 	}
+	if m.showSetupWizard {
+		return renderSetupWizardDialog(m)
+	}
 	dialog := renderErrorDialog(m)
 	if dialog == "" {
 		return ""
@@ -283,7 +292,7 @@ func renderDiffOverlay(m model) string {
 }
 
 // renderStatusBar renders the top status bar showing screen name and current mode.
-func renderStatusBar(screenName string, readOnly bool, width int) string {
+func renderStatusBar(screenName string, readOnly bool, width int, modeTagOverride ...string) string {
 	if width == 0 {
 		width = 80
 	}
@@ -292,9 +301,12 @@ func renderStatusBar(screenName string, readOnly bool, width int) string {
 	left := lipgloss.JoinHorizontal(lipgloss.Top, title, screen)
 
 	var modeTag string
-	if readOnly {
+	switch {
+	case len(modeTagOverride) > 0 && modeTagOverride[0] != "":
+		modeTag = modeTagOverride[0]
+	case readOnly:
 		modeTag = statusReadOnlyStyle.Render(" Read-only ")
-	} else {
+	default:
 		modeTag = statusEditModeStyle.Render(" Edit Mode ")
 	}
 
@@ -369,10 +381,25 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		boxWidth = 0
 	}
 
-	// When diff overlay is active, suppress bottom hints so status bar stays visible.
+	// When diff overlay or setup wizard is active, adjust bottom action hints.
 	effectiveOverlays := overlays
 	if m.showDiffOverlay {
 		effectiveOverlays = ""
+	} else if m.showSetupWizard {
+		var helpPairs [][2]string
+		switch m.setupWizard.step {
+		case wizardStepError:
+			helpPairs = [][2]string{{"enter", "retry"}, {"esc", "skip to read-only"}, {"q", "quit"}}
+		case wizardStepComplete:
+			helpPairs = [][2]string{{"enter", "open TUI"}, {"q", "quit"}}
+		case wizardStepCustomKeyInput, wizardStepBranch:
+			helpPairs = [][2]string{{"enter", "confirm"}, {"esc", "back"}}
+		case wizardStepKey:
+			helpPairs = [][2]string{{"enter", "select"}, {"↑/↓", "navigate"}, {"esc", "back"}}
+		default:
+			helpPairs = [][2]string{{"enter", "begin setup"}, {"esc", "skip to read-only"}, {"q", "quit"}}
+		}
+		effectiveOverlays = "\n" + renderStyledHelp(helpPairs)
 	}
 
 	bottomHeight := 1
@@ -380,6 +407,9 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		bottomHeight += strings.Count(effectiveOverlays, "\n") + 1
 	}
 	footerBox := renderFooterBox(m)
+	if m.showSetupWizard {
+		footerBox = ""
+	}
 	if footerBox != "" {
 		bottomHeight += strings.Count(footerBox, "\n") + 1
 	}
@@ -405,12 +435,24 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 		errMsg = "\n" + renderErrorMsg(m.errorMsg)
 	}
 
+	footerContent := ""
+	if footerBox != "" {
+		footerContent = "\n" + footerBox
+	}
+
+	statusBarTitle := title
+	var modeTagOverride string
+	if m.showSetupWizard {
+		statusBarTitle = "Setup"
+		modeTagOverride = statusSetupStyle.Render(" Setup ")
+	}
+
 	return lipgloss.JoinVertical(lipgloss.Left,
-		renderStatusBar(title, m.readOnly, m.width),
+		renderStatusBar(statusBarTitle, m.readOnly, m.width, modeTagOverride),
 		renderWithMargin(
 			content+"\n"+
 				effectiveOverlays+
-				renderFooterBox(m)+
+				footerContent+
 				errMsg,
 		),
 	)
