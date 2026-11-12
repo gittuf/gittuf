@@ -20,15 +20,45 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	blobIDs := []Hash{}
 	for i := 0; i < 3; i++ {
 		blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("%d", i)))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		blobIDs = append(blobIDs, blobID)
 	}
 
 	emptyTree, err := treeBuilder.WriteTreeFromEntries(nil)
-	if err != nil {
-		t.Fatal(err)
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		input  []string
+		output []string
+	}{
+		"ASCII": {
+			input:  []string{"a", "b", "c"},
+			output: []string{"a", "b", "c"},
+		},
+		"non-ASCII": {
+			input:  []string{"acafé.txt", "bcafé.txt", "ccafé.txt"},
+			output: []string{"acafé.txt", "bcafé.txt", "ccafé.txt"},
+		},
+		"tab": {
+			input:  []string{"a\tb.txt", "b\tb.txt", "c\tb.txt"},
+			output: []string{"a\tb.txt", "b\tb.txt", "c\tb.txt"},
+		},
+		"double quote": {
+			input:  []string{`a"b.txt`, `b"b.txt`, `c"b.txt`},
+			output: []string{`a"b.txt`, `b"b.txt`, `c"b.txt`},
+		},
+		"backslash": {
+			input:  []string{`a\ba`, `b\bb`, `c\bc`},
+			output: []string{`a\ba`, `b\bb`, `c\bc`},
+		},
+		"space": {
+			input:  []string{"a a", "b b", "c c"},
+			output: []string{"a a", "b b", "c c"},
+		},
+		"leading space": {
+			input:  []string{" a", " b", " c"},
+			output: []string{" a", " b", " c"},
+		},
 	}
 
 	// In each of the tests below, repo.Commit uses the test name as a ref
@@ -37,177 +67,230 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	// expects a commit with no parents will have a parent because of a commit created
 	// in a previous test
 
-	t.Run("modify single file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+	for name, test := range tests {
+		t.Run("modify single file "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[1])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0]}, diffs)
+		})
 
-	t.Run("rename single file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("rename single file "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("b", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[1], blobIDs[0])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a", "b"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0], test.output[1]}, diffs)
+		})
 
-	t.Run("swap two files around", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0]), NewEntryBlob("b", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("swap two files around "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0]), NewEntryBlob(test.input[1], blobIDs[1])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[1]), NewEntryBlob("b", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[1]), NewEntryBlob(test.input[1], blobIDs[0])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a", "b"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0], test.output[1]}, diffs)
+		})
 
-	t.Run("create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("create new file "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0]), NewEntryBlob("b", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0]), NewEntryBlob(test.input[1], blobIDs[1])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"b"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[1]}, diffs)
+		})
 
-	t.Run("delete file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0]), NewEntryBlob("b", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("delete file "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0]), NewEntryBlob(test.input[1], blobIDs[1])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"b"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[1]}, diffs)
+		})
 
-	t.Run("modify file and create new file", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("modify file and create new file "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
 
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[2]), NewEntryBlob("b", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[2]), NewEntryBlob(test.input[1], blobIDs[1])})
+			require.NoError(t, err)
 
-		_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			_, err = repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cB, err := repo.Commit(treeB, testNameToRefName(t.Name()), "Test commit\n", false)
+			require.NoError(t, err)
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cB)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a", "b"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cB)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0], test.output[1]}, diffs)
+		})
 
-	t.Run("no parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run("no parent "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		cA, err := repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
+			cA, err := repo.Commit(treeA, testNameToRefName(t.Name()), "Test commit\n", false)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		diffs, err := repo.GetFilePathsChangedByCommit(cA)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a"}, diffs)
-	})
+			diffs, err := repo.GetFilePathsChangedByCommit(cA)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0]}, diffs)
+		})
+
+		t.Run("merge commit with commit matching parent "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
+
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[1])})
+			require.NoError(t, err)
+
+			mainBranch := testNameToRefName(t.Name())
+			featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+			// Write common commit for both branches
+			cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+			require.NoError(t, err)
+			if err := repo.SetReference(featureBranch, cCommon); err != nil {
+				t.Fatal(err)
+			}
+
+			cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			// Create a merge commit with two parents
+			cM := repo.commitWithParents(t, treeB, []Hash{cA, cB}, "Merge commit\n", false)
+
+			diffs, err := repo.GetFilePathsChangedByCommit(cM)
+			assert.NoError(t, err)
+			assert.Nil(t, diffs)
+		})
+
+		t.Run("merge commit with no matching parent "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
+
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[1], blobIDs[1])})
+			require.NoError(t, err)
+
+			treeC, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[2], blobIDs[2])})
+			require.NoError(t, err)
+
+			mainBranch := testNameToRefName(t.Name())
+			featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+			// Write common commit for both branches
+			cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+			require.NoError(t, err)
+			if err := repo.SetReference(featureBranch, cCommon); err != nil {
+				t.Fatal(err)
+			}
+
+			cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			// Create a merge commit with two parents and a different tree
+			cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+
+			diffs, err := repo.GetFilePathsChangedByCommit(cM)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0], test.output[1], test.output[2]}, diffs)
+		})
+
+		t.Run("merge commit with overlapping parent trees "+name, func(t *testing.T) {
+			treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[0])})
+			require.NoError(t, err)
+
+			treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[1])})
+			require.NoError(t, err)
+
+			treeC, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob(test.input[0], blobIDs[2])})
+			require.NoError(t, err)
+
+			mainBranch := testNameToRefName(t.Name())
+			featureBranch := testNameToRefName(t.Name() + " feature branch")
+
+			// Write common commit for both branches
+			cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
+			require.NoError(t, err)
+			if err := repo.SetReference(featureBranch, cCommon); err != nil {
+				t.Fatal(err)
+			}
+
+			cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
+			require.NoError(t, err)
+
+			// Create a merge commit with two parents and an overlapping tree
+			cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
+
+			diffs, err := repo.GetFilePathsChangedByCommit(cM)
+			assert.NoError(t, err)
+			assert.Equal(t, []string{test.output[0]}, diffs)
+		})
+	}
 
 	t.Run("no parent, empty tree", func(t *testing.T) {
 		cA, err := repo.Commit(emptyTree, testNameToRefName(t.Name()), "Test commit\n", false)
@@ -216,139 +299,6 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 		diffs, err := repo.GetFilePathsChangedByCommit(cA)
 		assert.NoError(t, err)
 		assert.Nil(t, diffs)
-	})
-
-	t.Run("merge commit with commit matching parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		mainBranch := testNameToRefName(t.Name())
-		featureBranch := testNameToRefName(t.Name() + " feature branch")
-
-		// Write common commit for both branches
-		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.SetReference(featureBranch, cCommon); err != nil {
-			t.Fatal(err)
-		}
-
-		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Create a merge commit with two parents
-		cM := repo.commitWithParents(t, treeB, []Hash{cA, cB}, "Merge commit\n", false)
-
-		diffs, err := repo.GetFilePathsChangedByCommit(cM)
-		assert.Nil(t, err)
-		assert.Nil(t, diffs)
-	})
-
-	t.Run("merge commit with no matching parent", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("b", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		treeC, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("c", blobIDs[2])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		mainBranch := testNameToRefName(t.Name())
-		featureBranch := testNameToRefName(t.Name() + " feature branch")
-
-		// Write common commit for both branches
-		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.SetReference(featureBranch, cCommon); err != nil {
-			t.Fatal(err)
-		}
-
-		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Create a merge commit with two parents and a different tree
-		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
-
-		diffs, err := repo.GetFilePathsChangedByCommit(cM)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a", "b", "c"}, diffs)
-	})
-
-	t.Run("merge commit with overlapping parent trees", func(t *testing.T) {
-		treeA, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[0])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		treeB, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[1])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		treeC, err := treeBuilder.WriteTreeFromEntries([]TreeEntry{NewEntryBlob("a", blobIDs[2])})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		mainBranch := testNameToRefName(t.Name())
-		featureBranch := testNameToRefName(t.Name() + " feature branch")
-
-		// Write common commit for both branches
-		cCommon, err := repo.Commit(emptyTree, mainBranch, "Initial commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := repo.SetReference(featureBranch, cCommon); err != nil {
-			t.Fatal(err)
-		}
-
-		cA, err := repo.Commit(treeA, mainBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		cB, err := repo.Commit(treeB, featureBranch, "Test commit\n", false)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Create a merge commit with two parents and an overlapping tree
-		cM := repo.commitWithParents(t, treeC, []Hash{cA, cB}, "Merge commit\n", false)
-
-		diffs, err := repo.GetFilePathsChangedByCommit(cM)
-		assert.Nil(t, err)
-		assert.Equal(t, []string{"a"}, diffs)
 	})
 
 	t.Run("non-commit object", func(t *testing.T) {

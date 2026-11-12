@@ -492,48 +492,25 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 
 			switch entry := entry.(type) {
 			case *rsl.PropagationEntry:
+				updatedPolicy, isPolicyEntry, err := v.processPolicyEntry(ctx, entry, firstEntry, currentPolicy)
+				if err != nil {
+					return err
+				}
+				if isPolicyEntry {
+					currentPolicy = updatedPolicy
+					continue
+				}
+
 				slog.Debug(fmt.Sprintf("Entry '%s' is propagation entry, proceeding...", entry.GetID().String()))
 				continue
 
 			case *rsl.ReferenceEntry:
-				slog.Debug("Checking if entry is for policy staging reference...")
-				if entry.GetRefName() == PolicyStagingRef {
-					continue
+				updatedPolicy, isPolicyEntry, err := v.processPolicyEntry(ctx, entry, firstEntry, currentPolicy)
+				if err != nil {
+					return err
 				}
-				slog.Debug("Checking if entry is for policy reference...")
-				if entry.GetRefName() == PolicyRef {
-					if entry.GetID().Equal(firstEntry.GetID().Bytes()) {
-						// We've already loaded this policy
-						continue
-					}
-
-					newPolicy, err := loadStateForEntry(v.repo, entry)
-					if err != nil {
-						return err
-					}
-					// require newPolicy != nil
-
-					if currentPolicy != nil {
-						// currentPolicy can be nil when
-						// verifying from the beginning of the
-						// RSL entry and we only have staging
-						// refs
-						slog.Debug("Verifying new policy's root of trust using current policy...")
-						if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
-							return err
-						}
-					} else {
-						slog.Debug("No current policy, using new policy as initial policy...")
-					}
-
-					slog.Debug("Verifying new policy...")
-					if err := newPolicy.Verify(ctx); err != nil {
-						return err
-					}
-
-					slog.Debug("Updating current policy...")
-					currentPolicy = newPolicy
-
+				if isPolicyEntry {
+					currentPolicy = updatedPolicy
 					continue
 				}
 
@@ -696,6 +673,48 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	}
 
 	return nil
+}
+
+func (v *PolicyVerifier) processPolicyEntry(ctx context.Context, entry, firstEntry rsl.ReferenceUpdaterEntry, currentPolicy *State) (*State, bool, error) {
+	slog.Debug("Checking if entry is for policy staging reference...")
+	if entry.GetRefName() == PolicyStagingRef {
+		return currentPolicy, true, nil
+	}
+
+	slog.Debug("Checking if entry is for policy reference...")
+	if entry.GetRefName() != PolicyRef {
+		return currentPolicy, false, nil
+	}
+
+	if entry.GetID().Equal(firstEntry.GetID().Bytes()) {
+		// We've already loaded this policy
+		return currentPolicy, true, nil
+	}
+
+	newPolicy, err := loadStateForEntry(v.repo, entry)
+	if err != nil {
+		return nil, true, err
+	}
+	// require newPolicy != nil
+
+	if currentPolicy != nil {
+		// currentPolicy can be nil when verifying from the beginning of the RSL
+		// entry and we only have staging refs
+		slog.Debug("Verifying new policy's root of trust using current policy...")
+		if err := currentPolicy.VerifyNewState(ctx, newPolicy); err != nil {
+			return nil, true, err
+		}
+	} else {
+		slog.Debug("No current policy, using new policy as initial policy...")
+	}
+
+	slog.Debug("Verifying new policy...")
+	if err := newPolicy.Verify(ctx); err != nil {
+		return nil, true, err
+	}
+
+	slog.Debug("Updating current policy...")
+	return newPolicy, true, nil
 }
 
 func (s *StateMetadata) VerifyNewStateMetadata(_ context.Context, newStateMetadata *StateMetadata) error {

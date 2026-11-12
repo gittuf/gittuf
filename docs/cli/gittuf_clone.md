@@ -13,22 +13,22 @@ gittuf clone [flags]
 ### Options
 
 ```
-      --bare                   make a bare Git repository
+      --bare[=true|false]      make a bare Git repository
   -b, --branch string          specify branch to check out
-  -h, --help                   help for clone
+  -h, --help[=true|false]      help for clone
       --root-key public-keys   set of initial root of trust keys for the repository (each a path to an SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO

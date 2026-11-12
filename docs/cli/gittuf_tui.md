@@ -13,24 +13,24 @@ gittuf tui [flags]
 ### Options
 
 ```
-      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
-  -h, --help                 help for tui
-      --policy-name string   name of policy file to make changes to (default "targets")
-      --read-only            interact with the TUI in read-only mode
-  -k, --signing-key string   signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
-      --target-ref string    specify which policy ref should be inspected (default "policy")
+      --create-rsl-entry[=true|false]   create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
+  -h, --help[=true|false]               help for tui
+      --policy-name string              name of policy file to make changes to (default "targets")
+      --read-only[=true|false]          interact with the TUI in read-only mode
+  -k, --signing-key string              signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --target-ref string               specify which policy ref should be inspected (default "policy")
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO
