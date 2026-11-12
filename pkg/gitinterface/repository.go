@@ -243,12 +243,13 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 // accepts the arguments to the `git` binary, but the binary itself must not be
 // specified.
 type executor struct {
-	r           *Repository
-	args        []string
-	env         []string
-	stdIn       io.Reader
-	dir         string
-	unsetGitDir bool
+	r              *Repository
+	args           []string
+	env            []string
+	stdIn          io.Reader
+	dir            string
+	unsetGitDir    bool
+	preserveSpaces bool
 }
 
 // executor initializes a new executor instance to run a Git command with the
@@ -285,6 +286,11 @@ func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
 	return e
 }
 
+func (e *executor) withPreserveSpaces() *executor {
+	e.preserveSpaces = true
+	return e
+}
+
 // executeString runs the constructed Git command and returns the contents of
 // stdout.  Leading and trailing spaces and newlines are removed. This function
 // should be used almost every time; the only exception is when the output is
@@ -304,6 +310,9 @@ func (e *executor) executeString() (string, error) {
 		return "", fmt.Errorf("unable to read stdout contents: %w", err)
 	}
 
+	if e.preserveSpaces {
+		return string(stdOutContents), nil
+	}
 	return strings.TrimSpace(string(stdOutContents)), nil
 }
 
