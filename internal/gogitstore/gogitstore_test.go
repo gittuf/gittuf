@@ -140,6 +140,22 @@ func TestGetCommitInfo(t *testing.T) {
 				_, err = fast.GetCommitInfo(blobID)
 				assert.NotNil(t, err)
 			})
+
+			t.Run("declared commit encoding is converted to UTF-8", func(t *testing.T) {
+				messagePath := filepath.Join(t.TempDir(), "message")
+				require.NoError(t, os.WriteFile(messagePath, []byte("caf\xe9\n"), 0o600))
+
+				encodingID, err := githash.NewHash(git(t, binary, "", "-c", "i18n.commitEncoding=ISO-8859-1", "commit-tree", "-F", messagePath, treeID.String()))
+				require.NoError(t, err)
+
+				want, err := binary.GetCommitInfo(encodingID)
+				require.NoError(t, err)
+				require.Equal(t, "café", want.Message)
+
+				got, err := fast.GetCommitInfo(encodingID)
+				require.NoError(t, err)
+				assert.Equal(t, want, got)
+			})
 		})
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/go-git/go-git/v6/plumbing/filemode"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/go-git/go-git/v6/storage/memory"
+	"golang.org/x/text/encoding/ianaindex"
 )
 
 // ErrInvalidHash is returned when a hash is not a valid go-git object ID.
@@ -167,7 +168,7 @@ func (s *Storer) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, erro
 
 	info := gitstore.CommitInfo{
 		TreeID:  treeID,
-		Message: strings.TrimSpace(commit.Message),
+		Message: strings.TrimSpace(decodeCommitMessage(commit.Message, commit.Encoding)),
 	}
 
 	shallow, err := repo.Storer.Shallow()
@@ -189,6 +190,24 @@ func (s *Storer) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, erro
 	}
 
 	return info, nil
+}
+
+func decodeCommitMessage(message string, encoding object.MessageEncoding) string {
+	if encoding == "" || strings.EqualFold(string(encoding), "UTF-8") {
+		return message
+	}
+
+	enc, err := ianaindex.IANA.Encoding(string(encoding))
+	if err != nil || enc == nil {
+		return message
+	}
+
+	decoded, err := enc.NewDecoder().String(message)
+	if err != nil {
+		return message
+	}
+
+	return decoded
 }
 
 // GetEntriesInTree returns nil for an empty tree, as gitinterface does.
