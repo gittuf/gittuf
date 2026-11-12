@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/require"
@@ -51,9 +53,14 @@ func (v *Verifier) MetadataKey() *signerverifier.SSLibKey {
 }
 
 // Verify implements the dsse.Verifier.Verify interface for GPG keys.
+// Key and signature expiration are ignored; trust is determined by policy.
 func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 	sigReader := bytes.NewReader(sig)
 	_, err := openpgp.CheckArmoredDetachedSignature(openpgp.EntityList{v.entity}, bytes.NewReader(data), sigReader, nil)
+	// OpenPGP verifies the signature and checks revocation before expiration.
+	if errors.Is(err, pgperrors.ErrKeyExpired) || errors.Is(err, pgperrors.ErrSignatureExpired) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to verify gpg signature: %w", err)
 	}
