@@ -263,7 +263,7 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	keyPath := filepath.Join(tmpDir, "rsa")
 	sslibKeyO, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	sslibKey := NewKeyFromSSLibKey(sslibKeyO)
 
@@ -298,12 +298,12 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	ctx := context.Background()
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 
 	verifier, err := ssh.NewVerifierFromKey(sslibKeyO)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	signer := &ssh.Signer{
 		Verifier: verifier,
@@ -312,18 +312,18 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	// Unwrap and verify
 	// NOTE: For the sake of testing the contained key, we unwrap before we
 	// verify. Typically, in DSSE it should be the other way around.
 	payload, err := env.DecodeB64Payload()
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	rootMetadata2 := &RootMetadata{}
 	if err := json.Unmarshal(payload, rootMetadata2); err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 
 	sslibKey2 := rootMetadata2.Keys[sslibKey.KeyID]
@@ -331,11 +331,11 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	// NOTE: Typically, a caller would choose this method, if KeyType==ssh.SSHKeyType
 	verifier2, err := ssh.NewVerifierFromKey(sslibKey2.Keys()[0])
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	_, err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{verifier2}, 1)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 }
 

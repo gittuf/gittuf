@@ -6,6 +6,7 @@ package display
 import (
 	"bytes"
 	"fmt"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -54,12 +55,26 @@ func TestPagerResolution(t *testing.T) {
 	assert.Equal(t, "less", pager.getBinary())
 	assert.Equal(t, []string{"-F", "-R", "-X"}, pager.getFlags())
 
-	t.Setenv("LESS", "A")
-	assert.Equal(t, []string{"-A"}, pager.getFlags())
+	// less reads $LESS itself, so no flags must be passed when it is set
+	for _, options := range []string{"A", "-R", "FRX", "-R --mouse"} {
+		t.Setenv("LESS", options)
+		assert.Nil(t, pager.getFlags(), "LESS=%q", options)
+	}
 
 	pager = newPagerMore()
 	assert.Equal(t, "more", pager.getBinary())
 	assert.Len(t, pager.getFlags(), 0)
+
+	// No pager is returned when none of the programs can be found
+	t.Setenv("PATH", "")
+	assert.Nil(t, getPagerReal())
+}
+
+func TestPagerWriteCloserStartError(t *testing.T) {
+	writer := &pagerWriteCloser{command: exec.Command("gittuf-nonexistent-pager")}
+
+	_, err := writer.Write([]byte("Hello, world!"))
+	assert.Error(t, err)
 }
 
 func TestNewDisplayWriter(t *testing.T) {
