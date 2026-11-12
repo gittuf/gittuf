@@ -74,4 +74,28 @@ func TestInspectRoot(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "root"`)
 	})
+
+	t.Run("invalid revision hash", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		command := New()
+		command.SetArgs([]string{"--revision", "invalid-commit-hash"})
+		_, _, _, err := cmd.ExecuteCommandC(command)
+		assert.Error(t, err)
+	})
+
+	t.Run("non-existent revision commit", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		command := New()
+		command.SetArgs([]string{"--revision", "0000000000000000000000000000000000000000"})
+		_, _, _, err := cmd.ExecuteCommandC(command)
+		assert.Error(t, err)
+	})
 }
