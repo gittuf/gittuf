@@ -16,7 +16,7 @@ gittuf attest github pull-request [flags]
       --base-URL string           location of GitHub instance (default "https://github.com")
       --base-branch string        base branch for pull request, used with --commit
       --commit string             commit to record pull request attestation for
-  -h, --help                      help for pull-request
+  -h, --help[=true|false]         help for pull-request
       --pull-request-number int   pull request number to record in attestation (default -1)
       --repository string         path to base GitHub repository the pull request is opened against, of form {owner}/{repo}
 ```
@@ -24,15 +24,15 @@ gittuf attest github pull-request [flags]
 ### Options inherited from parent commands
 
 ```
-      --create-rsl-entry             create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
-      --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
-      --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
-      --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --create-rsl-entry[=true|false]   create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
+      --no-color[=true|false]           turn off colored output
+      --profile[=true|false]            enable CPU and memory profiling
+      --profile-CPU-file string         file to store CPU profile (default "cpu.prof")
+      --profile-memory-file string      file to store memory profile (default "memory.prof")
+  -k, --signing-key string              signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --storer-trace[=true|false]       report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace-file string        file to store the Git storage backend trace (default "storer.trace")
+      --verbose[=true|false]            enable verbose logging
 ```
 
 ### SEE ALSO

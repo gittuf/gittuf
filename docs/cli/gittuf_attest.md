@@ -9,21 +9,21 @@ The 'attest' command provides tools for attesting to code contributions. It incl
 ### Options
 
 ```
-      --create-rsl-entry     create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
-  -h, --help                 help for attest
-  -k, --signing-key string   signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --create-rsl-entry[=true|false]   create RSL entry for attestation change immediately (note: the new entry to the RSL will not be synced with the remote)
+  -h, --help[=true|false]               help for attest
+  -k, --signing-key string              signing key to use to sign attestations (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO
