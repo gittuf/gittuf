@@ -474,6 +474,21 @@ func TestAddRootPrincipal(t *testing.T) {
 	})
 }
 
+func TestAddRootPrincipalInvalidPerson(t *testing.T) {
+	rootMetadata := initialTestRootMetadata(t)
+	person := &Person{
+		PersonID: "alice",
+		Custom:   map[string]string{"bad key": "value"},
+	}
+	principals, err := rootMetadata.GetRootPrincipals()
+	require.NoError(t, err)
+	require.ErrorIs(t, rootMetadata.AddRootPrincipal(person), tuf.ErrInvalidCustomMetadataKey)
+	assert.NotContains(t, rootMetadata.Principals, person.ID())
+	after, err := rootMetadata.GetRootPrincipals()
+	require.NoError(t, err)
+	assert.Equal(t, principals, after)
+}
+
 func TestDeleteRootPrincipal(t *testing.T) {
 	key := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, rootPubKeyBytes))
 

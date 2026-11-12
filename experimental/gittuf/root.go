@@ -152,8 +152,7 @@ func (r *Repository) SetRepositoryLocation(ctx context.Context, signer sslibdsse
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 
-// AddRootKey is the interface for the user to add an authorized key
-// for the Root role.
+// AddRootKey adds an authorized key or person for the Root role.
 func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVerifier, newRootKey tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
@@ -184,12 +183,16 @@ func (r *Repository) AddRootKey(ctx context.Context, signer sslibdsse.SignerVeri
 		return err
 	}
 
-	slog.Debug("Adding root key...")
+	slog.Debug("Adding root principal...")
 	if err := rootMetadata.AddRootPrincipal(newRootKey); err != nil {
 		return err
 	}
 
-	commitMessage := fmt.Sprintf("Add root key '%s' to root", newRootKey.ID())
+	principalType := "key"
+	if _, ok := newRootKey.(*tufv02.Person); ok {
+		principalType = "person"
+	}
+	commitMessage := fmt.Sprintf("Add root %s '%s' to root", principalType, newRootKey.ID())
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 

@@ -836,7 +836,12 @@ func (r *RootMetadata) addPrincipal(principal tuf.Principal) error {
 		r.Principals = map[string]tuf.Principal{}
 	}
 	switch principal := principal.(type) {
-	case *Key, *Person:
+	case *Key:
+		r.Principals[principal.ID()] = principal
+	case *Person:
+		if err := principal.Validate(); err != nil {
+			return err
+		}
 		r.Principals[principal.ID()] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType
