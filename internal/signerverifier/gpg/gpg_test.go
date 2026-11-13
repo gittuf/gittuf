@@ -4,8 +4,13 @@
 package gpg
 
 import (
+	"bytes"
 	"testing"
+	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
@@ -71,6 +76,62 @@ func TestGPG(t *testing.T) {
 			if err == nil {
 				t.Fatalf("%s: %v", test.keyID, err)
 			}
+		})
+	}
+}
+
+func TestVerifyExpiration(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("DATA")
+	creationTime := time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name            string
+		keyLifetimeSecs uint32
+		sigLifetimeSecs uint32
+		expirationError error
+	}{
+		{
+			name:            "expired key",
+			keyLifetimeSecs: 3600,
+			expirationError: pgperrors.ErrKeyExpired,
+		},
+		{
+			name:            "expired signature",
+			sigLifetimeSecs: 3600,
+			expirationError: pgperrors.ErrSignatureExpired,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			config := &packet.Config{
+				Algorithm:       packet.PubKeyAlgoEdDSA,
+				Curve:           packet.Curve25519,
+				Time:            func() time.Time { return creationTime },
+				KeyLifetimeSecs: test.keyLifetimeSecs,
+			}
+			entity, err := openpgp.NewEntity("Test", "", "test@example.com", config)
+			require.NoError(t, err)
+
+			config.SigLifetimeSecs = test.sigLifetimeSecs
+			var signature bytes.Buffer
+			require.NoError(t, openpgp.ArmoredDetachSign(&signature, entity, bytes.NewReader(data), config))
+
+			_, err = openpgp.CheckArmoredDetachedSignature(openpgp.EntityList{entity}, bytes.NewReader(data), bytes.NewReader(signature.Bytes()), nil)
+			require.ErrorIs(t, err, test.expirationError)
+
+			verifier := &Verifier{entity: entity}
+			assert.NoError(t, verifier.Verify(t.Context(), data, signature.Bytes()))
+
+			// Expiration must not hide a signature over different contents.
+			assert.Error(t, verifier.Verify(t.Context(), []byte("NOT DATA"), signature.Bytes()))
+
+			// Revocation must still take precedence over expiration.
+			require.NoError(t, entity.RevokeKey(packet.KeyCompromised, "test revocation", config))
+			assert.ErrorIs(t, verifier.Verify(t.Context(), data, signature.Bytes()), pgperrors.ErrKeyRevoked)
 		})
 	}
 }

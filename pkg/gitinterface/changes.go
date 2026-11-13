@@ -22,7 +22,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 	parentCommitIDs := commitInfo.ParentIDs
 
 	if len(parentCommitIDs) == 0 {
-		filePaths, err := r.executor("ls-tree", "--name-only", "-r", commitID.String()).executeString()
+		filePaths, err := r.executor("ls-tree", "--name-only", "-r", "-z", commitID.String()).withPreserveSpaces().executeString()
 		if err != nil {
 			return nil, fmt.Errorf("unable to identify all commit file paths: %w", err)
 		}
@@ -31,13 +31,13 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 			return nil, nil
 		}
 
-		paths := strings.Split(filePaths, "\n")
+		paths := splitPathsOnNUL(filePaths)
 		return paths, nil
 	}
 
 	if len(parentCommitIDs) > 1 {
 		// Check if tree matches last commit
-		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).executeString()
+		stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", parentCommitIDs[len(parentCommitIDs)-1].String(), commitID.String()).withPreserveSpaces().executeString()
 		if err != nil {
 			return nil, fmt.Errorf("unable to diff commit against last parent commit: %w", err)
 		}
@@ -47,7 +47,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 
 		pathSet := map[string]bool{}
 		for _, parentCommitID := range parentCommitIDs {
-			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", parentCommitID.String(), commitID.String()).executeString()
+			stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", parentCommitID.String(), commitID.String()).withPreserveSpaces().executeString()
 			if err != nil {
 				return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 			}
@@ -55,11 +55,8 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 				continue
 			}
 
-			paths := strings.Split(stdOut, "\n")
+			paths := splitPathsOnNUL(stdOut)
 			for _, path := range paths {
-				if path == "" {
-					continue
-				}
 				pathSet[path] = true
 			}
 		}
@@ -76,7 +73,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 		return paths, nil
 	}
 
-	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).executeString()
+	stdOut, err := r.executor("diff-tree", "--no-commit-id", "--name-only", "-r", "-z", fmt.Sprintf("%s~1", commitID.String()), commitID.String()).withPreserveSpaces().executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to diff commit against parent: %w", err)
 	}
@@ -84,6 +81,19 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 		return nil, nil
 	}
 
-	paths := strings.Split(stdOut, "\n")
+	paths := splitPathsOnNUL(stdOut)
 	return paths, nil
+}
+
+// splitPathsOnNUL splits -z NUL-terminated output into literal path strings.
+func splitPathsOnNUL(output string) []string {
+	rawPaths := strings.Split(output, "\x00")
+	paths := make([]string, 0, len(rawPaths))
+	for _, path := range rawPaths {
+		if path == "" {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	return paths
 }

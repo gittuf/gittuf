@@ -15,7 +15,7 @@ gittuf policy add-person [flags]
 ```
       --associated-identity stringArray   identities on code review platforms in the form 'providerID::identity' (e.g., 'https://gittuf.dev/github-app::<username>+<user ID>')
       --custom stringArray                additional custom metadata in the form KEY=VALUE
-  -h, --help                              help for add-person
+  -h, --help[=true|false]                 help for add-person
       --person-ID string                  person ID
       --policy-name string                name of policy file to add person to (default "targets")
       --public-key stringArray            authorized public key for the person (path to SSH public key, "gpg:<fingerprint>" for GPG, or "fulcio:<identity>::<issuer>" for Sigstore)
@@ -24,15 +24,15 @@ gittuf policy add-person [flags]
 ### Options inherited from parent commands
 
 ```
-      --create-rsl-entry             create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
-      --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
-      --profile-memory-file string   file to store memory profile (default "memory.prof")
-  -k, --signing-key string           signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
-      --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --create-rsl-entry[=true|false]   create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
+      --no-color[=true|false]           turn off colored output
+      --profile[=true|false]            enable CPU and memory profiling
+      --profile-CPU-file string         file to store CPU profile (default "cpu.prof")
+      --profile-memory-file string      file to store memory profile (default "memory.prof")
+  -k, --signing-key string              signing key to use to sign policy metadata (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --storer-trace[=true|false]       report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace-file string        file to store the Git storage backend trace (default "storer.trace")
+      --verbose[=true|false]            enable verbose logging
 ```
 
 ### SEE ALSO
