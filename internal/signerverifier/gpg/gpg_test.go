@@ -261,3 +261,12 @@ func TestNewVerifierFromKey(t *testing.T) {
 		assert.ErrorContains(t, err, "failed to parse gpg key")
 	})
 }
+
+func TestNewSignerFromKeyID(t *testing.T) {
+	t.Run("non-existent key", func(t *testing.T) {
+		SetupTestGPGHomeDir(t)
+
+		_, err := NewSignerFromKeyID("non-existent-key")
+		assert.ErrorContains(t, err, "no GPG key found for key ID")
+	})
+}
