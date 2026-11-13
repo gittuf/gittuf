@@ -77,6 +77,30 @@ func TestPagerWriteCloserStartError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestPagerEnvVarSplitting(t *testing.T) {
+	tests := map[string]struct {
+		env    string
+		binary string
+		flags  []string
+	}{
+		"single spaces":     {env: "less -R", binary: "less", flags: []string{"-R"}},
+		"repeated spaces":   {env: "less  -R   -X", binary: "less", flags: []string{"-R", "-X"}},
+		"tab separated":     {env: "less\t-R", binary: "less", flags: []string{"-R"}},
+		"surrounding space": {env: "  less -R  ", binary: "less", flags: []string{"-R"}},
+		"only whitespace":   {env: " \t ", binary: "", flags: nil},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("PAGER", test.env)
+
+			pager := newPagerEnvVar()
+			assert.Equal(t, test.binary, pager.getBinary())
+			assert.Equal(t, test.flags, pager.getFlags())
+		})
+	}
+}
+
 func TestNewDisplayWriter(t *testing.T) {
 	tests := map[string]struct {
 		contents []byte
