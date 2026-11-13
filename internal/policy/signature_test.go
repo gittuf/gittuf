@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/common"
+	"github.com/gittuf/gittuf/internal/common/set"
 	"github.com/gittuf/gittuf/internal/gitstoretest"
 	svcommon "github.com/gittuf/gittuf/internal/signerverifier/common"
 	"github.com/gittuf/gittuf/internal/signerverifier/dsse"
@@ -473,4 +474,47 @@ func TestSignatureVerifierEnvelopeVerifierErrors(t *testing.T) {
 		_, err := verifier.Verify(testCtx, nil, env)
 		assert.ErrorIs(t, err, sslibdsse.ErrNoSignature)
 	})
+}
+
+func TestSignatureVerifierCountable(t *testing.T) {
+	t.Parallel()
+
+	shared := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
+	other := tufv02.NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets2PubKeyBytes))
+	person := func(id string, keys ...*tufv02.Key) *tufv02.Person {
+		publicKeys := map[string]*tufv02.Key{}
+		for _, key := range keys {
+			publicKeys[key.KeyID] = key
+		}
+		return &tufv02.Person{PersonID: id, PublicKeys: publicKeys}
+	}
+
+	verifier := &SignatureVerifier{
+		principals: []tuf.Principal{
+			person("alice", shared),
+			person("bob", shared),
+			person("carol", other),
+			person("keyless"),
+		},
+		threshold: 2,
+	}
+
+	tests := map[string]struct {
+		principalIDs []string
+		want         []string
+	}{
+		"distinct keys":               {principalIDs: []string{"alice", "carol"}, want: []string{"alice", "carol"}},
+		"shared key counts once":      {principalIDs: []string{"alice", "bob"}, want: []string{"alice"}},
+		"untrusted principal ignored": {principalIDs: []string{"carol", "dave"}, want: []string{"carol"}},
+		"principal without keys":      {principalIDs: []string{"carol", "keyless"}, want: []string{"carol"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			got := verifier.countable(set.NewSetFromItems(test.principalIDs...))
+			assert.ElementsMatch(t, test.want, got.Contents())
+		})
+	}
 }

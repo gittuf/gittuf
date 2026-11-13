@@ -55,6 +55,8 @@ var (
 	ErrNotAncestor                   = errors.New("cannot apply changes since policy is not an ancestor of the policy staging")
 	ErrControllerMetadataNotFound    = errors.New("requested controller repository metadata not found")
 	ErrControllerMetadataNotVerified = errors.New("unable to verify controller repository metadata")
+	ErrRootMetadataNotFound          = errors.New("policy state has no root metadata")
+	ErrTargetNotProtected            = errors.New("no rule or global threshold rule protects the target")
 )
 
 // State contains the full set of metadata and root keys present in a policy
@@ -219,10 +221,46 @@ func (s *StateMetadata) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
 	return repo.WriteTree(entries)
 }
 
+// loadAnchoredState returns the state for entry on the paths where the RSL
+// offers no applied policy to verify it against. The state must carry valid
+// metadata, and a caller that declared the initial root principals gets no
+// trust on sight: the root must also be signed by that anchor.
+//
+// The anchor is checked first. Verify fetches controller repositories named
+// in the root metadata, which must not happen for a root nobody trusts yet.
+func loadAnchoredState(ctx context.Context, repo gitstore.Storer, entry rsl.ReferenceUpdaterEntry, initialRootPrincipals []tuf.Principal) (*State, error) {
+	state, err := loadStateForEntry(repo, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(initialRootPrincipals) != 0 {
+		slog.Debug("Verifying root of trust using provided initial root principals...")
+		verifier := &SignatureVerifier{
+			repository: repo,
+			name:       "initial-root-verifier",
+			principals: initialRootPrincipals,
+			threshold:  len(initialRootPrincipals),
+		}
+
+		if _, err := verifier.Verify(ctx, nil, state.Metadata.RootEnvelope); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := state.Verify(ctx); err != nil {
+		return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
+	}
+
+	return state, nil
+}
+
 // LoadState returns the State of the repository's policy corresponding to the
 // entry. It verifies the root of trust for the state from the initial policy
-// entry in the RSL. If no policy states are found and the entry is for the
-// policy-staging ref, that entry is returned with no verification.
+// entry in the RSL. If no applied policy precedes the entry, there is no root
+// of trust to verify it against, so the entry's state is returned once its own
+// metadata verifies and, when initial root principals are given, its root is
+// signed by them.
 func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.ReferenceUpdaterEntry, opts ...policyopts.LoadStateOption) (*State, error) {
 	// Regardless of whether we've been asked for policy ref or staging ref,
 	// we want to examine and verify consecutive policy states that appear
@@ -245,8 +283,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		if errors.Is(err, ErrPolicyNotFound) {
 			// we don't have a policy entry yet
 			// we just return the state for the requested entry
-			slog.Debug("No applied policy found, loading requested policy without further verification...")
-			return loadStateForEntry(repo, requestedEntry)
+			slog.Debug("No applied policy found, loading requested policy...")
+			return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 		}
 		return nil, err
 	}
@@ -293,8 +331,8 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		// the first policy entry knows the requested entry, meaning the
 		// requested entry is an ancestor of the first policy entry
 		// we just return the state for the requested entry
-		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy without verification...")
-		return loadStateForEntry(repo, requestedEntry)
+		slog.Debug("Requested policy's entry was before first applied policy, loading requested policy...")
+		return loadAnchoredState(ctx, repo, requestedEntry, options.InitialRootPrincipals)
 	}
 
 	// If requestedEntry.RefName == policy, then allPolicyEntries includes requestedEntry
@@ -448,6 +486,74 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 	return verifiers, nil
 }
 
+// SatisfiedBy reports whether principalIDs, taken as the principals that signed
+// for target, meet the policy protecting it. It returns the name of the rule
+// whose threshold they meet, or an empty name when only global threshold rules
+// protect target. It applies the rule selection and thresholds verification
+// applies, so a delegated rule file counts and a rule after a last trusted
+// delegation does not.
+//
+// It answers for principals rather than signatures. Approvals from attestations
+// and GitHub apps are not considered, and neither are checks that need a
+// specific change, such as blocking force pushes, file rules, or the signature
+// on a tag object.
+//
+// ErrTargetNotProtected is returned when nothing constrains who signs for
+// target, and ErrVerifierConditionsUnmet when principalIDs fall short.
+func (s *State) SatisfiedBy(target string, principalIDs *set.Set[string]) (string, error) {
+	verifiers, err := s.FindVerifiersForPath(target)
+	if err != nil {
+		return "", err
+	}
+
+	count := 0
+	if globalRulesVerifier := s.getVerifierForGlobalRules(); globalRulesVerifier != nil {
+		count = globalRulesVerifier.countable(principalIDs).Len()
+	}
+
+	globalRuleMatched := false
+	var globalRuleErr error
+	for _, globalRules := range s.globalRules {
+		for _, rule := range globalRules {
+			switch rule := rule.(type) {
+			case tuf.GlobalRuleThreshold:
+				matched, err := verifyGlobalThresholdRule(rule, target, count, false)
+				globalRuleMatched = globalRuleMatched || matched
+				if err != nil && globalRuleErr == nil {
+					globalRuleErr = err
+				}
+			case tuf.GlobalRuleBlockForcePushes:
+			default:
+				return "", tuf.ErrUnknownGlobalRuleType
+			}
+		}
+	}
+
+	if len(verifiers) == 0 && !globalRuleMatched {
+		return "", ErrTargetNotProtected
+	}
+	if globalRuleErr != nil {
+		return "", globalRuleErr
+	}
+
+	if len(verifiers) == 0 {
+		return "", nil
+	}
+
+	for _, verifier := range verifiers {
+		// Verification stops at an invalid verifier rather than trying the
+		// next one, so this does too.
+		if !verifier.valid() {
+			return "", ErrInvalidVerifier
+		}
+		if _, met := verifier.metBy(verifier.countable(principalIDs)); met {
+			return verifier.Name(), nil
+		}
+	}
+
+	return "", ErrVerifierConditionsUnmet
+}
+
 // getVerifierForGlobalRules returns a verifier that trusts every principal
 // declared in the policy. Global rules are not delegations of trust: they
 // constrain a namespace irrespective of who is trusted for it, so they are
@@ -545,7 +651,14 @@ func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifi
 					threshold:  delegation.GetThreshold(),
 				}
 				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-					verifier.principals = append(verifier.principals, allPrincipals[principalID])
+					// Deserialized metadata skips AddRule's checks, so a rule
+					// can name a principal its rule file never defines. No key
+					// can sign as it.
+					principal, defined := allPrincipals[principalID]
+					if !defined {
+						continue
+					}
+					verifier.principals = append(verifier.principals, principal)
 				}
 				verifiers = append(verifiers, verifier)
 
@@ -657,7 +770,13 @@ func (s *State) Verify(ctx context.Context) error {
 
 				principals := []tuf.Principal{}
 				for _, principalID := range delegation.GetPrincipalIDs().Contents() {
-					principals = append(principals, delegationKeys[principalID])
+					// As in findVerifiersForPathIfProtected, an undefined
+					// principal cannot sign.
+					principal, defined := delegationKeys[principalID]
+					if !defined {
+						continue
+					}
+					principals = append(principals, principal)
 				}
 
 				verifier := &SignatureVerifier{
@@ -758,26 +877,7 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 		commitMessage = DefaultCommitMessage
 	}
 
-	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
-	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
-	if err != nil {
-		return err
-	}
-	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
-
-	for absoluteControllerPath, metadata := range s.ControllerMetadata {
-		stateMetadataTreeID, err := metadata.WriteTree(repo)
-		if err != nil {
-			return err
-		}
-		entries = append(entries, gitstore.TreeEntry{
-			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
-			ID:   stateMetadataTreeID,
-			Kind: gitstore.KindSubtree,
-		})
-	}
-
-	policyRootTreeID, err := repo.WriteTree(entries)
+	policyRootTreeID, err := s.WriteTree(repo)
 	if err != nil {
 		return err
 	}
@@ -806,6 +906,33 @@ func (s *State) Commit(repo gitstore.Storer, commitMessage string, createRSLEntr
 	}
 
 	return nil
+}
+
+// WriteTree writes the State's metadata to repo and returns the ID of the
+// policy tree holding it. It writes no commit and sets no reference, so a
+// caller that manages its own commit and reference handling can use it in place
+// of Commit.
+func (s *State) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
+	// Get treeIDs for state.Metadata and each of the state.ControllerMetadata entries
+	stateMetadataTreeID, err := s.Metadata.WriteTree(repo)
+	if err != nil {
+		return nil, err
+	}
+	entries := []gitstore.TreeEntry{{Path: metadataTreeEntryName, ID: stateMetadataTreeID, Kind: gitstore.KindSubtree}}
+
+	for absoluteControllerPath, metadata := range s.ControllerMetadata {
+		stateMetadataTreeID, err := metadata.WriteTree(repo)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, gitstore.TreeEntry{
+			Path: fmt.Sprintf("%s/%s", tuf.GittufControllerPrefix, absoluteControllerPath),
+			ID:   stateMetadataTreeID,
+			Kind: gitstore.KindSubtree,
+		})
+	}
+
+	return repo.WriteTree(entries)
 }
 
 // Apply takes valid changes from the policy staging ref, and fast-forward
@@ -1163,6 +1290,14 @@ func (s *State) HasRuleName(name string) bool {
 // This includes things like loading the set of rule names present in the state,
 // checking if it has file rules, etc.
 func (s *State) preprocess() error {
+	// A policy tree can be missing root.json entirely, which leaves the
+	// envelope nil. Reject it here: callers reach this with candidate trees
+	// they have not authenticated, and dereferencing the envelope below would
+	// panic rather than refuse them.
+	if s.Metadata == nil || s.Metadata.RootEnvelope == nil {
+		return ErrRootMetadataNotFound
+	}
+
 	rootMetadata, err := s.GetRootMetadata(false)
 	if err != nil {
 		return err
