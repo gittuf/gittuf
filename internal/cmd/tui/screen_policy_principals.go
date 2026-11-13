@@ -29,6 +29,10 @@ type policyPrincipalsFormScreen struct {
 	inputs     []textinput.Model
 	focusIndex int
 	action     string // "Add Person", "Edit Person"
+
+	// existingKeys holds the keys of the person being edited, by key ID, so
+	// the IDs prefilled in the form can be reused without loading them again.
+	existingKeys map[string]*tufv02.Key
 }
 
 func (s *policyPrincipalsScreen) refreshPrincipals(ctx context.Context, o *options) {
@@ -86,6 +90,7 @@ func (s *policyPrincipalsScreen) updatePrincipalsList() {
 
 func (f *policyPrincipalsFormScreen) initInputs(action string) {
 	f.action = action
+	f.existingKeys = nil
 	if action == "Add Standalone Key(s)" {
 		f.inputs = initInputs([]inputField{
 			{"Enter Public Keys (paths or IDs, comma-separated)", "Public Keys:"},
@@ -115,6 +120,8 @@ func (f *policyPrincipalsFormScreen) initInputsPrefilled(p tuf.Principal) {
 	// But it's stored in Custom Metadata for Person if we cast it, or we just leave it blank for manual edit.
 	// We'll leave Identities blank or parse it if we can cast to *tufv02.Person.
 	if person, ok := p.(*tufv02.Person); ok {
+		f.existingKeys = person.PublicKeys
+
 		identities := []string{}
 		for provider, id := range person.AssociatedIdentities {
 			identities = append(identities, fmt.Sprintf("%s::%s", provider, id))
@@ -344,6 +351,10 @@ func (f *policyPrincipalsFormScreen) handleFormSubmit(m *model) (tea.Model, tea.
 	publicKeys := map[string]*tufv02.Key{}
 	for _, keyPath := range publicKeysRaw {
 		if keyPath == "" {
+			continue
+		}
+		if key, ok := f.existingKeys[keyPath]; ok {
+			publicKeys[key.KeyID] = key
 			continue
 		}
 		key, err := gittuf.LoadPublicKey(keyPath)
