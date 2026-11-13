@@ -83,7 +83,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false))
 
@@ -115,7 +115,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false))
 
@@ -147,7 +147,7 @@ func TestAddRule(t *testing.T) {
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
 
-		newKey, err := gittuf.LoadPublicKey(newKeyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, newKeyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{newKey}, false))
 

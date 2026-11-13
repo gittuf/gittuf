@@ -101,7 +101,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddGitHubApp(t.Context(), signer, tuf.GitHubAppRoleName, appKey, false))
@@ -132,7 +132,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		// Add GitHub App and set trusted to true
@@ -165,7 +165,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		// Add GitHub App (untrusted by default)
@@ -197,7 +197,7 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		appKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		appKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		// Add GitHub App (untrusted by default)
