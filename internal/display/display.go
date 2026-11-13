@@ -81,13 +81,12 @@ type pagerEnvVar struct {
 
 func newPagerEnvVar() *pagerEnvVar {
 	env := os.Getenv("PAGER") // look at what the user has configured
-	env = strings.TrimSpace(env)
 
-	if env == "" {
+	split := strings.Fields(env)
+	if len(split) == 0 {
 		return &pagerEnvVar{}
 	}
 
-	split := strings.Split(env, " ")
 	return &pagerEnvVar{
 		binary: split[0],
 		flags:  split[1:],
