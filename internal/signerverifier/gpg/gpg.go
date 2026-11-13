@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -147,9 +148,16 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 
 func getPublicKeyForKeyID(keyID, program string) (*signerverifier.SSLibKey, error) {
 	cmd := exec.Command(program, "--batch", "--armor", "--export", keyID) //nolint:gosec
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+			return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, exitErr.Stderr)
+		}
+		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
+	}
+
+	if len(output) == 0 {
+		return nil, fmt.Errorf("no GPG key found for key ID %s", keyID)
 	}
 
 	return LoadGPGKeyFromBytes(output)
