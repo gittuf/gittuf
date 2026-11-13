@@ -181,6 +181,15 @@ func TestContents(t *testing.T) {
 		set := &Set[int]{}
 		assert.Nil(t, set.Contents())
 	})
+
+	t.Run("set contents are sorted", func(t *testing.T) {
+		set := NewSetFromItems("j", "c", "h", "a", "f", "d", "i", "b", "g", "e")
+		expected := []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j"}
+
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, expected, set.Contents())
+		}
+	})
 }
 
 func TestAdd(t *testing.T) {

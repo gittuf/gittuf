@@ -34,10 +34,7 @@ func NewSetFromItems[T cmp.Ordered](items ...T) *Set[T] {
 
 // MarshalJSON is used to serialize the instance of the set into JSON.
 func (s *Set[T]) MarshalJSON() ([]byte, error) {
-	contents := s.Contents()
-	slices.Sort(contents)
-
-	return json.Marshal(contents)
+	return json.Marshal(s.Contents())
 }
 
 // UnmarshalJSON is used to load a set from the JSON representation.
@@ -55,7 +52,7 @@ func (s *Set[T]) UnmarshalJSON(jsonBytes []byte) error {
 	return nil
 }
 
-// Contents returns the objects present in the set.
+// Contents returns the objects present in the set in sorted order.
 func (s *Set[T]) Contents() []T {
 	if s.contents == nil {
 		return nil
@@ -65,6 +62,7 @@ func (s *Set[T]) Contents() []T {
 	for item := range s.contents {
 		items = append(items, item)
 	}
+	slices.Sort(items)
 	return items
 }
 
