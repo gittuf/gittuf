@@ -27,6 +27,16 @@ func TestInspect(t *testing.T) {
 		assert.ErrorContains(t, err, "unable to identify git directory")
 	})
 
+	t.Run("uninitialized policy", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		_, _, _, err := cmd.ExecuteCommandC(New())
+		assert.Error(t, err)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
@@ -61,6 +71,15 @@ func TestInspect(t *testing.T) {
 		_, stdout, _, err := cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "targets"`)
+
+		commitID, err := repo.GetGitRepository().GetReference(policy.PolicyStagingRef)
+		require.NoError(t, err)
+
+		command := New()
+		command.SetArgs([]string{"--revision", commitID.String()})
+		_, stdout, _, err = cmd.ExecuteCommandC(command)
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "targets"`)
 	})
 
 	t.Run("invalid policy name", func(t *testing.T) {
@@ -89,5 +108,29 @@ func TestInspect(t *testing.T) {
 		command.SetArgs([]string{"--policy-name", "does-not-exist"})
 		_, _, _, err = cmd.ExecuteCommandC(command)
 		assert.ErrorContains(t, err, "unable to find requested metadata file")
+	})
+
+	t.Run("invalid revision hash", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		command := New()
+		command.SetArgs([]string{"--revision", "invalid-commit-hash"})
+		_, _, _, err := cmd.ExecuteCommandC(command)
+		assert.Error(t, err)
+	})
+
+	t.Run("non-existent revision commit", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		command := New()
+		command.SetArgs([]string{"--revision", "0000000000000000000000000000000000000000"})
+		_, _, _, err := cmd.ExecuteCommandC(command)
+		assert.Error(t, err)
 	})
 }
