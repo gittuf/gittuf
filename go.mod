@@ -15,6 +15,7 @@ require (
 	github.com/in-toto/attestation v1.2.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/mattn/go-isatty v0.0.24
+	github.com/mattn/go-shellwords v1.0.16
 	github.com/muesli/termenv v0.16.0
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/sigstore/cosign/v3 v3.1.4
