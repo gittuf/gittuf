@@ -23,6 +23,7 @@ const (
 	ConfigGitsignRekor       ConfigKey = "gitsign.rekor"
 	ConfigGitsignRedirectURL ConfigKey = "gitsign.redirecturl"
 
+	ConfigCoreHooksPath  ConfigKey = "core.hookspath"
 	ConfigCoreSSHCommand ConfigKey = "core.sshcommand"
 
 	ConfigCacheAutomatic ConfigKey = "gittuf.cache.automatic"
