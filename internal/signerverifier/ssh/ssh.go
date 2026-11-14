@@ -79,6 +79,8 @@ type Signer struct {
 // with the git "user.signingKey" option.
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
+	// best effort for Windows permissions; ssh-keygen remains source of truth
+	_ = prepareKeyFileForSigning(s.Path)
 	cmd := exec.Command("ssh-keygen", "-Y", "sign", "-n", SigNamespace, "-f", s.Path) //nolint:gosec
 
 	cmd.Stdin = bytes.NewBuffer(data)
