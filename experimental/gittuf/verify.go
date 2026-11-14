@@ -6,7 +6,6 @@ package gittuf
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
@@ -59,7 +58,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		refName = refNameOverride
 	}
 
-	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
+	slog.Debug("Verifying gittuf policies", "refName", refName)
 
 	verifier := policy.NewPolicyVerifier(r.r)
 
@@ -121,7 +120,7 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 		refName = refNameOverride
 	}
 
-	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s' from entry '%s'", refName, entryID))
+	slog.Debug("Verifying gittuf policies from RSL entry", "refName", refName, "entryID", entryID)
 	verifier := policy.NewPolicyVerifier(r.r)
 	expectedTip, err := verifier.VerifyRefFromEntry(ctx, refName, entryIDHash)
 	if err != nil {
@@ -134,7 +133,7 @@ func (r *Repository) VerifyRefFromEntry(ctx context.Context, refName, entryID st
 		return err
 	}
 
-	slog.Debug("Verification successful!")
+	slog.Info("Verification successful!")
 	return nil
 }
 
@@ -168,7 +167,7 @@ func (r *Repository) VerifyMergeable(ctx context.Context, targetRef, featureRef 
 		return false, err
 	}
 
-	slog.Debug(fmt.Sprintf("Inspecting gittuf policies to identify if '%s' can be merged into '%s' with current approvals...", featureRef, targetRef))
+	slog.Debug("Inspecting gittuf policies to identify feature reference can be merged into base reference with current approvals", "featureRef", featureRef, "targetRef", targetRef)
 	verifier := policy.NewPolicyVerifier(r.r)
 
 	var needRSLSignature bool

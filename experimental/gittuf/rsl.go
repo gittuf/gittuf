@@ -422,7 +422,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 			if err != nil {
 				return fmt.Errorf("unable to get current tip of the RSL: %w", err)
 			}
-			slog.Debug("New entry ID for '%s' is '%s'", localOnlyEntries[i].GetID().String(), currentTip.String())
+			slog.Debug(fmt.Sprintf("New entry ID for '%s' is '%s'", localOnlyEntries[i].GetID().String(), currentTip.String()))
 		}
 	}
 

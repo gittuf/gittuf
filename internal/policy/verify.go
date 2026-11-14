@@ -66,7 +66,7 @@ func NewPolicyVerifier(repo gitstore.Storer) *PolicyVerifier {
 // entry is returned if the policy verification is successful.
 func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (githash.Hash, error) {
 	// Find latest entry for target
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
+	slog.Debug("Identifying latest RSL entry", "targetRef", target)
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
@@ -80,7 +80,7 @@ func (v *PolicyVerifier) VerifyRef(ctx context.Context, target string) (githash.
 // the policy verification is successful.
 func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (githash.Hash, error) {
 	// Trace RSL back to the start
-	slog.Debug(fmt.Sprintf("Identifying first RSL entry for '%s'...", target))
+	slog.Debug("Identifying first RSL entry", "targetRef", target)
 	var (
 		firstEntry rsl.ReferenceUpdaterEntry
 		err        error
@@ -92,7 +92,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gith
 	}
 
 	// Find latest entry for target
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
+	slog.Debug("Identifying latest RSL entry", "targetRef", target)
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
@@ -107,7 +107,7 @@ func (v *PolicyVerifier) VerifyRefFull(ctx context.Context, target string) (gith
 // returned if the policy verification is successful.
 func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, entryID githash.Hash) (githash.Hash, error) {
 	// Load starting point entry
-	slog.Debug("Identifying starting RSL entry...")
+	slog.Debug("Identifying starting RSL entry")
 	fromEntryT, err := rsl.GetEntry(v.repo, entryID)
 	if err != nil {
 		return gitinterface.ZeroHash, err
@@ -121,7 +121,7 @@ func (v *PolicyVerifier) VerifyRefFromEntry(ctx context.Context, target string, 
 	}
 
 	// Find latest entry for target
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", target))
+	slog.Debug("Identifying latest RSL entry", "targetRef", target)
 	latestEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(target))
 	if err != nil {
 		return gitinterface.ZeroHash, err
@@ -150,7 +150,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 	}
 
 	var fromID githash.Hash
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	slog.Debug("Identifying latest RSL entry", "targetRef", targetRef)
 	targetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
 	switch {
 	case err == nil:
@@ -161,7 +161,7 @@ func (v *PolicyVerifier) VerifyMergeable(ctx context.Context, targetRef, feature
 		return false, err
 	}
 
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", featureRef))
+	slog.Debug("Identifying latest RSL entry", "featureRef", featureRef)
 	featureEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(featureRef), rsl.IsUnskipped())
 	if err != nil {
 		return false, err
@@ -190,7 +190,7 @@ func (v *PolicyVerifier) VerifyMergeableForCommit(ctx context.Context, targetRef
 	}
 
 	var fromID githash.Hash
-	slog.Debug(fmt.Sprintf("Identifying latest RSL entry for '%s'...", targetRef))
+	slog.Debug("Identifying latest RSL entry", "targetRef", targetRef)
 	targetEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(v.repo, rsl.ForReference(targetRef), rsl.IsUnskipped())
 	switch {
 	case err == nil:
@@ -300,7 +300,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 	// Load the policy state, read root.json to enumerate network repositories
 	// we want to inspect.
-	slog.Debug(fmt.Sprintf("Loading current policy from entry '%s'...", policyEntry.GetID().String()))
+	slog.Debug("Loading policy from RSL entry", "entryID", policyEntry.GetID().String())
 	policyState, err := LoadState(ctx, v.repo, policyEntry)
 	if err != nil {
 		return err
@@ -339,14 +339,14 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 	for _, entry := range networkRepositoryEntries {
 		// Clone the network repository into tmp
-		slog.Debug(fmt.Sprintf("Inspecting entry for repository '%s' at '%s'...", entry.GetName(), entry.GetLocation()))
+		slog.Debug("Inspecting RSL entry for network repository", "repositoryName", entry.GetName(), "repositoryLocation", entry.GetLocation())
 		tmpDir, err := os.MkdirTemp("", fmt.Sprintf("gittuf-network-%s-", entry.GetName()))
 		if err != nil {
 			return err
 		}
 		defer os.RemoveAll(tmpDir) //nolint:errcheck
 
-		slog.Debug(fmt.Sprintf("Cloning from '%s'...", entry.GetLocation()))
+		slog.Debug("Cloning network repository", "repositoryLocation", entry.GetLocation())
 		networkRepo, err := gitinterface.CloneAndFetchRepository(entry.GetLocation(), tmpDir, "", []string{rsl.Ref, PolicyRef}, true)
 		if err != nil {
 			return err
@@ -354,7 +354,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 		// Identify the most recent entry in the network repo's RSL that is for
 		// the policy ref
-		slog.Debug(fmt.Sprintf("Identifying latest policy entry in network repository '%s'...", entry.GetName()))
+		slog.Debug("Identifying latest policy entry in network repository", "repositoryName", entry.GetName())
 		latestNetworkPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(networkRepo, rsl.ForReference(PolicyRef))
 		if err != nil {
 			return err
@@ -362,7 +362,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 
 		// Load the policy state of the network repository, verify the initial
 		// roots
-		slog.Debug(fmt.Sprintf("Loading latest policy state for network repository from '%s'...", latestNetworkPolicyEntry.GetID().String()))
+		slog.Debug("Loading latest policy state for network repository", "entryID", latestNetworkPolicyEntry.GetID().String())
 		latestNetworkPolicyState, err := LoadState(ctx, networkRepo, latestNetworkPolicyEntry, policy.WithInitialRootPrincipals(entry.GetInitialRootPrincipals()))
 		if err != nil {
 			return err
@@ -391,7 +391,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 			return fmt.Errorf("%w: repository '%s' is invalid", ErrNetworkRepositoryDoesNotDeclareRequiredController, entry.GetName())
 		}
 
-		slog.Debug(fmt.Sprintf("Network repository '%s' has declared required controller repository with name '%s'", entry.GetName(), declaredControllerName))
+		slog.Debug("Network repository has declared required controller repository", "networkRepositoryName", entry.GetName(), "controllerRepositoryName", declaredControllerName)
 
 		// Check if it has correctly propagated changes
 		networkPolicyCommitInfo, err := networkRepo.GetCommitInfo(latestNetworkPolicyEntry.GetTargetID())
@@ -418,7 +418,7 @@ func (v *PolicyVerifier) VerifyNetwork(ctx context.Context) error {
 			return fmt.Errorf("%w: repository '%s' is stale", ErrNetworkRepositoryHasStaleControllerMetadata, entry.GetName())
 		}
 
-		slog.Debug(fmt.Sprintf("Successfully verified network repository '%s'!", entry.GetName()))
+		slog.Debug("Successfully verified network repository", "networkRepositoryName", entry.GetName())
 	}
 
 	return nil
@@ -440,7 +440,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	)
 
 	// Load policy applicable at firstEntry
-	slog.Debug(fmt.Sprintf("Loading policy applicable at first entry '%s'...", firstEntry.GetID().String()))
+	slog.Debug("Loading policy applicable at RSL entry", "entryID", firstEntry.GetID().String())
 	initialPolicyEntry, err := v.searcher.FindPolicyEntryFor(firstEntry)
 	if err == nil {
 		state, err := LoadState(ctx, v.repo, initialPolicyEntry)
@@ -455,7 +455,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 	}
 	// require currentPolicy != nil || parent(firstEntry) == nil
 
-	slog.Debug(fmt.Sprintf("Loading attestations applicable at first entry '%s'...", firstEntry.GetID().String()))
+	slog.Debug("Loading attestations applicable at RSL entry", "entryID", firstEntry.GetID().String())
 	initialAttestationsEntry, err := v.searcher.FindAttestationsEntryFor(firstEntry)
 	if err == nil {
 		attestationsState, err := attestations.LoadAttestationsForEntry(v.repo, initialAttestationsEntry)
@@ -488,7 +488,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 			entry := entries[0]
 			entries = entries[1:]
 
-			slog.Debug(fmt.Sprintf("Verifying entry '%s'...", entry.GetID().String()))
+			slog.Debug("Verifying RSL entry", "entryID", entry.GetID().String())
 
 			switch entry := entry.(type) {
 			case *rsl.PropagationEntry:
@@ -501,7 +501,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					continue
 				}
 
-				slog.Debug(fmt.Sprintf("Entry '%s' is propagation entry, proceeding...", entry.GetID().String()))
+				slog.Debug("Entry is propagation entry, proceeding", "entryID", entry.GetID().String())
 				continue
 
 			case *rsl.ReferenceEntry:
@@ -531,7 +531,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 					return ErrPolicyNotFound
 				}
 				if err := verifyEntry(ctx, v.repo, currentPolicy, currentAttestations, entry); err != nil {
-					slog.Debug(fmt.Sprintf("Violation found: %s", err.Error()))
+					slog.Debug("Violation found", "error", err.Error())
 					slog.Debug("Checking if entry has been revoked...")
 					// If the invalid entry is never marked as skipped, we return err
 					if !entry.SkippedBy(annotations[entry.GetID().String()]) {
@@ -604,7 +604,7 @@ func (v *PolicyVerifier) VerifyRelativeForRef(ctx context.Context, firstEntry, l
 			newEntry := entries[0]
 			entries = entries[1:]
 
-			slog.Debug(fmt.Sprintf("Inspecting entry '%s' to see if it's a fix entry...", newEntry.GetID().String()))
+			slog.Debug("Inspecting RSL entry to see if it's a fix entry", "entryID", newEntry.GetID().String())
 
 			slog.Debug("Checking if entry is for the affected reference...")
 			if newEntry.GetRefName() != invalidEntry.GetRefName() {
@@ -812,7 +812,7 @@ func (s *State) VerifyNewState(ctx context.Context, newPolicy *State) error {
 	for name, controllerMetadata := range s.ControllerMetadata {
 		newControllerMetadata, hasController := newPolicy.ControllerMetadata[name]
 		if !hasController {
-			slog.Debug(fmt.Sprintf("new policy does not have metadata for the controller '%s', skipping check for rollback of its metadata...", name))
+			slog.Debug("New policy does not have metadata for the controller, skipping check for rollback of its metadata", "controllerRepositoryName", name)
 			continue
 		}
 
@@ -925,7 +925,7 @@ func getApproverAttestationAndKeyIDs(ctx context.Context, repo gitstore.Storer, 
 	}
 
 	firstEntry := false
-	slog.Debug(fmt.Sprintf("Searching for RSL entry for '%s' before entry '%s'...", entry.RefName, entry.ID.String()))
+	slog.Debug("Searching for RSL entry for reference before entry", "reference", entry.RefName, "entryID", entry.ID.String())
 	priorRefEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(entry.RefName), rsl.BeforeEntryID(entry.ID))
 	if err != nil {
 		if !errors.Is(err, rsl.ErrRSLEntryNotFound) {
@@ -971,7 +971,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.
 		return nil, nil, nil
 	}
 
-	slog.Debug(fmt.Sprintf("Finding reference authorization attestations for '%s' from '%s' to '%s'...", targetRef, fromID.String(), toID.String()))
+	slog.Debug("Finding reference authorization attestations", "targetRef", targetRef, "fromID", fromID.String(), "toID", toID.String())
 	authorizationAttestation, err := attestationsState.GetReferenceAuthorizationFor(repo, targetRef, fromID.String(), toID.String())
 	if err != nil {
 		if !errors.Is(err, authorizations.ErrAuthorizationNotFound) {
@@ -993,7 +993,7 @@ func getApproverAttestationAndKeyIDsForIndex(ctx context.Context, repo gitstore.
 				continue
 			}
 
-			slog.Debug(fmt.Sprintf("GitHub pull request approvals are trusted from '%s', loading applicable attestations...", appName))
+			slog.Debug("GitHub pull request approvals are trusted from app, loading applicable attestations", "appName", appName)
 
 			githubApprovalAttestation, err := attestationsState.GetGitHubPullRequestApprovalAttestationFor(repo, appName, targetRef, fromID.String(), toID.String())
 			if err != nil {
@@ -1236,13 +1236,13 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 
 	for controllerName, globalRules := range policy.globalRules {
 		if controllerName == "" { // this is the special case
-			slog.Debug("Checking global rules declared in current repository...")
+			slog.Debug("Checking global rules declared in current repository")
 		} else {
-			slog.Debug(fmt.Sprintf("Checking global rules declared in controller repository '%s'...", controllerName))
+			slog.Debug("Checking global rules declared in controller repository", "controllerName", controllerName)
 		}
 		for _, rule := range globalRules {
 			// We check every global rule
-			slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))
+			slog.Debug("Checking if global rule applies", "ruleName", rule.GetName())
 			switch rule := rule.(type) {
 			case tuf.GlobalRuleThreshold:
 				if !rule.Matches(target) {
@@ -1250,7 +1250,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				}
 
 				// The global rule applies to the namespace under verification
-				slog.Debug(fmt.Sprintf("Verifying threshold global rule '%s'...", rule.GetName()))
+				slog.Debug("Verifying threshold global rule", "ruleName", rule.GetName())
 				requiredThreshold := rule.GetThreshold()
 				if rslSignatureNeededForThreshold && options.verifyMergeable {
 					// Since we're verifying if it's mergeable and we already know
@@ -1262,11 +1262,11 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				if verifiedGlobalRulesPrincipalIDs < requiredThreshold {
 					// Check if the verifiedPrincipalIDs meets the required global
 					// threshold
-					slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedGlobalRulesPrincipalIDs))
+					slog.Debug("Global rule for threshold not met", "ruleName", rule.GetName(), "requiredThreshold", rule.GetThreshold(), "haveThreshold", verifiedGlobalRulesPrincipalIDs)
 					return "", false, ErrVerifierConditionsUnmet
 				}
 
-				slog.Debug(fmt.Sprintf("Successfully verified global rule '%s'", rule.GetName()))
+				slog.Debug("Successfully verified global rule", "ruleName", rule.GetName())
 
 			case tuf.GlobalRuleBlockForcePushes:
 				// TODO: we use policy.repository, not ideal...
@@ -1275,7 +1275,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				}
 
 				// The global rule applies to the namespace under verification
-				slog.Debug(fmt.Sprintf("Verifying block force pushes global rule '%s'...", rule.GetName()))
+				slog.Debug("Verifying block force pushes global rule", "ruleName", rule.GetName())
 
 				if options.verifyMergeable {
 					// Cannot check for force pushes for a proposed change
@@ -1293,20 +1293,20 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				// If we have another object here, we've gone wrong somewhere.
 				currentEntry, err := rsl.GetEntry(policy.repository, gitID)
 				if err != nil {
-					slog.Debug(fmt.Sprintf("unable to load RSL entry for '%s': %v", gitID.String(), err))
+					slog.Debug("Unable to load RSL entry", "entryID", gitID.String(), "error", err.Error())
 					return "", false, err
 				}
 
 				currentEntryRef, isReferenceEntry := currentEntry.(*rsl.ReferenceEntry)
 				if !isReferenceEntry {
-					slog.Debug(fmt.Sprintf("Expected '%s' to be RSL reference entry, aborting verification of block force pushes global rule...", gitID.String()))
+					slog.Debug("Expected RSL reference entry, aborting verification of block force pushes global rule", "entryID", gitID.String())
 					return "", false, rsl.ErrInvalidRSLEntry
 				}
 
 				previousEntryRef, _, err := rsl.GetLatestReferenceUpdaterEntry(policy.repository, rsl.BeforeEntryID(currentEntry.GetID()), rsl.ForReference(currentEntryRef.RefName), rsl.IsUnskipped())
 				if err != nil {
 					if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-						slog.Debug(fmt.Sprintf("Entry '%s' is the first one for reference '%s', cannot check if it's a force push", currentEntryRef.GetID().String(), currentEntryRef.RefName))
+						slog.Debug("RSL Entry is the first one for reference, cannot check if it's a force push", "entryID", currentEntryRef.GetID().String(), "reference", currentEntryRef.RefName)
 						break
 					}
 
@@ -1318,11 +1318,11 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 					return "", false, err
 				}
 				if !knows {
-					slog.Debug(fmt.Sprintf("Current entry's commit '%s' is not a descendant of prior entry's commit '%s'", currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
+					slog.Debug("Current RSL entry's commit is not a descendant of prior entry's commit", "currentEntryTargetID", currentEntryRef.TargetID.String(), "previousEntryTargetID", previousEntryRef.GetTargetID().String())
 					return "", false, ErrVerifierConditionsUnmet
 				}
 
-				slog.Debug(fmt.Sprintf("Successfully verified global rule '%s' as '%s' is a descendant of '%s'", rule.GetName(), currentEntryRef.TargetID.String(), previousEntryRef.GetTargetID().String()))
+				slog.Debug("Successfully verified global rule as is a descendant of ", "ruleName", rule.GetName(), "currentEntryTargetRef", currentEntryRef.TargetID.String(), "previousEntryTargetRef", previousEntryRef.GetTargetID().String())
 
 			default:
 				slog.Debug("Unknown global rule type, aborting verification...")
@@ -1367,11 +1367,11 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 				// For each approver ID from the app attestation, we try to see
 				// if it matches a principal in the current verifiers.
 				for _, principal := range verifier.principals {
-					slog.Debug(fmt.Sprintf("Checking if approver identity '%s' matches '%s'...", approverID, principal.ID()))
+					slog.Debug("Checking if approver identity matches", "approverID", approverID, "principalID", principal.ID())
 					if usedPrincipalIDs.Has(principal.ID()) {
 						// This principal has already been counted towards the
 						// threshold
-						slog.Debug(fmt.Sprintf("Principal '%s' has already been counted towards threshold, skipping...", principal.ID()))
+						slog.Debug("Principal has already been counted towards threshold, skipping", "principalID", principal.ID())
 						continue
 					}
 
@@ -1385,7 +1385,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 								// The approver ID from the issuer (appName) matches
 								// the principal's associated identity for the same
 								// issuer!
-								slog.Debug(fmt.Sprintf("Principal '%s' has associated identity '%s', counting principal towards threshold...", principal.ID(), approverID))
+								slog.Debug("Principal has associated identity, counting principal towards threshold", "principalID", principal.ID(), "approverID", approverID)
 								usedPrincipalIDs.Add(principal.ID())
 								matchedAssociatedIdentity = true
 								break
@@ -1403,7 +1403,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 		trustedUsedPrincipalIDs := trustedPrincipalIDs.Intersection(usedPrincipalIDs)
 		if trustedUsedPrincipalIDs.Len() >= verifier.Threshold() {
 			// With approvals, we now meet threshold!
-			slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', threshold met!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
+			slog.Debug("Threshold met", "countedPrincipals", trustedUsedPrincipalIDs.Len(), "requiredThreshold", verifier.Threshold(), "verifierName", verifier.Name())
 			verifiedUsing = verifier.Name()
 			acceptedPrincipalIDs = trustedUsedPrincipalIDs
 			break
@@ -1412,7 +1412,7 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 		// If verifyMergeable is true, we only need to meet threshold - 1
 		if verifyMergeable && verifier.Threshold() > 1 {
 			if trustedUsedPrincipalIDs.Len() >= verifier.Threshold()-1 {
-				slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', policies can be met if the merge is by authorized person!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
+				slog.Debug("Threshold can be met if the merge is by authorized person", "countedPrincipals", trustedUsedPrincipalIDs.Len(), "requiredThreshold", verifier.Threshold(), "verifierName", verifier.Name())
 				verifiedUsing = verifier.Name()
 				acceptedPrincipalIDs = trustedUsedPrincipalIDs
 				rslEntrySignatureNeededForThreshold = true
