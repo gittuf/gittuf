@@ -928,11 +928,13 @@ func GetFirstReferenceUpdaterEntryForRef(storer gitstore.Storer, targetRef strin
 	return firstEntry, annotations, nil
 }
 
-// SkipAllInvalidReferenceEntriesForRef identifies invalid RSL reference entries.
-// Each invalid entry points to a target that is not reachable for the current
-// target of the same reference, indicating that history has been rewritten via a
-// rebase for the reference. After the invalid entries are identified, an annotation
-// entry is created that marks all of these entries as to be skipped.
+// SkipAllInvalidReferenceEntriesForRef identifies invalid RSL entries that
+// update the reference (reference and propagation entries). Each invalid entry
+// points to a target that is not reachable for the current target of the same
+// reference, indicating that history has been rewritten via a rebase for the
+// reference. Entries for other references are ignored. After the invalid
+// entries are identified, an annotation entry is created that marks all of
+// these entries as to be skipped.
 func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef string, signCommit bool) error {
 	slog.Debug("Checking if RSL entries point to commits not in the target ref...")
 
@@ -957,17 +959,19 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 	entriesToSkip := []githash.Hash{}
 
 	for {
-		if entry, ok := iterator.(*ReferenceEntry); ok {
-			isAncestor, err := storer.KnowsCommit(latestEntry.GetTargetID(), entry.TargetID)
+		// Only entries for the target ref are relevant, entries for other refs
+		// must neither be skipped nor end the search
+		if entry, ok := iterator.(ReferenceUpdaterEntry); ok && entry.GetRefName() == targetRef {
+			isAncestor, err := storer.KnowsCommit(latestEntry.GetTargetID(), entry.GetTargetID())
 			if err != nil {
 				return err
 			}
 
 			if !isAncestor {
-				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that does not exist in the target ref.", targetRef, entry.ID, entry.TargetID))
-				entriesToSkip = append(entriesToSkip, entry.ID)
+				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that does not exist in the target ref.", targetRef, entry.GetID(), entry.GetTargetID()))
+				entriesToSkip = append(entriesToSkip, entry.GetID())
 			} else {
-				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that exists in the target ref. No more commits to skip.", targetRef, entry.ID, entry.TargetID))
+				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that exists in the target ref. No more commits to skip.", targetRef, entry.GetID(), entry.GetTargetID()))
 				break
 			}
 		}
