@@ -4,11 +4,16 @@
 package log
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
+	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLog(t *testing.T) {
@@ -28,5 +33,90 @@ func TestLog(t *testing.T) {
 
 		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorContains(t, err, "unable to find RSL entry")
+	})
+
+	t.Run("success without filters", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		libRepo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		treeBuilder := gitinterface.NewTreeBuilder(r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+
+		commitID, err := r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.NoError(t, err)
+
+		err = libRepo.RecordRSLEntryForReference(t.Context(), "refs/heads/main", false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(r)
+		require.NoError(t, err)
+
+		_, out, _, err := cmd.ExecuteCommandC(New())
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), fmt.Sprintf("entry %s", latestEntry.GetID().String()))
+		assert.Contains(t, out.String(), "Ref:    refs/heads/main")
+		assert.Contains(t, out.String(), fmt.Sprintf("Target: %s", commitID.String()))
+	})
+
+	t.Run("filter by existing ref", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		libRepo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		treeBuilder := gitinterface.NewTreeBuilder(r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+
+		mainCommitID, err := r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.NoError(t, err)
+
+		err = libRepo.RecordRSLEntryForReference(t.Context(), "refs/heads/main", false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		featureCommitID, err := r.Commit(emptyTreeHash, "refs/heads/feature", "Feature commit\n", false)
+		require.NoError(t, err)
+
+		err = libRepo.RecordRSLEntryForReference(t.Context(), "refs/heads/feature", false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		_, out, _, err := cmd.ExecuteCommandC(New(), "--ref", "main")
+		assert.NoError(t, err)
+		assert.Contains(t, out.String(), "Ref:    refs/heads/main")
+		assert.Contains(t, out.String(), fmt.Sprintf("Target: %s", mainCommitID.String()))
+		assert.NotContains(t, out.String(), "refs/heads/feature")
+		assert.NotContains(t, out.String(), featureCommitID.String())
+	})
+
+	t.Run("filter by non-existent ref", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		r := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		t.Chdir(tmpDir)
+
+		libRepo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		treeBuilder := gitinterface.NewTreeBuilder(r)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.NoError(t, err)
+
+		_, err = r.Commit(emptyTreeHash, "refs/heads/main", "Initial commit\n", false)
+		require.NoError(t, err)
+
+		err = libRepo.RecordRSLEntryForReference(t.Context(), "refs/heads/main", false, rslopts.WithRecordLocalOnly())
+		require.NoError(t, err)
+
+		_, _, _, err = cmd.ExecuteCommandC(New(), "--ref", "nonexistent")
+		assert.ErrorContains(t, err, "requested Git reference not found")
 	})
 }
