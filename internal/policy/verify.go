@@ -1262,7 +1262,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 				if verifiedGlobalRulesPrincipalIDs < requiredThreshold {
 					// Check if the verifiedPrincipalIDs meets the required global
 					// threshold
-					slog.Debug("Global rule for threshold not met", "ruleName", rule.GetName(), "requiredThreshold", rule.GetThreshold(), "haveThreshold", verifiedGlobalRulesPrincipalIDs)
+					slog.Debug("Global rule for threshold not met", "ruleName", rule.GetName(), "requiredThreshold", rule.GetThreshold(), "countedPrincipals", verifiedGlobalRulesPrincipalIDs)
 					return "", false, ErrVerifierConditionsUnmet
 				}
 
@@ -1322,7 +1322,7 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 					return "", false, ErrVerifierConditionsUnmet
 				}
 
-				slog.Debug("Successfully verified global rule as is a descendant of ", "ruleName", rule.GetName(), "currentEntryTargetRef", currentEntryRef.TargetID.String(), "previousEntryTargetRef", previousEntryRef.GetTargetID().String())
+				slog.Debug("Successfully verified global rule preventing force pushes", "ruleName", rule.GetName(), "currentEntryTargetRef", currentEntryRef.TargetID.String(), "previousEntryTargetRef", previousEntryRef.GetTargetID().String())
 
 			default:
 				slog.Debug("Unknown global rule type, aborting verification...")

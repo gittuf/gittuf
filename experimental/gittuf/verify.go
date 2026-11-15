@@ -77,7 +77,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 		return err
 	}
 
-	slog.Debug("Verification successful!")
+	slog.Info("Verification successful!")
 	return nil
 }
 
