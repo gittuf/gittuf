@@ -1217,10 +1217,10 @@ func setupSSHKeysForSigning(t *testing.T, privateBytes, publicBytes []byte) *ssh
 	return signer
 }
 
-func addTestTagAuthorization(t *testing.T, repo *gitinterface.Repository, tagRefName string, targetID githash.Hash) *attestations.Attestations {
+func addTestTagAuthorization(t *testing.T, repo *gitinterface.Repository, signer *ssh.Signer, tagRefName string, fromID, toID githash.Hash) *attestations.Attestations {
 	t.Helper()
 
-	authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, gitinterface.ZeroHash.String(), targetID.String())
+	authorization, err := attestations.NewReferenceAuthorizationForTag(tagRefName, fromID.String(), toID.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1229,7 +1229,7 @@ func addTestTagAuthorization(t *testing.T, repo *gitinterface.Repository, tagRef
 	if err != nil {
 		t.Fatal(err)
 	}
-	env, err = dsse.SignEnvelope(testCtx, env, setupSSHKeysForSigning(t, targets1KeyBytes, targets1PubKeyBytes))
+	env, err = dsse.SignEnvelope(testCtx, env, signer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1238,7 +1238,7 @@ func addTestTagAuthorization(t *testing.T, repo *gitinterface.Repository, tagRef
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, gitinterface.ZeroHash.String(), targetID.String()); err != nil {
+	if err := currentAttestations.SetReferenceAuthorization(repo, env, tagRefName, fromID.String(), toID.String()); err != nil {
 		t.Fatal(err)
 	}
 	if err := currentAttestations.Commit(repo, "Add authorization", true, false); err != nil {
