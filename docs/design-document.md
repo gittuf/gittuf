@@ -314,7 +314,8 @@ custom.<namespace>/<name>: <value>
 
 The `targetID` is typically the ID of a commit for references that are branches.
 However, for entries that record the state of a Git tag, `targetID` is the ID of
-the annotated tag object.
+the annotated tag object. For a lightweight tag, it is the ID of the object the
+tag points to, which may be a commit, a tree, or a blob.
 
 ##### RSL Annotation Entries
 
@@ -496,7 +497,9 @@ zero. For a change to a branch, `ToTargetID` pre-computes the Git merge tree
 resulting from the change being approved. Thus, when verifying the change to the
 branch, it must be followed by an RSL reference entry that points to a commit
 which has the same Git tree ID. For a tag, `ToTargetID` records the Git object
-the tag object is expected to point to.
+the tag is expected to point to. Chained tags are peeled until an object that is
+not a tag is reached, so `ToTargetID` may be the ID of a commit, a tree, or a
+blob.
 
 Reference authorizations are stored in a directory called
 `reference-authorizations` in the attestations namespace. Each authorization
@@ -722,6 +725,25 @@ change. The gittuf implementation does not implement precisely this workflow,
 instead also including aspects of the recovery workflow to see if a change that
 fails verification has already been recovered from. See
 https://github.com/gittuf/gittuf/issues/708.
+
+#### Verifying Tags
+
+Entries for Git tags follow the workflow above, with these differences:
+
+1. The RSL is the source of truth for the tag. The entry's signature and any
+   reference authorizations for the change are verified against the rules
+   protecting the tag, as they are for branches.
+1. The signature on an annotated tag object is not considered and does not count
+   towards the threshold. The RSL entry records the tag object's ID, so the
+   entry's signature and any reference authorizations already authenticate the
+   tag. This matches branches, where commit signatures do not count towards
+   rules protecting Git references.
+1. A tag may point to a commit, a tree, a blob, or another tag. Chained tags are
+   peeled until an object that is not a tag is reached, and that object is the
+   one reference authorizations are matched against.
+1. For an annotated tag, the local tag reference must point to the tag object
+   recorded in the entry.
+1. Rules protecting files are not evaluated for tags.
 
 ### Recovery
 
