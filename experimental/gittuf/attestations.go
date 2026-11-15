@@ -169,7 +169,7 @@ func (r *Repository) AddReferenceAuthorization(ctx context.Context, signer sslib
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing reference authorization using '%s'...", keyID))
+	slog.Debug("Signing reference authorization", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -312,7 +312,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForCommit(ctx context.Contex
 	}
 
 	for _, pullRequest := range pullRequests {
-		slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequest.GetNumber()))
+		slog.Debug("Inspecting GitHub pull request", "pullRequestNumber", pullRequest.GetNumber())
 		pullRequestBranch := plumbing.NewBranchReferenceName(pullRequest.GetBase().GetRef()).String()
 
 		// pullRequest.Merged is not set on this endpoint for some reason
@@ -358,7 +358,7 @@ func (r *Repository) AddGitHubPullRequestAttestationForNumber(ctx context.Contex
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Inspecting GitHub pull request %d...", pullRequestNumber))
+	slog.Debug("Inspecting GitHub pull request", "pullRequestNumber", pullRequestNumber)
 	pullRequest, _, err := client.PullRequests.Get(ctx, owner, repository, pullRequestNumber)
 	if err != nil {
 		return err
@@ -450,7 +450,7 @@ func (r *Repository) AddGitHubPullRequestApprover(ctx context.Context, signer ss
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing GitHub pull request approval attestation using '%s'...", keyID))
+	slog.Debug("Signing GitHub pull request approval attestation", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -535,7 +535,7 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing GitHub pull request approval attestation using '%s'...", keyID))
+	slog.Debug("Signing GitHub pull request approval attestation", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -583,7 +583,7 @@ func (r *Repository) addGitHubPullRequestAttestation(ctx context.Context, signer
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing GitHub pull request attestation using '%s'...", keyID))
+	slog.Debug("Signing GitHub pull request attestation", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err

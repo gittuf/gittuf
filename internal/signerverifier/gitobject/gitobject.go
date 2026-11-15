@@ -208,7 +208,7 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 		return ErrIncorrectVerificationKey
 	}
 
-	slog.Debug(fmt.Sprintf("Using '%s' as Rekor instance...", rekorURL))
+	slog.Debug("Using Rekor instance", "rekorURL", rekorURL)
 
 	// gitsignRekor.NewWithOptions invokes cosign.GetRekorPubs which looks at
 	// the env var, so we don't have to do anything here

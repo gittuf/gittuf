@@ -65,18 +65,18 @@ func RSLLog(repo gitstore.Storer, writer io.WriteCloser, opts ...Option) error {
 				// we still want to track annotation entries for this entry (if
 				// there are any) since they may apply to other entries that we
 				// do want to display.
-				slog.Debug(fmt.Sprintf("Skipping reference entry '%s' since it is for ref '%s'...", iteratorEntry.ID.String(), iteratorEntry.RefName))
+				slog.Debug("Skipping reference entry since it is for ref", "entryID", iteratorEntry.ID.String(), "refName", iteratorEntry.RefName)
 				break
 			}
 
-			slog.Debug(fmt.Sprintf("Writing reference entry '%s'...", iteratorEntry.ID.String()))
+			slog.Debug("Writing reference entry", "entryID", iteratorEntry.ID.String())
 			if err := writeRSLReferenceEntry(writer, iteratorEntry, annotationsMap[iteratorEntry.ID.String()], hasParent); err != nil {
 				// We return nil here to avoid noisy output when the writer is
 				// unexpectedly closed, such as by killing the pager
 				return nil
 			}
 		case *rsl.AnnotationEntry:
-			slog.Debug(fmt.Sprintf("Tracking annotation entry '%s'...", iteratorEntry.ID.String()))
+			slog.Debug("Tracking annotation entry", "entryID", iteratorEntry.ID.String())
 			for _, targetID := range iteratorEntry.RSLEntryIDs {
 				targetIDString := targetID.String()
 
@@ -93,11 +93,11 @@ func RSLLog(repo gitstore.Storer, writer io.WriteCloser, opts ...Option) error {
 				// we still want to track annotation entries for this entry (if
 				// there are any) since they may apply to other entries that we
 				// do want to display.
-				slog.Debug(fmt.Sprintf("Skipping propagation entry '%s' since it is for ref '%s'...", iteratorEntry.ID.String(), iteratorEntry.RefName))
+				slog.Debug("Skipping propagation entry since it is for ref", "entryID", iteratorEntry.ID.String(), "refName", iteratorEntry.RefName)
 				break
 			}
 
-			slog.Debug(fmt.Sprintf("Writing propagation entry '%s'...", iteratorEntry.ID.String()))
+			slog.Debug("Writing propagation entry", "entryID", iteratorEntry.ID.String())
 			if err := writeRSLPropagationEntry(writer, iteratorEntry, hasParent); err != nil {
 				// We return nil here to avoid noisy output when
 				// the writer is unexpectedly closed, such as by
