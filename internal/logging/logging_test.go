@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"log/slog"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,4 +68,72 @@ func TestHandlerRendersWithAttributesOnEveryRecord(t *testing.T) {
 	logger.Info("second message", "entry", "abc123")
 
 	assert.Equal(t, "first message (component=\"rsl\")\nsecond message (component=\"rsl\" entry=\"abc123\")\n", buf.String())
+}
+
+func TestHandlerEscapesControlCharactersInMessages(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(NewHandler(&buf, slog.LevelInfo))
+
+	// A crafted global rule name such as "refs\n\x1b[31m" must neither
+	// forge an additional log line nor emit a terminal control sequence.
+	logger.Info("Checking global rule\n\x1b[31m")
+
+	assert.Equal(t, "Checking global rule\\n\\x1b[31m\n", buf.String())
+}
+
+func TestHandlerEscapesControlCharactersInValues(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(NewHandler(&buf, slog.LevelInfo))
+
+	logger.Info("Checking global rule", "ruleName", "refs\n\x1b[31m")
+
+	assert.Equal(t, "Checking global rule (ruleName=\"refs\\n\\x1b[31m\")\n", buf.String())
+}
+
+type redacted string
+
+func (r redacted) LogValue() slog.Value {
+	return slog.StringValue("<redacted>")
+}
+
+func TestHandlerResolvesLogValuerValues(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(NewHandler(&buf, slog.LevelInfo))
+
+	logger.Info("Verifying signature", "key", redacted("secret"))
+
+	assert.Equal(t, "Verifying signature (key=\"<redacted>\")\n", buf.String())
+}
+
+// sliceWriter records each Write call separately, and is deliberately not
+// safe for concurrent use: concurrent writes must be serialized by the
+// handler for the race detector to stay quiet.
+type sliceWriter struct {
+	writes []string
+}
+
+func (s *sliceWriter) Write(p []byte) (int, error) {
+	s.writes = append(s.writes, string(p))
+	return len(p), nil
+}
+
+func TestHandlerSerializesConcurrentWrites(t *testing.T) {
+	w := &sliceWriter{}
+	logger := slog.New(NewHandler(w, slog.LevelDebug))
+
+	const goroutines = 32
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			logger.Info("one record per write")
+		}()
+	}
+	wg.Wait()
+
+	assert.Len(t, w.writes, goroutines)
+	for _, write := range w.writes {
+		assert.Equal(t, "one record per write\n", write)
+	}
 }
