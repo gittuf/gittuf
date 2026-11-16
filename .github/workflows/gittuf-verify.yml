@@ -20,4 +20,4 @@ jobs:
           echo "Policy staging: $(git show --oneline refs/gittuf/policy-staging)"
           echo "Attestations:   $(git show --oneline refs/gittuf/attestations)"
           echo "Main:           $(git show --oneline refs/heads/main)"
-          gittuf verify-ref main --verbose
+          GITTUF_DEV=1 GITTUF_STORER=go-git gittuf verify-ref main --verbose
