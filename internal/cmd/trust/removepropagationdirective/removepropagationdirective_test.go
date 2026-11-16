@@ -20,6 +20,7 @@ import (
 
 func TestRemovePropagationDirective(t *testing.T) {
 	t.Run("not in dev mode", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "0")
 		pOpts := &persistent.Options{
 			SigningKey: "dummy-key",
 		}
