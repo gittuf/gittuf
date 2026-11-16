@@ -14,6 +14,7 @@ import (
 
 func TestPropagate(t *testing.T) {
 	t.Run("not in dev mode", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "0")
 		_, _, _, err := cmd.ExecuteCommandC(New())
 		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
 	})
