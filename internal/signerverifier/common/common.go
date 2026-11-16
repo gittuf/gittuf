@@ -25,7 +25,7 @@ var (
 // https://github.com/sigstore/sigstore and is used in gittuf's sigstore signing
 // and verification flows.
 func LoadCertsFromPath(path string) ([]*x509.Certificate, error) {
-	slog.Debug(fmt.Sprintf("Loading %s...", path))
+	slog.Debug("Loading certificates", "path", path)
 	pemBytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

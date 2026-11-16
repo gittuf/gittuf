@@ -227,7 +227,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
+	slog.Debug("Setting git directory for repository", "path", absPath)
 	repo.gitDirPath = absPath
 
 	objectFormat, err := repo.readObjectFormat()

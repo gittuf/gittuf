@@ -317,7 +317,7 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	for _, principal := range authorizedPrincipals {
-		slog.Debug(fmt.Sprintf("Adding principal '%s' to rule file...", strings.TrimSpace(principal.ID())))
+		slog.Debug("Adding principal to rule file", "principalID", strings.TrimSpace(principal.ID()))
 		if err := targetsMetadata.AddPrincipal(principal); err != nil {
 			return err
 		}
@@ -358,7 +358,7 @@ func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibd
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Updating principal '%s' in rule file...", strings.TrimSpace(principal.ID())))
+	slog.Debug("Updating principal in rule file", "principalID", strings.TrimSpace(principal.ID()))
 	if err := targetsMetadata.UpdatePrincipal(principal); err != nil {
 		return err
 	}
@@ -398,7 +398,7 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Removing principal '%s' from rule file...", strings.TrimSpace(principalID)))
+	slog.Debug("Removing principal from rule file", "principalID", strings.TrimSpace(principalID))
 	if err := targetsMetadata.RemovePrincipal(principalID); err != nil {
 		return err
 	}
@@ -444,7 +444,7 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 		env = state.Metadata.DelegationEnvelopes[targetsRoleName]
 	}
 
-	slog.Debug(fmt.Sprintf("Signing rule file using '%s'...", keyID))
+	slog.Debug("Signing rule file", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err

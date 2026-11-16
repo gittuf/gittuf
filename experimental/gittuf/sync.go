@@ -6,7 +6,6 @@ package gittuf
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"reflect"
@@ -31,7 +30,7 @@ var (
 // that the cloned repository's Git config (e.g., gpg.program) is used.
 // TODO: resolve how root keys are trusted / bootstrapped.
 func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeyRefs []string, bare bool) (*Repository, error) {
-	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
+	slog.Debug("Cloning remote repository", "remoteURL", remoteURL)
 
 	if dir == "" {
 		// FIXME: my understanding is backslashes are not used in URLs but I haven't dived into the RFCs to check yet

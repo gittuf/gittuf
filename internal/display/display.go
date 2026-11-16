@@ -4,7 +4,6 @@
 package display
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -17,7 +16,7 @@ func NewDisplayWriter(output io.Writer) io.WriteCloser {
 	pagerProg := getPager()
 	if pagerProg != nil {
 		binary := pagerProg.getBinary()
-		slog.Debug(fmt.Sprintf("Found pager program %s", binary))
+		slog.Debug("Found pager program", "program", binary)
 
 		flags := pagerProg.getFlags()
 		cmd := exec.Command(binary, flags...)
