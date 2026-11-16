@@ -13,6 +13,11 @@ import (
 )
 
 func TestPropagate(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		_, _, _, err := cmd.ExecuteCommandC(New())
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("no repository", func(t *testing.T) {
