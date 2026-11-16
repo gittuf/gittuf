@@ -305,32 +305,55 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 }
 
 func TestLoadPublicKey(t *testing.T) {
+	repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, t.TempDir(), false))}
+
 	t.Run("sigstore", func(t *testing.T) {
 		t.Run("fulcio valid", func(t *testing.T) {
 			keyRef := "fulcio:test@email.com::issuer"
 
-			key, err := LoadPublicKey(keyRef)
+			key, err := LoadPublicKey(repo, keyRef)
 			require.NoError(t, err)
 			require.NotNil(t, key)
 
 			assert.Equal(t, "test@email.com::issuer", key.ID())
 		})
 		t.Run("fulcio invalid", func(t *testing.T) {
-			_, err := LoadPublicKey("fulcio:invalid")
+			_, err := LoadPublicKey(repo, "fulcio:invalid")
 			assert.ErrorContains(t, err, "incorrect format for fulcio identity")
 		})
 	})
 
 	t.Run("gpg", func(t *testing.T) {
 		t.Run("invalid key", func(t *testing.T) {
-			_, err := LoadPublicKey("gpg:nonexistentkey123")
+			_, err := LoadPublicKey(repo, "gpg:nonexistentkey123")
 			assert.Error(t, err)
+		})
+
+		// Prevent developer Git config from leaking through
+		t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+		t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
+		gpg.SetupTestGPGHomeDir(t, artifacts.GPGKey1Private)
+		fingerprint := "157507bbe151e378ce8126c1dcfe043cdd2db96e"
+
+		t.Run("gpg.program not set", func(t *testing.T) {
+			key, err := LoadPublicKey(repo, GPGKeyPrefix+fingerprint)
+			require.NoError(t, err)
+			assert.Equal(t, fingerprint, key.ID())
+		})
+
+		t.Run("gpg.program set in repository Git config", func(t *testing.T) {
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, t.TempDir(), false))}
+			require.NoError(t, repo.r.SetGitConfig("gpg.program", "/nonexistent/gpg"))
+
+			_, err := LoadPublicKey(repo, GPGKeyPrefix+fingerprint)
+			assert.ErrorContains(t, err, "/nonexistent/gpg")
 		})
 	})
 
 	t.Run("ssh", func(t *testing.T) {
 		t.Run("invalid path", func(t *testing.T) {
-			_, err := LoadPublicKey("/non/existent/path")
+			_, err := LoadPublicKey(repo, "/non/existent/path")
 			assert.Error(t, err)
 		})
 	})

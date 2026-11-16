@@ -123,6 +123,18 @@ func NewSignerFromKeyID(keyID string, opts ...SignerOption) (*Signer, error) {
 	return &Signer{Verifier: verifier, program: options.program}, nil
 }
 
+// LoadPublicKeyFromKeyID returns the public key for the specified GPG key ID.
+// The key is exported using the GPG program set via WithGPGProgram, or "gpg"
+// if no program is set.
+func LoadPublicKeyFromKeyID(keyID string, opts ...SignerOption) (*signerverifier.SSLibKey, error) {
+	options := &SignerOptions{program: defaultGPGProgram}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	return getPublicKeyForKeyID(keyID, options.program)
+}
+
 // LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
 // armored bytes. The returned signerverifier.SSLibKey uses the primary key's fingerprint as the
 // key ID.

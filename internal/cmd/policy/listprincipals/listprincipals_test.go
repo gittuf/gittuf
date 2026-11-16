@@ -47,7 +47,7 @@ func TestListPrincipals(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
@@ -79,7 +79,7 @@ func TestListPrincipals(t *testing.T) {
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
@@ -118,7 +118,7 @@ func TestListPrincipals(t *testing.T) {
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 		require.NoError(t, repo.InitializeTargets(t.Context(), signer, "custom-policy", false, trustpolicyopts.WithRSLEntry()))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, "custom-policy", []tuf.Principal{newKey}, false, trustpolicyopts.WithRSLEntry()))
 

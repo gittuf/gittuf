@@ -26,9 +26,11 @@ var (
 
 // Clone wraps a typical git clone invocation, fetching gittuf refs in addition
 // to the standard refs. It performs a verification of the RSL against the
-// specified HEAD after cloning the repository.
+// specified HEAD after cloning the repository. expectedRootKeyRefs are key
+// references as accepted by LoadPublicKey; they are loaded after cloning so
+// that the cloned repository's Git config (e.g., gpg.program) is used.
 // TODO: resolve how root keys are trusted / bootstrapped.
-func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeys []tuf.Principal, bare bool) (*Repository, error) {
+func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRootKeyRefs []string, bare bool) (*Repository, error) {
 	slog.Debug(fmt.Sprintf("Cloning from '%s'...", remoteURL))
 
 	if dir == "" {
@@ -69,7 +71,19 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 	repository := &Repository{r: newStorer(r)}
 
-	if len(expectedRootKeys) > 0 {
+	if len(expectedRootKeyRefs) > 0 {
+		expectedRootKeys := make([]tuf.Principal, 0, len(expectedRootKeyRefs))
+		for _, keyRef := range expectedRootKeyRefs {
+			key, err := LoadPublicKey(repository, keyRef)
+			if err != nil {
+				if e := os.RemoveAll(dir); e != nil {
+					return nil, errors.Join(ErrCloningRepository, err, e)
+				}
+				return nil, errors.Join(ErrCloningRepository, err)
+			}
+			expectedRootKeys = append(expectedRootKeys, key)
+		}
+
 		slog.Debug("Verifying if root keys are expected root keys...")
 
 		sort.Slice(expectedRootKeys, func(i, j int) bool {
