@@ -317,6 +317,10 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	for _, principal := range authorizedPrincipals {
+		for keyID, principalIDs := range findReusedKeys(targetsMetadata.GetPrincipals(), principal) {
+			slog.Warn("Key is already held by another principal, make sure this is intended", "keyID", keyID, "principalID", principal.ID(), "heldBy", principalIDs)
+		}
+
 		slog.Debug("Adding principal to rule file", "principalID", strings.TrimSpace(principal.ID()))
 		if err := targetsMetadata.AddPrincipal(principal); err != nil {
 			return err
@@ -356,6 +360,10 @@ func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibd
 	targetsMetadata, err := state.GetTargetsMetadata(targetsRoleName, true)
 	if err != nil {
 		return err
+	}
+
+	for keyID, principalIDs := range findReusedKeys(targetsMetadata.GetPrincipals(), principal) {
+		slog.Warn("Key is already held by another principal, make sure this is intended", "keyID", keyID, "principalID", principal.ID(), "heldBy", principalIDs)
 	}
 
 	slog.Debug("Updating principal in rule file", "principalID", strings.TrimSpace(principal.ID()))
@@ -518,4 +526,26 @@ func (r *Repository) updateTargetsMetadata(ctx context.Context, state *policy.St
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
+}
+
+// findReusedKeys returns the keys of the principal that are already used by
+// other principals in the rule file, mapped to the IDs of those principals.
+func findReusedKeys(existingPrincipals map[string]tuf.Principal, principal tuf.Principal) map[string][]string {
+	reusedKeys := map[string][]string{}
+
+	for existingID, existingPrincipal := range existingPrincipals {
+		if existingID == principal.ID() {
+			continue
+		}
+
+		for _, existingKey := range existingPrincipal.Keys() {
+			for _, key := range principal.Keys() {
+				if key.KeyID == existingKey.KeyID {
+					reusedKeys[key.KeyID] = append(reusedKeys[key.KeyID], existingID)
+				}
+			}
+		}
+	}
+
+	return reusedKeys
 }
