@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install gittuf
-        uses: gittuf/gittuf-installer@4ecbb57b40e6eb6beaba120dcbef46123b0249e0
+        uses: gittuf/gittuf-installer@f3f980c73becd7402e78cb18a7ae31b7d9895817
       - name: Checkout and verify repository
         run: |
           sleep 10s
@@ -20,4 +20,4 @@ jobs:
           echo "Policy staging: $(git show --oneline refs/gittuf/policy-staging)"
           echo "Attestations:   $(git show --oneline refs/gittuf/attestations)"
           echo "Main:           $(git show --oneline refs/heads/main)"
-          gittuf verify-ref main --verbose
+          GITTUF_DEV=1 GITTUF_STORER=go-git gittuf verify-ref main --verbose
