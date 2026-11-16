@@ -61,13 +61,7 @@ func (r *Repository) VerifyRef(ctx context.Context, refName string, opts ...veri
 
 	slog.Debug(fmt.Sprintf("Verifying gittuf policies for '%s'", refName))
 
-	verifier := policy.NewPolicyVerifier(r.r)
-
-	if options.LatestOnly {
-		expectedTip, err = verifier.VerifyRef(ctx, refName)
-	} else {
-		expectedTip, err = verifier.VerifyRefFull(ctx, refName)
-	}
+	expectedTip, err = verifyRef(ctx, r.r, refName, options.LatestOnly)
 	if err != nil {
 		return err
 	}

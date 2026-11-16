@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/common/set"
@@ -22,6 +23,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/githash"
 	"github.com/gittuf/gittuf/pkg/gitstore"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 type SignatureVerifier struct {
@@ -49,13 +51,57 @@ func (v *SignatureVerifier) TrustedPrincipalIDs() *set.Set[string] {
 	return principalIDs
 }
 
+// valid reports whether v can be met at all. A rule whose principals are all
+// undefined leaves v with none.
+func (v *SignatureVerifier) valid() bool {
+	return v.threshold >= 1 && len(v.principals) >= 1
+}
+
+// metBy returns the principals in used that v trusts, and whether they meet v's
+// threshold.
+func (v *SignatureVerifier) metBy(used *set.Set[string]) (*set.Set[string], bool) {
+	trusted := v.TrustedPrincipalIDs().Intersection(used)
+	return trusted, trusted.Len() >= v.threshold
+}
+
+// countable returns the principals in principalIDs that v trusts and that
+// could sign. A principal with no keys never verifies, so it is left out. So is
+// any principal that shares a key with one already counted, since Verify never
+// counts one key toward two principals. Without signatures there is no way to
+// tell which key a principal would sign with, so a shared key excludes the
+// principal outright. This can undercount but never overcounts.
+func (v *SignatureVerifier) countable(principalIDs *set.Set[string]) *set.Set[string] {
+	counted := set.NewSet[string]()
+	countedKeyIDs := set.NewSet[string]()
+	for _, principal := range v.principals {
+		if !principalIDs.Has(principal.ID()) || counted.Has(principal.ID()) {
+			continue
+		}
+
+		keys := principal.Keys()
+		if len(keys) == 0 {
+			continue
+		}
+		if slices.ContainsFunc(keys, func(key *signerverifier.SSLibKey) bool { return countedKeyIDs.Has(key.KeyID) }) {
+			continue
+		}
+
+		counted.Add(principal.ID())
+		for _, key := range keys {
+			countedKeyIDs.Add(key.KeyID)
+		}
+	}
+
+	return counted
+}
+
 // Verify is used to check for a threshold of signatures using the verifier. The
 // threshold of signatures may be met using a combination of at most one Git
 // signature and signatures embedded in a DSSE envelope. Verify does not inspect
 // the envelope's payload, but instead only verifies the signatures. The caller
 // must ensure the validity of the envelope's contents.
 func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash, env *sslibdsse.Envelope) (*set.Set[string], error) {
-	if v.threshold < 1 || len(v.principals) < 1 {
+	if !v.valid() {
 		return nil, ErrInvalidVerifier
 	}
 

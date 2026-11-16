@@ -1245,28 +1245,12 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 			slog.Debug(fmt.Sprintf("Checking if global rule '%s' applies...", rule.GetName()))
 			switch rule := rule.(type) {
 			case tuf.GlobalRuleThreshold:
-				if !rule.Matches(target) {
-					break
+				// Since we're verifying if it's mergeable and we already know
+				// that the RSL signature is needed to meet threshold, we can
+				// reduce the global constraint threshold as well
+				if _, err := verifyGlobalThresholdRule(rule, target, verifiedGlobalRulesPrincipalIDs, rslSignatureNeededForThreshold && options.verifyMergeable); err != nil {
+					return "", false, err
 				}
-
-				// The global rule applies to the namespace under verification
-				slog.Debug(fmt.Sprintf("Verifying threshold global rule '%s'...", rule.GetName()))
-				requiredThreshold := rule.GetThreshold()
-				if rslSignatureNeededForThreshold && options.verifyMergeable {
-					// Since we're verifying if it's mergeable and we already know
-					// that the RSL signature is needed to meet threshold, we can
-					// reduce the global constraint threshold as well
-					slog.Debug("Reducing required global threshold by 1 (verifying if change is mergeable and RSL signature is required)...")
-					requiredThreshold--
-				}
-				if verifiedGlobalRulesPrincipalIDs < requiredThreshold {
-					// Check if the verifiedPrincipalIDs meets the required global
-					// threshold
-					slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), verifiedGlobalRulesPrincipalIDs))
-					return "", false, ErrVerifierConditionsUnmet
-				}
-
-				slog.Debug(fmt.Sprintf("Successfully verified global rule '%s'", rule.GetName()))
 
 			case tuf.GlobalRuleBlockForcePushes:
 				// TODO: we use policy.repository, not ideal...
@@ -1334,6 +1318,30 @@ func verifyGitObjectAndAttestations(ctx context.Context, policy *State, target s
 	return verifiedUsing, rslSignatureNeededForThreshold, nil
 }
 
+// verifyGlobalThresholdRule checks that count principals meet rule when it
+// matches target, with the requirement lowered by one when reduceByOne is set.
+// It reports whether rule matched.
+func verifyGlobalThresholdRule(rule tuf.GlobalRuleThreshold, target string, count int, reduceByOne bool) (bool, error) {
+	if !rule.Matches(target) {
+		return false, nil
+	}
+
+	// The global rule applies to the namespace under verification
+	slog.Debug(fmt.Sprintf("Verifying threshold global rule '%s'...", rule.GetName()))
+	requiredThreshold := rule.GetThreshold()
+	if reduceByOne {
+		slog.Debug("Reducing required global threshold by 1 (verifying if change is mergeable and RSL signature is required)...")
+		requiredThreshold--
+	}
+	if count < requiredThreshold {
+		slog.Debug(fmt.Sprintf("Global rule '%s' not met, required threshold '%d', only have '%d'", rule.GetName(), rule.GetThreshold(), count))
+		return true, ErrVerifierConditionsUnmet
+	}
+
+	slog.Debug(fmt.Sprintf("Successfully verified global rule '%s'", rule.GetName()))
+	return true, nil
+}
+
 func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers []*SignatureVerifier, gitID githash.Hash, authorizationAttestation *sslibdsse.Envelope, appNames []string, approverIDs *set.Set[string], verifyMergeable bool) (string, *set.Set[string], bool, error) {
 	if len(verifiers) == 0 {
 		return "", nil, false, ErrNoVerifiers
@@ -1345,8 +1353,6 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 		rslEntrySignatureNeededForThreshold bool
 	)
 	for _, verifier := range verifiers {
-		trustedPrincipalIDs := verifier.TrustedPrincipalIDs()
-
 		usedPrincipalIDs, err := verifier.Verify(ctx, gitID, authorizationAttestation)
 		if err == nil {
 			// We meet requirements just from the authorization attestation's sigs
@@ -1399,9 +1405,8 @@ func verifyGitObjectAndAttestationsUsingVerifiers(ctx context.Context, verifiers
 			}
 		}
 
-		// Get a list of used principals that are also trusted by the verifier
-		trustedUsedPrincipalIDs := trustedPrincipalIDs.Intersection(usedPrincipalIDs)
-		if trustedUsedPrincipalIDs.Len() >= verifier.Threshold() {
+		trustedUsedPrincipalIDs, met := verifier.metBy(usedPrincipalIDs)
+		if met {
 			// With approvals, we now meet threshold!
 			slog.Debug(fmt.Sprintf("Counted '%d' principals towards threshold '%d' for '%s', threshold met!", trustedUsedPrincipalIDs.Len(), verifier.Threshold(), verifier.Name()))
 			verifiedUsing = verifier.Name()
