@@ -34,7 +34,7 @@ func TestInspectRoot(t *testing.T) {
 		t.Chdir(tmpDir)
 
 		_, _, _, err := cmd.ExecuteCommandC(New())
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "requested Git reference not found")
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -48,30 +48,81 @@ func TestInspectRoot(t *testing.T) {
 		t.Chdir(tmpDir)
 
 		repo, err := gittuf.LoadRepository(".")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		initialCommitID, err := repo.GetGitRepository().GetReference(policy.PolicyStagingRef)
+		require.NoError(t, err)
+
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
+		require.NoError(t, err)
+
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false))
+
+		currentCommitID, err := repo.GetGitRepository().GetReference(policy.PolicyStagingRef)
+		require.NoError(t, err)
 
 		_, stdout, _, err := cmd.ExecuteCommandC(New())
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "root"`)
+		assert.Contains(t, stdout.String(), `"targets"`)
 
-		commitID, err := repo.GetGitRepository().GetReference(policy.PolicyStagingRef)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		command := New()
-		command.SetArgs([]string{"--revision", commitID.String()})
-		_, stdout, _, err = cmd.ExecuteCommandC(command)
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", initialCommitID.String())
 		assert.NoError(t, err)
 		assert.Contains(t, stdout.String(), `"type": "root"`)
+		assert.NotContains(t, stdout.String(), `"targets"`)
+
+		_, stdout, _, err = cmd.ExecuteCommandC(New(), "--revision", currentCommitID.String())
+		assert.NoError(t, err)
+		assert.Contains(t, stdout.String(), `"type": "root"`)
+		assert.Contains(t, stdout.String(), `"targets"`)
+	})
+
+	t.Run("invalid revision hash", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		t.Chdir(tmpDir)
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		_, _, _, err = cmd.ExecuteCommandC(New(), "--revision", "invalid-commit-hash")
+		assert.ErrorContains(t, err, "hash string is wrong length")
+	})
+
+	t.Run("non-existent revision commit", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		t.Chdir(tmpDir)
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+
+		_, _, _, err = cmd.ExecuteCommandC(New(), "--revision", "0000000000000000000000000000000000000000")
+		assert.ErrorContains(t, err, "unable to read commit")
 	})
 }
