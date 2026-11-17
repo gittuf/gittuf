@@ -75,6 +75,10 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		return tuf.ErrCannotManipulateRulesWithGittufPrefix
 	}
 
+	if t.Delegations == nil {
+		t.Delegations = &Delegations{}
+	}
+
 	for _, principalID := range authorizedPrincipalIDs {
 		if _, has := t.Delegations.Principals[principalID]; !has {
 			return tuf.ErrPrincipalNotFound
@@ -106,7 +110,11 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 			Threshold:    threshold,
 		},
 	}
-	allDelegations = append(allDelegations[:len(allDelegations)-1], newDelegation, AllowRule())
+	if len(allDelegations) == 0 {
+		allDelegations = []*Delegation{newDelegation, AllowRule()}
+	} else {
+		allDelegations = append(allDelegations[:len(allDelegations)-1], newDelegation, AllowRule())
+	}
 	t.Delegations.Roles = allDelegations
 	return nil
 }

@@ -366,6 +366,25 @@ func TestAddRuleAndGetRules(t *testing.T) {
 		targetsMetadata := &TargetsMetadata{}
 
 		assert.Nil(t, targetsMetadata.GetRules())
+
+		err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID}, []string{"test/"}, 1)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+	})
+
+	t.Run("empty delegations roles", func(t *testing.T) {
+		targetsMetadata := &TargetsMetadata{
+			Delegations: &Delegations{
+				Principals: map[string]tuf.Principal{key1.KeyID: key1},
+			},
+		}
+
+		err := targetsMetadata.AddRule("test-rule", []string{key1.KeyID}, []string{"test/"}, 1)
+		assert.NoError(t, err)
+
+		rules := targetsMetadata.GetRules()
+		assert.Equal(t, 2, len(rules))
+		assert.Equal(t, "test-rule", rules[0].ID())
+		assert.Equal(t, tuf.AllowRuleName, rules[1].ID())
 	})
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
