@@ -398,6 +398,54 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	})
 }
 
+func TestAddPrincipalToTargetsExistingPerson(t *testing.T) {
+	r := createTestRepositoryWithPolicy(t, "")
+
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	targetsPubKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.Nil(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{},
+		Custom:               map[string]string{},
+	}
+
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{person}, false)
+	require.Nil(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.Nil(t, err)
+
+	// Adding a person with the same ID must not replace the existing person
+	replacement := &tufv02.Person{
+		PersonID:             person.PersonID,
+		PublicKeys:           map[string]*tufv02.Key{targetsPubKey.KeyID: targetsPubKey},
+		AssociatedIdentities: map[string]string{},
+		Custom:               map[string]string{},
+	}
+
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{replacement}, false)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
+
+	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	require.Nil(t, err)
+
+	targetsMetadata, err := state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.Nil(t, err)
+
+	principal, has := targetsMetadata.GetPrincipals()[person.PersonID]
+	require.True(t, has)
+
+	keys := principal.Keys()
+	require.Len(t, keys, 1)
+	assert.Equal(t, gpgKey.KeyID, keys[0].KeyID)
+}
+
 func TestUpdatePrincipalInTargets(t *testing.T) {
 	r := createTestRepositoryWithPolicy(t, "")
 
