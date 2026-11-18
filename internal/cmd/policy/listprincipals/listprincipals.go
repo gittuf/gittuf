@@ -85,8 +85,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 			if _, err := fmt.Fprintf(stdOut, indentString+"Custom Metadata:\n"); err != nil {
 				return err
 			}
-			for _, key := range slices.Sorted(maps.Keys(customMetadata)) {
-				if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", key, customMetadata[key]); err != nil {
+			for _, name := range slices.Sorted(maps.Keys(customMetadata)) {
+				if _, err := fmt.Fprintf(stdOut, strings.Repeat(indentString, 2)+"%s: %s\n", name, customMetadata[name]); err != nil {
 					return err
 				}
 			}

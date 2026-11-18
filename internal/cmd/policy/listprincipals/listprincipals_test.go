@@ -4,10 +4,11 @@
 package listprincipals
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -155,8 +157,8 @@ func TestListPrincipals(t *testing.T) {
 		require.NoError(t, repo.ApplyPolicy(t.Context(), "", true, false))
 
 		principals := []tuf.Principal{newKey, rsaKey, ecdsaKey, person}
-		sort.Slice(principals, func(i, j int) bool {
-			return principals[i].ID() < principals[j].ID()
+		slices.SortFunc(principals, func(a, b tuf.Principal) int {
+			return cmp.Compare(a.ID(), b.ID())
 		})
 
 		expectedOutput := ""
@@ -164,8 +166,8 @@ func TestListPrincipals(t *testing.T) {
 			expectedOutput += fmt.Sprintf("Principal %s:\n    Keys:\n", principal.ID())
 
 			keys := principal.Keys()
-			sort.Slice(keys, func(i, j int) bool {
-				return keys[i].KeyID < keys[j].KeyID
+			slices.SortFunc(keys, func(a, b *signerverifier.SSLibKey) int {
+				return cmp.Compare(a.KeyID, b.KeyID)
 			})
 			for _, key := range keys {
 				expectedOutput += fmt.Sprintf("        %s (%s)\n", key.KeyID, key.KeyType)
