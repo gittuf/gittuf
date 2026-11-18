@@ -51,7 +51,7 @@ func TestSign(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))
@@ -95,7 +95,7 @@ func TestSign(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, newKey, false, trustpolicyopts.WithRSLEntry()))

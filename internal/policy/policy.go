@@ -234,7 +234,7 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		fn(options)
 	}
 
-	slog.Debug(fmt.Sprintf("Loading policy at entry '%s'...", requestedEntry.GetID().String()))
+	slog.Debug("Loading policy at RSL entry", "entryID", requestedEntry.GetID().String())
 
 	// TODO: should this searcher be inherited when invoked via Verifier?
 	searcher := newSearcher(repo)
@@ -259,7 +259,7 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		}
 
 		if len(options.InitialRootPrincipals) == 0 {
-			slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+			slog.Debug("Trusting root of trust for initial policy", "entryID", firstPolicyEntry.GetID().String())
 		} else {
 			slog.Debug("Verifying root of trust using provided initial root principals...")
 			verifier := &SignatureVerifier{
@@ -314,7 +314,7 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 		return nil, err
 	}
 	if len(options.InitialRootPrincipals) == 0 {
-		slog.Debug(fmt.Sprintf("Trusting root of trust for initial policy '%s'...", firstPolicyEntry.GetID().String()))
+		slog.Debug("Trusting root of trust for initial policy", "entryID", firstPolicyEntry.GetID().String())
 	} else {
 		slog.Debug("Verifying root of trust using provided initial root principals...")
 		verifier := &SignatureVerifier{
@@ -347,7 +347,7 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 			return nil, err
 		}
 
-		slog.Debug(fmt.Sprintf("Verifying root of trust for policy '%s'...", entry.GetID().String()))
+		slog.Debug("Verifying root of trust for policy", "entryID", entry.GetID().String())
 		if err := verifiedState.VerifyNewState(ctx, underTestState); err != nil {
 			return nil, fmt.Errorf("unable to verify roots of trust for policy states: %w", err)
 		}
@@ -369,7 +369,7 @@ func LoadState(ctx context.Context, repo gitstore.Storer, requestedEntry rsl.Ref
 			return nil, fmt.Errorf("requested state has invalidly signed metadata: %w", err)
 		}
 
-		slog.Debug(fmt.Sprintf("Successfully loaded policy at entry '%s'!", requestedEntry.GetID().String()))
+		slog.Debug("Successfully loaded policy at RSL entry", "entryID", requestedEntry.GetID().String())
 		return verifiedState, nil
 	}
 
@@ -433,7 +433,7 @@ func (s *State) FindVerifiersForPath(path string) ([]*SignatureVerifier, error) 
 		s.verifiersCache = map[string][]*SignatureVerifier{}
 	} else if verifiers, cacheHit := s.verifiersCache[path]; cacheHit {
 		// Cache hit for this path in this policy
-		slog.Debug(fmt.Sprintf("Found cached verifiers for path '%s'", path))
+		slog.Debug("Found cached verifiers for path", "path", path)
 		return verifiers, nil
 	}
 
@@ -963,7 +963,7 @@ func ReconcileStaging(repo gitstore.Storer, signCommit bool) error {
 	switch {
 	case referenceFound && entryFound:
 		if !policyEntry.GetTargetID().Equal(policyTip) {
-			slog.Debug("policy entry at tip does not match targetID in RSL entry, aborting.")
+			slog.Debug("Policy entry at tip does not match targetID in RSL entry, aborting")
 			return ErrInvalidPolicy
 		}
 		policyFound = true
@@ -1382,7 +1382,7 @@ func LoadStateFromCommit(repo gitstore.Storer, commitID githash.Hash) (*State, e
 		currentMetadataEntry := metadataQueue[0]
 		metadataQueue = metadataQueue[1:]
 
-		slog.Debug(fmt.Sprintf("Loading policy for '%s' from '%s'...", currentMetadataEntry.name, currentMetadataEntry.treeID.String()))
+		slog.Debug("Loading policy from Git tree", "metadataEntryName", currentMetadataEntry.name, "treeID", currentMetadataEntry.treeID.String())
 
 		metadataEntries, err := repo.GetEntriesInTree(currentMetadataEntry.treeID)
 		if err != nil {
@@ -1431,7 +1431,7 @@ func LoadStateFromCommit(repo gitstore.Storer, commitID githash.Hash) (*State, e
 	slog.Debug("Loaded current repository policy!")
 
 	for name := range state.ControllerMetadata {
-		slog.Debug(fmt.Sprintf("Loaded policy from controller '%s'!", name))
+		slog.Debug("Loaded policy from controller", "controllerRepositoryName", name)
 	}
 
 	if err := state.preprocess(); err != nil {

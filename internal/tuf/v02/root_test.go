@@ -389,7 +389,7 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 
 	verifier, err := ssh.NewVerifierFromKey(sslibKeyO)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	signer := &ssh.Signer{
 		Verifier: verifier,

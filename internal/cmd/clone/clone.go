@@ -6,7 +6,6 @@ package clone
 import (
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/common"
-	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/spf13/cobra"
 )
 
@@ -45,18 +44,7 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		dir = args[1]
 	}
 
-	expectedRootKeys := make([]tuf.Principal, len(o.expectedRootKeys))
-
-	for index, keyPath := range o.expectedRootKeys {
-		key, err := gittuf.LoadPublicKey(keyPath)
-		if err != nil {
-			return err
-		}
-
-		expectedRootKeys[index] = key
-	}
-
-	_, err := gittuf.Clone(cmd.Context(), args[0], dir, o.branch, expectedRootKeys, o.bare)
+	_, err := gittuf.Clone(cmd.Context(), args[0], dir, o.branch, o.expectedRootKeys, o.bare)
 	return err
 }
 

@@ -19,6 +19,16 @@ import (
 )
 
 func TestMakeController(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "0")
+		pOpts := &persistent.Options{
+			SigningKey: "dummy-key",
+		}
+
+		_, _, _, err := cmd.ExecuteCommandC(New(pOpts))
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
 	t.Setenv(dev.DevModeKey, "1")
 
 	t.Run("no repository", func(t *testing.T) {

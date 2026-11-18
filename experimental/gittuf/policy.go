@@ -6,7 +6,6 @@ package gittuf
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -28,7 +27,7 @@ var (
 // Note that this also pushes the RSL as the policy cannot change without an
 // update to the RSL.
 func (r *Repository) PushPolicy(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pushing policy and RSL references to %s...", remoteName))
+	slog.Debug("Pushing policy and RSL references to remote", "remoteName", remoteName)
 	if err := r.r.Push(remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingPolicy, err)
 	}
@@ -40,7 +39,7 @@ func (r *Repository) PushPolicy(remoteName string) error {
 // marked as fast forward only to detect divergence. Note that this also fetches
 // the RSL as the policy must be updated in sync with the RSL.
 func (r *Repository) PullPolicy(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pulling policy and RSL references from %s...", remoteName))
+	slog.Debug("Pulling policy and RSL references from remote", "remoteName", remoteName)
 	if err := r.r.Fetch(remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}, true); err != nil {
 		return errors.Join(ErrPullingPolicy, err)
 	}

@@ -173,7 +173,7 @@ func repoAddRootKey(ctx context.Context, o *options, keyInput string) error {
 		return err
 	}
 
-	newRootKey, err := gittuf.LoadPublicKey(keyInput)
+	newRootKey, err := gittuf.LoadPublicKey(repo, keyInput)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func repoAddPolicyKey(ctx context.Context, o *options, keyInput string) error {
 		return err
 	}
 
-	targetsKey, err := gittuf.LoadPublicKey(keyInput)
+	targetsKey, err := gittuf.LoadPublicKey(repo, keyInput)
 	if err != nil {
 		return err
 	}
@@ -421,7 +421,7 @@ func repoAddGitHubApp(ctx context.Context, o *options, appName, appKeyInput stri
 		return err
 	}
 
-	appKey, err := gittuf.LoadPublicKey(appKeyInput)
+	appKey, err := gittuf.LoadPublicKey(repo, appKeyInput)
 	if err != nil {
 		return err
 	}
@@ -508,7 +508,7 @@ func repoAddControllerRepository(ctx context.Context, o *options, repositoryName
 
 	initialRootPrincipals := make([]tuf.Principal, 0, len(principalRefs))
 	for _, principalRef := range principalRefs {
-		principal, err := gittuf.LoadPublicKey(principalRef)
+		principal, err := gittuf.LoadPublicKey(repo, principalRef)
 		if err != nil {
 			return err
 		}
@@ -537,7 +537,7 @@ func repoAddNetworkRepository(ctx context.Context, o *options, repositoryName, r
 
 	initialRootPrincipals := make([]tuf.Principal, 0, len(principalRefs))
 	for _, principalRef := range principalRefs {
-		principal, err := gittuf.LoadPublicKey(principalRef)
+		principal, err := gittuf.LoadPublicKey(repo, principalRef)
 		if err != nil {
 			return err
 		}

@@ -98,7 +98,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing initial root metadata using '%s'...", publicKey.KeyID))
+	slog.Debug("Signing initial root metadata", "keyID", publicKey.KeyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -351,7 +351,7 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 
 	slog.Debug("Adding GitHub app key...")
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	if err := rootMetadata.AddGitHubAppPrincipal(appName, appKey); err != nil {
@@ -396,7 +396,7 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 
 	slog.Debug("Removing GitHub app key...")
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	if err := rootMetadata.DeleteGitHubAppPrincipal(appName); err != nil {
@@ -440,7 +440,7 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	if rootMetadata.IsGitHubAppApprovalTrusted(appName) {
@@ -490,7 +490,7 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	apps, err := rootMetadata.GetGitHubAppEntries()
@@ -1219,7 +1219,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 
 	env := state.Metadata.RootEnvelope
 
-	slog.Debug(fmt.Sprintf("Signing root metadata using '%s'...", keyID))
+	slog.Debug("Signing root metadata", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err

@@ -40,7 +40,7 @@ func parseTokenForIdentityAndIssuer(token, fulcioURL string) (string, string, er
 	identity := subjectFromToken(tok)
 
 	if fulcioURL != "" {
-		slog.Debug(fmt.Sprintf("Querying '%s' for IDP configurations to see if a subject domain applies...", fulcioURL))
+		slog.Debug("Querying for IDP configurations to see if a subject domain applies", "fulcioURL", fulcioURL)
 
 		fulcio, err := url.Parse(fulcioURL)
 		if err != nil {
@@ -91,7 +91,7 @@ func parseTokenForIdentityAndIssuer(token, fulcioURL string) (string, string, er
 				}
 
 				// Per the Fulcio spec, the subject domain is added after a '!'
-				slog.Debug(fmt.Sprintf("Adding subject domain '%s' to identity '%s'...", subjectDomain, identity))
+				slog.Debug("Adding subject domain to identity", "subjectDomain", subjectDomain, "identity", identity)
 				identity = fmt.Sprintf("%s!%s", identity, subjectDomain)
 			}
 

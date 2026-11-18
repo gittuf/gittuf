@@ -6,7 +6,6 @@ package policy
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -74,7 +73,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 
 	// First, verify the gitObject's signature if one is presented
 	if !gitObjectID.IsZero() {
-		slog.Debug(fmt.Sprintf("Verifying signature of Git object with ID '%s'...", gitObjectID.String()))
+		slog.Debug("Verifying signature of Git object", "objectID", gitObjectID.String())
 
 		payload, gitSignature, err := v.repository.GetObjectSignature(gitObjectID)
 		if err != nil {
@@ -87,7 +86,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 			return nil, err
 		}
 		if ok {
-			slog.Debug(fmt.Sprintf("Using '%s' as Rekor server...", rekorURL))
+			slog.Debug("Using configured Rekor server", "rekorURL", rekorURL)
 			verifyOpts = append(verifyOpts, gitobject.WithRekorURL(rekorURL))
 		}
 
@@ -99,7 +98,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 				err := gitobject.Verify(ctx, key, payload, gitSignature, verifyOpts...)
 				if err == nil {
 					// Signature verification succeeded
-					slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of Git object '%s', counting '%s' towards threshold...", key.KeyID, principal.ID(), gitObjectID.String(), principal.ID()))
+					slog.Debug("Public key belonging to principal successfully used to verify signature of Git object, counting towards threshold...", "keyID", key.KeyID, "principalID", principal.ID(), "objectID", gitObjectID.String())
 					usedPrincipalIDs.Add(principal.ID())
 					usedKeyIDs.Add(key.KeyID)
 					gitObjectVerified = true
@@ -142,7 +141,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 			if usedPrincipalIDs.Has(principal.ID()) {
 				// Do not verify using this principal as they were verified for
 				// the Git signature
-				slog.Debug(fmt.Sprintf("Principal '%s' has already been counted towards the threshold, skipping...", principal.ID()))
+				slog.Debug("Principal has already been counted towards the threshold, skipping", "principalID", principal.ID())
 				continue
 			}
 
@@ -153,7 +152,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 				if usedKeyIDs.Has(key.KeyID) {
 					// this key has been encountered before, possibly because
 					// another Principal included this key
-					slog.Debug(fmt.Sprintf("Key with ID '%s' has already been used to verify a signature, skipping...", key.KeyID))
+					slog.Debug("Key with ID has already been used to verify a signature, skipping", "keyID", key.KeyID)
 					continue
 				}
 
@@ -163,26 +162,26 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 				)
 				switch key.KeyType {
 				case ssh.KeyType:
-					slog.Debug(fmt.Sprintf("Found SSH key '%s'...", key.KeyID))
+					slog.Debug("Found SSH key", "keyID", key.KeyID)
 					dsseVerifier, err = ssh.NewVerifierFromKey(key)
 					if err != nil {
 						return nil, err
 					}
 				case gpg.KeyType:
-					slog.Debug(fmt.Sprintf("Found GPG key '%s'...", key.KeyID))
+					slog.Debug("Found GPG key", "keyID", key.KeyID)
 					dsseVerifier, err = gpg.NewVerifierFromKey(key)
 					if err != nil {
 						return nil, err
 					}
 				case sigstore.KeyType:
-					slog.Debug(fmt.Sprintf("Found Sigstore key '%s'...", key.KeyID))
+					slog.Debug("Found Sigstore key", "keyID", key.KeyID)
 					opts := []sigstoreverifieropts.Option{}
 					rekorURL, ok, err := v.repository.LookupConfig(gitstore.ConfigGitsignRekor)
 					if err != nil {
 						return nil, err
 					}
 					if ok {
-						slog.Debug(fmt.Sprintf("Using '%s' as Rekor server...", rekorURL))
+						slog.Debug("Using configured Rekor server", "rekorURL", rekorURL)
 						opts = append(opts, sigstoreverifieropts.WithRekorURL(rekorURL))
 					}
 
@@ -217,7 +216,7 @@ func (v *SignatureVerifier) Verify(ctx context.Context, gitObjectID githash.Hash
 				// Mark all accepted keys as used: this doesn't count towards
 				// the threshold directly, but if another principal has the same
 				// key, they may not be counted towards the threshold
-				slog.Debug(fmt.Sprintf("Public key '%s' belonging to principal '%s' successfully used to verify signature of attestation, counting '%s' towards threshold...", key.KeyID, principal.ID(), principal.ID()))
+				slog.Debug("Public key belonging to principal successfully used to verify signature of attestation, counting towards threshold", "keyID", key.KeyID, "principalID", principal.ID())
 				usedKeyIDs.Add(key.KeyID)
 				usedPrincipalIDs.Add(principal.ID())
 			}

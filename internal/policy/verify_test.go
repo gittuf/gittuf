@@ -2200,6 +2200,115 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
+	t.Run("controller policy update", func(t *testing.T) {
+		controllerRepository, networkRepository := createControllerAndNetworkRepositories(t)
+		refName := "refs/heads/controller-update"
+
+		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		networkKey := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+		if err := networkRootMetadata.AddPrimaryRuleFilePrincipal(networkKey); err != nil {
+			t.Fatal(err)
+		}
+		networkRootEnvelope, err := dsse.CreateEnvelope(networkRootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkRootEnvelope, err = dsse.SignEnvelope(testCtx, networkRootEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsMetadata := InitializeTargetsMetadata()
+		if err := networkTargetsMetadata.AddPrincipal(networkKey); err != nil {
+			t.Fatal(err)
+		}
+		if err := networkTargetsMetadata.AddRule("allow-controller-update", []string{networkKey.KeyID}, []string{"git:" + refName}, 1); err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsEnvelope, err := dsse.CreateEnvelope(networkTargetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsEnvelope, err = dsse.SignEnvelope(testCtx, networkTargetsEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkState.Metadata.RootEnvelope = networkRootEnvelope
+		networkState.Metadata.TargetsEnvelope = networkTargetsEnvelope
+		if err := networkState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+		if err := networkState.Commit(networkRepository, "Add local policy\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := Apply(testCtx, networkRepository, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, rootKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, firstEntry, rootKeyBytes)
+		firstEntry.ID = firstEntryID
+		verifier := NewPolicyVerifier(networkRepository)
+		if err := verifier.VerifyRelativeForRef(testCtx, firstEntry, firstEntry, refName); err != nil {
+			t.Fatal(err)
+		}
+
+		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := controllerRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("controller-update", []string{"git:" + refName}, 2)); err != nil {
+			t.Fatal(err)
+		}
+
+		controllerRootEnvelope, err := dsse.CreateEnvelope(controllerRootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerRootEnvelope, err = dsse.SignEnvelope(testCtx, controllerRootEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerState.Metadata.RootEnvelope = controllerRootEnvelope
+		if err := controllerState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+		if err := controllerState.Commit(controllerRepository, "Add global rule\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := Apply(testCtx, controllerRepository, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, rootKeyBytes)
+		lastEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		lastEntryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, lastEntry, rootKeyBytes)
+		lastEntry.ID = lastEntryID
+
+		verifier = NewPolicyVerifier(networkRepository)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, lastEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
 	t.Run("no recovery, first entry is the very first entry", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"

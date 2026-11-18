@@ -13,22 +13,22 @@ gittuf verify-mergeable [flags]
 ### Options
 
 ```
-      --base-branch string      base branch for proposed merge
-      --bypass-RSL              bypass RSL when identifying current state of feature ref
-      --feature-branch string   feature branch for proposed merge
-  -h, --help                    help for verify-mergeable
+      --base-branch string        base branch for proposed merge
+      --bypass-RSL[=true|false]   bypass RSL when identifying current state of feature ref
+      --feature-branch string     feature branch for proposed merge
+  -h, --help[=true|false]         help for verify-mergeable
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO

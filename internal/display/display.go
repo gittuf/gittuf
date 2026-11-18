@@ -4,7 +4,6 @@
 package display
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -17,7 +16,7 @@ func NewDisplayWriter(output io.Writer) io.WriteCloser {
 	pagerProg := getPager()
 	if pagerProg != nil {
 		binary := pagerProg.getBinary()
-		slog.Debug(fmt.Sprintf("Found pager program %s", binary))
+		slog.Debug("Found pager program", "program", binary)
 
 		flags := pagerProg.getFlags()
 		cmd := exec.Command(binary, flags...)
@@ -81,13 +80,12 @@ type pagerEnvVar struct {
 
 func newPagerEnvVar() *pagerEnvVar {
 	env := os.Getenv("PAGER") // look at what the user has configured
-	env = strings.TrimSpace(env)
 
-	if env == "" {
+	split := strings.Fields(env)
+	if len(split) == 0 {
 		return &pagerEnvVar{}
 	}
 
-	split := strings.Split(env, " ")
 	return &pagerEnvVar{
 		binary: split[0],
 		flags:  split[1:],
@@ -114,14 +112,11 @@ func (p *pagerLess) getBinary() string {
 }
 
 func (p *pagerLess) getFlags() []string {
-	options := os.Getenv("LESS") // see if user already has preferred LESS flags
-	if options != "" {
-		flags := make([]string, 0, len(options))
-		split := strings.Split(options, "")
-		for _, s := range split {
-			flags = append(flags, fmt.Sprintf("-%s", s)) // we prefix the "-" as this is passed to exec.Command
-		}
-		return flags
+	// If the user already has preferred LESS flags, less reads them from the
+	// environment itself, so we must not pass them again as arguments. Doing
+	// so mangles values like "-R" or "--mouse" into filenames.
+	if os.Getenv("LESS") != "" {
+		return nil
 	}
 
 	// These are the default flags to use with less, matches what Git sets
