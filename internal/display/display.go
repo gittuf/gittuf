@@ -8,7 +8,10 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
+
+	"github.com/mattn/go-shellwords"
 )
 
 func NewDisplayWriter(output io.Writer) io.WriteCloser {
@@ -81,7 +84,23 @@ type pagerEnvVar struct {
 func newPagerEnvVar() *pagerEnvVar {
 	env := os.Getenv("PAGER") // look at what the user has configured
 
-	split := strings.Fields(env)
+	// go-shellwords treats a backslash as an escape character, so a Windows path
+	// like C:\Program Files\Git\usr\bin\less.exe would lose its separators when
+	// parsed. Doubling them keeps the path intact.
+	if runtime.GOOS == "windows" {
+		env = strings.ReplaceAll(env, `\`, `\\`)
+	}
+
+	parser := shellwords.NewParser()
+	parser.ParseEnv = false
+	parser.ParseBacktick = false
+
+	split, err := parser.Parse(env)
+
+	if err != nil {
+		slog.Debug("Unable to parse PAGER, using default pager", "error", err)
+		return &pagerEnvVar{}
+	}
 	if len(split) == 0 {
 		return &pagerEnvVar{}
 	}
