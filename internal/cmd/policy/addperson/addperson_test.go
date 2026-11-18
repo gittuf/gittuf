@@ -13,6 +13,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,6 +152,38 @@ func TestAddPerson(t *testing.T) {
 		}
 		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", newKeyPath+".pub", "--associated-identity", "github::jane-doe", "--custom", "department=engineering")
 		assert.NoError(t, err)
+	})
+
+	t.Run("person ID already exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		newKeyPath := filepath.Join(tmpDir, "new-test-key")
+		require.NoError(t, os.WriteFile(newKeyPath, artifacts.SSHRSAPrivate, 0o600))
+		require.NoError(t, os.WriteFile(newKeyPath+".pub", artifacts.SSHRSAPublicSSH, 0o600))
+
+		t.Chdir(tmpDir)
+
+		// Initialize the repository first
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
+
+		pOpts := &persistent.Options{
+			SigningKey: keyPath,
+		}
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", newKeyPath+".pub")
+		require.NoError(t, err)
+
+		_, _, _, err = cmd.ExecuteCommandC(New(pOpts), "--person-ID", "jane.doe@example.com", "--public-key", keyPath+".pub")
+		assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
 	})
 
 	t.Run("success with RSL entry", func(t *testing.T) {
