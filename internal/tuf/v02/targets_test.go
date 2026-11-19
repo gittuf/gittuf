@@ -70,28 +70,19 @@ func TestTargetsMetadataAndDelegations(t *testing.T) {
 
 		err = delegations.addPrincipal(nil)
 		assert.ErrorIs(t, err, tuf.ErrInvalidPrincipalType)
-	})
 
-	t.Run("test addPrincipal does not replace existing person", func(t *testing.T) {
-		delegations := &Delegations{}
-
-		err := delegations.addPrincipal(person)
-		assert.Nil(t, err)
+		// Existing principals are not replaced
+		err = delegations.addPrincipal(key)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
 
 		otherKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 		replacement := &Person{
 			PersonID:   person.PersonID,
 			PublicKeys: map[string]*Key{otherKey.KeyID: otherKey},
 		}
-
 		err = delegations.addPrincipal(replacement)
 		assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
 		assert.Equal(t, person, delegations.Principals[person.PersonID])
-
-		// updatePrincipal is the way to change an existing person
-		err = delegations.updatePrincipal(replacement)
-		assert.Nil(t, err)
-		assert.Equal(t, replacement, delegations.Principals[person.PersonID])
 	})
 
 	t.Run("test removePrincipal", func(t *testing.T) {

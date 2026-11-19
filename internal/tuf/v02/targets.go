@@ -341,8 +341,7 @@ func (d *Delegations) UnmarshalJSON(data []byte) error {
 }
 
 // addPrincipal adds a delegations key or person.  v02 supports Key and Person
-// as principal types. A person that already exists is not replaced, use
-// updatePrincipal to change one.
+// as principal types.
 func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 	if d.Principals == nil {
 		d.Principals = map[string]tuf.Principal{}
@@ -350,18 +349,18 @@ func (d *Delegations) addPrincipal(principal tuf.Principal) error {
 
 	switch principal := principal.(type) {
 	case *Key:
-		d.Principals[principal.ID()] = principal
 	case *Person:
 		if err := principal.Validate(); err != nil {
 			return err
 		}
-		if _, exists := d.Principals[principal.ID()]; exists {
-			return fmt.Errorf("%w: '%s'", tuf.ErrPrincipalAlreadyExists, principal.ID())
-		}
-		d.Principals[principal.ID()] = principal
 	default:
 		return tuf.ErrInvalidPrincipalType
 	}
+
+	if _, exists := d.Principals[principal.ID()]; exists {
+		return fmt.Errorf("%w: '%s'", tuf.ErrPrincipalAlreadyExists, principal.ID())
+	}
+	d.Principals[principal.ID()] = principal
 
 	return nil
 }
